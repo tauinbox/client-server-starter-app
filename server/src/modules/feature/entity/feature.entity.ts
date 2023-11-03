@@ -2,13 +2,13 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  PrimaryColumn,
+  PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 
 @Entity('feature')
 export class FeatureEntity {
-  @PrimaryColumn('uuid', { nullable: false })
+  @PrimaryGeneratedColumn('identity', { generatedIdentity: 'ALWAYS' })
   id: number;
 
   @Column({ name: 'name', type: 'text', nullable: false })
