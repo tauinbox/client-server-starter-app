@@ -3,6 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import configuration from './configuration';
 import { CacheModule } from '@nestjs/cache-manager';
 import { FeatureModule } from '../feature/featureModule';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ormConfig } from '../../orm.config';
 
 @Module({})
 export class CoreModule {
@@ -18,6 +20,7 @@ export class CoreModule {
         CacheModule.register({
           isGlobal: true,
         }),
+        TypeOrmModule.forRootAsync({ imports: [], useFactory: ormConfig }),
         FeatureModule,
       ],
       providers: [],
