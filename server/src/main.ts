@@ -20,6 +20,7 @@ async function bootstrap() {
   const app = await NestFactory.create(CoreModule.forRoot(), {
     cors: true,
     bufferLogs: true,
+    logger: ['fatal', 'error', 'warn', 'log'],
   });
 
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
