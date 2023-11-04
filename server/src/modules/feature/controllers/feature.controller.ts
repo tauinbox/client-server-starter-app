@@ -42,7 +42,9 @@ export class FeatureController {
   })
   @Get('entities')
   @ApiQuery({ name: 'searchTerm', required: false, type: String })
-  getEntities(@Query('searchTerm') searchTerm?: string): FeatureEntityDto[] {
+  getEntities(
+    @Query('searchTerm') searchTerm?: string,
+  ): Promise<FeatureEntityDto[]> {
     return this.featureService.getEntities(searchTerm);
   }
 
@@ -52,7 +54,7 @@ export class FeatureController {
   })
   @ApiNotFoundResponse({ description: 'Not found Error' })
   @Get('entities/:id')
-  getEntity(@Param('id', ParseIntPipe) id: number): FeatureEntityDto {
+  getEntity(@Param('id', ParseIntPipe) id: number): Promise<FeatureEntityDto> {
     return this.featureService.getEntityById(id);
   }
 }
