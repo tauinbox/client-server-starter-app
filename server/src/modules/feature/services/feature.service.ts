@@ -20,8 +20,8 @@ export class FeatureService {
   }
 
   getConfigParams() {
-    const { api, token } = this.configService.get('myProject');
-    return `API url: ${api}, Token: ${token}`;
+    const { api, token } = this.configService.get('externalProject');
+    return `External API url: ${api}, Token: ${token}`;
   }
 
   async getEntities(searchTerm?: string): Promise<FeatureEntityDto[]> {
