@@ -46,9 +46,12 @@ async function bootstrap() {
     customCss: '',
   });
 
-  await app.listen(
-    process.env.ENVIRONMENT ? Number(process.env.ENVIRONMENT) : 3000,
-  );
+  const port = process.env.APPLICATION_PORT
+    ? Number(process.env.APPLICATION_PORT)
+    : 3000;
+
+  await app.listen(port);
+  console.log(`Server started listening on port ${port}`);
 }
 
 bootstrap();
