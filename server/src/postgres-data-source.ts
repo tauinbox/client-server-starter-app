@@ -5,6 +5,7 @@ import { postgresConfig } from './postgres.config';
 dotenv.config();
 
 const postgresDataSource = new DataSource(postgresConfig());
+
 postgresDataSource
   .initialize()
   .then(() => {
@@ -13,4 +14,5 @@ postgresDataSource
   .catch((err) => {
     console.error('Error during Data Source initialization', err);
   });
+
 export default postgresDataSource;
