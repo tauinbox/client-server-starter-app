@@ -1,5 +1,11 @@
-@for (entity of featureEntities$ | async; track entity.id) {
-  <div>
-    <span>{{entity.id}} - {{entity.name}}</span>
-  </div>
+@if (isLoading()) {
+  Loading...
+} @else {
+  @for (entity of entities(); track entity.id) {
+    <div>
+      <span>{{entity.id}} - {{entity.name}}</span>
+    </div>
+  } @empty {
+    There are no entities
+  }
 }

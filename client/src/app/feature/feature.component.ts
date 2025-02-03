@@ -1,12 +1,10 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FeatureApiService } from './feature-api.service';
-import { AsyncPipe } from '@angular/common';
+import { rxResource } from '@angular/core/rxjs-interop';
 
 @Component({
     selector: 'app-feature',
-  imports: [
-    AsyncPipe
-  ],
+  imports: [],
     templateUrl: './feature.component.html',
     styleUrl: './feature.component.scss',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -14,5 +12,8 @@ import { AsyncPipe } from '@angular/common';
 export class FeatureComponent {
   private readonly featureApi = inject(FeatureApiService);
 
-  featureEntities$ = this.featureApi.getFeatureEntities();
+  private readonly featureResource = rxResource({loader:  () => this.featureApi.getFeatureEntities()});
+
+  protected entities = this.featureResource.value;
+  protected isLoading = this.featureResource.isLoading;
 }
