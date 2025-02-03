@@ -1,3 +1,5 @@
-<div *ngFor='let entity of featureEntities$ | async'>
-  <span>{{entity.id}} - {{entity.name}}</span>
-</div>
+@for (entity of featureEntities$ | async; track entity.id) {
+  <div>
+    <span>{{entity.id}} - {{entity.name}}</span>
+  </div>
+}

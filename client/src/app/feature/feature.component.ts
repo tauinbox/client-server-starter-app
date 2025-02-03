@@ -1,10 +1,12 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FeatureApiService } from './feature-api.service';
+import { AsyncPipe } from '@angular/common';
 
 @Component({
     selector: 'app-feature',
-    imports: [CommonModule],
+  imports: [
+    AsyncPipe
+  ],
     templateUrl: './feature.component.html',
     styleUrl: './feature.component.scss',
     changeDetection: ChangeDetectionStrategy.OnPush
