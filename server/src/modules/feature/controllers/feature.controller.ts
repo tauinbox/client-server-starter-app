@@ -1,12 +1,18 @@
 import {
+  Body,
   Controller,
+  Delete,
   Get,
   Header,
   HttpCode,
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
+  Post,
   Query,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { FeatureService } from '../services/feature.service';
 import {
@@ -18,6 +24,8 @@ import {
 } from '@nestjs/swagger';
 import { FeatureEntityDto } from '../dto/feature-entity.dto';
 import { FeatureConfigDto } from '../dto/feature-config.dto';
+import { FeatureEntityCreateDto } from '../dto/feature-entity-create.dto';
+import { FeatureEntityUpdateDto } from '../dto/feature-entity-update.dto';
 
 @ApiTags('Feature API')
 @Controller({
@@ -27,7 +35,7 @@ import { FeatureConfigDto } from '../dto/feature-config.dto';
 export class FeatureController {
   constructor(private readonly featureService: FeatureService) {}
 
-  @ApiOperation({ summary: 'Returns Hello World!' })
+  @ApiOperation({ summary: 'Returns feature description' })
   @ApiOkResponse({
     type: String,
   })
@@ -35,10 +43,10 @@ export class FeatureController {
   @Header('Content-Type', 'text/plain')
   @Get()
   getHello(): string {
-    return this.featureService.getHello();
+    return this.featureService.getDescription();
   }
 
-  @ApiOperation({ summary: 'Returns Config' })
+  @ApiOperation({ summary: 'Returns feature config' })
   @ApiOkResponse({
     type: FeatureConfigDto,
   })
@@ -47,7 +55,7 @@ export class FeatureController {
     return this.featureService.getConfigParams();
   }
 
-  @ApiOperation({ summary: 'Returns list of feature entities' })
+  @ApiOperation({ summary: 'Returns list of entities' })
   @ApiOkResponse({
     type: FeatureEntityDto,
     isArray: true,
@@ -60,6 +68,14 @@ export class FeatureController {
     return this.featureService.getEntities(searchTerm);
   }
 
+  @ApiOperation({ summary: 'Creates new entity' })
+  @HttpCode(HttpStatus.CREATED)
+  @UsePipes(ValidationPipe)
+  @Post('entities')
+  createEntity(@Body() data: FeatureEntityCreateDto): Promise<{ id: number }> {
+    return this.featureService.createEntity(data);
+  }
+
   @ApiOperation({ summary: 'Returns entity by ID' })
   @ApiOkResponse({
     type: FeatureEntityDto,
@@ -68,5 +84,25 @@ export class FeatureController {
   @Get('entities/:id')
   getEntity(@Param('id', ParseIntPipe) id: number): Promise<FeatureEntityDto> {
     return this.featureService.getEntityById(id);
+  }
+
+  @ApiOperation({ summary: 'Updates entity by ID' })
+  @ApiOkResponse({
+    type: FeatureEntityDto,
+  })
+  @UsePipes(ValidationPipe)
+  @Patch('entities/:id')
+  updateEntity(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: FeatureEntityUpdateDto,
+  ): Promise<FeatureEntityDto> {
+    return this.featureService.updateEntity(id, data);
+  }
+
+  @ApiOperation({ summary: 'Deletes entity by ID' })
+  @ApiNotFoundResponse({ description: 'Not found Error' })
+  @Delete('entities/:id')
+  deleteEntity(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    return this.featureService.deleteEntity(id);
   }
 }

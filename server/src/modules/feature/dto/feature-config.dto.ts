@@ -1,12 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Optional } from '@nestjs/common';
+import { IsOptional } from 'class-validator';
 
 export class FeatureConfigDto {
   @ApiProperty({ description: 'External API URL' })
-  @Optional()
+  @IsOptional()
   api?: string;
 
   @ApiProperty({ description: 'External API token' })
-  @Optional()
+  @IsOptional()
   token?: string;
 }
