@@ -1,4 +1,13 @@
-import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Query,
+} from '@nestjs/common';
 import { FeatureService } from '../services/feature.service';
 import {
   ApiNotFoundResponse,
@@ -8,6 +17,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { FeatureEntityDto } from '../dto/feature-entity.dto';
+import { FeatureConfigDto } from '../dto/feature-config.dto';
 
 @ApiTags('Feature API')
 @Controller({
@@ -21,17 +31,19 @@ export class FeatureController {
   @ApiOkResponse({
     type: String,
   })
+  @HttpCode(HttpStatus.OK)
+  @Header('Content-Type', 'text/plain')
   @Get()
   getHello(): string {
     return this.featureService.getHello();
   }
 
-  @ApiOperation({ summary: 'Returns Config Params' })
+  @ApiOperation({ summary: 'Returns Config' })
   @ApiOkResponse({
-    type: String,
+    type: FeatureConfigDto,
   })
   @Get('config')
-  getConfigParams(): string {
+  getConfigParams(): FeatureConfigDto {
     return this.featureService.getConfigParams();
   }
 
