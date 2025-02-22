@@ -1,12 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { FeatureEntityInterface } from '../interfaces/feature-entity.interface';
-import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 
-export class FeatureEntityDto implements FeatureEntityInterface {
-  @ApiProperty({ description: 'Unique identifier' })
-  @IsNumber()
-  id: number;
-
+export class FeatureEntityCreateDto implements FeatureEntityInterface {
   @ApiProperty({ description: 'Entity name' })
   @IsString()
   @IsNotEmpty()
