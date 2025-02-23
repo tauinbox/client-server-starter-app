@@ -12,7 +12,6 @@ import {
   Post,
   Query,
   UsePipes,
-  ValidationPipe,
 } from '@nestjs/common';
 import { FeatureService } from '../services/feature.service';
 import {
@@ -26,6 +25,9 @@ import { FeatureEntityDto } from '../dto/feature-entity.dto';
 import { FeatureConfigDto } from '../dto/feature-config.dto';
 import { FeatureEntityCreateDto } from '../dto/feature-entity-create.dto';
 import { FeatureEntityUpdateDto } from '../dto/feature-entity-update.dto';
+import { NameValidatorPipe } from '../pipes/name-validator.pipe';
+
+// We use Validation pipe globally in main.ts so it will apply to all the methods here
 
 @ApiTags('Feature API')
 @Controller({
@@ -70,9 +72,11 @@ export class FeatureController {
 
   @ApiOperation({ summary: 'Creates new entity' })
   @HttpCode(HttpStatus.CREATED)
-  @UsePipes(ValidationPipe)
+  @UsePipes(NameValidatorPipe)
   @Post('entities')
   createEntity(@Body() data: FeatureEntityCreateDto): Promise<{ id: number }> {
+    // we use @Body decorator here
+    // so the NameValidatorPipe pipe will apply to its data
     return this.featureService.createEntity(data);
   }
 
@@ -90,7 +94,6 @@ export class FeatureController {
   @ApiOkResponse({
     type: FeatureEntityDto,
   })
-  @UsePipes(ValidationPipe)
   @Patch('entities/:id')
   updateEntity(
     @Param('id', ParseIntPipe) id: number,
