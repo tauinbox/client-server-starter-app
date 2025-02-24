@@ -23,7 +23,12 @@ async function bootstrap() {
     logger: ['fatal', 'error', 'warn', 'log'],
   });
 
-  app.useGlobalPipes(new ValidationPipe({ transform: true }));
+  app.useGlobalPipes(
+    new ValidationPipe(
+      // This allows to automatically transform the incoming request payloads into DTO instances before validating them
+      { transform: true },
+    ),
+  );
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI });
 
