@@ -27,7 +27,8 @@ import { FeatureConfigDto } from '../dtos/feature-config.dto';
 import { FeatureEntityCreateDto } from '../dtos/feature-entity-create.dto';
 import { FeatureEntityUpdateDto } from '../dtos/feature-entity-update.dto';
 import { NameValidatorPipe } from '../pipes/name-validator.pipe';
-import { FeatureGuard } from '../guards/feature.guard';
+import { FeatureControllerGuard } from '../guards/feature-controller.guard';
+import { FeatureMethodGuard } from '../guards/feature-method.guard';
 
 // We use Validation pipe globally in main.ts so it will apply to all the methods here
 
@@ -36,7 +37,7 @@ import { FeatureGuard } from '../guards/feature.guard';
   path: 'feature',
   version: '1',
 })
-@UseGuards(FeatureGuard) // we can use guards at the controller level as well as on its methods
+@UseGuards(FeatureControllerGuard) // applies to all controller methods
 export class FeatureController {
   constructor(private readonly featureService: FeatureService) {}
 
@@ -76,6 +77,7 @@ export class FeatureController {
   @ApiOperation({ summary: 'Creates new entity' })
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(NameValidatorPipe)
+  @UseGuards(FeatureMethodGuard)
   @Post('entities')
   createEntity(@Body() data: FeatureEntityCreateDto): Promise<{ id: number }> {
     // we use @Body decorator here
