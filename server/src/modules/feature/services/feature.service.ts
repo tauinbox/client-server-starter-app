@@ -1,12 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { FeatureEntityDto } from '../dto/feature-entity.dto';
+import { FeatureEntityDto } from '../dtos/feature-entity.dto';
 import { plainToInstance } from 'class-transformer';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FeatureEntity } from '../entity/feature.entity';
+import { FeatureEntity } from '../entities/feature.entity';
 import { Repository } from 'typeorm';
-import { FeatureEntityCreateDto } from '../dto/feature-entity-create.dto';
-import { FeatureEntityUpdateDto } from '../dto/feature-entity-update.dto';
+import { FeatureEntityCreateDto } from '../dtos/feature-entity-create.dto';
+import { FeatureEntityUpdateDto } from '../dtos/feature-entity-update.dto';
 
 @Injectable()
 export class FeatureService {

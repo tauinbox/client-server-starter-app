@@ -11,6 +11,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
   UsePipes,
 } from '@nestjs/common';
 import { FeatureService } from '../services/feature.service';
@@ -21,11 +22,12 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { FeatureEntityDto } from '../dto/feature-entity.dto';
-import { FeatureConfigDto } from '../dto/feature-config.dto';
-import { FeatureEntityCreateDto } from '../dto/feature-entity-create.dto';
-import { FeatureEntityUpdateDto } from '../dto/feature-entity-update.dto';
+import { FeatureEntityDto } from '../dtos/feature-entity.dto';
+import { FeatureConfigDto } from '../dtos/feature-config.dto';
+import { FeatureEntityCreateDto } from '../dtos/feature-entity-create.dto';
+import { FeatureEntityUpdateDto } from '../dtos/feature-entity-update.dto';
 import { NameValidatorPipe } from '../pipes/name-validator.pipe';
+import { FeatureGuard } from '../guards/feature.guard';
 
 // We use Validation pipe globally in main.ts so it will apply to all the methods here
 
@@ -34,6 +36,7 @@ import { NameValidatorPipe } from '../pipes/name-validator.pipe';
   path: 'feature',
   version: '1',
 })
+@UseGuards(FeatureGuard) // we can use guards at the controller level as well as on its methods
 export class FeatureController {
   constructor(private readonly featureService: FeatureService) {}
 

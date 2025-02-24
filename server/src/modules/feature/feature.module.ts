@@ -2,13 +2,14 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { FeatureController } from './controllers/feature.controller';
 import { FeatureService } from './services/feature.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { FeatureEntity } from './entity/feature.entity';
+import { FeatureEntity } from './entities/feature.entity';
 import { LoggingMiddleware } from './middlewares/logging.middleware';
+import { FeatureGuard } from './guards/feature.guard';
 
 @Module({
   imports: [TypeOrmModule.forFeature([FeatureEntity])],
   controllers: [FeatureController],
-  providers: [FeatureService],
+  providers: [FeatureService, FeatureGuard],
   exports: [FeatureService],
 })
 export class FeatureModule implements NestModule {
