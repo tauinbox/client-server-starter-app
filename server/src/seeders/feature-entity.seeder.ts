@@ -1,5 +1,5 @@
 import { Seeder } from '@jorgebodega/typeorm-seeding';
-import { FeatureEntity } from '../modules/feature/entity/feature.entity';
+import { FeatureEntity } from '../modules/feature/entities/feature.entity';
 import { DataSource } from 'typeorm';
 
 export default class FeatureEntitySeeder extends Seeder {
