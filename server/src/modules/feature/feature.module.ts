@@ -14,7 +14,10 @@ import { LoggingMiddleware } from './middlewares/logging.middleware';
 export class FeatureModule implements NestModule {
   // to add middleware our module has to implement NestModule interface
 
-  configure(consumer: MiddlewareConsumer): any {
+  configure(consumer: MiddlewareConsumer) {
     consumer.apply(LoggingMiddleware).forRoutes('*'); // configure middleware to match all the routes
+
+    // .forRoutes({ path: '*', method: RequestMethod.ALL }); // another approach to configure it with method
+    // or if we want to apply middleware to a specific controller we can use: .forRoutes(FeatureController)
   }
 }
