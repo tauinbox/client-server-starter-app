@@ -4,12 +4,13 @@ import { FeatureService } from './services/feature.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FeatureEntity } from './entities/feature.entity';
 import { LoggingMiddleware } from './middlewares/logging.middleware';
-import { FeatureGuard } from './guards/feature.guard';
+import { FeatureControllerGuard } from './guards/feature-controller.guard';
+import { FeatureMethodGuard } from './guards/feature-method.guard';
 
 @Module({
   imports: [TypeOrmModule.forFeature([FeatureEntity])],
   controllers: [FeatureController],
-  providers: [FeatureService, FeatureGuard],
+  providers: [FeatureService, FeatureControllerGuard, FeatureMethodGuard],
   exports: [FeatureService],
 })
 export class FeatureModule implements NestModule {
