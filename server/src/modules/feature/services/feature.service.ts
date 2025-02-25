@@ -37,11 +37,11 @@ export class FeatureService {
     return plainToInstance(FeatureEntityDto, result);
   }
 
-  async createEntity(entity: FeatureEntityCreateDto): Promise<{ id: number }> {
-    const featureEntity = new FeatureEntity();
-    featureEntity.name = entity.name;
+  async createEntity(dto: FeatureEntityCreateDto): Promise<{ id: number }> {
+    const { name } = dto;
+    const entity = this.featureEntityRepository.create({ name });
 
-    const { id } = await this.featureEntityRepository.save(featureEntity);
+    const { id } = await this.featureEntityRepository.save(entity);
 
     return { id };
   }
