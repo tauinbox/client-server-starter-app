@@ -29,6 +29,8 @@ import { FeatureEntityUpdateDto } from '../dtos/feature-entity-update.dto';
 import { NameValidatorPipe } from '../pipes/name-validator.pipe';
 import { FeatureControllerGuard } from '../guards/feature-controller.guard';
 import { FeatureMethodGuard } from '../guards/feature-method.guard';
+import { RolesEnum } from '../enums/roles.enum';
+import { Roles } from '../decorators/roles.decorator';
 
 // We use Validation pipe globally in main.ts so it will apply to all the methods here
 
@@ -47,6 +49,7 @@ export class FeatureController {
   })
   @HttpCode(HttpStatus.OK)
   @Header('Content-Type', 'text/plain')
+  @Roles(RolesEnum.User) // here is our custom Roles metadata decorator
   @Get()
   getHello(): string {
     return this.featureService.getDescription();
@@ -56,6 +59,9 @@ export class FeatureController {
   @ApiOkResponse({
     type: FeatureConfigDto,
   })
+  // we can access this metadata in a guard
+  // @SetMetadata(MetadataKeysEnum.Roles, [RolesEnum.Admin]) // bad practice, the better way is to create a custom decorator
+  @Roles(RolesEnum.Admin, RolesEnum.User) // here is our custom Roles metadata decorator
   @Get('config')
   getConfigParams(): FeatureConfigDto {
     return this.featureService.getConfigParams();

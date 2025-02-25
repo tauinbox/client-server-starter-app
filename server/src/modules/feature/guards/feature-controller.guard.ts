@@ -1,9 +1,15 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { FeatureController } from '../controllers/feature.controller';
+import { Reflector } from '@nestjs/core';
+import { MetadataKeysEnum } from '../enums/metadata-keys.enum';
+import { RolesEnum } from '../enums/roles.enum';
 
 @Injectable()
 export class FeatureControllerGuard implements CanActivate {
+  constructor(private reflector: Reflector) {}
+  // Reflector allows access to metadata assigned to the methods or classes
+
   canActivate(
     context: ExecutionContext,
   ): boolean | Promise<boolean> | Observable<boolean> {
@@ -13,10 +19,20 @@ export class FeatureControllerGuard implements CanActivate {
 
     if (controllerClass === FeatureController) {
       console.log(
-        '[FeatureControllerGuard] - We can allow routes of this controller',
+        '[FeatureControllerGuard] We can allow routes of this controller',
       );
 
       // or we can throw new UnauthorizedException() / new ForbiddenException() otherwise
+    }
+
+    const roles = this.reflector.get<RolesEnum[]>(
+      MetadataKeysEnum.Roles,
+      context.getHandler(),
+    );
+
+    if (roles) {
+      // Here we have assigned metadata
+      console.log('[FeatureControllerGuard] Assigned roles:', roles);
     }
 
     return true;
