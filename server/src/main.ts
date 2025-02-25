@@ -1,9 +1,10 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { CoreModule } from './modules/core/core.module';
 import { Module, ValidationPipe, VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigModule } from '@nestjs/config';
 import configuration from './modules/core/configuration';
+import { FeatureService } from './modules/feature/services/feature.service';
 
 @Module({
   imports: [
@@ -22,6 +23,10 @@ async function bootstrap() {
     bufferLogs: true,
     logger: ['fatal', 'error', 'warn', 'log'],
   });
+
+  // here is the way how we can get instances to pass them as dependencies into class constructors (when needed)
+  const reflector = app.get(Reflector);
+  const featureService = app.get(FeatureService);
 
   app.useGlobalPipes(
     new ValidationPipe(
