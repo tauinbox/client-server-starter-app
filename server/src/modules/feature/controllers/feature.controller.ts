@@ -12,6 +12,7 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
   UsePipes,
 } from '@nestjs/common';
 import { FeatureService } from '../services/feature.service';
@@ -31,6 +32,7 @@ import { FeatureControllerGuard } from '../guards/feature-controller.guard';
 import { FeatureMethodGuard } from '../guards/feature-method.guard';
 import { RolesEnum } from '../enums/roles.enum';
 import { Roles } from '../decorators/roles.decorator';
+import { FeatureInterceptor } from '../interceptors/feature.interceptor';
 
 // We use Validation pipe globally in main.ts so it will apply to all the methods here
 
@@ -62,6 +64,7 @@ export class FeatureController {
   // we can access this metadata in a guard
   // @SetMetadata(MetadataKeysEnum.Roles, [RolesEnum.Admin]) // bad practice, the better way is to create a custom decorator
   @Roles(RolesEnum.Admin, RolesEnum.User) // here is our custom Roles metadata decorator
+  @UseInterceptors(FeatureInterceptor) // Apply interceptor at the method level
   @Get('config')
   getConfigParams(): FeatureConfigDto {
     return this.featureService.getConfigParams();
@@ -72,8 +75,8 @@ export class FeatureController {
     type: FeatureEntityDto,
     isArray: true,
   })
-  @Get('entities')
   @ApiQuery({ name: 'searchTerm', required: false, type: String })
+  @Get('entities')
   getEntities(
     @Query('searchTerm') searchTerm?: string,
   ): Promise<FeatureEntityDto[]> {
@@ -105,6 +108,7 @@ export class FeatureController {
   @ApiOkResponse({
     type: FeatureEntityDto,
   })
+  @ApiNotFoundResponse({ description: 'Not found Error' })
   @Patch('entities/:id')
   updateEntity(
     @Param('id', ParseIntPipe) id: number,
