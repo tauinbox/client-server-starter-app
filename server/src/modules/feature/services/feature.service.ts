@@ -66,11 +66,19 @@ export class FeatureService {
       throw new NotFoundException(`Unable to find entity with id=[${id}]`);
     }
 
-    entity = await this.featureEntityRepository.save({ ...entity, ...changes });
+    this.featureEntityRepository.merge(entity, changes);
+    entity = await this.featureEntityRepository.save(entity);
+
     return plainToInstance(FeatureEntityDto, entity);
   }
 
   async deleteEntity(id: number): Promise<void> {
-    await this.featureEntityRepository.delete(id);
+    const entity = await this.featureEntityRepository.findOneBy({ id });
+
+    if (!entity) {
+      throw new NotFoundException(`Unable to find entity with id=[${id}]`);
+    }
+
+    await this.featureEntityRepository.remove(entity);
   }
 }
