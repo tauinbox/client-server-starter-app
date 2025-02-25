@@ -11,4 +11,10 @@ export class FeatureEntityDto implements FeatureEntityInterface {
   @IsString()
   @IsNotEmpty()
   name: string;
+
+  @ApiProperty({ description: 'Creation date' })
+  createdAt: string;
+
+  @ApiProperty({ description: 'Date of last update' })
+  updatedAt: string;
 }
