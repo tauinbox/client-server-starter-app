@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigModule } from '@nestjs/config';
 import configuration from './modules/core/configuration';
 import { FeatureService } from './modules/feature/services/feature.service';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 @Module({
   imports: [
@@ -18,11 +19,14 @@ import { FeatureService } from './modules/feature/services/feature.service';
 class BootstrapModule {}
 
 async function bootstrap() {
-  const app = await NestFactory.create(CoreModule.forRoot(), {
-    cors: true,
-    bufferLogs: true,
-    logger: ['fatal', 'error', 'warn', 'log'],
-  });
+  const app = await NestFactory.create<NestExpressApplication>(
+    CoreModule.forRoot(),
+    {
+      cors: true,
+      bufferLogs: true,
+      logger: ['fatal', 'error', 'warn', 'log'],
+    },
+  );
 
   // here is the way how we can get instances to pass them as dependencies into class constructors (when needed)
   const reflector = app.get(Reflector);
