@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpEvent, HttpEventType, HttpResponse } from '@angular/common/http';
 import { FeatureEntityResponse } from './types/feature';
+import { Observable } from 'rxjs';
 
 const FEATURE_API_V1 = '/api/v1/feature';
 
@@ -20,5 +21,15 @@ export class FeatureApiService {
 
   getFeatureEntities() {
     return this.http.get<FeatureEntityResponse[]>(`${FEATURE_API_V1}/entities`);
+  }
+
+  uploadFile(file: File): Observable<HttpEvent<HttpEventType> | HttpResponse<void>> {
+    const formData = new FormData(); // we have to upload it as multipart/form-data
+    formData.append('upload-artifact', file); // here we construct the payload
+    
+    return this.http.post<void>(`${FEATURE_API_V1}/upload`, formData, {
+      reportProgress: true,
+      observe: 'events',
+    });
   }
 }
