@@ -1,3 +1,5 @@
+<input #input type='file' (change)='onFilesSelected($event, input)' multiple>
+
 @if (isLoading()) {
   Loading...
 } @else {

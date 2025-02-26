@@ -2,6 +2,9 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { FeatureApiService } from './feature-api.service';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { JsonPipe } from '@angular/common';
+import { merge } from 'rxjs';
+
+type FileInputEvent = Event & { target: EventTarget & { files: FileList } };
 
 @Component({
     selector: 'app-feature',
@@ -24,4 +27,12 @@ export class FeatureComponent {
   protected entities = this.entitiesResource.value;
 
   protected isLoading = computed(() => this.descriptionResource.isLoading() || this.configResource.isLoading() || this.entitiesResource.isLoading());
+
+  onFilesSelected(event: Event, input: HTMLInputElement) {
+    const files = Array.from((event as FileInputEvent).target.files);
+
+    merge(...files.map(file => this.featureApi.uploadFile(file))).subscribe(() => {
+      input.value = ''; // to reset input
+    });
+  }
 }

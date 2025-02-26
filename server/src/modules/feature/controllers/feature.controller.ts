@@ -11,6 +11,7 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
   UseInterceptors,
   UsePipes,
@@ -33,6 +34,10 @@ import { FeatureMethodGuard } from '../guards/feature-method.guard';
 import { RolesEnum } from '../enums/roles.enum';
 import { Roles } from '../decorators/roles.decorator';
 import { FeatureInterceptor } from '../interceptors/feature.interceptor';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import e from 'express';
+import { FeatureUploadDto } from '../dtos/feature-upload.dto';
 
 // We use Validation pipe globally in main.ts so it will apply to all the methods here
 
@@ -122,5 +127,35 @@ export class FeatureController {
   @Delete('entities/:id')
   deleteEntity(@Param('id', ParseIntPipe) id: number): Promise<void> {
     return this.featureService.deleteEntity(id);
+  }
+
+  @ApiOperation({ summary: 'Uploads file' })
+  @UseInterceptors(
+    // 'upload-artifact' is a name of attribute within received multipart/form-data containing the file data
+    FileInterceptor('upload-artifact', {
+      storage: diskStorage({
+        destination: './public/uploads',
+        filename(
+          req: e.Request,
+          file: Express.Multer.File,
+          callback: (error: Error | null, filename: string) => void,
+        ) {
+          callback(
+            null,
+            `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.originalname}`,
+          );
+        },
+      }),
+    }),
+  )
+  @Post('upload')
+  upload(
+    @Body() dto: FeatureUploadDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (file) {
+      dto.filename = file.filename;
+      console.log('Stored file:', dto);
+    }
   }
 }

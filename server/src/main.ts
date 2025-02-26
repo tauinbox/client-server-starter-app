@@ -6,6 +6,7 @@ import { ConfigModule } from '@nestjs/config';
 import configuration from './modules/core/configuration';
 import { FeatureService } from './modules/feature/services/feature.service';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ async function bootstrap() {
       { transform: true },
     ),
   );
+  app.useStaticAssets(join(__dirname, '..', 'public'));
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI });
 
