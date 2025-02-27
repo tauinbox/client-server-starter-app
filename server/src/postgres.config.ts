@@ -27,8 +27,8 @@ export const postgresConfig: () => PostgresConnectionOptions = () => ({
       : (process.env.DB_LOGGING as LoggerOptions)
     : localConfig.logging,
   logger: (process.env.DB_LOGGER as any) || localConfig.logger,
-  migrationsRun: false,
-  synchronize: false,
+  migrationsRun: false, // automatically run migrations on startup
+  synchronize: process.env.ENVIRONMENT === 'local', // should be false for production
   entities: [__dirname + '/modules/**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/migrations/*{ts,.js}'],
   applicationName: 'Starter Project',
