@@ -53,11 +53,12 @@ async function bootstrap() {
     .setTitle('Swagger')
     .setDescription('Starter Project API')
     .setContact(
-      'In case of any questions, feel free to ask',
-      'support.url',
-      'support@email',
+      'Alexander Tupavov',
+      'https://github.com/tauinbox',
+      'tauinbox@gmail.com',
     )
     .setVersion('1.0')
+    .addBearerAuth()
     .addServer('/')
     .build();
 
