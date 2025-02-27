@@ -3,10 +3,12 @@ import { CoreModule } from './modules/core/core.module';
 import { Module, ValidationPipe, VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigModule } from '@nestjs/config';
+import * as compression from 'compression';
 import configuration from './modules/core/configuration';
 import { FeatureService } from './modules/feature/services/feature.service';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import * as cookieParser from 'cookie-parser';
 
 @Module({
   imports: [
@@ -42,6 +44,8 @@ async function bootstrap() {
   app.useStaticAssets(join(__dirname, '..', 'public'));
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI });
+  app.use(compression());
+  app.use(cookieParser()); // this wil allow to get parsed cookie from req.cookies instead of req.get('Cookie')
 
   const config = new DocumentBuilder()
     .setTitle('Swagger')
