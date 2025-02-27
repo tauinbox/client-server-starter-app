@@ -3,7 +3,7 @@ import { Observable } from 'rxjs';
 import { FeatureController } from '../controllers/feature.controller';
 import { Reflector } from '@nestjs/core';
 import { MetadataKeysEnum } from '../enums/metadata-keys.enum';
-import { RolesEnum } from '../enums/roles.enum';
+import { FeatureRolesEnum } from '../enums/feature-roles.enum';
 
 @Injectable()
 export class FeatureControllerGuard implements CanActivate {
@@ -25,7 +25,7 @@ export class FeatureControllerGuard implements CanActivate {
       // or we can throw new UnauthorizedException() / new ForbiddenException() otherwise
     }
 
-    const roles = this.reflector.get<RolesEnum[]>(
+    const roles = this.reflector.get<FeatureRolesEnum[]>(
       MetadataKeysEnum.Roles,
       context.getHandler(),
     );

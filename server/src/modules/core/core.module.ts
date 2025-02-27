@@ -5,6 +5,8 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { FeatureModule } from '../feature/feature.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { postgresConfig } from '../../postgres.config';
+import { UsersModule } from '../users/users.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({})
 export class CoreModule {
@@ -21,6 +23,8 @@ export class CoreModule {
           isGlobal: true,
         }),
         TypeOrmModule.forRootAsync({ imports: [], useFactory: postgresConfig }),
+        AuthModule,
+        UsersModule,
         FeatureModule,
       ],
       providers: [],
