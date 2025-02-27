@@ -31,8 +31,8 @@ import { FeatureEntityUpdateDto } from '../dtos/feature-entity-update.dto';
 import { NameValidatorPipe } from '../pipes/name-validator.pipe';
 import { FeatureControllerGuard } from '../guards/feature-controller.guard';
 import { FeatureMethodGuard } from '../guards/feature-method.guard';
-import { RolesEnum } from '../enums/roles.enum';
-import { Roles } from '../decorators/roles.decorator';
+import { FeatureRolesEnum } from '../enums/feature-roles.enum';
+import { FeatureRoles } from '../decorators/feature-roles.decorator';
 import { FeatureInterceptor } from '../interceptors/feature.interceptor';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -56,7 +56,7 @@ export class FeatureController {
   })
   @HttpCode(HttpStatus.OK)
   @Header('Content-Type', 'text/plain')
-  @Roles(RolesEnum.User) // here is our custom Roles metadata decorator
+  @FeatureRoles(FeatureRolesEnum.User) // here is our custom Roles metadata decorator
   @Get()
   getHello(): string {
     return this.featureService.getDescription();
@@ -68,7 +68,7 @@ export class FeatureController {
   })
   // we can access this metadata in a guard
   // @SetMetadata(MetadataKeysEnum.Roles, [RolesEnum.Admin]) // bad practice, the better way is to create a custom decorator
-  @Roles(RolesEnum.Admin, RolesEnum.User) // here is our custom Roles metadata decorator
+  @FeatureRoles(FeatureRolesEnum.Admin, FeatureRolesEnum.User) // here is our custom Roles metadata decorator
   @UseInterceptors(FeatureInterceptor) // Apply interceptor at the method level
   @Get('config')
   getConfigParams(): FeatureConfigDto {
