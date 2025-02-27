@@ -9,6 +9,7 @@ import { FeatureService } from './modules/feature/services/feature.service';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import * as cookieParser from 'cookie-parser';
+import { corsOptions } from './cors-options';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ async function bootstrap() {
       { transform: true },
     ),
   );
+  app.enableCors(corsOptions());
   app.useStaticAssets(join(__dirname, '..', 'public'));
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI });
