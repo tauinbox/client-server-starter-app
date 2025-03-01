@@ -26,10 +26,10 @@ export const errorInterceptor: HttpInterceptorFn = (
         if (error.status === 401) {
           // Auto logout if 401 response returned from api
           authService.logout();
-          router.navigate(['/login']);
+          void router.navigate(['/login']);
           errorMessage = 'Your session has expired. Please log in again.';
         } else if (error.status === 403) {
-          router.navigate(['/forbidden']);
+          void router.navigate(['/forbidden']);
           errorMessage = 'You do not have permission to access this resource.';
         } else if (error.status === 404) {
           errorMessage = 'Resource not found.';
