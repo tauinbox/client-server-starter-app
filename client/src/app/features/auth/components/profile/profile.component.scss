@@ -1,0 +1,58 @@
+.profile-container {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+mat-card {
+  max-width: 600px;
+  width: 100%;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+.profile-info {
+  margin-bottom: 20px;
+}
+
+.full-width {
+  width: 100%;
+  margin-bottom: 15px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.error-message {
+  color: #f44336;
+  margin: 15px 0;
+}
+
+button[type="submit"] {
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ml-2 {
+  margin-left: 8px;
+}
+
+.my-4 {
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+
+h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-weight: 500;
+}

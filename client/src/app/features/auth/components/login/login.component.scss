@@ -1,0 +1,42 @@
+.login-container {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+mat-card {
+  max-width: 400px;
+  width: 100%;
+}
+
+.full-width {
+  width: 100%;
+  margin-bottom: 15px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.error-message {
+  color: #f44336;
+  margin: 15px 0;
+}
+
+button[type="submit"] {
+  min-width: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.text-center {
+  text-align: center;
+  width: 100%;
+}
+
+.ml-2 {
+  margin-left: 8px;
+}

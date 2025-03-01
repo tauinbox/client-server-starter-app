@@ -1,0 +1,174 @@
+<div class="user-search-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>Search Users</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form [formGroup]="searchForm" (ngSubmit)="onSubmit()">
+        <div class="search-fields">
+          <mat-form-field appearance="outline">
+            <mat-label>Email</mat-label>
+            <input matInput formControlName="email" placeholder="Search by email">
+            <mat-icon matPrefix>email</mat-icon>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>First Name</mat-label>
+            <input matInput formControlName="firstName" placeholder="Search by first name">
+            <mat-icon matPrefix>person</mat-icon>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Last Name</mat-label>
+            <input matInput formControlName="lastName" placeholder="Search by last name">
+            <mat-icon matPrefix>person</mat-icon>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Role</mat-label>
+            <mat-select formControlName="isAdmin">
+              <mat-option [value]="">All</mat-option>
+              <mat-option [value]="true">Admin</mat-option>
+              <mat-option [value]="false">User</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Status</mat-label>
+            <mat-select formControlName="isActive">
+              <mat-option [value]="">All</mat-option>
+              <mat-option [value]="true">Active</mat-option>
+              <mat-option [value]="false">Inactive</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <div class="search-actions">
+          <button mat-raised-button color="primary" type="submit" [disabled]="searching()">
+            @if (searching()) {
+              <ng-container>
+                <mat-spinner diameter="24"></mat-spinner>
+                <span class="ml-2">Searching...</span>
+              </ng-container>
+            } @else {
+              <ng-container>
+                <mat-icon>search</mat-icon>
+                <span>Search</span>
+              </ng-container>
+            }
+          </button>
+
+          <button mat-button type="button" (click)="resetForm()" [disabled]="searching()">
+            Clear
+          </button>
+        </div>
+      </form>
+
+      <mat-divider class="my-4"></mat-divider>
+
+      @if (searched()) {
+        @if (users().length === 0) {
+          <div class="empty-state">
+            <mat-icon class="empty-icon">search_off</mat-icon>
+            <h3>No Users Found</h3>
+            <p>No users match your search criteria. Try adjusting your filters.</p>
+          </div>
+        } @else {
+          <div class="results-header">
+            <h3>Search Results</h3>
+            <span class="results-count">{{ users().length }} user(s) found</span>
+          </div>
+
+          <div class="table-container">
+            <table mat-table [dataSource]="users()">
+              <!-- ID Column -->
+              <ng-container matColumnDef="id">
+                <th mat-header-cell *matHeaderCellDef>ID</th>
+                <td mat-cell *matCellDef="let user">
+                  <span class="truncate-text" [matTooltip]="user.id">{{ user.id }}</span>
+                </td>
+              </ng-container>
+
+              <!-- Email Column -->
+              <ng-container matColumnDef="email">
+                <th mat-header-cell *matHeaderCellDef>Email</th>
+                <td mat-cell *matCellDef="let user">{{ user.email }}</td>
+              </ng-container>
+
+              <!-- Name Column -->
+              <ng-container matColumnDef="name">
+                <th mat-header-cell *matHeaderCellDef>Name</th>
+                <td mat-cell *matCellDef="let user">{{ user.firstName }} {{ user.lastName }}</td>
+              </ng-container>
+
+              <!-- Status Column -->
+              <ng-container matColumnDef="status">
+                <th mat-header-cell *matHeaderCellDef>Status</th>
+                <td mat-cell *matCellDef="let user">
+                  @if (user.isActive) {
+                    <mat-chip color="accent" selected>Active</mat-chip>
+                  } @else {
+                    <mat-chip color="warn" selected>Inactive</mat-chip>
+                  }
+                </td>
+              </ng-container>
+
+              <!-- Role Column -->
+              <ng-container matColumnDef="role">
+                <th mat-header-cell *matHeaderCellDef>Role</th>
+                <td mat-cell *matCellDef="let user">
+                  @if (user.isAdmin) {
+                    <mat-chip color="primary" selected>Admin</mat-chip>
+                  } @else {
+                    <mat-chip>User</mat-chip>
+                  }
+                </td>
+              </ng-container>
+
+              <!-- Created At Column -->
+              <ng-container matColumnDef="createdAt">
+                <th mat-header-cell *matHeaderCellDef>Created</th>
+                <td mat-cell *matCellDef="let user">{{ user.createdAt | date:'medium' }}</td>
+              </ng-container>
+
+              <!-- Actions Column -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef>Actions</th>
+                <td mat-cell *matCellDef="let user">
+                  <button
+                    mat-icon-button
+                    color="primary"
+                    [routerLink]="['/users', user.id]"
+                    matTooltip="View Details"
+                  >
+                    <mat-icon>visibility</mat-icon>
+                  </button>
+                  <button
+                    mat-icon-button
+                    color="accent"
+                    [routerLink]="['/users', user.id, 'edit']"
+                    matTooltip="Edit User"
+                  >
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                  <button
+                    mat-icon-button
+                    color="warn"
+                    (click)="confirmDelete(user)"
+                    matTooltip="Delete User"
+                  >
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+            </table>
+          </div>
+        }
+      }
+    </mat-card-content>
+  </mat-card>
+</div>
