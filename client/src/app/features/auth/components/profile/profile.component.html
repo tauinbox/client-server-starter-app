@@ -1,0 +1,110 @@
+<div class="profile-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>My Profile</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      @if (loading()) {
+        <div class="loading-container">
+          <mat-spinner></mat-spinner>
+        </div>
+      } @else if (user()) {
+        <div class="profile-info">
+          <h3>Account Information</h3>
+          <p><strong>Email:</strong> {{ user()!.email }}</p>
+          <p><strong>Name:</strong> {{ user()!.firstName }} {{ user()!.lastName }}</p>
+          <p><strong>Role:</strong> {{ user()!.isAdmin ? 'Administrator' : 'User' }}</p>
+          <p><strong>Status:</strong> {{ user()!.isActive ? 'Active' : 'Inactive' }}</p>
+          <p><strong>Member Since:</strong> {{ user()!.createdAt | date:'medium' }}</p>
+        </div>
+
+        <mat-divider class="my-4"></mat-divider>
+
+        <form [formGroup]="profileForm" (ngSubmit)="onSubmit()">
+          <h3>Update Profile</h3>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>First Name</mat-label>
+            <input
+              matInput
+              type="text"
+              formControlName="firstName"
+              placeholder="First Name"
+              required
+            >
+            <mat-icon matPrefix>person</mat-icon>
+            @if (profileForm.get('firstName')?.invalid && profileForm.get('firstName')?.touched) {
+              <mat-error>
+                First name is required
+              </mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Last Name</mat-label>
+            <input
+              matInput
+              type="text"
+              formControlName="lastName"
+              placeholder="Last Name"
+              required
+            >
+            <mat-icon matPrefix>person</mat-icon>
+            @if (profileForm.get('lastName')?.invalid && profileForm.get('lastName')?.touched) {
+              <mat-error>
+                Last name is required
+              </mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>New Password (Optional)</mat-label>
+            <input
+              matInput
+              [type]="showPassword() ? 'text' : 'password'"
+              formControlName="password"
+              placeholder="Leave blank to keep current password"
+            >
+            <mat-icon matPrefix>lock</mat-icon>
+            <button
+              mat-icon-button
+              matSuffix
+              type="button"
+              (click)="togglePasswordVisibility()"
+            >
+              <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+            @if (profileForm.get('password')?.invalid && profileForm.get('password')?.touched) {
+              <mat-error>
+                Password must be at least 8 characters
+              </mat-error>
+            }
+          </mat-form-field>
+
+          @if (error()) {
+            <div class="error-message">
+              {{ error() }}
+            </div>
+          }
+
+          <div class="form-actions">
+            <button
+              mat-raised-button
+              color="primary"
+              type="submit"
+              [disabled]="profileForm.invalid || saving() || !profileForm.dirty"
+            >
+              @if (saving()) {
+                <mat-spinner diameter="24"></mat-spinner>
+                <span class="ml-2">Saving...</span>
+              } @else {
+                Update Profile
+              }
+            </button>
+          </div>
+        </form>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

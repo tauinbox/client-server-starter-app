@@ -1,0 +1,86 @@
+<div class="login-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>Login</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Email</mat-label>
+          <input
+            matInput
+            type="email"
+            formControlName="email"
+            placeholder="Email"
+            required
+          >
+          <mat-icon matPrefix>email</mat-icon>
+          @if (loginForm.get('email')?.invalid && loginForm.get('email')?.touched) {
+            <mat-error>
+              @if (loginForm.get('email')?.errors?.['required']) {
+                Email is required
+              } @else if (loginForm.get('email')?.errors?.['email']) {
+                Please enter a valid email address
+              }
+            </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Password</mat-label>
+          <input
+            matInput
+            [type]="showPassword() ? 'text' : 'password'"
+            formControlName="password"
+            placeholder="Password"
+            required
+          >
+          <mat-icon matPrefix>lock</mat-icon>
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="togglePasswordVisibility()"
+          >
+            <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+          @if (loginForm.get('password')?.invalid && loginForm.get('password')?.touched) {
+            <mat-error>
+              Password is required
+            </mat-error>
+          }
+        </mat-form-field>
+
+        @if (error()) {
+          <div class="error-message">
+            {{ error() }}
+          </div>
+        }
+
+        <div class="form-actions">
+          <button
+            mat-raised-button
+            color="primary"
+            type="submit"
+            [disabled]="loginForm.invalid || loading()"
+          >
+            @if (loading()) {
+              <mat-spinner diameter="24"></mat-spinner>
+              <span class="ml-2">Logging in...</span>
+            } @else {
+              Login
+            }
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+
+    <mat-card-actions>
+      <p class="text-center">
+        Don't have an account?
+        <a routerLink="/register">Register</a>
+      </p>
+    </mat-card-actions>
+  </mat-card>
+</div>

@@ -1,0 +1,90 @@
+<div class="user-detail-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>User Details</mat-card-title>
+      <div class="spacer"></div>
+      <button
+        mat-icon-button
+        color="primary"
+        routerLink="/users"
+        *ngIf="user()?.isAdmin"
+      >
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+    </mat-card-header>
+
+    <mat-card-content>
+      @if (loading()) {
+        <div class="loading-container">
+          <mat-spinner></mat-spinner>
+        </div>
+      } @else if (user()) {
+        <div class="user-info">
+          <div class="user-header">
+            <div class="avatar">
+              <mat-icon>person</mat-icon>
+            </div>
+            <div class="user-title">
+              <h2>{{ user()!.firstName }} {{ user()!.lastName }}</h2>
+              <p class="email">{{ user()!.email }}</p>
+              <div class="chips">
+                @if (user()!.isActive) {
+                  <mat-chip color="accent" selected>Active</mat-chip>
+                } @else {
+                  <mat-chip color="warn" selected>Inactive</mat-chip>
+                }
+
+                @if (user()!.isAdmin) {
+                  <mat-chip color="primary" selected>Administrator</mat-chip>
+                } @else {
+                  <mat-chip>User</mat-chip>
+                }
+              </div>
+            </div>
+          </div>
+
+          <mat-divider class="my-4"></mat-divider>
+
+          <div class="detail-section">
+            <h3>User Information</h3>
+
+            <div class="detail-item">
+              <div class="detail-label">User ID</div>
+              <div class="detail-value">{{ user()!.id }}</div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">Created On</div>
+              <div class="detail-value">{{ user()!.createdAt | date:'medium' }}</div>
+            </div>
+
+            <div class="detail-item">
+              <div class="detail-label">Last Updated</div>
+              <div class="detail-value">{{ user()!.updatedAt | date:'medium' }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions-container">
+          <button
+            mat-raised-button
+            color="primary"
+            [routerLink]="['/users', user()!.id, 'edit']"
+          >
+            <mat-icon>edit</mat-icon>
+            Edit User
+          </button>
+        </div>
+      } @else {
+        <div class="error-container">
+          <mat-icon class="error-icon">error_outline</mat-icon>
+          <h3>User Not Found</h3>
+          <p>The requested user could not be found.</p>
+          <button mat-raised-button color="primary" routerLink="/users">
+            Back to Users
+          </button>
+        </div>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

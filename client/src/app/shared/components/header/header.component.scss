@@ -1,0 +1,22 @@
+.spacer {
+  flex: 1 1 auto;
+}
+
+.active {
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+mat-menu {
+  display: flex;
+  align-items: center;
+}
+
+.mat-mdc-menu-item {
+  display: flex;
+  align-items: center;
+}
+
+.mat-mdc-menu-item .mat-icon {
+  margin-right: 8px;
+}

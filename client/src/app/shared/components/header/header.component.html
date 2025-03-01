@@ -1,0 +1,36 @@
+<mat-toolbar color="primary">
+  <span>Pet project</span>
+  <span class="spacer"></span>
+
+  @if (authService.isAuthenticated()) {
+    <button mat-button [matMenuTriggerFor]="menu">
+      {{ authService.user()?.firstName }} {{ authService.user()?.lastName }}
+      <mat-icon>expand_more</mat-icon>
+    </button>
+    <mat-menu #menu="matMenu">
+      <a mat-menu-item routerLink="/profile">
+        <mat-icon>account_circle</mat-icon>
+        <span>Profile</span>
+      </a>
+
+      @if (authService.isAdmin()) {
+        <a mat-menu-item routerLink="/users">
+          <mat-icon>people</mat-icon>
+          <span>Manage Users</span>
+        </a>
+        <a mat-menu-item routerLink="/users/search">
+          <mat-icon>search</mat-icon>
+          <span>Search Users</span>
+        </a>
+      }
+
+      <button mat-menu-item (click)="logout()">
+        <mat-icon>logout</mat-icon>
+        <span>Logout</span>
+      </button>
+    </mat-menu>
+  } @else {
+    <button mat-button routerLink="/login" routerLinkActive="active">Login</button>
+    <button mat-button routerLink="/register" routerLinkActive="active">Register</button>
+  }
+</mat-toolbar>
