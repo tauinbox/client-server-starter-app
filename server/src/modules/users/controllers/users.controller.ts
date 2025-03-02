@@ -33,6 +33,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { UserResponseDto } from '../dtos/user-response.dto';
+import { RolesEnum } from '../../auth/enums/roles.enum';
 
 @ApiTags('Users API')
 @Controller({
@@ -60,7 +61,7 @@ export class UsersController {
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles(RolesEnum.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all users (admin only)' })
   @ApiOkResponse({
@@ -75,7 +76,7 @@ export class UsersController {
 
   @Get('search')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles(RolesEnum.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Search users by criteria (admin only)' })
   @ApiQuery({ name: 'email', required: false, description: 'Filter by email' })
@@ -156,7 +157,7 @@ export class UsersController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles(RolesEnum.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a user (admin only)' })
   @ApiParam({ name: 'id', description: 'The user ID' })

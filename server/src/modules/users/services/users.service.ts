@@ -31,7 +31,6 @@ export class UsersService {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user
     const user = this.userRepository.create({
       ...createUserDto,
       password: hashedPassword,
@@ -49,6 +48,7 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
+
     return user;
   }
 
