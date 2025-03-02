@@ -26,25 +26,9 @@ import { RegisterDto } from '../dtos/register.dto';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { LoginDto } from '../dtos/login.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { UsersService } from '../../users/services/users.service';
 import { AuthResponseDto } from '../dtos/auth-response.dto';
-
-export interface LocalAuthRequest extends Request {
-  user: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    isAdmin: boolean;
-  };
-}
-
-export interface JwtAuthRequest extends Request {
-  user: {
-    userId: string;
-    email: string;
-    isAdmin: boolean;
-  };
-}
+import { JwtAuthRequest, LocalAuthRequest } from '../types/auth.request';
 
 @ApiTags('Auth API')
 @Controller({
@@ -53,7 +37,10 @@ export interface JwtAuthRequest extends Request {
 })
 @UseInterceptors(ClassSerializerInterceptor)
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly userService: UsersService,
+  ) {}
 
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
@@ -87,10 +74,11 @@ export class AuthController {
   @ApiOperation({ summary: 'Get the current user profile' })
   @ApiOkResponse({
     description: 'Current user profile',
-    type: UserResponseDto,
+    type: UserResponseDto, // TODO: replace with profile data
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  getProfile(@Request() req: JwtAuthRequest) {
-    return req.user;
+  async getProfile(@Request() req: JwtAuthRequest) {
+    return await this.userService.findOne(req.user.userId);
+    // TODO: replace with profile data
   }
 }

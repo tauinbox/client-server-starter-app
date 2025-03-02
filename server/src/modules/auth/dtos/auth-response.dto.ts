@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { UserResponseDto } from '../../users/dtos/user-response.dto';
 
 export class AuthResponseDto {
   @ApiProperty({
@@ -15,13 +16,9 @@ export class AuthResponseDto {
       firstName: 'John',
       lastName: 'Doe',
       isAdmin: false,
+      createdAt: '2023-01-01T00:00:00Z',
+      updatedAt: '2023-01-01T00:00:00Z',
     },
   })
-  user: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    isAdmin: boolean;
-  };
+  user: UserResponseDto;
 }

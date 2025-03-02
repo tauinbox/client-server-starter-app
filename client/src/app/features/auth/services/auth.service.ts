@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { catchError, Observable, tap, throwError } from 'rxjs';
 import { jwtDecode } from 'jwt-decode';
 import { User } from '../../users/models/user.types';
-import { AuthResponse, JwtPayload, LoginCredentials, RegisterRequest } from '../models/auth.types';
+import { AuthResponse, CustomJwtPayload, LoginCredentials, RegisterRequest } from '../models/auth.types';
 
 export const AUTH_API_V1 = 'api/v1/auth';
 
@@ -56,8 +56,9 @@ export class AuthService {
 
   getProfile(): Observable<User> {
     return this.http.get<User>(`${AUTH_API_V1}/profile`).pipe(
-      tap(user => {
-        // TODO: process profile data
+      tap(profile => {
+        // TODO: replace with profile data (it should be different entity, but now they are the same)
+        this.currentUserSignal.update(user => ({...(user ?? {}), ...profile}))
       })
     );
   }
@@ -71,8 +72,8 @@ export class AuthService {
     if (!token) return true;
 
     try {
-      const decoded = jwtDecode<JwtPayload>(token);
-      return decoded.exp < Date.now() / 1000;
+      const decoded = jwtDecode<CustomJwtPayload>(token);
+      return decoded.exp ? decoded.exp < Date.now() / 1000 : false;
     } catch (error) {
       return true;
     }
@@ -82,7 +83,7 @@ export class AuthService {
     localStorage.setItem(this.TOKEN_KEY, authResponse.access_token);
     localStorage.setItem(this.USER_KEY, JSON.stringify(authResponse.user));
 
-    this.currentUserSignal.set(authResponse.user as User);
+    this.currentUserSignal.set(authResponse.user);
     this.isAuthenticatedSignal.set(true);
     this.isAdminSignal.set(authResponse.user.isAdmin);
   }

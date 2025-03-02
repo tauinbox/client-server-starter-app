@@ -66,7 +66,7 @@ export class ProfileComponent implements OnInit {
 
     this.authService.getProfile().subscribe({
       next: (user) => {
-        this.user.set(user);
+        this.user.set(user); // TODO: update only profile data
         this.profileForm.patchValue({
           firstName: user.firstName,
           lastName: user.lastName

@@ -1,4 +1,5 @@
 import { CreateUser, User } from '../../users/models/user.types';
+import { JwtPayload } from 'jwt-decode';
 
 export type LoginCredentials = {
   email: string;
@@ -9,11 +10,9 @@ export type RegisterRequest = CreateUser & {}
 
 export type AuthResponse = {
   access_token: string;
-  user: Pick<User, 'id' | 'email' | 'firstName' | 'lastName' | 'isAdmin'>;
+  user: User;
 }
 
-export type JwtPayload = {
+export type CustomJwtPayload = JwtPayload & {
   userId: User['id'];
-  iat: number;
-  exp: number;
 } & Pick<User, 'email' | 'isAdmin'>;
