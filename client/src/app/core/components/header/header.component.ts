@@ -5,6 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../../features/auth/services/auth.service';
 import { RouterLink, RouterLinkActive } from '@angular/router';
+import { ThemeToggleComponent } from '../theme-toggle/theme-toggle.component';
 
 @Component({
   selector: 'app-header',
@@ -14,7 +15,8 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     MatIconModule,
     MatMenuModule,
     RouterLink,
-    RouterLinkActive
+    RouterLinkActive,
+    ThemeToggleComponent
   ],
   templateUrl: './header.component.html',
   styleUrl: './header.component.scss',

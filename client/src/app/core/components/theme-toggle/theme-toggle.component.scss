@@ -1,0 +1,7 @@
+button {
+  transition: transform 0.3s ease;
+}
+
+button:hover {
+  transform: rotate(30deg);
+}

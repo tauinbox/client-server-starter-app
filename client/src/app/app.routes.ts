@@ -63,7 +63,7 @@ export const routes: Routes = [
   },
   {
     path: AppRouteSegmentEnum.Any,
-    loadComponent: () => import('./shared/components/page-not-found/page-not-found.component')
+    loadComponent: () => import('./core/components/page-not-found/page-not-found.component')
       .then(c => c.PageNotFoundComponent)
   }
 ];

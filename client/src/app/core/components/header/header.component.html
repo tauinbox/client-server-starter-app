@@ -2,6 +2,8 @@
   <span>Pet project</span>
   <span class="spacer"></span>
 
+  <app-theme-toggle></app-theme-toggle>
+
   @if (authService.isAuthenticated()) {
     <button mat-button [matMenuTriggerFor]="menu">
       {{ authService.user()?.firstName }} {{ authService.user()?.lastName }}
