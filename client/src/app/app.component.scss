@@ -2,3 +2,8 @@
   display: block;
   min-height: 100vh;
 }
+
+:host-context(.dark-theme) {
+  background-color: #303030;
+  color: white;
+}
