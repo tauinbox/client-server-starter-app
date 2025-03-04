@@ -14,7 +14,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { AuthService } from '../../../auth/services/auth.service';
 import { User } from '../../models/user.types';
-import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 
 @Component({
   selector: 'app-user-edit',
@@ -129,7 +129,6 @@ export class UserEditComponent implements OnInit {
         this.saving.set(false);
         this.user.set(updatedUser);
 
-        // Reset password field
         this.userForm.patchValue({ password: '' });
         this.userForm.markAsPristine();
 
@@ -137,8 +136,7 @@ export class UserEditComponent implements OnInit {
           duration: 5000
         });
 
-        // Navigate back to user details
-        this.router.navigate(['/users', this.id()]);
+        void this.router.navigate(['/users', this.id()]);
       },
       error: (err) => {
         this.saving.set(false);
@@ -179,8 +177,7 @@ export class UserEditComponent implements OnInit {
           duration: 5000
         });
 
-        // Navigate back to user list
-        this.router.navigate(['/users']);
+        void this.router.navigate(['/users']);
       },
       error: () => {
         this.snackBar.open('Failed to delete user. Please try again.', 'Close', {

@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './features/auth/guards/auth.guard';
-import { adminGuard } from './features/auth/guards/admin.guard';
+import { authGuard } from '@features/auth/guards/auth.guard';
+import { adminGuard } from '@features/auth/guards/admin.guard';
 import { AppRouteSegmentEnum } from './app.route-segment.enum';
 
 export const routes: Routes = [
