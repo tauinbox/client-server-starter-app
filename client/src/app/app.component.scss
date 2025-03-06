@@ -2,8 +2,3 @@
   display: block;
   min-height: 100vh;
 }
-
-:host-context(.dark-theme) {
-  background-color:var(--base-dark-background-color);
-  color: var(--base-dark-text-color);
-}
