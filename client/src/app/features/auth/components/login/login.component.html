@@ -10,6 +10,7 @@
           <mat-label>Email</mat-label>
           <input
             matInput
+            autocomplete="on"
             type="email"
             formControlName="email"
             placeholder="Email"
@@ -33,6 +34,7 @@
           <mat-label>Password</mat-label>
           <input
             matInput
+            autocomplete="off"
             [type]="showPassword() ? 'text' : 'password'"
             formControlName="password"
             placeholder="Password"
