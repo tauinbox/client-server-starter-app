@@ -15,7 +15,6 @@ import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatOption, MatSelect } from '@angular/material/select';
 import { MatButton, MatIconButton } from '@angular/material/button';
-import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatDivider } from '@angular/material/divider';
 import {
   MatCell,
@@ -53,7 +52,6 @@ import { DatePipe } from '@angular/common';
     MatSelect,
     MatOption,
     MatButton,
-    MatProgressSpinner,
     MatDivider,
     MatTable,
     MatColumnDef,
