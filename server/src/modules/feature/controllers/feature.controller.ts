@@ -14,7 +14,7 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
-  UsePipes,
+  UsePipes
 } from '@nestjs/common';
 import { FeatureService } from '../services/feature.service';
 import {
@@ -22,7 +22,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
-  ApiTags,
+  ApiTags
 } from '@nestjs/swagger';
 import { FeatureEntityDto } from '../dtos/feature-entity.dto';
 import { FeatureConfigDto } from '../dtos/feature-config.dto';
@@ -44,7 +44,7 @@ import { FeatureUploadDto } from '../dtos/feature-upload.dto';
 @ApiTags('Feature API')
 @Controller({
   path: 'feature',
-  version: '1',
+  version: '1'
 })
 @UseGuards(FeatureControllerGuard) // applies to all controller methods
 export class FeatureController {
@@ -52,7 +52,7 @@ export class FeatureController {
 
   @ApiOperation({ summary: 'Returns feature description' })
   @ApiOkResponse({
-    type: String,
+    type: String
   })
   @HttpCode(HttpStatus.OK)
   @Header('Content-Type', 'text/plain')
@@ -64,7 +64,7 @@ export class FeatureController {
 
   @ApiOperation({ summary: 'Returns feature config' })
   @ApiOkResponse({
-    type: FeatureConfigDto,
+    type: FeatureConfigDto
   })
   // we can access this metadata in a guard
   // @SetMetadata(MetadataKeysEnum.Roles, [RolesEnum.Admin]) // bad practice, the better way is to create a custom decorator
@@ -78,12 +78,12 @@ export class FeatureController {
   @ApiOperation({ summary: 'Returns list of entities' })
   @ApiOkResponse({
     type: FeatureEntityDto,
-    isArray: true,
+    isArray: true
   })
   @ApiQuery({ name: 'searchTerm', required: false, type: String })
   @Get('entities')
   getEntities(
-    @Query('searchTerm') searchTerm?: string,
+    @Query('searchTerm') searchTerm?: string
   ): Promise<FeatureEntityDto[]> {
     return this.featureService.getEntities(searchTerm);
   }
@@ -101,7 +101,7 @@ export class FeatureController {
 
   @ApiOperation({ summary: 'Returns entity by ID' })
   @ApiOkResponse({
-    type: FeatureEntityDto,
+    type: FeatureEntityDto
   })
   @ApiNotFoundResponse({ description: 'Not found Error' })
   @Get('entities/:id')
@@ -111,13 +111,13 @@ export class FeatureController {
 
   @ApiOperation({ summary: 'Updates entity by ID' })
   @ApiOkResponse({
-    type: FeatureEntityDto,
+    type: FeatureEntityDto
   })
   @ApiNotFoundResponse({ description: 'Not found Error' })
   @Patch('entities/:id')
   updateEntity(
     @Param('id', ParseIntPipe) id: number,
-    @Body() data: FeatureEntityUpdateDto,
+    @Body() data: FeatureEntityUpdateDto
   ): Promise<FeatureEntityDto> {
     return this.featureService.updateEntity(id, data);
   }
@@ -138,20 +138,20 @@ export class FeatureController {
         filename(
           req: e.Request,
           file: Express.Multer.File,
-          callback: (error: Error | null, filename: string) => void,
+          callback: (error: Error | null, filename: string) => void
         ) {
           callback(
             null,
-            `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.originalname}`,
+            `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.originalname}`
           );
-        },
-      }),
-    }),
+        }
+      })
+    })
   )
   @Post('upload')
   upload(
     @Body() dto: FeatureUploadDto,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: Express.Multer.File
   ) {
     if (file) {
       dto.filename = file.filename;

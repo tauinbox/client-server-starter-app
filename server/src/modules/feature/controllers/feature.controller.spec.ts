@@ -8,7 +8,7 @@ describe('FeatureController', () => {
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
       controllers: [FeatureController],
-      providers: [FeatureService],
+      providers: [FeatureService]
     }).compile();
 
     appController = app.get<FeatureController>(FeatureController);

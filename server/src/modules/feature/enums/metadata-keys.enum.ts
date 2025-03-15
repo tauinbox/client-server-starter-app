@@ -1,3 +1,3 @@
 export enum MetadataKeysEnum {
-  Roles = 'roles',
+  Roles = 'roles'
 }

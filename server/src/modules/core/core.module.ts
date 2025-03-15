@@ -17,17 +17,17 @@ export class CoreModule {
       imports: [
         ConfigModule.forRoot({
           load: [configuration],
-          isGlobal: true,
+          isGlobal: true
         }),
         CacheModule.register({
-          isGlobal: true,
+          isGlobal: true
         }),
         TypeOrmModule.forRootAsync({ imports: [], useFactory: postgresConfig }),
         AuthModule,
         UsersModule,
-        FeatureModule,
+        FeatureModule
       ],
-      providers: [],
+      providers: []
     };
   }
 }

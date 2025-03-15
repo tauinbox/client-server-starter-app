@@ -8,7 +8,7 @@ import {
   Post,
   Request,
   UseGuards,
-  UseInterceptors,
+  UseInterceptors
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -18,7 +18,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
-  ApiUnauthorizedResponse,
+  ApiUnauthorizedResponse
 } from '@nestjs/swagger';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { AuthService } from '../services/auth.service';
@@ -33,13 +33,13 @@ import { JwtAuthRequest, LocalAuthRequest } from '../types/auth.request';
 @ApiTags('Auth API')
 @Controller({
   path: 'auth',
-  version: '1',
+  version: '1'
 })
 @UseInterceptors(ClassSerializerInterceptor)
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
-    private readonly userService: UsersService,
+    private readonly userService: UsersService
   ) {}
 
   @Post('register')
@@ -47,7 +47,7 @@ export class AuthController {
   @ApiBody({ type: RegisterDto })
   @ApiCreatedResponse({
     description: 'User has been successfully registered',
-    type: UserResponseDto,
+    type: UserResponseDto
   })
   @ApiConflictResponse({ description: 'User with this email already exists' })
   register(@Body() registerDto: RegisterDto) {
@@ -61,7 +61,7 @@ export class AuthController {
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({
     description: 'User has been successfully logged in',
-    type: AuthResponseDto,
+    type: AuthResponseDto
   })
   @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
   login(@Request() req: LocalAuthRequest) {
@@ -74,7 +74,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Get the current user profile' })
   @ApiOkResponse({
     description: 'Current user profile',
-    type: UserResponseDto, // TODO: replace with profile data
+    type: UserResponseDto // TODO: replace with profile data
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   async getProfile(@Request() req: JwtAuthRequest) {

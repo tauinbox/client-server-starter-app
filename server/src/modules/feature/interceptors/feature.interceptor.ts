@@ -2,7 +2,7 @@ import {
   CallHandler,
   ExecutionContext,
   Injectable,
-  NestInterceptor,
+  NestInterceptor
 } from '@nestjs/common';
 import { map, Observable, tap } from 'rxjs';
 
@@ -22,7 +22,7 @@ export class FeatureInterceptor implements NestInterceptor {
       tap(() => {
         console.log(
           '[FeatureInterceptor] After...',
-          `${Date.now() - startTime}ms`,
+          `${Date.now() - startTime}ms`
         );
       }),
       map((data) => {
@@ -30,7 +30,7 @@ export class FeatureInterceptor implements NestInterceptor {
         // right before it is sent to the client
         const { sensitiveData, ...rest } = data;
         return { ...rest, isModifiedByInterceptor: true };
-      }),
+      })
       // we can also catch errors thrown by the controllers and remap them as well
     );
   }

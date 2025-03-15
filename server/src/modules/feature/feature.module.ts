@@ -11,7 +11,7 @@ import { FeatureMethodGuard } from './guards/feature-method.guard';
   imports: [TypeOrmModule.forFeature([FeatureEntity])],
   controllers: [FeatureController],
   providers: [FeatureService, FeatureControllerGuard, FeatureMethodGuard],
-  exports: [FeatureService],
+  exports: [FeatureService]
 })
 export class FeatureModule implements NestModule {
   // to add middleware our module has to implement NestModule interface

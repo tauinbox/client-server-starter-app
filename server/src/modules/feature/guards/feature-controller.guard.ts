@@ -11,7 +11,7 @@ export class FeatureControllerGuard implements CanActivate {
   // Reflector allows access to metadata assigned to the methods or classes
 
   canActivate(
-    context: ExecutionContext,
+    context: ExecutionContext
   ): boolean | Promise<boolean> | Observable<boolean> {
     const controllerClass = context.getClass(); // (we can use it in method guards as well)
 
@@ -19,7 +19,7 @@ export class FeatureControllerGuard implements CanActivate {
 
     if (controllerClass === FeatureController) {
       console.log(
-        '[FeatureControllerGuard] We can allow routes of this controller',
+        '[FeatureControllerGuard] We can allow routes of this controller'
       );
 
       // or we can throw new UnauthorizedException() / new ForbiddenException() otherwise
@@ -27,7 +27,7 @@ export class FeatureControllerGuard implements CanActivate {
 
     const roles = this.reflector.get<FeatureRolesEnum[]>(
       MetadataKeysEnum.Roles,
-      context.getHandler(),
+      context.getHandler()
     );
 
     if (roles) {

@@ -10,7 +10,7 @@ import {
   Post,
   Query,
   UseGuards,
-  UseInterceptors,
+  UseInterceptors
 } from '@nestjs/common';
 import { UsersService } from '../services/users.service';
 import { CreateUserDto } from '../dtos/create-user.dto';
@@ -30,7 +30,7 @@ import {
   ApiQuery,
   ApiResponse,
   ApiTags,
-  ApiUnauthorizedResponse,
+  ApiUnauthorizedResponse
 } from '@nestjs/swagger';
 import { UserResponseDto } from '../dtos/user-response.dto';
 import { RolesEnum } from '../../auth/enums/roles.enum';
@@ -38,7 +38,7 @@ import { RolesEnum } from '../../auth/enums/roles.enum';
 @ApiTags('Users API')
 @Controller({
   path: 'users',
-  version: '1',
+  version: '1'
 })
 @UseInterceptors(ClassSerializerInterceptor)
 export class UsersController {
@@ -49,11 +49,11 @@ export class UsersController {
   @ApiBody({ type: CreateUserDto })
   @ApiCreatedResponse({
     description: 'The user has been successfully created.',
-    type: UserResponseDto,
+    type: UserResponseDto
   })
   @ApiResponse({
     status: HttpStatus.CONFLICT,
-    description: 'User with this email already exists',
+    description: 'User with this email already exists'
   })
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
@@ -66,7 +66,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Get all users (admin only)' })
   @ApiOkResponse({
     description: 'List of all users',
-    type: [UserResponseDto],
+    type: [UserResponseDto]
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - requires admin role' })
@@ -83,28 +83,28 @@ export class UsersController {
   @ApiQuery({
     name: 'firstName',
     required: false,
-    description: 'Filter by first name',
+    description: 'Filter by first name'
   })
   @ApiQuery({
     name: 'lastName',
     required: false,
-    description: 'Filter by last name',
+    description: 'Filter by last name'
   })
   @ApiQuery({
     name: 'isAdmin',
     required: false,
     description: 'Filter by admin status',
-    type: Boolean,
+    type: Boolean
   })
   @ApiQuery({
     name: 'isActive',
     required: false,
     description: 'Filter by active status',
-    type: Boolean,
+    type: Boolean
   })
   @ApiOkResponse({
     description: 'List of filtered users',
-    type: [UserResponseDto],
+    type: [UserResponseDto]
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - requires admin role' })
@@ -113,14 +113,14 @@ export class UsersController {
     @Query('firstName') firstName?: string,
     @Query('lastName') lastName?: string,
     @Query('isAdmin') isAdmin?: boolean,
-    @Query('isActive') isActive?: boolean,
+    @Query('isActive') isActive?: boolean
   ) {
     return this.usersService.searchUsers({
       email,
       firstName,
       lastName,
       isAdmin,
-      isActive,
+      isActive
     });
   }
 
@@ -131,7 +131,7 @@ export class UsersController {
   @ApiParam({ name: 'id', description: 'The user ID' })
   @ApiOkResponse({
     description: 'The user has been found',
-    type: UserResponseDto,
+    type: UserResponseDto
   })
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -147,7 +147,7 @@ export class UsersController {
   @ApiBody({ type: UpdateUserDto })
   @ApiOkResponse({
     description: 'The user has been successfully updated',
-    type: UserResponseDto,
+    type: UserResponseDto
   })
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
