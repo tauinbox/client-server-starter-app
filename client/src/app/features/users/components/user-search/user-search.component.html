@@ -18,6 +18,15 @@
           </mat-form-field>
 
           <mat-form-field appearance="outline">
+            <mat-label>Role</mat-label>
+            <mat-select formControlName="isAdmin">
+              <mat-option [value]="">All</mat-option>
+              <mat-option [value]="true">Admin</mat-option>
+              <mat-option [value]="false">User</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
             <mat-label>First Name</mat-label>
             <input
               matInput
@@ -35,15 +44,6 @@
               placeholder="Search by last name"
             />
             <mat-icon matPrefix>person</mat-icon>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline">
-            <mat-label>Role</mat-label>
-            <mat-select formControlName="isAdmin">
-              <mat-option [value]="">All</mat-option>
-              <mat-option [value]="true">Admin</mat-option>
-              <mat-option [value]="false">User</mat-option>
-            </mat-select>
           </mat-form-field>
 
           <mat-form-field appearance="outline">
