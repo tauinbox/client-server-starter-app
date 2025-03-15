@@ -57,30 +57,22 @@
         </div>
 
         <div class="search-actions">
+          @let isSearching = searching();
           <button
             mat-raised-button
             color="primary"
             type="submit"
-            [disabled]="searching()"
+            [disabled]="isSearching"
           >
-            @if (searching()) {
-              <ng-container>
-                <mat-spinner diameter="24"></mat-spinner>
-                <span class="ml-2">Searching...</span>
-              </ng-container>
-            } @else {
-              <ng-container>
-                <mat-icon>search</mat-icon>
-                <span>Search</span>
-              </ng-container>
-            }
+            <mat-icon>search</mat-icon>
+            Search
           </button>
 
           <button
             mat-button
             type="button"
             (click)="resetForm()"
-            [disabled]="searching()"
+            [disabled]="isSearching"
           >
             Clear
           </button>
