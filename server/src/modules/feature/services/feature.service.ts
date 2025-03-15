@@ -13,7 +13,7 @@ export class FeatureService {
   constructor(
     private readonly configService: ConfigService,
     @InjectRepository(FeatureEntity)
-    private readonly featureEntityRepository: Repository<FeatureEntity>,
+    private readonly featureEntityRepository: Repository<FeatureEntity>
   ) {}
 
   getDescription(): string {
@@ -30,7 +30,7 @@ export class FeatureService {
       ? await this.featureEntityRepository
           .createQueryBuilder('featureEntity')
           .where('featureEntity.name like :searchTerm', {
-            searchTerm: `%${searchTerm}%`,
+            searchTerm: `%${searchTerm}%`
           })
           .getMany()
       : await this.featureEntityRepository.find();
@@ -58,7 +58,7 @@ export class FeatureService {
 
   async updateEntity(
     id: number,
-    changes: FeatureEntityUpdateDto,
+    changes: FeatureEntityUpdateDto
   ): Promise<FeatureEntityDto> {
     let entity = await this.featureEntityRepository.findOneBy({ id });
 

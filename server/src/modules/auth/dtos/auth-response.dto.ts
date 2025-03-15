@@ -4,7 +4,7 @@ import { UserResponseDto } from '../../users/dtos/user-response.dto';
 export class AuthResponseDto {
   @ApiProperty({
     description: 'JWT access token',
-    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
   })
   access_token: string;
 
@@ -17,8 +17,8 @@ export class AuthResponseDto {
       lastName: 'Doe',
       isAdmin: false,
       createdAt: '2023-01-01T00:00:00Z',
-      updatedAt: '2023-01-01T00:00:00Z',
-    },
+      updatedAt: '2023-01-01T00:00:00Z'
+    }
   })
   user: UserResponseDto;
 }

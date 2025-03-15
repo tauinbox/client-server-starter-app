@@ -13,12 +13,12 @@ import { LocalAuthRequest } from '../types/auth.request';
 export class AuthService {
   constructor(
     private usersService: UsersService,
-    private jwtService: JwtService,
+    private jwtService: JwtService
   ) {}
 
   async validateUser(
     email: string,
-    password: string,
+    password: string
   ): Promise<UserResponseDto | null> {
     const user = await this.usersService.findByEmail(email);
     if (user && (await bcrypt.compare(password, user.password))) {
@@ -34,12 +34,12 @@ export class AuthService {
     const payload: CustomJwtPayload = {
       email: user.email,
       sub: user.id,
-      isAdmin: user.isAdmin,
+      isAdmin: user.isAdmin
     };
 
     return {
       access_token: this.jwtService.sign(payload),
-      user,
+      user
     };
   }
 

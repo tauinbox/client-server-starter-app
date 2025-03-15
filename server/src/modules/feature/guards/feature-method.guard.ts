@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 @Injectable()
 export class FeatureMethodGuard implements CanActivate {
   canActivate(
-    context: ExecutionContext,
+    context: ExecutionContext
   ): boolean | Promise<boolean> | Observable<boolean> {
     // context can be HTTP as well as Websocket, Rpc, Graphql etc
 
@@ -24,7 +24,7 @@ export class FeatureMethodGuard implements CanActivate {
     res.cookie('cookie', 'testCookieValue');
     console.log(
       '[FeatureMethodGuard] Headers:',
-      JSON.stringify(res.getHeaders(), null, 2),
+      JSON.stringify(res.getHeaders(), null, 2)
     );
 
     // getting HTTP only context
@@ -34,7 +34,7 @@ export class FeatureMethodGuard implements CanActivate {
 
     console.log(
       '[FeatureMethodGuard] User Agent:',
-      httpReq.headers['user-agent'],
+      httpReq.headers['user-agent']
     );
 
     return true;

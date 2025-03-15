@@ -1,7 +1,7 @@
 import {
   ConflictException,
   Injectable,
-  NotFoundException,
+  NotFoundException
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -14,7 +14,7 @@ import { UpdateUserDto } from '../dtos/update-user.dto';
 export class UsersService {
   constructor(
     @InjectRepository(User)
-    private userRepository: Repository<User>,
+    private userRepository: Repository<User>
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -22,7 +22,7 @@ export class UsersService {
 
     // Check if user already exists
     const existingUser = await this.userRepository.findOne({
-      where: { email },
+      where: { email }
     });
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
@@ -33,7 +33,7 @@ export class UsersService {
 
     const user = this.userRepository.create({
       ...createUserDto,
-      password: hashedPassword,
+      password: hashedPassword
     });
 
     return this.userRepository.save(user);
@@ -67,31 +67,31 @@ export class UsersService {
 
     if (filters.email) {
       queryBuilder.andWhere('user.email LIKE :email', {
-        email: `%${filters.email}%`,
+        email: `%${filters.email}%`
       });
     }
 
     if (filters.firstName) {
       queryBuilder.andWhere('user.firstName LIKE :firstName', {
-        firstName: `%${filters.firstName}%`,
+        firstName: `%${filters.firstName}%`
       });
     }
 
     if (filters.lastName) {
       queryBuilder.andWhere('user.lastName LIKE :lastName', {
-        lastName: `%${filters.lastName}%`,
+        lastName: `%${filters.lastName}%`
       });
     }
 
     if (filters.isAdmin !== undefined) {
       queryBuilder.andWhere('user.isAdmin = :isAdmin', {
-        isAdmin: filters.isAdmin,
+        isAdmin: filters.isAdmin
       });
     }
 
     if (filters.isActive !== undefined) {
       queryBuilder.andWhere('user.isActive = :isActive', {
-        isActive: filters.isActive,
+        isActive: filters.isActive
       });
     }
 
