@@ -40,6 +40,7 @@
             <mat-label>First Name</mat-label>
             <input
               matInput
+              autocomplete="on"
               type="text"
               formControlName="firstName"
               placeholder="First Name"
@@ -58,6 +59,7 @@
             <mat-label>Last Name</mat-label>
             <input
               matInput
+              autocomplete="on"
               type="text"
               formControlName="lastName"
               placeholder="Last Name"
@@ -76,6 +78,7 @@
             <mat-label>New Password (Optional)</mat-label>
             <input
               matInput
+              autocomplete="off"
               [type]="showPassword() ? 'text' : 'password'"
               formControlName="password"
               placeholder="Leave blank to keep current password"
