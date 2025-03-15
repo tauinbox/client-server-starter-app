@@ -1,5 +1,15 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { MatCard, MatCardContent, MatCardHeader, MatCardTitle } from '@angular/material/card';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  signal
+} from '@angular/core';
+import {
+  MatCard,
+  MatCardContent,
+  MatCardHeader,
+  MatCardTitle
+} from '@angular/material/card';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
@@ -79,7 +89,15 @@ export class UserSearchComponent {
   searching = signal(false);
   searched = signal(false);
 
-  displayedColumns: string[] = ['id', 'email', 'name', 'status', 'role', 'createdAt', 'actions'];
+  displayedColumns: string[] = [
+    'id',
+    'email',
+    'name',
+    'status',
+    'role',
+    'createdAt',
+    'actions'
+  ];
 
   constructor() {
     this.searchForm = this.fb.group({
@@ -103,11 +121,13 @@ export class UserSearchComponent {
 
     // Handle boolean values (convert from string if needed)
     if (formValue.isAdmin !== '') {
-      criteria.isAdmin = formValue.isAdmin === 'true' || formValue.isAdmin === true;
+      criteria.isAdmin =
+        formValue.isAdmin === 'true' || formValue.isAdmin === true;
     }
 
     if (formValue.isActive !== '') {
-      criteria.isActive = formValue.isActive === 'true' || formValue.isActive === true;
+      criteria.isActive =
+        formValue.isActive === 'true' || formValue.isActive === true;
     }
 
     this.searching.set(true);
@@ -120,9 +140,13 @@ export class UserSearchComponent {
       },
       error: () => {
         this.searching.set(false);
-        this.snackBar.open('Failed to search users. Please try again.', 'Close', {
-          duration: 5000
-        });
+        this.snackBar.open(
+          'Failed to search users. Please try again.',
+          'Close',
+          {
+            duration: 5000
+          }
+        );
       }
     });
   }
@@ -151,7 +175,7 @@ export class UserSearchComponent {
       }
     });
 
-    dialogRef.afterClosed().subscribe(result => {
+    dialogRef.afterClosed().subscribe((result) => {
       if (result) {
         this.deleteUser(user.id);
       }
@@ -161,16 +185,20 @@ export class UserSearchComponent {
   deleteUser(id: string): void {
     this.userService.delete(id).subscribe({
       next: () => {
-        this.users.update(users => users.filter(user => user.id !== id));
+        this.users.update((users) => users.filter((user) => user.id !== id));
 
         this.snackBar.open('User deleted successfully', 'Close', {
           duration: 5000
         });
       },
       error: () => {
-        this.snackBar.open('Failed to delete user. Please try again.', 'Close', {
-          duration: 5000
-        });
+        this.snackBar.open(
+          'Failed to delete user. Please try again.',
+          'Close',
+          {
+            duration: 5000
+          }
+        );
       }
     });
   }

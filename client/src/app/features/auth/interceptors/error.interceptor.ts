@@ -1,5 +1,10 @@
 import { inject } from '@angular/core';
-import { HttpErrorResponse, HttpHandlerFn, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
+import {
+  HttpErrorResponse,
+  HttpHandlerFn,
+  HttpInterceptorFn,
+  HttpRequest
+} from '@angular/common/http';
 import { throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { Router } from '@angular/router';
@@ -43,10 +48,10 @@ export const errorInterceptor: HttpInterceptorFn = (
       snackBar.open(errorMessage, 'Close', {
         duration: 5000,
         horizontalPosition: 'center',
-        verticalPosition: 'bottom',
+        verticalPosition: 'bottom'
       });
 
       return throwError(() => new Error(errorMessage));
     })
   );
-}
+};

@@ -4,7 +4,12 @@ import { Router } from '@angular/router';
 import { catchError, Observable, tap, throwError } from 'rxjs';
 import { jwtDecode } from 'jwt-decode';
 import { User } from '../../users/models/user.types';
-import { AuthResponse, CustomJwtPayload, LoginCredentials, RegisterRequest } from '../models/auth.types';
+import {
+  AuthResponse,
+  CustomJwtPayload,
+  LoginCredentials,
+  RegisterRequest
+} from '../models/auth.types';
 
 export const AUTH_API_V1 = 'api/v1/auth';
 
@@ -35,10 +40,11 @@ export class AuthService {
   }
 
   login(credentials: LoginCredentials): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${AUTH_API_V1}/login`, credentials)
+    return this.http
+      .post<AuthResponse>(`${AUTH_API_V1}/login`, credentials)
       .pipe(
-        tap(response => this.handleAuthentication(response)),
-        catchError(error => {
+        tap((response) => this.handleAuthentication(response)),
+        catchError((error) => {
           console.error('Login failed', error);
           return throwError(() => new Error('Invalid credentials'));
         })
@@ -56,9 +62,12 @@ export class AuthService {
 
   getProfile(): Observable<User> {
     return this.http.get<User>(`${AUTH_API_V1}/profile`).pipe(
-      tap(profile => {
+      tap((profile) => {
         // TODO: replace with profile data (it should be different entity, but now they are the same)
-        this.currentUserSignal.update(user => ({...(user ?? {}), ...profile}))
+        this.currentUserSignal.update((user) => ({
+          ...(user ?? {}),
+          ...profile
+        }));
       })
     );
   }

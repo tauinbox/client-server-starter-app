@@ -3,11 +3,7 @@
     <mat-card-header>
       <mat-card-title>Edit User</mat-card-title>
       <div class="spacer"></div>
-      <button
-        mat-icon-button
-        color="primary"
-        [routerLink]="['/users', id()]"
-      >
+      <button mat-icon-button color="primary" [routerLink]="['/users', id()]">
         <mat-icon>arrow_back</mat-icon>
       </button>
     </mat-card-header>
@@ -27,9 +23,11 @@
               formControlName="email"
               placeholder="Email"
               required
-            >
+            />
             <mat-icon matPrefix>email</mat-icon>
-            @if (userForm.get('email')?.invalid && userForm.get('email')?.touched) {
+            @if (
+              userForm.get('email')?.invalid && userForm.get('email')?.touched
+            ) {
               <mat-error>
                 @if (userForm.get('email')?.errors?.['required']) {
                   Email is required
@@ -48,12 +46,13 @@
               formControlName="firstName"
               placeholder="First Name"
               required
-            >
+            />
             <mat-icon matPrefix>person</mat-icon>
-            @if (userForm.get('firstName')?.invalid && userForm.get('firstName')?.touched) {
-              <mat-error>
-                First name is required
-              </mat-error>
+            @if (
+              userForm.get('firstName')?.invalid &&
+              userForm.get('firstName')?.touched
+            ) {
+              <mat-error> First name is required </mat-error>
             }
           </mat-form-field>
 
@@ -65,12 +64,13 @@
               formControlName="lastName"
               placeholder="Last Name"
               required
-            >
+            />
             <mat-icon matPrefix>person</mat-icon>
-            @if (userForm.get('lastName')?.invalid && userForm.get('lastName')?.touched) {
-              <mat-error>
-                Last name is required
-              </mat-error>
+            @if (
+              userForm.get('lastName')?.invalid &&
+              userForm.get('lastName')?.touched
+            ) {
+              <mat-error> Last name is required </mat-error>
             }
           </mat-form-field>
 
@@ -81,7 +81,7 @@
               [type]="showPassword() ? 'text' : 'password'"
               formControlName="password"
               placeholder="Leave blank to keep current password"
-            >
+            />
             <mat-icon matPrefix>lock</mat-icon>
             <button
               mat-icon-button
@@ -89,18 +89,23 @@
               type="button"
               (click)="togglePasswordVisibility()"
             >
-              <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+              <mat-icon>{{
+                showPassword() ? 'visibility_off' : 'visibility'
+              }}</mat-icon>
             </button>
-            @if (userForm.get('password')?.invalid && userForm.get('password')?.touched) {
-              <mat-error>
-                Password must be at least 8 characters
-              </mat-error>
+            @if (
+              userForm.get('password')?.invalid &&
+              userForm.get('password')?.touched
+            ) {
+              <mat-error> Password must be at least 8 characters </mat-error>
             }
           </mat-form-field>
 
           @if (authService.isAdmin()) {
             <div class="checkbox-group">
-              <mat-checkbox formControlName="isAdmin">Administrator</mat-checkbox>
+              <mat-checkbox formControlName="isAdmin"
+                >Administrator</mat-checkbox
+              >
               <mat-checkbox formControlName="isActive">Active</mat-checkbox>
             </div>
           }
@@ -125,11 +130,7 @@
 
             <div class="spacer"></div>
 
-            <button
-              mat-button
-              type="button"
-              [routerLink]="['/users', id()]"
-            >
+            <button mat-button type="button" [routerLink]="['/users', id()]">
               Cancel
             </button>
 

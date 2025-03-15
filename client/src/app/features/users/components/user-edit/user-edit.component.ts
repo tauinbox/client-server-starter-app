@@ -1,10 +1,27 @@
-import { ChangeDetectionStrategy, Component, inject, input, OnInit, signal } from '@angular/core';
-import { MatCard, MatCardContent, MatCardHeader, MatCardTitle } from '@angular/material/card';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  input,
+  OnInit,
+  signal
+} from '@angular/core';
+import {
+  MatCard,
+  MatCardContent,
+  MatCardHeader,
+  MatCardTitle
+} from '@angular/material/card';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { Router, RouterLink } from '@angular/router';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators
+} from '@angular/forms';
 import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatCheckbox } from '@angular/material/checkbox';
@@ -93,15 +110,19 @@ export class UserEditComponent implements OnInit {
       },
       error: () => {
         this.loading.set(false);
-        this.snackBar.open('Failed to load user details. Please try again.', 'Close', {
-          duration: 5000
-        });
+        this.snackBar.open(
+          'Failed to load user details. Please try again.',
+          'Close',
+          {
+            duration: 5000
+          }
+        );
       }
     });
   }
 
   togglePasswordVisibility(): void {
-    this.showPassword.update(prev => !prev);
+    this.showPassword.update((prev) => !prev);
   }
 
   onSubmit(): void {
@@ -112,7 +133,9 @@ export class UserEditComponent implements OnInit {
       email: this.userForm.value.email,
       firstName: this.userForm.value.firstName,
       lastName: this.userForm.value.lastName,
-      ...(this.userForm.value.password ? { password: this.userForm.value.password } : {})
+      ...(this.userForm.value.password
+        ? { password: this.userForm.value.password }
+        : {})
     };
 
     // Only include admin fields if user is an admin
@@ -140,14 +163,18 @@ export class UserEditComponent implements OnInit {
       },
       error: (err) => {
         this.saving.set(false);
-        this.error.set(err.message || 'Failed to update user. Please try again.');
+        this.error.set(
+          err.message || 'Failed to update user. Please try again.'
+        );
       }
     });
   }
 
   canDelete(): boolean {
     // Check if user is admin and not editing themselves
-    return this.authService.isAdmin() && this.id() !== this.authService.user()?.id;
+    return (
+      this.authService.isAdmin() && this.id() !== this.authService.user()?.id
+    );
   }
 
   confirmDelete(): void {
@@ -163,7 +190,7 @@ export class UserEditComponent implements OnInit {
       }
     });
 
-    dialogRef.afterClosed().subscribe(result => {
+    dialogRef.afterClosed().subscribe((result) => {
       if (result) {
         this.deleteUser();
       }
@@ -180,9 +207,13 @@ export class UserEditComponent implements OnInit {
         void this.router.navigate(['/users']);
       },
       error: () => {
-        this.snackBar.open('Failed to delete user. Please try again.', 'Close', {
-          duration: 5000
-        });
+        this.snackBar.open(
+          'Failed to delete user. Please try again.',
+          'Close',
+          {
+            duration: 5000
+          }
+        );
       }
     });
   }

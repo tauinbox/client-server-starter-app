@@ -8,10 +8,16 @@
   </div>
 </mat-dialog-content>
 <mat-dialog-actions align="end">
-  <button mat-button mat-dialog-close>{{ data.cancelButton || 'Cancel' }}</button>
+  <button mat-button mat-dialog-close>
+    {{ data.cancelButton || 'Cancel' }}
+  </button>
   <button
     mat-raised-button
-    [color]="data.icon === 'warning' || data.icon === 'error_outline' ? 'warn' : 'primary'"
+    [color]="
+      data.icon === 'warning' || data.icon === 'error_outline'
+        ? 'warn'
+        : 'primary'
+    "
     [mat-dialog-close]="true"
   >
     {{ data.confirmButton || 'Confirm' }}

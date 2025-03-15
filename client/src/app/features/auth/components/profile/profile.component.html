@@ -13,10 +13,22 @@
         <div class="profile-info">
           <h3>Account Information</h3>
           <p><strong>Email:</strong> {{ user()!.email }}</p>
-          <p><strong>Name:</strong> {{ user()!.firstName }} {{ user()!.lastName }}</p>
-          <p><strong>Role:</strong> {{ user()!.isAdmin ? 'Administrator' : 'User' }}</p>
-          <p><strong>Status:</strong> {{ user()!.isActive ? 'Active' : 'Inactive' }}</p>
-          <p><strong>Member Since:</strong> {{ user()!.createdAt | date:'medium' }}</p>
+          <p>
+            <strong>Name:</strong> {{ user()!.firstName }}
+            {{ user()!.lastName }}
+          </p>
+          <p>
+            <strong>Role:</strong>
+            {{ user()!.isAdmin ? 'Administrator' : 'User' }}
+          </p>
+          <p>
+            <strong>Status:</strong>
+            {{ user()!.isActive ? 'Active' : 'Inactive' }}
+          </p>
+          <p>
+            <strong>Member Since:</strong>
+            {{ user()!.createdAt | date: 'medium' }}
+          </p>
         </div>
 
         <mat-divider class="my-4"></mat-divider>
@@ -32,12 +44,13 @@
               formControlName="firstName"
               placeholder="First Name"
               required
-            >
+            />
             <mat-icon matPrefix>person</mat-icon>
-            @if (profileForm.get('firstName')?.invalid && profileForm.get('firstName')?.touched) {
-              <mat-error>
-                First name is required
-              </mat-error>
+            @if (
+              profileForm.get('firstName')?.invalid &&
+              profileForm.get('firstName')?.touched
+            ) {
+              <mat-error> First name is required </mat-error>
             }
           </mat-form-field>
 
@@ -49,12 +62,13 @@
               formControlName="lastName"
               placeholder="Last Name"
               required
-            >
+            />
             <mat-icon matPrefix>person</mat-icon>
-            @if (profileForm.get('lastName')?.invalid && profileForm.get('lastName')?.touched) {
-              <mat-error>
-                Last name is required
-              </mat-error>
+            @if (
+              profileForm.get('lastName')?.invalid &&
+              profileForm.get('lastName')?.touched
+            ) {
+              <mat-error> Last name is required </mat-error>
             }
           </mat-form-field>
 
@@ -65,7 +79,7 @@
               [type]="showPassword() ? 'text' : 'password'"
               formControlName="password"
               placeholder="Leave blank to keep current password"
-            >
+            />
             <mat-icon matPrefix>lock</mat-icon>
             <button
               mat-icon-button
@@ -73,12 +87,15 @@
               type="button"
               (click)="togglePasswordVisibility()"
             >
-              <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+              <mat-icon>{{
+                showPassword() ? 'visibility_off' : 'visibility'
+              }}</mat-icon>
             </button>
-            @if (profileForm.get('password')?.invalid && profileForm.get('password')?.touched) {
-              <mat-error>
-                Password must be at least 8 characters
-              </mat-error>
+            @if (
+              profileForm.get('password')?.invalid &&
+              profileForm.get('password')?.touched
+            ) {
+              <mat-error> Password must be at least 8 characters </mat-error>
             }
           </mat-form-field>
 

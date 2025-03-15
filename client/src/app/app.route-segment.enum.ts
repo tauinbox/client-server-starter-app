@@ -5,5 +5,5 @@ export enum AppRouteSegmentEnum {
   Users = 'users',
   Feature = 'feature',
   Forbidden = 'forbidden',
-  Any = '**',
+  Any = '**'
 }

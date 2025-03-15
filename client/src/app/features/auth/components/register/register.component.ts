@@ -1,7 +1,23 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { MatCard, MatCardActions, MatCardContent, MatCardHeader, MatCardTitle } from '@angular/material/card';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  signal
+} from '@angular/core';
+import {
+  MatCard,
+  MatCardActions,
+  MatCardContent,
+  MatCardHeader,
+  MatCardTitle
+} from '@angular/material/card';
 import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators
+} from '@angular/forms';
 import { MatInput } from '@angular/material/input';
 import { MatIcon } from '@angular/material/icon';
 import { MatButton, MatIconButton } from '@angular/material/button';
@@ -54,7 +70,7 @@ export class RegisterComponent {
   }
 
   togglePasswordVisibility(): void {
-    this.showPassword.update(prev => !prev);
+    this.showPassword.update((prev) => !prev);
   }
 
   onSubmit(): void {
@@ -76,7 +92,9 @@ export class RegisterComponent {
         if (err.status === 409) {
           this.error.set('User with this email already exists.');
         } else {
-          this.error.set(err.message || 'Registration failed. Please try again.');
+          this.error.set(
+            err.message || 'Registration failed. Please try again.'
+          );
         }
       }
     });
