@@ -55,12 +55,16 @@
 
             <div class="detail-item">
               <div class="detail-label">Created On</div>
-              <div class="detail-value">{{ user()!.createdAt | date:'medium' }}</div>
+              <div class="detail-value">
+                {{ user()!.createdAt | date: 'medium' }}
+              </div>
             </div>
 
             <div class="detail-item">
               <div class="detail-label">Last Updated</div>
-              <div class="detail-value">{{ user()!.updatedAt | date:'medium' }}</div>
+              <div class="detail-value">
+                {{ user()!.updatedAt | date: 'medium' }}
+              </div>
             </div>
           </div>
         </div>

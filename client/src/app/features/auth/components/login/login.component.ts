@@ -1,6 +1,22 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { MatCard, MatCardActions, MatCardContent, MatCardHeader, MatCardTitle } from '@angular/material/card';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  signal
+} from '@angular/core';
+import {
+  MatCard,
+  MatCardActions,
+  MatCardContent,
+  MatCardHeader,
+  MatCardTitle
+} from '@angular/material/card';
+import {
+  FormBuilder,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators
+} from '@angular/forms';
 import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatIcon } from '@angular/material/icon';
@@ -51,7 +67,7 @@ export class LoginComponent {
   }
 
   togglePasswordVisibility(): void {
-    this.showPassword.update(prev => !prev);
+    this.showPassword.update((prev) => !prev);
   }
 
   onSubmit(): void {
@@ -70,7 +86,9 @@ export class LoginComponent {
       },
       error: (err) => {
         this.loading.set(false);
-        this.error.set(err.message || 'Login failed. Please check your credentials.');
+        this.error.set(
+          err.message || 'Login failed. Please check your credentials.'
+        );
       }
     });
   }

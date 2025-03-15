@@ -14,9 +14,12 @@
             formControlName="email"
             placeholder="Email"
             required
-          >
+          />
           <mat-icon matPrefix>email</mat-icon>
-          @if (registerForm.get('email')?.invalid && registerForm.get('email')?.touched) {
+          @if (
+            registerForm.get('email')?.invalid &&
+            registerForm.get('email')?.touched
+          ) {
             <mat-error>
               @if (registerForm.get('email')?.errors?.['required']) {
                 Email is required
@@ -35,12 +38,13 @@
             formControlName="firstName"
             placeholder="First Name"
             required
-          >
+          />
           <mat-icon matPrefix>person</mat-icon>
-          @if (registerForm.get('firstName')?.invalid && registerForm.get('firstName')?.touched) {
-            <mat-error>
-              First name is required
-            </mat-error>
+          @if (
+            registerForm.get('firstName')?.invalid &&
+            registerForm.get('firstName')?.touched
+          ) {
+            <mat-error> First name is required </mat-error>
           }
         </mat-form-field>
 
@@ -52,12 +56,13 @@
             formControlName="lastName"
             placeholder="Last Name"
             required
-          >
+          />
           <mat-icon matPrefix>person</mat-icon>
-          @if (registerForm.get('lastName')?.invalid && registerForm.get('lastName')?.touched) {
-            <mat-error>
-              Last name is required
-            </mat-error>
+          @if (
+            registerForm.get('lastName')?.invalid &&
+            registerForm.get('lastName')?.touched
+          ) {
+            <mat-error> Last name is required </mat-error>
           }
         </mat-form-field>
 
@@ -69,7 +74,7 @@
             formControlName="password"
             placeholder="Password (min 8 characters)"
             required
-          >
+          />
           <mat-icon matPrefix>lock</mat-icon>
           <button
             mat-icon-button
@@ -77,9 +82,14 @@
             type="button"
             (click)="togglePasswordVisibility()"
           >
-            <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+            <mat-icon>{{
+              showPassword() ? 'visibility_off' : 'visibility'
+            }}</mat-icon>
           </button>
-          @if (registerForm.get('password')?.invalid && registerForm.get('password')?.touched) {
+          @if (
+            registerForm.get('password')?.invalid &&
+            registerForm.get('password')?.touched
+          ) {
             <mat-error>
               @if (registerForm.get('password')?.errors?.['required']) {
                 Password is required

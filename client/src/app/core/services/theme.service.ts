@@ -1,4 +1,10 @@
-import { effect, Injectable, Signal, signal, WritableSignal } from '@angular/core';
+import {
+  effect,
+  Injectable,
+  Signal,
+  signal,
+  WritableSignal
+} from '@angular/core';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -9,11 +15,13 @@ export class ThemeService {
   private readonly THEME_KEY = 'preferred-theme';
   private readonly themeSignal: WritableSignal<ThemeMode>;
 
-  readonly theme!: Signal<ThemeMode>
+  readonly theme!: Signal<ThemeMode>;
 
   constructor() {
     const savedTheme = localStorage.getItem(this.THEME_KEY) as ThemeMode;
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const prefersDark = window.matchMedia(
+      '(prefers-color-scheme: dark)'
+    ).matches;
     const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
 
     this.themeSignal = signal<ThemeMode>(initialTheme);
@@ -23,12 +31,14 @@ export class ThemeService {
       this.applyTheme(this.themeSignal());
     });
 
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-      // Only update if user hasn't explicitly set a preference
-      if (!localStorage.getItem(this.THEME_KEY)) {
-        this.themeSignal.set(e.matches ? 'dark' : 'light');
-      }
-    });
+    window
+      .matchMedia('(prefers-color-scheme: dark)')
+      .addEventListener('change', (e) => {
+        // Only update if user hasn't explicitly set a preference
+        if (!localStorage.getItem(this.THEME_KEY)) {
+          this.themeSignal.set(e.matches ? 'dark' : 'light');
+        }
+      });
   }
 
   toggleTheme(): void {

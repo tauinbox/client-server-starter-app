@@ -7,14 +7,20 @@ export type User = {
   isAdmin: boolean;
   createdAt: Date;
   updatedAt: Date;
-}
+};
 
-export type UserSearch = Pick<Partial<User>, 'email' | 'firstName' | 'lastName' | 'isAdmin' | 'isActive'>
+export type UserSearch = Pick<
+  Partial<User>,
+  'email' | 'firstName' | 'lastName' | 'isAdmin' | 'isActive'
+>;
 
 export type CreateUser = Pick<User, 'email' | 'firstName' | 'lastName'> & {
   password: string;
-}
+};
 
-export type UpdateUser =  Pick<Partial<User>, 'email' | 'firstName' | 'lastName' | 'isAdmin' | 'isActive'> & {
+export type UpdateUser = Pick<
+  Partial<User>,
+  'email' | 'firstName' | 'lastName' | 'isAdmin' | 'isActive'
+> & {
   password?: string;
-}
+};

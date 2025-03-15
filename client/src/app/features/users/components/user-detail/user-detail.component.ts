@@ -1,5 +1,17 @@
-import { ChangeDetectionStrategy, Component, inject, input, OnInit, signal } from '@angular/core';
-import { MatCard, MatCardContent, MatCardHeader, MatCardTitle } from '@angular/material/card';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  input,
+  OnInit,
+  signal
+} from '@angular/core';
+import {
+  MatCard,
+  MatCardContent,
+  MatCardHeader,
+  MatCardTitle
+} from '@angular/material/card';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { DatePipe, NgIf } from '@angular/common';
@@ -54,9 +66,13 @@ export class UserDetailComponent implements OnInit {
       },
       error: () => {
         this.loading.set(false);
-        this.snackBar.open('Failed to load user details. Please try again.', 'Close', {
-          duration: 5000
-        });
+        this.snackBar.open(
+          'Failed to load user details. Please try again.',
+          'Close',
+          {
+            duration: 5000
+          }
+        );
       }
     });
   }

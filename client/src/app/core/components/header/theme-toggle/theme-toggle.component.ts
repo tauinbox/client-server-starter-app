@@ -6,11 +6,7 @@ import { ThemeService } from '@core/services/theme.service';
 
 @Component({
   selector: 'app-theme-toggle',
-  imports: [
-    MatIconButton,
-    MatTooltip,
-    MatIcon
-  ],
+  imports: [MatIconButton, MatTooltip, MatIcon],
   templateUrl: './theme-toggle.component.html',
   styleUrl: './theme-toggle.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

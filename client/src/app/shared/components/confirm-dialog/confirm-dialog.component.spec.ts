@@ -9,8 +9,7 @@ describe('ConfirmDialogComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [ConfirmDialogComponent]
-    })
-    .compileComponents();
+    }).compileComponents();
 
     fixture = TestBed.createComponent(ConfirmDialogComponent);
     component = fixture.componentInstance;

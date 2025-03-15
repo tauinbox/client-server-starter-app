@@ -10,14 +10,9 @@ import { errorInterceptor } from '@features/auth/interceptors/error.interceptor'
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideRouter(routes,  withComponentInputBinding()),
+    provideRouter(routes, withComponentInputBinding()),
     provideAnimations(),
-    provideHttpClient(
-      withInterceptors([
-        jwtInterceptor,
-        errorInterceptor
-      ])
-    ),
+    provideHttpClient(withInterceptors([jwtInterceptor, errorInterceptor])),
     {
       provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
       useValue: { appearance: 'outline' }

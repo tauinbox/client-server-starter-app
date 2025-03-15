@@ -4,14 +4,14 @@ import { JwtPayload } from 'jwt-decode';
 export type LoginCredentials = {
   email: string;
   password: string;
-}
+};
 
-export type RegisterRequest = CreateUser & {}
+export type RegisterRequest = CreateUser & {};
 
 export type AuthResponse = {
   access_token: string;
   user: User;
-}
+};
 
 export type CustomJwtPayload = JwtPayload & {
   userId: User['id'];

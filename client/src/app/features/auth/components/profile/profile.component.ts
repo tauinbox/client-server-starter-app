@@ -1,8 +1,24 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
-import { MatCard, MatCardContent, MatCardHeader, MatCardTitle } from '@angular/material/card';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  OnInit,
+  signal
+} from '@angular/core';
+import {
+  MatCard,
+  MatCardContent,
+  MatCardHeader,
+  MatCardTitle
+} from '@angular/material/card';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatDivider } from '@angular/material/divider';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators
+} from '@angular/forms';
 import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
@@ -81,7 +97,7 @@ export class ProfileComponent implements OnInit {
   }
 
   togglePasswordVisibility(): void {
-    this.showPassword.update(prev => !prev);
+    this.showPassword.update((prev) => !prev);
   }
 
   onSubmit(): void {
@@ -91,7 +107,9 @@ export class ProfileComponent implements OnInit {
     const updateData = {
       firstName: this.profileForm.value.firstName,
       lastName: this.profileForm.value.lastName,
-      ...(this.profileForm.value.password ? { password: this.profileForm.value.password } : {})
+      ...(this.profileForm.value.password
+        ? { password: this.profileForm.value.password }
+        : {})
     };
 
     this.saving.set(true);
@@ -112,7 +130,9 @@ export class ProfileComponent implements OnInit {
       },
       error: (err) => {
         this.saving.set(false);
-        this.error.set(err.message || 'Failed to update profile. Please try again.');
+        this.error.set(
+          err.message || 'Failed to update profile. Please try again.'
+        );
       }
     });
   }

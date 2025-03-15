@@ -1,5 +1,16 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
-import { MatCard, MatCardContent, MatCardHeader, MatCardTitle } from '@angular/material/card';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  OnInit,
+  signal
+} from '@angular/core';
+import {
+  MatCard,
+  MatCardContent,
+  MatCardHeader,
+  MatCardTitle
+} from '@angular/material/card';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import {
@@ -68,7 +79,15 @@ export class UserListComponent implements OnInit {
   displayedUsers = signal<User[]>([]);
   loading = signal(true);
 
-  displayedColumns: string[] = ['id', 'email', 'name', 'status', 'role', 'createdAt', 'actions'];
+  displayedColumns: string[] = [
+    'id',
+    'email',
+    'name',
+    'status',
+    'role',
+    'createdAt',
+    'actions'
+  ];
   pageSize = signal(10);
   currentPage = signal(0);
 
@@ -113,18 +132,35 @@ export class UserListComponent implements OnInit {
 
     const data = [...this.users()];
 
-    this.users.set(data.sort((a, b) => {
-      const isAsc = sort.direction === 'asc';
-      switch (sort.active) {
-        case 'id': return this.compare(a.id, b.id, isAsc);
-        case 'email': return this.compare(a.email, b.email, isAsc);
-        case 'name': return this.compare(a.firstName + a.lastName, b.firstName + b.lastName, isAsc);
-        case 'status': return this.compare(a.isActive, b.isActive, isAsc);
-        case 'role': return this.compare(a.isAdmin, b.isAdmin, isAsc);
-        case 'createdAt': return this.compare(new Date(a.createdAt).getTime(), new Date(b.createdAt).getTime(), isAsc);
-        default: return 0;
-      }
-    }));
+    this.users.set(
+      data.sort((a, b) => {
+        const isAsc = sort.direction === 'asc';
+        switch (sort.active) {
+          case 'id':
+            return this.compare(a.id, b.id, isAsc);
+          case 'email':
+            return this.compare(a.email, b.email, isAsc);
+          case 'name':
+            return this.compare(
+              a.firstName + a.lastName,
+              b.firstName + b.lastName,
+              isAsc
+            );
+          case 'status':
+            return this.compare(a.isActive, b.isActive, isAsc);
+          case 'role':
+            return this.compare(a.isAdmin, b.isAdmin, isAsc);
+          case 'createdAt':
+            return this.compare(
+              new Date(a.createdAt).getTime(),
+              new Date(b.createdAt).getTime(),
+              isAsc
+            );
+          default:
+            return 0;
+        }
+      })
+    );
 
     this.updateDisplayedUsers();
   }
@@ -144,7 +180,7 @@ export class UserListComponent implements OnInit {
       }
     });
 
-    dialogRef.afterClosed().subscribe(result => {
+    dialogRef.afterClosed().subscribe((result) => {
       if (result) {
         this.deleteUser(user.id);
       }
@@ -154,7 +190,7 @@ export class UserListComponent implements OnInit {
   deleteUser(id: string): void {
     this.userService.delete(id).subscribe({
       next: () => {
-        this.users.update(users => users.filter(user => user.id !== id));
+        this.users.update((users) => users.filter((user) => user.id !== id));
         this.updateDisplayedUsers();
 
         this.snackBar.open('User deleted successfully', 'Close', {
@@ -162,9 +198,13 @@ export class UserListComponent implements OnInit {
         });
       },
       error: () => {
-        this.snackBar.open('Failed to delete user. Please try again.', 'Close', {
-          duration: 5000
-        });
+        this.snackBar.open(
+          'Failed to delete user. Please try again.',
+          'Close',
+          {
+            duration: 5000
+          }
+        );
       }
     });
   }

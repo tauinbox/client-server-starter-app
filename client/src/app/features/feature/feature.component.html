@@ -1,17 +1,17 @@
-<input #input type='file' (change)='onFilesSelected($event, input)' multiple>
+<input #input type="file" (change)="onFilesSelected($event, input)" multiple />
 
 @if (isLoading()) {
   Loading...
 } @else {
   <h4>Description:</h4>
-  <p>{{description()}}</p>
+  <p>{{ description() }}</p>
 
   <h4>Config:</h4>
-  <pre>{{config() | json}}</pre>
+  <pre>{{ config() | json }}</pre>
 
   @for (entity of entities(); track entity.id) {
     <div>
-      <span>{{entity.id}} - {{entity.name}}</span>
+      <span>{{ entity.id }} - {{ entity.name }}</span>
     </div>
   } @empty {
     There are no entities

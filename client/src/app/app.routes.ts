@@ -11,18 +11,24 @@ export const routes: Routes = [
   },
   {
     path: AppRouteSegmentEnum.Login,
-    loadComponent: () => import('./features/auth/components/login/login.component')
-      .then(c => c.LoginComponent)
+    loadComponent: () =>
+      import('./features/auth/components/login/login.component').then(
+        (c) => c.LoginComponent
+      )
   },
   {
     path: AppRouteSegmentEnum.Register,
-    loadComponent: () => import('./features/auth/components/register/register.component')
-      .then(c => c.RegisterComponent)
+    loadComponent: () =>
+      import('./features/auth/components/register/register.component').then(
+        (c) => c.RegisterComponent
+      )
   },
   {
     path: AppRouteSegmentEnum.Profile,
-    loadComponent: () => import('./features/auth/components/profile/profile.component')
-      .then(c => c.ProfileComponent),
+    loadComponent: () =>
+      import('./features/auth/components/profile/profile.component').then(
+        (c) => c.ProfileComponent
+      ),
     canActivate: [authGuard]
   },
   {
@@ -30,40 +36,57 @@ export const routes: Routes = [
     children: [
       {
         path: '',
-        loadComponent: () => import('./features/users/components/user-list/user-list.component')
-          .then(c => c.UserListComponent),
+        loadComponent: () =>
+          import(
+            './features/users/components/user-list/user-list.component'
+          ).then((c) => c.UserListComponent),
         canActivate: [adminGuard]
       },
       {
         path: 'search',
-        loadComponent: () => import('./features/users/components/user-search/user-search.component')
-          .then(c => c.UserSearchComponent),
+        loadComponent: () =>
+          import(
+            './features/users/components/user-search/user-search.component'
+          ).then((c) => c.UserSearchComponent),
         canActivate: [adminGuard]
       },
       {
         path: ':id',
-        loadComponent: () => import('./features/users/components/user-detail/user-detail.component')
-          .then(c => c.UserDetailComponent),
+        loadComponent: () =>
+          import(
+            './features/users/components/user-detail/user-detail.component'
+          ).then((c) => c.UserDetailComponent),
         canActivate: [authGuard]
       },
       {
         path: ':id/edit',
-        loadComponent: () => import('./features/users/components/user-edit/user-edit.component')
-          .then(c => c.UserEditComponent),
+        loadComponent: () =>
+          import(
+            './features/users/components/user-edit/user-edit.component'
+          ).then((c) => c.UserEditComponent),
         canActivate: [authGuard]
       }
     ]
   },
-  {path: AppRouteSegmentEnum.Feature, loadComponent: () => import('./features/feature/feature.component')
-      .then(c => c.FeatureComponent)},
+  {
+    path: AppRouteSegmentEnum.Feature,
+    loadComponent: () =>
+      import('./features/feature/feature.component').then(
+        (c) => c.FeatureComponent
+      )
+  },
   {
     path: AppRouteSegmentEnum.Forbidden,
-    loadComponent: () => import('./features/auth/components/forbidden/forbidden.component')
-      .then(c => c.ForbiddenComponent)
+    loadComponent: () =>
+      import('./features/auth/components/forbidden/forbidden.component').then(
+        (c) => c.ForbiddenComponent
+      )
   },
   {
     path: AppRouteSegmentEnum.Any,
-    loadComponent: () => import('./core/components/page-not-found/page-not-found.component')
-      .then(c => c.PageNotFoundComponent)
+    loadComponent: () =>
+      import('./core/components/page-not-found/page-not-found.component').then(
+        (c) => c.PageNotFoundComponent
+      )
   }
 ];

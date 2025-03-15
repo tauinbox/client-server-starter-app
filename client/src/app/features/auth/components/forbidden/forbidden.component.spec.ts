@@ -9,8 +9,7 @@ describe('ForbiddenComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [ForbiddenComponent]
-    })
-    .compileComponents();
+    }).compileComponents();
 
     fixture = TestBed.createComponent(ForbiddenComponent);
     component = fixture.componentInstance;

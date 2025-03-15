@@ -3,4 +3,4 @@ export type FeatureEntityResponse = {
   name: string;
   createdAt: string;
   updatedAt: string;
-}
+};
