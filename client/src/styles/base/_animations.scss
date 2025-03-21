@@ -1,4 +1,5 @@
 @use '../abstracts/variables' as vars;
+@use '../abstracts/functions' as func;
 
 // Fade in animation
 @keyframes fadeIn {
@@ -17,7 +18,7 @@
 // Slide in from right
 @keyframes slideInRight {
   from {
-    transform: translateX(20px);
+    transform: translateX(func.rem(20));
     opacity: 0;
   }
   to {
@@ -33,7 +34,7 @@
 // Slide in from left
 @keyframes slideInLeft {
   from {
-    transform: translateX(-20px);
+    transform: translateX(func.rem(-20));
     opacity: 0;
   }
   to {
@@ -49,7 +50,7 @@
 // Slide in from top
 @keyframes slideInTop {
   from {
-    transform: translateY(-20px);
+    transform: translateY(func.rem(-20));
     opacity: 0;
   }
   to {
@@ -65,7 +66,7 @@
 // Slide in from bottom
 @keyframes slideInBottom {
   from {
-    transform: translateY(20px);
+    transform: translateY(func.rem(20));
     opacity: 0;
   }
   to {
@@ -106,13 +107,13 @@
   50%,
   70%,
   90% {
-    transform: translateX(-5px);
+    transform: translateX(func.rem(-5));
   }
   20%,
   40%,
   60%,
   80% {
-    transform: translateX(5px);
+    transform: translateX(func.rem(5));
   }
 }
 
