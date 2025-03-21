@@ -15,10 +15,6 @@
     @include mix.empty-state;
   }
 
-  .spacer {
-    @include mix.spacer;
-  }
-
   .table-container {
     @include mix.table-container;
   }

@@ -83,11 +83,6 @@
   }
 }
 
-// Flex spacer (for pushing items to opposite ends)
-@mixin spacer {
-  flex: 1 1 auto;
-}
-
 // Button with spinner
 @mixin button-with-spinner($min-width: func.rem(120)) {
   min-width: $min-width;
