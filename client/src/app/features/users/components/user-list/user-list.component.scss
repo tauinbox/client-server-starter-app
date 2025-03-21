@@ -1,5 +1,6 @@
 @use 'abstracts/variables' as vars;
 @use 'abstracts/mixins' as mix;
+@use 'abstracts/functions' as func;
 
 :host {
   .user-list-container {
@@ -23,14 +24,14 @@
   }
 
   .mat-column-id {
-    max-width: 80px;
+    max-width: func.rem(80);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .truncate-text {
-    max-width: 60px;
+    max-width: func.rem(60);
     display: inline-block;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -39,6 +40,6 @@
 
   mat-chip {
     font-size: vars.$font-size-sm;
-    min-height: 24px;
+    min-height: func.rem(24);
   }
 }

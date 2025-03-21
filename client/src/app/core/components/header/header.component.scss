@@ -1,3 +1,5 @@
+@use 'abstracts/functions' as func;
+
 .spacer {
   flex: 1 1 auto;
 }
@@ -18,5 +20,5 @@ mat-menu {
 }
 
 .mat-mdc-menu-item .mat-icon {
-  margin-right: 8px;
+  margin-right: func.rem(8);
 }

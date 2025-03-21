@@ -181,7 +181,7 @@ export class UserEditComponent implements OnInit {
     if (!this.user()) return;
 
     const dialogRef = this.dialog.open(ConfirmDialogComponent, {
-      width: '350px',
+      width: 'func.rem(350)',
       data: {
         title: 'Confirm Delete',
         message: `Are you sure you want to delete user ${this.user()!.firstName} ${this.user()!.lastName}?`,

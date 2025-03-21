@@ -1,4 +1,5 @@
 @use 'variables' as vars;
+@use 'functions' as func;
 
 // Center content on the page
 @mixin centered-container($max-width: vars.$container-max-width) {
@@ -48,9 +49,9 @@
   text-align: center;
 
   .empty-icon {
-    font-size: 48px;
-    height: 48px;
-    width: 48px;
+    font-size: func.rem(48);
+    height: func.rem(48);
+    width: func.rem(48);
     margin-bottom: vars.$spacing-md;
     opacity: 0.5;
   }
@@ -73,7 +74,7 @@
 
   .detail-label {
     font-weight: vars.$font-weight-medium;
-    min-width: 150px;
+    min-width: func.rem(150);
     opacity: 0.6;
   }
 
@@ -88,7 +89,7 @@
 }
 
 // Button with spinner
-@mixin button-with-spinner($min-width: 120px) {
+@mixin button-with-spinner($min-width: func.rem(120)) {
   min-width: $min-width;
   display: flex;
   align-items: center;
@@ -114,10 +115,10 @@
 // Error pages (404, 403)
 @mixin error-page {
   text-align: center;
-  padding: 100px 20px;
+  padding: func.rem(100) func.rem(20);
 
   h1 {
-    font-size: 72px;
+    font-size: func.rem(72);
     margin-bottom: 0;
   }
 

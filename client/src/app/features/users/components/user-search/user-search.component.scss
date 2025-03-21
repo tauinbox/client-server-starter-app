@@ -1,5 +1,6 @@
 @use 'abstracts/variables' as vars;
 @use 'abstracts/mixins' as mix;
+@use 'abstracts/functions' as func;
 
 :host {
   .user-search-container {
@@ -8,14 +9,14 @@
 
   .search-fields {
     display: grid;
-    grid-template-columns: minmax(250px, 1fr) minmax(250px, 1fr);
-    gap: 16px;
+    grid-template-columns: minmax(func.rem(250), 1fr) minmax(func.rem(250), 1fr);
+    gap: func.rem(16);
   }
 
   .search-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
+    gap: func.rem(10);
   }
 
   .results-header {
@@ -33,20 +34,20 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 40px 0;
+    padding: func.rem(40) 0;
     text-align: center;
   }
 
   .empty-icon {
-    font-size: 48px;
-    height: 48px;
-    width: 48px;
-    margin-bottom: 16px;
+    font-size: func.rem(48);
+    height: func.rem(48);
+    width: func.rem(48);
+    margin-bottom: func.rem(16);
     opacity: 0.5;
   }
 
   .mat-column-id {
-    max-width: 80px;
+    max-width: func.rem(80);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

@@ -1,0 +1,10 @@
+$base-font-size: 16px;
+
+@function rem($pixels) {
+  // If $pixels has no unit, assume it's pixels
+  @if (unitless($pixels)) {
+    $pixels: $pixels * 1px;
+  }
+
+  @return ($pixels / $base-font-size) * 1rem;
+}
