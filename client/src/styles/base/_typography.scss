@@ -1,0 +1,139 @@
+@use '../abstracts/variables' as vars;
+@use '../abstracts/functions' as func;
+
+/*
+  Typography rules for the application
+  Following the existing Roboto font family used in the project
+*/
+
+// Base font settings
+body {
+  font-family: vars.$font-family-base;
+  font-size: vars.$font-size-base;
+  font-weight: vars.$font-weight-regular;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+}
+
+// Headings
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin-bottom: vars.$spacing-sm;
+  font-weight: vars.$font-weight-medium;
+  line-height: 1.2;
+}
+
+h1 {
+  font-size: func.rem(28);
+
+  @media (min-width: vars.$breakpoint-xs) {
+    font-size: func.rem(32);
+  }
+}
+
+h2 {
+  font-size: func.rem(24);
+
+  @media (min-width: vars.$breakpoint-xs) {
+    font-size: func.rem(28);
+  }
+}
+
+h3 {
+  font-size: func.rem(20);
+
+  @media (min-width: vars.$breakpoint-xs) {
+    font-size: func.rem(24);
+  }
+}
+
+h4 {
+  font-size: func.rem(18);
+}
+
+h5 {
+  font-size: func.rem(16);
+}
+
+h6 {
+  font-size: func.rem(14);
+}
+
+// Paragraphs
+p {
+  margin-bottom: vars.$spacing-sm;
+}
+
+// Links
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color vars.$transition-fast ease-in-out;
+
+  &:hover,
+  &:focus {
+    text-decoration: underline;
+  }
+}
+
+// Lists
+ul,
+ol {
+  margin-bottom: vars.$spacing-sm;
+  padding-left: vars.$spacing-md;
+}
+
+ul {
+  list-style-type: disc;
+}
+
+ol {
+  list-style-type: decimal;
+}
+
+// Small text
+small {
+  font-size: vars.$font-size-sm;
+}
+
+// Code
+code,
+pre {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: func.rem(14);
+  background-color: var(--color-border);
+  border-radius: vars.$border-radius-sm;
+}
+
+code {
+  padding: func.rem(2) func.rem(4);
+}
+
+pre {
+  padding: vars.$spacing-sm;
+  margin-bottom: vars.$spacing-md;
+  overflow-x: auto;
+
+  code {
+    padding: 0;
+    background-color: transparent;
+  }
+}
+
+// Blockquote
+blockquote {
+  padding-left: vars.$spacing-md;
+  margin-bottom: vars.$spacing-md;
+  border-left: func.rem(4) solid var(--color-border);
+  font-style: italic;
+}
+
+// Selection
+::selection {
+  background-color: var(--color-primary);
+  color: #fff;
+}
