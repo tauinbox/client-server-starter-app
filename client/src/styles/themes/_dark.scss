@@ -1,4 +1,5 @@
 @use '@angular/material' as mat;
+@use 'abstracts/functions' as func;
 @include mat.core();
 
 // Define dark theme
@@ -38,5 +39,5 @@ $dark-theme: mat.m2-define-dark-theme(
 
   // Common theme settings
   --color-scheme: dark;
-  --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --card-shadow: 0 func.rem(2) func.rem(8) rgba(0, 0, 0, 0.5);
 }

@@ -1,5 +1,6 @@
 @use '../abstracts/variables' as vars;
 @use '../abstracts/mixins' as mix;
+@use '../abstracts/functions' as func;
 
 .app-table {
   &__container {
@@ -12,7 +13,7 @@
   }
 
   &__truncate {
-    max-width: 60px;
+    max-width: func.rem(60);
     display: inline-block;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -21,6 +22,6 @@
 
   &__chip {
     font-size: vars.$font-size-sm;
-    min-height: 24px;
+    min-height: func.rem(24);
   }
 }

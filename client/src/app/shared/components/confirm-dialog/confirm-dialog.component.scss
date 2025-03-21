@@ -1,12 +1,14 @@
+@use 'abstracts/functions' as func;
+
 .dialog-content {
   display: flex;
   align-items: center;
-  padding: 20px 0;
+  padding: func.rem(20) 0;
 }
 
 .dialog-icon {
-  margin-right: 16px;
-  font-size: 24px;
-  height: 24px;
-  width: 24px;
+  margin-right: func.rem(16);
+  font-size: func.rem(24);
+  height: func.rem(24);
+  width: func.rem(24);
 }

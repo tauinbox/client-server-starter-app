@@ -1,4 +1,5 @@
 @use '@angular/material' as mat;
+@use 'abstracts/functions' as func;
 @include mat.core();
 
 // Define light theme
@@ -38,5 +39,5 @@ $light-theme: mat.m2-define-light-theme(
 
   // Common theme settings
   --color-scheme: light;
-  --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --card-shadow: 0 func.rem(2) func.rem(4) rgba(0, 0, 0, 0.1);
 }

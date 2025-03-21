@@ -1,18 +1,20 @@
+@use '../abstracts/functions' as func;
+
 // Spacing
-$spacing-unit: 8px;
-$spacing-xs: $spacing-unit;
-$spacing-sm: $spacing-unit * 2; // 16px
-$spacing-md: $spacing-unit * 3; // 24px
-$spacing-lg: $spacing-unit * 4; // 32px
-$spacing-xl: $spacing-unit * 6; // 48px
+$spacing-unit: func.rem(8);
+$spacing-xs: $spacing-unit; // 0.5rem
+$spacing-sm: $spacing-unit * 2; // 1rem (16px)
+$spacing-md: $spacing-unit * 3; // 1.5rem (24px)
+$spacing-lg: $spacing-unit * 4; // 2rem (32px)
+$spacing-xl: $spacing-unit * 6; // 3rem (48px)
 
 // Typography
 $font-family-base: Roboto, 'Helvetica Neue', sans-serif;
-$font-size-base: 16px;
-$font-size-sm: 14px;
-$font-size-lg: 18px;
-$font-size-xl: 24px;
-$font-size-xxl: 32px;
+$font-size-base: func.rem(16); // 1rem
+$font-size-sm: func.rem(14); // 0.875rem
+$font-size-lg: func.rem(18); // 1.125rem
+$font-size-xl: func.rem(24); // 1.5rem
+$font-size-xxl: func.rem(32); // 2rem
 
 // Font weights
 $font-weight-light: 300;
@@ -21,9 +23,9 @@ $font-weight-medium: 500;
 $font-weight-bold: 700;
 
 // Border radius
-$border-radius-sm: 4px;
-$border-radius-md: 8px;
-$border-radius-lg: 16px;
+$border-radius-sm: func.rem(4); // 0.25rem
+$border-radius-md: func.rem(8); // 0.5rem
+$border-radius-lg: func.rem(16); // 1rem
 $border-radius-circle: 50%;
 
 // Z-index
@@ -35,17 +37,17 @@ $z-index-modal: 1050;
 $z-index-popover: 1060;
 $z-index-tooltip: 1070;
 
-// Breakpoints
+// Breakpoints (typically kept in px for media queries)
 $breakpoint-xs: 599px;
 $breakpoint-sm: 959px;
 $breakpoint-md: 1279px;
 $breakpoint-lg: 1919px;
 
 // Layout
-$container-max-width: 1200px;
-$card-width-sm: 400px;
-$card-width-md: 600px;
-$card-width-lg: 800px;
+$container-max-width: func.rem(1200); // 75rem
+$card-width-sm: func.rem(400); // 25rem
+$card-width-md: func.rem(600); // 37.5rem
+$card-width-lg: func.rem(800); // 50rem
 
 // Animation
 $transition-fast: 150ms;
