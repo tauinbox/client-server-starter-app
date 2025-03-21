@@ -1,0 +1,133 @@
+@use 'variables' as vars;
+
+// Center content on the page
+@mixin centered-container($max-width: vars.$container-max-width) {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: $max-width;
+  margin: 0 auto;
+  padding: vars.$spacing-xl 0;
+}
+
+// Full width form field
+@mixin form-field-full-width {
+  width: 100%;
+  margin-bottom: vars.$spacing-sm;
+}
+
+// Form actions container (usually for submit buttons)
+@mixin form-actions($justify: flex-end) {
+  display: flex;
+  justify-content: $justify;
+  margin-top: vars.$spacing-md;
+}
+
+// Error message styling
+@mixin error-message {
+  color: var(--color-error);
+  margin: vars.$spacing-sm 0;
+}
+
+// Loading spinners container
+@mixin loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: vars.$spacing-xl 0;
+  width: 100%;
+}
+
+// Empty state styling
+@mixin empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: vars.$spacing-xl 0;
+  text-align: center;
+
+  .empty-icon {
+    font-size: 48px;
+    height: 48px;
+    width: 48px;
+    margin-bottom: vars.$spacing-md;
+    opacity: 0.5;
+  }
+}
+
+// Table container with overflow handling
+@mixin table-container {
+  width: 100%;
+  overflow-x: auto;
+
+  table {
+    width: 100%;
+  }
+}
+
+// Detail item for user/entity details
+@mixin detail-item {
+  display: flex;
+  margin-bottom: vars.$spacing-sm;
+
+  .detail-label {
+    font-weight: vars.$font-weight-medium;
+    min-width: 150px;
+    opacity: 0.6;
+  }
+
+  .detail-value {
+    word-break: break-word;
+  }
+}
+
+// Flex spacer (for pushing items to opposite ends)
+@mixin spacer {
+  flex: 1 1 auto;
+}
+
+// Button with spinner
+@mixin button-with-spinner($min-width: 120px) {
+  min-width: $min-width;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .spinner-margin {
+    margin-left: vars.$spacing-xs;
+  }
+}
+
+// Card component
+@mixin card-container($max-width: null) {
+  margin: vars.$spacing-md 0;
+
+  @if $max-width {
+    mat-card {
+      max-width: $max-width;
+      width: 100%;
+    }
+  }
+}
+
+// Error pages (404, 403)
+@mixin error-page {
+  text-align: center;
+  padding: 100px 20px;
+
+  h1 {
+    font-size: 72px;
+    margin-bottom: 0;
+  }
+
+  h2 {
+    font-size: vars.$font-size-xl;
+    margin-top: 0;
+    margin-bottom: vars.$spacing-md;
+  }
+
+  p {
+    margin-bottom: vars.$spacing-lg;
+  }
+}

@@ -54,11 +54,5 @@ export class ThemeService {
 
   private applyTheme(theme: ThemeMode): void {
     document.documentElement.setAttribute('data-theme', theme);
-
-    if (theme === 'dark') {
-      document.body.classList.add('dark-theme');
-    } else {
-      document.body.classList.remove('dark-theme');
-    }
   }
 }

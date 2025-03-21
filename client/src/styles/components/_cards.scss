@@ -1,0 +1,18 @@
+@use '../abstracts/variables' as vars;
+@use '../abstracts/mixins' as mix;
+
+.app-card {
+  &__container {
+    @include mix.card-container;
+  }
+
+  &__title-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+  }
+
+  &__content {
+    padding: vars.$spacing-md;
+  }
+}

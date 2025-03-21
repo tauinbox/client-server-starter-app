@@ -1,0 +1,24 @@
+@use '../abstracts/variables' as vars;
+@use '../abstracts/mixins' as mix;
+
+.app-form {
+  &__container {
+    @include mix.centered-container(vars.$card-width-md);
+  }
+
+  &__field {
+    @include mix.form-field-full-width;
+  }
+
+  &__actions {
+    @include mix.form-actions;
+  }
+
+  &__error {
+    @include mix.error-message;
+  }
+
+  &__submit {
+    @include mix.button-with-spinner;
+  }
+}

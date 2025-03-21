@@ -1,0 +1,42 @@
+@use '@angular/material' as mat;
+@include mat.core();
+
+// Define dark theme
+$dark-primary: mat.m2-define-palette(mat.$m2-teal-palette, 300);
+$dark-accent: mat.m2-define-palette(mat.$m2-deep-orange-palette, A200);
+$dark-warn: mat.m2-define-palette(mat.$m2-red-palette, 300);
+
+$dark-theme: mat.m2-define-dark-theme(
+  (
+    color: (
+      primary: $dark-primary,
+      accent: $dark-accent,
+      warn: $dark-warn
+    ),
+    typography: mat.m2-define-typography-config(),
+    density: 0
+  )
+);
+
+[data-theme='dark']:root {
+  @include mat.all-component-colors($dark-theme);
+
+  // Theme-specific colors
+  --color-primary: $dark-primary;
+  --color-accent: $dark-accent;
+  --color-warn: $dark-warn;
+
+  // UI colors - dark theme
+  --color-background: #303030;
+  --color-surface: #424242;
+  --color-text-primary: rgba(255, 255, 255, 0.87);
+  --color-text-secondary: rgba(255, 255, 255, 0.6);
+  --color-text-hint: rgba(255, 255, 255, 0.38);
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-divider: rgba(255, 255, 255, 0.12);
+  --color-disabled: rgba(255, 255, 255, 0.38);
+
+  // Common theme settings
+  --color-scheme: dark;
+  --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
