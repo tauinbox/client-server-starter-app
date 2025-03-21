@@ -1,19 +1,8 @@
-.container {
-  text-align: center;
-  padding: 100px 20px;
-}
+@use 'abstracts/variables' as vars;
+@use 'abstracts/mixins' as mix;
 
-h1 {
-  font-size: 72px;
-  margin-bottom: 0;
-}
-
-h2 {
-  font-size: 24px;
-  margin-top: 0;
-  margin-bottom: 20px;
-}
-
-p {
-  margin-bottom: 30px;
+:host {
+  .container {
+    @include mix.error-page();
+  }
 }

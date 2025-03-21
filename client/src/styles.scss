@@ -1,4 +1,6 @@
 /* Global styles */
-@use 'styles/variables';
-@use 'styles/theme';
-@use 'styles/layout';
+@use 'abstracts';
+@use 'components';
+@use 'layout';
+@use 'themes';
+@use 'utilities';

@@ -1,97 +1,50 @@
-.user-detail-container {
-  margin: 20px 0;
-}
+@use 'abstracts/variables' as vars;
+@use 'abstracts/mixins' as mix;
 
-.loading-container,
-.error-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 0;
-  text-align: center;
-}
+:host {
+  .user-detail-container {
+    @include mix.card-container;
+  }
 
-.error-icon {
-  font-size: 48px;
-  height: 48px;
-  width: 48px;
-  margin-bottom: 16px;
-  color: #f44336;
-}
+  .loading-container {
+    @include mix.loading-container;
+  }
 
-.user-header {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
+  .error-container {
+    @include mix.empty-state;
 
-.avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background-color: #e0e0e0;
-}
+    .error-icon {
+      color: var(--color-error);
+    }
+  }
 
-.avatar mat-icon {
-  font-size: 48px;
-  height: 48px;
-  width: 48px;
-}
+  .user-header {
+    display: flex;
+    align-items: center;
+    gap: vars.$spacing-md;
+  }
 
-.user-title h2 {
-  margin: 0 0 8px 0;
-}
+  .avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    border-radius: vars.$border-radius-circle;
+    background-color: var(--color-border);
 
-.email {
-  margin: 0 0 12px 0;
-  opacity: 0.6;
-}
+    mat-icon {
+      font-size: 48px;
+      height: 48px;
+      width: 48px;
+    }
+  }
 
-.chips {
-  display: flex;
-  gap: 8px;
-}
+  .detail-item {
+    @include mix.detail-item;
+  }
 
-.my-4 {
-  margin-top: 24px;
-  margin-bottom: 24px;
-}
-
-.detail-section {
-  margin-bottom: 24px;
-}
-
-.detail-section h3 {
-  margin-top: 0;
-  margin-bottom: 16px;
-  font-weight: 500;
-}
-
-.detail-item {
-  display: flex;
-  margin-bottom: 12px;
-}
-
-.detail-label {
-  font-weight: 500;
-  min-width: 150px;
-  opacity: 0.6;
-}
-
-.detail-value {
-  word-break: break-word;
-}
-
-.actions-container {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
-}
-
-.spacer {
-  flex: 1 1 auto;
+  .spacer {
+    flex: 1 1 auto;
+  }
 }

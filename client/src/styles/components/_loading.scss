@@ -1,0 +1,12 @@
+@use '../abstracts/variables' as vars;
+@use '../abstracts/mixins' as mix;
+
+.app-loading {
+  &__container {
+    @include mix.loading-container;
+  }
+
+  &__spinner {
+    margin-bottom: vars.$spacing-md;
+  }
+}

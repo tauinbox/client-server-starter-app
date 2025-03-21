@@ -1,42 +1,20 @@
-.login-container {
-  display: flex;
-  justify-content: center;
-  padding: 40px 0;
-}
+@use 'abstracts/variables' as vars;
+@use 'abstracts/mixins' as mix;
 
-mat-card {
-  max-width: 400px;
-  width: 100%;
-}
+:host {
+  .login-container {
+    @include mix.centered-container(vars.$card-width-sm);
+  }
 
-.full-width {
-  width: 100%;
-  margin-bottom: 15px;
-}
+  .form-actions {
+    @include mix.form-actions;
+  }
 
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
-}
+  .error-message {
+    @include mix.error-message;
+  }
 
-.error-message {
-  color: #f44336;
-  margin: 15px 0;
-}
-
-button[type='submit'] {
-  min-width: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.text-center {
-  text-align: center;
-  width: 100%;
-}
-
-.ml-2 {
-  margin-left: 8px;
+  button[type='submit'] {
+    @include mix.button-with-spinner;
+  }
 }

@@ -1,53 +1,44 @@
-.user-list-container {
-  margin: 20px 0;
-}
+@use 'abstracts/variables' as vars;
+@use 'abstracts/mixins' as mix;
 
-.loading-container,
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 0;
-  text-align: center;
-}
+:host {
+  .user-list-container {
+    @include mix.card-container;
+  }
 
-.empty-icon {
-  font-size: 48px;
-  height: 48px;
-  width: 48px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
+  .loading-container {
+    @include mix.loading-container;
+  }
 
-.spacer {
-  flex: 1 1 auto;
-}
+  .empty-state {
+    @include mix.empty-state;
+  }
 
-.table-container {
-  overflow-x: auto;
-}
+  .spacer {
+    @include mix.spacer;
+  }
 
-table {
-  width: 100%;
-}
+  .table-container {
+    @include mix.table-container;
+  }
 
-.mat-column-id {
-  max-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+  .mat-column-id {
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
-.truncate-text {
-  max-width: 60px;
-  display: inline-block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+  .truncate-text {
+    max-width: 60px;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
-mat-chip {
-  font-size: 12px;
-  min-height: 24px;
+  mat-chip {
+    font-size: vars.$font-size-sm;
+    min-height: 24px;
+  }
 }

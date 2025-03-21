@@ -1,0 +1,42 @@
+@use '@angular/material' as mat;
+@include mat.core();
+
+// Define light theme
+$light-primary: mat.m2-define-palette(mat.$m2-teal-palette, 600);
+$light-accent: mat.m2-define-palette(mat.$m2-deep-orange-palette, A400);
+$light-warn: mat.m2-define-palette(mat.$m2-red-palette);
+
+$light-theme: mat.m2-define-light-theme(
+  (
+    color: (
+      primary: $light-primary,
+      accent: $light-accent,
+      warn: $light-warn
+    ),
+    typography: mat.m2-define-typography-config(),
+    density: 0
+  )
+);
+
+@include mat.all-component-themes($light-theme);
+
+:root {
+  // Theme-specific colors
+  --color-primary: $light-primary;
+  --color-accent: $light-accent;
+  --color-warn: $light-warn;
+
+  // UI colors - light theme
+  --color-background: #fafafa;
+  --color-surface: #ffffff;
+  --color-text-primary: rgba(0, 0, 0, 0.87);
+  --color-text-secondary: rgba(0, 0, 0, 0.6);
+  --color-text-hint: rgba(0, 0, 0, 0.38);
+  --color-border: rgba(0, 0, 0, 0.12);
+  --color-divider: rgba(0, 0, 0, 0.12);
+  --color-disabled: rgba(0, 0, 0, 0.38);
+
+  // Common theme settings
+  --color-scheme: light;
+  --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
