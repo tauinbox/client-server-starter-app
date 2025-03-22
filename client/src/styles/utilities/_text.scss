@@ -45,26 +45,33 @@
 
 // Text colors
 .text-primary {
-  color: var(--color-primary) !important;
+  color: var(--color-text-primary) !important;
 }
+
 .text-accent {
   color: var(--color-accent) !important;
 }
+
 .text-warn {
   color: var(--color-warn) !important;
 }
+
 .text-success {
   color: var(--color-success) !important;
 }
+
 .text-error {
   color: var(--color-error) !important;
 }
+
 .text-info {
   color: var(--color-info) !important;
 }
+
 .text-warning {
   color: var(--color-warning) !important;
 }
+
 .text-muted {
   color: var(--color-text-secondary) !important;
 }

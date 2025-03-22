@@ -13,6 +13,7 @@ body {
   font-weight: vars.$font-weight-regular;
   line-height: 1.5;
   color: var(--color-text-primary);
+  background-color: var(--color-background);
 }
 
 // Headings
@@ -136,4 +137,9 @@ blockquote {
 ::selection {
   background-color: var(--color-primary);
   color: #fff;
+}
+
+// Auto filled color
+input {
+  color-scheme: var(--color-scheme);
 }
