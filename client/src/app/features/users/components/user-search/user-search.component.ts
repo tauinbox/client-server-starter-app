@@ -1,7 +1,9 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
+  OnInit,
   signal
 } from '@angular/core';
 import {
@@ -10,7 +12,12 @@ import {
   MatCardHeader,
   MatCardTitle
 } from '@angular/material/card';
-import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import {
+  FormBuilder,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule
+} from '@angular/forms';
 import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatOption, MatSelect } from '@angular/material/select';
@@ -38,6 +45,15 @@ import { MatDialog } from '@angular/material/dialog';
 import { User, UserSearch } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { DatePipe } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
+
+type UserSearchFormType = {
+  email: FormControl<string>;
+  firstName: FormControl<string>;
+  lastName: FormControl<string>;
+  isAdmin: FormControl<string>;
+  isActive: FormControl<string>;
+};
 
 @Component({
   selector: 'app-user-search',
@@ -69,23 +85,24 @@ import { DatePipe } from '@angular/common';
     MatRowDef,
     MatInput,
     MatLabel,
-    MatIcon,
     DatePipe
   ],
   templateUrl: './user-search.component.html',
   styleUrl: './user-search.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class UserSearchComponent {
+export class UserSearchComponent implements OnInit {
   private fb = inject(FormBuilder);
   private userService = inject(UserService);
   private snackBar = inject(MatSnackBar);
   private dialog = inject(MatDialog);
 
-  searchForm: FormGroup;
+  searchForm!: FormGroup<UserSearchFormType>;
   users = signal<User[]>([]);
   searching = signal(false);
   searched = signal(false);
+
+  resultsFound = computed(() => this.users().length > 0);
 
   displayedColumns: string[] = [
     'id',
@@ -97,38 +114,26 @@ export class UserSearchComponent {
     'actions'
   ];
 
-  constructor() {
-    this.searchForm = this.fb.group({
-      email: [''],
-      firstName: [''],
-      lastName: [''],
-      isAdmin: [''],
-      isActive: ['']
+  ngOnInit(): void {
+    this.initForm();
+  }
+
+  private initForm(): void {
+    this.searchForm = this.fb.group<UserSearchFormType>({
+      email: this.fb.control('', { nonNullable: true }),
+      firstName: this.fb.control('', { nonNullable: true }),
+      lastName: this.fb.control('', { nonNullable: true }),
+      isAdmin: this.fb.control('', { nonNullable: true }),
+      isActive: this.fb.control('', { nonNullable: true })
     });
   }
 
   onSubmit(): void {
-    const criteria: UserSearch = {};
-
-    // Only include non-empty fields in the search criteria
-    const formValue = this.searchForm.value;
-
-    if (formValue.email) criteria.email = formValue.email;
-    if (formValue.firstName) criteria.firstName = formValue.firstName;
-    if (formValue.lastName) criteria.lastName = formValue.lastName;
-
-    // Handle boolean values (convert from string if needed)
-    if (formValue.isAdmin !== '') {
-      criteria.isAdmin =
-        formValue.isAdmin === 'true' || formValue.isAdmin === true;
-    }
-
-    if (formValue.isActive !== '') {
-      criteria.isActive =
-        formValue.isActive === 'true' || formValue.isActive === true;
-    }
+    const formValues = this.searchForm.getRawValue();
+    const criteria = this.buildSearchCriteria(formValues);
 
     this.searching.set(true);
+    this.searched.set(false);
 
     this.userService.search(criteria).subscribe({
       next: (users) => {
@@ -136,17 +141,35 @@ export class UserSearchComponent {
         this.searching.set(false);
         this.searched.set(true);
       },
-      error: () => {
+      error: (err: HttpErrorResponse) => {
         this.searching.set(false);
-        this.snackBar.open(
-          'Failed to search users. Please try again.',
-          'Close',
-          {
-            duration: 5000
-          }
-        );
+        const errorMessage =
+          err.error?.message || 'Failed to search users. Please try again.';
+        this.snackBar.open(errorMessage, 'Close', {
+          duration: 5000
+        });
       }
     });
+  }
+
+  private buildSearchCriteria(
+    formValues: FormGroup<UserSearchFormType>['value']
+  ): UserSearch {
+    const criteria: UserSearch = {};
+
+    if (formValues.email?.trim()) criteria.email = formValues.email;
+    if (formValues.firstName?.trim()) criteria.firstName = formValues.firstName;
+    if (formValues.lastName?.trim()) criteria.lastName = formValues.lastName;
+
+    if (formValues.isAdmin !== '') {
+      criteria.isAdmin = formValues.isAdmin === 'true';
+    }
+
+    if (formValues.isActive !== '') {
+      criteria.isActive = formValues.isActive === 'true';
+    }
+
+    return criteria;
   }
 
   resetForm(): void {
@@ -164,12 +187,13 @@ export class UserSearchComponent {
 
   confirmDelete(user: User): void {
     const dialogRef = this.dialog.open(ConfirmDialogComponent, {
-      width: 'func.rem(350)',
+      width: '350px',
       data: {
         title: 'Confirm Delete',
         message: `Are you sure you want to delete user ${user.firstName} ${user.lastName}?`,
         confirmButton: 'Delete',
-        cancelButton: 'Cancel'
+        cancelButton: 'Cancel',
+        icon: 'warning'
       }
     });
 
@@ -180,7 +204,7 @@ export class UserSearchComponent {
     });
   }
 
-  deleteUser(id: string): void {
+  private deleteUser(id: string): void {
     this.userService.delete(id).subscribe({
       next: () => {
         this.users.update((users) => users.filter((user) => user.id !== id));
@@ -189,14 +213,12 @@ export class UserSearchComponent {
           duration: 5000
         });
       },
-      error: () => {
-        this.snackBar.open(
-          'Failed to delete user. Please try again.',
-          'Close',
-          {
-            duration: 5000
-          }
-        );
+      error: (err: HttpErrorResponse) => {
+        const errorMessage =
+          err.error?.message || 'Failed to delete user. Please try again.';
+        this.snackBar.open(errorMessage, 'Close', {
+          duration: 5000
+        });
       }
     });
   }
