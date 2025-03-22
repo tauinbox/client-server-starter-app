@@ -1,12 +1,14 @@
 @use '../abstracts/functions' as func;
 
 // Spacing
-$spacing-unit: func.rem(8);
-$spacing-xs: $spacing-unit; // 0.5rem
-$spacing-sm: $spacing-unit * 2; // 1rem (16px)
-$spacing-md: $spacing-unit * 3; // 1.5rem (24px)
-$spacing-lg: $spacing-unit * 4; // 2rem (32px)
-$spacing-xl: $spacing-unit * 6; // 3rem (48px)
+$spacing-unit: func.rem(4);
+$spacing-xxs: $spacing-unit; // 0.25rem (4px)
+$spacing-xs: $spacing-unit * 2; // 0.5rem (8px)
+$spacing-sm: $spacing-unit * 3; // 0.75rem (12px)
+$spacing-md: $spacing-unit * 4; // 1rem (16px)
+$spacing-lg: $spacing-unit * 6; // 1.5rem (24px)
+$spacing-xl: $spacing-unit * 8; // 2rem (32px)
+$spacing-xxl: $spacing-unit * 12; // 3rem (48px)
 
 // Typography
 $font-family-base: Roboto, 'Helvetica Neue', sans-serif;

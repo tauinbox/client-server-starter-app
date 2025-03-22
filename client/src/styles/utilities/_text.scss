@@ -1,20 +1,40 @@
 @use '../abstracts/variables' as vars;
 
 // Text alignment
-.text-left { text-align: left !important; }
-.text-center { text-align: center !important; }
-.text-right { text-align: right !important; }
+.text-left {
+  text-align: left !important;
+}
+.text-center {
+  text-align: center !important;
+}
+.text-right {
+  text-align: right !important;
+}
 
 // Text transforms
-.text-lowercase { text-transform: lowercase !important; }
-.text-uppercase { text-transform: uppercase !important; }
-.text-capitalize { text-transform: capitalize !important; }
+.text-lowercase {
+  text-transform: lowercase !important;
+}
+.text-uppercase {
+  text-transform: uppercase !important;
+}
+.text-capitalize {
+  text-transform: capitalize !important;
+}
 
 // Font weights
-.font-weight-light { font-weight: vars.$font-weight-light !important; }
-.font-weight-normal { font-weight: vars.$font-weight-regular !important; }
-.font-weight-medium { font-weight: vars.$font-weight-medium !important; }
-.font-weight-bold { font-weight: vars.$font-weight-bold !important; }
+.font-weight-light {
+  font-weight: vars.$font-weight-light !important;
+}
+.font-weight-normal {
+  font-weight: vars.$font-weight-regular !important;
+}
+.font-weight-medium {
+  font-weight: vars.$font-weight-medium !important;
+}
+.font-weight-bold {
+  font-weight: vars.$font-weight-bold !important;
+}
 
 // Text overflow
 .text-truncate {
@@ -24,11 +44,27 @@
 }
 
 // Text colors
-.text-primary { color: var(--color-primary) !important; }
-.text-accent { color: var(--color-accent) !important; }
-.text-warn { color: var(--color-warn) !important; }
-.text-success { color: var(--color-success) !important; }
-.text-error { color: var(--color-error) !important; }
-.text-info { color: var(--color-info) !important; }
-.text-warning { color: var(--color-warning) !important; }
-.text-muted { color: var(--color-text-secondary) !important; }
+.text-primary {
+  color: var(--color-primary) !important;
+}
+.text-accent {
+  color: var(--color-accent) !important;
+}
+.text-warn {
+  color: var(--color-warn) !important;
+}
+.text-success {
+  color: var(--color-success) !important;
+}
+.text-error {
+  color: var(--color-error) !important;
+}
+.text-info {
+  color: var(--color-info) !important;
+}
+.text-warning {
+  color: var(--color-warning) !important;
+}
+.text-muted {
+  color: var(--color-text-secondary) !important;
+}
