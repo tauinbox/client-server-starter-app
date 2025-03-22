@@ -1,6 +1,5 @@
 @use '../abstracts/variables' as vars;
 
-// Margin utilities
 $spacing-sizes: (
   '0': 0,
   '1': vars.$spacing-xxs,
@@ -12,6 +11,7 @@ $spacing-sizes: (
   '7': vars.$spacing-xxl
 );
 
+// Margin utilities
 @each $size, $value in $spacing-sizes {
   .m-#{$size} {
     margin: $value !important;
