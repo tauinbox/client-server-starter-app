@@ -3,30 +3,64 @@
 // Margin utilities
 $spacing-sizes: (
   '0': 0,
-  '1': vars.$spacing-xs,
-  '2': vars.$spacing-sm,
-  '3': vars.$spacing-md,
-  '4': vars.$spacing-lg,
-  '5': vars.$spacing-xl
+  '1': vars.$spacing-xxs,
+  '2': vars.$spacing-xs,
+  '3': vars.$spacing-sm,
+  '4': vars.$spacing-md,
+  '5': vars.$spacing-lg,
+  '6': vars.$spacing-xl,
+  '7': vars.$spacing-xxl
 );
 
 @each $size, $value in $spacing-sizes {
-  .m-#{$size} { margin: $value !important; }
-  .mx-#{$size} { margin-left: $value !important; margin-right: $value !important; }
-  .my-#{$size} { margin-top: $value !important; margin-bottom: $value !important; }
-  .mt-#{$size} { margin-top: $value !important; }
-  .mr-#{$size} { margin-right: $value !important; }
-  .mb-#{$size} { margin-bottom: $value !important; }
-  .ml-#{$size} { margin-left: $value !important; }
+  .m-#{$size} {
+    margin: $value !important;
+  }
+  .mx-#{$size} {
+    margin-left: $value !important;
+    margin-right: $value !important;
+  }
+  .my-#{$size} {
+    margin-top: $value !important;
+    margin-bottom: $value !important;
+  }
+  .mt-#{$size} {
+    margin-top: $value !important;
+  }
+  .mr-#{$size} {
+    margin-right: $value !important;
+  }
+  .mb-#{$size} {
+    margin-bottom: $value !important;
+  }
+  .ml-#{$size} {
+    margin-left: $value !important;
+  }
 }
 
 // Padding utilities
 @each $size, $value in $spacing-sizes {
-  .p-#{$size} { padding: $value !important; }
-  .px-#{$size} { padding-left: $value !important; padding-right: $value !important; }
-  .py-#{$size} { padding-top: $value !important; padding-bottom: $value !important; }
-  .pt-#{$size} { padding-top: $value !important; }
-  .pr-#{$size} { padding-right: $value !important; }
-  .pb-#{$size} { padding-bottom: $value !important; }
-  .pl-#{$size} { padding-left: $value !important; }
+  .p-#{$size} {
+    padding: $value !important;
+  }
+  .px-#{$size} {
+    padding-left: $value !important;
+    padding-right: $value !important;
+  }
+  .py-#{$size} {
+    padding-top: $value !important;
+    padding-bottom: $value !important;
+  }
+  .pt-#{$size} {
+    padding-top: $value !important;
+  }
+  .pr-#{$size} {
+    padding-right: $value !important;
+  }
+  .pb-#{$size} {
+    padding-bottom: $value !important;
+  }
+  .pl-#{$size} {
+    padding-left: $value !important;
+  }
 }
