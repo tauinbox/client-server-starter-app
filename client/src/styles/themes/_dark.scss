@@ -2,10 +2,15 @@
 @use 'abstracts/functions' as func;
 @include mat.core();
 
-// Define dark theme
+// Define dark theme palettes
 $dark-primary: mat.m2-define-palette(mat.$m2-teal-palette, 300);
 $dark-accent: mat.m2-define-palette(mat.$m2-deep-orange-palette, A200);
 $dark-warn: mat.m2-define-palette(mat.$m2-red-palette, 300);
+
+// Define state palettes
+$dark-success: mat.m2-define-palette(mat.$m2-green-palette, 300);
+$dark-info: mat.m2-define-palette(mat.$m2-blue-palette, 300);
+$dark-warning: mat.m2-define-palette(mat.$m2-orange-palette, 300);
 
 $dark-theme: mat.m2-define-dark-theme(
   (
@@ -22,23 +27,27 @@ $dark-theme: mat.m2-define-dark-theme(
 [data-theme='dark']:root {
   @include mat.all-component-colors($dark-theme);
 
+  // Common theme settings
+  --color-scheme: dark;
+
+  // Theme-specific colors
+  --color-primary: #{mat.m2-get-color-from-palette($dark-primary)};
+  --color-accent: #{mat.m2-get-color-from-palette($dark-accent)};
+  --color-warn: #{mat.m2-get-color-from-palette($dark-warn)};
+
+  // State colors
+  --color-success: #{mat.m2-get-color-from-palette($dark-success)};
+  --color-info: #{mat.m2-get-color-from-palette($dark-info)};
+  --color-warning: #{mat.m2-get-color-from-palette($dark-warning)};
+  --color-error: #{mat.m2-get-color-from-palette($dark-warn)};
+
   // UI colors
   --color-background: #303030;
   --color-surface: #424242;
   --color-text-primary: rgba(255, 255, 255, 0.87);
   --color-text-secondary: rgba(255, 255, 255, 0.6);
-  --color-text-hint: rgba(255, 255, 255, 0.38);
+  --color-text-tertiary: rgba(255, 255, 255, 0.38);
   --color-border: rgba(255, 255, 255, 0.12);
   --color-divider: rgba(255, 255, 255, 0.12);
   --color-disabled: rgba(255, 255, 255, 0.38);
-
-  // State colors
-  --color-success: #81c784; // Material Green 300
-  --color-error: #e57373; // Material Red 300
-  --color-info: #64b5f6; // Material Blue 300
-  --color-warning: #ffb74d; // Material Orange 300
-
-  // Common theme settings
-  --color-scheme: dark;
-  --card-shadow: 0 func.rem(2) func.rem(8) rgba(0, 0, 0, 0.5);
 }

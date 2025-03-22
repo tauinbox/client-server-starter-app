@@ -45,7 +45,7 @@
 
 // Text colors
 .text-primary {
-  color: var(--color-text-primary) !important;
+  color: var(--color-primary) !important;
 }
 
 .text-accent {
@@ -72,6 +72,10 @@
   color: var(--color-warning) !important;
 }
 
-.text-muted {
+.text-secondary {
   color: var(--color-text-secondary) !important;
+}
+
+.text-tertiary {
+  color: var(--color-text-tertiary) !important;
 }
