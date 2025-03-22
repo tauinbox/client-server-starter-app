@@ -2,10 +2,15 @@
 @use 'abstracts/functions' as func;
 @include mat.core();
 
-// Define light theme
+// Define light theme palettes
 $light-primary: mat.m2-define-palette(mat.$m2-teal-palette, 600);
 $light-accent: mat.m2-define-palette(mat.$m2-deep-orange-palette, A400);
 $light-warn: mat.m2-define-palette(mat.$m2-red-palette);
+
+// Define state palettes
+$light-success: mat.m2-define-palette(mat.$m2-green-palette, 500);
+$light-info: mat.m2-define-palette(mat.$m2-blue-palette, 500);
+$light-warning: mat.m2-define-palette(mat.$m2-orange-palette, 500);
 
 $light-theme: mat.m2-define-light-theme(
   (
@@ -22,23 +27,27 @@ $light-theme: mat.m2-define-light-theme(
 :root {
   @include mat.all-component-themes($light-theme);
 
+  // Common theme settings
+  --color-scheme: light;
+
+  // Theme-specific colors
+  --color-primary: #{mat.m2-get-color-from-palette($light-primary)};
+  --color-accent: #{mat.m2-get-color-from-palette($light-accent)};
+  --color-warn: #{mat.m2-get-color-from-palette($light-warn)};
+
+  // State colors
+  --color-success: #{mat.m2-get-color-from-palette($light-success)};
+  --color-info: #{mat.m2-get-color-from-palette($light-info)};
+  --color-warning: #{mat.m2-get-color-from-palette($light-warning)};
+  --color-error: #{mat.m2-get-color-from-palette($light-warn)};
+
   // UI colors
   --color-background: #fafafa;
   --color-surface: #ffffff;
   --color-text-primary: rgba(0, 0, 0, 0.87);
   --color-text-secondary: rgba(0, 0, 0, 0.6);
-  --color-text-hint: rgba(0, 0, 0, 0.38);
+  --color-text-tertiary: rgba(0, 0, 0, 0.38);
   --color-border: rgba(0, 0, 0, 0.12);
   --color-divider: rgba(0, 0, 0, 0.12);
   --color-disabled: rgba(0, 0, 0, 0.38);
-
-  // State colors
-  --color-success: #4caf50; // Material Green 500
-  --color-error: #f44336; // Material Red 500
-  --color-info: #2196f3; // Material Blue 500
-  --color-warning: #ff9800; // Material Orange 500
-
-  // Common theme settings
-  --color-scheme: light;
-  --card-shadow: 0 func.rem(2) func.rem(4) rgba(0, 0, 0, 0.1);
 }

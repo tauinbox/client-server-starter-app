@@ -1,11 +1,6 @@
 @use '../abstracts/variables' as vars;
 @use '../abstracts/functions' as func;
 
-/*
-  Typography rules for the application
-  Following the existing Roboto font family used in the project
-*/
-
 // Base font settings
 body {
   font-family: vars.$font-family-base;
@@ -139,7 +134,7 @@ blockquote {
   color: #fff;
 }
 
-// Auto filled color
+// Used to highlight auto-filled fields
 input {
   color-scheme: var(--color-scheme);
 }
