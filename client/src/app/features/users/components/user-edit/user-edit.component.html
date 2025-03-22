@@ -117,16 +117,17 @@
           }
 
           <div class="form-actions">
-            <button
-              mat-button
-              type="button"
-              color="warn"
-              (click)="confirmDelete()"
-              *ngIf="canDelete()"
-            >
-              <mat-icon>delete</mat-icon>
-              Delete User
-            </button>
+            @if (canDelete()) {
+              <button
+                mat-button
+                type="button"
+                color="warn"
+                (click)="confirmDelete()"
+              >
+                <mat-icon>delete</mat-icon>
+                Delete User
+              </button>
+            }
 
             <div class="spacer"></div>
 

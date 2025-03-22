@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
   input,
   OnInit,
@@ -83,6 +84,15 @@ export class UserEditComponent implements OnInit {
 
   userForm!: FormGroup<UserFormType>;
 
+  canSubmit = computed(
+    () => this.userForm?.valid && !this.saving() && this.userForm?.dirty
+  );
+
+  canDelete = computed(
+    () =>
+      this.authService.isAdmin() && this.id() !== this.authService.user()?.id
+  );
+
   ngOnInit(): void {
     this.initForm();
     this.loadUser();
@@ -149,16 +159,31 @@ export class UserEditComponent implements OnInit {
   }
 
   onSubmit(): void {
-    if (this.userForm.invalid || !this.user()) return;
+    if (!this.canSubmit()) return;
 
     const formValues = this.userForm.getRawValue();
+    const updateData: FormGroup<UserFormType>['value'] =
+      this.prepareUpdateData(formValues);
+
+    this.saving.set(true);
+    this.error.set(null);
+
+    this.userService.update(this.id(), updateData).subscribe({
+      next: this.handleUpdateSuccess.bind(this),
+      error: this.handleUpdateError.bind(this)
+    });
+  }
+
+  private prepareUpdateData(
+    formValues: FormGroup<UserFormType>['value']
+  ): UpdateUser {
     const updateData: UpdateUser = {
       email: formValues.email,
       firstName: formValues.firstName,
       lastName: formValues.lastName
     };
 
-    if (formValues.password.trim()) {
+    if (formValues.password?.trim()) {
       updateData.password = formValues.password;
     }
 
@@ -167,57 +192,50 @@ export class UserEditComponent implements OnInit {
       updateData.isActive = formValues.isActive;
     }
 
-    this.saving.set(true);
-    this.error.set(null);
-
-    this.userService.update(this.id(), updateData).subscribe({
-      next: (updatedUser) => {
-        this.saving.set(false);
-        this.user.set(updatedUser);
-
-        this.userForm.patchValue({ password: '' });
-        this.userForm.markAsPristine();
-
-        this.snackBar.open('User updated successfully', 'Close', {
-          duration: 5000
-        });
-
-        void this.router.navigate(['/users', this.id()]);
-      },
-      error: (err: HttpErrorResponse) => {
-        this.saving.set(false);
-        const errorMessage =
-          err.error?.message || 'Failed to update user. Please try again.';
-        this.error.set(errorMessage);
-      }
-    });
+    return updateData;
   }
 
-  canDelete(): boolean {
-    return (
-      this.authService.isAdmin() && this.id() !== this.authService.user()?.id
-    );
+  private handleUpdateSuccess(updatedUser: User): void {
+    this.saving.set(false);
+    this.user.set(updatedUser);
+
+    this.userForm.patchValue({ password: '' });
+    this.userForm.markAsPristine();
+
+    this.snackBar.open('User updated successfully', 'Close', {
+      duration: 5000
+    });
+
+    void this.router.navigate(['/users', this.id()]);
+  }
+
+  private handleUpdateError(err: HttpErrorResponse): void {
+    this.saving.set(false);
+    const errorMessage =
+      err.error?.message || 'Failed to update user. Please try again.';
+    this.error.set(errorMessage);
   }
 
   confirmDelete(): void {
     if (!this.user()) return;
 
-    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
-      width: '350px',
-      data: {
-        title: 'Confirm Delete',
-        message: `Are you sure you want to delete user ${this.user()!.firstName} ${this.user()!.lastName}?`,
-        confirmButton: 'Delete',
-        cancelButton: 'Cancel',
-        icon: 'warning'
-      }
-    });
-
-    dialogRef.afterClosed().subscribe((result) => {
-      if (result) {
-        this.deleteUser();
-      }
-    });
+    this.dialog
+      .open(ConfirmDialogComponent, {
+        width: '350px',
+        data: {
+          title: 'Confirm Delete',
+          message: `Are you sure you want to delete user ${this.user()!.firstName} ${this.user()!.lastName}?`,
+          confirmButton: 'Delete',
+          cancelButton: 'Cancel',
+          icon: 'warning'
+        }
+      })
+      .afterClosed()
+      .subscribe((result) => {
+        if (result) {
+          this.deleteUser();
+        }
+      });
   }
 
   private deleteUser(): void {
