@@ -10,7 +10,7 @@ const localConfig: Partial<PostgresConnectionOptions> = {
   logging: ['warn', 'error'] as LoggerOptions,
   logger: 'simple-console',
   schema: 'public',
-  migrationsRun: false,
+  migrationsRun: false
 };
 
 export const postgresConfig: () => PostgresConnectionOptions = () => ({
@@ -28,10 +28,10 @@ export const postgresConfig: () => PostgresConnectionOptions = () => ({
     : localConfig.logging,
   logger: (process.env.DB_LOGGER as any) || localConfig.logger,
   migrationsRun: false, // automatically run migrations on startup
-  synchronize: process.env.ENVIRONMENT === 'local', // should be false for production
+  synchronize: process.env.ENVIRONMENT === 'local', // should be false for production (set to false for generating migration files)
   entities: [__dirname + '/modules/**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/migrations/*{ts,.js}'],
-  applicationName: 'Starter Project',
+  applicationName: 'Starter Project'
 });
 
 function isJsonString(str: string) {

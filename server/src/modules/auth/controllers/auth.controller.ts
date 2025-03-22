@@ -27,7 +27,7 @@ import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { LoginDto } from '../dtos/login.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { UsersService } from '../../users/services/users.service';
-import { AuthResponseDto } from '../dtos/auth-response.dto';
+import { AuthResponseDto, RefreshTokenDto } from '../dtos/auth-response.dto';
 import { JwtAuthRequest, LocalAuthRequest } from '../types/auth.request';
 
 @ApiTags('Auth API')
@@ -68,17 +68,40 @@ export class AuthController {
     return this.authService.login(req.user);
   }
 
+  @Post('refresh-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Refresh access token using a refresh token' })
+  @ApiBody({ type: RefreshTokenDto })
+  @ApiOkResponse({
+    description: 'Tokens have been refreshed',
+    type: AuthResponseDto
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid refresh token' })
+  refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
+    return this.authService.refreshTokens(refreshTokenDto.refresh_token);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Logout and invalidate refresh tokens' })
+  @ApiOkResponse({ description: 'Successfully logged out' })
+  async logout(@Request() req: JwtAuthRequest) {
+    await this.authService.logout(req.user.userId);
+    return { message: 'Successfully logged out' };
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get the current user profile' })
   @ApiOkResponse({
     description: 'Current user profile',
-    type: UserResponseDto // TODO: replace with profile data
+    type: UserResponseDto
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   async getProfile(@Request() req: JwtAuthRequest) {
     return await this.userService.findOne(req.user.userId);
-    // TODO: replace with profile data
   }
 }
