@@ -15,6 +15,7 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatDivider } from '@angular/material/divider';
 import {
   FormBuilder,
+  FormControl,
   FormGroup,
   ReactiveFormsModule,
   Validators
@@ -26,8 +27,15 @@ import { MatButton, MatIconButton } from '@angular/material/button';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../../users/services/user.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { User } from '../../../users/models/user.types';
+import { UpdateUser, User } from '../../../users/models/user.types';
 import { DatePipe } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
+
+type ProfileFormType = {
+  firstName: FormControl<string>;
+  lastName: FormControl<string>;
+  password: FormControl<string>;
+};
 
 @Component({
   selector: 'app-profile',
@@ -58,40 +66,55 @@ export class ProfileComponent implements OnInit {
   private userService = inject(UserService);
   private snackBar = inject(MatSnackBar);
 
-  profileForm: FormGroup;
+  profileForm!: FormGroup<ProfileFormType>;
   user = signal<User | null>(null);
   loading = signal(true);
   saving = signal(false);
   error = signal<string | null>(null);
   showPassword = signal(false);
 
-  constructor() {
-    this.profileForm = this.fb.group({
-      firstName: ['', Validators.required],
-      lastName: ['', Validators.required],
-      password: ['', [Validators.minLength(8)]]
-    });
+  ngOnInit(): void {
+    this.initForm();
+    this.loadProfile();
   }
 
-  ngOnInit(): void {
-    this.loadProfile();
+  private initForm(): void {
+    this.profileForm = this.fb.group<ProfileFormType>({
+      firstName: this.fb.control('', {
+        validators: [Validators.required],
+        nonNullable: true
+      }),
+      lastName: this.fb.control('', {
+        validators: [Validators.required],
+        nonNullable: true
+      }),
+      password: this.fb.control('', {
+        validators: [Validators.minLength(8)],
+        nonNullable: true
+      })
+    });
   }
 
   loadProfile(): void {
     this.loading.set(true);
+    this.error.set(null);
 
     this.authService.getProfile().subscribe({
       next: (user) => {
-        this.user.set(user); // TODO: update only profile data
+        this.user.set(user);
         this.profileForm.patchValue({
           firstName: user.firstName,
-          lastName: user.lastName
+          lastName: user.lastName,
+          password: ''
         });
         this.loading.set(false);
+        this.profileForm.markAsPristine();
       },
-      error: () => {
+      error: (err: HttpErrorResponse) => {
         this.loading.set(false);
-        this.error.set('Failed to load profile. Please try again.');
+        const errorMessage =
+          err.error?.message || 'Failed to load profile. Please try again.';
+        this.error.set(errorMessage);
       }
     });
   }
@@ -103,14 +126,16 @@ export class ProfileComponent implements OnInit {
   onSubmit(): void {
     if (this.profileForm.invalid || !this.user()) return;
 
-    // Only include password in update if it was provided
-    const updateData = {
-      firstName: this.profileForm.value.firstName,
-      lastName: this.profileForm.value.lastName,
-      ...(this.profileForm.value.password
-        ? { password: this.profileForm.value.password }
-        : {})
+    const formValues = this.profileForm.getRawValue();
+
+    const updateData: UpdateUser = {
+      firstName: formValues.firstName,
+      lastName: formValues.lastName
     };
+
+    if (formValues.password.trim()) {
+      updateData.password = formValues.password;
+    }
 
     this.saving.set(true);
     this.error.set(null);
@@ -120,7 +145,6 @@ export class ProfileComponent implements OnInit {
         this.saving.set(false);
         this.user.set(updatedUser);
 
-        // Reset password field
         this.profileForm.patchValue({ password: '' });
         this.profileForm.markAsPristine();
 
@@ -128,11 +152,11 @@ export class ProfileComponent implements OnInit {
           duration: 5000
         });
       },
-      error: (err) => {
+      error: (err: HttpErrorResponse) => {
         this.saving.set(false);
-        this.error.set(
-          err.message || 'Failed to update profile. Please try again.'
-        );
+        const errorMessage =
+          err.error?.message || 'Failed to update profile. Please try again.';
+        this.error.set(errorMessage);
       }
     });
   }

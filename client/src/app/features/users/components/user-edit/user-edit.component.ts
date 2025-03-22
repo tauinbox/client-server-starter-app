@@ -18,6 +18,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import {
   FormBuilder,
+  FormControl,
   FormGroup,
   ReactiveFormsModule,
   Validators
@@ -25,13 +26,22 @@ import {
 import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatCheckbox } from '@angular/material/checkbox';
-import { NgIf } from '@angular/common';
 import { UserService } from '../../services/user.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { AuthService } from '../../../auth/services/auth.service';
-import { User } from '../../models/user.types';
+import { UpdateUser, User } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
+import { HttpErrorResponse } from '@angular/common/http';
+
+type UserFormType = {
+  email: FormControl<string>;
+  firstName: FormControl<string>;
+  lastName: FormControl<string>;
+  password: FormControl<string>;
+  isAdmin: FormControl<boolean>;
+  isActive: FormControl<boolean>;
+};
 
 @Component({
   selector: 'app-user-edit',
@@ -50,8 +60,7 @@ import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confir
     MatFormField,
     MatInput,
     MatCheckbox,
-    MatButton,
-    NgIf
+    MatButton
   ],
   templateUrl: './user-edit.component.html',
   styleUrl: './user-edit.component.scss',
@@ -72,25 +81,39 @@ export class UserEditComponent implements OnInit {
   error = signal<string | null>(null);
   showPassword = signal(false);
 
-  userForm: FormGroup;
-
-  constructor() {
-    this.userForm = this.fb.group({
-      email: ['', [Validators.required, Validators.email]],
-      firstName: ['', Validators.required],
-      lastName: ['', Validators.required],
-      password: ['', [Validators.minLength(8)]],
-      isAdmin: [false],
-      isActive: [true]
-    });
-  }
+  userForm!: FormGroup<UserFormType>;
 
   ngOnInit(): void {
+    this.initForm();
     this.loadUser();
+  }
+
+  private initForm(): void {
+    this.userForm = this.fb.group<UserFormType>({
+      email: this.fb.control('', {
+        validators: [Validators.required, Validators.email],
+        nonNullable: true
+      }),
+      firstName: this.fb.control('', {
+        validators: [Validators.required],
+        nonNullable: true
+      }),
+      lastName: this.fb.control('', {
+        validators: [Validators.required],
+        nonNullable: true
+      }),
+      password: this.fb.control('', {
+        validators: [Validators.minLength(8)],
+        nonNullable: true
+      }),
+      isAdmin: this.fb.control(false, { nonNullable: true }),
+      isActive: this.fb.control(true, { nonNullable: true })
+    });
   }
 
   loadUser(): void {
     this.loading.set(true);
+    this.error.set(null);
 
     this.userService.getById(this.id()).subscribe({
       next: (user) => {
@@ -101,22 +124,22 @@ export class UserEditComponent implements OnInit {
           firstName: user.firstName,
           lastName: user.lastName,
           isAdmin: user.isAdmin,
-          isActive: user.isActive
+          isActive: user.isActive,
+          password: ''
         });
 
-        // Reset form state after patching values
         this.userForm.markAsPristine();
         this.loading.set(false);
       },
-      error: () => {
+      error: (err: HttpErrorResponse) => {
         this.loading.set(false);
-        this.snackBar.open(
-          'Failed to load user details. Please try again.',
-          'Close',
-          {
-            duration: 5000
-          }
-        );
+        const errorMessage =
+          err.error?.message ||
+          'Failed to load user details. Please try again.';
+        this.error.set(errorMessage);
+        this.snackBar.open(errorMessage, 'Close', {
+          duration: 5000
+        });
       }
     });
   }
@@ -128,20 +151,20 @@ export class UserEditComponent implements OnInit {
   onSubmit(): void {
     if (this.userForm.invalid || !this.user()) return;
 
-    // Only include password in update if it was provided
-    const updateData: any = {
-      email: this.userForm.value.email,
-      firstName: this.userForm.value.firstName,
-      lastName: this.userForm.value.lastName,
-      ...(this.userForm.value.password
-        ? { password: this.userForm.value.password }
-        : {})
+    const formValues = this.userForm.getRawValue();
+    const updateData: UpdateUser = {
+      email: formValues.email,
+      firstName: formValues.firstName,
+      lastName: formValues.lastName
     };
 
-    // Only include admin fields if user is an admin
+    if (formValues.password.trim()) {
+      updateData.password = formValues.password;
+    }
+
     if (this.authService.isAdmin()) {
-      updateData['isAdmin'] = this.userForm.value.isAdmin;
-      updateData['isActive'] = this.userForm.value.isActive;
+      updateData.isAdmin = formValues.isAdmin;
+      updateData.isActive = formValues.isActive;
     }
 
     this.saving.set(true);
@@ -161,17 +184,16 @@ export class UserEditComponent implements OnInit {
 
         void this.router.navigate(['/users', this.id()]);
       },
-      error: (err) => {
+      error: (err: HttpErrorResponse) => {
         this.saving.set(false);
-        this.error.set(
-          err.message || 'Failed to update user. Please try again.'
-        );
+        const errorMessage =
+          err.error?.message || 'Failed to update user. Please try again.';
+        this.error.set(errorMessage);
       }
     });
   }
 
   canDelete(): boolean {
-    // Check if user is admin and not editing themselves
     return (
       this.authService.isAdmin() && this.id() !== this.authService.user()?.id
     );
@@ -181,12 +203,13 @@ export class UserEditComponent implements OnInit {
     if (!this.user()) return;
 
     const dialogRef = this.dialog.open(ConfirmDialogComponent, {
-      width: 'func.rem(350)',
+      width: '350px',
       data: {
         title: 'Confirm Delete',
         message: `Are you sure you want to delete user ${this.user()!.firstName} ${this.user()!.lastName}?`,
         confirmButton: 'Delete',
-        cancelButton: 'Cancel'
+        cancelButton: 'Cancel',
+        icon: 'warning'
       }
     });
 
@@ -197,23 +220,20 @@ export class UserEditComponent implements OnInit {
     });
   }
 
-  deleteUser(): void {
+  private deleteUser(): void {
     this.userService.delete(this.id()).subscribe({
       next: () => {
         this.snackBar.open('User deleted successfully', 'Close', {
           duration: 5000
         });
-
         void this.router.navigate(['/users']);
       },
-      error: () => {
-        this.snackBar.open(
-          'Failed to delete user. Please try again.',
-          'Close',
-          {
-            duration: 5000
-          }
-        );
+      error: (err: HttpErrorResponse) => {
+        const errorMessage =
+          err.error?.message || 'Failed to delete user. Please try again.';
+        this.snackBar.open(errorMessage, 'Close', {
+          duration: 5000
+        });
       }
     });
   }
