@@ -14,7 +14,7 @@ import {
 } from '@angular/material/card';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
-import { DatePipe, NgIf } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatChip } from '@angular/material/chips';
@@ -31,7 +31,6 @@ import { User } from '../../models/user.types';
     MatCardTitle,
     MatIconButton,
     RouterLink,
-    NgIf,
     MatIcon,
     MatCardContent,
     MatProgressSpinner,
