@@ -4,5 +4,4 @@
 .container {
   @include mix.centered-container();
   display: block;
-  box-sizing: border-box;
 }
