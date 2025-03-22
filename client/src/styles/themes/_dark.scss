@@ -22,12 +22,7 @@ $dark-theme: mat.m2-define-dark-theme(
 [data-theme='dark']:root {
   @include mat.all-component-colors($dark-theme);
 
-  // Theme-specific colors
-  --color-primary: $dark-primary;
-  --color-accent: $dark-accent;
-  --color-warn: $dark-warn;
-
-  // UI colors - dark theme
+  // UI colors
   --color-background: #303030;
   --color-surface: #424242;
   --color-text-primary: rgba(255, 255, 255, 0.87);
@@ -36,6 +31,12 @@ $dark-theme: mat.m2-define-dark-theme(
   --color-border: rgba(255, 255, 255, 0.12);
   --color-divider: rgba(255, 255, 255, 0.12);
   --color-disabled: rgba(255, 255, 255, 0.38);
+
+  // State colors
+  --color-success: #81c784; // Material Green 300
+  --color-error: #e57373; // Material Red 300
+  --color-info: #64b5f6; // Material Blue 300
+  --color-warning: #ffb74d; // Material Orange 300
 
   // Common theme settings
   --color-scheme: dark;

@@ -22,12 +22,7 @@ $light-theme: mat.m2-define-light-theme(
 :root {
   @include mat.all-component-themes($light-theme);
 
-  // Theme-specific colors
-  --color-primary: $light-primary;
-  --color-accent: $light-accent;
-  --color-warn: $light-warn;
-
-  // UI colors - light theme
+  // UI colors
   --color-background: #fafafa;
   --color-surface: #ffffff;
   --color-text-primary: rgba(0, 0, 0, 0.87);
@@ -36,6 +31,12 @@ $light-theme: mat.m2-define-light-theme(
   --color-border: rgba(0, 0, 0, 0.12);
   --color-divider: rgba(0, 0, 0, 0.12);
   --color-disabled: rgba(0, 0, 0, 0.38);
+
+  // State colors
+  --color-success: #4caf50; // Material Green 500
+  --color-error: #f44336; // Material Red 500
+  --color-info: #2196f3; // Material Blue 500
+  --color-warning: #ff9800; // Material Orange 500
 
   // Common theme settings
   --color-scheme: light;
