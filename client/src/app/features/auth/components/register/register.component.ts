@@ -14,6 +14,7 @@ import {
 import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
 import {
   FormBuilder,
+  FormControl,
   FormGroup,
   ReactiveFormsModule,
   Validators
@@ -25,6 +26,14 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { HttpErrorResponse } from '@angular/common/http';
+
+type RegisterFormType = {
+  email: FormControl<string>;
+  firstName: FormControl<string>;
+  lastName: FormControl<string>;
+  password: FormControl<string>;
+};
 
 @Component({
   selector: 'app-register',
@@ -55,17 +64,29 @@ export class RegisterComponent {
   private router = inject(Router);
   private snackBar = inject(MatSnackBar);
 
-  registerForm: FormGroup;
+  registerForm: FormGroup<RegisterFormType>;
   loading = signal(false);
   error = signal<string | null>(null);
   showPassword = signal(false);
 
   constructor() {
-    this.registerForm = this.fb.group({
-      email: ['', [Validators.required, Validators.email]],
-      firstName: ['', Validators.required],
-      lastName: ['', Validators.required],
-      password: ['', [Validators.required, Validators.minLength(8)]]
+    this.registerForm = this.fb.group<RegisterFormType>({
+      email: this.fb.control('', {
+        validators: [Validators.required, Validators.email],
+        nonNullable: true
+      }),
+      firstName: this.fb.control('', {
+        validators: [Validators.required],
+        nonNullable: true
+      }),
+      lastName: this.fb.control('', {
+        validators: [Validators.required],
+        nonNullable: true
+      }),
+      password: this.fb.control('', {
+        validators: [Validators.required, Validators.minLength(8)],
+        nonNullable: true
+      })
     });
   }
 
@@ -79,15 +100,15 @@ export class RegisterComponent {
     this.loading.set(true);
     this.error.set(null);
 
-    this.authService.register(this.registerForm.value).subscribe({
+    this.authService.register(this.registerForm.getRawValue()).subscribe({
       next: () => {
         this.loading.set(false);
         this.snackBar.open('Registration successful! Please login.', 'Close', {
           duration: 5000
         });
-        this.router.navigate(['/login']);
+        void this.router.navigate(['/login']);
       },
-      error: (err) => {
+      error: (err: HttpErrorResponse) => {
         this.loading.set(false);
         if (err.status === 409) {
           this.error.set('User with this email already exists.');
