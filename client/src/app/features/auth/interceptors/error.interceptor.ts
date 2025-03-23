@@ -9,13 +9,13 @@ import { throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { AuthService } from '../services/auth.service';
+import { TokenService } from '../services/token.service';
 
 export const errorInterceptor: HttpInterceptorFn = (
   request: HttpRequest<unknown>,
   next: HttpHandlerFn
 ) => {
-  const authService = inject(AuthService);
+  const tokenService = inject(TokenService);
   const router = inject(Router);
   const snackBar = inject(MatSnackBar);
 
@@ -24,14 +24,10 @@ export const errorInterceptor: HttpInterceptorFn = (
       let errorMessage = 'An unknown error occurred';
 
       if (error.error instanceof ErrorEvent) {
-        // Client-side error
         errorMessage = `Error: ${error.error.message}`;
       } else {
-        // Server-side error
         if (error.status === 401) {
-          // Auto logout if 401 response returned from api
-          authService.logout();
-          void router.navigate(['/login']);
+          tokenService.logout();
           errorMessage = 'Your session has expired. Please log in again.';
         } else if (error.status === 403) {
           void router.navigate(['/forbidden']);

@@ -1,12 +1,10 @@
 import { DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Router } from '@angular/router';
 import {
   catchError,
-  map,
   Observable,
-  of,
   switchMap,
+  take,
   tap,
   throwError,
   timer
@@ -16,22 +14,18 @@ import { User } from '../../users/models/user.types';
 import {
   AuthResponse,
   LoginCredentials,
-  RefreshTokensRequest,
-  RegisterRequest,
-  TokensResponse
+  RegisterRequest
 } from '../models/auth.types';
 import { TokenService } from './token.service';
 
 export const AUTH_API_V1 = 'api/v1/auth';
-const USER_KEY = 'auth_user';
-const TOKEN_REFRESH_WINDOW = 60; // seconds before expiry to refresh token
+const TOKEN_REFRESH_WINDOW = 60;
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
   private http = inject(HttpClient);
-  private router = inject(Router);
   private destroyRef = inject(DestroyRef);
   private tokenService = inject(TokenService);
 
@@ -43,6 +37,14 @@ export class AuthService {
   readonly isAdmin = this.isAdminSignal.asReadonly();
 
   constructor() {
+    this.tokenService.refreshToken$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((authResponse) => {
+        if (authResponse) {
+          this.handleAuthentication(authResponse);
+        }
+      });
+
     this.checkAuthStatus();
   }
 
@@ -58,7 +60,6 @@ export class AuthService {
       .pipe(
         tap((response) => this.handleAuthentication(response)),
         catchError((error: HttpErrorResponse) => {
-          console.error('Login failed', error);
           return throwError(
             () => new Error(error.error?.message || 'Invalid credentials')
           );
@@ -67,18 +68,9 @@ export class AuthService {
   }
 
   logout(): void {
-    if (this.isAuthenticated()) {
-      this.http
-        .post(`${AUTH_API_V1}/logout`, {})
-        .pipe(
-          catchError(() => of(null)),
-          takeUntilDestroyed(this.destroyRef)
-        )
-        .subscribe();
-    }
-
-    this.clearAuthData();
-    void this.router.navigate(['/login']);
+    this.tokenService.logout();
+    this.currentUserSignal.set(null);
+    this.isAdminSignal.set(false);
   }
 
   getProfile(): Observable<User> {
@@ -96,67 +88,42 @@ export class AuthService {
     );
   }
 
-  setupTokenRefresh(): void {
+  private setupTokenRefresh(): void {
     const expiryTime = this.tokenService.getTokenExpiryTime();
     if (!expiryTime) return;
 
     const timeToRefresh = expiryTime - Date.now() - TOKEN_REFRESH_WINDOW * 1000;
 
     if (timeToRefresh <= 0) {
-      this.refreshToken().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
+      this.tokenService.refreshToken().pipe(take(1)).subscribe();
       return;
     }
 
     timer(timeToRefresh)
       .pipe(
-        switchMap(() => {
-          return this.refreshToken();
-        }),
+        take(1),
+        switchMap(() => this.tokenService.refreshToken().pipe(take(1))),
         takeUntilDestroyed(this.destroyRef)
       )
       .subscribe();
   }
 
-  refreshToken(): Observable<TokensResponse | null> {
-    if (this.tokenService.isRefreshInProgress()) {
-      return this.tokenService.refreshToken$;
+  private updateUserData(user: User): void {
+    this.currentUserSignal.set(user);
+    this.isAdminSignal.set(user.isAdmin);
+  }
+
+  private updateUserFromLocalStorage(): void {
+    const user = this.tokenService.getUserData();
+
+    if (user) {
+      this.updateUserData(user);
     }
-
-    const refreshToken = this.tokenService.getRefreshToken();
-    if (!refreshToken) {
-      this.logout();
-      return of(null);
-    }
-
-    const refreshRequest: RefreshTokensRequest = {
-      refresh_token: refreshToken
-    };
-
-    this.tokenService.startRefreshProcess();
-
-    return this.http
-      .post<AuthResponse>(`${AUTH_API_V1}/refresh-token`, refreshRequest)
-      .pipe(
-        tap((response) => {
-          this.handleAuthentication(response);
-          this.tokenService.endRefreshProcess(response.tokens);
-        }),
-        map((response) => response.tokens),
-        catchError((error: HttpErrorResponse) => {
-          this.tokenService.endRefreshProcess(null);
-          this.logout();
-          return of(null);
-        })
-      );
   }
 
   private handleAuthentication(authResponse: AuthResponse): void {
-    this.tokenService.saveTokens(authResponse.tokens);
-    localStorage.setItem(USER_KEY, JSON.stringify(authResponse.user));
-
-    this.currentUserSignal.set(authResponse.user);
-    this.isAdminSignal.set(authResponse.user.isAdmin);
-
+    this.tokenService.saveTokens(authResponse);
+    this.updateUserData(authResponse.user);
     this.setupTokenRefresh();
   }
 
@@ -164,35 +131,20 @@ export class AuthService {
     if (this.tokenService.isTokenExpired()) {
       const refreshToken = this.tokenService.getRefreshToken();
       if (refreshToken) {
-        this.refreshToken()
-          .pipe(takeUntilDestroyed(this.destroyRef))
-          .subscribe();
+        this.tokenService
+          .refreshToken()
+          .pipe(take(1))
+          .subscribe({
+            error: () => this.tokenService.clearTokens()
+          });
         return;
       }
 
-      this.clearAuthData();
+      this.tokenService.clearTokens();
       return;
     }
 
-    const userJson = localStorage.getItem(USER_KEY);
-    if (userJson) {
-      try {
-        const user = JSON.parse(userJson) as User;
-        this.currentUserSignal.set(user);
-        this.isAdminSignal.set(user.isAdmin);
-
-        this.setupTokenRefresh();
-      } catch (error) {
-        this.clearAuthData();
-      }
-    }
-  }
-
-  private clearAuthData(): void {
-    this.tokenService.clearTokens();
-    localStorage.removeItem(USER_KEY);
-    this.currentUserSignal.set(null);
-    this.isAdminSignal.set(false);
+    this.updateUserFromLocalStorage();
   }
 
   private handleError(error: HttpErrorResponse) {
