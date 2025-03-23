@@ -6,14 +6,16 @@ import {
   HttpRequest
 } from '@angular/common/http';
 import { catchError, switchMap, throwError } from 'rxjs';
+import { TokenService } from '../services/token.service';
 import { AuthService } from '../services/auth.service';
 
 export const jwtInterceptor: HttpInterceptorFn = (
   request: HttpRequest<unknown>,
   next: HttpHandlerFn
 ) => {
+  const tokenService = inject(TokenService);
   const authService = inject(AuthService);
-  const token = authService.getAccessToken();
+  const token = tokenService.getAccessToken();
 
   if (token) {
     request = addTokenToRequest(request, token);
@@ -25,22 +27,22 @@ export const jwtInterceptor: HttpInterceptorFn = (
       if (
         error.status === 401 &&
         !request.url.includes('refresh-token') &&
-        !request.url.includes('login')
+        !request.url.includes('login') &&
+        !tokenService.isRefreshInProgress()
       ) {
-        // Try to refresh the token
+        tokenService.startRefreshProcess();
+
         return authService.refreshToken().pipe(
           switchMap((tokens) => {
             if (!tokens) {
-              // If refresh fails, logout and redirect
               authService.logout();
               return throwError(() => error);
             }
 
-            // Retry the original request with the new token
             return next(addTokenToRequest(request, tokens.access_token));
           }),
           catchError(() => {
-            // If the refresh request fails, logout and propagate the error
+            tokenService.endRefreshProcess(null);
             authService.logout();
             return throwError(() => error);
           })

@@ -19,7 +19,7 @@ export type AuthResponse = {
   user: User;
 };
 
-export type RefreshTokenRequest = {
+export type RefreshTokensRequest = {
   refresh_token: string;
 };
 
