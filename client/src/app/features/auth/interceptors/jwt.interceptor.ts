@@ -7,14 +7,14 @@ import {
 } from '@angular/common/http';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { TokenService } from '../services/token.service';
-import { AuthService } from '../services/auth.service';
+import { Router } from '@angular/router';
 
 export const jwtInterceptor: HttpInterceptorFn = (
   request: HttpRequest<unknown>,
   next: HttpHandlerFn
 ) => {
   const tokenService = inject(TokenService);
-  const authService = inject(AuthService);
+  const router = inject(Router);
   const token = tokenService.getAccessToken();
 
   if (token) {
@@ -23,33 +23,28 @@ export const jwtInterceptor: HttpInterceptorFn = (
 
   return next(request).pipe(
     catchError((error: HttpErrorResponse) => {
-      // Check if the error is 401 Unauthorized and we're not trying to refresh already
       if (
         error.status === 401 &&
         !request.url.includes('refresh-token') &&
         !request.url.includes('login') &&
         !tokenService.isRefreshInProgress()
       ) {
-        tokenService.startRefreshProcess();
-
-        return authService.refreshToken().pipe(
+        return tokenService.refreshToken().pipe(
           switchMap((tokens) => {
             if (!tokens) {
-              authService.logout();
+              void router.navigate(['/login']);
               return throwError(() => error);
             }
 
             return next(addTokenToRequest(request, tokens.access_token));
           }),
           catchError(() => {
-            tokenService.endRefreshProcess(null);
-            authService.logout();
+            void router.navigate(['/login']);
             return throwError(() => error);
           })
         );
       }
 
-      // For all other errors, just pass them through
       return throwError(() => error);
     })
   );
