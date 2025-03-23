@@ -36,7 +36,6 @@ export class AuthService {
   async login(user: LocalAuthRequest['user']) {
     const tokens = await this.generateTokens(user.id, user.email, user.isAdmin);
 
-    // Create a refresh token
     await this.refreshTokenService.deleteByUserId(user.id);
     await this.refreshTokenService.createRefreshToken(
       user.id,
@@ -55,26 +54,21 @@ export class AuthService {
   }
 
   async refreshTokens(refreshToken: string) {
-    // Find the refresh token in the database
     const tokenDoc = await this.refreshTokenService.findByToken(refreshToken);
 
     if (!tokenDoc || tokenDoc.revoked || tokenDoc.isExpired()) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    // Get the user
     const user = await this.usersService.findOne(tokenDoc.userId);
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
 
-    // Revoke the current refresh token
     await this.refreshTokenService.revokeToken(tokenDoc.id);
 
-    // Generate new tokens
     const tokens = await this.generateTokens(user.id, user.email, user.isAdmin);
 
-    // Create a new refresh token
     await this.refreshTokenService.createRefreshToken(
       user.id,
       tokens.refresh_token,

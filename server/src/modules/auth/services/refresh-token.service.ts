@@ -15,10 +15,11 @@ export class RefreshTokenService {
     token: string,
     expiresIn: number
   ): Promise<RefreshToken> {
-    const refreshToken = new RefreshToken();
-    refreshToken.userId = userId;
-    refreshToken.token = token;
-    refreshToken.expiresAt = new Date(Date.now() + expiresIn * 1000);
+    const refreshToken = this.repository.create({
+      userId,
+      token,
+      expiresAt: new Date(Date.now() + expiresIn * 1000)
+    });
 
     return this.repository.save(refreshToken);
   }
@@ -35,9 +36,6 @@ export class RefreshTokenService {
     await this.repository.update(id, { revoked: true });
   }
 
-  /**
-   * Count expired tokens for logging purposes
-   */
   async countExpiredTokens(): Promise<number> {
     const now = new Date();
     return this.repository.count({
@@ -47,9 +45,6 @@ export class RefreshTokenService {
     });
   }
 
-  /**
-   * Remove all expired tokens
-   */
   async removeExpiredTokens(): Promise<void> {
     await this.repository
       .createQueryBuilder()
@@ -59,10 +54,6 @@ export class RefreshTokenService {
       .execute();
   }
 
-  /**
-   * Remove tokens that are both revoked and expired
-   * This is a more aggressive cleanup for the weekly maintenance
-   */
   async removeRevokedAndExpiredTokens(): Promise<void> {
     const now = new Date();
     await this.repository.delete({
@@ -71,10 +62,6 @@ export class RefreshTokenService {
     });
   }
 
-  /**
-   * Get statistics about refresh tokens
-   * Useful for monitoring and admin dashboards
-   */
   async getTokenStatistics(): Promise<{
     totalActive: number;
     totalExpired: number;
