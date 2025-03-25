@@ -1,5 +1,5 @@
 import { inject, Injectable, signal } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import {
   BehaviorSubject,
   catchError,
@@ -7,6 +7,8 @@ import {
   map,
   Observable,
   of,
+  skip,
+  take,
   tap
 } from 'rxjs';
 import { jwtDecode } from 'jwt-decode';
@@ -22,8 +24,6 @@ import { User } from '@features/users/models/user.types';
 
 const AUTH_TOKENS = 'auth_tokens';
 
-export const USER_KEY = 'auth_user';
-
 @Injectable({
   providedIn: 'root'
 })
@@ -31,19 +31,19 @@ export class TokenService {
   private http = inject(HttpClient);
   private router = inject(Router);
 
-  private refreshInProgress = false;
   private authTokensSubject = new BehaviorSubject<AuthResponse | null>(
     this.getAuthTokens()
   );
 
-  refreshToken$ = this.authTokensSubject.asObservable();
+  authTokens$ = this.authTokensSubject.asObservable();
 
-  private isAuthenticatedSignal = signal<boolean>(false);
+  private readonly isRefreshInProgressSignal = signal<boolean>(false);
+  private readonly isAuthenticatedSignal = signal<boolean>(
+    !this.isAccessTokenExpired()
+  );
+
   readonly isAuthenticated = this.isAuthenticatedSignal.asReadonly();
-
-  constructor() {
-    this.isAuthenticatedSignal.set(!this.isTokenExpired());
-  }
+  readonly isRefreshInProgress = this.isRefreshInProgressSignal.asReadonly();
 
   getAuthTokens() {
     let authTokens: AuthResponse | null = null;
@@ -82,7 +82,7 @@ export class TokenService {
     localStorage.removeItem(AUTH_TOKENS);
     this.authTokensSubject.next(null);
     this.isAuthenticatedSignal.set(false);
-    this.refreshInProgress = false;
+    this.isRefreshInProgressSignal.set(false);
   }
 
   logout(): void {
@@ -97,7 +97,7 @@ export class TokenService {
     void this.router.navigate(['/login']);
   }
 
-  isTokenExpired(): boolean {
+  isAccessTokenExpired(): boolean {
     const token = this.getAccessToken();
     if (!token) return true;
 
@@ -132,14 +132,12 @@ export class TokenService {
     }
   }
 
-  isRefreshInProgress(): boolean {
-    return this.refreshInProgress;
-  }
-
   refreshToken(): Observable<TokensResponse | null> {
-    if (this.refreshInProgress) {
-      return this.refreshToken$.pipe(
-        map((response) => response?.tokens || null)
+    if (this.isRefreshInProgress()) {
+      return this.authTokens$.pipe(
+        skip(1), // Skip current BehaviorSubject value and wait for the fresh one
+        take(1),
+        map((response) => response?.tokens ?? null)
       );
     }
 
@@ -153,20 +151,19 @@ export class TokenService {
       refresh_token: refreshToken
     };
 
-    this.refreshInProgress = true;
+    this.isRefreshInProgressSignal.set(true);
 
     return this.http
       .post<AuthResponse>(`${AUTH_API_V1}/refresh-token`, refreshRequest)
       .pipe(
         tap((response) => {
-          this.saveTokens(response);
           this.authTokensSubject.next(response);
         }),
         map((response) => response.tokens),
         finalize(() => {
-          this.refreshInProgress = false;
+          this.isRefreshInProgressSignal.set(false);
         }),
-        catchError((error: HttpErrorResponse) => {
+        catchError(() => {
           this.clearTokens();
           this.authTokensSubject.next(null);
           return of(null);

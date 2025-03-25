@@ -1,15 +1,13 @@
-import { DestroyRef, inject, Injectable, signal } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import {
   catchError,
   Observable,
   switchMap,
-  take,
   tap,
   throwError,
   timer
 } from 'rxjs';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { User } from '../../users/models/user.types';
 import {
   AuthResponse,
@@ -26,7 +24,6 @@ const TOKEN_REFRESH_WINDOW = 60;
 })
 export class AuthService {
   private http = inject(HttpClient);
-  private destroyRef = inject(DestroyRef);
   private tokenService = inject(TokenService);
 
   private currentUserSignal = signal<User | null>(null);
@@ -37,15 +34,17 @@ export class AuthService {
   readonly isAdmin = this.isAdminSignal.asReadonly();
 
   constructor() {
-    this.tokenService.refreshToken$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((authResponse) => {
-        if (authResponse) {
-          this.handleAuthentication(authResponse);
-        }
-      });
+    const user = this.tokenService.getUserData();
 
-    this.checkAuthStatus();
+    if (user) {
+      this.updateUserData(user);
+    }
+
+    this.tokenService.authTokens$.subscribe((authResponse) => {
+      if (authResponse) {
+        this.handleAuthentication(authResponse);
+      }
+    });
   }
 
   register(registerData: RegisterRequest): Observable<User> {
@@ -88,23 +87,19 @@ export class AuthService {
     );
   }
 
-  private setupTokenRefresh(): void {
+  private scheduleTokenRefresh(): void {
     const expiryTime = this.tokenService.getTokenExpiryTime();
     if (!expiryTime) return;
 
     const timeToRefresh = expiryTime - Date.now() - TOKEN_REFRESH_WINDOW * 1000;
 
     if (timeToRefresh <= 0) {
-      this.tokenService.refreshToken().pipe(take(1)).subscribe();
+      this.tokenService.refreshToken().subscribe();
       return;
     }
 
     timer(timeToRefresh)
-      .pipe(
-        take(1),
-        switchMap(() => this.tokenService.refreshToken().pipe(take(1))),
-        takeUntilDestroyed(this.destroyRef)
-      )
+      .pipe(switchMap(() => this.tokenService.refreshToken()))
       .subscribe();
   }
 
@@ -113,38 +108,10 @@ export class AuthService {
     this.isAdminSignal.set(user.isAdmin);
   }
 
-  private updateUserFromLocalStorage(): void {
-    const user = this.tokenService.getUserData();
-
-    if (user) {
-      this.updateUserData(user);
-    }
-  }
-
   private handleAuthentication(authResponse: AuthResponse): void {
     this.tokenService.saveTokens(authResponse);
     this.updateUserData(authResponse.user);
-    this.setupTokenRefresh();
-  }
-
-  private checkAuthStatus(): void {
-    if (this.tokenService.isTokenExpired()) {
-      const refreshToken = this.tokenService.getRefreshToken();
-      if (refreshToken) {
-        this.tokenService
-          .refreshToken()
-          .pipe(take(1))
-          .subscribe({
-            error: () => this.tokenService.clearTokens()
-          });
-        return;
-      }
-
-      this.tokenService.clearTokens();
-      return;
-    }
-
-    this.updateUserFromLocalStorage();
+    this.scheduleTokenRefresh();
   }
 
   private handleError(error: HttpErrorResponse) {
