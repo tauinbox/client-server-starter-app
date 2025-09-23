@@ -22,13 +22,13 @@ export class FeatureComponent {
   private readonly featureApi = inject(FeatureApiService);
 
   private readonly descriptionResource = rxResource({
-    loader: () => this.featureApi.getFeatureDescription()
+    stream: () => this.featureApi.getFeatureDescription()
   });
   private readonly configResource = rxResource({
-    loader: () => this.featureApi.getConfig()
+    stream: () => this.featureApi.getConfig()
   });
   private readonly entitiesResource = rxResource({
-    loader: () => this.featureApi.getFeatureEntities()
+    stream: () => this.featureApi.getFeatureEntities()
   });
 
   protected description = this.descriptionResource.value;
