@@ -44,12 +44,12 @@ import { User } from '../../models/user.types';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UserDetailComponent implements OnInit {
-  private userService = inject(UserService);
-  private snackBar = inject(MatSnackBar);
+  readonly #userService = inject(UserService);
+  readonly #snackBar = inject(MatSnackBar);
 
-  id = input.required<string>();
-  user = signal<User | null>(null);
-  loading = signal(true);
+  readonly id = input.required<string>();
+  readonly user = signal<User | null>(null);
+  readonly loading = signal(true);
 
   ngOnInit(): void {
     this.loadUser();
@@ -58,20 +58,14 @@ export class UserDetailComponent implements OnInit {
   loadUser(): void {
     this.loading.set(true);
 
-    this.userService.getById(this.id()).subscribe({
+    this.#userService.getById(this.id()).subscribe({
       next: (user) => {
         this.user.set(user);
         this.loading.set(false);
       },
       error: () => {
         this.loading.set(false);
-        this.snackBar.open(
-          'Failed to load user details. Please try again.',
-          'Close',
-          {
-            duration: 5000
-          }
-        );
+        this.#snackBar.open('Failed to load user details. Please try again.', 'Close', { duration: 5000 });
       }
     });
   }

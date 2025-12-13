@@ -21,33 +21,34 @@ export const errorInterceptor: HttpInterceptorFn = (
 
   return next(request).pipe(
     catchError((error: HttpErrorResponse) => {
-      let errorMessage = 'An unknown error occurred';
+      const errorMessage = handleHttpError(error, tokenService, router);
 
-      if (error.error instanceof ErrorEvent) {
-        errorMessage = `Error: ${error.error.message}`;
-      } else {
-        if (error.status === 401) {
-          tokenService.logout();
-          errorMessage = 'Your session has expired. Please log in again.';
-        } else if (error.status === 403) {
-          void router.navigate(['/forbidden']);
-          errorMessage = 'You do not have permission to access this resource.';
-        } else if (error.status === 404) {
-          errorMessage = 'Resource not found.';
-        } else if (error.error?.message) {
-          errorMessage = error.error.message;
-        } else {
-          errorMessage = `Error Code: ${error.status}\nMessage: ${error.message}`;
-        }
-      }
-
-      snackBar.open(errorMessage, 'Close', {
-        duration: 5000,
-        horizontalPosition: 'center',
-        verticalPosition: 'bottom'
-      });
+      snackBar.open(errorMessage, 'Close', { duration: 5000 });
 
       return throwError(() => new Error(errorMessage));
     })
   );
 };
+
+function handleHttpError(
+  error: HttpErrorResponse,
+  tokenService: TokenService,
+  router: Router
+): string {
+  if (error.error instanceof ErrorEvent) {
+    return `Error: ${error.error.message}`;
+  }
+
+  switch (error.status) {
+    case 401:
+      tokenService.logout();
+      return 'Your session has expired. Please log in again.';
+    case 403:
+      void router.navigate(['/forbidden']);
+      return 'You do not have permission to access this resource.';
+    case 404:
+      return 'Resource not found.';
+    default:
+      return error.error?.message || `Error Code: ${error.status}`;
+  }
+}

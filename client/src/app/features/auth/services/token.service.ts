@@ -28,22 +28,19 @@ const AUTH_TOKENS = 'auth_tokens';
   providedIn: 'root'
 })
 export class TokenService {
-  private http = inject(HttpClient);
-  private router = inject(Router);
-
-  private authTokensSubject = new BehaviorSubject<AuthResponse | null>(
+  readonly #http = inject(HttpClient);
+  readonly #router = inject(Router);
+  readonly #authTokensSubject = new BehaviorSubject<AuthResponse | null>(
     this.getAuthTokens()
   );
-
-  authTokens$ = this.authTokensSubject.asObservable();
-
-  private readonly isRefreshInProgressSignal = signal<boolean>(false);
-  private readonly isAuthenticatedSignal = signal<boolean>(
+  readonly #isRefreshInProgressSignal = signal<boolean>(false);
+  readonly #isAuthenticatedSignal = signal<boolean>(
     !this.isAccessTokenExpired()
   );
 
-  readonly isAuthenticated = this.isAuthenticatedSignal.asReadonly();
-  readonly isRefreshInProgress = this.isRefreshInProgressSignal.asReadonly();
+  readonly authTokens$ = this.#authTokensSubject.asObservable();
+  readonly isAuthenticated = this.#isAuthenticatedSignal.asReadonly();
+  readonly isRefreshInProgress = this.#isRefreshInProgressSignal.asReadonly();
 
   getAuthTokens() {
     let authTokens: AuthResponse | null = null;
@@ -75,26 +72,26 @@ export class TokenService {
 
   saveTokens(response: AuthResponse): void {
     localStorage.setItem(AUTH_TOKENS, JSON.stringify(response));
-    this.isAuthenticatedSignal.set(true);
+    this.#isAuthenticatedSignal.set(true);
   }
 
   clearTokens(): void {
     localStorage.removeItem(AUTH_TOKENS);
-    this.authTokensSubject.next(null);
-    this.isAuthenticatedSignal.set(false);
-    this.isRefreshInProgressSignal.set(false);
+    this.#authTokensSubject.next(null);
+    this.#isAuthenticatedSignal.set(false);
+    this.#isRefreshInProgressSignal.set(false);
   }
 
   logout(): void {
     if (this.isAuthenticated()) {
-      this.http
+      this.#http
         .post(`${AUTH_API_V1}/logout`, {})
         .pipe(catchError(() => of(null)))
         .subscribe();
     }
 
     this.clearTokens();
-    void this.router.navigate(['/login']);
+    void this.#router.navigate(['/login']);
   }
 
   isAccessTokenExpired(): boolean {
@@ -151,21 +148,21 @@ export class TokenService {
       refresh_token: refreshToken
     };
 
-    this.isRefreshInProgressSignal.set(true);
+    this.#isRefreshInProgressSignal.set(true);
 
-    return this.http
+    return this.#http
       .post<AuthResponse>(`${AUTH_API_V1}/refresh-token`, refreshRequest)
       .pipe(
         tap((response) => {
-          this.authTokensSubject.next(response);
+          this.#authTokensSubject.next(response);
         }),
         map((response) => response.tokens),
         finalize(() => {
-          this.isRefreshInProgressSignal.set(false);
+          this.#isRefreshInProgressSignal.set(false);
         }),
         catchError(() => {
           this.clearTokens();
-          this.authTokensSubject.next(null);
+          this.#authTokensSubject.next(null);
           return of(null);
         })
       );

@@ -9,26 +9,26 @@ export const USERS_API_V1 = 'api/v1/users';
   providedIn: 'root'
 })
 export class UserService {
-  private http = inject(HttpClient);
+  readonly #http = inject(HttpClient);
 
   getAll(): Observable<User[]> {
-    return this.http.get<User[]>(USERS_API_V1);
+    return this.#http.get<User[]>(USERS_API_V1);
   }
 
   getById(id: string): Observable<User> {
-    return this.http.get<User>(`${USERS_API_V1}/${id}`);
+    return this.#http.get<User>(`${USERS_API_V1}/${id}`);
   }
 
   create(user: CreateUser): Observable<User> {
-    return this.http.post<User>(USERS_API_V1, user);
+    return this.#http.post<User>(USERS_API_V1, user);
   }
 
   update(id: string, user: UpdateUser): Observable<User> {
-    return this.http.patch<User>(`${USERS_API_V1}/${id}`, user);
+    return this.#http.patch<User>(`${USERS_API_V1}/${id}`, user);
   }
 
   delete(id: string): Observable<void> {
-    return this.http.delete<void>(`${USERS_API_V1}/${id}`);
+    return this.#http.delete<void>(`${USERS_API_V1}/${id}`);
   }
 
   search(criteria: UserSearch): Observable<User[]> {
@@ -54,6 +54,6 @@ export class UserService {
       params = params.set('isActive', criteria.isActive.toString());
     }
 
-    return this.http.get<User[]>(`${USERS_API_V1}/search`, { params });
+    return this.#http.get<User[]>(`${USERS_API_V1}/search`, { params });
   }
 }

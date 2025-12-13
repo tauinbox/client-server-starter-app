@@ -49,18 +49,18 @@ import { AuthService } from '../../services/auth.service';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LoginComponent {
-  private fb = inject(FormBuilder);
-  private authService = inject(AuthService);
-  private router = inject(Router);
-  private route = inject(ActivatedRoute);
+  readonly #fb = inject(FormBuilder);
+  readonly #authService = inject(AuthService);
+  readonly #router = inject(Router);
+  readonly #route = inject(ActivatedRoute);
 
-  loginForm: FormGroup;
-  loading = signal(false);
-  error = signal<string | null>(null);
-  showPassword = signal(false);
+  readonly loginForm: FormGroup;
+  protected readonly loading = signal(false);
+  protected readonly error = signal<string | null>(null);
+  protected readonly showPassword = signal(false);
 
   constructor() {
-    this.loginForm = this.fb.group({
+    this.loginForm = this.#fb.group({
       email: ['', [Validators.required, Validators.email]],
       password: ['', Validators.required]
     });
@@ -76,13 +76,11 @@ export class LoginComponent {
     this.loading.set(true);
     this.error.set(null);
 
-    this.authService.login(this.loginForm.value).subscribe({
+    this.#authService.login(this.loginForm.value).subscribe({
       next: () => {
         this.loading.set(false);
-
-        // Get return URL from query params or default to '/'
-        const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
-        void this.router.navigateByUrl(returnUrl);
+        const returnUrl = this.#route.snapshot.queryParams['returnUrl'] || '/';
+        void this.#router.navigateByUrl(returnUrl);
       },
       error: (err) => {
         this.loading.set(false);

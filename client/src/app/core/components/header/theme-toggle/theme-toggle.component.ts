@@ -12,5 +12,5 @@ import { ThemeService } from '@core/services/theme.service';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ThemeToggleComponent {
-  themeService = inject(ThemeService);
+  protected readonly themeService = inject(ThemeService);
 }

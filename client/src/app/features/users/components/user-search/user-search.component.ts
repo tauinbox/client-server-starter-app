@@ -1,9 +1,8 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  computed,
+  DestroyRef,
   inject,
-  OnInit,
   signal
 } from '@angular/core';
 import {
@@ -46,6 +45,7 @@ import { User, UserSearch } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 type UserSearchFormType = {
   email: FormControl<string>;
@@ -91,18 +91,25 @@ type UserSearchFormType = {
   styleUrl: './user-search.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class UserSearchComponent implements OnInit {
-  private fb = inject(FormBuilder);
-  private userService = inject(UserService);
-  private snackBar = inject(MatSnackBar);
-  private dialog = inject(MatDialog);
+export class UserSearchComponent {
+  readonly #fb = inject(FormBuilder);
+  readonly #userService = inject(UserService);
+  readonly #snackBar = inject(MatSnackBar);
+  readonly #dialog = inject(MatDialog);
+  readonly #destroyRef = inject(DestroyRef);
 
-  searchForm!: FormGroup<UserSearchFormType>;
-  users = signal<User[]>([]);
-  searching = signal(false);
-  searched = signal(false);
+  readonly searchForm: FormGroup<UserSearchFormType> =
+    this.#fb.group<UserSearchFormType>({
+      email: this.#fb.control('', { nonNullable: true }),
+      firstName: this.#fb.control('', { nonNullable: true }),
+      lastName: this.#fb.control('', { nonNullable: true }),
+      isAdmin: this.#fb.control('', { nonNullable: true }),
+      isActive: this.#fb.control('', { nonNullable: true })
+    });
 
-  resultsFound = computed(() => this.users().length > 0);
+  readonly users = signal<User[]>([]);
+  readonly searching = signal(false);
+  readonly searched = signal(false);
 
   displayedColumns: string[] = [
     'id',
@@ -114,45 +121,34 @@ export class UserSearchComponent implements OnInit {
     'actions'
   ];
 
-  ngOnInit(): void {
-    this.initForm();
-  }
-
-  private initForm(): void {
-    this.searchForm = this.fb.group<UserSearchFormType>({
-      email: this.fb.control('', { nonNullable: true }),
-      firstName: this.fb.control('', { nonNullable: true }),
-      lastName: this.fb.control('', { nonNullable: true }),
-      isAdmin: this.fb.control('', { nonNullable: true }),
-      isActive: this.fb.control('', { nonNullable: true })
-    });
-  }
-
   onSubmit(): void {
     const formValues = this.searchForm.getRawValue();
-    const criteria = this.buildSearchCriteria(formValues);
+    const criteria = this.#buildSearchCriteria(formValues);
 
     this.searching.set(true);
     this.searched.set(false);
 
-    this.userService.search(criteria).subscribe({
-      next: (users) => {
-        this.users.set(users);
-        this.searching.set(false);
-        this.searched.set(true);
-      },
-      error: (err: HttpErrorResponse) => {
-        this.searching.set(false);
-        const errorMessage =
-          err.error?.message || 'Failed to search users. Please try again.';
-        this.snackBar.open(errorMessage, 'Close', {
-          duration: 5000
-        });
-      }
-    });
+    this.#userService
+      .search(criteria)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: (users) => {
+          this.users.set(users);
+          this.searching.set(false);
+          this.searched.set(true);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.searching.set(false);
+          this.#snackBar.open(
+            err.error?.message || 'Failed to search users. Please try again.',
+            'Close',
+            { duration: 5000 }
+          );
+        }
+      });
   }
 
-  private buildSearchCriteria(
+  #buildSearchCriteria(
     formValues: FormGroup<UserSearchFormType>['value']
   ): UserSearch {
     const criteria: UserSearch = {};
@@ -186,8 +182,8 @@ export class UserSearchComponent implements OnInit {
   }
 
   confirmDelete(user: User): void {
-    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
-      width: '350px',
+    const dialogRef = this.#dialog.open(ConfirmDialogComponent, {
+      width: 'func.rem(350)',
       data: {
         title: 'Confirm Delete',
         message: `Are you sure you want to delete user ${user.firstName} ${user.lastName}?`,
@@ -199,26 +195,25 @@ export class UserSearchComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe((result) => {
       if (result) {
-        this.deleteUser(user.id);
+        this.#deleteUser(user.id);
       }
     });
   }
 
-  private deleteUser(id: string): void {
-    this.userService.delete(id).subscribe({
+  #deleteUser(id: string): void {
+    this.#userService.delete(id).subscribe({
       next: () => {
         this.users.update((users) => users.filter((user) => user.id !== id));
-
-        this.snackBar.open('User deleted successfully', 'Close', {
+        this.#snackBar.open('User deleted successfully', 'Close', {
           duration: 5000
         });
       },
       error: (err: HttpErrorResponse) => {
-        const errorMessage =
-          err.error?.message || 'Failed to delete user. Please try again.';
-        this.snackBar.open(errorMessage, 'Close', {
-          duration: 5000
-        });
+        this.#snackBar.open(
+          err.error?.message || 'Failed to delete user. Please try again.',
+          'Close',
+          { duration: 5000 }
+        );
       }
     });
   }

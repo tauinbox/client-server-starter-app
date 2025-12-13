@@ -68,23 +68,23 @@ type UserFormType = {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UserEditComponent implements OnInit {
-  private fb = inject(FormBuilder);
-  private userService = inject(UserService);
-  private router = inject(Router);
-  private snackBar = inject(MatSnackBar);
-  private dialog = inject(MatDialog);
-  authService = inject(AuthService);
+  readonly #fb = inject(FormBuilder);
+  readonly #userService = inject(UserService);
+  readonly #router = inject(Router);
+  readonly #snackBar = inject(MatSnackBar);
+  readonly #dialog = inject(MatDialog);
+  protected readonly authService = inject(AuthService);
 
-  id = input.required<string>();
-  user = signal<User | null>(null);
-  loading = signal(true);
-  saving = signal(false);
-  error = signal<string | null>(null);
-  showPassword = signal(false);
+  readonly id = input.required<string>();
+  readonly user = signal<User | null>(null);
+  readonly loading = signal(true);
+  readonly saving = signal(false);
+  readonly error = signal<string | null>(null);
+  readonly showPassword = signal(false);
 
   userForm!: FormGroup<UserFormType>;
 
-  canSubmit = computed(
+  readonly canSubmit = computed(
     () => this.userForm?.valid && !this.saving() && this.userForm?.dirty
   );
 
@@ -99,25 +99,25 @@ export class UserEditComponent implements OnInit {
   }
 
   private initForm(): void {
-    this.userForm = this.fb.group<UserFormType>({
-      email: this.fb.control('', {
+    this.userForm = this.#fb.group<UserFormType>({
+      email: this.#fb.control('', {
         validators: [Validators.required, Validators.email],
         nonNullable: true
       }),
-      firstName: this.fb.control('', {
+      firstName: this.#fb.control('', {
         validators: [Validators.required],
         nonNullable: true
       }),
-      lastName: this.fb.control('', {
+      lastName: this.#fb.control('', {
         validators: [Validators.required],
         nonNullable: true
       }),
-      password: this.fb.control('', {
+      password: this.#fb.control('', {
         validators: [Validators.minLength(8)],
         nonNullable: true
       }),
-      isAdmin: this.fb.control(false, { nonNullable: true }),
-      isActive: this.fb.control(true, { nonNullable: true })
+      isAdmin: this.#fb.control(false, { nonNullable: true }),
+      isActive: this.#fb.control(true, { nonNullable: true })
     });
   }
 
@@ -125,7 +125,7 @@ export class UserEditComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.userService.getById(this.id()).subscribe({
+    this.#userService.getById(this.id()).subscribe({
       next: (user) => {
         this.user.set(user);
 
@@ -147,9 +147,7 @@ export class UserEditComponent implements OnInit {
           err.error?.message ||
           'Failed to load user details. Please try again.';
         this.error.set(errorMessage);
-        this.snackBar.open(errorMessage, 'Close', {
-          duration: 5000
-        });
+        this.#snackBar.open(errorMessage, 'Close', { duration: 5000 });
       }
     });
   }
@@ -162,21 +160,18 @@ export class UserEditComponent implements OnInit {
     if (!this.canSubmit()) return;
 
     const formValues = this.userForm.getRawValue();
-    const updateData: FormGroup<UserFormType>['value'] =
-      this.prepareUpdateData(formValues);
+    const updateData = this.#prepareUpdateData(formValues);
 
     this.saving.set(true);
     this.error.set(null);
 
-    this.userService.update(this.id(), updateData).subscribe({
-      next: this.handleUpdateSuccess.bind(this),
-      error: this.handleUpdateError.bind(this)
+    this.#userService.update(this.id(), updateData).subscribe({
+      next: (user) => this.#handleUpdateSuccess(user),
+      error: (err) => this.#handleUpdateError(err)
     });
   }
 
-  private prepareUpdateData(
-    formValues: FormGroup<UserFormType>['value']
-  ): UpdateUser {
+  #prepareUpdateData(formValues: FormGroup<UserFormType>['value']): UpdateUser {
     const updateData: UpdateUser = {
       email: formValues.email,
       firstName: formValues.firstName,
@@ -195,33 +190,32 @@ export class UserEditComponent implements OnInit {
     return updateData;
   }
 
-  private handleUpdateSuccess(updatedUser: User): void {
+  #handleUpdateSuccess(updatedUser: User): void {
     this.saving.set(false);
     this.user.set(updatedUser);
 
     this.userForm.patchValue({ password: '' });
     this.userForm.markAsPristine();
 
-    this.snackBar.open('User updated successfully', 'Close', {
+    this.#snackBar.open('User updated successfully', 'Close', {
       duration: 5000
     });
-
-    void this.router.navigate(['/users', this.id()]);
+    void this.#router.navigate(['/users', this.id()]);
   }
 
-  private handleUpdateError(err: HttpErrorResponse): void {
+  #handleUpdateError(err: HttpErrorResponse): void {
     this.saving.set(false);
-    const errorMessage =
-      err.error?.message || 'Failed to update user. Please try again.';
-    this.error.set(errorMessage);
+    this.error.set(
+      err.error?.message || 'Failed to update user. Please try again.'
+    );
   }
 
   confirmDelete(): void {
     if (!this.user()) return;
 
-    this.dialog
+    this.#dialog
       .open(ConfirmDialogComponent, {
-        width: '350px',
+        width: 'func.rem(350)',
         data: {
           title: 'Confirm Delete',
           message: `Are you sure you want to delete user ${this.user()!.firstName} ${this.user()!.lastName}?`,
@@ -233,25 +227,25 @@ export class UserEditComponent implements OnInit {
       .afterClosed()
       .subscribe((result) => {
         if (result) {
-          this.deleteUser();
+          this.#deleteUser();
         }
       });
   }
 
-  private deleteUser(): void {
-    this.userService.delete(this.id()).subscribe({
+  #deleteUser(): void {
+    this.#userService.delete(this.id()).subscribe({
       next: () => {
-        this.snackBar.open('User deleted successfully', 'Close', {
+        this.#snackBar.open('User deleted successfully', 'Close', {
           duration: 5000
         });
-        void this.router.navigate(['/users']);
+        void this.#router.navigate(['/users']);
       },
       error: (err: HttpErrorResponse) => {
-        const errorMessage =
-          err.error?.message || 'Failed to delete user. Please try again.';
-        this.snackBar.open(errorMessage, 'Close', {
-          duration: 5000
-        });
+        this.#snackBar.open(
+          err.error?.message || 'Failed to delete user. Please try again.',
+          'Close',
+          { duration: 5000 }
+        );
       }
     });
   }

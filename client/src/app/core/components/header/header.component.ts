@@ -23,7 +23,7 @@ import { ThemeToggleComponent } from './theme-toggle/theme-toggle.component';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class HeaderComponent {
-  authService = inject(AuthService);
+  protected readonly authService = inject(AuthService);
 
   logout(): void {
     this.authService.logout();
