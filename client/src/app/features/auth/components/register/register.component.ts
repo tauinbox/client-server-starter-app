@@ -59,31 +59,31 @@ type RegisterFormType = {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class RegisterComponent {
-  private fb = inject(FormBuilder);
-  private authService = inject(AuthService);
-  private router = inject(Router);
-  private snackBar = inject(MatSnackBar);
+  readonly #fb = inject(FormBuilder);
+  readonly #authService = inject(AuthService);
+  readonly #router = inject(Router);
+  readonly #snackBar = inject(MatSnackBar);
 
-  registerForm: FormGroup<RegisterFormType>;
-  loading = signal(false);
-  error = signal<string | null>(null);
-  showPassword = signal(false);
+  readonly registerForm: FormGroup<RegisterFormType>;
+  protected readonly loading = signal(false);
+  protected readonly error = signal<string | null>(null);
+  protected readonly showPassword = signal(false);
 
   constructor() {
-    this.registerForm = this.fb.group<RegisterFormType>({
-      email: this.fb.control('', {
+    this.registerForm = this.#fb.group<RegisterFormType>({
+      email: this.#fb.control('', {
         validators: [Validators.required, Validators.email],
         nonNullable: true
       }),
-      firstName: this.fb.control('', {
+      firstName: this.#fb.control('', {
         validators: [Validators.required],
         nonNullable: true
       }),
-      lastName: this.fb.control('', {
+      lastName: this.#fb.control('', {
         validators: [Validators.required],
         nonNullable: true
       }),
-      password: this.fb.control('', {
+      password: this.#fb.control('', {
         validators: [Validators.required, Validators.minLength(8)],
         nonNullable: true
       })
@@ -100,13 +100,13 @@ export class RegisterComponent {
     this.loading.set(true);
     this.error.set(null);
 
-    this.authService.register(this.registerForm.getRawValue()).subscribe({
+    this.#authService.register(this.registerForm.getRawValue()).subscribe({
       next: () => {
         this.loading.set(false);
-        this.snackBar.open('Registration successful! Please login.', 'Close', {
+        this.#snackBar.open('Registration successful! Please login.', 'Close', {
           duration: 5000
         });
-        void this.router.navigate(['/login']);
+        void this.#router.navigate(['/login']);
       },
       error: (err: HttpErrorResponse) => {
         this.loading.set(false);

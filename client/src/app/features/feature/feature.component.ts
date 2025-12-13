@@ -19,33 +19,33 @@ type FileInputEvent = Event & { target: EventTarget & { files: FileList } };
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class FeatureComponent {
-  private readonly featureApi = inject(FeatureApiService);
+  readonly #featureApi = inject(FeatureApiService);
 
-  private readonly descriptionResource = rxResource({
-    stream: () => this.featureApi.getFeatureDescription()
+  readonly #descriptionResource = rxResource({
+    stream: () => this.#featureApi.getFeatureDescription()
   });
-  private readonly configResource = rxResource({
-    stream: () => this.featureApi.getConfig()
+  readonly #configResource = rxResource({
+    stream: () => this.#featureApi.getConfig()
   });
-  private readonly entitiesResource = rxResource({
-    stream: () => this.featureApi.getFeatureEntities()
+  readonly #entitiesResource = rxResource({
+    stream: () => this.#featureApi.getFeatureEntities()
   });
 
-  protected description = this.descriptionResource.value;
-  protected config = this.configResource.value;
-  protected entities = this.entitiesResource.value;
+  protected readonly description = this.#descriptionResource.value;
+  protected readonly config = this.#configResource.value;
+  protected readonly entities = this.#entitiesResource.value;
 
-  protected isLoading = computed(
+  protected readonly isLoading = computed(
     () =>
-      this.descriptionResource.isLoading() ||
-      this.configResource.isLoading() ||
-      this.entitiesResource.isLoading()
+      this.#descriptionResource.isLoading() ||
+      this.#configResource.isLoading() ||
+      this.#entitiesResource.isLoading()
   );
 
   onFilesSelected(event: Event, input: HTMLInputElement) {
     const files = Array.from((event as FileInputEvent).target.files);
 
-    merge(...files.map((file) => this.featureApi.uploadFile(file))).subscribe(
+    merge(...files.map((file) => this.#featureApi.uploadFile(file))).subscribe(
       () => {
         input.value = ''; // to reset input
       }

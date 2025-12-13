@@ -61,34 +61,34 @@ type ProfileFormType = {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProfileComponent implements OnInit {
-  private fb = inject(FormBuilder);
-  private authService = inject(AuthService);
-  private userService = inject(UserService);
-  private snackBar = inject(MatSnackBar);
+  readonly #fb = inject(FormBuilder);
+  readonly #authService = inject(AuthService);
+  readonly #userService = inject(UserService);
+  readonly #snackBar = inject(MatSnackBar);
 
   profileForm!: FormGroup<ProfileFormType>;
-  user = signal<User | null>(null);
-  loading = signal(true);
-  saving = signal(false);
-  error = signal<string | null>(null);
-  showPassword = signal(false);
+  protected readonly user = signal<User | null>(null);
+  protected readonly loading = signal(true);
+  protected readonly saving = signal(false);
+  protected readonly error = signal<string | null>(null);
+  protected readonly showPassword = signal(false);
 
   ngOnInit(): void {
-    this.initForm();
+    this.#initForm();
     this.loadProfile();
   }
 
-  private initForm(): void {
-    this.profileForm = this.fb.group<ProfileFormType>({
-      firstName: this.fb.control('', {
+  #initForm(): void {
+    this.profileForm = this.#fb.group<ProfileFormType>({
+      firstName: this.#fb.control('', {
         validators: [Validators.required],
         nonNullable: true
       }),
-      lastName: this.fb.control('', {
+      lastName: this.#fb.control('', {
         validators: [Validators.required],
         nonNullable: true
       }),
-      password: this.fb.control('', {
+      password: this.#fb.control('', {
         validators: [Validators.minLength(8)],
         nonNullable: true
       })
@@ -99,7 +99,7 @@ export class ProfileComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.authService.getProfile().subscribe({
+    this.#authService.getProfile().subscribe({
       next: (user) => {
         this.user.set(user);
         this.profileForm.patchValue({
@@ -140,7 +140,7 @@ export class ProfileComponent implements OnInit {
     this.saving.set(true);
     this.error.set(null);
 
-    this.userService.update(this.user()!.id, updateData).subscribe({
+    this.#userService.update(this.user()!.id, updateData).subscribe({
       next: (updatedUser) => {
         this.saving.set(false);
         this.user.set(updatedUser);
@@ -148,9 +148,7 @@ export class ProfileComponent implements OnInit {
         this.profileForm.patchValue({ password: '' });
         this.profileForm.markAsPristine();
 
-        this.snackBar.open('Profile updated successfully', 'Close', {
-          duration: 5000
-        });
+        this.#snackBar.open('Profile updated successfully', 'Close', { duration: 5000 });
       },
       error: (err: HttpErrorResponse) => {
         this.saving.set(false);

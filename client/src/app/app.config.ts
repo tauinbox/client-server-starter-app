@@ -1,8 +1,7 @@
-import { ApplicationConfig } from '@angular/core';
+import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { routes } from './app.routes';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { provideAnimations } from '@angular/platform-browser/animations';
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { MAT_SNACK_BAR_DEFAULT_OPTIONS } from '@angular/material/snack-bar';
 import { jwtInterceptor } from '@features/auth/interceptors/jwt.interceptor';
@@ -10,8 +9,8 @@ import { errorInterceptor } from '@features/auth/interceptors/error.interceptor'
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes, withComponentInputBinding()),
-    provideAnimations(),
     provideHttpClient(withInterceptors([errorInterceptor, jwtInterceptor])),
     {
       provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,

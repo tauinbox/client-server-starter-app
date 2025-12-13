@@ -30,6 +30,7 @@
     "@angular/cli": "~21.0.2",
     "@angular/compiler-cli": "^21.0.3",
     "@types/jasmine": "~5.1.4",
+    "baseline-browser-mapping": "^2.9.7",
     "browser-sync": "^3.0.3",
     "jasmine-core": "~5.4.0",
     "karma": "~6.4.4",

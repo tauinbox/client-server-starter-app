@@ -38,6 +38,8 @@ import { User } from '../../models/user.types';
 import { DatePipe } from '@angular/common';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 
+type SortableValue = string | number | boolean | Date;
+
 @Component({
   selector: 'app-user-list',
   imports: [
@@ -71,13 +73,15 @@ import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confir
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UserListComponent implements OnInit {
-  private userService = inject(UserService);
-  private snackBar = inject(MatSnackBar);
-  private dialog = inject(MatDialog);
+  readonly #userService = inject(UserService);
+  readonly #snackBar = inject(MatSnackBar);
+  readonly #dialog = inject(MatDialog);
 
-  users = signal<User[]>([]);
-  displayedUsers = signal<User[]>([]);
-  loading = signal(true);
+  readonly users = signal<User[]>([]);
+  readonly displayedUsers = signal<User[]>([]);
+  readonly loading = signal(true);
+  readonly pageSize = signal(10);
+  readonly currentPage = signal(0);
 
   displayedColumns: string[] = [
     'id',
@@ -88,8 +92,6 @@ export class UserListComponent implements OnInit {
     'createdAt',
     'actions'
   ];
-  pageSize = signal(10);
-  currentPage = signal(0);
 
   ngOnInit(): void {
     this.loadUsers();
@@ -98,7 +100,7 @@ export class UserListComponent implements OnInit {
   loadUsers(): void {
     this.loading.set(true);
 
-    this.userService.getAll().subscribe({
+    this.#userService.getAll().subscribe({
       next: (users) => {
         this.users.set(users);
         this.updateDisplayedUsers();
@@ -106,9 +108,11 @@ export class UserListComponent implements OnInit {
       },
       error: () => {
         this.loading.set(false);
-        this.snackBar.open('Failed to load users. Please try again.', 'Close', {
-          duration: 5000
-        });
+        this.#snackBar.open(
+          'Failed to load users. Please try again.',
+          'Close',
+          { duration: 5000 }
+        );
       }
     });
   }
@@ -165,12 +169,12 @@ export class UserListComponent implements OnInit {
     this.updateDisplayedUsers();
   }
 
-  compare(a: any, b: any, isAsc: boolean): number {
+  compare<T extends SortableValue>(a: T, b: T, isAsc: boolean): number {
     return (a < b ? -1 : 1) * (isAsc ? 1 : -1);
   }
 
   confirmDelete(user: User): void {
-    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+    const dialogRef = this.#dialog.open(ConfirmDialogComponent, {
       width: 'func.rem(350)',
       data: {
         title: 'Confirm Delete',
@@ -188,22 +192,19 @@ export class UserListComponent implements OnInit {
   }
 
   deleteUser(id: string): void {
-    this.userService.delete(id).subscribe({
+    this.#userService.delete(id).subscribe({
       next: () => {
         this.users.update((users) => users.filter((user) => user.id !== id));
         this.updateDisplayedUsers();
-
-        this.snackBar.open('User deleted successfully', 'Close', {
+        this.#snackBar.open('User deleted successfully', 'Close', {
           duration: 5000
         });
       },
       error: () => {
-        this.snackBar.open(
+        this.#snackBar.open(
           'Failed to delete user. Please try again.',
           'Close',
-          {
-            duration: 5000
-          }
+          { duration: 5000 }
         );
       }
     });

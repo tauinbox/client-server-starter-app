@@ -17,30 +17,30 @@ import {
 import { TokenService } from './token.service';
 
 export const AUTH_API_V1 = 'api/v1/auth';
-const TOKEN_REFRESH_WINDOW = 60;
+const TOKEN_REFRESH_WINDOW_SECONDS = 60;
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
-  private http = inject(HttpClient);
-  private tokenService = inject(TokenService);
+  readonly #http = inject(HttpClient);
+  readonly #tokenService = inject(TokenService);
 
-  private currentUserSignal = signal<User | null>(null);
-  private isAdminSignal = signal<boolean>(false);
+  readonly #currentUserSignal = signal<User | null>(null);
+  readonly #isAdminSignal = signal<boolean>(false);
 
-  readonly user = this.currentUserSignal.asReadonly();
-  readonly isAuthenticated = this.tokenService.isAuthenticated;
-  readonly isAdmin = this.isAdminSignal.asReadonly();
+  readonly user = this.#currentUserSignal.asReadonly();
+  readonly isAuthenticated = this.#tokenService.isAuthenticated;
+  readonly isAdmin = this.#isAdminSignal.asReadonly();
 
   constructor() {
-    const user = this.tokenService.getUserData();
+    const user = this.#tokenService.getUserData();
 
     if (user) {
       this.updateUserData(user);
     }
 
-    this.tokenService.authTokens$.subscribe((authResponse) => {
+    this.#tokenService.authTokens$.subscribe((authResponse) => {
       if (authResponse) {
         this.handleAuthentication(authResponse);
       }
@@ -48,13 +48,13 @@ export class AuthService {
   }
 
   register(registerData: RegisterRequest): Observable<User> {
-    return this.http
+    return this.#http
       .post<User>(`${AUTH_API_V1}/register`, registerData)
       .pipe(catchError(this.handleError));
   }
 
   login(credentials: LoginCredentials): Observable<AuthResponse> {
-    return this.http
+    return this.#http
       .post<AuthResponse>(`${AUTH_API_V1}/login`, credentials)
       .pipe(
         tap((response) => this.handleAuthentication(response)),
@@ -67,15 +67,15 @@ export class AuthService {
   }
 
   logout(): void {
-    this.tokenService.logout();
-    this.currentUserSignal.set(null);
-    this.isAdminSignal.set(false);
+    this.#tokenService.logout();
+    this.#currentUserSignal.set(null);
+    this.#isAdminSignal.set(false);
   }
 
   getProfile(): Observable<User> {
-    return this.http.get<User>(`${AUTH_API_V1}/profile`).pipe(
+    return this.#http.get<User>(`${AUTH_API_V1}/profile`).pipe(
       tap((profile) => {
-        this.currentUserSignal.update(
+        this.#currentUserSignal.update(
           (user) =>
             ({
               ...(user ?? {}),
@@ -88,28 +88,29 @@ export class AuthService {
   }
 
   private scheduleTokenRefresh(): void {
-    const expiryTime = this.tokenService.getTokenExpiryTime();
+    const expiryTime = this.#tokenService.getTokenExpiryTime();
     if (!expiryTime) return;
 
-    const timeToRefresh = expiryTime - Date.now() - TOKEN_REFRESH_WINDOW * 1000;
+    const timeToRefresh =
+      expiryTime - Date.now() - TOKEN_REFRESH_WINDOW_SECONDS * 1000;
 
     if (timeToRefresh <= 0) {
-      this.tokenService.refreshToken().subscribe();
+      this.#tokenService.refreshToken().subscribe();
       return;
     }
 
     timer(timeToRefresh)
-      .pipe(switchMap(() => this.tokenService.refreshToken()))
+      .pipe(switchMap(() => this.#tokenService.refreshToken()))
       .subscribe();
   }
 
   private updateUserData(user: User): void {
-    this.currentUserSignal.set(user);
-    this.isAdminSignal.set(user.isAdmin);
+    this.#currentUserSignal.set(user);
+    this.#isAdminSignal.set(user.isAdmin);
   }
 
   private handleAuthentication(authResponse: AuthResponse): void {
-    this.tokenService.saveTokens(authResponse);
+    this.#tokenService.saveTokens(authResponse);
     this.updateUserData(authResponse.user);
     this.scheduleTokenRefresh();
   }

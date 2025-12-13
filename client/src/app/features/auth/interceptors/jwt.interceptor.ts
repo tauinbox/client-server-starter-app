@@ -9,6 +9,8 @@ import { catchError, switchMap, throwError } from 'rxjs';
 import { TokenService } from '../services/token.service';
 import { Router } from '@angular/router';
 
+const AUTH_EXCLUDED_URLS = ['refresh-token', 'login'] as const;
+
 export const jwtInterceptor: HttpInterceptorFn = (
   request: HttpRequest<unknown>,
   next: HttpHandlerFn
@@ -23,12 +25,7 @@ export const jwtInterceptor: HttpInterceptorFn = (
 
   return next(request).pipe(
     catchError((error: HttpErrorResponse) => {
-      if (
-        error.status === 401 &&
-        !request.url.includes('refresh-token') &&
-        !request.url.includes('login') &&
-        !tokenService.isRefreshInProgress()
-      ) {
+      if (shouldAttemptTokenRefresh(error, request, tokenService)) {
         return tokenService.refreshToken().pipe(
           switchMap((tokens) => {
             if (!tokens) {
@@ -49,6 +46,16 @@ export const jwtInterceptor: HttpInterceptorFn = (
     })
   );
 };
+
+function shouldAttemptTokenRefresh(
+  error: HttpErrorResponse,
+  request: HttpRequest<unknown>,
+  tokenService: TokenService
+): boolean {
+  return error.status === 401 &&
+    !AUTH_EXCLUDED_URLS.some((url) => request.url.includes(url)) &&
+    !tokenService.isRefreshInProgress();
+}
 
 function addTokenToRequest(
   request: HttpRequest<unknown>,
