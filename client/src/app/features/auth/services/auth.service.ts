@@ -1,8 +1,10 @@
 import { inject, Injectable, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import {
   catchError,
   Observable,
+  Subscription,
   switchMap,
   tap,
   throwError,
@@ -26,6 +28,8 @@ export class AuthService {
   readonly #http = inject(HttpClient);
   readonly #tokenService = inject(TokenService);
 
+  #refreshSubscription?: Subscription;
+
   readonly #currentUserSignal = signal<User | null>(null);
   readonly #isAdminSignal = signal<boolean>(false);
 
@@ -40,11 +44,13 @@ export class AuthService {
       this.updateUserData(user);
     }
 
-    this.#tokenService.authTokens$.subscribe((authResponse) => {
-      if (authResponse) {
-        this.handleAuthentication(authResponse);
-      }
-    });
+    this.#tokenService.authTokens$
+      .pipe(takeUntilDestroyed())
+      .subscribe((authResponse) => {
+        if (authResponse) {
+          this.handleAuthentication(authResponse);
+        }
+      });
   }
 
   register(registerData: RegisterRequest): Observable<User> {
@@ -67,6 +73,7 @@ export class AuthService {
   }
 
   logout(): void {
+    this.#refreshSubscription?.unsubscribe();
     this.#tokenService.logout();
     this.#currentUserSignal.set(null);
     this.#isAdminSignal.set(false);
@@ -88,6 +95,8 @@ export class AuthService {
   }
 
   private scheduleTokenRefresh(): void {
+    this.#refreshSubscription?.unsubscribe();
+
     const expiryTime = this.#tokenService.getTokenExpiryTime();
     if (!expiryTime) return;
 
@@ -95,11 +104,11 @@ export class AuthService {
       expiryTime - Date.now() - TOKEN_REFRESH_WINDOW_SECONDS * 1000;
 
     if (timeToRefresh <= 0) {
-      this.#tokenService.refreshToken().subscribe();
+      this.#refreshSubscription = this.#tokenService.refreshToken().subscribe();
       return;
     }
 
-    timer(timeToRefresh)
+    this.#refreshSubscription = timer(timeToRefresh)
       .pipe(switchMap(() => this.#tokenService.refreshToken()))
       .subscribe();
   }

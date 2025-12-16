@@ -13,7 +13,7 @@ import {
 } from '@angular/material/card';
 import {
   FormBuilder,
-  FormGroup,
+  FormControl,
   ReactiveFormsModule,
   Validators
 } from '@angular/forms';
@@ -24,6 +24,12 @@ import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
+import { HttpErrorResponse } from '@angular/common/http';
+
+type LoginFormType = {
+  email: FormControl<string>;
+  password: FormControl<string>;
+};
 
 @Component({
   selector: 'app-login',
@@ -54,17 +60,20 @@ export class LoginComponent {
   readonly #router = inject(Router);
   readonly #route = inject(ActivatedRoute);
 
-  readonly loginForm: FormGroup;
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly showPassword = signal(false);
 
-  constructor() {
-    this.loginForm = this.#fb.group({
-      email: ['', [Validators.required, Validators.email]],
-      password: ['', Validators.required]
-    });
-  }
+  readonly loginForm = this.#fb.group<LoginFormType>({
+    email: this.#fb.control('', {
+      validators: [Validators.required, Validators.email],
+      nonNullable: true
+    }),
+    password: this.#fb.control('', {
+      validators: [Validators.required],
+      nonNullable: true
+    })
+  });
 
   togglePasswordVisibility(): void {
     this.showPassword.update((prev) => !prev);
@@ -76,13 +85,13 @@ export class LoginComponent {
     this.loading.set(true);
     this.error.set(null);
 
-    this.#authService.login(this.loginForm.value).subscribe({
+    this.#authService.login(this.loginForm.getRawValue()).subscribe({
       next: () => {
         this.loading.set(false);
         const returnUrl = this.#route.snapshot.queryParams['returnUrl'] || '/';
         void this.#router.navigateByUrl(returnUrl);
       },
-      error: (err) => {
+      error: (err: HttpErrorResponse) => {
         this.loading.set(false);
         this.error.set(
           err.message || 'Login failed. Please check your credentials.'

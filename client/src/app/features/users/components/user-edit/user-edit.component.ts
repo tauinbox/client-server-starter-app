@@ -34,6 +34,7 @@ import { AuthService } from '../../../auth/services/auth.service';
 import { UpdateUser, User } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { HttpErrorResponse } from '@angular/common/http';
+import { rem } from '@shared/utils/css.utils';
 
 type UserFormType = {
   email: FormControl<string>;
@@ -215,7 +216,7 @@ export class UserEditComponent implements OnInit {
 
     this.#dialog
       .open(ConfirmDialogComponent, {
-        width: 'func.rem(350)',
+        width: rem(350),
         data: {
           title: 'Confirm Delete',
           message: `Are you sure you want to delete user ${this.user()!.firstName} ${this.user()!.lastName}?`,

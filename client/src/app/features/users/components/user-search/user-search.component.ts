@@ -46,6 +46,7 @@ import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confir
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { rem } from '@shared/utils/css.utils';
 
 type UserSearchFormType = {
   email: FormControl<string>;
@@ -183,7 +184,7 @@ export class UserSearchComponent {
 
   confirmDelete(user: User): void {
     const dialogRef = this.#dialog.open(ConfirmDialogComponent, {
-      width: 'func.rem(350)',
+      width: rem(350),
       data: {
         title: 'Confirm Delete',
         message: `Are you sure you want to delete user ${user.firstName} ${user.lastName}?`,
