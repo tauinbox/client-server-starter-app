@@ -37,6 +37,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { User } from '../../models/user.types';
 import { DatePipe } from '@angular/common';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
+import { rem } from '@shared/utils/css.utils';
 
 type SortableValue = string | number | boolean | Date;
 
@@ -175,7 +176,7 @@ export class UserListComponent implements OnInit {
 
   confirmDelete(user: User): void {
     const dialogRef = this.#dialog.open(ConfirmDialogComponent, {
-      width: 'func.rem(350)',
+      width: rem(350),
       data: {
         title: 'Confirm Delete',
         message: `Are you sure you want to delete user ${user.firstName} ${user.lastName}?`,
