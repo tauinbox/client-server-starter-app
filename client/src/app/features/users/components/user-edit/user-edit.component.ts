@@ -83,24 +83,8 @@ export class UserEditComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly showPassword = signal(false);
 
-  userForm!: FormGroup<UserFormType>;
-
-  readonly canSubmit = computed(
-    () => this.userForm?.valid && !this.saving() && this.userForm?.dirty
-  );
-
-  canDelete = computed(
-    () =>
-      this.authService.isAdmin() && this.id() !== this.authService.user()?.id
-  );
-
-  ngOnInit(): void {
-    this.initForm();
-    this.loadUser();
-  }
-
-  private initForm(): void {
-    this.userForm = this.#fb.group<UserFormType>({
+  protected readonly userForm: FormGroup<UserFormType> =
+    this.#fb.group<UserFormType>({
       email: this.#fb.control('', {
         validators: [Validators.required, Validators.email],
         nonNullable: true
@@ -120,6 +104,18 @@ export class UserEditComponent implements OnInit {
       isAdmin: this.#fb.control(false, { nonNullable: true }),
       isActive: this.#fb.control(true, { nonNullable: true })
     });
+
+  protected readonly canSubmit = computed(
+    () => this.userForm.valid && !this.saving() && this.userForm.dirty
+  );
+
+  protected readonly canDelete = computed(
+    () =>
+      this.authService.isAdmin() && this.id() !== this.authService.user()?.id
+  );
+
+  ngOnInit() {
+    this.loadUser();
   }
 
   loadUser(): void {

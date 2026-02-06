@@ -16,9 +16,9 @@ import { corsOptions } from './cors-options';
     ConfigModule.forRoot({
       load: [configuration],
       envFilePath: ['.env.development', '.env'],
-      isGlobal: true,
-    }),
-  ],
+      isGlobal: true
+    })
+  ]
 })
 class BootstrapModule {}
 
@@ -28,19 +28,19 @@ async function bootstrap() {
     {
       cors: true,
       bufferLogs: true,
-      logger: ['fatal', 'error', 'warn', 'log'],
-    },
+      logger: ['fatal', 'error', 'warn', 'log']
+    }
   );
 
-  // here is the way how we can get instances to pass them as dependencies into class constructors (when needed)
+  // Example: getting instances to pass as dependencies into class constructors (when needed)
   const reflector = app.get(Reflector);
   const featureService = app.get(FeatureService);
 
   app.useGlobalPipes(
     new ValidationPipe(
       // This allows to automatically transform the incoming request payloads into DTO instances before validating them
-      { transform: true },
-    ),
+      { transform: true }
+    )
   );
   app.enableCors(corsOptions());
   app.useStaticAssets(join(__dirname, '..', 'public'));
@@ -55,7 +55,7 @@ async function bootstrap() {
     .setContact(
       'Alexander Tupavov',
       'https://github.com/tauinbox',
-      'tauinbox@gmail.com',
+      'tauinbox@gmail.com'
     )
     .setVersion('1.0')
     .addBearerAuth()
@@ -66,7 +66,7 @@ async function bootstrap() {
 
   SwaggerModule.setup('swagger', app, document, {
     swaggerOptions: {},
-    customCss: '',
+    customCss: ''
   });
 
   const port = process.env.APPLICATION_PORT
@@ -77,4 +77,4 @@ async function bootstrap() {
   console.log(`Server started listening on port ${port}`);
 }
 
-bootstrap();
+void bootstrap();

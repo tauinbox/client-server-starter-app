@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '@features/auth/services/auth.service';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { ThemeToggleComponent } from './theme-toggle/theme-toggle.component';
+import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 
 @Component({
   selector: 'app-header',
@@ -24,6 +25,7 @@ import { ThemeToggleComponent } from './theme-toggle/theme-toggle.component';
 })
 export class HeaderComponent {
   protected readonly authService = inject(AuthService);
+  protected readonly routes = AppRouteSegmentEnum;
 
   logout(): void {
     this.authService.logout();

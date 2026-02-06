@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
+import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 
 export const adminGuard: CanActivateFn = (route, state) => {
   const authService = inject(AuthService);
@@ -11,12 +12,11 @@ export const adminGuard: CanActivateFn = (route, state) => {
   }
 
   if (!authService.isAuthenticated()) {
-    void router.navigate(['/login'], {
+    void router.navigate([`/${AppRouteSegmentEnum.Login}`], {
       queryParams: { returnUrl: state.url }
     });
   } else {
-    // User is authenticated but not an admin
-    void router.navigate(['/forbidden']);
+    void router.navigate([`/${AppRouteSegmentEnum.Forbidden}`]);
   }
 
   return false;

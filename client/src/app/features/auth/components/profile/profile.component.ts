@@ -66,20 +66,14 @@ export class ProfileComponent implements OnInit {
   readonly #userService = inject(UserService);
   readonly #snackBar = inject(MatSnackBar);
 
-  profileForm!: FormGroup<ProfileFormType>;
   protected readonly user = signal<User | null>(null);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly showPassword = signal(false);
 
-  ngOnInit(): void {
-    this.#initForm();
-    this.loadProfile();
-  }
-
-  #initForm(): void {
-    this.profileForm = this.#fb.group<ProfileFormType>({
+  protected readonly profileForm: FormGroup<ProfileFormType> =
+    this.#fb.group<ProfileFormType>({
       firstName: this.#fb.control('', {
         validators: [Validators.required],
         nonNullable: true
@@ -93,6 +87,9 @@ export class ProfileComponent implements OnInit {
         nonNullable: true
       })
     });
+
+  ngOnInit() {
+    this.loadProfile();
   }
 
   loadProfile(): void {
@@ -148,7 +145,9 @@ export class ProfileComponent implements OnInit {
         this.profileForm.patchValue({ password: '' });
         this.profileForm.markAsPristine();
 
-        this.#snackBar.open('Profile updated successfully', 'Close', { duration: 5000 });
+        this.#snackBar.open('Profile updated successfully', 'Close', {
+          duration: 5000
+        });
       },
       error: (err: HttpErrorResponse) => {
         this.saving.set(false);

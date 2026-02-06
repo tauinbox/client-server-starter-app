@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
+import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 
 export const authGuard: CanActivateFn = (route, state) => {
   const authService = inject(AuthService);
@@ -10,7 +11,7 @@ export const authGuard: CanActivateFn = (route, state) => {
     return true;
   }
 
-  void router.navigate(['/login'], {
+  void router.navigate([`/${AppRouteSegmentEnum.Login}`], {
     queryParams: { returnUrl: state.url }
   });
 

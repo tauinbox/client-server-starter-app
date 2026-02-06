@@ -10,17 +10,17 @@
       <mat-icon>expand_more</mat-icon>
     </button>
     <mat-menu #menu="matMenu">
-      <a mat-menu-item routerLink="/profile">
+      <a mat-menu-item [routerLink]="'/' + routes.Profile">
         <mat-icon>account_circle</mat-icon>
         <span>Profile</span>
       </a>
 
       @if (authService.isAdmin()) {
-        <a mat-menu-item routerLink="/users">
+        <a mat-menu-item [routerLink]="'/' + routes.Users">
           <mat-icon>people</mat-icon>
           <span>Manage Users</span>
         </a>
-        <a mat-menu-item routerLink="/users/search">
+        <a mat-menu-item [routerLink]="'/' + routes.Users + '/search'">
           <mat-icon>search</mat-icon>
           <span>Search Users</span>
         </a>
@@ -32,10 +32,10 @@
       </button>
     </mat-menu>
   } @else {
-    <button mat-button routerLink="/login" routerLinkActive="active">
+    <button mat-button [routerLink]="'/' + routes.Login" routerLinkActive="active">
       Login
     </button>
-    <button mat-button routerLink="/register" routerLinkActive="active">
+    <button mat-button [routerLink]="'/' + routes.Register" routerLinkActive="active">
       Register
     </button>
   }
