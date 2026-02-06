@@ -2,8 +2,9 @@ import {
   CorsOptions,
   CorsOptionsDelegate
 } from "@nestjs/common/interfaces/external/cors-options.interface";
+import { Request } from 'express';
 
-export const corsOptions = (): CorsOptions | CorsOptionsDelegate<any> => {
+export const corsOptions = (): CorsOptions | CorsOptionsDelegate<Request> => {
   const originsString = process.env.CORS_ORIGINS;
   if (originsString) {
     return {

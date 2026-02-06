@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, Repository } from 'typeorm';
+import { LessThan, MoreThan, Repository } from 'typeorm';
 import { RefreshToken } from '../entities/refresh-token.entity';
 
 @Injectable()
@@ -71,7 +71,7 @@ export class RefreshTokenService {
 
     const totalActive = await this.repository.count({
       where: {
-        expiresAt: LessThan(now),
+        expiresAt: MoreThan(now),
         revoked: false
       }
     });

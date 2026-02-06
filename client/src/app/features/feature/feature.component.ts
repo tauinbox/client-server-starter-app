@@ -2,10 +2,11 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject
 } from '@angular/core';
 import { FeatureApiService } from './feature-api.service';
-import { rxResource } from '@angular/core/rxjs-interop';
+import { rxResource, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { JsonPipe } from '@angular/common';
 import { merge } from 'rxjs';
 
@@ -20,6 +21,7 @@ type FileInputEvent = Event & { target: EventTarget & { files: FileList } };
 })
 export class FeatureComponent {
   readonly #featureApi = inject(FeatureApiService);
+  readonly #destroyRef = inject(DestroyRef);
 
   readonly #descriptionResource = rxResource({
     stream: () => this.#featureApi.getFeatureDescription()
@@ -45,10 +47,16 @@ export class FeatureComponent {
   onFilesSelected(event: Event, input: HTMLInputElement) {
     const files = Array.from((event as FileInputEvent).target.files);
 
-    merge(...files.map((file) => this.#featureApi.uploadFile(file))).subscribe(
-      () => {
-        input.value = ''; // to reset input
-      }
-    );
+    merge(...files.map((file) => this.#featureApi.uploadFile(file)))
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          input.value = '';
+        },
+        error: (err: unknown) => {
+          console.error('File upload failed', err);
+          input.value = '';
+        }
+      });
   }
 }

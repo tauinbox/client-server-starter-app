@@ -124,15 +124,13 @@ export class AuthService {
     this.scheduleTokenRefresh();
   }
 
-  private handleError(error: HttpErrorResponse) {
-    let errorMessage;
-
+  private handleError = (error: HttpErrorResponse) => {
+    let errorMessage: string;
     if (error.error instanceof ErrorEvent) {
       errorMessage = `Error: ${error.error.message}`;
     } else {
       errorMessage = error.error?.message || `Error Code: ${error.status}`;
     }
-
     return throwError(() => new Error(errorMessage));
-  }
+  };
 }

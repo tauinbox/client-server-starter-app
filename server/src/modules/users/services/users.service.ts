@@ -99,12 +99,14 @@ export class UsersService {
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
 
-    // If password is being updated, hash it
-    if (updateUserDto.password) {
-      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
+    const changes: Partial<UpdateUserDto> = { ...updateUserDto };
+
+    if (changes.password) {
+      changes.password = await bcrypt.hash(changes.password, 10);
     }
 
-    Object.assign(user, updateUserDto);
+    this.userRepository.merge(user, changes);
+
     return this.userRepository.save(user);
   }
 

@@ -1,4 +1,5 @@
 <div class="profile-container">
+  @let u = user();
   <mat-card>
     <mat-card-header>
       <mat-card-title>My Profile</mat-card-title>
@@ -9,25 +10,25 @@
         <div class="loading-container">
           <mat-spinner></mat-spinner>
         </div>
-      } @else if (user()) {
+      } @else if (u) {
         <div class="mt-1">
           <h3>Account Information</h3>
-          <p><strong>Email:</strong> {{ user()!.email }}</p>
+          <p><strong>Email:</strong> {{ u.email }}</p>
           <p>
-            <strong>Name:</strong> {{ user()!.firstName }}
-            {{ user()!.lastName }}
+            <strong>Name:</strong> {{ u.firstName }}
+            {{ u.lastName }}
           </p>
           <p>
             <strong>Role:</strong>
-            {{ user()!.isAdmin ? 'Administrator' : 'User' }}
+            {{ u.isAdmin ? 'Administrator' : 'User' }}
           </p>
           <p>
             <strong>Status:</strong>
-            {{ user()!.isActive ? 'Active' : 'Inactive' }}
+            {{ u.isActive ? 'Active' : 'Inactive' }}
           </p>
           <p>
             <strong>Member Since:</strong>
-            {{ user()!.createdAt | date: 'medium' }}
+            {{ u.createdAt | date: 'medium' }}
           </p>
         </div>
 
