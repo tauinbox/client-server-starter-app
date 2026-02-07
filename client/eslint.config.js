@@ -8,6 +8,14 @@ const prettierPlugin = require('eslint-plugin-prettier');
 
 module.exports = defineConfig([
   {
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      'coverage/**',
+      '.angular/**',
+      '.idea/**',
+      '.run/**'
+    ],
     files: ['**/*.ts'],
     extends: [
       eslint.configs.recommended,
