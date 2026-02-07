@@ -5,6 +5,7 @@ const tseslint = require('typescript-eslint');
 const angular = require('angular-eslint');
 const prettier = require('eslint-config-prettier');
 const prettierPlugin = require('eslint-plugin-prettier');
+const importPlugin = require('eslint-plugin-import');
 
 module.exports = defineConfig([
   {
@@ -25,7 +26,8 @@ module.exports = defineConfig([
       prettier
     ],
     plugins: {
-      prettier: prettierPlugin
+      prettier: prettierPlugin,
+      import: importPlugin
     },
     processor: angular.processInlineTemplates,
     rules: {
@@ -52,7 +54,16 @@ module.exports = defineConfig([
           prefix: 'app',
           style: 'kebab-case'
         }
-      ]
+      ],
+      'import/no-cycle': 'error'
+    }
+  },
+  {
+    settings: {
+      'import/resolver': {
+        typescript: true,
+        node: true
+      }
     }
   },
   {

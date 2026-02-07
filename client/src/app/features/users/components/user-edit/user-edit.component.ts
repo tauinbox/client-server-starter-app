@@ -30,6 +30,7 @@ import type { UpdateUser, User } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { rem } from '@shared/utils/css.utils';
+import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 
 type UserFormType = {
   email: FormControl<string>;
@@ -192,7 +193,7 @@ export class UserEditComponent implements OnInit {
     this.#snackBar.open('User updated successfully', 'Close', {
       duration: 5000
     });
-    void this.#router.navigate(['/users', this.id()]);
+    void this.#router.navigate([`/${AppRouteSegmentEnum.Users}`, this.id()]);
   }
 
   #handleUpdateError(err: HttpErrorResponse): void {
@@ -230,7 +231,7 @@ export class UserEditComponent implements OnInit {
         this.#snackBar.open('User deleted successfully', 'Close', {
           duration: 5000
         });
-        void this.#router.navigate(['/users']);
+        void this.#router.navigate([`/${AppRouteSegmentEnum.Users}`]);
       },
       error: (err: HttpErrorResponse) => {
         this.#snackBar.open(

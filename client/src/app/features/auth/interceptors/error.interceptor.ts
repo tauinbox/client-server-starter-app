@@ -9,42 +9,34 @@ import { throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { TokenService } from '../services/token.service';
+import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 
 export const errorInterceptor: HttpInterceptorFn = (
   request: HttpRequest<unknown>,
   next: HttpHandlerFn
 ) => {
-  const tokenService = inject(TokenService);
   const router = inject(Router);
   const snackBar = inject(MatSnackBar);
 
   return next(request).pipe(
     catchError((error: HttpErrorResponse) => {
-      const errorMessage = handleHttpError(error, tokenService, router);
+      const errorMessage = handleHttpError(error, router);
 
       snackBar.open(errorMessage, 'Close', { duration: 5000 });
 
-      return throwError(() => new Error(errorMessage));
+      return throwError(() => error);
     })
   );
 };
 
-function handleHttpError(
-  error: HttpErrorResponse,
-  tokenService: TokenService,
-  router: Router
-): string {
+function handleHttpError(error: HttpErrorResponse, router: Router): string {
   if (error.error instanceof ErrorEvent) {
     return `Error: ${error.error.message}`;
   }
 
   switch (error.status) {
-    case 401:
-      tokenService.logout();
-      return 'Your session has expired. Please log in again.';
     case 403:
-      void router.navigate(['/forbidden']);
+      void router.navigate([`/${AppRouteSegmentEnum.Forbidden}`]);
       return 'You do not have permission to access this resource.';
     case 404:
       return 'Resource not found.';
