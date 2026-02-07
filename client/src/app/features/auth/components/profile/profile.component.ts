@@ -1,8 +1,8 @@
+import type { OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
   inject,
-  OnInit,
   signal
 } from '@angular/core';
 import {
@@ -13,13 +13,8 @@ import {
 } from '@angular/material/card';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatDivider } from '@angular/material/divider';
-import {
-  FormBuilder,
-  FormControl,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators
-} from '@angular/forms';
+import type { FormControl, FormGroup } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
@@ -27,9 +22,9 @@ import { MatButton, MatIconButton } from '@angular/material/button';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../../users/services/user.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { UpdateUser, User } from '../../../users/models/user.types';
+import type { UpdateUser, User } from '../../../users/models/user.types';
 import { DatePipe } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
+import type { HttpErrorResponse } from '@angular/common/http';
 
 type ProfileFormType = {
   firstName: FormControl<string>;

@@ -1,9 +1,9 @@
+import type { OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
   inject,
   input,
-  OnInit,
   signal
 } from '@angular/core';
 import {
@@ -21,7 +21,7 @@ import { MatChip } from '@angular/material/chips';
 import { MatDivider } from '@angular/material/divider';
 import { UserService } from '../../services/user.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { User } from '../../models/user.types';
+import type { User } from '../../models/user.types';
 
 @Component({
   selector: 'app-user-detail',
@@ -65,7 +65,11 @@ export class UserDetailComponent implements OnInit {
       },
       error: () => {
         this.loading.set(false);
-        this.#snackBar.open('Failed to load user details. Please try again.', 'Close', { duration: 5000 });
+        this.#snackBar.open(
+          'Failed to load user details. Please try again.',
+          'Close',
+          { duration: 5000 }
+        );
       }
     });
   }

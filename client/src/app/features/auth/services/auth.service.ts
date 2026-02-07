@@ -1,17 +1,11 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import {
-  catchError,
-  Observable,
-  Subscription,
-  switchMap,
-  tap,
-  throwError,
-  timer
-} from 'rxjs';
-import { User } from '../../users/models/user.types';
-import {
+import type { HttpErrorResponse } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
+import type { Observable, Subscription } from 'rxjs';
+import { catchError, switchMap, tap, throwError, timer } from 'rxjs';
+import type { User } from '../../users/models/user.types';
+import type {
   AuthResponse,
   LoginCredentials,
   RegisterRequest

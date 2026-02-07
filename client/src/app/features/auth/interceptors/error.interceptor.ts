@@ -1,5 +1,5 @@
 import { inject } from '@angular/core';
-import {
+import type {
   HttpErrorResponse,
   HttpHandlerFn,
   HttpInterceptorFn,

@@ -1,4 +1,4 @@
-import { Routes } from '@angular/router';
+import type { Routes } from '@angular/router';
 import { authGuard } from '@features/auth/guards/auth.guard';
 import { adminGuard } from '@features/auth/guards/admin.guard';
 import { AppRouteSegmentEnum } from './app.route-segment.enum';
@@ -37,33 +37,33 @@ export const routes: Routes = [
       {
         path: '',
         loadComponent: () =>
-          import(
-            './features/users/components/user-list/user-list.component'
-          ).then((c) => c.UserListComponent),
+          import('./features/users/components/user-list/user-list.component').then(
+            (c) => c.UserListComponent
+          ),
         canActivate: [adminGuard]
       },
       {
         path: 'search',
         loadComponent: () =>
-          import(
-            './features/users/components/user-search/user-search.component'
-          ).then((c) => c.UserSearchComponent),
+          import('./features/users/components/user-search/user-search.component').then(
+            (c) => c.UserSearchComponent
+          ),
         canActivate: [adminGuard]
       },
       {
         path: ':id',
         loadComponent: () =>
-          import(
-            './features/users/components/user-detail/user-detail.component'
-          ).then((c) => c.UserDetailComponent),
+          import('./features/users/components/user-detail/user-detail.component').then(
+            (c) => c.UserDetailComponent
+          ),
         canActivate: [authGuard]
       },
       {
         path: ':id/edit',
         loadComponent: () =>
-          import(
-            './features/users/components/user-edit/user-edit.component'
-          ).then((c) => c.UserEditComponent),
+          import('./features/users/components/user-edit/user-edit.component').then(
+            (c) => c.UserEditComponent
+          ),
         canActivate: [authGuard]
       }
     ]

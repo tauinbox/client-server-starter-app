@@ -1,5 +1,5 @@
-import { CreateUser, User } from '../../users/models/user.types';
-import { JwtPayload } from 'jwt-decode';
+import type { CreateUser, User } from '../../users/models/user.types';
+import type { JwtPayload } from 'jwt-decode';
 
 export type LoginCredentials = {
   email: string;
