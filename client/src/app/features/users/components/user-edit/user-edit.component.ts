@@ -187,6 +187,10 @@ export class UserEditComponent implements OnInit {
     this.saving.set(false);
     this.user.set(updatedUser);
 
+    if (this.id() === this.authService.user()?.id) {
+      this.authService.updateCurrentUser(updatedUser);
+    }
+
     this.userForm.patchValue({ password: '' });
     this.userForm.markAsPristine();
 
