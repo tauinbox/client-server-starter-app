@@ -1,8 +1,9 @@
 import { inject } from '@angular/core';
 import type { CanActivateFn } from '@angular/router';
 import { Router } from '@angular/router';
+import { catchError, map, of } from 'rxjs';
 import { AuthService } from '../services/auth.service';
-import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
+import { navigateToLogin } from '@features/auth/utils/navigate-to-login';
 
 export const authGuard: CanActivateFn = (route, state) => {
   const authService = inject(AuthService);
@@ -12,9 +13,18 @@ export const authGuard: CanActivateFn = (route, state) => {
     return true;
   }
 
-  void router.navigate([`/${AppRouteSegmentEnum.Login}`], {
-    queryParams: { returnUrl: state.url }
-  });
+  return authService.refreshTokens().pipe(
+    map((tokens) => {
+      if (tokens) {
+        return true;
+      }
 
-  return false;
+      navigateToLogin(router, state.url);
+      return false;
+    }),
+    catchError(() => {
+      navigateToLogin(router, state.url);
+      return of(false);
+    })
+  );
 };

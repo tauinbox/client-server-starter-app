@@ -22,6 +22,7 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type { HttpErrorResponse } from '@angular/common/http';
+import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 
 type RegisterFormType = {
   email: FormControl<string>;
@@ -101,7 +102,7 @@ export class RegisterComponent {
         this.#snackBar.open('Registration successful! Please login.', 'Close', {
           duration: 5000
         });
-        void this.#router.navigate(['/login']);
+        void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`]);
       },
       error: (err: HttpErrorResponse) => {
         this.loading.set(false);
@@ -109,7 +110,7 @@ export class RegisterComponent {
           this.error.set('User with this email already exists.');
         } else {
           this.error.set(
-            err.message || 'Registration failed. Please try again.'
+            err.error?.message || 'Registration failed. Please try again.'
           );
         }
       }
