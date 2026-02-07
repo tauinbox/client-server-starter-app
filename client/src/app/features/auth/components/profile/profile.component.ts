@@ -136,6 +136,7 @@ export class ProfileComponent implements OnInit {
       next: (updatedUser) => {
         this.saving.set(false);
         this.user.set(updatedUser);
+        this.#authService.updateCurrentUser(updatedUser);
 
         this.profileForm.patchValue({ password: '' });
         this.profileForm.markAsPristine();

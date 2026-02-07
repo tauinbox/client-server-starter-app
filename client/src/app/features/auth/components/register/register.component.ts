@@ -60,13 +60,14 @@ export class RegisterComponent {
   readonly #router = inject(Router);
   readonly #snackBar = inject(MatSnackBar);
 
-  readonly registerForm: FormGroup<RegisterFormType>;
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly showPassword = signal(false);
 
-  constructor() {
-    this.registerForm = this.#fb.group<RegisterFormType>({
+  protected readonly appRouteSegmentEnum = AppRouteSegmentEnum;
+
+  readonly registerForm: FormGroup<RegisterFormType> =
+    this.#fb.group<RegisterFormType>({
       email: this.#fb.control('', {
         validators: [Validators.required, Validators.email],
         nonNullable: true
@@ -84,7 +85,6 @@ export class RegisterComponent {
         nonNullable: true
       })
     });
-  }
 
   togglePasswordVisibility(): void {
     this.showPassword.update((prev) => !prev);

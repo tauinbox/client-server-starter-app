@@ -1,4 +1,4 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { Observable, Subscription } from 'rxjs';
 import {
@@ -23,6 +23,8 @@ import type {
 } from '../models/auth.types';
 import { TokenService } from './token.service';
 import { AUTH_API_V1 } from '@features/auth/constants/auth-api.const';
+import { navigateToLogin } from '@features/auth/utils/navigate-to-login';
+import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 
 const TOKEN_REFRESH_WINDOW_SECONDS = 60;
 
@@ -37,53 +39,60 @@ export class AuthService {
   #refreshSubscription?: Subscription;
   #refreshInFlight$: Observable<TokensResponse | null> | null = null;
 
-  readonly #currentUserSignal = signal<User | null>(null);
-
-  readonly user = this.#currentUserSignal.asReadonly();
+  readonly user = this.#tokenService.user;
   readonly isAuthenticated = this.#tokenService.isAuthenticated;
-  readonly isAdmin = computed(
-    () => this.#currentUserSignal()?.isAdmin ?? false
-  );
+  readonly isAdmin = this.#tokenService.isAdmin;
 
   constructor() {
-    const storedUser = this.#tokenService.getUserData();
-
-    if (storedUser) {
-      this.#currentUserSignal.set(storedUser);
+    if (this.isAuthenticated()) {
       this.#scheduleTokenRefresh();
     }
   }
 
   register(registerData: RegisterRequest): Observable<User> {
-    return this.#http.post<User>(`${AUTH_API_V1}/register`, registerData);
+    return this.#http.post<User>(
+      `${AUTH_API_V1}/${AppRouteSegmentEnum.Register}`,
+      registerData
+    );
   }
 
   login(credentials: LoginCredentials): Observable<AuthResponse> {
     return this.#http
-      .post<AuthResponse>(`${AUTH_API_V1}/login`, credentials)
+      .post<AuthResponse>(
+        `${AUTH_API_V1}/${AppRouteSegmentEnum.Login}`,
+        credentials
+      )
       .pipe(tap((response) => this.#handleAuthentication(response)));
   }
 
-  logout(): void {
+  logout(returnUrl?: string): void {
     this.#refreshSubscription?.unsubscribe();
 
     if (this.isAuthenticated()) {
       this.#http
-        .post(`${AUTH_API_V1}/logout`, {})
+        .post(`${AUTH_API_V1}/${AppRouteSegmentEnum.Logout}`, {})
         .pipe(catchError(() => of(null)))
         .subscribe();
     }
 
-    this.#tokenService.clearTokens();
-    this.#currentUserSignal.set(null);
+    this.#tokenService.clearAuth();
     this.#refreshInFlight$ = null;
-    void this.#router.navigate(['/login']);
+
+    if (returnUrl) {
+      navigateToLogin(this.#router, returnUrl);
+    } else {
+      void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`]);
+    }
   }
 
   getProfile(): Observable<User> {
     return this.#http
-      .get<User>(`${AUTH_API_V1}/profile`)
-      .pipe(tap((profile) => this.#currentUserSignal.set(profile)));
+      .get<User>(`${AUTH_API_V1}/${AppRouteSegmentEnum.Profile}`)
+      .pipe(tap((profile) => this.#tokenService.updateUser(profile)));
+  }
+
+  updateCurrentUser(user: User): void {
+    this.#tokenService.updateUser(user);
   }
 
   refreshTokens(): Observable<TokensResponse | null> {
@@ -93,20 +102,22 @@ export class AuthService {
 
     const refreshToken = this.#tokenService.getRefreshToken();
     if (!refreshToken) {
-      this.#tokenService.clearTokens();
+      this.#tokenService.clearAuth();
       return of(null);
     }
 
     const request: RefreshTokensRequest = { refresh_token: refreshToken };
 
     this.#refreshInFlight$ = this.#http
-      .post<AuthResponse>(`${AUTH_API_V1}/refresh-token`, request)
+      .post<AuthResponse>(
+        `${AUTH_API_V1}/${AppRouteSegmentEnum.RefreshToken}`,
+        request
+      )
       .pipe(
         tap((response) => this.#handleAuthentication(response)),
         map((response) => response.tokens),
         catchError((error) => {
-          this.#tokenService.clearTokens();
-          this.#currentUserSignal.set(null);
+          this.#tokenService.clearAuth();
           return throwError(() => error);
         }),
         finalize(() => {
@@ -138,8 +149,7 @@ export class AuthService {
   }
 
   #handleAuthentication(authResponse: AuthResponse): void {
-    this.#tokenService.saveTokens(authResponse);
-    this.#currentUserSignal.set(authResponse.user);
+    this.#tokenService.saveAuthResponse(authResponse);
     this.#scheduleTokenRefresh();
   }
 }

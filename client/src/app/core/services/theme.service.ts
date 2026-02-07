@@ -1,4 +1,6 @@
-import { effect, Injectable, signal } from '@angular/core';
+import { effect, inject, Injectable, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import { StorageService } from './storage.service';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -8,6 +10,10 @@ const THEME_KEY = 'preferred-theme';
   providedIn: 'root'
 })
 export class ThemeService {
+  readonly #storage = inject(StorageService);
+  readonly #document = inject(DOCUMENT);
+  readonly #window = this.#document.defaultView;
+
   readonly #themeSignal = signal<ThemeMode>(this.#getInitialTheme());
   readonly theme = this.#themeSignal.asReadonly();
 
@@ -16,10 +22,10 @@ export class ThemeService {
       this.#applyTheme(this.#themeSignal());
     });
 
-    window
-      .matchMedia('(prefers-color-scheme: dark)')
+    this.#window
+      ?.matchMedia('(prefers-color-scheme: dark)')
       .addEventListener('change', (e) => {
-        if (!localStorage.getItem(THEME_KEY)) {
+        if (!this.#storage.getItem(THEME_KEY)) {
           this.#themeSignal.set(e.matches ? 'dark' : 'light');
         }
       });
@@ -28,23 +34,22 @@ export class ThemeService {
   toggleTheme(): void {
     const newTheme = this.#themeSignal() === 'light' ? 'dark' : 'light';
     this.#themeSignal.set(newTheme);
-    localStorage.setItem(THEME_KEY, newTheme);
+    this.#storage.setItem(THEME_KEY, newTheme);
   }
 
   setTheme(theme: ThemeMode): void {
     this.#themeSignal.set(theme);
-    localStorage.setItem(THEME_KEY, theme);
+    this.#storage.setItem(THEME_KEY, theme);
   }
 
   #getInitialTheme(): ThemeMode {
-    const savedTheme = localStorage.getItem(THEME_KEY) as ThemeMode | null;
-    const prefersDark = window.matchMedia(
-      '(prefers-color-scheme: dark)'
-    ).matches;
+    const savedTheme = this.#storage.getItem(THEME_KEY) as ThemeMode | null;
+    const prefersDark =
+      this.#window?.matchMedia('(prefers-color-scheme: dark)').matches ?? false;
     return savedTheme || (prefersDark ? 'dark' : 'light');
   }
 
   #applyTheme(theme: ThemeMode): void {
-    document.documentElement.setAttribute('data-theme', theme);
+    this.#document.documentElement.setAttribute('data-theme', theme);
   }
 }

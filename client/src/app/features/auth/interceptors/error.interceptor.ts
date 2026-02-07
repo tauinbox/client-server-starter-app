@@ -20,9 +20,11 @@ export const errorInterceptor: HttpInterceptorFn = (
 
   return next(request).pipe(
     catchError((error: HttpErrorResponse) => {
-      const errorMessage = handleHttpError(error, router);
-
-      snackBar.open(errorMessage, 'Close', { duration: 5000 });
+      // 401 is handled by jwt interceptor (token refresh / logout)
+      if (error.status !== 401) {
+        const errorMessage = handleHttpError(error, router);
+        snackBar.open(errorMessage, 'Close', { duration: 5000 });
+      }
 
       return throwError(() => error);
     })

@@ -6,5 +6,6 @@ export enum AppRouteSegmentEnum {
   Users = 'users',
   Feature = 'feature',
   Forbidden = 'forbidden',
+  RefreshToken = 'refresh-token',
   Any = '**'
 }
