@@ -11,7 +11,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes, withComponentInputBinding()),
-    provideHttpClient(withInterceptors([jwtInterceptor, errorInterceptor])),
+    provideHttpClient(withInterceptors([errorInterceptor, jwtInterceptor])),
     {
       provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
       useValue: { appearance: 'outline' }
