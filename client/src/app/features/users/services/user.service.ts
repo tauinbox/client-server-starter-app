@@ -1,7 +1,12 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { CreateUser, UpdateUser, User, UserSearch } from '../models/user.types';
+import type { Observable } from 'rxjs';
+import type {
+  CreateUser,
+  UpdateUser,
+  User,
+  UserSearch
+} from '../models/user.types';
 
 export const USERS_API_V1 = 'api/v1/users';
 

@@ -1,8 +1,8 @@
+import type { OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
   inject,
-  OnInit,
   signal
 } from '@angular/core';
 import {
@@ -25,16 +25,18 @@ import {
   MatRowDef,
   MatTable
 } from '@angular/material/table';
-import { MatSort, Sort } from '@angular/material/sort';
+import type { Sort } from '@angular/material/sort';
+import { MatSort } from '@angular/material/sort';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatIconButton, MatMiniFabButton } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { MatChip } from '@angular/material/chips';
-import { MatPaginator, PageEvent } from '@angular/material/paginator';
+import type { PageEvent } from '@angular/material/paginator';
+import { MatPaginator } from '@angular/material/paginator';
 import { UserService } from '../../services/user.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
-import { User } from '../../models/user.types';
+import type { User } from '../../models/user.types';
 import { DatePipe } from '@angular/common';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { rem } from '@shared/utils/css.utils';

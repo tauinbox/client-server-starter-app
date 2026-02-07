@@ -10,13 +10,13 @@ import {
 import { MatIcon } from '@angular/material/icon';
 import { MatButton } from '@angular/material/button';
 
-export interface ConfirmDialogData {
+export type ConfirmDialogData = {
   title: string;
   message: string;
   confirmButton: string;
   cancelButton: string;
   icon?: string;
-}
+};
 
 @Component({
   selector: 'app-confirm-dialog',

@@ -1,12 +1,12 @@
 import { inject, Injectable } from '@angular/core';
-import {
-  HttpClient,
+import type {
   HttpEvent,
   HttpEventType,
   HttpResponse
 } from '@angular/common/http';
-import { FeatureEntityResponse } from './models/feature.types';
-import { Observable } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import type { FeatureEntityResponse } from './models/feature.types';
+import type { Observable } from 'rxjs';
 
 const FEATURE_API_V1 = '/api/v1/feature';
 
@@ -21,14 +21,20 @@ export class FeatureApiService {
   }
 
   getConfig() {
-    return this.#http.get<{ api: string; token: string }>(`${FEATURE_API_V1}/config`);
+    return this.#http.get<{ api: string; token: string }>(
+      `${FEATURE_API_V1}/config`
+    );
   }
 
   getFeatureEntities() {
-    return this.#http.get<FeatureEntityResponse[]>(`${FEATURE_API_V1}/entities`);
+    return this.#http.get<FeatureEntityResponse[]>(
+      `${FEATURE_API_V1}/entities`
+    );
   }
 
-  uploadFile(file: File): Observable<HttpEvent<HttpEventType> | HttpResponse<void>> {
+  uploadFile(
+    file: File
+  ): Observable<HttpEvent<HttpEventType> | HttpResponse<void>> {
     const formData = new FormData();
     formData.append('upload-artifact', file);
 

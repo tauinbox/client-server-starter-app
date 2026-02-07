@@ -38,7 +38,9 @@ export class ThemeService {
 
   #getInitialTheme(): ThemeMode {
     const savedTheme = localStorage.getItem(THEME_KEY) as ThemeMode | null;
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const prefersDark = window.matchMedia(
+      '(prefers-color-scheme: dark)'
+    ).matches;
     return savedTheme || (prefersDark ? 'dark' : 'light');
   }
 

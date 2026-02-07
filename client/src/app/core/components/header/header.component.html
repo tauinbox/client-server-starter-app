@@ -32,10 +32,18 @@
       </button>
     </mat-menu>
   } @else {
-    <button mat-button [routerLink]="'/' + routes.Login" routerLinkActive="active">
+    <button
+      mat-button
+      [routerLink]="'/' + routes.Login"
+      routerLinkActive="active"
+    >
       Login
     </button>
-    <button mat-button [routerLink]="'/' + routes.Register" routerLinkActive="active">
+    <button
+      mat-button
+      [routerLink]="'/' + routes.Register"
+      routerLinkActive="active"
+    >
       Register
     </button>
   }

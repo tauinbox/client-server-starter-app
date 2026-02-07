@@ -1,11 +1,11 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import type { Observable } from 'rxjs';
 import {
   BehaviorSubject,
   catchError,
   finalize,
   map,
-  Observable,
   of,
   skip,
   take,
@@ -13,14 +13,14 @@ import {
 } from 'rxjs';
 import { jwtDecode } from 'jwt-decode';
 import { Router } from '@angular/router';
-import {
+import type {
   AuthResponse,
   CustomJwtPayload,
   RefreshTokensRequest,
   TokensResponse
 } from '../models/auth.types';
 import { AUTH_API_V1 } from '@features/auth/services/auth.service';
-import { User } from '@features/users/models/user.types';
+import type { User } from '@features/users/models/user.types';
 
 const AUTH_TOKENS = 'auth_tokens';
 

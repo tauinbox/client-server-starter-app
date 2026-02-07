@@ -1,5 +1,5 @@
 import { inject } from '@angular/core';
-import {
+import type {
   HttpErrorResponse,
   HttpHandlerFn,
   HttpInterceptorFn,
@@ -52,9 +52,11 @@ function shouldAttemptTokenRefresh(
   request: HttpRequest<unknown>,
   tokenService: TokenService
 ): boolean {
-  return error.status === 401 &&
+  return (
+    error.status === 401 &&
     !AUTH_EXCLUDED_URLS.some((url) => request.url.includes(url)) &&
-    !tokenService.isRefreshInProgress();
+    !tokenService.isRefreshInProgress()
+  );
 }
 
 function addTokenToRequest(
