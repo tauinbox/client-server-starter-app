@@ -6,16 +6,23 @@ import type {
   HttpRequest
 } from '@angular/common/http';
 import { catchError, switchMap, throwError } from 'rxjs';
+import { Router } from '@angular/router';
 import { TokenService } from '../services/token.service';
 import { AuthService } from '../services/auth.service';
+import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 
-const AUTH_EXCLUDED_URLS = ['refresh-token', 'login', 'register'] as const;
+const AUTH_EXCLUDED_URLS = [
+  AppRouteSegmentEnum.RefreshToken,
+  AppRouteSegmentEnum.Login,
+  AppRouteSegmentEnum.Register
+] as const;
 
 export const jwtInterceptor: HttpInterceptorFn = (
   request: HttpRequest<unknown>,
   next: HttpHandlerFn
 ) => {
   const injector = inject(Injector);
+  const router = inject(Router);
   const tokenService = inject(TokenService);
   const token = tokenService.getAccessToken();
 
@@ -32,14 +39,14 @@ export const jwtInterceptor: HttpInterceptorFn = (
         return authService.refreshTokens().pipe(
           switchMap((tokens) => {
             if (!tokens) {
-              authService.logout();
+              authService.logout(router.url);
               return throwError(() => error);
             }
 
             return next(addTokenToRequest(request, tokens.access_token));
           }),
           catchError(() => {
-            authService.logout();
+            authService.logout(router.url);
             return throwError(() => error);
           })
         );

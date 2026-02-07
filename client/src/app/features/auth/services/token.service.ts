@@ -1,19 +1,24 @@
-import { Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import { jwtDecode } from 'jwt-decode';
 import type { AuthResponse, CustomJwtPayload } from '../models/auth.types';
 import type { User } from '@features/users/models/user.types';
+import { StorageService } from '@core/services/storage.service';
 
-const AUTH_TOKENS = 'auth_tokens';
+const AUTH_STORAGE_KEY = 'auth_storage';
 
 @Injectable({
   providedIn: 'root'
 })
 export class TokenService {
-  readonly #authResponse = signal<AuthResponse | null>(this.#readFromStorage());
-  readonly #isAuthenticated = signal<boolean>(!this.isAccessTokenExpired());
+  readonly #storage = inject(StorageService);
 
-  readonly authResponse = this.#authResponse.asReadonly();
-  readonly isAuthenticated = this.#isAuthenticated.asReadonly();
+  readonly #authResponse = signal<AuthResponse | null>(this.#readFromStorage());
+
+  readonly user = computed<User | null>(
+    () => this.#authResponse()?.user ?? null
+  );
+  readonly isAuthenticated = computed(() => this.#authResponse() !== null);
+  readonly isAdmin = computed(() => this.user()?.isAdmin ?? false);
 
   getAccessToken(): string | null {
     return this.#authResponse()?.tokens.access_token ?? null;
@@ -23,20 +28,23 @@ export class TokenService {
     return this.#authResponse()?.tokens.refresh_token ?? null;
   }
 
-  getUserData(): User | null {
-    return this.#authResponse()?.user ?? null;
-  }
-
-  saveTokens(response: AuthResponse): void {
-    localStorage.setItem(AUTH_TOKENS, JSON.stringify(response));
+  saveAuthResponse(response: AuthResponse): void {
+    this.#storage.setItem(AUTH_STORAGE_KEY, JSON.stringify(response));
     this.#authResponse.set(response);
-    this.#isAuthenticated.set(true);
   }
 
-  clearTokens(): void {
-    localStorage.removeItem(AUTH_TOKENS);
+  updateUser(user: User): void {
+    const current = this.#authResponse();
+    if (!current) return;
+
+    const updated: AuthResponse = { ...current, user };
+    this.#storage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updated));
+    this.#authResponse.set(updated);
+  }
+
+  clearAuth(): void {
+    this.#storage.removeItem(AUTH_STORAGE_KEY);
     this.#authResponse.set(null);
-    this.#isAuthenticated.set(false);
   }
 
   isAccessTokenExpired(): boolean {
@@ -63,19 +71,8 @@ export class TokenService {
     }
   }
 
-  getTokenPayload(): CustomJwtPayload | null {
-    const token = this.getAccessToken();
-    if (!token) return null;
-
-    try {
-      return jwtDecode<CustomJwtPayload>(token);
-    } catch {
-      return null;
-    }
-  }
-
   #readFromStorage(): AuthResponse | null {
-    const raw = localStorage.getItem(AUTH_TOKENS);
+    const raw = this.#storage.getItem(AUTH_STORAGE_KEY);
 
     try {
       return raw ? (JSON.parse(raw) as AuthResponse) : null;
