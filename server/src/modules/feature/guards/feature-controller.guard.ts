@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  Logger
+} from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { FeatureController } from '../controllers/feature.controller';
 import { Reflector } from '@nestjs/core';

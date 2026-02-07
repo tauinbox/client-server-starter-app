@@ -17,10 +17,13 @@ export class FeatureInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap(() => {
-        this.logger.debug(`After handler execution: ${Date.now() - startTime}ms`);
+        this.logger.debug(
+          `After handler execution: ${Date.now() - startTime}ms`
+        );
       }),
       map((data: Record<string, unknown>) => {
         if (data && typeof data === 'object') {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { sensitiveData, ...rest } = data;
           return { ...rest, isModifiedByInterceptor: true };
         }
