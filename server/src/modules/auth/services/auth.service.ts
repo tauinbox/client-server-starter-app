@@ -34,7 +34,7 @@ export class AuthService {
   }
 
   async login(user: LocalAuthRequest['user']) {
-    const tokens = await this.generateTokens(user.id, user.email, user.isAdmin);
+    const tokens = this.generateTokens(user.id, user.email, user.isAdmin);
 
     await this.refreshTokenService.deleteByUserId(user.id);
     await this.refreshTokenService.createRefreshToken(
@@ -67,7 +67,7 @@ export class AuthService {
 
     await this.refreshTokenService.revokeToken(tokenDoc.id);
 
-    const tokens = await this.generateTokens(user.id, user.email, user.isAdmin);
+    const tokens = this.generateTokens(user.id, user.email, user.isAdmin);
 
     await this.refreshTokenService.createRefreshToken(
       user.id,
@@ -85,11 +85,11 @@ export class AuthService {
     await this.refreshTokenService.deleteByUserId(userId);
   }
 
-  private async generateTokens(
+  private generateTokens(
     userId: string,
     email: string,
     isAdmin: boolean
-  ): Promise<TokensResponseDto> {
+  ): TokensResponseDto {
     const jwtPayload: CustomJwtPayload = {
       sub: userId,
       email,
