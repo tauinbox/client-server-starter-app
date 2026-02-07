@@ -1,0 +1,10 @@
+dist
+coverage
+node_modules
+
+**/*.generated.ts
+**/*.api.ts
+
+.angular/**
+.idea/**
+.run/**
