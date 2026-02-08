@@ -72,16 +72,18 @@ export class AuthService {
 
   logout(returnUrl?: string): void {
     this.#refreshSubscription?.unsubscribe();
+    this.#refreshInFlight$ = null;
 
     if (this.isAuthenticated()) {
       this.#http
         .post(AuthApiEnum.Logout, {}, { context: silent })
-        .pipe(catchError(() => of(null)))
+        .pipe(
+          finalize(() => {
+            this.#tokenService.clearAuth();
+          })
+        )
         .subscribe();
     }
-
-    this.#tokenService.clearAuth();
-    this.#refreshInFlight$ = null;
 
     if (returnUrl) {
       navigateToLogin(this.#router, returnUrl);
