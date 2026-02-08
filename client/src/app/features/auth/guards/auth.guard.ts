@@ -3,13 +3,15 @@ import type { CanActivateFn } from '@angular/router';
 import { Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { AuthService } from '../services/auth.service';
+import { TokenService } from '../services/token.service';
 import { navigateToLogin } from '@features/auth/utils/navigate-to-login';
 
 export const authGuard: CanActivateFn = (route, state) => {
   const authService = inject(AuthService);
+  const tokenService = inject(TokenService);
   const router = inject(Router);
 
-  if (authService.isAuthenticated()) {
+  if (authService.isAuthenticated() && !tokenService.isAccessTokenExpired()) {
     return true;
   }
 
