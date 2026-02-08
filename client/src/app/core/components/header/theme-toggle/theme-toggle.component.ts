@@ -1,13 +1,10 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  inject,
-  Signal
-} from '@angular/core';
+import type { Signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { MatIconButton } from '@angular/material/button';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatIcon } from '@angular/material/icon';
-import { ThemeMode, ThemeService } from '@core/services/theme.service';
+import type { ThemeMode } from '@core/services/theme.service';
+import { ThemeService } from '@core/services/theme.service';
 
 @Component({
   selector: 'app-theme-toggle',

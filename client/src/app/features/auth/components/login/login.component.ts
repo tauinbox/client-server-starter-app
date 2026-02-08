@@ -97,8 +97,7 @@ export class LoginComponent {
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           this.error.set(
-            err.error?.message ||
-              'Login failed. Please check your credentials.'
+            err.error?.message || 'Login failed. Please check your credentials.'
           );
         }
       });
