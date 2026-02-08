@@ -1,7 +1,7 @@
 @use '@angular/material' as mat;
 @use 'abstracts/functions' as func;
-@include mat.elevation-classes();
-@include mat.app-background();
+@include mat.elevation-classes;
+@include mat.app-background;
 
 // Define light theme palettes
 $light-primary: mat.m2-define-palette(mat.$m2-teal-palette, 600);
@@ -12,7 +12,6 @@ $light-warn: mat.m2-define-palette(mat.$m2-red-palette);
 $light-success: mat.m2-define-palette(mat.$m2-green-palette, 500);
 $light-info: mat.m2-define-palette(mat.$m2-blue-palette, 500);
 $light-warning: mat.m2-define-palette(mat.$m2-orange-palette, 500);
-
 $light-theme: mat.m2-define-light-theme(
   (
     color: (
@@ -26,8 +25,6 @@ $light-theme: mat.m2-define-light-theme(
 );
 
 :root {
-  @include mat.all-component-themes($light-theme);
-
   // Common theme settings
   --color-scheme: light;
 
@@ -44,11 +41,13 @@ $light-theme: mat.m2-define-light-theme(
 
   // UI colors
   --color-background: #fafafa;
-  --color-surface: #ffffff;
-  --color-text-primary: rgba(0, 0, 0, 0.87);
-  --color-text-secondary: rgba(0, 0, 0, 0.6);
-  --color-text-tertiary: rgba(0, 0, 0, 0.38);
-  --color-border: rgba(0, 0, 0, 0.12);
-  --color-divider: rgba(0, 0, 0, 0.12);
-  --color-disabled: rgba(0, 0, 0, 0.38);
+  --color-surface: #fff;
+  --color-text-primary: rgb(0 0 0 / 87%);
+  --color-text-secondary: rgb(0 0 0 / 60%);
+  --color-text-tertiary: rgb(0 0 0 / 38%);
+  --color-border: rgb(0 0 0 / 12%);
+  --color-divider: rgb(0 0 0 / 12%);
+  --color-disabled: rgb(0 0 0 / 38%);
+
+  @include mat.all-component-themes($light-theme);
 }

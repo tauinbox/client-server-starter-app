@@ -4,9 +4,11 @@
 .text-left {
   text-align: left !important;
 }
+
 .text-center {
   text-align: center !important;
 }
+
 .text-right {
   text-align: right !important;
 }
@@ -15,9 +17,11 @@
 .text-lowercase {
   text-transform: lowercase !important;
 }
+
 .text-uppercase {
   text-transform: uppercase !important;
 }
+
 .text-capitalize {
   text-transform: capitalize !important;
 }
@@ -26,12 +30,15 @@
 .font-weight-light {
   font-weight: vars.$font-weight-light !important;
 }
+
 .font-weight-normal {
   font-weight: vars.$font-weight-regular !important;
 }
+
 .font-weight-medium {
   font-weight: vars.$font-weight-medium !important;
 }
+
 .font-weight-bold {
   font-weight: vars.$font-weight-bold !important;
 }

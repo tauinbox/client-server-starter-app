@@ -1,8 +1,10 @@
+@use 'sass:math';
+
 $base-font-size: 16px;
 
 @function rem($pixels) {
   // If $pixels has no unit, assume it's pixels
-  @if (unitless($pixels)) {
+  @if math.is-unitless($pixels) {
     $pixels: $pixels * 1px;
   }
 

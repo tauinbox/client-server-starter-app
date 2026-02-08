@@ -27,15 +27,15 @@
   }
 
   .truncate-text {
-    max-width: func.rem(60);
     display: inline-block;
+    max-width: func.rem(60);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   mat-chip {
-    font-size: vars.$font-size-sm;
     min-height: func.rem(24);
+    font-size: vars.$font-size-sm;
   }
 }

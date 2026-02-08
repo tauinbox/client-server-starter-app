@@ -2,81 +2,86 @@
 @use '../abstracts/functions' as func;
 
 // Fade in animation
-@keyframes fadeIn {
+@keyframes fade-in {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
 }
 
 .fade-in {
-  animation: fadeIn vars.$transition-medium ease-in-out;
+  animation: fade-in vars.$transition-medium ease-in-out;
 }
 
 // Slide in from right
-@keyframes slideInRight {
+@keyframes slide-in-right {
   from {
-    transform: translateX(func.rem(20));
     opacity: 0;
+    transform: translateX(func.rem(20));
   }
+
   to {
-    transform: translateX(0);
     opacity: 1;
+    transform: translateX(0);
   }
 }
 
 .slide-in-right {
-  animation: slideInRight vars.$transition-medium ease-out;
+  animation: slide-in-right vars.$transition-medium ease-out;
 }
 
 // Slide in from left
-@keyframes slideInLeft {
+@keyframes slide-in-left {
   from {
-    transform: translateX(func.rem(-20));
     opacity: 0;
+    transform: translateX(func.rem(-20));
   }
+
   to {
-    transform: translateX(0);
     opacity: 1;
+    transform: translateX(0);
   }
 }
 
 .slide-in-left {
-  animation: slideInLeft vars.$transition-medium ease-out;
+  animation: slide-in-left vars.$transition-medium ease-out;
 }
 
 // Slide in from top
-@keyframes slideInTop {
+@keyframes slide-in-top {
   from {
-    transform: translateY(func.rem(-20));
     opacity: 0;
+    transform: translateY(func.rem(-20));
   }
+
   to {
-    transform: translateY(0);
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
 .slide-in-top {
-  animation: slideInTop vars.$transition-medium ease-out;
+  animation: slide-in-top vars.$transition-medium ease-out;
 }
 
 // Slide in from bottom
-@keyframes slideInBottom {
+@keyframes slide-in-bottom {
   from {
-    transform: translateY(func.rem(20));
     opacity: 0;
+    transform: translateY(func.rem(20));
   }
+
   to {
-    transform: translateY(0);
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
 .slide-in-bottom {
-  animation: slideInBottom vars.$transition-medium ease-out;
+  animation: slide-in-bottom vars.$transition-medium ease-out;
 }
 
 // Pulse animation
@@ -84,9 +89,11 @@
   0% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.05);
   }
+
   100% {
     transform: scale(1);
   }
@@ -102,6 +109,7 @@
   100% {
     transform: translateX(0);
   }
+
   10%,
   30%,
   50%,
@@ -109,6 +117,7 @@
   90% {
     transform: translateX(func.rem(-5));
   }
+
   20%,
   40%,
   60%,
@@ -126,6 +135,7 @@
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
