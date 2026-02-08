@@ -43,7 +43,7 @@ export class ThemeService {
   }
 
   #getInitialTheme(): ThemeMode {
-    const savedTheme = this.#storage.getItem(THEME_KEY) as ThemeMode | null;
+    const savedTheme = this.#storage.getItem<ThemeMode>(THEME_KEY);
     const prefersDark =
       this.#window?.matchMedia('(prefers-color-scheme: dark)').matches ?? false;
     return savedTheme || (prefersDark ? 'dark' : 'light');

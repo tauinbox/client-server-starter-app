@@ -29,7 +29,7 @@ export class TokenService {
   }
 
   saveAuthResponse(response: AuthResponse): void {
-    this.#storage.setItem(AUTH_STORAGE_KEY, JSON.stringify(response));
+    this.#storage.setItem(AUTH_STORAGE_KEY, response);
     this.#authResponse.set(response);
   }
 
@@ -38,7 +38,7 @@ export class TokenService {
     if (!current) return;
 
     const updated: AuthResponse = { ...current, user };
-    this.#storage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updated));
+    this.#storage.setItem(AUTH_STORAGE_KEY, updated);
     this.#authResponse.set(updated);
   }
 
@@ -72,13 +72,6 @@ export class TokenService {
   }
 
   #readFromStorage(): AuthResponse | null {
-    const raw = this.#storage.getItem(AUTH_STORAGE_KEY);
-
-    try {
-      return raw ? (JSON.parse(raw) as AuthResponse) : null;
-    } catch {
-      console.error('Unable to parse auth tokens from storage');
-      return null;
-    }
+    return this.#storage.getItem<AuthResponse>(AUTH_STORAGE_KEY);
   }
 }

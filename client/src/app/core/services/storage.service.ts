@@ -7,12 +7,22 @@ import { DOCUMENT } from '@angular/common';
 export class StorageService {
   readonly #storage = inject(DOCUMENT).defaultView?.localStorage ?? null;
 
-  getItem(key: string): string | null {
-    return this.#storage?.getItem(key) ?? null;
+  getItem<T>(key: string): T | null {
+    const item = this.#storage?.getItem(key) ?? null;
+
+    if (!item) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(item);
+    } catch {
+      return item as T;
+    }
   }
 
-  setItem(key: string, value: string): void {
-    this.#storage?.setItem(key, value);
+  setItem<T>(key: string, value: T): void {
+    this.#storage?.setItem(key, JSON.stringify(value));
   }
 
   removeItem(key: string): void {
