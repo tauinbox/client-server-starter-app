@@ -1,7 +1,5 @@
 @let isDarkTheme = theme() === 'dark';
-@let tooltip = isDarkTheme
-  ? 'Switch to light theme'
-  : 'Switch to dark theme';
+@let tooltip = isDarkTheme ? 'Switch to light theme' : 'Switch to dark theme';
 @let icon = isDarkTheme ? 'light_mode' : 'dark_mode';
 
 <button
@@ -10,7 +8,5 @@
   [matTooltip]="tooltip"
   aria-label="Toggle theme"
 >
-  <mat-icon
-    [fontIcon]="icon"
-  ></mat-icon>
+  <mat-icon [fontIcon]="icon"></mat-icon>
 </button>
