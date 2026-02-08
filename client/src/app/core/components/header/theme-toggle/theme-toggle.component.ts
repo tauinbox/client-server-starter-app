@@ -19,6 +19,8 @@ import { ThemeMode, ThemeService } from '@core/services/theme.service';
 export class ThemeToggleComponent {
   readonly #themeService = inject(ThemeService);
 
-  protected readonly toggleTheme = this.#themeService.toggleTheme.bind(this.#themeService);
+  protected readonly toggleTheme = this.#themeService.toggleTheme.bind(
+    this.#themeService
+  );
   protected readonly theme: Signal<ThemeMode> = this.#themeService.theme;
 }

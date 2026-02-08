@@ -14,7 +14,7 @@ import { AuthEndpointEnum } from '../constants/auth-api.const';
 const AUTH_EXCLUDED_URLS = [
   AuthEndpointEnum.RefreshToken,
   AuthEndpointEnum.Login,
-  AuthEndpointEnum.Register,
+  AuthEndpointEnum.Register
 ] as const;
 
 export const jwtInterceptor: HttpInterceptorFn = (
