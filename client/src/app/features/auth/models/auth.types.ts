@@ -6,7 +6,7 @@ export type LoginCredentials = {
   password: string;
 };
 
-export type RegisterRequest = CreateUser & {};
+export type RegisterRequest = CreateUser;
 
 export type TokensResponse = {
   access_token: string;

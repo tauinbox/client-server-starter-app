@@ -49,6 +49,10 @@ export class AuthService {
     }
   }
 
+  isAccessTokenExpired(): boolean {
+    return this.#tokenService.isAccessTokenExpired();
+  }
+
   register(registerData: RegisterRequest): Observable<User> {
     return this.#http.post<User>(AuthApiEnum.Register, registerData);
   }
@@ -130,13 +134,17 @@ export class AuthService {
       expiryTime - Date.now() - TOKEN_REFRESH_WINDOW_SECONDS * 1000;
 
     if (timeToRefresh <= 0) {
-      this.#refreshSubscription = this.refreshTokens().subscribe();
+      this.#refreshSubscription = this.refreshTokens().subscribe({
+        error: () => this.logout()
+      });
       return;
     }
 
     this.#refreshSubscription = timer(timeToRefresh)
       .pipe(switchMap(() => this.refreshTokens()))
-      .subscribe();
+      .subscribe({
+        error: () => this.logout()
+      });
   }
 
   #handleAuthentication(authResponse: AuthResponse): void {

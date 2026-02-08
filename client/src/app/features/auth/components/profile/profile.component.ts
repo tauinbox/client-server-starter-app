@@ -2,6 +2,7 @@ import type { OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   inject,
   signal
 } from '@angular/core';
@@ -25,6 +26,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import type { UpdateUser, User } from '../../../users/models/user.types';
 import { DatePipe } from '@angular/common';
 import type { HttpErrorResponse } from '@angular/common/http';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 type ProfileFormType = {
   firstName: FormControl<string>;
@@ -60,6 +62,7 @@ export class ProfileComponent implements OnInit {
   readonly #authService = inject(AuthService);
   readonly #userService = inject(UserService);
   readonly #snackBar = inject(MatSnackBar);
+  readonly #destroyRef = inject(DestroyRef);
 
   protected readonly user = signal<User | null>(null);
   protected readonly loading = signal(true);
@@ -91,24 +94,27 @@ export class ProfileComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.#authService.getProfile().subscribe({
-      next: (user) => {
-        this.user.set(user);
-        this.profileForm.patchValue({
-          firstName: user.firstName,
-          lastName: user.lastName,
-          password: ''
-        });
-        this.loading.set(false);
-        this.profileForm.markAsPristine();
-      },
-      error: (err: HttpErrorResponse) => {
-        this.loading.set(false);
-        const errorMessage =
-          err.error?.message || 'Failed to load profile. Please try again.';
-        this.error.set(errorMessage);
-      }
-    });
+    this.#authService
+      .getProfile()
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: (user) => {
+          this.user.set(user);
+          this.profileForm.patchValue({
+            firstName: user.firstName,
+            lastName: user.lastName,
+            password: ''
+          });
+          this.loading.set(false);
+          this.profileForm.markAsPristine();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loading.set(false);
+          const errorMessage =
+            err.error?.message || 'Failed to load profile. Please try again.';
+          this.error.set(errorMessage);
+        }
+      });
   }
 
   togglePasswordVisibility(): void {
@@ -132,25 +138,29 @@ export class ProfileComponent implements OnInit {
     this.saving.set(true);
     this.error.set(null);
 
-    this.#userService.update(this.user()!.id, updateData).subscribe({
-      next: (updatedUser) => {
-        this.saving.set(false);
-        this.user.set(updatedUser);
-        this.#authService.updateCurrentUser(updatedUser);
+    this.#userService
+      .update(this.user()!.id, updateData)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: (updatedUser) => {
+          this.saving.set(false);
+          this.user.set(updatedUser);
+          this.#authService.updateCurrentUser(updatedUser);
 
-        this.profileForm.patchValue({ password: '' });
-        this.profileForm.markAsPristine();
+          this.profileForm.patchValue({ password: '' });
+          this.profileForm.markAsPristine();
 
-        this.#snackBar.open('Profile updated successfully', 'Close', {
-          duration: 5000
-        });
-      },
-      error: (err: HttpErrorResponse) => {
-        this.saving.set(false);
-        const errorMessage =
-          err.error?.message || 'Failed to update profile. Please try again.';
-        this.error.set(errorMessage);
-      }
-    });
+          this.#snackBar.open('Profile updated successfully', 'Close', {
+            duration: 5000
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.saving.set(false);
+          const errorMessage =
+            err.error?.message ||
+            'Failed to update profile. Please try again.';
+          this.error.set(errorMessage);
+        }
+      });
   }
 }
