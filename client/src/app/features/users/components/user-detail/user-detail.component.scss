@@ -12,17 +12,17 @@
   }
 
   .error-container {
-    @include mix.empty-state;
-
     .error-icon {
       color: var(--color-error);
     }
+
+    @include mix.empty-state;
   }
 
   .user-header {
     display: flex;
-    align-items: center;
     gap: vars.$spacing-md;
+    align-items: center;
   }
 
   .avatar {
@@ -31,13 +31,13 @@
     justify-content: center;
     width: func.rem(80);
     height: func.rem(80);
-    border-radius: vars.$border-radius-circle;
     background-color: var(--color-border);
+    border-radius: vars.$border-radius-circle;
 
     mat-icon {
-      font-size: func.rem(48);
-      height: func.rem(48);
       width: func.rem(48);
+      height: func.rem(48);
+      font-size: func.rem(48);
     }
   }
 

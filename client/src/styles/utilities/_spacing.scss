@@ -18,8 +18,8 @@ $spacing-sizes: (
   }
 
   .mx-#{$size} {
-    margin-left: $value !important;
     margin-right: $value !important;
+    margin-left: $value !important;
   }
 
   .my-#{$size} {
@@ -51,8 +51,8 @@ $spacing-sizes: (
   }
 
   .px-#{$size} {
-    padding-left: $value !important;
     padding-right: $value !important;
+    padding-left: $value !important;
   }
 
   .py-#{$size} {

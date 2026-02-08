@@ -7,8 +7,8 @@
   justify-content: center;
   width: 100%;
   max-width: $max-width;
-  margin: 0 auto;
   padding: vars.$spacing-xl 0;
+  margin: 0 auto;
 }
 
 // Full width form field
@@ -26,17 +26,17 @@
 
 // Error message styling
 @mixin error-message {
-  color: var(--color-error);
   margin: vars.$spacing-sm 0;
+  color: var(--color-error);
 }
 
 // Loading spinners container
 @mixin loading-container {
   display: flex;
-  justify-content: center;
   align-items: center;
-  padding: vars.$spacing-xl 0;
+  justify-content: center;
   width: 100%;
+  padding: vars.$spacing-xl 0;
 }
 
 // Empty state styling
@@ -49,10 +49,10 @@
   text-align: center;
 
   .empty-icon {
-    font-size: func.rem(48);
-    height: func.rem(48);
     width: func.rem(48);
+    height: func.rem(48);
     margin-bottom: vars.$spacing-md;
+    font-size: func.rem(48);
     opacity: 0.5;
   }
 }
@@ -73,22 +73,23 @@
   margin-bottom: vars.$spacing-sm;
 
   .detail-label {
-    font-weight: vars.$font-weight-medium;
     min-width: func.rem(150);
+    font-weight: vars.$font-weight-medium;
     opacity: 0.6;
   }
 
   .detail-value {
-    word-break: break-word;
+    word-break: break-all;
+    overflow-wrap: break-word;
   }
 }
 
 // Button with spinner
 @mixin button-with-spinner($min-width: func.rem(120)) {
-  min-width: $min-width;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: $min-width;
 
   .spinner-margin {
     margin-left: vars.$spacing-xs;
@@ -101,26 +102,26 @@
 
   @if $max-width {
     mat-card {
-      max-width: $max-width;
       width: 100%;
+      max-width: $max-width;
     }
   }
 }
 
 // Error pages (404, 403)
 @mixin error-page {
-  text-align: center;
   padding: func.rem(100) func.rem(20);
+  text-align: center;
 
   h1 {
-    font-size: func.rem(72);
     margin-bottom: 0;
+    font-size: func.rem(72);
   }
 
   h2 {
-    font-size: vars.$font-size-xl;
     margin-top: 0;
     margin-bottom: vars.$spacing-md;
+    font-size: vars.$font-size-xl;
   }
 
   p {

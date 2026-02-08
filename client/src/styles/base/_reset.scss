@@ -22,16 +22,16 @@ figcaption,
 blockquote,
 dl,
 dd {
-  margin: 0;
   padding: 0;
+  margin: 0;
 }
 
 // Set core body defaults
 body {
   min-height: 100dvh;
   scroll-behavior: smooth;
-  text-rendering: optimizeSpeed;
   line-height: 1.5;
+  text-rendering: optimizespeed;
 }
 
 // Remove list styles on ul, ol elements
@@ -42,8 +42,8 @@ ol {
 
 // Make images easier to work with
 img {
-  max-width: 100%;
   display: block;
+  max-width: 100%;
 }
 
 // Inherit fonts for inputs and buttons
@@ -56,18 +56,18 @@ select {
 
 // Remove default fieldset styles
 fieldset {
-  border: 0;
   padding: 0;
   margin: 0;
+  border: 0;
 }
 
 // Remove animations for people who've turned them off
 @media (prefers-reduced-motion: reduce) {
   * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
   }
 }
 

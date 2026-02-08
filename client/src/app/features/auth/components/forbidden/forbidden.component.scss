@@ -3,6 +3,6 @@
 
 :host {
   .container {
-    @include mix.error-page();
+    @include mix.error-page;
   }
 }

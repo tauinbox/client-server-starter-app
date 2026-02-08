@@ -2,6 +2,7 @@
 @use 'abstracts/mixins' as mix;
 
 .container {
-  @include mix.centered-container();
   display: block;
+
+  @include mix.centered-container;
 }

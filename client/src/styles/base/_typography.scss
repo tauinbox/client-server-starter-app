@@ -79,8 +79,8 @@ a {
 // Lists
 ul,
 ol {
-  margin-bottom: vars.$spacing-sm;
   padding-left: vars.$spacing-md;
+  margin-bottom: vars.$spacing-sm;
 }
 
 ul {
@@ -124,14 +124,14 @@ pre {
 blockquote {
   padding-left: vars.$spacing-md;
   margin-bottom: vars.$spacing-md;
-  border-left: func.rem(4) solid var(--color-border);
   font-style: italic;
+  border-left: func.rem(4) solid var(--color-border);
 }
 
 // Selection
 ::selection {
-  background-color: var(--color-primary);
   color: #fff;
+  background-color: var(--color-primary);
 }
 
 // Handle Chrome's autofill background color

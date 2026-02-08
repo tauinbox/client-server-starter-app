@@ -15,14 +15,14 @@
 
   .search-actions {
     display: flex;
-    justify-content: flex-end;
     gap: func.rem(10);
+    justify-content: flex-end;
   }
 
   .results-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
   }
 
   .results-count {
@@ -39,10 +39,10 @@
   }
 
   .empty-icon {
-    font-size: func.rem(48);
-    height: func.rem(48);
     width: func.rem(48);
+    height: func.rem(48);
     margin-bottom: func.rem(16);
+    font-size: func.rem(48);
     opacity: 0.5;
   }
 
