@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   inject,
   signal
 } from '@angular/core';
@@ -23,6 +24,7 @@ import { AuthService } from '../../services/auth.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 type RegisterFormType = {
   email: FormControl<string>;
@@ -59,6 +61,7 @@ export class RegisterComponent {
   readonly #authService = inject(AuthService);
   readonly #router = inject(Router);
   readonly #snackBar = inject(MatSnackBar);
+  readonly #destroyRef = inject(DestroyRef);
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -96,24 +99,29 @@ export class RegisterComponent {
     this.loading.set(true);
     this.error.set(null);
 
-    this.#authService.register(this.registerForm.getRawValue()).subscribe({
-      next: () => {
-        this.loading.set(false);
-        this.#snackBar.open('Registration successful! Please login.', 'Close', {
-          duration: 5000
-        });
-        void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`]);
-      },
-      error: (err: HttpErrorResponse) => {
-        this.loading.set(false);
-        if (err.status === 409) {
-          this.error.set('User with this email already exists.');
-        } else {
-          this.error.set(
-            err.error?.message || 'Registration failed. Please try again.'
+    this.#authService
+      .register(this.registerForm.getRawValue())
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.loading.set(false);
+          this.#snackBar.open(
+            'Registration successful! Please login.',
+            'Close',
+            { duration: 5000 }
           );
+          void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`]);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loading.set(false);
+          if (err.status === 409) {
+            this.error.set('User with this email already exists.');
+          } else {
+            this.error.set(
+              err.error?.message || 'Registration failed. Please try again.'
+            );
+          }
         }
-      }
-    });
+      });
   }
 }

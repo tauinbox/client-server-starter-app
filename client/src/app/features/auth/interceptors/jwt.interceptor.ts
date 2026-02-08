@@ -25,8 +25,9 @@ export const jwtInterceptor: HttpInterceptorFn = (
   const router = inject(Router);
   const tokenService = inject(TokenService);
   const token = tokenService.getAccessToken();
+  const isExcluded = isAuthExcludedUrl(request);
 
-  if (token) {
+  if (token && !isExcluded) {
     request = addTokenToRequest(request, token);
   }
 
@@ -35,19 +36,20 @@ export const jwtInterceptor: HttpInterceptorFn = (
       // to avoid circular dependency HttpClient → Interceptor → AuthService → HttpClient
       const authService = injector.get(AuthService);
 
-      if (shouldAttemptTokenRefresh(error, request)) {
+      if (shouldAttemptTokenRefresh(error, isExcluded)) {
+        const handleError = () => {
+          authService.logout(router.url);
+          return throwError(() => error);
+        };
+
         return authService.refreshTokens().pipe(
+          catchError(handleError),
           switchMap((tokens) => {
             if (!tokens) {
-              authService.logout(router.url);
-              return throwError(() => error);
+              return handleError();
             }
 
             return next(addTokenToRequest(request, tokens.access_token));
-          }),
-          catchError(() => {
-            authService.logout(router.url);
-            return throwError(() => error);
           })
         );
       }
@@ -57,14 +59,17 @@ export const jwtInterceptor: HttpInterceptorFn = (
   );
 };
 
+function isAuthExcludedUrl(request: HttpRequest<unknown>): boolean {
+  return AUTH_EXCLUDED_URLS.some((excludedUrl) =>
+    request.url.includes(excludedUrl)
+  );
+}
+
 function shouldAttemptTokenRefresh(
   error: HttpErrorResponse,
-  request: HttpRequest<unknown>
+  isExcluded: boolean
 ): boolean {
-  return (
-    error.status === 401 &&
-    !AUTH_EXCLUDED_URLS.some((excludedUrl) => request.url.includes(excludedUrl))
-  );
+  return error.status === 401 && !isExcluded;
 }
 
 function addTokenToRequest(
