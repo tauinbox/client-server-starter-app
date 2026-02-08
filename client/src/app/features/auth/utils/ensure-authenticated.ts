@@ -1,5 +1,4 @@
-import { Observable, switchMap } from 'rxjs';
-import { catchError, map, of } from 'rxjs';
+import { catchError, Observable, of, switchMap } from 'rxjs';
 import type { Router } from '@angular/router';
 import type { AuthService } from '../services/auth.service';
 import { navigateToLogin } from './navigate-to-login';

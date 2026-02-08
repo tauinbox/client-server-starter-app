@@ -157,8 +157,7 @@ export class ProfileComponent implements OnInit {
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
           const errorMessage =
-            err.error?.message ||
-            'Failed to update profile. Please try again.';
+            err.error?.message || 'Failed to update profile. Please try again.';
           this.error.set(errorMessage);
         }
       });

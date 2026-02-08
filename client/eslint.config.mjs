@@ -1,13 +1,14 @@
 // @ts-check
-const eslint = require('@eslint/js');
-const { defineConfig } = require('eslint/config');
-const tseslint = require('typescript-eslint');
-const angular = require('angular-eslint');
-const prettier = require('eslint-config-prettier');
-const prettierPlugin = require('eslint-plugin-prettier');
-const importPlugin = require('eslint-plugin-import');
+import eslint from '@eslint/js';
+import tseslint from 'typescript-eslint';
+import angular from 'angular-eslint';
+import prettier from 'eslint-config-prettier';
+import prettierPlugin from 'eslint-plugin-prettier';
+import importPlugin from 'eslint-plugin-import';
+import unusedImportsPlugin from 'eslint-plugin-unused-imports';
+import { fixupPluginRules } from '@eslint/compat';
 
-module.exports = defineConfig([
+export default tseslint.config(
   {
     ignores: [
       'node_modules/**',
@@ -20,18 +21,32 @@ module.exports = defineConfig([
     files: ['**/*.ts'],
     extends: [
       eslint.configs.recommended,
-      tseslint.configs.recommended,
-      tseslint.configs.stylistic,
-      angular.configs.tsRecommended,
+      ...tseslint.configs.recommended,
+      ...tseslint.configs.stylistic,
+      ...angular.configs.tsRecommended,
       prettier
     ],
     plugins: {
       prettier: prettierPlugin,
-      import: importPlugin
+      // to fix type incompatibility
+      import: fixupPluginRules(importPlugin),
+      'unused-imports': unusedImportsPlugin
     },
     processor: angular.processInlineTemplates,
     rules: {
       'prettier/prettier': 'error',
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      'unused-imports/no-unused-imports': 'error',
+      'unused-imports/no-unused-vars': [
+        'warn',
+        {
+          vars: 'all',
+          varsIgnorePattern: '^_',
+          args: 'after-used',
+          argsIgnorePattern: '^_'
+        }
+      ],
       '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
       '@typescript-eslint/consistent-type-imports': [
         'error',
@@ -69,8 +84,8 @@ module.exports = defineConfig([
   {
     files: ['**/*.html'],
     extends: [
-      angular.configs.templateRecommended,
-      angular.configs.templateAccessibility,
+      ...angular.configs.templateRecommended,
+      ...angular.configs.templateAccessibility,
       prettier
     ],
     plugins: {
@@ -80,4 +95,4 @@ module.exports = defineConfig([
       'prettier/prettier': 'error'
     }
   }
-]);
+);
