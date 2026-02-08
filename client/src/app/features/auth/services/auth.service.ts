@@ -22,7 +22,7 @@ import type {
   TokensResponse
 } from '../models/auth.types';
 import { TokenService } from './token.service';
-import { AUTH_API_V1 } from '@features/auth/constants/auth-api.const';
+import { AuthEndpointEnum } from '@features/auth/constants/auth-api.const';
 import { navigateToLogin } from '@features/auth/utils/navigate-to-login';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 
@@ -50,18 +50,12 @@ export class AuthService {
   }
 
   register(registerData: RegisterRequest): Observable<User> {
-    return this.#http.post<User>(
-      `${AUTH_API_V1}/${AppRouteSegmentEnum.Register}`,
-      registerData
-    );
+    return this.#http.post<User>(AuthEndpointEnum.Register, registerData);
   }
 
   login(credentials: LoginCredentials): Observable<AuthResponse> {
     return this.#http
-      .post<AuthResponse>(
-        `${AUTH_API_V1}/${AppRouteSegmentEnum.Login}`,
-        credentials
-      )
+      .post<AuthResponse>(AuthEndpointEnum.Login, credentials)
       .pipe(tap((response) => this.#handleAuthentication(response)));
   }
 
@@ -70,7 +64,7 @@ export class AuthService {
 
     if (this.isAuthenticated()) {
       this.#http
-        .post(`${AUTH_API_V1}/${AppRouteSegmentEnum.Logout}`, {})
+        .post(AuthEndpointEnum.Logout, {})
         .pipe(catchError(() => of(null)))
         .subscribe();
     }
@@ -87,7 +81,7 @@ export class AuthService {
 
   getProfile(): Observable<User> {
     return this.#http
-      .get<User>(`${AUTH_API_V1}/${AppRouteSegmentEnum.Profile}`)
+      .get<User>(AuthEndpointEnum.Profile)
       .pipe(tap((profile) => this.#tokenService.updateUser(profile)));
   }
 
@@ -109,10 +103,7 @@ export class AuthService {
     const request: RefreshTokensRequest = { refresh_token: refreshToken };
 
     this.#refreshInFlight$ = this.#http
-      .post<AuthResponse>(
-        `${AUTH_API_V1}/${AppRouteSegmentEnum.RefreshToken}`,
-        request
-      )
+      .post<AuthResponse>(AuthEndpointEnum.RefreshToken, request)
       .pipe(
         tap((response) => this.#handleAuthentication(response)),
         map((response) => response.tokens),

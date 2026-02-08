@@ -9,12 +9,12 @@ import { catchError, switchMap, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 import { TokenService } from '../services/token.service';
 import { AuthService } from '../services/auth.service';
-import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
+import { AuthEndpointEnum } from '../constants/auth-api.const';
 
 const AUTH_EXCLUDED_URLS = [
-  AppRouteSegmentEnum.RefreshToken,
-  AppRouteSegmentEnum.Login,
-  AppRouteSegmentEnum.Register
+  AuthEndpointEnum.RefreshToken,
+  AuthEndpointEnum.Login,
+  AuthEndpointEnum.Register,
 ] as const;
 
 export const jwtInterceptor: HttpInterceptorFn = (
@@ -63,7 +63,7 @@ function shouldAttemptTokenRefresh(
 ): boolean {
   return (
     error.status === 401 &&
-    !AUTH_EXCLUDED_URLS.some((url) => request.url.includes(url))
+    !AUTH_EXCLUDED_URLS.some((excludedUrl) => request.url.includes(excludedUrl))
   );
 }
 
