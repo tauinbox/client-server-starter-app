@@ -9,13 +9,10 @@ import { catchError, switchMap, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 import { TokenService } from '../services/token.service';
 import { AuthService } from '../services/auth.service';
-import { AuthApiEnum } from '../constants/auth-api.const';
-
-const AUTH_EXCLUDED_URLS = [
-  AuthApiEnum.RefreshToken,
-  AuthApiEnum.Login,
-  AuthApiEnum.Register
-] as const;
+import { isAuthExcludedUrl } from '@features/auth/utils/is-auth-excluded-urls';
+import { isTokenRefreshExcludedUrl } from '@features/auth/utils/is-token-refresh-excluded-urls';
+import { shouldAttemptTokenRefresh } from '@features/auth/utils/should-attempt-token-refresh';
+import { addTokenToRequest } from '@features/auth/utils/add-token-to-request';
 
 export const jwtInterceptor: HttpInterceptorFn = (
   request: HttpRequest<unknown>,
@@ -25,9 +22,10 @@ export const jwtInterceptor: HttpInterceptorFn = (
   const router = inject(Router);
   const tokenService = inject(TokenService);
   const token = tokenService.getAccessToken();
-  const isExcluded = isAuthExcludedUrl(request);
+  const isAuthExcluded = isAuthExcludedUrl(request);
+  const isTokenRefreshExcluded = isTokenRefreshExcludedUrl(request);
 
-  if (token && !isExcluded) {
+  if (token && !isAuthExcluded) {
     request = addTokenToRequest(request, token);
   }
 
@@ -36,7 +34,12 @@ export const jwtInterceptor: HttpInterceptorFn = (
       // to avoid circular dependency HttpClient → Interceptor → AuthService → HttpClient
       const authService = injector.get(AuthService);
 
-      if (shouldAttemptTokenRefresh(error, isExcluded)) {
+      if (
+        shouldAttemptTokenRefresh(
+          error,
+          isAuthExcluded || isTokenRefreshExcluded
+        )
+      ) {
         const handleError = () => {
           authService.logout(router.url);
           return throwError(() => error);
@@ -58,27 +61,3 @@ export const jwtInterceptor: HttpInterceptorFn = (
     })
   );
 };
-
-function isAuthExcludedUrl(request: HttpRequest<unknown>): boolean {
-  return AUTH_EXCLUDED_URLS.some((excludedUrl) =>
-    request.url.includes(excludedUrl)
-  );
-}
-
-function shouldAttemptTokenRefresh(
-  error: HttpErrorResponse,
-  isExcluded: boolean
-): boolean {
-  return error.status === 401 && !isExcluded;
-}
-
-function addTokenToRequest(
-  request: HttpRequest<unknown>,
-  token: string
-): HttpRequest<unknown> {
-  return request.clone({
-    setHeaders: {
-      Authorization: `Bearer ${token}`
-    }
-  });
-}
