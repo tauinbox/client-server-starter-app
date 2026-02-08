@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import type { Observable, Subscription } from 'rxjs';
 import {
   catchError,
@@ -25,8 +25,13 @@ import { TokenService } from './token.service';
 import { AuthApiEnum } from '@features/auth/constants/auth-api.const';
 import { navigateToLogin } from '@features/auth/utils/navigate-to-login';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
+import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@features/auth/context-tokens/error-notifications';
 
 const TOKEN_REFRESH_WINDOW_SECONDS = 60;
+const silent = new HttpContext().set(
+  DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN,
+  true
+);
 
 @Injectable({
   providedIn: 'root'
@@ -54,12 +59,14 @@ export class AuthService {
   }
 
   register(registerData: RegisterRequest): Observable<User> {
-    return this.#http.post<User>(AuthApiEnum.Register, registerData);
+    return this.#http.post<User>(AuthApiEnum.Register, registerData, {
+      context: silent
+    });
   }
 
   login(credentials: LoginCredentials): Observable<AuthResponse> {
     return this.#http
-      .post<AuthResponse>(AuthApiEnum.Login, credentials)
+      .post<AuthResponse>(AuthApiEnum.Login, credentials, { context: silent })
       .pipe(tap((response) => this.#handleAuthentication(response)));
   }
 
@@ -68,7 +75,7 @@ export class AuthService {
 
     if (this.isAuthenticated()) {
       this.#http
-        .post(AuthApiEnum.Logout, {})
+        .post(AuthApiEnum.Logout, {}, { context: silent })
         .pipe(catchError(() => of(null)))
         .subscribe();
     }
