@@ -9,12 +9,12 @@ import { catchError, switchMap, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 import { TokenService } from '../services/token.service';
 import { AuthService } from '../services/auth.service';
-import { AuthEndpointEnum } from '../constants/auth-api.const';
+import { AuthApiEnum } from '../constants/auth-api.const';
 
 const AUTH_EXCLUDED_URLS = [
-  AuthEndpointEnum.RefreshToken,
-  AuthEndpointEnum.Login,
-  AuthEndpointEnum.Register
+  AuthApiEnum.RefreshToken,
+  AuthApiEnum.Login,
+  AuthApiEnum.Register
 ] as const;
 
 export const jwtInterceptor: HttpInterceptorFn = (

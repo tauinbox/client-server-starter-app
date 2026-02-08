@@ -22,7 +22,7 @@ import type {
   TokensResponse
 } from '../models/auth.types';
 import { TokenService } from './token.service';
-import { AuthEndpointEnum } from '@features/auth/constants/auth-api.const';
+import { AuthApiEnum } from '@features/auth/constants/auth-api.const';
 import { navigateToLogin } from '@features/auth/utils/navigate-to-login';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 
@@ -50,12 +50,12 @@ export class AuthService {
   }
 
   register(registerData: RegisterRequest): Observable<User> {
-    return this.#http.post<User>(AuthEndpointEnum.Register, registerData);
+    return this.#http.post<User>(AuthApiEnum.Register, registerData);
   }
 
   login(credentials: LoginCredentials): Observable<AuthResponse> {
     return this.#http
-      .post<AuthResponse>(AuthEndpointEnum.Login, credentials)
+      .post<AuthResponse>(AuthApiEnum.Login, credentials)
       .pipe(tap((response) => this.#handleAuthentication(response)));
   }
 
@@ -64,7 +64,7 @@ export class AuthService {
 
     if (this.isAuthenticated()) {
       this.#http
-        .post(AuthEndpointEnum.Logout, {})
+        .post(AuthApiEnum.Logout, {})
         .pipe(catchError(() => of(null)))
         .subscribe();
     }
@@ -81,7 +81,7 @@ export class AuthService {
 
   getProfile(): Observable<User> {
     return this.#http
-      .get<User>(AuthEndpointEnum.Profile)
+      .get<User>(AuthApiEnum.Profile)
       .pipe(tap((profile) => this.#tokenService.updateUser(profile)));
   }
 
@@ -103,7 +103,7 @@ export class AuthService {
     const request: RefreshTokensRequest = { refresh_token: refreshToken };
 
     this.#refreshInFlight$ = this.#http
-      .post<AuthResponse>(AuthEndpointEnum.RefreshToken, request)
+      .post<AuthResponse>(AuthApiEnum.RefreshToken, request)
       .pipe(
         tap((response) => this.#handleAuthentication(response)),
         map((response) => response.tokens),
