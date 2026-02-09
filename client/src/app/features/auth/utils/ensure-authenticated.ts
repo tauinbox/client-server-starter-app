@@ -20,10 +20,12 @@ export function ensureAuthenticated(
         return result instanceof Observable ? result : of(result);
       }
 
+      authService.clearSession();
       navigateToLogin(router, returnUrl);
       return of(false);
     }),
     catchError(() => {
+      authService.clearSession();
       navigateToLogin(router, returnUrl);
       return of(false);
     })
