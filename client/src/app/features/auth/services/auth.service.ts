@@ -142,18 +142,22 @@ export class AuthService {
     const timeToRefresh =
       expiryTime - Date.now() - TOKEN_REFRESH_WINDOW_SECONDS * 1000;
 
+    const handleRefreshResult = {
+      next: (tokens: TokensResponse | null) => {
+        if (!tokens) this.logout(this.#router.url);
+      },
+      error: () => this.logout(this.#router.url)
+    };
+
     if (timeToRefresh <= 0) {
-      this.#refreshSubscription = this.refreshTokens().subscribe({
-        error: () => this.logout()
-      });
+      this.#refreshSubscription =
+        this.refreshTokens().subscribe(handleRefreshResult);
       return;
     }
 
     this.#refreshSubscription = timer(timeToRefresh)
       .pipe(switchMap(() => this.refreshTokens()))
-      .subscribe({
-        error: () => this.logout()
-      });
+      .subscribe(handleRefreshResult);
   }
 
   #handleAuthentication(authResponse: AuthResponse): void {
