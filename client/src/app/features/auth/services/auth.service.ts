@@ -28,10 +28,8 @@ import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@features/auth/context-tokens/error-notifications';
 
 const TOKEN_REFRESH_WINDOW_SECONDS = 60;
-const silent = new HttpContext().set(
-  DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN,
-  true
-);
+const silentContext = () =>
+  new HttpContext().set(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN, true);
 
 @Injectable({
   providedIn: 'root'
@@ -60,13 +58,15 @@ export class AuthService {
 
   register(registerData: RegisterRequest): Observable<User> {
     return this.#http.post<User>(AuthApiEnum.Register, registerData, {
-      context: silent
+      context: silentContext()
     });
   }
 
   login(credentials: LoginCredentials): Observable<AuthResponse> {
     return this.#http
-      .post<AuthResponse>(AuthApiEnum.Login, credentials, { context: silent })
+      .post<AuthResponse>(AuthApiEnum.Login, credentials, {
+        context: silentContext()
+      })
       .pipe(tap((response) => this.#handleAuthentication(response)));
   }
 
@@ -74,21 +74,26 @@ export class AuthService {
     this.#refreshSubscription?.unsubscribe();
     this.#refreshInFlight$ = null;
 
+    const completeLogout = () => {
+      if (returnUrl) {
+        navigateToLogin(this.#router, returnUrl);
+      } else {
+        void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`]);
+      }
+    };
+
     if (this.isAuthenticated()) {
       this.#http
-        .post(AuthApiEnum.Logout, {}, { context: silent })
+        .post(AuthApiEnum.Logout, {}, { context: silentContext() })
         .pipe(
           finalize(() => {
             this.#tokenService.clearAuth();
+            completeLogout();
           })
         )
         .subscribe();
-    }
-
-    if (returnUrl) {
-      navigateToLogin(this.#router, returnUrl);
     } else {
-      void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`]);
+      completeLogout();
     }
   }
 

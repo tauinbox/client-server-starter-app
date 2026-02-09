@@ -31,7 +31,7 @@ export const jwtInterceptor: HttpInterceptorFn = (
 
   return next(request).pipe(
     catchError((error: HttpErrorResponse) => {
-      // Inject it here to avoid circular dependency HttpClient → Interceptor → AuthService → HttpClient
+      // Inject here to avoid circular dependency HttpClient → Interceptor → AuthService → HttpClient
       const authService = injector.get(AuthService);
 
       if (
