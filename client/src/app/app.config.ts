@@ -12,6 +12,8 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes, withComponentInputBinding()),
+    // Error interceptor must be registered before JWT interceptor:
+    // JWT handles 401s (refresh + retry), error interceptor handles everything else
     provideHttpClient(withInterceptors([errorInterceptor, jwtInterceptor])),
     {
       provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
