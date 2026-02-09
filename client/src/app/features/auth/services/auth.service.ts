@@ -97,6 +97,12 @@ export class AuthService {
     }
   }
 
+  clearSession(): void {
+    this.#refreshSubscription?.unsubscribe();
+    this.#refreshInFlight$ = null;
+    this.#tokenService.clearAuth();
+  }
+
   getProfile(): Observable<User> {
     return this.#http
       .get<User>(AuthApiEnum.Profile)
@@ -121,7 +127,9 @@ export class AuthService {
     const request: RefreshTokensRequest = { refresh_token: refreshToken };
 
     this.#refreshInFlight$ = this.#http
-      .post<AuthResponse>(AuthApiEnum.RefreshToken, request)
+      .post<AuthResponse>(AuthApiEnum.RefreshToken, request, {
+        context: silentContext()
+      })
       .pipe(
         tap((response) => this.#handleAuthentication(response)),
         map((response) => response.tokens),

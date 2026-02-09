@@ -33,5 +33,10 @@ export const errorInterceptor: HttpInterceptorFn = (
 };
 
 function getErrorMessageText(e: HttpErrorResponse): string {
-  return e.error.message || e.message || `Error Code: ${e.status}`;
+  const serverMessage =
+    typeof e.error === 'object' && e.error !== null
+      ? (e.error as { message?: string }).message
+      : undefined;
+
+  return serverMessage || e.message || `Error Code: ${e.status}`;
 }
