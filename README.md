@@ -84,8 +84,8 @@ fullstack-starter-app/
 git clone <repository-url>
 cd fullstack-starter-app
 
-cd server && npm install
-cd ../client && npm install
+cd client && npm install   # also activates git hooks (husky)
+cd ../server && npm install
 ```
 
 ### 2. Configure the server
@@ -223,6 +223,19 @@ Three tables managed via TypeORM migrations:
 | ESLint | Server (@typescript-eslint + prettier) | `eslint.config.mjs` |
 | Prettier | Both (single quotes, no trailing commas) | `.prettierrc` |
 | Stylelint | Client SCSS (recess property order) | `.stylelintrc.json` |
+| Husky + lint-staged | Pre-commit hook (auto-fix staged files) | `.lintstagedrc.mjs` |
+
+### Git Hooks
+
+A pre-commit hook (via [husky](https://typicode.github.io/husky/)) runs **lint-staged** on every commit. It applies auto-fix linting to staged files only:
+
+| Glob | Linter |
+|------|--------|
+| `client/src/**/*.ts` | ESLint (angular-eslint) |
+| `client/src/**/*.scss` | Stylelint |
+| `server/src/**/*.ts` | ESLint (@typescript-eslint) |
+
+Husky and lint-staged are installed in the `client/` sub-package. Running `npm install` inside `client/` activates the git hooks via the `prepare` script.
 
 ## Testing
 
