@@ -242,6 +242,3 @@ Three tables managed via TypeORM migrations:
 - Configurable CORS (permissive only in `local` environment)
 - Angular template escaping for XSS prevention
 
-## License
-
-UNLICENSED
