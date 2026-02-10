@@ -121,6 +121,33 @@ export function mockRegisterError(
   );
 }
 
+export function mockUpdateUser(page: Page, user: Partial<MockUser> = {}) {
+  return page.route('**/api/v1/users/*', (route) => {
+    if (route.request().method() === 'PATCH') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ...defaultUser, ...user })
+      });
+    }
+    return route.fallback();
+  });
+}
+
+export async function loginViaUi(
+  page: Page,
+  user: Partial<MockUser> = {}
+): Promise<void> {
+  await mockLogin(page, user);
+  await mockRefreshToken(page, user);
+  await mockProfile(page, user);
+  await page.goto('/login');
+  await page.getByLabel('Email').fill('test@example.com');
+  await page.getByLabel('Password').fill('password123');
+  await page.getByRole('main').getByRole('button', { name: 'Login' }).click();
+  await page.waitForURL(/.*\/profile$/);
+}
+
 export function mockRefreshToken(page: Page, user: Partial<MockUser> = {}) {
   return page.route('**/api/v1/auth/refresh-token', (route) =>
     route.fulfill({
