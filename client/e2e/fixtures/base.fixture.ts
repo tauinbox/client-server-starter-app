@@ -97,6 +97,30 @@ export function mockProfile(page: Page, user: Partial<MockUser> = {}) {
   );
 }
 
+export function mockRegister(page: Page, user: Partial<MockUser> = {}) {
+  return page.route('**/api/v1/auth/register', (route) =>
+    route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({ ...defaultUser, ...user })
+    })
+  );
+}
+
+export function mockRegisterError(
+  page: Page,
+  status = 409,
+  message = 'User with this email already exists'
+) {
+  return page.route('**/api/v1/auth/register', (route) =>
+    route.fulfill({
+      status,
+      contentType: 'application/json',
+      body: JSON.stringify({ message, statusCode: status })
+    })
+  );
+}
+
 export function mockRefreshToken(page: Page, user: Partial<MockUser> = {}) {
   return page.route('**/api/v1/auth/refresh-token', (route) =>
     route.fulfill({
