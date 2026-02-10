@@ -1,76 +1,201 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
-</p>
+# Server
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS 11 REST API with JWT authentication, PostgreSQL via TypeORM, and Swagger documentation.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Installation
+## Getting Started
 
 ```bash
-$ npm install
+npm install
+cp .env.example .env      # Configure database and JWT settings
+npm run build
+npm run migrations:run     # Apply database schema
+npm run seed:run           # Optional: seed sample data
+npm run start:dev          # Dev server at http://localhost:3000
 ```
 
-## Running the app
+## Commands
+
+| Task | Command |
+|------|---------|
+| Dev server | `npm run start:dev` (port 3000, watch mode) |
+| Production start | `npm run start:prod` |
+| Build | `npm run build` |
+| Lint | `npm run lint` |
+| Lint fix | `npm run lint:fix` |
+| Format check | `npm run format:check` |
+| Format | `npm run format` |
+| Unit tests | `npm test` |
+| Single test | `npx jest --testPathPattern=<pattern>` |
+| Test watch | `npm run test:watch` |
+| Test coverage | `npm run test:cov` |
+| E2E tests | `npm run test:e2e` |
+| Run migrations | `npm run migrations:run` (build first) |
+| Generate migration | `npm run migrations:gen` (build first) |
+| Revert migration | `npm run migrations:revert` (build first) |
+| Run seeders | `npm run seed:run` (build first) |
+
+## Environment Configuration
+
+Copy `.env.example` to `.env` and configure:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `APPLICATION_PORT` | `3000` | HTTP listen port |
+| `ENVIRONMENT` | `local` | Environment name (`local` enables auto-sync & permissive CORS) |
+| `DB_HOST` | `localhost` | PostgreSQL host |
+| `DB_PORT` | `5432` | PostgreSQL port |
+| `DB_NAME` | `my-db` | Database name |
+| `DB_USER` | `postgres` | Database user |
+| `DB_PASSWORD` | `password` | Database password |
+| `DB_SCHEMA` | `public` | Database schema |
+| `DB_LOGGING` | `["query","warn","error","log"]` | TypeORM logging levels |
+| `JWT_SECRET` | `my_jwt_secret_key` | Secret for signing JWTs |
+| `JWT_EXPIRATION` | `3600` | Access token lifetime in seconds (1h) |
+| `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime in seconds (7d) |
+| `EXTERNAL_API` | - | Third-party API URL for feature config |
+| `EXTERNAL_API_TOKEN` | - | API token for external service |
+| `CORS_ORIGINS` | - | Allowed origins separated by `#` |
+
+## Architecture
+
+### Module Structure
+
+```
+src/modules/
+├── core/                   # Dynamic root module
+│   ├── config/             # @nestjs/config, loads .env
+│   ├── cache/              # @nestjs/cache-manager
+│   ├── database/           # TypeORM + PostgreSQL config
+│   └── schedule/           # @nestjs/schedule for cron jobs
+├── auth/
+│   ├── controllers/        # AuthController (login, register, logout, refresh, profile)
+│   ├── services/           # AuthService, RefreshTokenService, TokenCleanupService
+│   ├── strategies/         # LocalStrategy (email/password), JwtStrategy (Bearer)
+│   ├── guards/             # LocalAuthGuard, JwtAuthGuard, RolesGuard
+│   └── dto/                # LoginDto, RegisterDto, RefreshTokenDto
+├── users/
+│   ├── controllers/        # UsersController (CRUD + search)
+│   ├── services/           # UsersService
+│   ├── entities/           # User entity
+│   └── dto/                # CreateUserDto, UpdateUserDto, UserResponseDto
+└── feature/
+    ├── controllers/        # FeatureController (CRUD, config, upload)
+    ├── services/           # FeatureService
+    ├── entities/           # FeatureEntity
+    ├── guards/             # Example guard
+    ├── interceptors/       # Example interceptor (strips sensitive data)
+    ├── middlewares/         # Logging middleware
+    └── pipes/              # Name validation pipe
+```
+
+### Request Pipeline
+
+```
+Request → Global Middleware (Compression, CookieParser, CORS)
+        → Module Middleware
+        → Guards (JwtAuthGuard, RolesGuard)
+        → Interceptors (ClassSerializer, custom)
+        → Pipes (ValidationPipe, custom)
+        → Controller Handler
+        → Interceptors (response phase)
+        → Response
+```
+
+### Authentication
+
+- **LocalStrategy** — validates email/password via bcrypt on login
+- **JwtStrategy** — extracts and verifies Bearer token on protected routes
+- **RolesGuard** — checks `@Roles()` decorator for admin-only endpoints
+- **Refresh tokens** — opaque 80-char hex tokens stored in DB, rotated on use
+- **Token cleanup** — daily cron removes expired tokens, weekly cron removes revoked+expired
+
+### Database
+
+Three tables managed via TypeORM migrations:
+
+| Table | Description |
+|-------|-------------|
+| `users` | UUID PK, email (unique), name, bcrypt password, isAdmin, isActive |
+| `refresh_tokens` | UUID PK, token, FK to users (CASCADE), expires_at, revoked |
+| `feature` | Auto-increment PK, name, timestamps |
+
+Migration and seed commands operate on compiled JS in `dist/` — always run `npm run build` first.
+
+## API
+
+Swagger docs: http://localhost:3000/swagger
+
+Base URL: `/api/v1`
+
+### Auth (`/api/v1/auth`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/register` | None | Register user |
+| POST | `/login` | None | Login, returns JWT + refresh token |
+| POST | `/refresh-token` | None | Refresh access token |
+| POST | `/logout` | Bearer | Revoke all refresh tokens |
+| GET | `/profile` | Bearer | Get current user |
+
+### Users (`/api/v1/users`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/` | None | Create user |
+| GET | `/` | Admin | List all users |
+| GET | `/search` | Admin | Search users (query params: email, firstName, lastName, isAdmin, isActive) |
+| GET | `/:id` | Bearer | Get user by ID |
+| PATCH | `/:id` | Bearer | Update user |
+| DELETE | `/:id` | Admin | Delete user |
+
+### Feature (`/api/v1/feature`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/` | None | Returns "Hello World!" |
+| GET | `/config` | None | Returns external API config |
+| GET | `/entities` | None | List entities (optional `searchTerm` query) |
+| POST | `/entities` | None | Create entity (name: max 20 chars, no digits) |
+| GET | `/entities/:id` | None | Get entity by ID |
+| PATCH | `/entities/:id` | None | Update entity |
+| DELETE | `/entities/:id` | None | Delete entity |
+| POST | `/upload` | None | Upload files (multipart, field: `upload-artifact`) |
+
+## Testing
+
+### Unit Tests (Jest)
+
+- Test files: `*.spec.ts` alongside source files
+- Environment: Node
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm test                   # Run all
+npm run test:watch         # Watch mode
+npm run test:cov           # Coverage report
+npx jest --testPathPattern=auth   # Run specific tests
 ```
 
-## Test
+### E2E Tests (Jest)
+
+- Separate config: `test/jest-e2e.json`
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm run test:e2e
 ```
 
-## Swagger
-http://localhost:3000/swagger
+## Tech Stack
 
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](LICENSE).
+| Technology | Version |
+|------------|---------|
+| NestJS | 11.1.13 |
+| TypeORM | 0.3.28 |
+| PostgreSQL | via `pg` 8.x |
+| Passport | 0.7.x |
+| bcrypt | 6.x |
+| class-validator | 0.14.x |
+| @nestjs/swagger | 11.x |
+| @nestjs/schedule | 6.x |
+| TypeScript | 5.9.x |
+| Jest | 30.x |
+| ESLint | 9.x |
+| Prettier | 3.x |

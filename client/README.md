@@ -1,27 +1,134 @@
 # Client
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 16.1.4.
+Angular 21 SPA with standalone components, Angular Material UI, JWT authentication, and light/dark theming.
 
-## Development server
+## Getting Started
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+```bash
+npm install
+npm start             # Dev server at http://localhost:4200 (proxies /api to backend)
+```
 
-## Code scaffolding
+The dev proxy (`proxy.conf.mjs`) forwards `/api` and `/ws` requests to `BACKEND_URL` (default `http://localhost:3000`).
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+## Commands
 
-## Build
+| Task | Command |
+|------|---------|
+| Dev server | `npm start` |
+| Build | `npm run build` |
+| Lint | `npm run lint` |
+| Unit tests | `npm test` (Vitest) |
+| E2E tests | `npm run test:e2e` (Playwright) |
+| E2E tests (UI) | `npm run test:e2e:ui` |
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+## Architecture
 
-## Running unit tests
+### Component Structure
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+All components are standalone (no NgModules) with `OnPush` change detection and lazy-loaded routes.
 
-## Running end-to-end tests
+```
+src/app/
+├── core/                   # Header, theme toggle, storage service, 404 page
+├── features/
+│   ├── auth/               # Login, register, profile, forbidden
+│   │   ├── guards/         # authGuard, adminGuard
+│   │   ├── interceptors/   # jwtInterceptor, errorInterceptor
+│   │   └── services/       # AuthService, TokenService
+│   ├── users/              # User list, detail, edit, search (admin)
+│   └── feature/            # Example feature module
+└── shared/                 # Confirm dialog, shared utilities
+```
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+### Routes
 
-## Further help
+| Path | Component | Guard |
+|------|-----------|-------|
+| `/login` | LoginComponent | - |
+| `/register` | RegisterComponent | - |
+| `/profile` | ProfileComponent | authGuard |
+| `/users` | UserListComponent | adminGuard |
+| `/users/search` | UserSearchComponent | adminGuard |
+| `/users/:id` | UserDetailComponent | authGuard |
+| `/users/:id/edit` | UserEditComponent | authGuard |
+| `/feature` | FeatureComponent | - |
+| `/forbidden` | ForbiddenComponent | - |
+| `/**` | PageNotFoundComponent | - |
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+### State Management
+
+Angular Signals without a centralized store:
+
+- **TokenService** — source of truth, manages `localStorage('auth_storage')`, exposes `user`, `isAuthenticated`, `isAdmin` signals
+- **AuthService** — facade over TokenService, handles login/register/logout/refresh, schedules automatic token refresh
+- **ThemeService** — `theme` signal (`'light'` | `'dark'`), system preference detection, persists to localStorage
+
+### HTTP Interceptors
+
+1. **errorInterceptor** — catches errors, shows `MatSnackBar` notifications, skips 401s
+2. **jwtInterceptor** — attaches `Authorization: Bearer` header, handles 401 with token refresh + request retry, uses `shareReplay(1)` to prevent concurrent refreshes
+
+### Path Aliases
+
+| Alias | Path |
+|-------|------|
+| `@core/*` | `src/app/core/*` |
+| `@features/*` | `src/app/features/*` |
+| `@shared/*` | `src/app/shared/*` |
+
+## Styling
+
+- **Angular Material** + Angular CDK for UI components
+- **SCSS architecture** with themes, utilities, and component styles
+- **Light/dark theming** via CSS custom properties and Material theme mixins
+- **Stylelint** with recess property order
+
+```
+src/styles/
+├── abstracts/        # Variables, functions, mixins
+├── base/             # Reset, typography, animations
+├── themes/           # Light and dark Material themes + CSS vars
+├── layout/           # Containers, grids
+├── components/       # Cards, forms, loading, tables
+└── utilities/        # Flex, spacing, text, visibility helpers
+```
+
+## Testing
+
+### Unit Tests (Vitest)
+
+- Builder: `@angular/build:unit-test`
+- Environment: jsdom
+- Setup file: `src/test-setup.ts` (matchMedia polyfill)
+- Pattern: `*.spec.ts` alongside source files
+
+```bash
+npm test
+```
+
+### E2E Tests (Playwright)
+
+- Browser: Chromium
+- API mocking via route interception (no real backend needed)
+- Custom `mockApi` fixture blocks real API calls
+- Covers: login, register, profile pages
+
+```bash
+npm run test:e2e           # Headless
+npm run test:e2e:ui        # Interactive UI
+```
+
+## Tech Stack
+
+| Technology | Version |
+|------------|---------|
+| Angular | 21.1.3 |
+| Angular Material | 21.1.3 |
+| TypeScript | 5.9.x |
+| RxJS | 7.8.x |
+| Vitest | 4.0.18 |
+| Playwright | 1.58.2 |
+| ESLint | 9.x |
+| Prettier | 3.x |
+| Stylelint | 17.x |
