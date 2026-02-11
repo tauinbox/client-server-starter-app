@@ -1,5 +1,9 @@
 import type { ApplicationConfig } from '@angular/core';
-import { provideZoneChangeDetection } from '@angular/core';
+import {
+  inject,
+  provideAppInitializer,
+  provideZoneChangeDetection
+} from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { routes } from './app.routes';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
@@ -7,6 +11,7 @@ import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { MAT_SNACK_BAR_DEFAULT_OPTIONS } from '@angular/material/snack-bar';
 import { jwtInterceptor } from '@features/auth/interceptors/jwt.interceptor';
 import { errorInterceptor } from '@features/auth/interceptors/error.interceptor';
+import { AuthService } from '@features/auth/services/auth.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -15,6 +20,9 @@ export const appConfig: ApplicationConfig = {
     // Error interceptor must be registered before JWT interceptor:
     // JWT handles 401s (refresh + retry), error interceptor handles everything else
     provideHttpClient(withInterceptors([errorInterceptor, jwtInterceptor])),
+    provideAppInitializer(() => {
+      inject(AuthService).initSession();
+    }),
     {
       provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
       useValue: { appearance: 'outline' }

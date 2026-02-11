@@ -10,6 +10,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 
 import { ProfileComponent } from './profile.component';
 import { AuthStore } from '../../store/auth.store';
+import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../../users/services/user.service';
 import type { User } from '../../../users/models/user.types';
 
@@ -27,9 +28,11 @@ const mockUser: User = {
 describe('ProfileComponent', () => {
   let component: ProfileComponent;
   let fixture: ComponentFixture<ProfileComponent>;
+  let authStoreMock: {
+    updateCurrentUser: ReturnType<typeof vi.fn>;
+  };
   let authServiceMock: {
     getProfile: ReturnType<typeof vi.fn>;
-    updateCurrentUser: ReturnType<typeof vi.fn>;
   };
   let userServiceMock: {
     update: ReturnType<typeof vi.fn>;
@@ -37,9 +40,12 @@ describe('ProfileComponent', () => {
   let snackBarMock: { open: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
-    authServiceMock = {
-      getProfile: vi.fn().mockReturnValue(of(mockUser)),
+    authStoreMock = {
       updateCurrentUser: vi.fn()
+    };
+
+    authServiceMock = {
+      getProfile: vi.fn().mockReturnValue(of(mockUser))
     };
 
     userServiceMock = {
@@ -55,7 +61,8 @@ describe('ProfileComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideNoopAnimations(),
-        { provide: AuthStore, useValue: authServiceMock },
+        { provide: AuthStore, useValue: authStoreMock },
+        { provide: AuthService, useValue: authServiceMock },
         { provide: UserService, useValue: userServiceMock },
         { provide: MatSnackBar, useValue: snackBarMock }
       ]
@@ -178,9 +185,7 @@ describe('ProfileComponent', () => {
         'Close',
         { duration: 5000 }
       );
-      expect(authServiceMock.updateCurrentUser).toHaveBeenCalledWith(
-        updatedUser
-      );
+      expect(authStoreMock.updateCurrentUser).toHaveBeenCalledWith(updatedUser);
       expect(component['saving']()).toBe(false);
       expect(component['profileForm'].pristine).toBe(true);
     });

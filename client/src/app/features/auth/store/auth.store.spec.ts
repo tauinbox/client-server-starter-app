@@ -1,14 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting
-} from '@angular/common/http/testing';
-import { firstValueFrom } from 'rxjs';
 import { AuthStore } from './auth.store';
 import { StorageService } from '@core/services/storage.service';
-import { AuthApiEnum } from '@features/auth/constants/auth-api.const';
 import type { AuthResponse } from '../models/auth.types';
 
 // Helper: create a base64url-encoded JWT with given payload
@@ -68,12 +60,7 @@ describe('AuthStore', () => {
     };
 
     TestBed.configureTestingModule({
-      providers: [
-        provideRouter([]),
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: StorageService, useValue: storageMock }
-      ]
+      providers: [{ provide: StorageService, useValue: storageMock }]
     });
 
     return TestBed.inject(AuthStore);
@@ -111,93 +98,6 @@ describe('AuthStore', () => {
     });
   });
 
-  describe('session restoration with expired access token', () => {
-    it('should successfully refresh tokens when access token is expired', async () => {
-      const savedAuth = createMockAuthResponse({ expiredToken: true });
-      const store = createStore(savedAuth);
-      const httpMock = TestBed.inject(HttpTestingController);
-
-      const newAuth = createMockAuthResponse();
-
-      const tokensPromise = firstValueFrom(store.refreshTokens());
-
-      const req = httpMock.expectOne(AuthApiEnum.RefreshToken);
-      expect(req.request.body).toEqual({
-        refresh_token: 'valid-refresh-token'
-      });
-      req.flush(newAuth);
-
-      const tokens = await tokensPromise;
-
-      expect(tokens).toEqual(newAuth.tokens);
-      expect(store.isAuthenticated()).toBe(true);
-      expect(store.isAccessTokenExpired()).toBe(false);
-
-      httpMock.verify();
-    });
-
-    it('should clear session when refresh fails', async () => {
-      const savedAuth = createMockAuthResponse({ expiredToken: true });
-      const store = createStore(savedAuth);
-      const httpMock = TestBed.inject(HttpTestingController);
-
-      const tokensPromise = firstValueFrom(store.refreshTokens()).catch(
-        (err) => err
-      );
-
-      const req = httpMock.expectOne(AuthApiEnum.RefreshToken);
-      req.flush(
-        { message: 'Invalid refresh token' },
-        { status: 401, statusText: 'Unauthorized' }
-      );
-
-      await tokensPromise;
-
-      expect(store.isAuthenticated()).toBe(false);
-      expect(store.authResponse()).toBeNull();
-      expect(storageMock.removeItem).toHaveBeenCalledWith('auth_storage');
-
-      httpMock.verify();
-    });
-  });
-
-  describe('refreshTokens storage fallback', () => {
-    it('should fallback to storage when store state is cleared but storage has auth', async () => {
-      // Start with empty store
-      const store = createStore(null);
-      const httpMock = TestBed.inject(HttpTestingController);
-
-      // Simulate: store state is empty but storage has valid auth
-      // (e.g., state was cleared by a race condition but storage wasn't)
-      const savedAuth = createMockAuthResponse({ expiredToken: true });
-      storageMock.getItem.mockReturnValue(savedAuth);
-
-      const newAuth = createMockAuthResponse();
-      const tokensPromise = firstValueFrom(store.refreshTokens());
-
-      const req = httpMock.expectOne(AuthApiEnum.RefreshToken);
-      expect(req.request.body).toEqual({
-        refresh_token: 'valid-refresh-token'
-      });
-      req.flush(newAuth);
-
-      const tokens = await tokensPromise;
-      expect(tokens).toEqual(newAuth.tokens);
-
-      httpMock.verify();
-    });
-
-    it('should return null when neither store nor storage has refresh token', async () => {
-      const store = createStore(null);
-      storageMock.getItem.mockReturnValue(null);
-
-      const tokens = await firstValueFrom(store.refreshTokens());
-
-      expect(tokens).toBeNull();
-      expect(store.isAuthenticated()).toBe(false);
-    });
-  });
-
   describe('computed signals', () => {
     it('should report isAccessTokenExpired true for expired token', () => {
       const savedAuth = createMockAuthResponse({ expiredToken: true });
@@ -225,6 +125,77 @@ describe('AuthStore', () => {
       const store = createStore(savedAuth);
 
       expect(store.isAdmin()).toBe(true);
+    });
+  });
+
+  describe('saveAuthResponse', () => {
+    it('should save to storage and update state', () => {
+      const store = createStore(null);
+      const authResponse = createMockAuthResponse();
+
+      store.saveAuthResponse(authResponse);
+
+      expect(storageMock.setItem).toHaveBeenCalledWith(
+        'auth_storage',
+        authResponse
+      );
+      expect(store.authResponse()).toEqual(authResponse);
+      expect(store.isAuthenticated()).toBe(true);
+    });
+  });
+
+  describe('updateCurrentUser', () => {
+    it('should update user in state and storage', () => {
+      const savedAuth = createMockAuthResponse();
+      const store = createStore(savedAuth);
+
+      const updatedUser = { ...savedAuth.user, firstName: 'Updated' };
+      store.updateCurrentUser(updatedUser);
+
+      expect(store.user()).toEqual(updatedUser);
+      expect(storageMock.setItem).toHaveBeenCalledWith('auth_storage', {
+        ...savedAuth,
+        user: updatedUser
+      });
+    });
+
+    it('should do nothing when no auth response exists', () => {
+      const store = createStore(null);
+      const user = createMockAuthResponse().user;
+
+      store.updateCurrentUser(user);
+
+      expect(store.user()).toBeNull();
+      expect(storageMock.setItem).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('clearSession', () => {
+    it('should clear storage and reset state', () => {
+      const savedAuth = createMockAuthResponse();
+      const store = createStore(savedAuth);
+
+      store.clearSession();
+
+      expect(storageMock.removeItem).toHaveBeenCalledWith('auth_storage');
+      expect(store.authResponse()).toBeNull();
+      expect(store.isAuthenticated()).toBe(false);
+    });
+  });
+
+  describe('getTokenExpiryTime', () => {
+    it('should return expiry time in milliseconds', () => {
+      const savedAuth = createMockAuthResponse();
+      const store = createStore(savedAuth);
+
+      const expiryTime = store.getTokenExpiryTime();
+      expect(expiryTime).toBeGreaterThan(Date.now());
+    });
+
+    it('should return null when no token', () => {
+      const store = createStore(null);
+
+      expect(store.getTokenExpiryTime()).toBeNull();
     });
   });
 });
