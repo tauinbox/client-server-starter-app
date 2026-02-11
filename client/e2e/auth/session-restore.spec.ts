@@ -2,7 +2,7 @@ import {
   expect,
   mockProfile,
   test
-} from './fixtures/base.fixture';
+} from '../fixtures/base.fixture';
 
 /**
  * Creates a base64url-encoded JWT with the given payload.

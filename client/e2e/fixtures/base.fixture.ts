@@ -160,3 +160,141 @@ export function mockRefreshToken(page: Page, user: Partial<MockUser> = {}) {
     })
   );
 }
+
+// --- Users API mocks ---
+
+export const mockUsersList: MockUser[] = [
+  {
+    id: '1',
+    email: 'admin@example.com',
+    firstName: 'Admin',
+    lastName: 'User',
+    isAdmin: true,
+    isActive: true,
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z'
+  },
+  {
+    id: '2',
+    email: 'john@example.com',
+    firstName: 'John',
+    lastName: 'Smith',
+    isAdmin: false,
+    isActive: true,
+    createdAt: '2025-02-01T00:00:00.000Z',
+    updatedAt: '2025-02-01T00:00:00.000Z'
+  },
+  {
+    id: '3',
+    email: 'jane@example.com',
+    firstName: 'Jane',
+    lastName: 'Doe',
+    isAdmin: false,
+    isActive: false,
+    createdAt: '2025-03-01T00:00:00.000Z',
+    updatedAt: '2025-03-01T00:00:00.000Z'
+  }
+];
+
+export function mockGetUsers(page: Page, users: MockUser[] = mockUsersList) {
+  return page.route('**/api/v1/users', (route) => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(users)
+      });
+    }
+    return route.fallback();
+  });
+}
+
+export function mockGetUser(page: Page, user: Partial<MockUser> = {}) {
+  return page.route('**/api/v1/users/*', (route) => {
+    if (
+      route.request().method() === 'GET' &&
+      !route.request().url().includes('/search')
+    ) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ...mockUsersList[0], ...user })
+      });
+    }
+    return route.fallback();
+  });
+}
+
+export function mockGetUserError(page: Page, status = 404) {
+  return page.route('**/api/v1/users/*', (route) => {
+    if (
+      route.request().method() === 'GET' &&
+      !route.request().url().includes('/search')
+    ) {
+      return route.fulfill({
+        status,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'User not found', statusCode: status })
+      });
+    }
+    return route.fallback();
+  });
+}
+
+export function mockSearchUsers(
+  page: Page,
+  users: MockUser[] = mockUsersList
+) {
+  return page.route('**/api/v1/users/search*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(users)
+    })
+  );
+}
+
+export function mockDeleteUser(page: Page) {
+  return page.route('**/api/v1/users/*', (route) => {
+    if (route.request().method() === 'DELETE') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: '{}'
+      });
+    }
+    return route.fallback();
+  });
+}
+
+export function mockDeleteUserError(page: Page) {
+  return page.route('**/api/v1/users/*', (route) => {
+    if (route.request().method() === 'DELETE') {
+      return route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'Failed to delete user',
+          statusCode: 500
+        })
+      });
+    }
+    return route.fallback();
+  });
+}
+
+export function mockUpdateUserError(page: Page) {
+  return page.route('**/api/v1/users/*', (route) => {
+    if (route.request().method() === 'PATCH') {
+      return route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'Failed to update user',
+          statusCode: 500
+        })
+      });
+    }
+    return route.fallback();
+  });
+}

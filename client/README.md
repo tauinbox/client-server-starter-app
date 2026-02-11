@@ -115,7 +115,8 @@ npm test
 - Browser: Chromium
 - API mocking via route interception (no real backend needed)
 - Custom `mockApi` fixture blocks real API calls
-- Covers: login, register, profile pages
+- Test structure: organized by module in `e2e/auth/` and `e2e/users/`
+- Coverage: 93 tests (37 auth + 56 users) covering login, register, profile, session-restore, users list/detail/edit/search
 
 ```bash
 npm run test:e2e           # Headless
