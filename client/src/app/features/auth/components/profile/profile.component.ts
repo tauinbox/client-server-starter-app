@@ -21,6 +21,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { AuthStore } from '../../store/auth.store';
+import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../../users/services/user.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type { UpdateUser, User } from '../../../users/models/user.types';
@@ -60,6 +61,7 @@ type ProfileFormType = {
 export class ProfileComponent implements OnInit {
   readonly #fb = inject(FormBuilder);
   readonly #authStore = inject(AuthStore);
+  readonly #authService = inject(AuthService);
   readonly #userService = inject(UserService);
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
@@ -94,7 +96,7 @@ export class ProfileComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.#authStore
+    this.#authService
       .getProfile()
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({

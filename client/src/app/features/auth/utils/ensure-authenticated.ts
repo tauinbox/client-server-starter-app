@@ -5,12 +5,16 @@ import { navigateToLogin } from './navigate-to-login';
 type AuthStoreLike = {
   isAuthenticated: () => boolean;
   isAccessTokenExpired: () => boolean;
-  refreshTokens: () => Observable<unknown>;
   clearSession: () => void;
+};
+
+type AuthServiceLike = {
+  refreshTokens: () => Observable<unknown>;
 };
 
 export function ensureAuthenticated(
   authStore: AuthStoreLike,
+  authService: AuthServiceLike,
   router: Router,
   returnUrl: string,
   onAuthenticated: () => boolean | Observable<boolean>
@@ -19,7 +23,7 @@ export function ensureAuthenticated(
     return onAuthenticated();
   }
 
-  return authStore.refreshTokens().pipe(
+  return authService.refreshTokens().pipe(
     switchMap((tokens) => {
       if (tokens) {
         const result = onAuthenticated();

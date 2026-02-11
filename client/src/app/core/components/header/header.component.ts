@@ -4,6 +4,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthStore } from '@features/auth/store/auth.store';
+import { AuthService } from '@features/auth/services/auth.service';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { ThemeToggleComponent } from './theme-toggle/theme-toggle.component';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
@@ -27,7 +28,9 @@ export class HeaderComponent {
   protected readonly authStore = inject(AuthStore);
   protected readonly routes = AppRouteSegmentEnum;
 
+  readonly #authService = inject(AuthService);
+
   logout(): void {
-    this.authStore.logout();
+    this.#authService.logout();
   }
 }
