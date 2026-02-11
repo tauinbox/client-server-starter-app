@@ -4,7 +4,7 @@ import { DOCUMENT } from '@angular/common';
 @Injectable({
   providedIn: 'root'
 })
-export class StorageService {
+export class LocalStorageService {
   readonly #storage = inject(DOCUMENT).defaultView?.localStorage ?? null;
 
   getItem<T>(key: string): T | null {

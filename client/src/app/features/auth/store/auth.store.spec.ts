@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { AuthStore } from './auth.store';
-import { StorageService } from '@core/services/storage.service';
+import { LocalStorageService } from '@core/services/local-storage.service';
 import type { AuthResponse } from '../models/auth.types';
 
 // Helper: create a base64url-encoded JWT with given payload
@@ -60,7 +60,7 @@ describe('AuthStore', () => {
     };
 
     TestBed.configureTestingModule({
-      providers: [{ provide: StorageService, useValue: storageMock }]
+      providers: [{ provide: LocalStorageService, useValue: storageMock }]
     });
 
     return TestBed.inject(AuthStore);

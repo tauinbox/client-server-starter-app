@@ -1,6 +1,6 @@
 import { effect, inject, Injectable, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
-import { StorageService } from './storage.service';
+import { LocalStorageService } from './local-storage.service';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -10,7 +10,7 @@ const THEME_KEY = 'preferred-theme';
   providedIn: 'root'
 })
 export class ThemeService {
-  readonly #storage = inject(StorageService);
+  readonly #storage = inject(LocalStorageService);
   readonly #document = inject(DOCUMENT);
   readonly #window = this.#document.defaultView;
 
