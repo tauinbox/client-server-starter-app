@@ -3,8 +3,10 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
 
 import { UserEditComponent } from './user-edit.component';
+import { UsersStore } from '../../store/users.store';
 
 describe('UserEditComponent', () => {
   let component: UserEditComponent;
@@ -16,7 +18,9 @@ describe('UserEditComponent', () => {
       providers: [
         provideRouter([]),
         provideHttpClient(),
-        provideHttpClientTesting()
+        provideHttpClientTesting(),
+        provideNoopAnimations(),
+        UsersStore
       ]
     }).compileComponents();
 

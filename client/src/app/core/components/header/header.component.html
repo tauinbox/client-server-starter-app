@@ -4,9 +4,9 @@
 
   <app-theme-toggle></app-theme-toggle>
 
-  @if (authService.isAuthenticated()) {
+  @if (authStore.isAuthenticated()) {
     <button mat-button [matMenuTriggerFor]="menu">
-      {{ authService.user()?.firstName }} {{ authService.user()?.lastName }}
+      {{ authStore.user()?.firstName }} {{ authStore.user()?.lastName }}
       <mat-icon>expand_more</mat-icon>
     </button>
     <mat-menu #menu="matMenu">
@@ -15,7 +15,7 @@
         <span>Profile</span>
       </a>
 
-      @if (authService.isAdmin()) {
+      @if (authStore.isAdmin()) {
         <a mat-menu-item [routerLink]="'/' + routes.Users">
           <mat-icon>people</mat-icon>
           <span>Manage Users</span>

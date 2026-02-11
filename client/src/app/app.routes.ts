@@ -2,6 +2,7 @@ import type { Routes } from '@angular/router';
 import { authGuard } from '@features/auth/guards/auth.guard';
 import { adminGuard } from '@features/auth/guards/admin.guard';
 import { AppRouteSegmentEnum } from './app.route-segment.enum';
+import { UsersStore } from '@features/users/store/users.store';
 
 export const routes: Routes = [
   {
@@ -33,6 +34,7 @@ export const routes: Routes = [
   },
   {
     path: AppRouteSegmentEnum.Users,
+    providers: [UsersStore],
     children: [
       {
         path: '',

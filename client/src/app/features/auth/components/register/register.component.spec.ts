@@ -9,7 +9,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 
 import { RegisterComponent } from './register.component';
-import { AuthService } from '../../services/auth.service';
+import { AuthStore } from '../../store/auth.store';
 import type { User } from '@features/users/models/user.types';
 
 const mockUser: User = {
@@ -41,7 +41,7 @@ describe('RegisterComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideNoopAnimations(),
-        { provide: AuthService, useValue: authServiceMock },
+        { provide: AuthStore, useValue: authServiceMock },
         { provide: MatSnackBar, useValue: snackBarMock }
       ]
     }).compileComponents();
