@@ -6,6 +6,9 @@ All notable changes to this project, organized by date and grouped by theme.
 
 ## 2026-02-11
 
+### Architecture
+- **extract AuthService from AuthStore** - Split `AuthStore` into a pure state container (no `HttpClient`) and a new `AuthService` (`@Injectable`) that owns all HTTP operations, token refresh scheduling, and session lifecycle. Eliminates the circular dependency chain (`AuthStore → HttpClient → jwtInterceptor → AuthStore`) at its root. Removed the `setTimeout` workaround in store init. Added `provideAppInitializer` in `app.config.ts` to call `AuthService.initSession()`. Updated JWT interceptor to inject `AuthStore` directly for token reads and lazy-inject `AuthService` for refresh/logout. Updated `ensureAuthenticated` utility, both guards, and all auth-related components. Created `auth.service.spec.ts` (12 tests) and updated all existing spec files (134 unit tests pass, 37 e2e tests pass).
+
 ### State Management
 - **integrate NgRx Signal Store** - Replaced `TokenService` + `AuthService` with a single `AuthStore` (`@ngrx/signals`, `providedIn: 'root'`). Created route-level `UsersStore` with `withEntities<User>()` for user list/detail/search/edit state. Migrated all guards, interceptors, and components to use the new stores. Deleted `TokenService` and `AuthService`. Updated all unit tests.
 

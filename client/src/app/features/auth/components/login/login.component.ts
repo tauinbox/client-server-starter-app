@@ -20,7 +20,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { AuthStore } from '../../store/auth.store';
+import { AuthService } from '../../services/auth.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -54,7 +54,7 @@ type LoginFormType = {
 })
 export class LoginComponent {
   readonly #fb = inject(FormBuilder);
-  readonly #authStore = inject(AuthStore);
+  readonly #authService = inject(AuthService);
   readonly #router = inject(Router);
   readonly #route = inject(ActivatedRoute);
   readonly #destroyRef = inject(DestroyRef);
@@ -84,7 +84,7 @@ export class LoginComponent {
     this.loading.set(true);
     this.error.set(null);
 
-    this.#authStore
+    this.#authService
       .login(this.loginForm.getRawValue())
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({

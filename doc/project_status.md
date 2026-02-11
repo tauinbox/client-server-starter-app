@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-02-11
 **Current branch:** `master`
-**Latest commit:** NgRx Signal Store integration (AuthStore + UsersStore)
+**Latest commit:** Extract AuthService from AuthStore (eliminate circular dependency)
 
 ---
 
@@ -30,7 +30,7 @@ The project is a functional full-stack application with authentication, user man
 
 | Module | Status | Notes |
 |--------|--------|-------|
-| Auth (login, register, profile) | Done | JWT interceptor, auto-refresh, guards. NgRx Signal Store (`AuthStore`) |
+| Auth (login, register, profile) | Done | `AuthStore` (pure state) + `AuthService` (HTTP/orchestration). JWT interceptor, auto-refresh, guards |
 | Users (list, detail, edit, search) | Done | Admin-only access, pagination, sorting. NgRx Signal Store (`UsersStore`) |
 | Feature (example) | Done | Description, config, entities list, file upload |
 | Theming (light/dark) | Done | System preference detection, Material themes |
@@ -54,7 +54,7 @@ The project is a functional full-stack application with authentication, user man
 | Type | Status | Notes |
 |------|--------|-------|
 | Server unit tests (Jest) | Configured | `*.spec.ts` alongside source |
-| Client unit tests (Vitest) | Configured | Auth module covered (120 tests / 27 files); migrated to NgRx Signal Store mocks |
+| Client unit tests (Vitest) | Configured | Auth module covered (134 tests / 28 files); AuthStore + AuthService split with separate specs |
 | Client E2E (Playwright) | In Progress | Login, register, profile, session-restore tests done (37 tests); users and feature pages not yet covered |
 | Server E2E (Jest) | Configured | Separate Jest config |
 
@@ -64,7 +64,7 @@ The project is a functional full-stack application with authentication, user man
 
 | Date | Focus Area | Key Changes |
 |------|-----------|-------------|
-| 2026-02-11 | State management, Bug fix | NgRx Signal Store integration — AuthStore (global) + UsersStore (route-level); deleted TokenService + AuthService. Fixed session restoration bug (NG0200 circular dependency on init). Added session-restore E2E tests |
+| 2026-02-11 | Architecture, State management | Extracted `AuthService` from `AuthStore` — eliminated circular dependency (NG0200) at root, removed `setTimeout` hack. NgRx Signal Store integration — AuthStore (global) + UsersStore (route-level). Session-restore E2E tests |
 | 2026-02-10 | Testing, Code quality | Auth module unit tests (132 tests); Playwright E2E setup; husky + lint-staged pre-commit hooks |
 | 2026-02-09 | Unit testing, Auth | Karma → Vitest migration; auth module refactoring |
 | 2026-02-08 | Code quality | Stylelint setup, Prettier formatting, linter fixes, auth/storage refactoring |
