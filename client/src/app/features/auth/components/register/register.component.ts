@@ -20,7 +20,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { Router, RouterLink } from '@angular/router';
-import { AuthService } from '../../services/auth.service';
+import { AuthStore } from '../../store/auth.store';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
@@ -58,7 +58,7 @@ type RegisterFormType = {
 })
 export class RegisterComponent {
   readonly #fb = inject(FormBuilder);
-  readonly #authService = inject(AuthService);
+  readonly #authStore = inject(AuthStore);
   readonly #router = inject(Router);
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
@@ -99,7 +99,7 @@ export class RegisterComponent {
     this.loading.set(true);
     this.error.set(null);
 
-    this.#authService
+    this.#authStore
       .register(this.registerForm.getRawValue())
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({

@@ -2,9 +2,9 @@ import type { OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
-  input,
-  signal
+  input
 } from '@angular/core';
 import {
   MatCard,
@@ -19,9 +19,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatChip } from '@angular/material/chips';
 import { MatDivider } from '@angular/material/divider';
-import { UserService } from '../../services/user.service';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import type { User } from '../../models/user.types';
+import { UsersStore } from '../../store/users.store';
 
 @Component({
   selector: 'app-user-detail',
@@ -44,33 +42,15 @@ import type { User } from '../../models/user.types';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UserDetailComponent implements OnInit {
-  readonly #userService = inject(UserService);
-  readonly #snackBar = inject(MatSnackBar);
+  readonly #usersStore = inject(UsersStore);
 
   readonly id = input.required<string>();
-  readonly user = signal<User | null>(null);
-  readonly loading = signal(true);
+  readonly user = computed(
+    () => this.#usersStore.entityMap()[this.id()] ?? null
+  );
+  readonly loading = this.#usersStore.detailLoading;
 
   ngOnInit(): void {
-    this.loadUser();
-  }
-
-  loadUser(): void {
-    this.loading.set(true);
-
-    this.#userService.getById(this.id()).subscribe({
-      next: (user) => {
-        this.user.set(user);
-        this.loading.set(false);
-      },
-      error: () => {
-        this.loading.set(false);
-        this.#snackBar.open(
-          'Failed to load user details. Please try again.',
-          'Close',
-          { duration: 5000 }
-        );
-      }
-    });
+    this.#usersStore.loadOne(this.id());
   }
 }

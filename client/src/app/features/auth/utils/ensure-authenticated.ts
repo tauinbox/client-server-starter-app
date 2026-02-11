@@ -1,31 +1,37 @@
 import { catchError, Observable, of, switchMap } from 'rxjs';
 import type { Router } from '@angular/router';
-import type { AuthService } from '../services/auth.service';
 import { navigateToLogin } from './navigate-to-login';
 
+type AuthStoreLike = {
+  isAuthenticated: () => boolean;
+  isAccessTokenExpired: () => boolean;
+  refreshTokens: () => Observable<unknown>;
+  clearSession: () => void;
+};
+
 export function ensureAuthenticated(
-  authService: AuthService,
+  authStore: AuthStoreLike,
   router: Router,
   returnUrl: string,
   onAuthenticated: () => boolean | Observable<boolean>
 ): boolean | Observable<boolean> {
-  if (authService.isAuthenticated() && !authService.isAccessTokenExpired()) {
+  if (authStore.isAuthenticated() && !authStore.isAccessTokenExpired()) {
     return onAuthenticated();
   }
 
-  return authService.refreshTokens().pipe(
+  return authStore.refreshTokens().pipe(
     switchMap((tokens) => {
       if (tokens) {
         const result = onAuthenticated();
         return result instanceof Observable ? result : of(result);
       }
 
-      authService.clearSession();
+      authStore.clearSession();
       navigateToLogin(router, returnUrl);
       return of(false);
     }),
     catchError(() => {
-      authService.clearSession();
+      authStore.clearSession();
       navigateToLogin(router, returnUrl);
       return of(false);
     })

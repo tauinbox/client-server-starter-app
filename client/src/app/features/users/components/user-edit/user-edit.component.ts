@@ -25,12 +25,13 @@ import { MatCheckbox } from '@angular/material/checkbox';
 import { UserService } from '../../services/user.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
-import { AuthService } from '../../../auth/services/auth.service';
+import { AuthStore } from '../../../auth/store/auth.store';
 import type { UpdateUser, User } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { rem } from '@shared/utils/css.utils';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
+import { UsersStore } from '../../store/users.store';
 
 type UserFormType = {
   email: FormControl<string>;
@@ -67,10 +68,11 @@ type UserFormType = {
 export class UserEditComponent implements OnInit {
   readonly #fb = inject(FormBuilder);
   readonly #userService = inject(UserService);
+  readonly #usersStore = inject(UsersStore);
   readonly #router = inject(Router);
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
-  protected readonly authService = inject(AuthService);
+  protected readonly authStore = inject(AuthStore);
 
   readonly id = input.required<string>();
   readonly user = signal<User | null>(null);
@@ -106,8 +108,7 @@ export class UserEditComponent implements OnInit {
   );
 
   protected readonly canDelete = computed(
-    () =>
-      this.authService.isAdmin() && this.id() !== this.authService.user()?.id
+    () => this.authStore.isAdmin() && this.id() !== this.authStore.user()?.id
   );
 
   ngOnInit() {
@@ -158,7 +159,7 @@ export class UserEditComponent implements OnInit {
     this.saving.set(true);
     this.error.set(null);
 
-    this.#userService.update(this.id(), updateData).subscribe({
+    this.#usersStore.updateUser(this.id(), updateData).subscribe({
       next: (user) => this.#handleUpdateSuccess(user),
       error: (err) => this.#handleUpdateError(err)
     });
@@ -175,7 +176,7 @@ export class UserEditComponent implements OnInit {
       updateData.password = formValues.password;
     }
 
-    if (this.authService.isAdmin()) {
+    if (this.authStore.isAdmin()) {
       updateData.isAdmin = formValues.isAdmin;
       updateData.isActive = formValues.isActive;
     }
@@ -187,8 +188,8 @@ export class UserEditComponent implements OnInit {
     this.saving.set(false);
     this.user.set(updatedUser);
 
-    if (this.id() === this.authService.user()?.id) {
-      this.authService.updateCurrentUser(updatedUser);
+    if (this.id() === this.authStore.user()?.id) {
+      this.authStore.updateCurrentUser(updatedUser);
     }
 
     this.userForm.patchValue({ password: '' });
@@ -230,7 +231,7 @@ export class UserEditComponent implements OnInit {
   }
 
   #deleteUser(): void {
-    this.#userService.delete(this.id()).subscribe({
+    this.#usersStore.deleteUser(this.id()).subscribe({
       next: () => {
         this.#snackBar.open('User deleted successfully', 'Close', {
           duration: 5000

@@ -20,7 +20,7 @@ import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatButton, MatIconButton } from '@angular/material/button';
-import { AuthService } from '../../services/auth.service';
+import { AuthStore } from '../../store/auth.store';
 import { UserService } from '../../../users/services/user.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type { UpdateUser, User } from '../../../users/models/user.types';
@@ -59,7 +59,7 @@ type ProfileFormType = {
 })
 export class ProfileComponent implements OnInit {
   readonly #fb = inject(FormBuilder);
-  readonly #authService = inject(AuthService);
+  readonly #authStore = inject(AuthStore);
   readonly #userService = inject(UserService);
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
@@ -94,7 +94,7 @@ export class ProfileComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.#authService
+    this.#authStore
       .getProfile()
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
@@ -145,7 +145,7 @@ export class ProfileComponent implements OnInit {
         next: (updatedUser) => {
           this.saving.set(false);
           this.user.set(updatedUser);
-          this.#authService.updateCurrentUser(updatedUser);
+          this.#authStore.updateCurrentUser(updatedUser);
 
           this.profileForm.patchValue({ password: '' });
           this.profileForm.markAsPristine();
