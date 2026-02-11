@@ -1,7 +1,8 @@
 import { computed, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type { Observable } from 'rxjs';
-import { catchError, EMPTY, pipe, switchMap, tap } from 'rxjs';
+import { pipe, switchMap, tap } from 'rxjs';
+import { tapResponse } from '@ngrx/operators';
 import {
   patchState,
   signalStore,
@@ -72,21 +73,22 @@ export const UsersStore = signalStore(
           tap(() => patchState(store, { listLoading: true, listError: null })),
           switchMap(() =>
             userService.getAll().pipe(
-              tap((users) => {
-                patchState(store, setAllEntities(users));
-                patchState(store, { listLoading: false });
-              }),
-              catchError(() => {
-                patchState(store, {
-                  listLoading: false,
-                  listError: 'Failed to load users. Please try again.'
-                });
-                snackBar.open(
-                  'Failed to load users. Please try again.',
-                  'Close',
-                  { duration: 5000 }
-                );
-                return EMPTY;
+              tapResponse({
+                next: (users) => {
+                  patchState(store, setAllEntities(users));
+                  patchState(store, { listLoading: false });
+                },
+                error: () => {
+                  patchState(store, {
+                    listLoading: false,
+                    listError: 'Failed to load users. Please try again.'
+                  });
+                  snackBar.open(
+                    'Failed to load users. Please try again.',
+                    'Close',
+                    { duration: 5000 }
+                  );
+                }
               })
             )
           )
@@ -100,21 +102,23 @@ export const UsersStore = signalStore(
           ),
           switchMap((id) =>
             userService.getById(id).pipe(
-              tap((user) => {
-                patchState(store, setEntity(user));
-                patchState(store, { detailLoading: false });
-              }),
-              catchError(() => {
-                patchState(store, {
-                  detailLoading: false,
-                  detailError: 'Failed to load user details. Please try again.'
-                });
-                snackBar.open(
-                  'Failed to load user details. Please try again.',
-                  'Close',
-                  { duration: 5000 }
-                );
-                return EMPTY;
+              tapResponse({
+                next: (user) => {
+                  patchState(store, setEntity(user));
+                  patchState(store, { detailLoading: false });
+                },
+                error: () => {
+                  patchState(store, {
+                    detailLoading: false,
+                    detailError:
+                      'Failed to load user details. Please try again.'
+                  });
+                  snackBar.open(
+                    'Failed to load user details. Please try again.',
+                    'Close',
+                    { duration: 5000 }
+                  );
+                }
               })
             )
           )
@@ -148,27 +152,28 @@ export const UsersStore = signalStore(
           ),
           switchMap((criteria) =>
             userService.search(criteria).pipe(
-              tap((users) => {
-                for (const user of users) {
-                  patchState(store, setEntity(user));
+              tapResponse({
+                next: (users) => {
+                  for (const user of users) {
+                    patchState(store, setEntity(user));
+                  }
+                  patchState(store, {
+                    searchResultIds: users.map((u) => u.id),
+                    searchLoading: false,
+                    searchPerformed: true
+                  });
+                },
+                error: () => {
+                  patchState(store, {
+                    searchLoading: false,
+                    searchError: 'Failed to search users. Please try again.'
+                  });
+                  snackBar.open(
+                    'Failed to search users. Please try again.',
+                    'Close',
+                    { duration: 5000 }
+                  );
                 }
-                patchState(store, {
-                  searchResultIds: users.map((u) => u.id),
-                  searchLoading: false,
-                  searchPerformed: true
-                });
-              }),
-              catchError(() => {
-                patchState(store, {
-                  searchLoading: false,
-                  searchError: 'Failed to search users. Please try again.'
-                });
-                snackBar.open(
-                  'Failed to search users. Please try again.',
-                  'Close',
-                  { duration: 5000 }
-                );
-                return EMPTY;
               })
             )
           )
