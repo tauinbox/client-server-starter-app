@@ -4,11 +4,13 @@ import { ensureAuthenticated } from './ensure-authenticated';
 import type { TokensResponse } from '../models/auth.types';
 
 describe('ensureAuthenticated', () => {
-  let authServiceMock: {
+  let authStoreMock: {
     isAuthenticated: ReturnType<typeof vi.fn>;
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
-    refreshTokens: ReturnType<typeof vi.fn>;
     clearSession: ReturnType<typeof vi.fn>;
+  };
+  let authServiceMock: {
+    refreshTokens: ReturnType<typeof vi.fn>;
   };
   let routerMock: { navigate: ReturnType<typeof vi.fn> };
 
@@ -19,22 +21,26 @@ describe('ensureAuthenticated', () => {
   };
 
   beforeEach(() => {
-    authServiceMock = {
+    authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(false),
       isAccessTokenExpired: vi.fn().mockReturnValue(true),
-      refreshTokens: vi.fn(),
       clearSession: vi.fn()
+    };
+
+    authServiceMock = {
+      refreshTokens: vi.fn()
     };
 
     routerMock = { navigate: vi.fn() };
   });
 
   it('should call onAuthenticated directly when authenticated and token valid', () => {
-    authServiceMock.isAuthenticated.mockReturnValue(true);
-    authServiceMock.isAccessTokenExpired.mockReturnValue(false);
+    authStoreMock.isAuthenticated.mockReturnValue(true);
+    authStoreMock.isAccessTokenExpired.mockReturnValue(false);
 
     const result = ensureAuthenticated(
-      authServiceMock as Parameters<typeof ensureAuthenticated>[0],
+      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
+      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
       routerMock as unknown as Router,
       '/dashboard',
       () => true
@@ -45,11 +51,12 @@ describe('ensureAuthenticated', () => {
   });
 
   it('should refresh tokens when not authenticated', async () => {
-    authServiceMock.isAuthenticated.mockReturnValue(false);
+    authStoreMock.isAuthenticated.mockReturnValue(false);
     authServiceMock.refreshTokens.mockReturnValue(of(mockTokens));
 
     const result = ensureAuthenticated(
-      authServiceMock as Parameters<typeof ensureAuthenticated>[0],
+      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
+      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
       routerMock as unknown as Router,
       '/dashboard',
       () => true
@@ -61,12 +68,13 @@ describe('ensureAuthenticated', () => {
   });
 
   it('should refresh tokens when authenticated but token expired', async () => {
-    authServiceMock.isAuthenticated.mockReturnValue(true);
-    authServiceMock.isAccessTokenExpired.mockReturnValue(true);
+    authStoreMock.isAuthenticated.mockReturnValue(true);
+    authStoreMock.isAccessTokenExpired.mockReturnValue(true);
     authServiceMock.refreshTokens.mockReturnValue(of(mockTokens));
 
     const result = ensureAuthenticated(
-      authServiceMock as Parameters<typeof ensureAuthenticated>[0],
+      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
+      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
       routerMock as unknown as Router,
       '/dashboard',
       () => true
@@ -80,7 +88,8 @@ describe('ensureAuthenticated', () => {
     authServiceMock.refreshTokens.mockReturnValue(of(null));
 
     const result = ensureAuthenticated(
-      authServiceMock as Parameters<typeof ensureAuthenticated>[0],
+      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
+      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
       routerMock as unknown as Router,
       '/dashboard',
       () => true
@@ -88,7 +97,7 @@ describe('ensureAuthenticated', () => {
 
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(false);
-    expect(authServiceMock.clearSession).toHaveBeenCalled();
+    expect(authStoreMock.clearSession).toHaveBeenCalled();
     expect(routerMock.navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/dashboard' }
     });
@@ -100,7 +109,8 @@ describe('ensureAuthenticated', () => {
     );
 
     const result = ensureAuthenticated(
-      authServiceMock as Parameters<typeof ensureAuthenticated>[0],
+      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
+      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
       routerMock as unknown as Router,
       '/settings',
       () => true
@@ -108,7 +118,7 @@ describe('ensureAuthenticated', () => {
 
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(false);
-    expect(authServiceMock.clearSession).toHaveBeenCalled();
+    expect(authStoreMock.clearSession).toHaveBeenCalled();
     expect(routerMock.navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/settings' }
     });
@@ -118,7 +128,8 @@ describe('ensureAuthenticated', () => {
     authServiceMock.refreshTokens.mockReturnValue(of(mockTokens));
 
     const result = ensureAuthenticated(
-      authServiceMock as Parameters<typeof ensureAuthenticated>[0],
+      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
+      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
       routerMock as unknown as Router,
       '/dashboard',
       () => of(true)

@@ -35,7 +35,8 @@ src/app/
 │   ├── auth/               # Login, register, profile, forbidden
 │   │   ├── guards/         # authGuard, adminGuard
 │   │   ├── interceptors/   # jwtInterceptor, errorInterceptor
-│   │   └── store/          # AuthStore (NgRx Signal Store)
+│   │   ├── services/       # AuthService (HTTP, refresh scheduling)
+│   │   └── store/          # AuthStore (NgRx Signal Store, pure state)
 │   ├── users/              # User list, detail, edit, search (admin)
 │   │   └── store/          # UsersStore (NgRx Signal Store, route-level)
 │   └── feature/            # Example feature module
@@ -61,7 +62,8 @@ src/app/
 
 NgRx Signal Store (`@ngrx/signals`):
 
-- **AuthStore** (`providedIn: 'root'`) — manages `localStorage('auth_storage')`, exposes `user`, `isAuthenticated`, `isAdmin` computed signals. Handles login/register/logout/refresh, schedules automatic token refresh
+- **AuthStore** (`providedIn: 'root'`) — pure state container managing `localStorage('auth_storage')`, exposes `user`, `isAuthenticated`, `isAdmin` computed signals. No `HttpClient` dependency
+- **AuthService** (`providedIn: 'root'`) — HTTP operations (login/register/logout/refresh/profile), token refresh scheduling via `provideAppInitializer`. Eliminates the circular dependency chain
 - **UsersStore** (route-level at `/users`) — entity-based store with `withEntities<User>()`. Manages user list, detail, search state with pagination and loading indicators
 - **ThemeService** — `theme` signal (`'light'` | `'dark'`), system preference detection, persists to localStorage
 
