@@ -1,4 +1,4 @@
-import { inject } from '@angular/core';
+import { computed, inject } from '@angular/core';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import type { Observable, Subscription } from 'rxjs';
 import {
@@ -22,7 +22,6 @@ import {
   withMethods,
   withState
 } from '@ngrx/signals';
-import { computed } from '@angular/core';
 import type { User } from '@features/users/models/user.types';
 import type {
   AuthResponse,
@@ -241,7 +240,7 @@ export const AuthStore = signalStore(
       return refreshInFlight$;
     }
 
-    function initFromStorage(): void {
+    function onStorageInit(): void {
       if (store.authResponse()) {
         // Defer to avoid circular dependency: AuthStore → HttpClient → jwtInterceptor → AuthStore (NG0200).
         // The store must be fully constructed before making HTTP requests.
@@ -268,16 +267,16 @@ export const AuthStore = signalStore(
       logout,
       getProfile,
       refreshTokens,
-      _initFromStorage: initFromStorage,
-      _destroyRefresh: destroyRefresh
+      onStorageInit,
+      destroyRefresh
     };
   }),
   withHooks({
     onInit(store) {
-      store._initFromStorage();
+      store.onStorageInit();
     },
     onDestroy(store) {
-      store._destroyRefresh();
+      store.destroyRefresh();
     }
   })
 );
