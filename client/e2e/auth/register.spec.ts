@@ -3,7 +3,7 @@ import {
   mockRegister,
   mockRegisterError,
   test
-} from './fixtures/base.fixture';
+} from '../fixtures/base.fixture';
 
 test.describe('Register page', () => {
   test('should display the registration form', async ({ mockApi: page }) => {
