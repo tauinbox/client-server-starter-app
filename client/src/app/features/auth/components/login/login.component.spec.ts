@@ -9,7 +9,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 
 import { LoginComponent } from './login.component';
-import { AuthService } from '../../services/auth.service';
+import { AuthStore } from '../../store/auth.store';
 import type { AuthResponse } from '../../models/auth.types';
 
 const mockAuthResponse: AuthResponse = {
@@ -50,7 +50,7 @@ describe('LoginComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideNoopAnimations(),
-        { provide: AuthService, useValue: authServiceMock },
+        { provide: AuthStore, useValue: authServiceMock },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -173,7 +173,7 @@ describe('LoginComponent', () => {
           provideHttpClient(),
           provideHttpClientTesting(),
           provideNoopAnimations(),
-          { provide: AuthService, useValue: authServiceMock },
+          { provide: AuthStore, useValue: authServiceMock },
           {
             provide: ActivatedRoute,
             useValue: {

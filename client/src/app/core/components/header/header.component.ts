@@ -3,7 +3,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { AuthService } from '@features/auth/services/auth.service';
+import { AuthStore } from '@features/auth/store/auth.store';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { ThemeToggleComponent } from './theme-toggle/theme-toggle.component';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
@@ -24,10 +24,10 @@ import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class HeaderComponent {
-  protected readonly authService = inject(AuthService);
+  protected readonly authStore = inject(AuthStore);
   protected readonly routes = AppRouteSegmentEnum;
 
   logout(): void {
-    this.authService.logout();
+    this.authStore.logout();
   }
 }

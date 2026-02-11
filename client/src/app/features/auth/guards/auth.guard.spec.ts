@@ -5,7 +5,7 @@ import type {
   RouterStateSnapshot
 } from '@angular/router';
 import { authGuard } from './auth.guard';
-import { AuthService } from '../services/auth.service';
+import { AuthStore } from '../store/auth.store';
 import type { Observable } from 'rxjs';
 import { firstValueFrom, of } from 'rxjs';
 
@@ -31,7 +31,7 @@ describe('authGuard', () => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
-        { provide: AuthService, useValue: authServiceMock }
+        { provide: AuthStore, useValue: authServiceMock }
       ]
     });
   });
@@ -75,5 +75,40 @@ describe('authGuard', () => {
 
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(true);
+  });
+
+  it('should refresh and allow access when authenticated with expired token', async () => {
+    authServiceMock.isAuthenticated.mockReturnValue(true);
+    authServiceMock.isAccessTokenExpired.mockReturnValue(true);
+    authServiceMock.refreshTokens.mockReturnValue(
+      of({ access_token: 'new', refresh_token: 'new', expires_in: 3600 })
+    );
+
+    const result = TestBed.runInInjectionContext(() =>
+      authGuard(mockRoute, mockState)
+    );
+
+    const value = await firstValueFrom(result as Observable<boolean>);
+    expect(value).toBe(true);
+    expect(authServiceMock.refreshTokens).toHaveBeenCalled();
+  });
+
+  it('should redirect to login when authenticated with expired token and refresh fails', async () => {
+    authServiceMock.isAuthenticated.mockReturnValue(true);
+    authServiceMock.isAccessTokenExpired.mockReturnValue(true);
+    authServiceMock.refreshTokens.mockReturnValue(of(null));
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate');
+
+    const result = TestBed.runInInjectionContext(() =>
+      authGuard(mockRoute, mockState)
+    );
+
+    const value = await firstValueFrom(result as Observable<boolean>);
+    expect(value).toBe(false);
+    expect(authServiceMock.clearSession).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
+      queryParams: { returnUrl: '/protected' }
+    });
   });
 });

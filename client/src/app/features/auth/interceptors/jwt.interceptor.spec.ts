@@ -12,28 +12,22 @@ import {
 import { provideRouter, Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { jwtInterceptor } from './jwt.interceptor';
-import { TokenService } from '../services/token.service';
-import { AuthService } from '../services/auth.service';
+import { AuthStore } from '../store/auth.store';
 import type { TokensResponse } from '../models/auth.types';
 
 describe('jwtInterceptor', () => {
   let http: HttpClient;
   let httpMock: HttpTestingController;
-  let tokenServiceMock: {
+  let authStoreMock: {
     getAccessToken: ReturnType<typeof vi.fn>;
-  };
-  let authServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
     logout: ReturnType<typeof vi.fn>;
   };
   let router: Router;
 
   beforeEach(() => {
-    tokenServiceMock = {
-      getAccessToken: vi.fn().mockReturnValue(null)
-    };
-
-    authServiceMock = {
+    authStoreMock = {
+      getAccessToken: vi.fn().mockReturnValue(null),
       refreshTokens: vi.fn(),
       logout: vi.fn()
     };
@@ -43,8 +37,7 @@ describe('jwtInterceptor', () => {
         provideHttpClient(withInterceptors([jwtInterceptor])),
         provideHttpClientTesting(),
         provideRouter([]),
-        { provide: TokenService, useValue: tokenServiceMock },
-        { provide: AuthService, useValue: authServiceMock }
+        { provide: AuthStore, useValue: authStoreMock }
       ]
     });
 
@@ -58,7 +51,7 @@ describe('jwtInterceptor', () => {
   });
 
   it('should attach Bearer token to non-excluded requests', () => {
-    tokenServiceMock.getAccessToken.mockReturnValue('my-access-token');
+    authStoreMock.getAccessToken.mockReturnValue('my-access-token');
 
     http.get('/api/v1/users').subscribe();
 
@@ -70,7 +63,7 @@ describe('jwtInterceptor', () => {
   });
 
   it('should skip token for excluded URLs (login)', () => {
-    tokenServiceMock.getAccessToken.mockReturnValue('my-access-token');
+    authStoreMock.getAccessToken.mockReturnValue('my-access-token');
 
     http.post('api/v1/auth/login', { email: 'a', password: 'b' }).subscribe();
 
@@ -80,7 +73,7 @@ describe('jwtInterceptor', () => {
   });
 
   it('should skip token for excluded URLs (register)', () => {
-    tokenServiceMock.getAccessToken.mockReturnValue('my-access-token');
+    authStoreMock.getAccessToken.mockReturnValue('my-access-token');
 
     http.post('api/v1/auth/register', {}).subscribe();
 
@@ -90,7 +83,7 @@ describe('jwtInterceptor', () => {
   });
 
   it('should skip token for excluded URLs (refresh-token)', () => {
-    tokenServiceMock.getAccessToken.mockReturnValue('my-access-token');
+    authStoreMock.getAccessToken.mockReturnValue('my-access-token');
 
     http.post('api/v1/auth/refresh-token', {}).subscribe();
 
@@ -100,7 +93,7 @@ describe('jwtInterceptor', () => {
   });
 
   it('should not add header when no token exists', () => {
-    tokenServiceMock.getAccessToken.mockReturnValue(null);
+    authStoreMock.getAccessToken.mockReturnValue(null);
 
     http.get('/api/v1/users').subscribe();
 
@@ -110,14 +103,14 @@ describe('jwtInterceptor', () => {
   });
 
   it('should attempt refresh on 401 for non-excluded URL', () => {
-    tokenServiceMock.getAccessToken.mockReturnValue('expired-token');
+    authStoreMock.getAccessToken.mockReturnValue('expired-token');
 
     const newTokens: TokensResponse = {
       access_token: 'new-access-token',
       refresh_token: 'new-refresh-token',
       expires_in: 3600
     };
-    authServiceMock.refreshTokens.mockReturnValue(of(newTokens));
+    authStoreMock.refreshTokens.mockReturnValue(of(newTokens));
 
     http.get('/api/v1/users').subscribe();
 
@@ -137,7 +130,7 @@ describe('jwtInterceptor', () => {
   });
 
   it('should pass 401 through for excluded URLs (login)', () => {
-    tokenServiceMock.getAccessToken.mockReturnValue(null);
+    authStoreMock.getAccessToken.mockReturnValue(null);
     let caughtError: HttpErrorResponse | null = null;
 
     http.post('api/v1/auth/login', {}).subscribe({
@@ -151,12 +144,12 @@ describe('jwtInterceptor', () => {
     );
 
     expect(caughtError!.status).toBe(401);
-    expect(authServiceMock.refreshTokens).not.toHaveBeenCalled();
+    expect(authStoreMock.refreshTokens).not.toHaveBeenCalled();
   });
 
   it('should logout and rethrow when refresh fails', () => {
-    tokenServiceMock.getAccessToken.mockReturnValue('expired-token');
-    authServiceMock.refreshTokens.mockReturnValue(
+    authStoreMock.getAccessToken.mockReturnValue('expired-token');
+    authStoreMock.refreshTokens.mockReturnValue(
       throwError(() => new Error('Refresh failed'))
     );
     vi.spyOn(router, 'url', 'get').mockReturnValue('/dashboard');
@@ -171,12 +164,12 @@ describe('jwtInterceptor', () => {
     req.flush({}, { status: 401, statusText: 'Unauthorized' });
 
     expect(caughtError).toBe(true);
-    expect(authServiceMock.logout).toHaveBeenCalledWith('/dashboard');
+    expect(authStoreMock.logout).toHaveBeenCalledWith('/dashboard');
   });
 
   it('should logout when refresh returns null', () => {
-    tokenServiceMock.getAccessToken.mockReturnValue('expired-token');
-    authServiceMock.refreshTokens.mockReturnValue(of(null));
+    authStoreMock.getAccessToken.mockReturnValue('expired-token');
+    authStoreMock.refreshTokens.mockReturnValue(of(null));
     vi.spyOn(router, 'url', 'get').mockReturnValue('/settings');
 
     let caughtError = false;
@@ -189,11 +182,11 @@ describe('jwtInterceptor', () => {
     req.flush({}, { status: 401, statusText: 'Unauthorized' });
 
     expect(caughtError).toBe(true);
-    expect(authServiceMock.logout).toHaveBeenCalledWith('/settings');
+    expect(authStoreMock.logout).toHaveBeenCalledWith('/settings');
   });
 
   it('should pass non-401 errors through without refresh', () => {
-    tokenServiceMock.getAccessToken.mockReturnValue('valid-token');
+    authStoreMock.getAccessToken.mockReturnValue('valid-token');
     let caughtError: HttpErrorResponse | null = null;
 
     http.get('/api/v1/users').subscribe({
@@ -207,6 +200,6 @@ describe('jwtInterceptor', () => {
     );
 
     expect(caughtError!.status).toBe(403);
-    expect(authServiceMock.refreshTokens).not.toHaveBeenCalled();
+    expect(authStoreMock.refreshTokens).not.toHaveBeenCalled();
   });
 });

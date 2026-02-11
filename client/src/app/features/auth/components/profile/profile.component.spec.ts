@@ -9,7 +9,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 
 import { ProfileComponent } from './profile.component';
-import { AuthService } from '../../services/auth.service';
+import { AuthStore } from '../../store/auth.store';
 import { UserService } from '../../../users/services/user.service';
 import type { User } from '../../../users/models/user.types';
 
@@ -55,7 +55,7 @@ describe('ProfileComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideNoopAnimations(),
-        { provide: AuthService, useValue: authServiceMock },
+        { provide: AuthStore, useValue: authServiceMock },
         { provide: UserService, useValue: userServiceMock },
         { provide: MatSnackBar, useValue: snackBarMock }
       ]

@@ -1,6 +1,5 @@
 import { of, throwError, Observable, firstValueFrom } from 'rxjs';
 import type { Router } from '@angular/router';
-import type { AuthService } from '../services/auth.service';
 import { ensureAuthenticated } from './ensure-authenticated';
 import type { TokensResponse } from '../models/auth.types';
 
@@ -35,7 +34,7 @@ describe('ensureAuthenticated', () => {
     authServiceMock.isAccessTokenExpired.mockReturnValue(false);
 
     const result = ensureAuthenticated(
-      authServiceMock as unknown as AuthService,
+      authServiceMock as Parameters<typeof ensureAuthenticated>[0],
       routerMock as unknown as Router,
       '/dashboard',
       () => true
@@ -50,7 +49,7 @@ describe('ensureAuthenticated', () => {
     authServiceMock.refreshTokens.mockReturnValue(of(mockTokens));
 
     const result = ensureAuthenticated(
-      authServiceMock as unknown as AuthService,
+      authServiceMock as Parameters<typeof ensureAuthenticated>[0],
       routerMock as unknown as Router,
       '/dashboard',
       () => true
@@ -67,7 +66,7 @@ describe('ensureAuthenticated', () => {
     authServiceMock.refreshTokens.mockReturnValue(of(mockTokens));
 
     const result = ensureAuthenticated(
-      authServiceMock as unknown as AuthService,
+      authServiceMock as Parameters<typeof ensureAuthenticated>[0],
       routerMock as unknown as Router,
       '/dashboard',
       () => true
@@ -81,7 +80,7 @@ describe('ensureAuthenticated', () => {
     authServiceMock.refreshTokens.mockReturnValue(of(null));
 
     const result = ensureAuthenticated(
-      authServiceMock as unknown as AuthService,
+      authServiceMock as Parameters<typeof ensureAuthenticated>[0],
       routerMock as unknown as Router,
       '/dashboard',
       () => true
@@ -101,7 +100,7 @@ describe('ensureAuthenticated', () => {
     );
 
     const result = ensureAuthenticated(
-      authServiceMock as unknown as AuthService,
+      authServiceMock as Parameters<typeof ensureAuthenticated>[0],
       routerMock as unknown as Router,
       '/settings',
       () => true
@@ -119,7 +118,7 @@ describe('ensureAuthenticated', () => {
     authServiceMock.refreshTokens.mockReturnValue(of(mockTokens));
 
     const result = ensureAuthenticated(
-      authServiceMock as unknown as AuthService,
+      authServiceMock as Parameters<typeof ensureAuthenticated>[0],
       routerMock as unknown as Router,
       '/dashboard',
       () => of(true)
