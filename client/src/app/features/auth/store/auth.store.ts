@@ -9,7 +9,7 @@ import {
 } from '@ngrx/signals';
 import type { User } from '@features/users/models/user.types';
 import type { AuthResponse, CustomJwtPayload } from '../models/auth.types';
-import { StorageService } from '@core/services/storage.service';
+import { LocalStorageService } from '@core/services/local-storage.service';
 
 export const AUTH_STORAGE_KEY = 'auth_storage';
 
@@ -20,7 +20,7 @@ type AuthState = {
 export const AuthStore = signalStore(
   { providedIn: 'root' },
   withState<AuthState>(() => {
-    const storage = inject(StorageService);
+    const storage = inject(LocalStorageService);
     return {
       authResponse: storage.getItem<AuthResponse>(AUTH_STORAGE_KEY) ?? null
     };
@@ -31,7 +31,7 @@ export const AuthStore = signalStore(
     isAdmin: computed(() => store.authResponse()?.user?.isAdmin ?? false)
   })),
   withMethods((store) => {
-    const storage = inject(StorageService);
+    const storage = inject(LocalStorageService);
 
     function getAccessToken(): string | null {
       return store.authResponse()?.tokens.access_token ?? null;

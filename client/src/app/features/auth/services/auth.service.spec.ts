@@ -8,7 +8,7 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from './auth.service';
 import { AuthStore } from '../store/auth.store';
-import { StorageService } from '@core/services/storage.service';
+import { LocalStorageService } from '@core/services/local-storage.service';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import type { AuthResponse } from '../models/auth.types';
 
@@ -93,7 +93,7 @@ describe('AuthService', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: AuthStore, useValue: authStoreMock },
-        { provide: StorageService, useValue: storageMock }
+        { provide: LocalStorageService, useValue: storageMock }
       ]
     });
 

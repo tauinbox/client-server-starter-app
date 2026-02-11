@@ -21,8 +21,8 @@ import type {
   RegisterRequest,
   TokensResponse
 } from '../models/auth.types';
-import { StorageService } from '@core/services/storage.service';
-import { AuthStore, AUTH_STORAGE_KEY } from '../store/auth.store';
+import { LocalStorageService } from '@core/services/local-storage.service';
+import { AUTH_STORAGE_KEY, AuthStore } from '../store/auth.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import { navigateToLogin } from '../utils/navigate-to-login';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
@@ -37,7 +37,7 @@ const silentContext = () =>
 export class AuthService {
   readonly #http = inject(HttpClient);
   readonly #router = inject(Router);
-  readonly #storage = inject(StorageService);
+  readonly #storage = inject(LocalStorageService);
   readonly #authStore = inject(AuthStore);
 
   #refreshSubscription: Subscription | undefined;
