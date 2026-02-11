@@ -101,7 +101,7 @@ export class AuthService {
 
     let refreshToken = this.#authStore.getRefreshToken();
 
-    // Fallback: if store state has no refresh token, try loading from storage
+    // Fallback: if store state has no refresh token, try loading from local storage
     if (!refreshToken) {
       const saved = this.#storage.getItem<AuthResponse>(AUTH_STORAGE_KEY);
       if (saved?.tokens?.refresh_token) {
