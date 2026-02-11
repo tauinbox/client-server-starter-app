@@ -7,8 +7,7 @@ import type {
 } from '@angular/common/http';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { Router } from '@angular/router';
-import { TokenService } from '../services/token.service';
-import { AuthService } from '../services/auth.service';
+import { AuthStore } from '../store/auth.store';
 import { isAuthExcludedUrl } from '@features/auth/utils/is-auth-excluded-urls';
 import { isTokenRefreshExcludedUrl } from '@features/auth/utils/is-token-refresh-excluded-urls';
 import { shouldAttemptTokenRefresh } from '@features/auth/utils/should-attempt-token-refresh';
@@ -20,8 +19,8 @@ export const jwtInterceptor: HttpInterceptorFn = (
 ) => {
   const injector = inject(Injector);
   const router = inject(Router);
-  const tokenService = inject(TokenService);
-  const token = tokenService.getAccessToken();
+  const authStore = inject(AuthStore);
+  const token = authStore.getAccessToken();
   const isAuthExcluded = isAuthExcludedUrl(request);
   const isTokenRefreshExcluded = isTokenRefreshExcludedUrl(request);
 
@@ -31,8 +30,8 @@ export const jwtInterceptor: HttpInterceptorFn = (
 
   return next(request).pipe(
     catchError((error: HttpErrorResponse) => {
-      // Inject here to avoid circular dependency HttpClient → Interceptor → AuthService → HttpClient
-      const authService = injector.get(AuthService);
+      // Use injector.get to avoid circular dependency HttpClient → Interceptor → AuthStore → HttpClient
+      const store = injector.get(AuthStore);
 
       if (
         shouldAttemptTokenRefresh(
@@ -41,11 +40,11 @@ export const jwtInterceptor: HttpInterceptorFn = (
         )
       ) {
         const handleError = () => {
-          authService.logout(router.url);
+          store.logout(router.url);
           return throwError(() => error);
         };
 
-        return authService.refreshTokens().pipe(
+        return store.refreshTokens().pipe(
           catchError(handleError),
           switchMap((tokens) => {
             if (!tokens) {

@@ -3,8 +3,10 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
 
 import { UserListComponent } from './user-list.component';
+import { UsersStore } from '../../store/users.store';
 
 describe('UserListComponent', () => {
   let component: UserListComponent;
@@ -16,7 +18,9 @@ describe('UserListComponent', () => {
       providers: [
         provideRouter([]),
         provideHttpClient(),
-        provideHttpClientTesting()
+        provideHttpClientTesting(),
+        provideNoopAnimations(),
+        UsersStore
       ]
     }).compileComponents();
 

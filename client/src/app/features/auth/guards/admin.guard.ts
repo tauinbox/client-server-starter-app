@@ -1,16 +1,16 @@
 import { inject } from '@angular/core';
 import type { CanActivateFn } from '@angular/router';
 import { Router } from '@angular/router';
-import { AuthService } from '../services/auth.service';
+import { AuthStore } from '../store/auth.store';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { ensureAuthenticated } from '../utils/ensure-authenticated';
 
 export const adminGuard: CanActivateFn = (route, state) => {
-  const authService = inject(AuthService);
+  const authStore = inject(AuthStore);
   const router = inject(Router);
 
-  return ensureAuthenticated(authService, router, state.url, () => {
-    if (authService.isAdmin()) {
+  return ensureAuthenticated(authStore, router, state.url, () => {
+    if (authStore.isAdmin()) {
       return true;
     }
 

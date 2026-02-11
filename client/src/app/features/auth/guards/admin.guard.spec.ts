@@ -5,7 +5,7 @@ import type {
   RouterStateSnapshot
 } from '@angular/router';
 import { adminGuard } from './admin.guard';
-import { AuthService } from '../services/auth.service';
+import { AuthStore } from '../store/auth.store';
 import type { Observable } from 'rxjs';
 import { firstValueFrom, of } from 'rxjs';
 
@@ -33,7 +33,7 @@ describe('adminGuard', () => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
-        { provide: AuthService, useValue: authServiceMock }
+        { provide: AuthStore, useValue: authServiceMock }
       ]
     });
   });

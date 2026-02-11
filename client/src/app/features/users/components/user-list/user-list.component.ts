@@ -2,6 +2,7 @@ import type { OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
   signal
 } from '@angular/core';
@@ -33,13 +34,13 @@ import { RouterLink } from '@angular/router';
 import { MatChip } from '@angular/material/chips';
 import type { PageEvent } from '@angular/material/paginator';
 import { MatPaginator } from '@angular/material/paginator';
-import { UserService } from '../../services/user.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import type { User } from '../../models/user.types';
 import { DatePipe } from '@angular/common';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { rem } from '@shared/utils/css.utils';
+import { UsersStore } from '../../store/users.store';
 
 type SortableValue = string | number | boolean | Date;
 
@@ -76,15 +77,53 @@ type SortableValue = string | number | boolean | Date;
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UserListComponent implements OnInit {
-  readonly #userService = inject(UserService);
+  readonly #usersStore = inject(UsersStore);
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
 
-  readonly users = signal<User[]>([]);
-  readonly displayedUsers = signal<User[]>([]);
-  readonly loading = signal(true);
-  readonly pageSize = signal(10);
-  readonly currentPage = signal(0);
+  readonly #sortState = signal<Sort>({ active: '', direction: '' });
+
+  readonly loading = this.#usersStore.listLoading;
+  readonly totalUsers = this.#usersStore.totalUsers;
+  readonly pageSize = this.#usersStore.pageSize;
+  readonly currentPage = this.#usersStore.currentPage;
+
+  readonly displayedUsers = computed(() => {
+    const sort = this.#sortState();
+    const users = this.#usersStore.displayedUsers();
+
+    if (!sort.active || sort.direction === '') {
+      return users;
+    }
+
+    return [...users].sort((a, b) => {
+      const isAsc = sort.direction === 'asc';
+      switch (sort.active) {
+        case 'id':
+          return this.compare(a.id, b.id, isAsc);
+        case 'email':
+          return this.compare(a.email, b.email, isAsc);
+        case 'name':
+          return this.compare(
+            a.firstName + a.lastName,
+            b.firstName + b.lastName,
+            isAsc
+          );
+        case 'status':
+          return this.compare(a.isActive, b.isActive, isAsc);
+        case 'role':
+          return this.compare(a.isAdmin, b.isAdmin, isAsc);
+        case 'createdAt':
+          return this.compare(
+            new Date(a.createdAt).getTime(),
+            new Date(b.createdAt).getTime(),
+            isAsc
+          );
+        default:
+          return 0;
+      }
+    });
+  });
 
   displayedColumns: string[] = [
     'id',
@@ -97,79 +136,16 @@ export class UserListComponent implements OnInit {
   ];
 
   ngOnInit(): void {
-    this.loadUsers();
-  }
-
-  loadUsers(): void {
-    this.loading.set(true);
-
-    this.#userService.getAll().subscribe({
-      next: (users) => {
-        this.users.set(users);
-        this.updateDisplayedUsers();
-        this.loading.set(false);
-      },
-      error: () => {
-        this.loading.set(false);
-        this.#snackBar.open(
-          'Failed to load users. Please try again.',
-          'Close',
-          { duration: 5000 }
-        );
-      }
-    });
-  }
-
-  updateDisplayedUsers(): void {
-    const start = this.currentPage() * this.pageSize();
-    const end = start + this.pageSize();
-    this.displayedUsers.set(this.users().slice(start, end));
+    this.#usersStore.loadAll();
   }
 
   handlePageEvent(event: PageEvent): void {
-    this.pageSize.set(event.pageSize);
-    this.currentPage.set(event.pageIndex);
-    this.updateDisplayedUsers();
+    this.#usersStore.setPageSize(event.pageSize);
+    this.#usersStore.setPage(event.pageIndex);
   }
 
   sortData(sort: Sort): void {
-    if (!sort.active || sort.direction === '') {
-      return;
-    }
-
-    const data = [...this.users()];
-
-    this.users.set(
-      data.sort((a, b) => {
-        const isAsc = sort.direction === 'asc';
-        switch (sort.active) {
-          case 'id':
-            return this.compare(a.id, b.id, isAsc);
-          case 'email':
-            return this.compare(a.email, b.email, isAsc);
-          case 'name':
-            return this.compare(
-              a.firstName + a.lastName,
-              b.firstName + b.lastName,
-              isAsc
-            );
-          case 'status':
-            return this.compare(a.isActive, b.isActive, isAsc);
-          case 'role':
-            return this.compare(a.isAdmin, b.isAdmin, isAsc);
-          case 'createdAt':
-            return this.compare(
-              new Date(a.createdAt).getTime(),
-              new Date(b.createdAt).getTime(),
-              isAsc
-            );
-          default:
-            return 0;
-        }
-      })
-    );
-
-    this.updateDisplayedUsers();
+    this.#sortState.set(sort);
   }
 
   compare<T extends SortableValue>(a: T, b: T, isAsc: boolean): number {
@@ -195,10 +171,8 @@ export class UserListComponent implements OnInit {
   }
 
   deleteUser(id: string): void {
-    this.#userService.delete(id).subscribe({
+    this.#usersStore.deleteUser(id).subscribe({
       next: () => {
-        this.users.update((users) => users.filter((user) => user.id !== id));
-        this.updateDisplayedUsers();
         this.#snackBar.open('User deleted successfully', 'Close', {
           duration: 5000
         });

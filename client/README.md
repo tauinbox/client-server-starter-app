@@ -35,8 +35,9 @@ src/app/
 │   ├── auth/               # Login, register, profile, forbidden
 │   │   ├── guards/         # authGuard, adminGuard
 │   │   ├── interceptors/   # jwtInterceptor, errorInterceptor
-│   │   └── services/       # AuthService, TokenService
+│   │   └── store/          # AuthStore (NgRx Signal Store)
 │   ├── users/              # User list, detail, edit, search (admin)
+│   │   └── store/          # UsersStore (NgRx Signal Store, route-level)
 │   └── feature/            # Example feature module
 └── shared/                 # Confirm dialog, shared utilities
 ```
@@ -58,10 +59,10 @@ src/app/
 
 ### State Management
 
-Angular Signals without a centralized store:
+NgRx Signal Store (`@ngrx/signals`):
 
-- **TokenService** — source of truth, manages `localStorage('auth_storage')`, exposes `user`, `isAuthenticated`, `isAdmin` signals
-- **AuthService** — facade over TokenService, handles login/register/logout/refresh, schedules automatic token refresh
+- **AuthStore** (`providedIn: 'root'`) — manages `localStorage('auth_storage')`, exposes `user`, `isAuthenticated`, `isAdmin` computed signals. Handles login/register/logout/refresh, schedules automatic token refresh
+- **UsersStore** (route-level at `/users`) — entity-based store with `withEntities<User>()`. Manages user list, detail, search state with pagination and loading indicators
 - **ThemeService** — `theme` signal (`'light'` | `'dark'`), system preference detection, persists to localStorage
 
 ### HTTP Interceptors
@@ -126,6 +127,7 @@ npm run test:e2e:ui        # Interactive UI
 | Angular | 21.1.3 |
 | Angular Material | 21.1.3 |
 | TypeScript | 5.9.x |
+| @ngrx/signals | 21.0.x |
 | RxJS | 7.8.x |
 | Vitest | 4.0.18 |
 | Playwright | 1.58.2 |

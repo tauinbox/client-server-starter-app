@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import {
   MatCard,
   MatCardContent,
@@ -34,15 +28,13 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { MatChip } from '@angular/material/chips';
 import { RouterLink } from '@angular/router';
 import { MatInput } from '@angular/material/input';
-import { UserService } from '../../services/user.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import type { User, UserSearch } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { DatePipe } from '@angular/common';
-import type { HttpErrorResponse } from '@angular/common/http';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { rem } from '@shared/utils/css.utils';
+import { UsersStore } from '../../store/users.store';
 
 type UserSearchFormType = {
   email: FormControl<string>;
@@ -90,10 +82,9 @@ type UserSearchFormType = {
 })
 export class UserSearchComponent {
   readonly #fb = inject(FormBuilder);
-  readonly #userService = inject(UserService);
+  readonly #usersStore = inject(UsersStore);
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
-  readonly #destroyRef = inject(DestroyRef);
 
   readonly searchForm: FormGroup<UserSearchFormType> =
     this.#fb.group<UserSearchFormType>({
@@ -104,9 +95,9 @@ export class UserSearchComponent {
       isActive: this.#fb.control('', { nonNullable: true })
     });
 
-  readonly users = signal<User[]>([]);
-  readonly searching = signal(false);
-  readonly searched = signal(false);
+  readonly users = this.#usersStore.searchResultUsers;
+  readonly searching = this.#usersStore.searchLoading;
+  readonly searched = this.#usersStore.searchPerformed;
 
   displayedColumns: string[] = [
     'id',
@@ -121,28 +112,7 @@ export class UserSearchComponent {
   onSubmit(): void {
     const formValues = this.searchForm.getRawValue();
     const criteria = this.#buildSearchCriteria(formValues);
-
-    this.searching.set(true);
-    this.searched.set(false);
-
-    this.#userService
-      .search(criteria)
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe({
-        next: (users) => {
-          this.users.set(users);
-          this.searching.set(false);
-          this.searched.set(true);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.searching.set(false);
-          this.#snackBar.open(
-            err.error?.message || 'Failed to search users. Please try again.',
-            'Close',
-            { duration: 5000 }
-          );
-        }
-      });
+    this.#usersStore.search(criteria);
   }
 
   #buildSearchCriteria(
@@ -174,8 +144,7 @@ export class UserSearchComponent {
       isActive: ''
     });
 
-    this.users.set([]);
-    this.searched.set(false);
+    this.#usersStore.clearSearch();
   }
 
   confirmDelete(user: User): void {
@@ -198,16 +167,16 @@ export class UserSearchComponent {
   }
 
   #deleteUser(id: string): void {
-    this.#userService.delete(id).subscribe({
+    this.#usersStore.deleteUser(id).subscribe({
       next: () => {
-        this.users.update((users) => users.filter((user) => user.id !== id));
+        this.#usersStore.clearSearch();
         this.#snackBar.open('User deleted successfully', 'Close', {
           duration: 5000
         });
       },
-      error: (err: HttpErrorResponse) => {
+      error: () => {
         this.#snackBar.open(
-          err.error?.message || 'Failed to delete user. Please try again.',
+          'Failed to delete user. Please try again.',
           'Close',
           { duration: 5000 }
         );
