@@ -4,7 +4,7 @@ import {
   mockProfile,
   mockUpdateUser,
   test
-} from './fixtures/base.fixture';
+} from '../fixtures/base.fixture';
 
 test.describe('Profile page', () => {
   test('should redirect to login when not authenticated', async ({

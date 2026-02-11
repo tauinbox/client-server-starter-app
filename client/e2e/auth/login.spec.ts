@@ -5,7 +5,7 @@ import {
   mockProfile,
   mockRefreshToken,
   test
-} from './fixtures/base.fixture';
+} from '../fixtures/base.fixture';
 
 test.describe('Login page', () => {
   test('should display the login form', async ({ mockApi: page }) => {
