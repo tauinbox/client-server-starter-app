@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -38,6 +39,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import e from 'express';
 import { FeatureUploadDto } from '../dtos/feature-upload.dto';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 // We use Validation pipe globally in main.ts so it will apply to all the methods here
 
@@ -130,6 +132,7 @@ export class FeatureController {
   }
 
   @ApiOperation({ summary: 'Uploads file' })
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     // 'upload-artifact' is a name of attribute within received multipart/form-data containing the file data
     FileInterceptor('upload-artifact', {
@@ -140,12 +143,31 @@ export class FeatureController {
           file: Express.Multer.File,
           callback: (error: Error | null, filename: string) => void
         ) {
+          const sanitized = file.originalname.replace(
+            /[^a-zA-Z0-9._-]/g,
+            '_'
+          );
           callback(
             null,
-            `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.originalname}`
+            `${Date.now()}-${Math.round(Math.random() * 1e9)}-${sanitized}`
           );
         }
-      })
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter(
+        req: e.Request,
+        file: Express.Multer.File,
+        callback: (error: Error | null, acceptFile: boolean) => void
+      ) {
+        const allowed = /\.(jpg|jpeg|png|gif|pdf|doc|docx|txt)$/i;
+        if (!allowed.test(file.originalname)) {
+          return callback(
+            new BadRequestException('File type not allowed'),
+            false
+          );
+        }
+        callback(null, true);
+      }
     })
   )
   @Post('upload')
@@ -153,9 +175,9 @@ export class FeatureController {
     @Body() dto: FeatureUploadDto,
     @UploadedFile() file: Express.Multer.File
   ) {
-    if (file) {
-      dto.filename = file.filename;
-      console.log('Stored file:', dto);
+    if (!file) {
+      throw new BadRequestException('File is required');
     }
+    dto.filename = file.filename;
   }
 }

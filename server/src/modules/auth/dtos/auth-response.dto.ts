@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsString } from 'class-validator';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
 
 export class TokensResponseDto {
@@ -40,5 +41,7 @@ export class RefreshTokenDto {
     description: 'Refresh token',
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
   })
+  @IsString()
+  @IsNotEmpty()
   refresh_token: string;
 }

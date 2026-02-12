@@ -7,6 +7,7 @@ import { FeatureEntity } from '../entities/feature.entity';
 import { Repository } from 'typeorm';
 import { FeatureEntityCreateDto } from '../dtos/feature-entity-create.dto';
 import { FeatureEntityUpdateDto } from '../dtos/feature-entity-update.dto';
+import { escapeLikePattern } from '../../../common/utils/escape-like';
 
 @Injectable()
 export class FeatureService {
@@ -21,7 +22,10 @@ export class FeatureService {
   }
 
   getConfigParams() {
-    const { api, token } = this.configService.get('externalProject');
+    const { api, token } = this.configService.get<{
+      api: string;
+      token: string;
+    }>('externalProject');
     return { api, token };
   }
 
@@ -30,7 +34,7 @@ export class FeatureService {
       ? await this.featureEntityRepository
           .createQueryBuilder('featureEntity')
           .where('featureEntity.name like :searchTerm', {
-            searchTerm: `%${searchTerm}%`
+            searchTerm: `%${escapeLikePattern(searchTerm)}%`
           })
           .getMany()
       : await this.featureEntityRepository.find();
