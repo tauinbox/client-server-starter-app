@@ -58,7 +58,7 @@ fullstack-starter-app/
 │   │   │   └── feature/    # Example feature
 │   │   └── shared/         # Shared components (confirm dialog)
 │   ├── src/styles/         # SCSS architecture (themes, utilities, components)
-│   └── e2e/                # Playwright E2E tests
+│   └── e2e/                # Playwright E2E tests (modular fixtures + auth/users specs)
 ├── server/                 # NestJS 11 API
 │   ├── src/modules/
 │   │   ├── core/           # Config, caching, database, scheduling

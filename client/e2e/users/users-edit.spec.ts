@@ -1,5 +1,6 @@
 import {
   expect,
+  expectAuthRedirect,
   loginViaUi,
   mockDeleteUser,
   mockGetUser,
@@ -13,9 +14,7 @@ test.describe('User Edit page', () => {
   test('should redirect to login when not authenticated', async ({
     mockApi: page
   }) => {
-    await page.goto('/users/1/edit');
-
-    await expect(page).toHaveURL(/.*\/login/);
+    await expectAuthRedirect(page, '/users/1/edit');
   });
 
   test('should populate form with user data', async ({ mockApi: page }) => {

@@ -1,5 +1,7 @@
 import {
   expect,
+  expectAuthRedirect,
+  expectForbiddenRedirect,
   loginViaUi,
   mockDeleteUser,
   mockSearchUsers,
@@ -11,18 +13,13 @@ test.describe('User Search page', () => {
   test('should redirect to login when not authenticated', async ({
     mockApi: page
   }) => {
-    await page.goto('/users/search');
-
-    await expect(page).toHaveURL(/.*\/login/);
+    await expectAuthRedirect(page, '/users/search');
   });
 
   test('should redirect to forbidden when non-admin', async ({
     mockApi: page
   }) => {
-    await loginViaUi(page, { isAdmin: false });
-    await page.goto('/users/search');
-
-    await expect(page).toHaveURL(/.*\/forbidden/);
+    await expectForbiddenRedirect(page, '/users/search');
   });
 
   test('should display "Search Users" heading', async ({ mockApi: page }) => {

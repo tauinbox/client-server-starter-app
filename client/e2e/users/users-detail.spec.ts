@@ -1,5 +1,6 @@
 import {
   expect,
+  expectAuthRedirect,
   loginViaUi,
   mockGetUser,
   mockGetUserError,
@@ -11,9 +12,7 @@ test.describe('User Detail page', () => {
   test('should redirect to login when not authenticated', async ({
     mockApi: page
   }) => {
-    await page.goto('/users/1');
-
-    await expect(page).toHaveURL(/.*\/login/);
+    await expectAuthRedirect(page, '/users/1');
   });
 
   test('should allow non-admin authenticated users', async ({

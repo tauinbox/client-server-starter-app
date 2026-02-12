@@ -114,9 +114,15 @@ npm test
 
 - Browser: Chromium
 - API mocking via route interception (no real backend needed)
-- Custom `mockApi` fixture blocks real API calls
+- Modular fixture architecture in `e2e/fixtures/`:
+  - `base.fixture.ts` — custom `mockApi` fixture (blocks real API calls) + re-exports all modules
+  - `jwt.utils.ts` — JWT creation utilities
+  - `mock-data.ts` — shared test data (users, tokens)
+  - `mocks/auth.mocks.ts` — auth route mocks
+  - `mocks/users.mocks.ts` — users route mocks
+  - `helpers.ts` — `loginViaUi()`, `expectAuthRedirect()`, `expectForbiddenRedirect()`
 - Test structure: organized by module in `e2e/auth/` and `e2e/users/`
-- Coverage: 93 tests (37 auth + 56 users) covering login, register, profile, session-restore, users list/detail/edit/search
+- Coverage: 95 tests (37 auth + 58 users) covering login, register, profile, session-restore, users list/detail/edit/search
 
 ```bash
 npm run test:e2e           # Headless
