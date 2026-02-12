@@ -1,33 +1,24 @@
-// @ts-check
+import { defineConfig, globalIgnores } from 'eslint/config';
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettierConfig from 'eslint-config-prettier';
 
-export default tseslint.config(
+export default defineConfig(
   eslint.configs.recommended,
-  ...tseslint.configs.recommendedTypeChecked,
+  tseslint.configs.recommendedTypeChecked,
   {
     languageOptions: {
       parserOptions: {
         projectService: true,
-        tsconfigRootDir: import.meta.dirname
+        tsconfigRootDir: __dirname
       }
     }
   },
   {
     files: ['**/*.js', '**/*.mjs'],
-    ...tseslint.configs.disableTypeChecked
+    extends: [tseslint.configs.disableTypeChecked]
   },
-  {
-    ignores: [
-      'dist/**',
-      'node_modules/**',
-      'coverage/**',
-      'public/**',
-      '*.config.js',
-      '*.config.mjs'
-    ]
-  },
+  globalIgnores(['dist/**', 'node_modules/**', 'coverage/**', 'public/**']),
   {
     rules: {
       '@typescript-eslint/interface-name-prefix': 'off',
