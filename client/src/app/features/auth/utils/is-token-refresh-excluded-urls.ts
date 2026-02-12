@@ -6,7 +6,8 @@ const TOKEN_REFRESH_EXCLUDED_URLS = [AuthApiEnum.Logout] as const;
 export function isTokenRefreshExcludedUrl(
   request: HttpRequest<unknown>
 ): boolean {
+  const urlPath = request.url.split('?')[0];
   return TOKEN_REFRESH_EXCLUDED_URLS.some((excludedUrl) =>
-    request.url.includes(excludedUrl)
+    urlPath.endsWith(excludedUrl)
   );
 }

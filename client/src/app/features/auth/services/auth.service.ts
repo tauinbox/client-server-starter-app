@@ -1,19 +1,9 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import type { Observable, Subscription } from 'rxjs';
-import {
-  catchError,
-  finalize,
-  map,
-  of,
-  shareReplay,
-  switchMap,
-  tap,
-  throwError,
-  timer
-} from 'rxjs';
+import { finalize, map, of, shareReplay, switchMap, tap, timer } from 'rxjs';
 import { Router } from '@angular/router';
-import type { User } from '@features/users/models/user.types';
+import type { User } from '@shared/models/user.types';
 import type {
   AuthResponse,
   LoginCredentials,
@@ -22,12 +12,11 @@ import type {
   TokensResponse,
   UpdateProfile
 } from '../models/auth.types';
-import { LocalStorageService } from '@core/services/local-storage.service';
-import { AUTH_STORAGE_KEY, AuthStore } from '../store/auth.store';
+import { AuthStore } from '../store/auth.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import { navigateToLogin } from '../utils/navigate-to-login';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
-import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '../context-tokens/error-notifications';
+import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
 
 const TOKEN_REFRESH_WINDOW_SECONDS = 60;
 
@@ -38,7 +27,6 @@ const silentContext = () =>
 export class AuthService {
   readonly #http = inject(HttpClient);
   readonly #router = inject(Router);
-  readonly #storage = inject(LocalStorageService);
   readonly #authStore = inject(AuthStore);
 
   #refreshSubscription: Subscription | undefined;
@@ -106,16 +94,7 @@ export class AuthService {
       return this.#refreshInFlight$;
     }
 
-    let refreshToken = this.#authStore.getRefreshToken();
-
-    // Fallback: if store state has no refresh token, try loading from local storage
-    if (!refreshToken) {
-      const saved = this.#storage.getItem<AuthResponse>(AUTH_STORAGE_KEY);
-      if (saved?.tokens?.refresh_token) {
-        this.#authStore.saveAuthResponse(saved);
-        refreshToken = saved.tokens.refresh_token;
-      }
-    }
+    const refreshToken = this.#authStore.getRefreshToken();
 
     if (!refreshToken) {
       this.#authStore.clearSession();
@@ -134,9 +113,6 @@ export class AuthService {
           this.scheduleTokenRefresh();
         }),
         map((response) => response.tokens),
-        catchError((error) => {
-          return throwError(() => error);
-        }),
         finalize(() => {
           this.#refreshInFlight$ = null;
         }),

@@ -10,7 +10,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 
 import { ProfileComponent } from './profile.component';
 import { AuthService } from '../../services/auth.service';
-import type { User } from '../../../users/models/user.types';
+import type { User } from '@shared/models/user.types';
 
 const mockUser: User = {
   id: '1',

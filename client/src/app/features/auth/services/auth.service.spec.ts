@@ -8,7 +8,6 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from './auth.service';
 import { AuthStore } from '../store/auth.store';
-import { LocalStorageService } from '@core/services/local-storage.service';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import type { AuthResponse } from '../models/auth.types';
 
@@ -65,12 +64,6 @@ describe('AuthService', () => {
     updateCurrentUser: ReturnType<typeof vi.fn>;
     clearSession: ReturnType<typeof vi.fn>;
   };
-  let storageMock: {
-    getItem: ReturnType<typeof vi.fn>;
-    setItem: ReturnType<typeof vi.fn>;
-    removeItem: ReturnType<typeof vi.fn>;
-  };
-
   beforeEach(() => {
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(false),
@@ -81,19 +74,12 @@ describe('AuthService', () => {
       clearSession: vi.fn()
     };
 
-    storageMock = {
-      getItem: vi.fn().mockReturnValue(null),
-      setItem: vi.fn(),
-      removeItem: vi.fn()
-    };
-
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: AuthStore, useValue: authStoreMock },
-        { provide: LocalStorageService, useValue: storageMock }
+        { provide: AuthStore, useValue: authStoreMock }
       ]
     });
 
@@ -200,31 +186,11 @@ describe('AuthService', () => {
 
     it('should return null when no refresh token available', async () => {
       authStoreMock.getRefreshToken.mockReturnValue(null);
-      storageMock.getItem.mockReturnValue(null);
 
       const tokens = await firstValueFrom(service.refreshTokens());
 
       expect(tokens).toBeNull();
       expect(authStoreMock.clearSession).toHaveBeenCalled();
-    });
-
-    it('should fallback to storage when store has no refresh token', async () => {
-      authStoreMock.getRefreshToken.mockReturnValue(null);
-      const savedAuth = createMockAuthResponse({ expiredToken: true });
-      storageMock.getItem.mockReturnValue(savedAuth);
-
-      const newAuth = createMockAuthResponse();
-      const tokensPromise = firstValueFrom(service.refreshTokens());
-
-      const req = httpMock.expectOne(AuthApiEnum.RefreshToken);
-      expect(req.request.body).toEqual({
-        refresh_token: 'valid-refresh-token'
-      });
-      req.flush(newAuth);
-
-      const tokens = await tokensPromise;
-      expect(tokens).toEqual(newAuth.tokens);
-      expect(authStoreMock.saveAuthResponse).toHaveBeenCalledWith(savedAuth);
     });
 
     it('should deduplicate concurrent refresh calls', async () => {

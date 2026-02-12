@@ -12,7 +12,7 @@ import {
 } from '@angular/common/http/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { errorInterceptor } from './error.interceptor';
-import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '../context-tokens/error-notifications';
+import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
 
 describe('errorInterceptor', () => {
   let http: HttpClient;

@@ -8,7 +8,8 @@ const AUTH_EXCLUDED_URLS = [
 ] as const;
 
 export function isAuthExcludedUrl(request: HttpRequest<unknown>): boolean {
+  const urlPath = request.url.split('?')[0];
   return AUTH_EXCLUDED_URLS.some((excludedUrl) =>
-    request.url.includes(excludedUrl)
+    urlPath.endsWith(excludedUrl)
   );
 }
