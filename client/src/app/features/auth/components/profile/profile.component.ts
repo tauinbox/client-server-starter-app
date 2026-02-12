@@ -22,7 +22,7 @@ import { MatInput } from '@angular/material/input';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { AuthService } from '../../services/auth.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import type { User } from '../../../users/models/user.types';
+import type { User } from '@shared/models/user.types';
 import type { UpdateProfile } from '../../models/auth.types';
 import { DatePipe } from '@angular/common';
 import type { HttpErrorResponse } from '@angular/common/http';

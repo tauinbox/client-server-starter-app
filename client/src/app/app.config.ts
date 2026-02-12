@@ -10,7 +10,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { MAT_SNACK_BAR_DEFAULT_OPTIONS } from '@angular/material/snack-bar';
 import { jwtInterceptor } from '@features/auth/interceptors/jwt.interceptor';
-import { errorInterceptor } from '@features/auth/interceptors/error.interceptor';
+import { errorInterceptor } from '@core/interceptors/error.interceptor';
 import { AuthService } from '@features/auth/services/auth.service';
 
 export const appConfig: ApplicationConfig = {

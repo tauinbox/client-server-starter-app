@@ -31,4 +31,14 @@ describe('isAuthExcludedUrl', () => {
     const request = new HttpRequest('GET', 'api/v1/users');
     expect(isAuthExcludedUrl(request)).toBe(false);
   });
+
+  it('should return true for login URL with query params', () => {
+    const request = new HttpRequest('POST', 'api/v1/auth/login?lang=en', {});
+    expect(isAuthExcludedUrl(request)).toBe(true);
+  });
+
+  it('should return false for partial path match like login-history', () => {
+    const request = new HttpRequest('GET', 'api/v1/auth/login-history');
+    expect(isAuthExcludedUrl(request)).toBe(false);
+  });
 });

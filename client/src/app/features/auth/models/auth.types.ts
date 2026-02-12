@@ -1,4 +1,4 @@
-import type { CreateUser, User } from '../../users/models/user.types';
+import type { CreateUser, User } from '@shared/models/user.types';
 import type { JwtPayload } from 'jwt-decode';
 
 export type LoginCredentials = {

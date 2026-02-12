@@ -8,7 +8,7 @@ import type {
 import { throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@features/auth/context-tokens/error-notifications';
+import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
 
 export const errorInterceptor: HttpInterceptorFn = (
   request: HttpRequest<unknown>,

@@ -7,7 +7,7 @@ import {
   withMethods,
   withState
 } from '@ngrx/signals';
-import type { User } from '@features/users/models/user.types';
+import type { User } from '@shared/models/user.types';
 import type { AuthResponse, CustomJwtPayload } from '../models/auth.types';
 import { LocalStorageService } from '@core/services/local-storage.service';
 

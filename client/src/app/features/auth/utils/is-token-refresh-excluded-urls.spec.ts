@@ -21,4 +21,14 @@ describe('isTokenRefreshExcludedUrl', () => {
     const request = new HttpRequest('GET', 'api/v1/users');
     expect(isTokenRefreshExcludedUrl(request)).toBe(false);
   });
+
+  it('should return true for logout URL with query params', () => {
+    const request = new HttpRequest('POST', 'api/v1/auth/logout?all=true', {});
+    expect(isTokenRefreshExcludedUrl(request)).toBe(true);
+  });
+
+  it('should return false for partial path match like logout-all', () => {
+    const request = new HttpRequest('POST', 'api/v1/auth/logout-all', {});
+    expect(isTokenRefreshExcludedUrl(request)).toBe(false);
+  });
 });
