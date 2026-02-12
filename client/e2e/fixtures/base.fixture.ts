@@ -254,6 +254,21 @@ export function mockSearchUsers(
   );
 }
 
+export function mockSearchUsersWithCapture(
+  page: Page,
+  capturedUrls: string[],
+  users: MockUser[] = mockUsersList
+) {
+  return page.route('**/api/v1/users/search*', (route) => {
+    capturedUrls.push(route.request().url());
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(users)
+    });
+  });
+}
+
 export function mockDeleteUser(page: Page) {
   return page.route('**/api/v1/users/*', (route) => {
     if (route.request().method() === 'DELETE') {

@@ -3,6 +3,7 @@ import {
   loginViaUi,
   mockDeleteUser,
   mockSearchUsers,
+  mockSearchUsersWithCapture,
   test
 } from '../fixtures/base.fixture';
 
@@ -125,6 +126,38 @@ test.describe('User Search page', () => {
     await row.locator('button', { has: page.locator('mat-icon', { hasText: 'edit' }) }).click();
 
     await expect(page).toHaveURL(/.*\/users\/1\/edit$/);
+  });
+
+  test('should send isAdmin=true when "Admin" role is selected', async ({
+    mockApi: page
+  }) => {
+    const capturedUrls: string[] = [];
+    await loginViaUi(page, { isAdmin: true });
+    await mockSearchUsersWithCapture(page, capturedUrls);
+    await page.goto('/users/search');
+
+    await page.getByLabel('Role').click();
+    await page.getByRole('option', { name: 'Admin' }).click();
+    await page.getByRole('button', { name: 'Search' }).click();
+
+    await expect(page.getByText('Search Results')).toBeVisible();
+    expect(capturedUrls[0]).toContain('isAdmin=true');
+  });
+
+  test('should send isActive=true when "Active" status is selected', async ({
+    mockApi: page
+  }) => {
+    const capturedUrls: string[] = [];
+    await loginViaUi(page, { isAdmin: true });
+    await mockSearchUsersWithCapture(page, capturedUrls);
+    await page.goto('/users/search');
+
+    await page.getByLabel('Status').click();
+    await page.getByRole('option', { name: 'Active', exact: true }).click();
+    await page.getByRole('button', { name: 'Search' }).click();
+
+    await expect(page.getByText('Search Results')).toBeVisible();
+    expect(capturedUrls[0]).toContain('isActive=true');
   });
 
   test('should delete user from results with confirmation', async ({
