@@ -20,11 +20,10 @@ import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatButton, MatIconButton } from '@angular/material/button';
-import { AuthStore } from '../../store/auth.store';
 import { AuthService } from '../../services/auth.service';
-import { UserService } from '../../../users/services/user.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import type { UpdateUser, User } from '../../../users/models/user.types';
+import type { User } from '../../../users/models/user.types';
+import type { UpdateProfile } from '../../models/auth.types';
 import { DatePipe } from '@angular/common';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -60,9 +59,7 @@ type ProfileFormType = {
 })
 export class ProfileComponent implements OnInit {
   readonly #fb = inject(FormBuilder);
-  readonly #authStore = inject(AuthStore);
   readonly #authService = inject(AuthService);
-  readonly #userService = inject(UserService);
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
 
@@ -128,7 +125,7 @@ export class ProfileComponent implements OnInit {
 
     const formValues = this.profileForm.getRawValue();
 
-    const updateData: UpdateUser = {
+    const updateData: UpdateProfile = {
       firstName: formValues.firstName,
       lastName: formValues.lastName
     };
@@ -140,14 +137,13 @@ export class ProfileComponent implements OnInit {
     this.saving.set(true);
     this.error.set(null);
 
-    this.#userService
-      .update(this.user()!.id, updateData)
+    this.#authService
+      .updateProfile(updateData)
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: (updatedUser) => {
           this.saving.set(false);
           this.user.set(updatedUser);
-          this.#authStore.updateCurrentUser(updatedUser);
 
           this.profileForm.patchValue({ password: '' });
           this.profileForm.markAsPristine();

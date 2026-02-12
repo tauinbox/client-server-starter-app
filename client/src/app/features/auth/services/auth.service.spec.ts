@@ -180,7 +180,7 @@ describe('AuthService', () => {
       expect(authStoreMock.saveAuthResponse).toHaveBeenCalledWith(newAuth);
     });
 
-    it('should clear session when refresh fails', async () => {
+    it('should rethrow error when refresh fails (callers handle cleanup)', async () => {
       authStoreMock.getRefreshToken.mockReturnValue('valid-refresh-token');
 
       const tokensPromise = firstValueFrom(service.refreshTokens()).catch(
@@ -193,8 +193,9 @@ describe('AuthService', () => {
         { status: 401, statusText: 'Unauthorized' }
       );
 
-      await tokensPromise;
-      expect(authStoreMock.clearSession).toHaveBeenCalled();
+      const error = await tokensPromise;
+      expect(error.status).toBe(401);
+      expect(authStoreMock.clearSession).not.toHaveBeenCalled();
     });
 
     it('should return null when no refresh token available', async () => {

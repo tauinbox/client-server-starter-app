@@ -19,7 +19,8 @@ import type {
   LoginCredentials,
   RefreshTokensRequest,
   RegisterRequest,
-  TokensResponse
+  TokensResponse,
+  UpdateProfile
 } from '../models/auth.types';
 import { LocalStorageService } from '@core/services/local-storage.service';
 import { AUTH_STORAGE_KEY, AuthStore } from '../store/auth.store';
@@ -94,6 +95,12 @@ export class AuthService {
       .pipe(tap((profile) => this.#authStore.updateCurrentUser(profile)));
   }
 
+  updateProfile(data: UpdateProfile): Observable<User> {
+    return this.#http
+      .patch<User>(AuthApiEnum.Profile, data)
+      .pipe(tap((user) => this.#authStore.updateCurrentUser(user)));
+  }
+
   refreshTokens(): Observable<TokensResponse | null> {
     if (this.#refreshInFlight$) {
       return this.#refreshInFlight$;
@@ -128,13 +135,12 @@ export class AuthService {
         }),
         map((response) => response.tokens),
         catchError((error) => {
-          this.#authStore.clearSession();
           return throwError(() => error);
         }),
         finalize(() => {
           this.#refreshInFlight$ = null;
         }),
-        shareReplay(1)
+        shareReplay({ bufferSize: 1, refCount: true })
       );
 
     return this.#refreshInFlight$;
@@ -146,8 +152,13 @@ export class AuthService {
     const expiryTime = this.#authStore.getTokenExpiryTime();
     if (!expiryTime) return;
 
+    const now = Date.now();
+
+    // Token already expired — no point in scheduling, let guards/interceptor handle refresh
+    if (expiryTime <= now) return;
+
     const timeToRefresh =
-      expiryTime - Date.now() - TOKEN_REFRESH_WINDOW_SECONDS * 1000;
+      expiryTime - now - TOKEN_REFRESH_WINDOW_SECONDS * 1000;
 
     const handleRefreshResult = {
       next: (tokens: TokensResponse | null) => {
