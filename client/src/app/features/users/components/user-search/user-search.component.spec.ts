@@ -11,6 +11,7 @@ import { UsersStore } from '../../store/users.store';
 describe('UserSearchComponent', () => {
   let component: UserSearchComponent;
   let fixture: ComponentFixture<UserSearchComponent>;
+  let usersStore: InstanceType<typeof UsersStore>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -26,10 +27,73 @@ describe('UserSearchComponent', () => {
 
     fixture = TestBed.createComponent(UserSearchComponent);
     component = fixture.componentInstance;
+    usersStore = TestBed.inject(UsersStore);
     fixture.detectChanges();
   });
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  describe('search criteria building', () => {
+    let searchSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      searchSpy = vi.spyOn(usersStore, 'search').mockImplementation(vi.fn());
+    });
+
+    it('should pass isAdmin=true when Role is "Admin"', () => {
+      component.searchForm.patchValue({ isAdmin: 'true' });
+      component.onSubmit();
+
+      expect(searchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ isAdmin: true })
+      );
+    });
+
+    it('should pass isAdmin=false when Role is "User"', () => {
+      component.searchForm.patchValue({ isAdmin: 'false' });
+      component.onSubmit();
+
+      expect(searchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ isAdmin: false })
+      );
+    });
+
+    it('should exclude isAdmin when Role is "All"', () => {
+      component.searchForm.patchValue({ isAdmin: '' });
+      component.onSubmit();
+
+      expect(searchSpy).toHaveBeenCalledWith(
+        expect.not.objectContaining({ isAdmin: expect.anything() })
+      );
+    });
+
+    it('should pass isActive=true when Status is "Active"', () => {
+      component.searchForm.patchValue({ isActive: 'true' });
+      component.onSubmit();
+
+      expect(searchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ isActive: true })
+      );
+    });
+
+    it('should pass isActive=false when Status is "Inactive"', () => {
+      component.searchForm.patchValue({ isActive: 'false' });
+      component.onSubmit();
+
+      expect(searchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ isActive: false })
+      );
+    });
+
+    it('should exclude isActive when Status is "All"', () => {
+      component.searchForm.patchValue({ isActive: '' });
+      component.onSubmit();
+
+      expect(searchSpy).toHaveBeenCalledWith(
+        expect.not.objectContaining({ isActive: expect.anything() })
+      );
+    });
   });
 });
