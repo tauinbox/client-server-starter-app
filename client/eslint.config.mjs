@@ -11,6 +11,11 @@ import { fixupPluginRules } from '@eslint/compat';
 export default tseslint.config(
   {
     ignores: [
+      'src/index.html'
+    ]
+  },
+  {
+    ignores: [
       'node_modules/**',
       'dist/**',
       'coverage/**',
