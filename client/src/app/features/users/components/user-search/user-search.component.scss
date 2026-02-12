@@ -3,8 +3,10 @@
 @use 'abstracts/functions' as func;
 
 :host {
+  width: 100%;
+
   .user-search-container {
-    @include mix.centered-container(vars.$container-max-width);
+    @include mix.card-container;
   }
 
   .search-fields {
@@ -44,6 +46,10 @@
     margin-bottom: func.rem(16);
     font-size: func.rem(48);
     opacity: 0.5;
+  }
+
+  .table-container {
+    @include mix.table-container;
   }
 
   .mat-column-id {
