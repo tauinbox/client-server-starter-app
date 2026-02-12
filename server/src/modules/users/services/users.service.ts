@@ -9,6 +9,7 @@ import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
+import { escapeLikePattern } from '../../../common/utils/escape-like';
 
 @Injectable()
 export class UsersService {
@@ -65,19 +66,19 @@ export class UsersService {
 
     if (filters.email) {
       queryBuilder.andWhere('user.email LIKE :email', {
-        email: `%${filters.email}%`
+        email: `%${escapeLikePattern(filters.email)}%`
       });
     }
 
     if (filters.firstName) {
       queryBuilder.andWhere('user.firstName LIKE :firstName', {
-        firstName: `%${filters.firstName}%`
+        firstName: `%${escapeLikePattern(filters.firstName)}%`
       });
     }
 
     if (filters.lastName) {
       queryBuilder.andWhere('user.lastName LIKE :lastName', {
-        lastName: `%${filters.lastName}%`
+        lastName: `%${escapeLikePattern(filters.lastName)}%`
       });
     }
 

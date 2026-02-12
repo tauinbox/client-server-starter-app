@@ -125,9 +125,10 @@ export class UsersController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RolesEnum.Admin)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get a user by ID' })
+  @ApiOperation({ summary: 'Get a user by ID (admin only)' })
   @ApiParam({ name: 'id', description: 'The user ID' })
   @ApiOkResponse({
     description: 'The user has been found',
@@ -135,6 +136,7 @@ export class UsersController {
   })
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden - requires admin role' })
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }
