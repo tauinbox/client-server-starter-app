@@ -1,5 +1,6 @@
 import {
   expect,
+  expectAuthRedirect,
   loginViaUi,
   mockProfile,
   mockUpdateUser,
@@ -10,9 +11,7 @@ test.describe('Profile page', () => {
   test('should redirect to login when not authenticated', async ({
     mockApi: page
   }) => {
-    await page.goto('/profile');
-
-    await expect(page).toHaveURL(/.*\/login/);
+    await expectAuthRedirect(page, '/profile');
   });
 
   test('should display account information after login', async ({
@@ -169,8 +168,8 @@ test.describe('Profile page', () => {
 
   test('should show error on update failure', async ({ mockApi: page }) => {
     await loginViaUi(page);
-    // Mock update to fail
-    await page.route('**/api/v1/users/*', (route) => {
+    // Mock update to fail — route registered after mockProfile so it takes priority
+    await page.route('**/api/v1/auth/profile', (route) => {
       if (route.request().method() === 'PATCH') {
         return route.fulfill({
           status: 500,
