@@ -61,7 +61,10 @@ Copy `.env.example` to `.env` and configure:
 ### Module Structure
 
 ```
-src/modules/
+src/
+├── common/
+│   └── utils/              # Shared utilities (escapeLikePattern)
+└── modules/
 ├── core/                   # Dynamic root module
 │   ├── config/             # @nestjs/config, loads .env
 │   ├── cache/              # @nestjs/cache-manager
@@ -144,8 +147,8 @@ Base URL: `/api/v1`
 | POST | `/` | None | Create user |
 | GET | `/` | Admin | List all users |
 | GET | `/search` | Admin | Search users (query params: email, firstName, lastName, isAdmin, isActive) |
-| GET | `/:id` | Bearer | Get user by ID |
-| PATCH | `/:id` | Bearer | Update user |
+| GET | `/:id` | Admin | Get user by ID |
+| PATCH | `/:id` | Admin | Update user |
 | DELETE | `/:id` | Admin | Delete user |
 
 ### Feature (`/api/v1/feature`)
@@ -159,7 +162,7 @@ Base URL: `/api/v1`
 | GET | `/entities/:id` | None | Get entity by ID |
 | PATCH | `/entities/:id` | None | Update entity |
 | DELETE | `/entities/:id` | None | Delete entity |
-| POST | `/upload` | None | Upload files (multipart, field: `upload-artifact`) |
+| POST | `/upload` | Bearer | Upload files (multipart, field: `upload-artifact`, 5 MB limit, type whitelist) |
 
 ## Testing
 

@@ -150,13 +150,13 @@ API base URL: `/api/v1`
 | GET | `/auth/profile` | Bearer | Get current user profile |
 | GET | `/users` | Admin | List all users |
 | GET | `/users/search` | Admin | Search users by criteria |
-| GET | `/users/:id` | Bearer | Get user by ID |
-| PATCH | `/users/:id` | Bearer | Update user |
+| GET | `/users/:id` | Admin | Get user by ID |
+| PATCH | `/users/:id` | Admin | Update user |
 | DELETE | `/users/:id` | Admin | Delete user |
 | GET | `/feature` | None | Example endpoint |
 | GET | `/feature/entities` | None | List feature entities |
 | POST | `/feature/entities` | None | Create feature entity |
-| POST | `/feature/upload` | None | Upload files |
+| POST | `/feature/upload` | Bearer | Upload files (5 MB limit, type whitelist) |
 
 ## Available Commands
 
@@ -252,6 +252,8 @@ Husky and lint-staged are installed in the `client/` sub-package. Running `npm i
 - JWT access tokens (1h) + opaque refresh tokens (7d) with rotation
 - `@Exclude()` decorator hides password in API responses
 - `class-validator` on server DTOs, Angular `Validators` on client forms
+- LIKE query pattern escaping to prevent SQL injection via wildcards
+- File upload security: auth required, 5 MB limit, type whitelist, filename sanitization
 - Configurable CORS (permissive only in `local` environment)
 - Angular template escaping for XSS prevention
 
