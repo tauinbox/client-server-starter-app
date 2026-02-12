@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Request,
   UseGuards,
@@ -23,6 +24,7 @@ import {
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { AuthService } from '../services/auth.service';
 import { RegisterDto } from '../dtos/register.dto';
+import { UpdateProfileDto } from '../dtos/update-profile.dto';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { LoginDto } from '../dtos/login.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
@@ -103,5 +105,22 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   async getProfile(@Request() req: JwtAuthRequest) {
     return await this.userService.findOne(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('profile')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update the current user profile' })
+  @ApiBody({ type: UpdateProfileDto })
+  @ApiOkResponse({
+    description: 'Profile has been successfully updated',
+    type: UserResponseDto
+  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  async updateProfile(
+    @Request() req: JwtAuthRequest,
+    @Body() updateProfileDto: UpdateProfileDto
+  ) {
+    return await this.userService.update(req.user.userId, updateProfileDto);
   }
 }

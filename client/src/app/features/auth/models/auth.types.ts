@@ -23,6 +23,12 @@ export type RefreshTokensRequest = {
   refresh_token: string;
 };
 
+export type UpdateProfile = {
+  firstName?: string;
+  lastName?: string;
+  password?: string;
+};
+
 export type CustomJwtPayload = JwtPayload & {
   userId: User['id'];
 } & Pick<User, 'email' | 'isAdmin'>;

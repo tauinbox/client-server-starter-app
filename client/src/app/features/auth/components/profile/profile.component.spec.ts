@@ -9,9 +9,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 
 import { ProfileComponent } from './profile.component';
-import { AuthStore } from '../../store/auth.store';
 import { AuthService } from '../../services/auth.service';
-import { UserService } from '../../../users/services/user.service';
 import type { User } from '../../../users/models/user.types';
 
 const mockUser: User = {
@@ -28,28 +26,16 @@ const mockUser: User = {
 describe('ProfileComponent', () => {
   let component: ProfileComponent;
   let fixture: ComponentFixture<ProfileComponent>;
-  let authStoreMock: {
-    updateCurrentUser: ReturnType<typeof vi.fn>;
-  };
   let authServiceMock: {
     getProfile: ReturnType<typeof vi.fn>;
-  };
-  let userServiceMock: {
-    update: ReturnType<typeof vi.fn>;
+    updateProfile: ReturnType<typeof vi.fn>;
   };
   let snackBarMock: { open: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
-    authStoreMock = {
-      updateCurrentUser: vi.fn()
-    };
-
     authServiceMock = {
-      getProfile: vi.fn().mockReturnValue(of(mockUser))
-    };
-
-    userServiceMock = {
-      update: vi.fn()
+      getProfile: vi.fn().mockReturnValue(of(mockUser)),
+      updateProfile: vi.fn()
     };
 
     snackBarMock = { open: vi.fn() };
@@ -61,9 +47,7 @@ describe('ProfileComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideNoopAnimations(),
-        { provide: AuthStore, useValue: authStoreMock },
         { provide: AuthService, useValue: authServiceMock },
-        { provide: UserService, useValue: userServiceMock },
         { provide: MatSnackBar, useValue: snackBarMock }
       ]
     }).compileComponents();
@@ -132,24 +116,24 @@ describe('ProfileComponent', () => {
     it('should not submit when form is invalid', () => {
       component['profileForm'].controls.firstName.setValue('');
       component.onSubmit();
-      expect(userServiceMock.update).not.toHaveBeenCalled();
+      expect(authServiceMock.updateProfile).not.toHaveBeenCalled();
     });
 
     it('should not submit when user is null', () => {
       component['user'].set(null);
       component.onSubmit();
-      expect(userServiceMock.update).not.toHaveBeenCalled();
+      expect(authServiceMock.updateProfile).not.toHaveBeenCalled();
     });
 
     it('should submit without password when password is empty', () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
-      userServiceMock.update.mockReturnValue(of(updatedUser));
+      authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component['profileForm'].patchValue({ firstName: 'Updated' });
       component['profileForm'].markAsDirty();
       component.onSubmit();
 
-      expect(userServiceMock.update).toHaveBeenCalledWith('1', {
+      expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
         firstName: 'Updated',
         lastName: 'User'
       });
@@ -157,7 +141,7 @@ describe('ProfileComponent', () => {
 
     it('should include password when provided', () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
-      userServiceMock.update.mockReturnValue(of(updatedUser));
+      authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component['profileForm'].patchValue({
         firstName: 'Updated',
@@ -166,7 +150,7 @@ describe('ProfileComponent', () => {
       component['profileForm'].markAsDirty();
       component.onSubmit();
 
-      expect(userServiceMock.update).toHaveBeenCalledWith('1', {
+      expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
         firstName: 'Updated',
         lastName: 'User',
         password: 'newpassword123'
@@ -175,7 +159,7 @@ describe('ProfileComponent', () => {
 
     it('should show snackbar and update user on success', () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
-      userServiceMock.update.mockReturnValue(of(updatedUser));
+      authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component['profileForm'].patchValue({ firstName: 'Updated' });
       component.onSubmit();
@@ -185,14 +169,14 @@ describe('ProfileComponent', () => {
         'Close',
         { duration: 5000 }
       );
-      expect(authStoreMock.updateCurrentUser).toHaveBeenCalledWith(updatedUser);
+      expect(component['user']()).toEqual(updatedUser);
       expect(component['saving']()).toBe(false);
       expect(component['profileForm'].pristine).toBe(true);
     });
 
     it('should reset password field after successful update', () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
-      userServiceMock.update.mockReturnValue(of(updatedUser));
+      authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component['profileForm'].patchValue({
         firstName: 'Updated',
@@ -208,7 +192,9 @@ describe('ProfileComponent', () => {
         error: { message: 'Update failed' },
         status: 400
       });
-      userServiceMock.update.mockReturnValue(throwError(() => httpError));
+      authServiceMock.updateProfile.mockReturnValue(
+        throwError(() => httpError)
+      );
 
       component['profileForm'].patchValue({ firstName: 'Updated' });
       component.onSubmit();
@@ -222,7 +208,9 @@ describe('ProfileComponent', () => {
         error: null,
         status: 500
       });
-      userServiceMock.update.mockReturnValue(throwError(() => httpError));
+      authServiceMock.updateProfile.mockReturnValue(
+        throwError(() => httpError)
+      );
 
       component['profileForm'].patchValue({ firstName: 'Updated' });
       component.onSubmit();

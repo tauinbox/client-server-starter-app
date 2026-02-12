@@ -1,6 +1,7 @@
 import type { Routes } from '@angular/router';
 import { authGuard } from '@features/auth/guards/auth.guard';
 import { adminGuard } from '@features/auth/guards/admin.guard';
+import { guestGuard } from '@features/auth/guards/guest.guard';
 import { AppRouteSegmentEnum } from './app.route-segment.enum';
 import { UsersStore } from '@features/users/store/users.store';
 
@@ -15,14 +16,16 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/auth/components/login/login.component').then(
         (c) => c.LoginComponent
-      )
+      ),
+    canActivate: [guestGuard]
   },
   {
     path: AppRouteSegmentEnum.Register,
     loadComponent: () =>
       import('./features/auth/components/register/register.component').then(
         (c) => c.RegisterComponent
-      )
+      ),
+    canActivate: [guestGuard]
   },
   {
     path: AppRouteSegmentEnum.Profile,

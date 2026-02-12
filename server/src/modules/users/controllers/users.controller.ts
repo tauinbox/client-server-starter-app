@@ -140,9 +140,10 @@ export class UsersController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RolesEnum.Admin)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update a user' })
+  @ApiOperation({ summary: 'Update a user (admin only)' })
   @ApiParam({ name: 'id', description: 'The user ID' })
   @ApiBody({ type: UpdateUserDto })
   @ApiOkResponse({
@@ -151,6 +152,7 @@ export class UsersController {
   })
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden - requires admin role' })
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(id, updateUserDto);
   }
