@@ -23,7 +23,8 @@ import { RefreshTokenService } from './services/refresh-token.service';
       useFactory: (configService: ConfigService) => ({
         secret: configService.get('JWT_SECRET'),
         signOptions: {
-          expiresIn: `${configService.get('JWT_EXPIRATION')}s`
+          expiresIn: `${configService.get('JWT_EXPIRATION')}s`,
+          algorithm: 'HS256'
         }
       })
     })
