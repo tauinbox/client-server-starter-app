@@ -52,6 +52,13 @@ Copy `.env.example` to `.env` and configure:
 | `JWT_SECRET` | `my_jwt_secret_key` | Secret for signing JWTs |
 | `JWT_EXPIRATION` | `3600` | Access token lifetime in seconds (1h) |
 | `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime in seconds (7d) |
+| `GOOGLE_CLIENT_ID` | - | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | - | Google OAuth client secret |
+| `FACEBOOK_CLIENT_ID` | - | Facebook OAuth client ID |
+| `FACEBOOK_CLIENT_SECRET` | - | Facebook OAuth client secret |
+| `VK_CLIENT_ID` | - | VK OAuth client ID |
+| `VK_CLIENT_SECRET` | - | VK OAuth client secret |
+| `CLIENT_URL` | `http://localhost:4200` | Client URL for OAuth callback redirects |
 | `EXTERNAL_API` | - | Third-party API URL for feature config |
 | `EXTERNAL_API_TOKEN` | - | API token for external service |
 | `CORS_ORIGINS` | - | Allowed origins separated by `#` |
@@ -71,11 +78,13 @@ src/
 │   ├── database/           # TypeORM + PostgreSQL config
 │   └── schedule/           # @nestjs/schedule for cron jobs
 ├── auth/
-│   ├── controllers/        # AuthController (login, register, logout, refresh, profile)
-│   ├── services/           # AuthService, RefreshTokenService, TokenCleanupService
-│   ├── strategies/         # LocalStrategy (email/password), JwtStrategy (Bearer)
-│   ├── guards/             # LocalAuthGuard, JwtAuthGuard, RolesGuard
-│   └── dto/                # LoginDto, RegisterDto, RefreshTokenDto
+│   ├── controllers/        # AuthController, OAuthController
+│   ├── services/           # AuthService, RefreshTokenService, OAuthAccountService, TokenCleanupService
+│   ├── strategies/         # LocalStrategy, JwtStrategy, GoogleStrategy, FacebookStrategy, VkStrategy
+│   ├── guards/             # LocalAuthGuard, JwtAuthGuard, RolesGuard, Google/Facebook/VkOAuthGuard
+│   ├── entities/           # RefreshToken, OAuthAccount
+│   ├── enums/              # OAuthProvider
+│   └── dto/                # LoginDto, RegisterDto, RefreshTokenDto, UpdateProfileDto
 ├── users/
 │   ├── controllers/        # UsersController (CRUD + search)
 │   ├── services/           # UsersService
@@ -108,18 +117,21 @@ Request → Global Middleware (Compression, CookieParser, CORS)
 
 - **LocalStrategy** — validates email/password via bcrypt on login
 - **JwtStrategy** — extracts and verifies Bearer token on protected routes
+- **GoogleStrategy / FacebookStrategy / VkStrategy** — OAuth2 login (conditionally registered when env vars are set)
 - **RolesGuard** — checks `@Roles()` decorator for admin-only endpoints
-- **Refresh tokens** — opaque 80-char hex tokens stored in DB, rotated on use
+- **Refresh tokens** — opaque 80-char hex tokens stored in DB (SHA-256 hashed), rotated on use
+- **OAuth accounts** — auto-link by email, manage linked providers, safety check on unlink
 - **Token cleanup** — daily cron removes expired tokens, weekly cron removes revoked+expired
 
 ### Database
 
-Three tables managed via TypeORM migrations:
+Four tables managed via TypeORM migrations:
 
 | Table | Description |
 |-------|-------------|
-| `users` | UUID PK, email (unique), name, bcrypt password, isAdmin, isActive |
-| `refresh_tokens` | UUID PK, token, FK to users (CASCADE), expires_at, revoked |
+| `users` | UUID PK, email (unique), name, bcrypt password (nullable for OAuth-only users), isAdmin, isActive |
+| `oauth_accounts` | UUID PK, provider + provider_id (unique), FK to users (CASCADE) |
+| `refresh_tokens` | UUID PK, token (SHA-256 hashed), FK to users (CASCADE), expires_at, revoked |
 | `feature` | Auto-increment PK, name, timestamps |
 
 Migration and seed commands operate on compiled JS in `dist/` — always run `npm run build` first.
@@ -139,12 +151,22 @@ Base URL: `/api/v1`
 | POST | `/refresh-token` | None | Refresh access token |
 | POST | `/logout` | Bearer | Revoke all refresh tokens |
 | GET | `/profile` | Bearer | Get current user |
+| PATCH | `/profile` | Bearer | Update own profile (name, password) |
+
+### OAuth (`/api/v1/auth/oauth`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/:provider` | None | Initiate OAuth login (google, facebook, vk) |
+| GET | `/:provider/callback` | None | OAuth provider callback → redirect to client |
+| GET | `/accounts` | Bearer | List linked OAuth accounts |
+| DELETE | `/accounts/:provider` | Bearer | Unlink OAuth provider |
 
 ### Users (`/api/v1/users`)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/` | None | Create user |
+| POST | `/` | Admin | Create user |
 | GET | `/` | Admin | List all users |
 | GET | `/search` | Admin | Search users (query params: email, firstName, lastName, isAdmin, isActive) |
 | GET | `/:id` | Admin | Get user by ID |

@@ -11,7 +11,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 | Backend | NestJS | 11.1.13 |
 | Database | PostgreSQL (TypeORM) | 0.3.28 |
 | Language | TypeScript | 5.9.x |
-| Auth | JWT + Refresh Tokens (Passport) | - |
+| Auth | JWT + Refresh Tokens + OAuth (Passport) | - |
 | Client Tests | Vitest (unit), Playwright (e2e) | 4.0.18 / 1.58.2 |
 | Server Tests | Jest (unit + e2e) | 30.2.0 |
 
@@ -19,10 +19,12 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 
 ### Authentication
 - Email/password registration and login
+- **OAuth2 login via Google, Facebook, VK** — auto-links by email, creates OAuth-only users
 - JWT access tokens (1h) + opaque refresh tokens (7d)
 - Automatic token refresh 60 seconds before expiry
 - 401 handling with request retry in JWT interceptor
 - Role-based access control (admin/user)
+- OAuth account management (link/unlink providers in profile)
 - Server-side token cleanup via cron jobs
 
 ### User Management (Admin)
@@ -109,6 +111,13 @@ Edit `.env` with your database credentials and settings:
 | `JWT_SECRET` | `my_jwt_secret_key` | Secret for signing JWTs |
 | `JWT_EXPIRATION` | `3600` | Access token lifetime (seconds) |
 | `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime (seconds) |
+| `GOOGLE_CLIENT_ID` | - | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | - | Google OAuth client secret |
+| `FACEBOOK_CLIENT_ID` | - | Facebook OAuth client ID |
+| `FACEBOOK_CLIENT_SECRET` | - | Facebook OAuth client secret |
+| `VK_CLIENT_ID` | - | VK OAuth client ID |
+| `VK_CLIENT_SECRET` | - | VK OAuth client secret |
+| `CLIENT_URL` | `http://localhost:4200` | Client URL for OAuth redirects |
 
 ### 3. Set up the database
 
@@ -148,6 +157,11 @@ API base URL: `/api/v1`
 | POST | `/auth/refresh-token` | None | Refresh access token |
 | POST | `/auth/logout` | Bearer | Logout, revokes refresh tokens |
 | GET | `/auth/profile` | Bearer | Get current user profile |
+| PATCH | `/auth/profile` | Bearer | Update own profile (name, password) |
+| GET | `/auth/oauth/:provider` | None | Initiate OAuth login (google, facebook, vk) |
+| GET | `/auth/oauth/:provider/callback` | None | OAuth provider callback |
+| GET | `/auth/oauth/accounts` | Bearer | List linked OAuth accounts |
+| DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink OAuth provider |
 | GET | `/users` | Admin | List all users |
 | GET | `/users/search` | Admin | Search users by criteria |
 | GET | `/users/:id` | Admin | Get user by ID |
@@ -202,17 +216,18 @@ npm run test:e2e:ui        # E2E tests (interactive UI)
 ### Server
 
 - **Modular NestJS architecture** with dynamic root `CoreModule`
-- **Passport strategies**: `LocalStrategy` (email/password) and `JwtStrategy` (Bearer token)
+- **Passport strategies**: `LocalStrategy` (email/password), `JwtStrategy` (Bearer token), `GoogleStrategy`, `FacebookStrategy`, `VkStrategy` (OAuth, conditionally registered)
 - **Request pipeline**: Global middleware -> Module middleware -> Guards -> Interceptors -> Pipes -> Controller
 - **Cron jobs**: Daily expired token cleanup, weekly revoked token cleanup
 - **Swagger** auto-generated API documentation
 
 ### Database
 
-Three tables managed via TypeORM migrations:
+Four tables managed via TypeORM migrations:
 
-- **users** — UUID primary key, email (unique), name, bcrypt password hash, role/active flags
-- **refresh_tokens** — Linked to users (CASCADE delete), token string, expiry, revoked flag
+- **users** — UUID primary key, email (unique), name, bcrypt password hash (nullable for OAuth-only users), role/active flags
+- **oauth_accounts** — Linked to users (CASCADE delete), provider + provider_id (unique), timestamps
+- **refresh_tokens** — Linked to users (CASCADE delete), token string (SHA-256 hashed), expiry, revoked flag
 - **feature** — Auto-increment ID, name, timestamps
 
 ## Code Quality

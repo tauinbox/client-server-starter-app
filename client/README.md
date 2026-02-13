@@ -30,9 +30,9 @@ All components are standalone (no NgModules) with `OnPush` change detection and 
 
 ```
 src/app/
-├── core/                   # Header, theme toggle, storage service, 404 page
+├── core/                   # Header, theme toggle, storage/session-storage services, 404 page
 ├── features/
-│   ├── auth/               # Login, register, profile, forbidden
+│   ├── auth/               # Login, register, profile, OAuth callback, forbidden
 │   │   ├── guards/         # authGuard, adminGuard
 │   │   ├── interceptors/   # jwtInterceptor, errorInterceptor
 │   │   ├── services/       # AuthService (HTTP, refresh scheduling)
@@ -54,6 +54,7 @@ src/app/
 | `/users/search` | UserSearchComponent | adminGuard |
 | `/users/:id` | UserDetailComponent | authGuard |
 | `/users/:id/edit` | UserEditComponent | authGuard |
+| `/oauth/callback` | OAuthCallbackComponent | - |
 | `/feature` | FeatureComponent | - |
 | `/forbidden` | ForbiddenComponent | - |
 | `/**` | PageNotFoundComponent | - |
@@ -63,7 +64,7 @@ src/app/
 NgRx Signal Store (`@ngrx/signals`):
 
 - **AuthStore** (`providedIn: 'root'`) — pure state container managing `localStorage('auth_storage')`, exposes `user`, `isAuthenticated`, `isAdmin` computed signals. No `HttpClient` dependency
-- **AuthService** (`providedIn: 'root'`) — HTTP operations (login/register/logout/refresh/profile), token refresh scheduling via `provideAppInitializer`. Eliminates the circular dependency chain
+- **AuthService** (`providedIn: 'root'`) — HTTP operations (login/register/logout/refresh/profile/OAuth accounts), token refresh scheduling via `provideAppInitializer`. Eliminates the circular dependency chain
 - **UsersStore** (route-level at `/users`) — entity-based store with `withEntities<User>()`. Manages user list, detail, search state with pagination and loading indicators
 - **ThemeService** — `theme` signal (`'light'` | `'dark'`), system preference detection, persists to localStorage
 
