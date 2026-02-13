@@ -71,13 +71,13 @@ export class UsersService {
     }
 
     if (filters.firstName) {
-      queryBuilder.andWhere('user.firstName LIKE :firstName', {
+      queryBuilder.andWhere('user.firstName ILIKE :firstName', {
         firstName: `%${escapeLikePattern(filters.firstName)}%`
       });
     }
 
     if (filters.lastName) {
-      queryBuilder.andWhere('user.lastName LIKE :lastName', {
+      queryBuilder.andWhere('user.lastName ILIKE :lastName', {
         lastName: `%${escapeLikePattern(filters.lastName)}%`
       });
     }
