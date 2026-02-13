@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, MoreThan, Repository } from 'typeorm';
 import { RefreshToken } from '../entities/refresh-token.entity';
+import { hashToken } from '../../../common/utils/hash-token';
 
 @Injectable()
 export class RefreshTokenService {
@@ -17,7 +18,7 @@ export class RefreshTokenService {
   ): Promise<RefreshToken> {
     const refreshToken = this.repository.create({
       userId,
-      token,
+      token: hashToken(token),
       expiresAt: new Date(Date.now() + expiresIn * 1000)
     });
 
@@ -25,7 +26,7 @@ export class RefreshTokenService {
   }
 
   async findByToken(token: string): Promise<RefreshToken | null> {
-    return this.repository.findOne({ where: { token } });
+    return this.repository.findOne({ where: { token: hashToken(token) } });
   }
 
   async deleteByUserId(userId: string): Promise<void> {

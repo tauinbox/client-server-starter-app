@@ -45,7 +45,10 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a new user' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RolesEnum.Admin)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a new user (admin only)' })
   @ApiBody({ type: CreateUserDto })
   @ApiCreatedResponse({
     description: 'The user has been successfully created.',
@@ -55,6 +58,8 @@ export class UsersController {
     status: HttpStatus.CONFLICT,
     description: 'User with this email already exists'
   })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden - requires admin role' })
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }

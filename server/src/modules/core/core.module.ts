@@ -1,4 +1,5 @@
 import { DynamicModule, Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import configuration from './configuration';
 import { CacheModule } from '@nestjs/cache-manager';
@@ -8,6 +9,7 @@ import { postgresConfig } from '../../postgres.config';
 import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 @Module({})
 export class CoreModule {
@@ -24,12 +26,18 @@ export class CoreModule {
           isGlobal: true
         }),
         ScheduleModule.forRoot(),
+        ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
         TypeOrmModule.forRootAsync({ imports: [], useFactory: postgresConfig }),
         AuthModule,
         UsersModule,
         FeatureModule
       ],
-      providers: []
+      providers: [
+        {
+          provide: APP_GUARD,
+          useClass: ThrottlerGuard
+        }
+      ]
     };
   }
 }

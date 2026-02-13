@@ -21,9 +21,9 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed:run": "typeorm-seeding seed -d dist/postgres-data-source.js dist/seeders/*.js",
-    "migrations:gen": "npx typeorm-ts-node-esm migration:generate ./src/migrations/migration -d dist/postgres-data-source.js",
-    "migrations:run": "npx typeorm-ts-node-esm migration:run -d dist/postgres-data-source.js",
-    "migrations:revert": "npx typeorm-ts-node-esm migration:revert -d dist/postgres-data-source.js"
+    "migrations:gen": "npx typeorm-ts-node-esm migration:generate ./src/migrations/migration -d dist/src/postgres-data-source.js",
+    "migrations:run": "npx typeorm-ts-node-esm migration:run -d dist/src/postgres-data-source.js",
+    "migrations:revert": "npx typeorm-ts-node-esm migration:revert -d dist/src/postgres-data-source.js"
   },
   "dependencies": {
     "@jorgebodega/typeorm-seeding": "^7.1.0",
@@ -37,6 +37,7 @@
     "@nestjs/platform-express": "^11.1.13",
     "@nestjs/schedule": "^6.1.1",
     "@nestjs/swagger": "^11.2.6",
+    "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^11.0.0",
     "axios": "^1.13.5",
     "bcrypt": "^6.0.0",
@@ -44,6 +45,7 @@
     "class-validator": "^0.14.3",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
+    "helmet": "^8.1.0",
     "http-proxy-middleware": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
     "passport": "^0.7.0",
