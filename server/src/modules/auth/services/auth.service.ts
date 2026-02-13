@@ -130,28 +130,6 @@ export class AuthService {
     };
   }
 
-  async linkOAuthAccount(userId: string, profile: OAuthUserProfile) {
-    const existing = await this.oauthAccountService.findByProviderAndProviderId(
-      profile.provider,
-      profile.providerId
-    );
-
-    if (existing) {
-      if (existing.userId !== userId) {
-        throw new UnauthorizedException(
-          'This OAuth account is already linked to another user'
-        );
-      }
-      return; // Already linked to this user
-    }
-
-    await this.safeCreateOAuthAccount(
-      userId,
-      profile.provider,
-      profile.providerId
-    );
-  }
-
   private async safeCreateOAuthAccount(
     userId: string,
     provider: string,

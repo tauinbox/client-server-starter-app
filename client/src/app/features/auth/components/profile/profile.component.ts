@@ -31,6 +31,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DomSanitizer } from '@angular/platform-browser';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
+import { registerOAuthIcons } from '../../utils/register-oauth-icons';
 
 type ProfileFormType = {
   firstName: FormControl<string>;
@@ -107,21 +108,7 @@ export class ProfileComponent implements OnInit {
     });
 
   constructor() {
-    const iconRegistry = inject(MatIconRegistry);
-    const sanitizer = inject(DomSanitizer);
-
-    iconRegistry.addSvgIcon(
-      'google',
-      sanitizer.bypassSecurityTrustResourceUrl('/assets/icons/google.svg')
-    );
-    iconRegistry.addSvgIcon(
-      'facebook',
-      sanitizer.bypassSecurityTrustResourceUrl('/assets/icons/facebook.svg')
-    );
-    iconRegistry.addSvgIcon(
-      'vk',
-      sanitizer.bypassSecurityTrustResourceUrl('/assets/icons/vk.svg')
-    );
+    registerOAuthIcons(inject(MatIconRegistry), inject(DomSanitizer));
   }
 
   ngOnInit() {

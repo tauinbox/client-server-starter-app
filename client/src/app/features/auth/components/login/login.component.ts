@@ -29,6 +29,7 @@ import { SessionStorageService } from '@core/services/session-storage.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
+import { registerOAuthIcons } from '../../utils/register-oauth-icons';
 
 type LoginFormType = {
   email: FormControl<string>;
@@ -91,21 +92,7 @@ export class LoginComponent implements OnInit {
   });
 
   constructor() {
-    const iconRegistry = inject(MatIconRegistry);
-    const sanitizer = inject(DomSanitizer);
-
-    iconRegistry.addSvgIcon(
-      'google',
-      sanitizer.bypassSecurityTrustResourceUrl('/assets/icons/google.svg')
-    );
-    iconRegistry.addSvgIcon(
-      'facebook',
-      sanitizer.bypassSecurityTrustResourceUrl('/assets/icons/facebook.svg')
-    );
-    iconRegistry.addSvgIcon(
-      'vk',
-      sanitizer.bypassSecurityTrustResourceUrl('/assets/icons/vk.svg')
-    );
+    registerOAuthIcons(inject(MatIconRegistry), inject(DomSanitizer));
   }
 
   ngOnInit(): void {
