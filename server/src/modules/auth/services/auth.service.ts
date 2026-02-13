@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -24,17 +28,21 @@ export class AuthService {
     private oauthAccountService: OAuthAccountService
   ) {}
 
+  // Pre-computed dummy hash for constant-time rejection (prevents timing attacks)
+  private static readonly DUMMY_HASH =
+    '$2b$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012';
+
   async validateUser(
     email: string,
     password: string
   ): Promise<UserResponseDto | null> {
     const user = await this.usersService.findByEmail(email);
-    if (
-      user &&
-      user.isActive &&
-      user.password &&
-      (await bcrypt.compare(password, user.password))
-    ) {
+    const hashToCompare =
+      user?.isActive && user.password ? user.password : AuthService.DUMMY_HASH;
+
+    const isMatch = await bcrypt.compare(password, hashToCompare);
+
+    if (user && user.isActive && user.password && isMatch) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password, ...result } = user;
       return result;
@@ -84,7 +92,7 @@ export class AuthService {
           throw new UnauthorizedException('User account is deactivated');
         }
         user = existingUser;
-        await this.oauthAccountService.createOAuthAccount(
+        await this.safeCreateOAuthAccount(
           user.id,
           profile.provider,
           profile.providerId
@@ -96,7 +104,7 @@ export class AuthService {
           firstName: profile.firstName,
           lastName: profile.lastName
         });
-        await this.oauthAccountService.createOAuthAccount(
+        await this.safeCreateOAuthAccount(
           user.id,
           profile.provider,
           profile.providerId
@@ -137,11 +145,44 @@ export class AuthService {
       return; // Already linked to this user
     }
 
-    await this.oauthAccountService.createOAuthAccount(
+    await this.safeCreateOAuthAccount(
       userId,
       profile.provider,
       profile.providerId
     );
+  }
+
+  private async safeCreateOAuthAccount(
+    userId: string,
+    provider: string,
+    providerId: string
+  ): Promise<void> {
+    try {
+      await this.oauthAccountService.createOAuthAccount(
+        userId,
+        provider,
+        providerId
+      );
+    } catch (error: unknown) {
+      // PostgreSQL unique_violation error code
+      const PG_UNIQUE_VIOLATION = '23505';
+      const dbError = error as { code?: string };
+      if (dbError.code === PG_UNIQUE_VIOLATION) {
+        const existing =
+          await this.oauthAccountService.findByProviderAndProviderId(
+            provider,
+            providerId
+          );
+        if (existing && existing.userId !== userId) {
+          throw new ConflictException(
+            'This OAuth account is already linked to another user'
+          );
+        }
+        // Already linked to this user — safe to ignore
+        return;
+      }
+      throw error;
+    }
   }
 
   async register(registerDto: RegisterDto): Promise<User> {

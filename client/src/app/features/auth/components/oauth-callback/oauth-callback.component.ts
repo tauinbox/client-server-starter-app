@@ -46,7 +46,11 @@ export class OAuthCallbackComponent implements OnInit {
       const decoded = atob(dataMatch[1].replace(/-/g, '+').replace(/_/g, '/'));
       const authResponse: AuthResponse = JSON.parse(decoded);
 
-      if (!authResponse.tokens?.access_token || !authResponse.user) {
+      if (
+        !authResponse.tokens?.access_token ||
+        !authResponse.user?.id ||
+        !authResponse.user?.email
+      ) {
         this.#redirectToLogin('auth_failed');
         return;
       }
@@ -57,10 +61,12 @@ export class OAuthCallbackComponent implements OnInit {
       const returnUrl = sessionStorage.getItem('oauth_return_url');
       sessionStorage.removeItem('oauth_return_url');
 
-      void this.#router.navigateByUrl(
-        returnUrl || `/${AppRouteSegmentEnum.Profile}`,
-        { replaceUrl: true }
-      );
+      const safeUrl =
+        returnUrl && returnUrl.startsWith('/') && !returnUrl.includes('//')
+          ? returnUrl
+          : `/${AppRouteSegmentEnum.Profile}`;
+
+      void this.#router.navigateByUrl(safeUrl, { replaceUrl: true });
     } catch {
       this.#redirectToLogin('auth_failed');
     }

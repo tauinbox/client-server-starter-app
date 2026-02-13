@@ -55,7 +55,11 @@ describe('OAuthController', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn().mockReturnValue('http://localhost:4200')
+            get: jest
+              .fn()
+              .mockImplementation((key: string) =>
+                key === 'CLIENT_URL' ? 'http://localhost:4200' : undefined
+              )
           }
         }
       ]
@@ -128,6 +132,15 @@ describe('OAuthController', () => {
           mockJwtRequest('user-1') as JwtAuthRequest
         )
       ).rejects.toThrow('Cannot unlink');
+    });
+
+    it('should throw when provider is invalid', async () => {
+      await expect(
+        controller.unlinkOAuth(
+          'invalid-provider',
+          mockJwtRequest('user-1') as JwtAuthRequest
+        )
+      ).rejects.toThrow('Invalid OAuth provider');
     });
 
     it('should allow unlink when user has password', async () => {

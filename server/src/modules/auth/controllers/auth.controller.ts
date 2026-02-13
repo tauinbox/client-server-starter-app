@@ -124,6 +124,15 @@ export class AuthController {
     @Request() req: JwtAuthRequest,
     @Body() updateProfileDto: UpdateProfileDto
   ) {
-    return await this.userService.update(req.user.userId, updateProfileDto);
+    const updatedUser = await this.userService.update(
+      req.user.userId,
+      updateProfileDto
+    );
+
+    if (updateProfileDto.password) {
+      await this.authService.logout(req.user.userId);
+    }
+
+    return updatedUser;
   }
 }

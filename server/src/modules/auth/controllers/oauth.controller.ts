@@ -36,13 +36,33 @@ import { UsersService } from '../../users/services/users.service';
 })
 export class OAuthController {
   private readonly logger = new Logger(OAuthController.name);
+  private readonly clientUrl: string;
 
   constructor(
     private readonly authService: AuthService,
     private readonly oauthAccountService: OAuthAccountService,
     private readonly usersService: UsersService,
     private readonly configService: ConfigService
-  ) {}
+  ) {
+    const url = this.configService.get<string>('CLIENT_URL');
+    if (!url) {
+      throw new Error('CLIENT_URL environment variable is not configured');
+    }
+    try {
+      const parsed = new URL(url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error(
+          `CLIENT_URL must use http or https protocol, got: ${parsed.protocol}`
+        );
+      }
+    } catch (error) {
+      if (error instanceof TypeError) {
+        throw new Error(`CLIENT_URL is not a valid URL: ${url}`);
+      }
+      throw error;
+    }
+    this.clientUrl = url;
+  }
 
   // --- Google ---
 
@@ -160,14 +180,12 @@ export class OAuthController {
     profile: OAuthUserProfile,
     res: Response
   ): Promise<void> {
-    const clientUrl = this.configService.get<string>('CLIENT_URL');
-
     try {
       if (!profile.email) {
         this.logger.warn(
           `OAuth login failed: no email provided by ${profile.provider}`
         );
-        res.redirect(`${clientUrl}/login?oauth_error=no_email`);
+        res.redirect(`${this.clientUrl}/login?oauth_error=no_email`);
         return;
       }
 
@@ -177,10 +195,10 @@ export class OAuthController {
         'base64url'
       );
 
-      res.redirect(`${clientUrl}/oauth/callback#data=${encodedData}`);
+      res.redirect(`${this.clientUrl}/oauth/callback#data=${encodedData}`);
     } catch (error) {
       this.logger.error('OAuth callback error', error);
-      res.redirect(`${clientUrl}/login?oauth_error=auth_failed`);
+      res.redirect(`${this.clientUrl}/login?oauth_error=auth_failed`);
     }
   }
 }
