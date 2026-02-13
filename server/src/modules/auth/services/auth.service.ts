@@ -31,6 +31,7 @@ export class AuthService {
     const user = await this.usersService.findByEmail(email);
     if (
       user &&
+      user.isActive &&
       user.password &&
       (await bcrypt.compare(password, user.password))
     ) {
@@ -70,12 +71,18 @@ export class AuthService {
     if (existingOAuth) {
       // Returning OAuth user
       user = await this.usersService.findOne(existingOAuth.userId);
+      if (!user.isActive) {
+        throw new UnauthorizedException('User account is deactivated');
+      }
     } else {
       // 2. Check if user exists by email
       const existingUser = await this.usersService.findByEmail(profile.email);
 
       if (existingUser) {
         // Link OAuth to existing user
+        if (!existingUser.isActive) {
+          throw new UnauthorizedException('User account is deactivated');
+        }
         user = existingUser;
         await this.oauthAccountService.createOAuthAccount(
           user.id,
@@ -153,6 +160,11 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
+    if (!user.isActive) {
+      await this.refreshTokenService.revokeToken(tokenDoc.id);
+      throw new UnauthorizedException('User account is deactivated');
+    }
+
     await this.refreshTokenService.revokeToken(tokenDoc.id);
 
     const tokens = this.generateTokens(user.id, user.email, user.isAdmin);
@@ -163,9 +175,11 @@ export class AuthService {
       parseInt(this.configService.get('JWT_REFRESH_EXPIRATION') || '604800', 10)
     );
 
+    const { password: _, ...userWithoutPassword } = user;
+
     return {
       tokens,
-      user
+      user: userWithoutPassword
     };
   }
 

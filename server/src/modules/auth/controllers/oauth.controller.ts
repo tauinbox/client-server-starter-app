@@ -131,6 +131,10 @@ export class OAuthController {
     @Param('provider') provider: string,
     @Request() req: JwtAuthRequest
   ) {
+    if (!Object.values(OAuthProvider).includes(provider as OAuthProvider)) {
+      throw new BadRequestException(`Invalid OAuth provider: ${provider}`);
+    }
+
     const userId = req.user.userId;
     const accounts = await this.oauthAccountService.findByUserId(userId);
 

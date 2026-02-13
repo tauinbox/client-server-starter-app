@@ -9,9 +9,7 @@ import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthUserProfile } from '../types/oauth-profile';
 
-function mockJwtRequest(
-  userId: string
-): { user: JwtAuthRequest['user'] } {
+function mockJwtRequest(userId: string): { user: JwtAuthRequest['user'] } {
   return {
     user: { userId, email: 'test@example.com', isAdmin: false }
   };
