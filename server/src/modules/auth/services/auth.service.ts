@@ -11,6 +11,8 @@ import { CustomJwtPayload } from '../types/jwt-payload';
 import { LocalAuthRequest } from '../types/auth.request';
 import { TokensResponseDto } from '../dtos/auth-response.dto';
 import { RefreshTokenService } from './refresh-token.service';
+import { OAuthAccountService } from './oauth-account.service';
+import { OAuthUserProfile } from '../types/oauth-profile';
 
 @Injectable()
 export class AuthService {
@@ -18,7 +20,8 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     private configService: ConfigService,
-    private refreshTokenService: RefreshTokenService
+    private refreshTokenService: RefreshTokenService,
+    private oauthAccountService: OAuthAccountService
   ) {}
 
   async validateUser(
@@ -26,7 +29,11 @@ export class AuthService {
     password: string
   ): Promise<UserResponseDto | null> {
     const user = await this.usersService.findByEmail(email);
-    if (user && (await bcrypt.compare(password, user.password))) {
+    if (
+      user &&
+      user.password &&
+      (await bcrypt.compare(password, user.password))
+    ) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password, ...result } = user;
       return result;
@@ -48,6 +55,86 @@ export class AuthService {
       tokens,
       user
     };
+  }
+
+  async loginWithOAuth(profile: OAuthUserProfile) {
+    // 1. Check if OAuth account already linked
+    const existingOAuth =
+      await this.oauthAccountService.findByProviderAndProviderId(
+        profile.provider,
+        profile.providerId
+      );
+
+    let user: User;
+
+    if (existingOAuth) {
+      // Returning OAuth user
+      user = await this.usersService.findOne(existingOAuth.userId);
+    } else {
+      // 2. Check if user exists by email
+      const existingUser = await this.usersService.findByEmail(profile.email);
+
+      if (existingUser) {
+        // Link OAuth to existing user
+        user = existingUser;
+        await this.oauthAccountService.createOAuthAccount(
+          user.id,
+          profile.provider,
+          profile.providerId
+        );
+      } else {
+        // 3. Create new user + OAuth account
+        user = await this.usersService.createOAuthUser({
+          email: profile.email,
+          firstName: profile.firstName,
+          lastName: profile.lastName
+        });
+        await this.oauthAccountService.createOAuthAccount(
+          user.id,
+          profile.provider,
+          profile.providerId
+        );
+      }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...userWithoutPassword } = user;
+
+    const tokens = this.generateTokens(user.id, user.email, user.isAdmin);
+
+    await this.refreshTokenService.deleteByUserId(user.id);
+    await this.refreshTokenService.createRefreshToken(
+      user.id,
+      tokens.refresh_token,
+      parseInt(this.configService.get('JWT_REFRESH_EXPIRATION') || '604800', 10)
+    );
+
+    return {
+      tokens,
+      user: userWithoutPassword
+    };
+  }
+
+  async linkOAuthAccount(userId: string, profile: OAuthUserProfile) {
+    const existing = await this.oauthAccountService.findByProviderAndProviderId(
+      profile.provider,
+      profile.providerId
+    );
+
+    if (existing) {
+      if (existing.userId !== userId) {
+        throw new UnauthorizedException(
+          'This OAuth account is already linked to another user'
+        );
+      }
+      return; // Already linked to this user
+    }
+
+    await this.oauthAccountService.createOAuthAccount(
+      userId,
+      profile.provider,
+      profile.providerId
+    );
   }
 
   async register(registerDto: RegisterDto): Promise<User> {

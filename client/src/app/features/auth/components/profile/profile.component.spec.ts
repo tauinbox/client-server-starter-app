@@ -29,13 +29,17 @@ describe('ProfileComponent', () => {
   let authServiceMock: {
     getProfile: ReturnType<typeof vi.fn>;
     updateProfile: ReturnType<typeof vi.fn>;
+    getOAuthAccounts: ReturnType<typeof vi.fn>;
+    unlinkOAuthAccount: ReturnType<typeof vi.fn>;
   };
   let snackBarMock: { open: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     authServiceMock = {
       getProfile: vi.fn().mockReturnValue(of(mockUser)),
-      updateProfile: vi.fn()
+      updateProfile: vi.fn(),
+      getOAuthAccounts: vi.fn().mockReturnValue(of([])),
+      unlinkOAuthAccount: vi.fn()
     };
 
     snackBarMock = { open: vi.fn() };

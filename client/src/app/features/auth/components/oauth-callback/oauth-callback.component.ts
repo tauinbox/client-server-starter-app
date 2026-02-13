@@ -1,0 +1,75 @@
+import type { OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { MatProgressSpinner } from '@angular/material/progress-spinner';
+import type { AuthResponse } from '../../models/auth.types';
+import { AuthStore } from '../../store/auth.store';
+import { AuthService } from '../../services/auth.service';
+import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
+
+@Component({
+  selector: 'app-oauth-callback',
+  imports: [MatProgressSpinner],
+  template: `
+    <div class="oauth-callback-container">
+      <mat-spinner></mat-spinner>
+      <p>Completing sign in...</p>
+    </div>
+  `,
+  styles: `
+    .oauth-callback-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 50vh;
+      gap: 16px;
+    }
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class OAuthCallbackComponent implements OnInit {
+  readonly #router = inject(Router);
+  readonly #authStore = inject(AuthStore);
+  readonly #authService = inject(AuthService);
+
+  ngOnInit(): void {
+    try {
+      const fragment = window.location.hash;
+      const dataMatch = fragment.match(/data=([^&]+)/);
+
+      if (!dataMatch?.[1]) {
+        this.#redirectToLogin('auth_failed');
+        return;
+      }
+
+      const decoded = atob(dataMatch[1].replace(/-/g, '+').replace(/_/g, '/'));
+      const authResponse: AuthResponse = JSON.parse(decoded);
+
+      if (!authResponse.tokens?.access_token || !authResponse.user) {
+        this.#redirectToLogin('auth_failed');
+        return;
+      }
+
+      this.#authStore.saveAuthResponse(authResponse);
+      this.#authService.scheduleTokenRefresh();
+
+      const returnUrl = sessionStorage.getItem('oauth_return_url');
+      sessionStorage.removeItem('oauth_return_url');
+
+      void this.#router.navigateByUrl(
+        returnUrl || `/${AppRouteSegmentEnum.Profile}`,
+        { replaceUrl: true }
+      );
+    } catch {
+      this.#redirectToLogin('auth_failed');
+    }
+  }
+
+  #redirectToLogin(error: string): void {
+    void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`], {
+      queryParams: { oauth_error: error },
+      replaceUrl: true
+    });
+  }
+}

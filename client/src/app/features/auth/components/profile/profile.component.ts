@@ -17,7 +17,7 @@ import { MatDivider } from '@angular/material/divider';
 import type { FormControl, FormGroup } from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
-import { MatIcon } from '@angular/material/icon';
+import { MatIcon, MatIconRegistry } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { AuthService } from '../../services/auth.service';
@@ -27,11 +27,24 @@ import type { UpdateProfile } from '../../models/auth.types';
 import { DatePipe } from '@angular/common';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DomSanitizer } from '@angular/platform-browser';
+import { OAUTH_URLS } from '../../constants/auth-api.const';
 
 type ProfileFormType = {
   firstName: FormControl<string>;
   lastName: FormControl<string>;
   password: FormControl<string>;
+};
+
+type OAuthAccountInfo = {
+  provider: string;
+  createdAt: string;
+};
+
+const PROVIDER_LABELS: Record<string, string> = {
+  google: 'Google',
+  facebook: 'Facebook',
+  vk: 'VK'
 };
 
 @Component({
@@ -68,6 +81,10 @@ export class ProfileComponent implements OnInit {
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly showPassword = signal(false);
+  protected readonly oauthAccounts = signal<OAuthAccountInfo[]>([]);
+  protected readonly oauthLoading = signal(false);
+  protected readonly allProviders = Object.keys(OAUTH_URLS);
+  protected readonly providerLabels = PROVIDER_LABELS;
 
   protected readonly profileForm: FormGroup<ProfileFormType> =
     this.#fb.group<ProfileFormType>({
@@ -85,8 +102,27 @@ export class ProfileComponent implements OnInit {
       })
     });
 
+  constructor() {
+    const iconRegistry = inject(MatIconRegistry);
+    const sanitizer = inject(DomSanitizer);
+
+    iconRegistry.addSvgIcon(
+      'google',
+      sanitizer.bypassSecurityTrustResourceUrl('/assets/icons/google.svg')
+    );
+    iconRegistry.addSvgIcon(
+      'facebook',
+      sanitizer.bypassSecurityTrustResourceUrl('/assets/icons/facebook.svg')
+    );
+    iconRegistry.addSvgIcon(
+      'vk',
+      sanitizer.bypassSecurityTrustResourceUrl('/assets/icons/vk.svg')
+    );
+  }
+
   ngOnInit() {
     this.loadProfile();
+    this.loadOAuthAccounts();
   }
 
   loadProfile(): void {
@@ -112,6 +148,53 @@ export class ProfileComponent implements OnInit {
           const errorMessage =
             err.error?.message || 'Failed to load profile. Please try again.';
           this.error.set(errorMessage);
+        }
+      });
+  }
+
+  loadOAuthAccounts(): void {
+    this.#authService
+      .getOAuthAccounts()
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: (accounts) => this.oauthAccounts.set(accounts),
+        error: () => this.oauthAccounts.set([])
+      });
+  }
+
+  isProviderLinked(provider: string): boolean {
+    return this.oauthAccounts().some((a) => a.provider === provider);
+  }
+
+  connectProvider(provider: string): void {
+    sessionStorage.setItem('oauth_return_url', '/profile');
+    window.location.href = OAUTH_URLS[provider as keyof typeof OAUTH_URLS];
+  }
+
+  disconnectProvider(provider: string): void {
+    this.oauthLoading.set(true);
+    this.#authService
+      .unlinkOAuthAccount(provider)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.oauthLoading.set(false);
+          this.oauthAccounts.update((accounts) =>
+            accounts.filter((a) => a.provider !== provider)
+          );
+          this.#snackBar.open(
+            `${PROVIDER_LABELS[provider] || provider} account disconnected`,
+            'Close',
+            { duration: 5000 }
+          );
+        },
+        error: (err: HttpErrorResponse) => {
+          this.oauthLoading.set(false);
+          this.#snackBar.open(
+            err.error?.message || 'Failed to disconnect account',
+            'Close',
+            { duration: 5000 }
+          );
         }
       });
   }

@@ -34,6 +34,40 @@
 
         <mat-divider class="my-4"></mat-divider>
 
+        <div class="oauth-section">
+          <h3>Connected Accounts</h3>
+          <div class="oauth-providers">
+            @for (provider of allProviders; track provider) {
+              <div class="oauth-provider-row">
+                <div class="oauth-provider-info">
+                  <mat-icon [svgIcon]="provider"></mat-icon>
+                  <span>{{ providerLabels[provider] }}</span>
+                </div>
+                @if (isProviderLinked(provider)) {
+                  <button
+                    mat-stroked-button
+                    color="warn"
+                    [disabled]="oauthLoading()"
+                    (click)="disconnectProvider(provider)"
+                  >
+                    Disconnect
+                  </button>
+                } @else {
+                  <button
+                    mat-stroked-button
+                    [disabled]="oauthLoading()"
+                    (click)="connectProvider(provider)"
+                  >
+                    Connect
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        <mat-divider class="my-4"></mat-divider>
+
         <form [formGroup]="profileForm" (ngSubmit)="onSubmit()">
           <h3>Update Profile</h3>
 

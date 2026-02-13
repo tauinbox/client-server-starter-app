@@ -111,6 +111,20 @@ export class UsersService {
     return this.userRepository.save(user);
   }
 
+  async createOAuthUser(data: {
+    email: string;
+    firstName: string;
+    lastName: string;
+  }): Promise<User> {
+    const user = this.userRepository.create({
+      email: data.email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      password: null
+    });
+    return this.userRepository.save(user);
+  }
+
   async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
     await this.userRepository.remove(user);

@@ -1,5 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  Matches,
+  MaxLength,
+  MinLength
+} from 'class-validator';
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({
@@ -21,7 +27,8 @@ export class UpdateProfileDto {
   lastName?: string;
 
   @ApiPropertyOptional({
-    description: 'New password (min 8 characters, must contain uppercase, lowercase and number)',
+    description:
+      'New password (min 8 characters, must contain uppercase, lowercase and number)',
     example: 'NewPassword123',
     minLength: 8
   })
@@ -29,7 +36,8 @@ export class UpdateProfileDto {
   @MinLength(8)
   @MaxLength(128)
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/, {
-    message: 'Password must contain at least one uppercase letter, one lowercase letter and one number'
+    message:
+      'Password must contain at least one uppercase letter, one lowercase letter and one number'
   })
   password?: string;
 }

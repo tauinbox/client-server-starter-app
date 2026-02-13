@@ -21,9 +21,9 @@ export class User {
   @Column()
   lastName: string;
 
-  @Column()
+  @Column({ nullable: true })
   @Exclude()
-  password: string;
+  password: string | null;
 
   @Column({ default: true })
   isActive: boolean;

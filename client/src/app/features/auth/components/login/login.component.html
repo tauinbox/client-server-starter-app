@@ -81,6 +81,42 @@
           </button>
         </div>
       </form>
+
+      <div class="oauth-divider">
+        <mat-divider></mat-divider>
+        <span class="oauth-divider-text">or sign in with</span>
+        <mat-divider></mat-divider>
+      </div>
+
+      <div class="oauth-buttons">
+        <button
+          mat-stroked-button
+          type="button"
+          class="oauth-button"
+          (click)="onOAuthLogin('google')"
+        >
+          <mat-icon svgIcon="google"></mat-icon>
+          <span>Google</span>
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          class="oauth-button"
+          (click)="onOAuthLogin('facebook')"
+        >
+          <mat-icon svgIcon="facebook"></mat-icon>
+          <span>Facebook</span>
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          class="oauth-button"
+          (click)="onOAuthLogin('vk')"
+        >
+          <mat-icon svgIcon="vk"></mat-icon>
+          <span>VK</span>
+        </button>
+      </div>
     </mat-card-content>
 
     <mat-card-actions>
