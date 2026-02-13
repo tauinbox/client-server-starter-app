@@ -1,10 +1,12 @@
 import type { OnInit } from '@angular/core';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { Router } from '@angular/router';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import type { AuthResponse } from '../../models/auth.types';
 import { AuthStore } from '../../store/auth.store';
 import { AuthService } from '../../services/auth.service';
+import { SessionStorageService } from '@core/services/session-storage.service';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 
 @Component({
@@ -32,10 +34,12 @@ export class OAuthCallbackComponent implements OnInit {
   readonly #router = inject(Router);
   readonly #authStore = inject(AuthStore);
   readonly #authService = inject(AuthService);
+  readonly #sessionStorage = inject(SessionStorageService);
+  readonly #window = inject(DOCUMENT).defaultView;
 
   ngOnInit(): void {
     try {
-      const fragment = window.location.hash;
+      const fragment = this.#window?.location.hash ?? '';
       const dataMatch = fragment.match(/data=([^&]+)/);
 
       if (!dataMatch?.[1]) {
@@ -58,8 +62,9 @@ export class OAuthCallbackComponent implements OnInit {
       this.#authStore.saveAuthResponse(authResponse);
       this.#authService.scheduleTokenRefresh();
 
-      const returnUrl = sessionStorage.getItem('oauth_return_url');
-      sessionStorage.removeItem('oauth_return_url');
+      const returnUrl =
+        this.#sessionStorage.getItem<string>('oauth_return_url');
+      this.#sessionStorage.removeItem('oauth_return_url');
 
       const safeUrl =
         returnUrl && returnUrl.startsWith('/') && !returnUrl.includes('//')

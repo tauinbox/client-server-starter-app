@@ -20,7 +20,9 @@ import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon, MatIconRegistry } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatButton, MatIconButton } from '@angular/material/button';
+import { DOCUMENT } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
+import { SessionStorageService } from '@core/services/session-storage.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type { User } from '@shared/models/user.types';
 import type { UpdateProfile } from '../../models/auth.types';
@@ -75,6 +77,8 @@ export class ProfileComponent implements OnInit {
   readonly #authService = inject(AuthService);
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #sessionStorage = inject(SessionStorageService);
+  readonly #window = inject(DOCUMENT).defaultView;
 
   protected readonly user = signal<User | null>(null);
   protected readonly loading = signal(true);
@@ -167,8 +171,11 @@ export class ProfileComponent implements OnInit {
   }
 
   connectProvider(provider: string): void {
-    sessionStorage.setItem('oauth_return_url', '/profile');
-    window.location.href = OAUTH_URLS[provider as keyof typeof OAUTH_URLS];
+    this.#sessionStorage.setItem('oauth_return_url', '/profile');
+    if (this.#window) {
+      this.#window.location.href =
+        OAUTH_URLS[provider as keyof typeof OAUTH_URLS];
+    }
   }
 
   disconnectProvider(provider: string): void {

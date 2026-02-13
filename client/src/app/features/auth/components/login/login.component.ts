@@ -21,9 +21,11 @@ import { MatIcon, MatIconRegistry } from '@angular/material/icon';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatDivider } from '@angular/material/divider';
+import { DOCUMENT } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DomSanitizer } from '@angular/platform-browser';
 import { AuthService } from '../../services/auth.service';
+import { SessionStorageService } from '@core/services/session-storage.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
@@ -69,6 +71,8 @@ export class LoginComponent implements OnInit {
   readonly #router = inject(Router);
   readonly #route = inject(ActivatedRoute);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #sessionStorage = inject(SessionStorageService);
+  readonly #window = inject(DOCUMENT).defaultView;
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -119,11 +123,14 @@ export class LoginComponent implements OnInit {
   }
 
   onOAuthLogin(provider: string): void {
-    sessionStorage.setItem(
+    this.#sessionStorage.setItem(
       'oauth_return_url',
       this.#route.snapshot.queryParams['returnUrl'] || '/'
     );
-    window.location.href = this.oauthUrls[provider as keyof typeof OAUTH_URLS];
+    if (this.#window) {
+      this.#window.location.href =
+        this.oauthUrls[provider as keyof typeof OAUTH_URLS];
+    }
   }
 
   onSubmit(): void {
