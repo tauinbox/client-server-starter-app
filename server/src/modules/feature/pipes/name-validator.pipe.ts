@@ -4,10 +4,14 @@ import {
   Injectable,
   PipeTransform
 } from '@nestjs/common';
+import { FeatureEntityCreateDto } from '../dtos/feature-entity-create.dto';
 
 @Injectable()
 export class NameValidatorPipe implements PipeTransform {
-  transform(value: any, metadata: ArgumentMetadata): any {
+  transform(
+    value: FeatureEntityCreateDto,
+    metadata: ArgumentMetadata
+  ): FeatureEntityCreateDto {
     if (metadata.type !== 'body') {
       // apply the pipe only to the request body (which was defined by the @Body decorator)
       return value;

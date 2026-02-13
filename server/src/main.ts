@@ -1,27 +1,13 @@
-import { NestFactory, Reflector } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
 import { CoreModule } from './modules/core/core.module';
-import { Module, ValidationPipe, VersioningType } from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { ConfigModule } from '@nestjs/config';
 import * as compression from 'compression';
 import helmet from 'helmet';
-import configuration from './modules/core/configuration';
-import { FeatureService } from './modules/feature/services/feature.service';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import * as cookieParser from 'cookie-parser';
 import { corsOptions } from './cors-options';
-
-@Module({
-  imports: [
-    ConfigModule.forRoot({
-      load: [configuration],
-      envFilePath: ['.env.development', '.env'],
-      isGlobal: true
-    })
-  ]
-})
-class _BootstrapModule {}
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(
@@ -33,9 +19,11 @@ async function bootstrap() {
     }
   );
 
-  // Example: getting instances to pass as dependencies into class constructors (when needed)
-  const _reflector = app.get(Reflector);
-  const _featureService = app.get(FeatureService);
+  /*
+   Example: getting instances to pass as dependencies into class constructors (when needed)
+   const reflector = app.get(Reflector);
+   const featureService = app.get(FeatureService);
+   */
 
   app.useGlobalPipes(
     new ValidationPipe(

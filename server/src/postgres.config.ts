@@ -26,7 +26,9 @@ export const postgresConfig: () => PostgresConnectionOptions = () => ({
       ? (JSON.parse(process.env.DB_LOGGING) as LoggerOptions)
       : (process.env.DB_LOGGING as LoggerOptions)
     : localConfig.logging,
-  logger: (process.env.DB_LOGGER as any) || localConfig.logger,
+  logger:
+    (process.env.DB_LOGGER as PostgresConnectionOptions['logger']) ||
+    localConfig.logger,
   migrationsRun: false, // automatically run migrations on startup
   synchronize: process.env.ENVIRONMENT === 'local', // should be false for production (set to false for generating migration files)
   entities: [__dirname + '/modules/**/*.entity{.ts,.js}'],
@@ -37,7 +39,7 @@ export const postgresConfig: () => PostgresConnectionOptions = () => ({
 function isJsonString(str: string) {
   try {
     JSON.parse(str);
-  } catch (e) {
+  } catch (_e) {
     return false;
   }
   return true;
