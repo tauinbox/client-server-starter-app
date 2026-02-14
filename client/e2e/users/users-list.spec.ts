@@ -38,12 +38,24 @@ test.describe('User List page', () => {
     await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users');
 
-    await expect(page.getByRole('columnheader', { name: 'Email' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Name' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Status' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Role' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Created' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Actions' })).toBeVisible();
+    await expect(
+      page.getByRole('columnheader', { name: 'Email' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('columnheader', { name: 'Name' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('columnheader', { name: 'Status' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('columnheader', { name: 'Role' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('columnheader', { name: 'Created' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('columnheader', { name: 'Actions' })
+    ).toBeVisible();
   });
 
   test('should display user data in table rows', async ({
@@ -54,13 +66,23 @@ test.describe('User List page', () => {
     await page.goto('/users');
 
     // Seed data includes admin@example.com, john@example.com, jane@example.com
-    await expect(page.getByRole('cell', { name: 'admin@example.com' })).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'admin@example.com' })
+    ).toBeVisible();
     await expect(page.getByRole('cell', { name: 'Admin User' })).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'john@example.com' })).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'john@example.com' })
+    ).toBeVisible();
     await expect(page.getByRole('cell', { name: 'John Smith' })).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'Active' }).first()).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'Inactive' }).first()).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'Admin', exact: true }).first()).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'Active' }).first()
+    ).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'Inactive' }).first()
+    ).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'Admin', exact: true }).first()
+    ).toBeVisible();
   });
 
   test('should show empty state when no users', async ({
@@ -111,7 +133,10 @@ test.describe('User List page', () => {
     // Override users endpoint to return exactly these 12
     await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.route('**/api/v1/users', (route) => {
-      if (route.request().method() === 'GET' && !route.request().url().includes('/search')) {
+      if (
+        route.request().method() === 'GET' &&
+        !route.request().url().includes('/search')
+      ) {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -122,13 +147,21 @@ test.describe('User List page', () => {
     });
     await page.goto('/users');
 
-    await expect(page.getByRole('cell', { name: 'user1@example.com' })).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'user10@example.com' })).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'user1@example.com' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'user10@example.com' })
+    ).toBeVisible();
 
     await page.getByRole('button', { name: 'Next page' }).click();
 
-    await expect(page.getByRole('cell', { name: 'user11@example.com' })).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'user12@example.com' })).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'user11@example.com' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'user12@example.com' })
+    ).toBeVisible();
   });
 
   test('should navigate to detail page on view button click', async ({
@@ -139,7 +172,11 @@ test.describe('User List page', () => {
     await page.goto('/users');
 
     const row = page.getByRole('row', { name: /admin@example\.com/ });
-    await row.locator('button', { has: page.locator('mat-icon', { hasText: 'visibility' }) }).click();
+    await row
+      .locator('button', {
+        has: page.locator('mat-icon', { hasText: 'visibility' })
+      })
+      .click();
 
     await expect(page).toHaveURL(/.*\/users\/1$/);
   });
@@ -152,7 +189,9 @@ test.describe('User List page', () => {
     await page.goto('/users');
 
     const row = page.getByRole('row', { name: /admin@example\.com/ });
-    await row.locator('button', { has: page.locator('mat-icon', { hasText: 'edit' }) }).click();
+    await row
+      .locator('button', { has: page.locator('mat-icon', { hasText: 'edit' }) })
+      .click();
 
     await expect(page).toHaveURL(/.*\/users\/1\/edit$/);
   });
@@ -164,7 +203,11 @@ test.describe('User List page', () => {
     await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users');
 
-    await page.locator('button', { has: page.locator('mat-icon', { hasText: 'search' }) }).click();
+    await page
+      .locator('button', {
+        has: page.locator('mat-icon', { hasText: 'search' })
+      })
+      .click();
 
     await expect(page).toHaveURL(/.*\/users\/search$/);
   });
@@ -177,11 +220,17 @@ test.describe('User List page', () => {
     await page.goto('/users');
 
     const row = page.getByRole('row', { name: /john@example\.com/ });
-    await row.locator('button', { has: page.locator('mat-icon', { hasText: 'delete' }) }).click();
+    await row
+      .locator('button', {
+        has: page.locator('mat-icon', { hasText: 'delete' })
+      })
+      .click();
 
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByText('Confirm Delete')).toBeVisible();
-    await expect(page.getByText(/Are you sure you want to delete user John Smith/)).toBeVisible();
+    await expect(
+      page.getByText(/Are you sure you want to delete user John Smith/)
+    ).toBeVisible();
   });
 
   test('should delete user after confirming', async ({ _mockServer, page }) => {
@@ -189,9 +238,16 @@ test.describe('User List page', () => {
     await page.goto('/users');
 
     const row = page.getByRole('row', { name: /john@example\.com/ });
-    await row.locator('button', { has: page.locator('mat-icon', { hasText: 'delete' }) }).click();
+    await row
+      .locator('button', {
+        has: page.locator('mat-icon', { hasText: 'delete' })
+      })
+      .click();
 
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Delete' })
+      .click();
 
     await expect(page.getByText('User deleted successfully')).toBeVisible();
   });
@@ -204,11 +260,20 @@ test.describe('User List page', () => {
     await page.goto('/users');
 
     const row = page.getByRole('row', { name: /john@example\.com/ });
-    await row.locator('button', { has: page.locator('mat-icon', { hasText: 'delete' }) }).click();
+    await row
+      .locator('button', {
+        has: page.locator('mat-icon', { hasText: 'delete' })
+      })
+      .click();
 
-    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Cancel' })
+      .click();
 
     await expect(page.getByRole('dialog')).toBeHidden();
-    await expect(page.getByRole('cell', { name: 'john@example.com' })).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'john@example.com' })
+    ).toBeVisible();
   });
 });

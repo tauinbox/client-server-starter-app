@@ -84,7 +84,9 @@ test.describe('User Detail page', () => {
     await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/1');
 
-    await expect(page.locator('.chips').getByText('Administrator')).toBeVisible();
+    await expect(
+      page.locator('.chips').getByText('Administrator')
+    ).toBeVisible();
   });
 
   test('should display User chip for non-admin user', async ({
@@ -113,9 +115,7 @@ test.describe('User Detail page', () => {
     await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/1');
 
-    await expect(
-      page.getByRole('button', { name: 'Edit User' })
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit User' })).toBeVisible();
   });
 
   test('should navigate to edit page on "Edit User" button click', async ({
@@ -138,7 +138,9 @@ test.describe('User Detail page', () => {
     await page.goto('/users/1');
 
     await expect(
-      page.locator('mat-card-header button', { has: page.locator('mat-icon', { hasText: 'arrow_back' }) })
+      page.locator('mat-card-header button', {
+        has: page.locator('mat-icon', { hasText: 'arrow_back' })
+      })
     ).toBeVisible();
   });
 
@@ -150,7 +152,9 @@ test.describe('User Detail page', () => {
     await page.goto('/users/3');
 
     await expect(
-      page.locator('mat-card-header button', { has: page.locator('mat-icon', { hasText: 'arrow_back' }) })
+      page.locator('mat-card-header button', {
+        has: page.locator('mat-icon', { hasText: 'arrow_back' })
+      })
     ).toBeHidden();
   });
 
@@ -161,6 +165,8 @@ test.describe('User Detail page', () => {
     await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/999');
 
-    await expect(page.getByRole('heading', { name: 'User Not Found' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'User Not Found' })
+    ).toBeVisible();
   });
 });

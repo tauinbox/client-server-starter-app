@@ -246,7 +246,10 @@ test.describe('User Edit page', () => {
     await page.goto('/users/3/edit');
 
     await page.getByRole('button', { name: 'Delete User' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Delete' })
+      .click();
 
     await expect(page.getByText('User deleted successfully')).toBeVisible();
     await expect(page).toHaveURL(/.*\/users$/);

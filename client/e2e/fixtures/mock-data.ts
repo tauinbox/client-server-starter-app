@@ -1,6 +1,9 @@
 import { createMockJwt } from './jwt.utils';
 
-export { createMockUser, createOAuthAccount } from '../../../mock-server/src/factories';
+export {
+  createMockUser,
+  createOAuthAccount
+} from '../../../mock-server/src/factories';
 
 export type MockUser = {
   id: string;

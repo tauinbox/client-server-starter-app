@@ -53,8 +53,12 @@ test.describe('User Search page', () => {
     await page.getByRole('button', { name: 'Search' }).click();
 
     await expect(page.getByText('Search Results')).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'admin@example.com' })).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'john@example.com' })).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'admin@example.com' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'john@example.com' })
+    ).toBeVisible();
   });
 
   test('should display result count', async ({ _mockServer, page }) => {
@@ -110,7 +114,11 @@ test.describe('User Search page', () => {
     await page.getByRole('button', { name: 'Search' }).click();
 
     const row = page.getByRole('row', { name: /admin@example\.com/ });
-    await row.locator('button', { has: page.locator('mat-icon', { hasText: 'visibility' }) }).click();
+    await row
+      .locator('button', {
+        has: page.locator('mat-icon', { hasText: 'visibility' })
+      })
+      .click();
 
     await expect(page).toHaveURL(/.*\/users\/1$/);
   });
@@ -125,7 +133,9 @@ test.describe('User Search page', () => {
     await page.getByRole('button', { name: 'Search' }).click();
 
     const row = page.getByRole('row', { name: /admin@example\.com/ });
-    await row.locator('button', { has: page.locator('mat-icon', { hasText: 'edit' }) }).click();
+    await row
+      .locator('button', { has: page.locator('mat-icon', { hasText: 'edit' }) })
+      .click();
 
     await expect(page).toHaveURL(/.*\/users\/1\/edit$/);
   });
@@ -180,11 +190,18 @@ test.describe('User Search page', () => {
     await page.getByRole('button', { name: 'Search' }).click();
 
     const row = page.getByRole('row', { name: /john@example\.com/ });
-    await row.locator('button', { has: page.locator('mat-icon', { hasText: 'delete' }) }).click();
+    await row
+      .locator('button', {
+        has: page.locator('mat-icon', { hasText: 'delete' })
+      })
+      .click();
 
     await expect(page.getByRole('dialog')).toBeVisible();
 
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Delete' })
+      .click();
 
     await expect(page.getByText('User deleted successfully')).toBeVisible();
   });

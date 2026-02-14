@@ -4,7 +4,7 @@ import { resetState } from '../../../mock-server/src/state';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 
-export interface MockServerApi {
+export type MockServerApi = {
   url: string;
   reset(): void;
   getState(): Promise<{
@@ -13,7 +13,7 @@ export interface MockServerApi {
     refreshTokens: number;
   }>;
   seedUsers(
-    users: Array<{
+    users: {
       id: string;
       email: string;
       firstName: string;
@@ -23,17 +23,17 @@ export interface MockServerApi {
       isAdmin: boolean;
       createdAt: string;
       updatedAt: string;
-    }>
+    }[]
   ): Promise<void>;
   seedOAuthAccounts(
     userId: string,
-    accounts: Array<{
+    accounts: {
       provider: string;
       providerId: string;
       createdAt: string;
-    }>
+    }[]
   ): Promise<void>;
-}
+};
 
 type WorkerFixtures = {
   _workerMockServer: { port: number; server: Server };
@@ -45,6 +45,7 @@ type TestFixtures = {
 
 export const test = base.extend<TestFixtures, WorkerFixtures>({
   _workerMockServer: [
+    // eslint-disable-next-line no-empty-pattern
     async ({}, use) => {
       const app = createApp();
       const server = await new Promise<Server>((resolve) => {
@@ -106,11 +107,20 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 export { expect };
 
 // Re-export jwt utils for session-restore tests that need them
-export { base64url, createExpiredJwt, createMockJwt, createValidJwt } from './jwt.utils';
+export {
+  base64url,
+  createExpiredJwt,
+  createMockJwt,
+  createValidJwt
+} from './jwt.utils';
 
 // Re-export seed/mock data types and constants
 export type { MockUser } from './mock-data';
 export { defaultUser } from './mock-data';
 
 // Re-export helpers
-export { loginViaUi, expectAuthRedirect, expectForbiddenRedirect } from './helpers';
+export {
+  loginViaUi,
+  expectAuthRedirect,
+  expectForbiddenRedirect
+} from './helpers';
