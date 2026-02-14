@@ -1,4 +1,4 @@
-const AUTH_API_V1 = 'api/v1/auth';
+const AUTH_API_V1 = '/api/v1/auth';
 
 export enum AuthApiEnum {
   Login = `${AUTH_API_V1}/login`,
@@ -11,7 +11,7 @@ export enum AuthApiEnum {
 }
 
 export const OAUTH_URLS = {
-  google: `/${AUTH_API_V1}/oauth/google`,
-  facebook: `/${AUTH_API_V1}/oauth/facebook`,
-  vk: `/${AUTH_API_V1}/oauth/vk`
+  google: `${AUTH_API_V1}/oauth/google`,
+  facebook: `${AUTH_API_V1}/oauth/facebook`,
+  vk: `${AUTH_API_V1}/oauth/vk`
 } as const;
