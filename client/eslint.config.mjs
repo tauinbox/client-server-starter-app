@@ -7,6 +7,7 @@ import prettierPlugin from 'eslint-plugin-prettier';
 import importPlugin from 'eslint-plugin-import';
 import unusedImportsPlugin from 'eslint-plugin-unused-imports';
 import { fixupPluginRules } from '@eslint/compat';
+import baseRules from '../eslint.base.config.mjs';
 
 export default tseslint.config(
   {
@@ -39,6 +40,7 @@ export default tseslint.config(
     },
     processor: angular.processInlineTemplates,
     rules: {
+      ...baseRules,
       'prettier/prettier': 'error',
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': 'off',

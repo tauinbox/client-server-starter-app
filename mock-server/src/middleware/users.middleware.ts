@@ -85,7 +85,8 @@ router.get('/search', adminGuard, (req, res) => {
 
 // GET /api/v1/users/:id — requires auth (not admin), matching client authGuard
 router.get('/:id', authGuard, (req, res) => {
-  const user = findUserById(req.params.id);
+  const id = req.params.id as string;
+  const user = findUserById(id);
   if (!user) {
     res.status(404).json({ message: 'User not found', statusCode: 404 });
     return;
@@ -96,7 +97,8 @@ router.get('/:id', authGuard, (req, res) => {
 
 // PATCH /api/v1/users/:id
 router.patch('/:id', adminGuard, (req, res) => {
-  const user = findUserById(req.params.id);
+  const id = req.params.id as string;
+  const user = findUserById(id);
   if (!user) {
     res.status(404).json({ message: 'User not found', statusCode: 404 });
     return;
@@ -127,14 +129,15 @@ router.patch('/:id', adminGuard, (req, res) => {
 
 // DELETE /api/v1/users/:id
 router.delete('/:id', adminGuard, (req, res) => {
+  const id = req.params.id as string;
   const state = getState();
-  if (!state.users.has(req.params.id)) {
+  if (!state.users.has(id)) {
     res.status(404).json({ message: 'User not found', statusCode: 404 });
     return;
   }
 
-  state.users.delete(req.params.id);
-  state.oauthAccounts.delete(req.params.id);
+  state.users.delete(id);
+  state.oauthAccounts.delete(id);
 
   res.json({});
 });
