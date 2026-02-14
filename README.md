@@ -70,10 +70,16 @@ fullstack-starter-app/
 │   ├── src/migrations/     # TypeORM migrations
 │   └── src/seeders/        # Database seeders
 ├── mock-server/            # In-memory Express server for dev/testing
-│   ├── index.js            # Server entry point
-│   ├── state.js            # In-memory state management
-│   ├── data.js             # Seed data (users, tokens)
-│   └── routes/             # API route handlers (auth, users, OAuth)
+│   └── src/
+│       ├── index.ts        # Server entry point
+│       ├── app.ts          # Express app factory (createApp)
+│       ├── state.ts        # In-memory state management
+│       ├── seed.ts         # Faker-based seed data (70 users)
+│       ├── factories.ts    # createMockUser, createOAuthAccount
+│       ├── jwt.utils.ts    # JWT generation/validation
+│       ├── middleware/      # Route handlers (auth, users, OAuth) + guards
+│       ├── helpers/        # Auth helper utilities
+│       └── control.routes.ts  # Test control API (reset, seed)
 └── doc/                    # Project documentation
 ```
 
@@ -91,8 +97,9 @@ fullstack-starter-app/
 git clone <repository-url>
 cd fullstack-starter-app
 
-cd client && npm install   # also activates git hooks (husky)
+cd client && npm install        # also activates git hooks (husky)
 cd ../server && npm install
+cd ../mock-server && npm install
 ```
 
 ### 2. Configure the server
@@ -150,8 +157,9 @@ npm start
 **Option 2: Mock server (no database required, great for frontend development)**
 
 ```bash
-# Terminal 1 — Mock backend (port 3000, in-memory data)
-npm run start:mock
+# Terminal 1 — Mock backend (port 3000, in-memory data, watch mode)
+cd mock-server
+npm run start:dev
 
 # Terminal 2 — Frontend (port 4200, proxies /api to mock server)
 cd client
@@ -196,13 +204,16 @@ API base URL: `/api/v1`
 
 ## Available Commands
 
-### Root (Mock Server)
+### Mock Server (`cd mock-server`)
 
 ```bash
-npm run start:mock         # Start mock server (port 3000, in-memory API)
+npm start                  # Start mock server (port 3000)
+npm run start:dev          # Start with watch mode (ts-node-dev)
+npm run lint               # Lint check
+npm run format:check       # Prettier check
 ```
 
-### Server
+### Server (`cd server`)
 
 ```bash
 npm run start:dev          # Dev server (port 3000, watch mode)
@@ -236,7 +247,7 @@ npm run test:e2e:ui        # E2E tests (interactive UI)
 
 - **Standalone components** (no NgModules), all using `OnPush` change detection
 - **Lazy loading** via `loadComponent` on all routes
-- **Angular Signals** for state management (no centralized store)
+- **NgRx Signal Store** for state management (`AuthStore` global, `UsersStore` route-level)
 - **HTTP interceptors**: JWT (auto-attach token, handle 401 refresh) and error (snackbar notifications)
 - **Guards**: `authGuard` (checks authentication + token refresh) and `adminGuard` (checks admin role)
 - **Path aliases**: `@core/*`, `@features/*`, `@shared/*`
@@ -263,7 +274,7 @@ Four tables managed via TypeORM migrations:
 | Tool | Scope | Config |
 |------|-------|--------|
 | ESLint | Client (angular-eslint, unused-imports, import cycles) | `eslint.config.mjs` |
-| ESLint | Server (@typescript-eslint + prettier) | `eslint.config.mjs` |
+| ESLint | Server (@typescript-eslint + prettier) | `eslint.config.ts` |
 | Prettier | Both (single quotes, no trailing commas) | `.prettierrc` |
 | Stylelint | Client SCSS (recess property order) | `.stylelintrc.json` |
 | Husky + lint-staged | Pre-commit hook (auto-fix staged files) | `.lintstagedrc.mjs` |
@@ -274,9 +285,10 @@ A pre-commit hook (via [husky](https://typicode.github.io/husky/)) runs **lint-s
 
 | Glob | Linter |
 |------|--------|
-| `client/src/**/*.ts` | ESLint (angular-eslint) |
+| `client/{src,e2e}/**/*.ts` | ESLint (angular-eslint + prettier) |
 | `client/src/**/*.scss` | Stylelint |
-| `server/src/**/*.ts` | ESLint (@typescript-eslint) |
+| `server/src/**/*.ts` | Prettier + ESLint (@typescript-eslint) |
+| `mock-server/src/**/*.ts` | Prettier + ESLint (@typescript-eslint) |
 
 Husky and lint-staged are installed in the `client/` sub-package. Running `npm install` inside `client/` activates the git hooks via the `prepare` script.
 

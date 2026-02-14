@@ -24,6 +24,12 @@ export interface State {
   refreshTokens: Map<string, string>;
 }
 
+import type { Request } from 'express';
+
+export interface AuthenticatedRequest extends Request {
+  user: MockUser;
+}
+
 export interface TokensResponse {
   access_token: string;
   refresh_token: string;

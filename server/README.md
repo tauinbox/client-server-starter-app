@@ -13,11 +13,12 @@ npm run seed:run           # Optional: seed sample data
 npm run start:dev          # Dev server at http://localhost:3000
 ```
 
-**Alternative for development**: Use the mock-server (no database required) from the root directory:
+**Alternative for development**: Use the mock-server (no database required):
 
 ```bash
-# From project root
-npm run start:mock         # Starts in-memory Express API on port 3000
+cd mock-server
+npm install
+npm run start:dev          # Starts in-memory Express API on port 3000 (watch mode)
 ```
 
 ## Commands
@@ -77,7 +78,7 @@ Copy `.env.example` to `.env` and configure:
 ```
 src/
 ├── common/
-│   └── utils/              # Shared utilities (escapeLikePattern)
+│   └── utils/              # Shared utilities (escapeLikePattern, hashToken)
 └── modules/
 ├── core/                   # Dynamic root module
 │   ├── config/             # @nestjs/config, loads .env

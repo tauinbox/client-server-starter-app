@@ -15,7 +15,7 @@ const mockServerEslintConfig = path.join(mockServerDir, 'eslint.config.ts');
 const stylelintConfig = path.join(clientDir, '.stylelintrc.json');
 
 export default {
-  'client/src/**/*.ts': (files) => {
+  'client/{src,e2e}/**/*.ts': (files) => {
     return `${clientBin('eslint')} --fix -c ${clientEslintConfig} ${files.join(' ')}`;
   },
   'client/src/**/*.scss': (files) => {

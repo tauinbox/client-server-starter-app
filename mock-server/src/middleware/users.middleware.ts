@@ -6,20 +6,13 @@ import {
   getState,
   toUserResponse
 } from '../state';
-import { requireAdmin } from '../helpers/auth.helpers';
+import { adminGuard, authGuard } from '../helpers/auth.helpers';
 import type { MockUser } from '../types';
 
 const router = Router();
 
 // POST /api/v1/users
-router.post('/', (req, res) => {
-  const admin = requireAdmin(req);
-  if ('error' in admin) {
-    const msg = admin.error === 403 ? 'Forbidden' : 'Unauthorized';
-    res.status(admin.error).json({ message: msg, statusCode: admin.error });
-    return;
-  }
-
+router.post('/', adminGuard, (req, res) => {
   const { email, firstName, lastName, password } = req.body;
 
   if (!email || !firstName || !lastName || !password) {
@@ -56,27 +49,13 @@ router.post('/', (req, res) => {
 });
 
 // GET /api/v1/users
-router.get('/', (req, res) => {
-  const admin = requireAdmin(req);
-  if ('error' in admin) {
-    const msg = admin.error === 403 ? 'Forbidden' : 'Unauthorized';
-    res.status(admin.error).json({ message: msg, statusCode: admin.error });
-    return;
-  }
-
+router.get('/', adminGuard, (req, res) => {
   const users = Array.from(getState().users.values()).map(toUserResponse);
   res.json(users);
 });
 
 // GET /api/v1/users/search
-router.get('/search', (req, res) => {
-  const admin = requireAdmin(req);
-  if ('error' in admin) {
-    const msg = admin.error === 403 ? 'Forbidden' : 'Unauthorized';
-    res.status(admin.error).json({ message: msg, statusCode: admin.error });
-    return;
-  }
-
+router.get('/search', adminGuard, (req, res) => {
   const { email, firstName, lastName, isAdmin, isActive } = req.query;
   let users = Array.from(getState().users.values());
 
@@ -104,15 +83,8 @@ router.get('/search', (req, res) => {
   res.json(users.map(toUserResponse));
 });
 
-// GET /api/v1/users/:id
-router.get('/:id', (req, res) => {
-  const admin = requireAdmin(req);
-  if ('error' in admin) {
-    const msg = admin.error === 403 ? 'Forbidden' : 'Unauthorized';
-    res.status(admin.error).json({ message: msg, statusCode: admin.error });
-    return;
-  }
-
+// GET /api/v1/users/:id — requires auth (not admin), matching client authGuard
+router.get('/:id', authGuard, (req, res) => {
   const user = findUserById(req.params.id);
   if (!user) {
     res.status(404).json({ message: 'User not found', statusCode: 404 });
@@ -123,14 +95,7 @@ router.get('/:id', (req, res) => {
 });
 
 // PATCH /api/v1/users/:id
-router.patch('/:id', (req, res) => {
-  const admin = requireAdmin(req);
-  if ('error' in admin) {
-    const msg = admin.error === 403 ? 'Forbidden' : 'Unauthorized';
-    res.status(admin.error).json({ message: msg, statusCode: admin.error });
-    return;
-  }
-
+router.patch('/:id', adminGuard, (req, res) => {
   const user = findUserById(req.params.id);
   if (!user) {
     res.status(404).json({ message: 'User not found', statusCode: 404 });
@@ -161,14 +126,7 @@ router.patch('/:id', (req, res) => {
 });
 
 // DELETE /api/v1/users/:id
-router.delete('/:id', (req, res) => {
-  const admin = requireAdmin(req);
-  if ('error' in admin) {
-    const msg = admin.error === 403 ? 'Forbidden' : 'Unauthorized';
-    res.status(admin.error).json({ message: msg, statusCode: admin.error });
-    return;
-  }
-
+router.delete('/:id', adminGuard, (req, res) => {
   const state = getState();
   if (!state.users.has(req.params.id)) {
     res.status(404).json({ message: 'User not found', statusCode: 404 });

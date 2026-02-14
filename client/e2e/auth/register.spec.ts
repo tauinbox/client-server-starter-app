@@ -1,7 +1,10 @@
 import { expect, test } from '../fixtures/base.fixture';
 
 test.describe('Register page', () => {
-  test('should display the registration form', async ({ _mockServer, page }) => {
+  test('should display the registration form', async ({
+    _mockServer,
+    page
+  }) => {
     await page.goto('/register');
 
     const main = page.getByRole('main');
@@ -9,9 +12,7 @@ test.describe('Register page', () => {
     await expect(page.getByLabel('First Name')).toBeVisible();
     await expect(page.getByLabel('Last Name')).toBeVisible();
     await expect(page.getByLabel('Password')).toBeVisible();
-    await expect(
-      main.getByRole('button', { name: 'Register' })
-    ).toBeVisible();
+    await expect(main.getByRole('button', { name: 'Register' })).toBeVisible();
   });
 
   test('should disable submit button when form is empty', async ({
@@ -21,9 +22,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const main = page.getByRole('main');
-    await expect(
-      main.getByRole('button', { name: 'Register' })
-    ).toBeDisabled();
+    await expect(main.getByRole('button', { name: 'Register' })).toBeDisabled();
   });
 
   test('should disable submit button with invalid email', async ({
@@ -38,9 +37,7 @@ test.describe('Register page', () => {
     await page.getByLabel('Last Name').fill('Doe');
     await page.getByLabel('Password').fill('password123');
 
-    await expect(
-      main.getByRole('button', { name: 'Register' })
-    ).toBeDisabled();
+    await expect(main.getByRole('button', { name: 'Register' })).toBeDisabled();
   });
 
   test('should disable submit button with short password', async ({
@@ -55,9 +52,7 @@ test.describe('Register page', () => {
     await page.getByLabel('Last Name').fill('Doe');
     await page.getByLabel('Password').fill('short');
 
-    await expect(
-      main.getByRole('button', { name: 'Register' })
-    ).toBeDisabled();
+    await expect(main.getByRole('button', { name: 'Register' })).toBeDisabled();
   });
 
   test('should enable submit button when form is valid', async ({
@@ -72,9 +67,7 @@ test.describe('Register page', () => {
     await page.getByLabel('Last Name').fill('Doe');
     await page.getByLabel('Password').fill('password123');
 
-    await expect(
-      main.getByRole('button', { name: 'Register' })
-    ).toBeEnabled();
+    await expect(main.getByRole('button', { name: 'Register' })).toBeEnabled();
   });
 
   test('should show validation errors on touched empty fields', async ({
@@ -172,7 +165,10 @@ test.describe('Register page', () => {
       route.fulfill({
         status: 500,
         contentType: 'application/json',
-        body: JSON.stringify({ message: 'Internal server error', statusCode: 500 })
+        body: JSON.stringify({
+          message: 'Internal server error',
+          statusCode: 500
+        })
       })
     );
     await page.goto('/register');

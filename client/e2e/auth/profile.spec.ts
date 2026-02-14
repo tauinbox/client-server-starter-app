@@ -136,9 +136,7 @@ test.describe('Profile page', () => {
     await page.getByLabel('Last Name').fill('Smith');
     await page.getByRole('button', { name: 'Update Profile' }).click();
 
-    await expect(
-      page.getByText('Profile updated successfully')
-    ).toBeVisible();
+    await expect(page.getByText('Profile updated successfully')).toBeVisible();
   });
 
   test('should show updated info after successful update', async ({
@@ -163,18 +161,13 @@ test.describe('Profile page', () => {
     await page.getByLabel('First Name').fill('Jane');
     await page.getByRole('button', { name: 'Update Profile' }).click();
 
-    await expect(
-      page.getByText('Profile updated successfully')
-    ).toBeVisible();
+    await expect(page.getByText('Profile updated successfully')).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Update Profile' })
     ).toBeDisabled();
   });
 
-  test('should show error on update failure', async ({
-    _mockServer,
-    page
-  }) => {
+  test('should show error on update failure', async ({ _mockServer, page }) => {
     await loginViaUi(page, _mockServer.url);
     // Intercept PATCH profile to return 500
     await page.route('**/api/v1/auth/profile', (route) => {

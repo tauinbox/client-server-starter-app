@@ -18,26 +18,6 @@ test.describe('User Detail page', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { isAdmin: false });
-    // Mock the user detail endpoint to bypass admin guard for this test
-    await page.route('**/api/v1/users/3', (route) => {
-      if (route.request().method() === 'GET') {
-        return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            id: '3',
-            email: 'john@example.com',
-            firstName: 'John',
-            lastName: 'Smith',
-            isActive: true,
-            isAdmin: false,
-            createdAt: '2025-02-01T00:00:00.000Z',
-            updatedAt: '2025-02-01T00:00:00.000Z'
-          })
-        });
-      }
-      return route.fallback();
-    });
     await page.goto('/users/3');
 
     await expect(page.getByText('User Details')).toBeVisible();
@@ -104,7 +84,9 @@ test.describe('User Detail page', () => {
     await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/1');
 
-    await expect(page.locator('.chips').getByText('Administrator')).toBeVisible();
+    await expect(
+      page.locator('.chips').getByText('Administrator')
+    ).toBeVisible();
   });
 
   test('should display User chip for non-admin user', async ({
@@ -133,9 +115,7 @@ test.describe('User Detail page', () => {
     await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/1');
 
-    await expect(
-      page.getByRole('button', { name: 'Edit User' })
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit User' })).toBeVisible();
   });
 
   test('should navigate to edit page on "Edit User" button click', async ({
@@ -158,7 +138,9 @@ test.describe('User Detail page', () => {
     await page.goto('/users/1');
 
     await expect(
-      page.locator('mat-card-header button', { has: page.locator('mat-icon', { hasText: 'arrow_back' }) })
+      page.locator('mat-card-header button', {
+        has: page.locator('mat-icon', { hasText: 'arrow_back' })
+      })
     ).toBeVisible();
   });
 
@@ -170,7 +152,9 @@ test.describe('User Detail page', () => {
     await page.goto('/users/3');
 
     await expect(
-      page.locator('mat-card-header button', { has: page.locator('mat-icon', { hasText: 'arrow_back' }) })
+      page.locator('mat-card-header button', {
+        has: page.locator('mat-icon', { hasText: 'arrow_back' })
+      })
     ).toBeHidden();
   });
 
@@ -181,6 +165,8 @@ test.describe('User Detail page', () => {
     await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/999');
 
-    await expect(page.getByRole('heading', { name: 'User Not Found' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'User Not Found' })
+    ).toBeVisible();
   });
 });
