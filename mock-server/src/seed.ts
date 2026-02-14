@@ -1,142 +1,14 @@
+import { faker } from '@faker-js/faker';
+import { createMockUser, createOAuthAccount } from './factories';
 import type { MockUser, OAuthAccount } from './types';
 
-const firstNames = [
-  'Alex',
-  'Maria',
-  'David',
-  'Elena',
-  'Michael',
-  'Sofia',
-  'Daniel',
-  'Anna',
-  'James',
-  'Laura',
-  'Robert',
-  'Emma',
-  'William',
-  'Olivia',
-  'Thomas',
-  'Mia',
-  'Carlos',
-  'Natalia',
-  'Andrei',
-  'Victoria',
-  'Sergei',
-  'Irina',
-  'Pavel',
-  'Yulia',
-  'Dmitry',
-  'Tatiana',
-  'Nikolai',
-  'Ekaterina',
-  'Ivan',
-  'Olga',
-  'Peter',
-  'Svetlana',
-  'Anton',
-  'Alina',
-  'Viktor',
-  'Daria',
-  'Maxim',
-  'Polina',
-  'Artem',
-  'Kristina',
-  'Roman',
-  'Vera',
-  'Denis',
-  'Nina',
-  'Oleg',
-  'Lydia',
-  'Igor',
-  'Galina',
-  'Alexei',
-  'Tamara',
-  'Yuri',
-  'Nadya',
-  'Konstantin',
-  'Larisa',
-  'Mikhail',
-  'Valentina',
-  'Georgy',
-  'Marina',
-  'Evgeny',
-  'Ksenia',
-  'Vladislav',
-  'Inna',
-  'Stanislav',
-  'Diana',
-  'Timur'
-];
-
-const lastNames = [
-  'Anderson',
-  'Martinez',
-  'Johnson',
-  'Garcia',
-  'Brown',
-  'Lopez',
-  'Davis',
-  'Hernandez',
-  'Miller',
-  'Moore',
-  'Taylor',
-  'Jackson',
-  'Martin',
-  'Lee',
-  'Thompson',
-  'White',
-  'Harris',
-  'Clark',
-  'Lewis',
-  'Robinson',
-  'Walker',
-  'Young',
-  'Allen',
-  'King',
-  'Wright',
-  'Hill',
-  'Scott',
-  'Green',
-  'Adams',
-  'Baker',
-  'Nelson',
-  'Carter',
-  'Mitchell',
-  'Perez',
-  'Roberts',
-  'Turner',
-  'Phillips',
-  'Campbell',
-  'Parker',
-  'Evans',
-  'Edwards',
-  'Collins',
-  'Stewart',
-  'Sanchez',
-  'Morris',
-  'Rogers',
-  'Reed',
-  'Cook',
-  'Morgan',
-  'Bell',
-  'Murphy',
-  'Bailey',
-  'Rivera',
-  'Cooper',
-  'Richardson',
-  'Cox',
-  'Howard',
-  'Ward',
-  'Torres',
-  'Peterson',
-  'Gray',
-  'Ramirez',
-  'Watson',
-  'Brooks',
-  'Kelly'
-];
+// Fixed seed for reproducible data across restarts
+faker.seed(12345);
 
 function generateUsers(): MockUser[] {
+  // Passwords are stored in plaintext (no hashing) — this is intentional
+  // for the mock server. The real server uses bcrypt.
+  // Well-known users that E2E tests depend on — do not change
   const manual: MockUser[] = [
     {
       id: '1',
@@ -197,39 +69,41 @@ function generateUsers(): MockUser[] {
 
   const generated: MockUser[] = [];
   for (let i = 0; i < 65; i++) {
-    const id = String(i + 6);
-    const firstName = firstNames[i];
-    const lastName = lastNames[i];
-    const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`;
-    const day = String((i % 28) + 1).padStart(2, '0');
-    const month = String((i % 12) + 1).padStart(2, '0');
-    generated.push({
-      id,
-      email,
-      firstName,
-      lastName,
-      password: 'Password1',
-      isActive: i % 5 !== 0,
-      isAdmin: i % 20 === 0,
-      createdAt: `2025-${month}-${day}T00:00:00.000Z`,
-      updatedAt: `2025-${month}-${day}T00:00:00.000Z`
-    });
+    generated.push(
+      createMockUser({
+        id: String(i + 6),
+        isActive: i % 5 !== 0,
+        isAdmin: i % 20 === 0
+      })
+    );
   }
 
   return [...manual, ...generated];
 }
 
-export const seedUsers: MockUser[] = generateUsers();
+function generateOAuthAccounts(): Map<string, OAuthAccount[]> {
+  const accounts = new Map<string, OAuthAccount[]>();
 
-export const seedOAuthAccounts: Map<string, OAuthAccount[]> = new Map([
-  [
-    '1',
-    [
-      {
-        provider: 'google',
-        providerId: 'google-admin-123',
-        createdAt: '2025-01-01T00:00:00.000Z'
-      }
-    ]
-  ]
-]);
+  // Admin always has a Google OAuth account
+  accounts.set('1', [
+    {
+      provider: 'google',
+      providerId: 'google-admin-123',
+      createdAt: '2025-01-01T00:00:00.000Z'
+    }
+  ]);
+
+  // Add OAuth accounts for ~10 random generated users
+  for (let i = 0; i < 10; i++) {
+    const userId = String(faker.number.int({ min: 6, max: 70 }));
+    if (!accounts.has(userId)) {
+      accounts.set(userId, [createOAuthAccount()]);
+    }
+  }
+
+  return accounts;
+}
+
+export const seedUsers: MockUser[] = generateUsers();
+export const seedOAuthAccounts: Map<string, OAuthAccount[]> =
+  generateOAuthAccounts();

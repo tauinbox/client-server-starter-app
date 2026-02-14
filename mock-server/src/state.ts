@@ -1,6 +1,9 @@
 import type { MockUser, OAuthAccount, State } from './types';
 import { seedOAuthAccounts, seedUsers } from './seed';
 
+// Each Playwright worker imports this module in its own process,
+// so state is isolated per worker. Do NOT share a single process
+// across parallel test workers — state will collide.
 let state: State;
 
 export function resetState(): void {

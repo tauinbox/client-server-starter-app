@@ -18,26 +18,6 @@ test.describe('User Detail page', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { isAdmin: false });
-    // Mock the user detail endpoint to bypass admin guard for this test
-    await page.route('**/api/v1/users/3', (route) => {
-      if (route.request().method() === 'GET') {
-        return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            id: '3',
-            email: 'john@example.com',
-            firstName: 'John',
-            lastName: 'Smith',
-            isActive: true,
-            isAdmin: false,
-            createdAt: '2025-02-01T00:00:00.000Z',
-            updatedAt: '2025-02-01T00:00:00.000Z'
-          })
-        });
-      }
-      return route.fallback();
-    });
     await page.goto('/users/3');
 
     await expect(page.getByText('User Details')).toBeVisible();

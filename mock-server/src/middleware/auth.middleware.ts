@@ -7,8 +7,8 @@ import {
   getState,
   toUserResponse
 } from '../state';
-import { requireAuth } from '../helpers/auth.helpers';
-import type { MockUser } from '../types';
+import { authGuard } from '../helpers/auth.helpers';
+import type { AuthenticatedRequest, MockUser } from '../types';
 
 const router = Router();
 
@@ -37,7 +37,7 @@ router.post('/register', (req, res) => {
     email,
     firstName,
     lastName,
-    password,
+    password, // Stored as plaintext — mock only. Real server uses bcrypt.
     isActive: true,
     isAdmin: false,
     createdAt: now,
@@ -54,6 +54,7 @@ router.post('/login', (req, res) => {
   const { email, password } = req.body;
 
   const user = findUserByEmail(email);
+  // Plaintext comparison — mock only. Real server uses bcrypt.compare().
   if (!user || user.password !== password) {
     res.status(401).json({ message: 'Invalid credentials', statusCode: 401 });
     return;
@@ -100,19 +101,13 @@ router.post('/refresh-token', (req, res) => {
 });
 
 // POST /api/v1/auth/logout
-router.post('/logout', (req, res) => {
-  const auth = requireAuth(req);
-  if ('error' in auth) {
-    res
-      .status(auth.error)
-      .json({ message: 'Unauthorized', statusCode: auth.error });
-    return;
-  }
+router.post('/logout', authGuard, (req, res) => {
+  const { user } = req as AuthenticatedRequest;
 
   // Remove all refresh tokens for this user
   const state = getState();
   for (const [token, userId] of state.refreshTokens.entries()) {
-    if (userId === auth.user.id) {
+    if (userId === user.id) {
       state.refreshTokens.delete(token);
     }
   }
@@ -121,30 +116,15 @@ router.post('/logout', (req, res) => {
 });
 
 // GET /api/v1/auth/profile
-router.get('/profile', (req, res) => {
-  const auth = requireAuth(req);
-  if ('error' in auth) {
-    res
-      .status(auth.error)
-      .json({ message: 'Unauthorized', statusCode: auth.error });
-    return;
-  }
-
-  res.json(toUserResponse(auth.user));
+router.get('/profile', authGuard, (req, res) => {
+  const { user } = req as AuthenticatedRequest;
+  res.json(toUserResponse(user));
 });
 
 // PATCH /api/v1/auth/profile
-router.patch('/profile', (req, res) => {
-  const auth = requireAuth(req);
-  if ('error' in auth) {
-    res
-      .status(auth.error)
-      .json({ message: 'Unauthorized', statusCode: auth.error });
-    return;
-  }
-
+router.patch('/profile', authGuard, (req, res) => {
   const { firstName, lastName, password } = req.body;
-  const user = auth.user;
+  const { user } = req as AuthenticatedRequest;
 
   if (firstName !== undefined) user.firstName = firstName;
   if (lastName !== undefined) user.lastName = lastName;
