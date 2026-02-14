@@ -20,7 +20,7 @@ router.get('/accounts', authGuard, (req, res) => {
 // DELETE /api/v1/auth/oauth/accounts/:provider
 router.delete('/accounts/:provider', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
-  const provider = req.params.provider;
+  const provider = req.params.provider as string;
   const validProviders = ['google', 'facebook', 'vk'];
   if (!validProviders.includes(provider)) {
     res.status(400).json({
