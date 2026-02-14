@@ -199,10 +199,7 @@ describe('OAuthController', () => {
       const res = mockResponse();
       const req = mockJwtRequest('user-1');
 
-      const result = controller.initOAuthLink(
-        req as JwtAuthRequest,
-        res
-      );
+      const result = controller.initOAuthLink(req as JwtAuthRequest, res);
 
       expect(jwtServiceMock.sign).toHaveBeenCalledWith(
         { sub: 'user-1' },
@@ -242,10 +239,7 @@ describe('OAuthController', () => {
         lastName: 'User'
       };
 
-      await controller.googleCallback(
-        mockExpressRequest(profile),
-        res
-      );
+      await controller.googleCallback(mockExpressRequest(profile), res);
 
       expect(res.redirect).toHaveBeenCalledWith(
         expect.stringContaining('http://localhost:4200/oauth/callback#data=')
@@ -262,10 +256,7 @@ describe('OAuthController', () => {
         lastName: 'User'
       };
 
-      await controller.vkCallback(
-        mockExpressRequest(profile),
-        res
-      );
+      await controller.vkCallback(mockExpressRequest(profile), res);
 
       expect(res.redirect).toHaveBeenCalledWith(
         'http://localhost:4200/login?oauth_error=no_email'
@@ -284,10 +275,7 @@ describe('OAuthController', () => {
         lastName: 'User'
       };
 
-      await controller.googleCallback(
-        mockExpressRequest(profile),
-        res
-      );
+      await controller.googleCallback(mockExpressRequest(profile), res);
 
       expect(res.redirect).toHaveBeenCalledWith(
         'http://localhost:4200/login?oauth_error=auth_failed'
@@ -368,10 +356,7 @@ describe('OAuthController', () => {
         lastName: 'User'
       };
 
-      await controller.googleCallback(
-        mockExpressRequest(profile),
-        res
-      );
+      await controller.googleCallback(mockExpressRequest(profile), res);
 
       expect(authServiceMock.loginWithOAuth).toHaveBeenCalledWith(profile);
       expect(authServiceMock.linkOAuthToUser).not.toHaveBeenCalled();

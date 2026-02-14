@@ -214,10 +214,9 @@ export class OAuthController {
     res: Response
   ): Promise<void> {
     try {
-      const linkToken =
-        (req.cookies as Record<string, string> | undefined)?.[
-          OAuthController.OAUTH_LINK_COOKIE
-        ];
+      const linkToken = (req.cookies as Record<string, string> | undefined)?.[
+        OAuthController.OAUTH_LINK_COOKIE
+      ];
 
       if (linkToken) {
         return this.handleOAuthLink(linkToken, profile, res);
@@ -268,9 +267,7 @@ export class OAuthController {
       );
     } catch (error) {
       this.logger.error('OAuth link error', error);
-      res.redirect(
-        `${this.clientUrl}/profile?oauth_error=link_failed`
-      );
+      res.redirect(`${this.clientUrl}/profile?oauth_error=link_failed`);
     }
   }
 }
