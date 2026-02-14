@@ -5,7 +5,7 @@
   "description": "In-memory mock backend for development and E2E testing",
   "scripts": {
     "start": "ts-node src/index.ts",
-    "start:mock": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "start:dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\"",

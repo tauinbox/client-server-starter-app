@@ -114,17 +114,18 @@ npm test
 ### E2E Tests (Playwright)
 
 - Browser: Chromium
-- **API testing**: Uses in-memory Express mock-server (port 3000) instead of route interception
-- Mock-server launches automatically via Playwright `webServer` config
-- Seed data: `admin@example.com / Password1` (admin), `user@example.com / Password1` (user), + 3 more users
+- **API testing**: Uses in-memory Express mock-server with per-worker isolation (not route interception)
+- Worker-scoped fixture starts Express on dynamic port (`app.listen(0)`), test-scoped resets state
+- `page.route(/\/api\//)` intercepts API calls and rewrites URL to worker's mock-server port
+- Seed data: 5 well-known users + 65 faker-generated (70 total). Credentials: `admin@example.com / Password1` (admin), `user@example.com / Password1` (user)
 - Modular fixture architecture in `e2e/fixtures/`:
-  - `base.fixture.ts` — custom `mockApi` fixture + re-exports all modules
-  - `jwt.utils.ts` — JWT creation utilities
-  - `mock-data.ts` — shared test data (users, tokens)
+  - `base.fixture.ts` — `_mockServer` (MockServerApi) and `_workerMockServer` fixtures + re-exports all modules
+  - `jwt.utils.ts` — JWT creation utilities (`base64url`, `createMockJwt`, `createExpiredJwt`, `createValidJwt`)
+  - `mock-data.ts` — `MockUser` type, `defaultUser`, factory re-exports (`createMockUser`, `createOAuthAccount`)
   - `helpers.ts` — `loginViaUi()`, `expectAuthRedirect()`, `expectForbiddenRedirect()`
 - Test structure: organized by module in `e2e/auth/` and `e2e/users/`
 - Coverage: 95 tests (37 auth + 58 users) covering login, register, profile, session-restore, users list/detail/edit/search
-- Workers: 1 (shared in-memory state in mock-server)
+- Workers: 4 (fully parallel, per-worker mock-server instances on dynamic ports)
 
 ```bash
 npm run test:e2e           # Headless
