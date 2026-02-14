@@ -165,6 +165,10 @@ export class AuthService {
     );
   }
 
+  initOAuthLink(): Observable<{ message: string }> {
+    return this.#http.post<{ message: string }>(AuthApiEnum.OAuthLinkInit, {});
+  }
+
   unlinkOAuthAccount(provider: string): Observable<{ message: string }> {
     return this.#http.delete<{ message: string }>(
       `${AuthApiEnum.OAuthAccounts}/${provider}`

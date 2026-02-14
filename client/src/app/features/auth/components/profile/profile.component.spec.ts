@@ -7,6 +7,7 @@ import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { ActivatedRoute } from '@angular/router';
 
 import { ProfileComponent } from './profile.component';
 import { AuthService } from '../../services/auth.service';
@@ -31,18 +32,27 @@ describe('ProfileComponent', () => {
     updateProfile: ReturnType<typeof vi.fn>;
     getOAuthAccounts: ReturnType<typeof vi.fn>;
     unlinkOAuthAccount: ReturnType<typeof vi.fn>;
+    initOAuthLink: ReturnType<typeof vi.fn>;
   };
   let snackBarMock: { open: ReturnType<typeof vi.fn> };
+  let activatedRouteMock: { snapshot: { queryParamMap: Map<string, string> } };
 
   beforeEach(async () => {
     authServiceMock = {
       getProfile: vi.fn().mockReturnValue(of(mockUser)),
       updateProfile: vi.fn(),
       getOAuthAccounts: vi.fn().mockReturnValue(of([])),
-      unlinkOAuthAccount: vi.fn()
+      unlinkOAuthAccount: vi.fn(),
+      initOAuthLink: vi.fn().mockReturnValue(of({ message: 'Link initiated' }))
     };
 
     snackBarMock = { open: vi.fn() };
+
+    activatedRouteMock = {
+      snapshot: {
+        queryParamMap: new Map()
+      }
+    };
 
     await TestBed.configureTestingModule({
       imports: [ProfileComponent],
@@ -52,7 +62,8 @@ describe('ProfileComponent', () => {
         provideHttpClientTesting(),
         provideNoopAnimations(),
         { provide: AuthService, useValue: authServiceMock },
-        { provide: MatSnackBar, useValue: snackBarMock }
+        { provide: MatSnackBar, useValue: snackBarMock },
+        { provide: ActivatedRoute, useValue: activatedRouteMock }
       ]
     }).compileComponents();
 

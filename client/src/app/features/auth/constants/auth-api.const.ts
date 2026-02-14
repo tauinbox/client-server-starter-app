@@ -6,7 +6,8 @@ export enum AuthApiEnum {
   Register = `${AUTH_API_V1}/register`,
   Profile = `${AUTH_API_V1}/profile`,
   RefreshToken = `${AUTH_API_V1}/refresh-token`,
-  OAuthAccounts = `${AUTH_API_V1}/oauth/accounts`
+  OAuthAccounts = `${AUTH_API_V1}/oauth/accounts`,
+  OAuthLinkInit = `${AUTH_API_V1}/oauth/link-init`
 }
 
 export const OAUTH_URLS = {

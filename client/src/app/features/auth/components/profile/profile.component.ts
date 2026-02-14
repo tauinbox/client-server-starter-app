@@ -6,6 +6,7 @@ import {
   inject,
   signal
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   MatCard,
   MatCardContent,
@@ -80,6 +81,8 @@ export class ProfileComponent implements OnInit {
   readonly #destroyRef = inject(DestroyRef);
   readonly #sessionStorage = inject(SessionStorageService);
   readonly #window = inject(DOCUMENT).defaultView;
+  readonly #route = inject(ActivatedRoute);
+  readonly #router = inject(Router);
 
   protected readonly user = signal<User | null>(null);
   protected readonly loading = signal(true);
@@ -114,6 +117,34 @@ export class ProfileComponent implements OnInit {
   ngOnInit() {
     this.loadProfile();
     this.loadOAuthAccounts();
+    this.#checkOAuthLinkedParam();
+  }
+
+  #checkOAuthLinkedParam(): void {
+    const provider = this.#route.snapshot.queryParamMap.get('oauth_linked');
+    const error = this.#route.snapshot.queryParamMap.get('oauth_error');
+
+    if (provider) {
+      this.#snackBar.open(
+        `${PROVIDER_LABELS[provider] || provider} account connected successfully`,
+        'Close',
+        { duration: 5000 }
+      );
+      void this.#router.navigate([], {
+        queryParams: { oauth_linked: null },
+        queryParamsHandling: 'merge'
+      });
+    } else if (error) {
+      this.#snackBar.open(
+        'Failed to link OAuth account. Please try again.',
+        'Close',
+        { duration: 5000 }
+      );
+      void this.#router.navigate([], {
+        queryParams: { oauth_error: null },
+        queryParamsHandling: 'merge'
+      });
+    }
   }
 
   loadProfile(): void {
@@ -158,11 +189,27 @@ export class ProfileComponent implements OnInit {
   }
 
   connectProvider(provider: string): void {
-    this.#sessionStorage.setItem('oauth_return_url', '/profile');
-    if (this.#window) {
-      this.#window.location.href =
-        OAUTH_URLS[provider as keyof typeof OAUTH_URLS];
-    }
+    this.oauthLoading.set(true);
+    this.#authService
+      .initOAuthLink()
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.#sessionStorage.setItem('oauth_return_url', '/profile');
+          if (this.#window) {
+            this.#window.location.href =
+              OAUTH_URLS[provider as keyof typeof OAUTH_URLS];
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.oauthLoading.set(false);
+          this.#snackBar.open(
+            err.error?.message || 'Failed to initiate link',
+            'Close',
+            { duration: 5000 }
+          );
+        }
+      });
   }
 
   disconnectProvider(provider: string): void {

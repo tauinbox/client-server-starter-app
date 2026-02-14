@@ -5,6 +5,7 @@ import {
   Get,
   Logger,
   Param,
+  Post,
   Request,
   Res,
   UseGuards
@@ -16,8 +17,9 @@ import {
   ApiParam,
   ApiTags
 } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Request as ExpressRequest, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { AuthService } from '../services/auth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
 import { GoogleOAuthGuard } from '../guards/google-oauth.guard';
@@ -38,11 +40,15 @@ export class OAuthController {
   private readonly logger = new Logger(OAuthController.name);
   private readonly clientUrl: string;
 
+  private static readonly OAUTH_LINK_COOKIE = 'oauth_link';
+  private static readonly OAUTH_LINK_MAX_AGE_SECONDS = 300;
+
   constructor(
     private readonly authService: AuthService,
     private readonly oauthAccountService: OAuthAccountService,
     private readonly usersService: UsersService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly jwtService: JwtService
   ) {
     const url = this.configService.get<string>('CLIENT_URL');
     if (!url) {
@@ -64,6 +70,32 @@ export class OAuthController {
     this.clientUrl = url;
   }
 
+  // --- Link initiation ---
+
+  @Post('link-init')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Initiate OAuth account linking for current user' })
+  initOAuthLink(
+    @Request() req: JwtAuthRequest,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    const linkToken = this.jwtService.sign(
+      { sub: req.user.userId },
+      { expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS }
+    );
+
+    res.cookie(OAuthController.OAUTH_LINK_COOKIE, linkToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: this.configService.get('NODE_ENV') === 'production',
+      path: '/api/v1/auth/oauth',
+      maxAge: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS * 1000
+    });
+
+    return { message: 'Link initiated' };
+  }
+
   // --- Google ---
 
   @Get('google')
@@ -77,10 +109,10 @@ export class OAuthController {
   @UseGuards(GoogleOAuthGuard)
   @ApiOperation({ summary: 'Google OAuth callback' })
   async googleCallback(
-    @Request() req: { user: OAuthUserProfile },
+    @Request() req: ExpressRequest & { user: OAuthUserProfile },
     @Res() res: Response
   ) {
-    return this.handleOAuthCallback(req.user, res);
+    return this.handleOAuthCallback(req.user, req, res);
   }
 
   // --- Facebook ---
@@ -96,10 +128,10 @@ export class OAuthController {
   @UseGuards(FacebookOAuthGuard)
   @ApiOperation({ summary: 'Facebook OAuth callback' })
   async facebookCallback(
-    @Request() req: { user: OAuthUserProfile },
+    @Request() req: ExpressRequest & { user: OAuthUserProfile },
     @Res() res: Response
   ) {
-    return this.handleOAuthCallback(req.user, res);
+    return this.handleOAuthCallback(req.user, req, res);
   }
 
   // --- VK ---
@@ -115,10 +147,10 @@ export class OAuthController {
   @UseGuards(VkOAuthGuard)
   @ApiOperation({ summary: 'VK OAuth callback' })
   async vkCallback(
-    @Request() req: { user: OAuthUserProfile },
+    @Request() req: ExpressRequest & { user: OAuthUserProfile },
     @Res() res: Response
   ) {
-    return this.handleOAuthCallback(req.user, res);
+    return this.handleOAuthCallback(req.user, req, res);
   }
 
   // --- OAuth accounts management ---
@@ -178,9 +210,19 @@ export class OAuthController {
 
   private async handleOAuthCallback(
     profile: OAuthUserProfile,
+    req: ExpressRequest,
     res: Response
   ): Promise<void> {
     try {
+      const linkToken =
+        (req.cookies as Record<string, string> | undefined)?.[
+          OAuthController.OAUTH_LINK_COOKIE
+        ];
+
+      if (linkToken) {
+        return this.handleOAuthLink(linkToken, profile, res);
+      }
+
       if (!profile.email) {
         this.logger.warn(
           `OAuth login failed: no email provided by ${profile.provider}`
@@ -199,6 +241,36 @@ export class OAuthController {
     } catch (error) {
       this.logger.error('OAuth callback error', error);
       res.redirect(`${this.clientUrl}/login?oauth_error=auth_failed`);
+    }
+  }
+
+  private async handleOAuthLink(
+    linkToken: string,
+    profile: OAuthUserProfile,
+    res: Response
+  ): Promise<void> {
+    res.clearCookie(OAuthController.OAUTH_LINK_COOKIE, {
+      path: '/api/v1/auth/oauth'
+    });
+
+    try {
+      const payload = this.jwtService.verify<{ sub: string }>(linkToken);
+      const userId = payload.sub;
+
+      await this.authService.linkOAuthToUser(
+        userId,
+        profile.provider,
+        profile.providerId
+      );
+
+      res.redirect(
+        `${this.clientUrl}/profile?oauth_linked=${profile.provider}`
+      );
+    } catch (error) {
+      this.logger.error('OAuth link error', error);
+      res.redirect(
+        `${this.clientUrl}/profile?oauth_error=link_failed`
+      );
     }
   }
 }

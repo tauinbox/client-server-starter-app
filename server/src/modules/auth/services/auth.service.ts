@@ -163,6 +163,20 @@ export class AuthService {
     }
   }
 
+  async linkOAuthToUser(
+    userId: string,
+    provider: string,
+    providerId: string
+  ): Promise<void> {
+    const user = await this.usersService.findOne(userId);
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException(
+        'User account not found or deactivated'
+      );
+    }
+    await this.safeCreateOAuthAccount(userId, provider, providerId);
+  }
+
   async register(registerDto: RegisterDto): Promise<User> {
     return this.usersService.create(registerDto);
   }
