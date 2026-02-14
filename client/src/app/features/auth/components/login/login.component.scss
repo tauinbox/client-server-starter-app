@@ -17,4 +17,35 @@
   button[type='submit'] {
     @include mix.button-with-spinner;
   }
+
+  .oauth-divider {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin: 24px 0 16px;
+
+    mat-divider {
+      flex: 1;
+    }
+
+    .oauth-divider-text {
+      font-size: 14px;
+      color: var(--mat-sys-on-surface-variant);
+      white-space: nowrap;
+    }
+  }
+
+  .oauth-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    .oauth-button {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+  }
 }

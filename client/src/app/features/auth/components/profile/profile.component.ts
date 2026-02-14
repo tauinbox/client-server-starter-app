@@ -6,6 +6,7 @@ import {
   inject,
   signal
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   MatCard,
   MatCardContent,
@@ -17,21 +18,37 @@ import { MatDivider } from '@angular/material/divider';
 import type { FormControl, FormGroup } from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
-import { MatIcon } from '@angular/material/icon';
+import { MatIcon, MatIconRegistry } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatButton, MatIconButton } from '@angular/material/button';
+import { DOCUMENT } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
+import { SessionStorageService } from '@core/services/session-storage.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type { User } from '@shared/models/user.types';
 import type { UpdateProfile } from '../../models/auth.types';
 import { DatePipe } from '@angular/common';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DomSanitizer } from '@angular/platform-browser';
+import { OAUTH_URLS } from '../../constants/auth-api.const';
+import { registerOAuthIcons } from '../../utils/register-oauth-icons';
 
 type ProfileFormType = {
   firstName: FormControl<string>;
   lastName: FormControl<string>;
   password: FormControl<string>;
+};
+
+type OAuthAccountInfo = {
+  provider: string;
+  createdAt: string;
+};
+
+const PROVIDER_LABELS: Record<string, string> = {
+  google: 'Google',
+  facebook: 'Facebook',
+  vk: 'VK'
 };
 
 @Component({
@@ -62,12 +79,20 @@ export class ProfileComponent implements OnInit {
   readonly #authService = inject(AuthService);
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #sessionStorage = inject(SessionStorageService);
+  readonly #window = inject(DOCUMENT).defaultView;
+  readonly #route = inject(ActivatedRoute);
+  readonly #router = inject(Router);
 
   protected readonly user = signal<User | null>(null);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly showPassword = signal(false);
+  protected readonly oauthAccounts = signal<OAuthAccountInfo[]>([]);
+  protected readonly oauthLoading = signal(false);
+  protected readonly allProviders = Object.keys(OAUTH_URLS);
+  protected readonly providerLabels = PROVIDER_LABELS;
 
   protected readonly profileForm: FormGroup<ProfileFormType> =
     this.#fb.group<ProfileFormType>({
@@ -85,8 +110,41 @@ export class ProfileComponent implements OnInit {
       })
     });
 
+  constructor() {
+    registerOAuthIcons(inject(MatIconRegistry), inject(DomSanitizer));
+  }
+
   ngOnInit() {
     this.loadProfile();
+    this.loadOAuthAccounts();
+    this.#checkOAuthLinkedParam();
+  }
+
+  #checkOAuthLinkedParam(): void {
+    const provider = this.#route.snapshot.queryParamMap.get('oauth_linked');
+    const error = this.#route.snapshot.queryParamMap.get('oauth_error');
+
+    if (provider) {
+      this.#snackBar.open(
+        `${PROVIDER_LABELS[provider] || provider} account connected successfully`,
+        'Close',
+        { duration: 5000 }
+      );
+      void this.#router.navigate([], {
+        queryParams: { oauth_linked: null },
+        queryParamsHandling: 'merge'
+      });
+    } else if (error) {
+      this.#snackBar.open(
+        'Failed to link OAuth account. Please try again.',
+        'Close',
+        { duration: 5000 }
+      );
+      void this.#router.navigate([], {
+        queryParams: { oauth_error: null },
+        queryParamsHandling: 'merge'
+      });
+    }
   }
 
   loadProfile(): void {
@@ -112,6 +170,72 @@ export class ProfileComponent implements OnInit {
           const errorMessage =
             err.error?.message || 'Failed to load profile. Please try again.';
           this.error.set(errorMessage);
+        }
+      });
+  }
+
+  loadOAuthAccounts(): void {
+    this.#authService
+      .getOAuthAccounts()
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: (accounts) => this.oauthAccounts.set(accounts),
+        error: () => this.oauthAccounts.set([])
+      });
+  }
+
+  isProviderLinked(provider: string): boolean {
+    return this.oauthAccounts().some((a) => a.provider === provider);
+  }
+
+  connectProvider(provider: string): void {
+    this.oauthLoading.set(true);
+    this.#authService
+      .initOAuthLink()
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.#sessionStorage.setItem('oauth_return_url', '/profile');
+          if (this.#window) {
+            this.#window.location.href =
+              OAUTH_URLS[provider as keyof typeof OAUTH_URLS];
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.oauthLoading.set(false);
+          this.#snackBar.open(
+            err.error?.message || 'Failed to initiate link',
+            'Close',
+            { duration: 5000 }
+          );
+        }
+      });
+  }
+
+  disconnectProvider(provider: string): void {
+    this.oauthLoading.set(true);
+    this.#authService
+      .unlinkOAuthAccount(provider)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.oauthLoading.set(false);
+          this.oauthAccounts.update((accounts) =>
+            accounts.filter((a) => a.provider !== provider)
+          );
+          this.#snackBar.open(
+            `${PROVIDER_LABELS[provider] || provider} account disconnected`,
+            'Close',
+            { duration: 5000 }
+          );
+        },
+        error: (err: HttpErrorResponse) => {
+          this.oauthLoading.set(false);
+          this.#snackBar.open(
+            err.error?.message || 'Failed to disconnect account',
+            'Close',
+            { duration: 5000 }
+          );
         }
       });
   }

@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -11,6 +15,8 @@ import { CustomJwtPayload } from '../types/jwt-payload';
 import { LocalAuthRequest } from '../types/auth.request';
 import { TokensResponseDto } from '../dtos/auth-response.dto';
 import { RefreshTokenService } from './refresh-token.service';
+import { OAuthAccountService } from './oauth-account.service';
+import { OAuthUserProfile } from '../types/oauth-profile';
 
 @Injectable()
 export class AuthService {
@@ -18,15 +24,25 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     private configService: ConfigService,
-    private refreshTokenService: RefreshTokenService
+    private refreshTokenService: RefreshTokenService,
+    private oauthAccountService: OAuthAccountService
   ) {}
+
+  // Pre-computed dummy hash for constant-time rejection (prevents timing attacks)
+  private static readonly DUMMY_HASH =
+    '$2b$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012';
 
   async validateUser(
     email: string,
     password: string
   ): Promise<UserResponseDto | null> {
     const user = await this.usersService.findByEmail(email);
-    if (user && (await bcrypt.compare(password, user.password))) {
+    const hashToCompare =
+      user?.isActive && user.password ? user.password : AuthService.DUMMY_HASH;
+
+    const isMatch = await bcrypt.compare(password, hashToCompare);
+
+    if (user && user.isActive && user.password && isMatch) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password, ...result } = user;
       return result;
@@ -50,6 +66,117 @@ export class AuthService {
     };
   }
 
+  async loginWithOAuth(profile: OAuthUserProfile) {
+    // 1. Check if OAuth account already linked
+    const existingOAuth =
+      await this.oauthAccountService.findByProviderAndProviderId(
+        profile.provider,
+        profile.providerId
+      );
+
+    let user: User;
+
+    if (existingOAuth) {
+      // Returning OAuth user
+      user = await this.usersService.findOne(existingOAuth.userId);
+      if (!user.isActive) {
+        throw new UnauthorizedException('User account is deactivated');
+      }
+    } else {
+      // 2. Check if user exists by email
+      const existingUser = await this.usersService.findByEmail(profile.email);
+
+      if (existingUser) {
+        // Link OAuth to existing user
+        if (!existingUser.isActive) {
+          throw new UnauthorizedException('User account is deactivated');
+        }
+        user = existingUser;
+        await this.safeCreateOAuthAccount(
+          user.id,
+          profile.provider,
+          profile.providerId
+        );
+      } else {
+        // 3. Create new user + OAuth account
+        user = await this.usersService.createOAuthUser({
+          email: profile.email,
+          firstName: profile.firstName,
+          lastName: profile.lastName
+        });
+        await this.safeCreateOAuthAccount(
+          user.id,
+          profile.provider,
+          profile.providerId
+        );
+      }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...userWithoutPassword } = user;
+
+    const tokens = this.generateTokens(user.id, user.email, user.isAdmin);
+
+    await this.refreshTokenService.deleteByUserId(user.id);
+    await this.refreshTokenService.createRefreshToken(
+      user.id,
+      tokens.refresh_token,
+      parseInt(this.configService.get('JWT_REFRESH_EXPIRATION') || '604800', 10)
+    );
+
+    return {
+      tokens,
+      user: userWithoutPassword
+    };
+  }
+
+  private async safeCreateOAuthAccount(
+    userId: string,
+    provider: string,
+    providerId: string
+  ): Promise<void> {
+    try {
+      await this.oauthAccountService.createOAuthAccount(
+        userId,
+        provider,
+        providerId
+      );
+    } catch (error: unknown) {
+      // PostgreSQL unique_violation error code
+      const PG_UNIQUE_VIOLATION = '23505';
+      const dbError = error as { code?: string };
+      if (dbError.code === PG_UNIQUE_VIOLATION) {
+        const existing =
+          await this.oauthAccountService.findByProviderAndProviderId(
+            provider,
+            providerId
+          );
+        if (existing && existing.userId !== userId) {
+          throw new ConflictException(
+            'This OAuth account is already linked to another user'
+          );
+        }
+        // Already linked to this user — safe to ignore
+        return;
+      }
+      throw error;
+    }
+  }
+
+  async linkOAuthToUser(
+    userId: string,
+    provider: string,
+    providerId: string
+  ): Promise<void> {
+    const user = await this.usersService.findOne(userId);
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException(
+        'User account not found or deactivated'
+      );
+    }
+    await this.safeCreateOAuthAccount(userId, provider, providerId);
+  }
+
   async register(registerDto: RegisterDto): Promise<User> {
     return this.usersService.create(registerDto);
   }
@@ -66,6 +193,11 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
+    if (!user.isActive) {
+      await this.refreshTokenService.revokeToken(tokenDoc.id);
+      throw new UnauthorizedException('User account is deactivated');
+    }
+
     await this.refreshTokenService.revokeToken(tokenDoc.id);
 
     const tokens = this.generateTokens(user.id, user.email, user.isAdmin);
@@ -76,9 +208,11 @@ export class AuthService {
       parseInt(this.configService.get('JWT_REFRESH_EXPIRATION') || '604800', 10)
     );
 
+    const { password: _, ...userWithoutPassword } = user;
+
     return {
       tokens,
-      user
+      user: userWithoutPassword
     };
   }
 

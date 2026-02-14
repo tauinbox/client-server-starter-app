@@ -74,6 +74,13 @@ export const routes: Routes = [
     ]
   },
   {
+    path: AppRouteSegmentEnum.OAuthCallback,
+    loadComponent: () =>
+      import('./features/auth/components/oauth-callback/oauth-callback.component').then(
+        (c) => c.OAuthCallbackComponent
+      )
+  },
+  {
     path: AppRouteSegmentEnum.Feature,
     loadComponent: () =>
       import('./features/feature/feature.component').then(

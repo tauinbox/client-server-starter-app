@@ -159,6 +159,22 @@ export class AuthService {
     this.#refreshInFlight$ = null;
   }
 
+  getOAuthAccounts(): Observable<{ provider: string; createdAt: string }[]> {
+    return this.#http.get<{ provider: string; createdAt: string }[]>(
+      AuthApiEnum.OAuthAccounts
+    );
+  }
+
+  initOAuthLink(): Observable<{ message: string }> {
+    return this.#http.post<{ message: string }>(AuthApiEnum.OAuthLinkInit, {});
+  }
+
+  unlinkOAuthAccount(provider: string): Observable<{ message: string }> {
+    return this.#http.delete<{ message: string }>(
+      `${AuthApiEnum.OAuthAccounts}/${provider}`
+    );
+  }
+
   initSession(): void {
     if (this.#authStore.isAuthenticated()) {
       this.scheduleTokenRefresh();

@@ -6,6 +6,7 @@
     "types": [
       "vitest/globals"
     ],
+    "composite": true,
     "lib": [
       "ES2022",
       "esnext.disposable",
@@ -13,7 +14,7 @@
     ]
   },
   "include": [
-    "src/**/*.spec.ts",
+    "src/**/*.ts",
     "src/**/*.d.ts"
   ]
 }

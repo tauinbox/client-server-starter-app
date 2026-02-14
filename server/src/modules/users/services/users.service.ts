@@ -51,7 +51,7 @@ export class UsersService {
     return user;
   }
 
-  async findByEmail(email: string): Promise<User | undefined> {
+  async findByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({ where: { email } });
   }
 
@@ -108,6 +108,20 @@ export class UsersService {
 
     this.userRepository.merge(user, changes);
 
+    return this.userRepository.save(user);
+  }
+
+  async createOAuthUser(data: {
+    email: string;
+    firstName: string;
+    lastName: string;
+  }): Promise<User> {
+    const user = this.userRepository.create({
+      email: data.email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      password: null
+    });
     return this.userRepository.save(user);
   }
 

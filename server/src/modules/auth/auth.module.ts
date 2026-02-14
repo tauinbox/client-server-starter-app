@@ -7,16 +7,39 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { UsersModule } from '../users/users.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './controllers/auth.controller';
+import { OAuthController } from './controllers/oauth.controller';
 import { AuthService } from './services/auth.service';
 import { RefreshToken } from './entities/refresh-token.entity';
+import { OAuthAccount } from './entities/oauth-account.entity';
 import { TokenCleanupService } from './services/token-cleanup.service';
 import { RefreshTokenService } from './services/refresh-token.service';
+import { OAuthAccountService } from './services/oauth-account.service';
+import { GoogleStrategy } from './strategies/google.strategy';
+import { FacebookStrategy } from './strategies/facebook.strategy';
+import { VkStrategy } from './strategies/vk.strategy';
+
+function conditionalProvider(
+  envVar: string,
+  strategyClass: new (...args: unknown[]) => unknown
+) {
+  return {
+    provide: strategyClass,
+    inject: [ConfigService],
+    useFactory: (configService: ConfigService) => {
+      if (configService.get(envVar)) {
+        return new strategyClass(configService);
+      }
+      // Strategy not configured — guards will throw NotFoundException
+      return null;
+    }
+  };
+}
 
 @Module({
   imports: [
     UsersModule,
     PassportModule,
-    TypeOrmModule.forFeature([RefreshToken]),
+    TypeOrmModule.forFeature([RefreshToken, OAuthAccount]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -29,13 +52,17 @@ import { RefreshTokenService } from './services/refresh-token.service';
       })
     })
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, OAuthController],
   providers: [
     AuthService,
     LocalStrategy,
     JwtStrategy,
     RefreshTokenService,
-    TokenCleanupService
+    TokenCleanupService,
+    OAuthAccountService,
+    conditionalProvider('GOOGLE_CLIENT_ID', GoogleStrategy),
+    conditionalProvider('FACEBOOK_CLIENT_ID', FacebookStrategy),
+    conditionalProvider('VK_CLIENT_ID', VkStrategy)
   ],
   exports: [AuthService]
 })
