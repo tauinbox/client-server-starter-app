@@ -1,14 +1,7 @@
-import {
-  expect,
-  mockLogin,
-  mockLoginError,
-  mockProfile,
-  mockRefreshToken,
-  test
-} from '../fixtures/base.fixture';
+import { expect, test } from '../fixtures/base.fixture';
 
 test.describe('Login page', () => {
-  test('should display the login form', async ({ mockApi: page }) => {
+  test('should display the login form', async ({ _mockServer, page }) => {
     await page.goto('/login');
 
     const main = page.getByRole('main');
@@ -18,7 +11,8 @@ test.describe('Login page', () => {
   });
 
   test('should disable submit button when form is invalid', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
     await page.goto('/login');
 
@@ -27,26 +21,24 @@ test.describe('Login page', () => {
   });
 
   test('should login successfully and redirect to profile', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
-    await mockLogin(page);
-    await mockRefreshToken(page);
-    await mockProfile(page);
     await page.goto('/login');
 
     const main = page.getByRole('main');
-    await page.getByLabel('Email').fill('test@example.com');
-    await page.getByLabel('Password').fill('password123');
+    await page.getByLabel('Email').fill('user@example.com');
+    await page.getByLabel('Password').fill('Password1');
     await main.getByRole('button', { name: 'Login' }).click();
 
     await expect(page).toHaveURL(/.*\/profile$/);
-    await expect(page.getByText('Name: John Doe')).toBeVisible();
+    await expect(page.getByText('Name: Regular User')).toBeVisible();
   });
 
   test('should show error on invalid credentials', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
-    await mockLoginError(page);
     await page.goto('/login');
 
     const main = page.getByRole('main');

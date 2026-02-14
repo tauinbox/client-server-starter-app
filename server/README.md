@@ -13,6 +13,13 @@ npm run seed:run           # Optional: seed sample data
 npm run start:dev          # Dev server at http://localhost:3000
 ```
 
+**Alternative for development**: Use the mock-server (no database required) from the root directory:
+
+```bash
+# From project root
+npm run start:mock         # Starts in-memory Express API on port 3000
+```
+
 ## Commands
 
 | Task | Command |

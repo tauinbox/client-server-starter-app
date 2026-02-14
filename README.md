@@ -60,7 +60,7 @@ fullstack-starter-app/
 │   │   │   └── feature/    # Example feature
 │   │   └── shared/         # Shared components (confirm dialog)
 │   ├── src/styles/         # SCSS architecture (themes, utilities, components)
-│   └── e2e/                # Playwright E2E tests (modular fixtures + auth/users specs)
+│   └── e2e/                # Playwright E2E tests (uses mock-server)
 ├── server/                 # NestJS 11 API
 │   ├── src/modules/
 │   │   ├── core/           # Config, caching, database, scheduling
@@ -69,6 +69,11 @@ fullstack-starter-app/
 │   │   └── feature/        # Example module
 │   ├── src/migrations/     # TypeORM migrations
 │   └── src/seeders/        # Database seeders
+├── mock-server/            # In-memory Express server for dev/testing
+│   ├── index.js            # Server entry point
+│   ├── state.js            # In-memory state management
+│   ├── data.js             # Seed data (users, tokens)
+│   └── routes/             # API route handlers (auth, users, OAuth)
 └── doc/                    # Project documentation
 ```
 
@@ -130,6 +135,8 @@ npm run seed:run            # Optional: seed 100 sample entities
 
 ### 4. Start development servers
 
+**Option 1: Full stack (NestJS server with PostgreSQL)**
+
 ```bash
 # Terminal 1 — Backend (port 3000)
 cd server
@@ -140,7 +147,22 @@ cd client
 npm start
 ```
 
+**Option 2: Mock server (no database required, great for frontend development)**
+
+```bash
+# Terminal 1 — Mock backend (port 3000, in-memory data)
+npm run start:mock
+
+# Terminal 2 — Frontend (port 4200, proxies /api to mock server)
+cd client
+npm start
+```
+
 Open http://localhost:4200 in your browser.
+
+**Mock server credentials:**
+- Admin: `admin@example.com` / `Password1`
+- User: `user@example.com` / `Password1`
 
 ## API Documentation
 
@@ -174,6 +196,12 @@ API base URL: `/api/v1`
 
 ## Available Commands
 
+### Root (Mock Server)
+
+```bash
+npm run start:mock         # Start mock server (port 3000, in-memory API)
+```
+
 ### Server
 
 ```bash
@@ -198,7 +226,7 @@ npm start                  # Dev server (port 4200, proxy to backend)
 npm run build              # Production build
 npm run lint               # Lint check
 npm test                   # Unit tests (Vitest)
-npm run test:e2e           # E2E tests (Playwright)
+npm run test:e2e           # E2E tests (Playwright, uses mock-server)
 npm run test:e2e:ui        # E2E tests (interactive UI)
 ```
 
@@ -259,7 +287,8 @@ Husky and lint-staged are installed in the `client/` sub-package. Running `npm i
 | Server unit tests | Jest | `*.spec.ts` alongside source |
 | Server E2E tests | Jest | Separate config in `test/` |
 | Client unit tests | Vitest | `*.spec.ts` alongside source |
-| Client E2E tests | Playwright | `e2e/` directory, API mocking via route interception |
+| Client E2E tests | Playwright | `e2e/` directory, uses mock-server (in-memory Express API) |
+| Mock server | Express | `mock-server/` directory, provides full API simulation for E2E tests |
 
 ## Security
 

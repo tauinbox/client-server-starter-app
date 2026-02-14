@@ -114,16 +114,17 @@ npm test
 ### E2E Tests (Playwright)
 
 - Browser: Chromium
-- API mocking via route interception (no real backend needed)
+- **API testing**: Uses in-memory Express mock-server (port 3000) instead of route interception
+- Mock-server launches automatically via Playwright `webServer` config
+- Seed data: `admin@example.com / Password1` (admin), `user@example.com / Password1` (user), + 3 more users
 - Modular fixture architecture in `e2e/fixtures/`:
-  - `base.fixture.ts` — custom `mockApi` fixture (blocks real API calls) + re-exports all modules
+  - `base.fixture.ts` — custom `mockApi` fixture + re-exports all modules
   - `jwt.utils.ts` — JWT creation utilities
   - `mock-data.ts` — shared test data (users, tokens)
-  - `mocks/auth.mocks.ts` — auth route mocks
-  - `mocks/users.mocks.ts` — users route mocks
   - `helpers.ts` — `loginViaUi()`, `expectAuthRedirect()`, `expectForbiddenRedirect()`
 - Test structure: organized by module in `e2e/auth/` and `e2e/users/`
 - Coverage: 95 tests (37 auth + 58 users) covering login, register, profile, session-restore, users list/detail/edit/search
+- Workers: 1 (shared in-memory state in mock-server)
 
 ```bash
 npm run test:e2e           # Headless

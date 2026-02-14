@@ -72,9 +72,9 @@ describe('jwtInterceptor', () => {
   it('should skip token for excluded URLs (login)', () => {
     authStoreMock.getAccessToken.mockReturnValue('my-access-token');
 
-    http.post('api/v1/auth/login', { email: 'a', password: 'b' }).subscribe();
+    http.post('/api/v1/auth/login', { email: 'a', password: 'b' }).subscribe();
 
-    const req = httpMock.expectOne('api/v1/auth/login');
+    const req = httpMock.expectOne('/api/v1/auth/login');
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush({});
   });
@@ -82,9 +82,9 @@ describe('jwtInterceptor', () => {
   it('should skip token for excluded URLs (register)', () => {
     authStoreMock.getAccessToken.mockReturnValue('my-access-token');
 
-    http.post('api/v1/auth/register', {}).subscribe();
+    http.post('/api/v1/auth/register', {}).subscribe();
 
-    const req = httpMock.expectOne('api/v1/auth/register');
+    const req = httpMock.expectOne('/api/v1/auth/register');
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush({});
   });
@@ -92,9 +92,9 @@ describe('jwtInterceptor', () => {
   it('should skip token for excluded URLs (refresh-token)', () => {
     authStoreMock.getAccessToken.mockReturnValue('my-access-token');
 
-    http.post('api/v1/auth/refresh-token', {}).subscribe();
+    http.post('/api/v1/auth/refresh-token', {}).subscribe();
 
-    const req = httpMock.expectOne('api/v1/auth/refresh-token');
+    const req = httpMock.expectOne('/api/v1/auth/refresh-token');
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush({});
   });
@@ -140,11 +140,11 @@ describe('jwtInterceptor', () => {
     authStoreMock.getAccessToken.mockReturnValue(null);
     let caughtError: HttpErrorResponse | null = null;
 
-    http.post('api/v1/auth/login', {}).subscribe({
+    http.post('/api/v1/auth/login', {}).subscribe({
       error: (err) => (caughtError = err)
     });
 
-    const req = httpMock.expectOne('api/v1/auth/login');
+    const req = httpMock.expectOne('/api/v1/auth/login');
     req.flush(
       { message: 'Unauthorized' },
       { status: 401, statusText: 'Unauthorized' }

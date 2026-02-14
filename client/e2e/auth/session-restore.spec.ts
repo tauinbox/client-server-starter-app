@@ -5,7 +5,6 @@ import {
   createValidJwt,
   defaultUser,
   expect,
-  mockProfile,
   test
 } from '../fixtures/base.fixture';
 
@@ -26,6 +25,19 @@ function mockRefreshTokenWithNewTokens(page: Page) {
   );
 }
 
+function mockProfile(page: Page) {
+  return page.route('**/api/v1/auth/profile', (route) => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(defaultUser)
+      });
+    }
+    return route.fallback();
+  });
+}
+
 function setExpiredAuthInStorage(page: Page) {
   const expiredAuthData = {
     tokens: {
@@ -43,7 +55,8 @@ function setExpiredAuthInStorage(page: Page) {
 
 test.describe('Session restoration with expired access token', () => {
   test('should refresh tokens and restore session when access token is expired', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
     await setExpiredAuthInStorage(page);
 
@@ -77,7 +90,8 @@ test.describe('Session restoration with expired access token', () => {
   });
 
   test('should redirect to login when refresh token is also invalid', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
     await setExpiredAuthInStorage(page);
 
@@ -93,15 +107,6 @@ test.describe('Session restoration with expired access token', () => {
       })
     );
 
-    // Mock logout endpoint
-    await page.route('**/api/v1/auth/logout', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: '{}'
-      })
-    );
-
     await page.goto('/profile');
 
     // Should be redirected to login since refresh failed
@@ -109,7 +114,8 @@ test.describe('Session restoration with expired access token', () => {
   });
 
   test('should restore session and navigate to profile from root URL', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
     await setExpiredAuthInStorage(page);
     await mockRefreshTokenWithNewTokens(page);

@@ -5,7 +5,6 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env['CI'],
   retries: process.env['CI'] ? 1 : 0,
-  workers: process.env['CI'] ? 1 : undefined,
   reporter: 'html',
   use: {
     baseURL: 'http://localhost:4200',
@@ -19,9 +18,11 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] }
     }
   ],
-  webServer: {
-    command: 'npm start',
-    url: 'http://localhost:4200',
-    reuseExistingServer: !process.env['CI']
-  }
+  webServer: [
+    {
+      command: 'npm start',
+      url: 'http://localhost:4200',
+      reuseExistingServer: !process.env['CI']
+    }
+  ]
 });
