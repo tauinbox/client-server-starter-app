@@ -2,18 +2,40 @@ import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
 import type { MockUser } from './mock-data';
-import { mockLogin, mockProfile, mockRefreshToken } from './mocks/auth.mocks';
 
+/**
+ * Seed a test user in mock-server state and log in via the UI.
+ */
 export async function loginViaUi(
   page: Page,
-  user: Partial<MockUser> = {}
+  mockServerUrl: string,
+  overrides: Partial<MockUser> = {}
 ): Promise<void> {
-  await mockLogin(page, user);
-  await mockRefreshToken(page, user);
-  await mockProfile(page, user);
+  const email = overrides.email ?? 'testlogin@example.com';
+  const password = 'Password1';
+
+  // Seed the user with desired properties via control API
+  const user = {
+    id: overrides.id ?? '100',
+    email,
+    firstName: overrides.firstName ?? 'John',
+    lastName: overrides.lastName ?? 'Doe',
+    password,
+    isActive: overrides.isActive ?? true,
+    isAdmin: overrides.isAdmin ?? false,
+    createdAt: overrides.createdAt ?? '2025-01-01T00:00:00.000Z',
+    updatedAt: overrides.updatedAt ?? '2025-01-01T00:00:00.000Z'
+  };
+
+  await fetch(`${mockServerUrl}/__control/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify([user])
+  });
+
   await page.goto('/login');
-  await page.getByLabel('Email').fill('test@example.com');
-  await page.getByLabel('Password').fill('password123');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
   await page.getByRole('main').getByRole('button', { name: 'Login' }).click();
   await page.waitForURL(/.*\/profile$/);
 }
@@ -28,9 +50,10 @@ export async function expectAuthRedirect(
 
 export async function expectForbiddenRedirect(
   page: Page,
+  mockServerUrl: string,
   url: string
 ): Promise<void> {
-  await loginViaUi(page, { isAdmin: false });
+  await loginViaUi(page, mockServerUrl, { isAdmin: false });
   await page.goto(url);
   await expect(page).toHaveURL(/.*\/forbidden/);
 }

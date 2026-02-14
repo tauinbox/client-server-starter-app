@@ -1,12 +1,7 @@
-import {
-  expect,
-  mockRegister,
-  mockRegisterError,
-  test
-} from '../fixtures/base.fixture';
+import { expect, test } from '../fixtures/base.fixture';
 
 test.describe('Register page', () => {
-  test('should display the registration form', async ({ mockApi: page }) => {
+  test('should display the registration form', async ({ _mockServer, page }) => {
     await page.goto('/register');
 
     const main = page.getByRole('main');
@@ -20,7 +15,8 @@ test.describe('Register page', () => {
   });
 
   test('should disable submit button when form is empty', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
     await page.goto('/register');
 
@@ -31,7 +27,8 @@ test.describe('Register page', () => {
   });
 
   test('should disable submit button with invalid email', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
     await page.goto('/register');
 
@@ -47,7 +44,8 @@ test.describe('Register page', () => {
   });
 
   test('should disable submit button with short password', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
     await page.goto('/register');
 
@@ -63,7 +61,8 @@ test.describe('Register page', () => {
   });
 
   test('should enable submit button when form is valid', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
     await page.goto('/register');
 
@@ -79,7 +78,8 @@ test.describe('Register page', () => {
   });
 
   test('should show validation errors on touched empty fields', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
     await page.goto('/register');
 
@@ -98,7 +98,8 @@ test.describe('Register page', () => {
   });
 
   test('should show email validation error for invalid email', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
     await page.goto('/register');
 
@@ -110,7 +111,10 @@ test.describe('Register page', () => {
     ).toBeVisible();
   });
 
-  test('should show password min length error', async ({ mockApi: page }) => {
+  test('should show password min length error', async ({
+    _mockServer,
+    page
+  }) => {
     await page.goto('/register');
 
     await page.getByLabel('Password').fill('short');
@@ -122,16 +126,16 @@ test.describe('Register page', () => {
   });
 
   test('should register successfully and redirect to login', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
-    await mockRegister(page);
     await page.goto('/register');
 
     const main = page.getByRole('main');
-    await page.getByLabel('Email').fill('new@example.com');
+    await page.getByLabel('Email').fill('newuser@example.com');
     await page.getByLabel('First Name').fill('Jane');
     await page.getByLabel('Last Name').fill('Smith');
-    await page.getByLabel('Password').fill('password123');
+    await page.getByLabel('Password').fill('Password1');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(page).toHaveURL(/.*\/login$/);
@@ -141,16 +145,17 @@ test.describe('Register page', () => {
   });
 
   test('should show error when email already exists', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
-    await mockRegisterError(page, 409, 'User with this email already exists');
     await page.goto('/register');
 
     const main = page.getByRole('main');
-    await page.getByLabel('Email').fill('existing@example.com');
+    // admin@example.com exists in seed data
+    await page.getByLabel('Email').fill('admin@example.com');
     await page.getByLabel('First Name').fill('John');
     await page.getByLabel('Last Name').fill('Doe');
-    await page.getByLabel('Password').fill('password123');
+    await page.getByLabel('Password').fill('Password1');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(
@@ -159,22 +164,30 @@ test.describe('Register page', () => {
   });
 
   test('should show generic error on server failure', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
-    await mockRegisterError(page, 500, 'Internal server error');
+    // Use page.route() to intercept and return 500 for this specific error test
+    await page.route('**/api/v1/auth/register', (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'Internal server error', statusCode: 500 })
+      })
+    );
     await page.goto('/register');
 
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('test@example.com');
     await page.getByLabel('First Name').fill('John');
     await page.getByLabel('Last Name').fill('Doe');
-    await page.getByLabel('Password').fill('password123');
+    await page.getByLabel('Password').fill('Password1');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(page.locator('.error-message')).toBeVisible();
   });
 
-  test('should have a link to login page', async ({ mockApi: page }) => {
+  test('should have a link to login page', async ({ _mockServer, page }) => {
     await page.goto('/register');
 
     const loginLink = page.getByRole('link', { name: 'Login' });

@@ -3,34 +3,36 @@ import {
   expectAuthRedirect,
   expectForbiddenRedirect,
   loginViaUi,
-  mockDeleteUser,
-  mockSearchUsers,
-  mockSearchUsersWithCapture,
   test
 } from '../fixtures/base.fixture';
 
 test.describe('User Search page', () => {
   test('should redirect to login when not authenticated', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
     await expectAuthRedirect(page, '/users/search');
   });
 
   test('should redirect to forbidden when non-admin', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
-    await expectForbiddenRedirect(page, '/users/search');
+    await expectForbiddenRedirect(page, _mockServer.url, '/users/search');
   });
 
-  test('should display "Search Users" heading', async ({ mockApi: page }) => {
-    await loginViaUi(page, { isAdmin: true });
+  test('should display "Search Users" heading', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/search');
 
     await expect(page.getByText('Search Users')).toBeVisible();
   });
 
-  test('should display search form fields', async ({ mockApi: page }) => {
-    await loginViaUi(page, { isAdmin: true });
+  test('should display search form fields', async ({ _mockServer, page }) => {
+    await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/search');
 
     await expect(page.getByLabel('Email')).toBeVisible();
@@ -41,10 +43,10 @@ test.describe('User Search page', () => {
   });
 
   test('should display search results in table after searching', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
-    await loginViaUi(page, { isAdmin: true });
-    await mockSearchUsers(page);
+    await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/search');
 
     await page.getByLabel('Email').fill('example');
@@ -55,36 +57,39 @@ test.describe('User Search page', () => {
     await expect(page.getByRole('cell', { name: 'john@example.com' })).toBeVisible();
   });
 
-  test('should display result count', async ({ mockApi: page }) => {
-    await loginViaUi(page, { isAdmin: true });
-    await mockSearchUsers(page);
+  test('should display result count', async ({ _mockServer, page }) => {
+    await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/search');
 
+    // Search for "Smith" last name — only John Smith matches
+    await page.getByLabel('Last Name').fill('Smith');
     await page.getByRole('button', { name: 'Search' }).click();
 
-    await expect(page.getByText('3 user(s) found')).toBeVisible();
+    await expect(page.getByText('1 user(s) found')).toBeVisible();
   });
 
   test('should show empty state when no results', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
-    await loginViaUi(page, { isAdmin: true });
-    await mockSearchUsers(page, []);
+    await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/search');
 
+    // Search for a non-existent email
+    await page.getByLabel('Email').fill('nonexistent@nowhere.com');
     await page.getByRole('button', { name: 'Search' }).click();
 
     await expect(page.getByText('No Users Found')).toBeVisible();
   });
 
   test('should clear results and form on "Clear" button click', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
-    await loginViaUi(page, { isAdmin: true });
-    await mockSearchUsers(page);
+    await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/search');
 
-    await page.getByLabel('Email').fill('test');
+    await page.getByLabel('Email').fill('example');
     await page.getByRole('button', { name: 'Search' }).click();
 
     await expect(page.getByText('Search Results')).toBeVisible();
@@ -96,10 +101,10 @@ test.describe('User Search page', () => {
   });
 
   test('should navigate to detail page on view button click', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
-    await loginViaUi(page, { isAdmin: true });
-    await mockSearchUsers(page);
+    await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/search');
 
     await page.getByRole('button', { name: 'Search' }).click();
@@ -111,10 +116,10 @@ test.describe('User Search page', () => {
   });
 
   test('should navigate to edit page on edit button click', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
-    await loginViaUi(page, { isAdmin: true });
-    await mockSearchUsers(page);
+    await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/search');
 
     await page.getByRole('button', { name: 'Search' }).click();
@@ -126,11 +131,15 @@ test.describe('User Search page', () => {
   });
 
   test('should send isAdmin=true when "Admin" role is selected', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
     const capturedUrls: string[] = [];
-    await loginViaUi(page, { isAdmin: true });
-    await mockSearchUsersWithCapture(page, capturedUrls);
+    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await page.route('**/api/v1/users/search*', (route) => {
+      capturedUrls.push(route.request().url());
+      return route.fallback();
+    });
     await page.goto('/users/search');
 
     await page.getByLabel('Role').click();
@@ -142,11 +151,15 @@ test.describe('User Search page', () => {
   });
 
   test('should send isActive=true when "Active" status is selected', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
     const capturedUrls: string[] = [];
-    await loginViaUi(page, { isAdmin: true });
-    await mockSearchUsersWithCapture(page, capturedUrls);
+    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await page.route('**/api/v1/users/search*', (route) => {
+      capturedUrls.push(route.request().url());
+      return route.fallback();
+    });
     await page.goto('/users/search');
 
     await page.getByLabel('Status').click();
@@ -158,11 +171,10 @@ test.describe('User Search page', () => {
   });
 
   test('should delete user from results with confirmation', async ({
-    mockApi: page
+    _mockServer,
+    page
   }) => {
-    await loginViaUi(page, { isAdmin: true });
-    await mockSearchUsers(page);
-    await mockDeleteUser(page);
+    await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/search');
 
     await page.getByRole('button', { name: 'Search' }).click();
