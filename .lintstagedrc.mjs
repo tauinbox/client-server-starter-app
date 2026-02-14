@@ -18,6 +18,9 @@ export default {
     return `${clientBin('stylelint')} --fix --config ${stylelintConfig} ${files.join(' ')}`;
   },
   'server/src/**/*.ts': (files) => {
-    return `${serverBin('eslint')} --fix -c ${serverEslintConfig} ${files.join(' ')}`;
+    return [
+      `${serverBin('prettier')} --write ${files.join(' ')}`,
+      `${serverBin('eslint')} --fix -c ${serverEslintConfig} ${files.join(' ')}`
+    ];
   }
 };

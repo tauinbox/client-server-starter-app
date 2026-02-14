@@ -170,9 +170,7 @@ export class AuthService {
   ): Promise<void> {
     const user = await this.usersService.findOne(userId);
     if (!user || !user.isActive) {
-      throw new UnauthorizedException(
-        'User account not found or deactivated'
-      );
+      throw new UnauthorizedException('User account not found or deactivated');
     }
     await this.safeCreateOAuthAccount(userId, provider, providerId);
   }
