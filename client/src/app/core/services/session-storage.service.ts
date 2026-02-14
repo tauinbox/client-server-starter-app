@@ -8,21 +8,23 @@ export class SessionStorageService {
   readonly #storage = inject(DOCUMENT).defaultView?.sessionStorage ?? null;
 
   getItem<T>(key: string): T | null {
-    const item = this.#storage?.getItem(key) ?? null;
+    const raw = this.#storage?.getItem(key) ?? null;
 
-    if (!item) {
+    if (raw === null) {
       return null;
     }
 
     try {
-      return JSON.parse(item);
+      return JSON.parse(raw) as T;
     } catch {
-      return item as T;
+      return raw as T;
     }
   }
 
   setItem<T>(key: string, value: T): void {
-    this.#storage?.setItem(key, JSON.stringify(value));
+    const serialized =
+      typeof value === 'string' ? value : JSON.stringify(value);
+    this.#storage?.setItem(key, serialized);
   }
 
   removeItem(key: string): void {
