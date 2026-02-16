@@ -20,12 +20,12 @@ import { VkStrategy } from './strategies/vk.strategy';
 
 function conditionalProvider(
   envVar: string,
-  strategyClass: new (...args: unknown[]) => unknown
+  strategyClass: new (configService: ConfigService) => unknown
 ) {
   return {
     provide: strategyClass,
     inject: [ConfigService],
-    useFactory: (configService: ConfigService) => {
+    useFactory: (configService: ConfigService): unknown => {
       if (configService.get(envVar)) {
         return new strategyClass(configService);
       }

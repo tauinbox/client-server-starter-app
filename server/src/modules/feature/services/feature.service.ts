@@ -22,7 +22,7 @@ export class FeatureService {
   }
 
   getConfigParams() {
-    const { api, token } = this.configService.get<{
+    const { api, token } = this.configService.getOrThrow<{
       api: string;
       token: string;
     }>('externalProject');
