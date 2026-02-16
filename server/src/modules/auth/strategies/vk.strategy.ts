@@ -9,8 +9,8 @@ import { OAuthProvider } from '../enums/oauth-provider.enum';
 export class VkStrategy extends PassportStrategy(Strategy, 'vkontakte') {
   constructor(configService: ConfigService) {
     super({
-      clientID: configService.get('VK_CLIENT_ID'),
-      clientSecret: configService.get('VK_CLIENT_SECRET'),
+      clientID: configService.getOrThrow('VK_CLIENT_ID'),
+      clientSecret: configService.getOrThrow('VK_CLIENT_SECRET'),
       callbackURL: '/api/v1/auth/oauth/vk/callback',
       scope: ['email']
     } as ConstructorParameters<typeof Strategy>[0] & { scope: string[] });

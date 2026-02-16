@@ -9,8 +9,8 @@ import { OAuthProvider } from '../enums/oauth-provider.enum';
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor(configService: ConfigService) {
     super({
-      clientID: configService.get('GOOGLE_CLIENT_ID'),
-      clientSecret: configService.get('GOOGLE_CLIENT_SECRET'),
+      clientID: configService.getOrThrow('GOOGLE_CLIENT_ID'),
+      clientSecret: configService.getOrThrow('GOOGLE_CLIENT_SECRET'),
       callbackURL: '/api/v1/auth/oauth/google/callback',
       scope: ['email', 'profile']
     });

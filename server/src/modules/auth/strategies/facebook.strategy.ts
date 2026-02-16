@@ -9,8 +9,8 @@ import { OAuthProvider } from '../enums/oauth-provider.enum';
 export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
   constructor(configService: ConfigService) {
     super({
-      clientID: configService.get('FACEBOOK_CLIENT_ID'),
-      clientSecret: configService.get('FACEBOOK_CLIENT_SECRET'),
+      clientID: configService.getOrThrow('FACEBOOK_CLIENT_ID'),
+      clientSecret: configService.getOrThrow('FACEBOOK_CLIENT_SECRET'),
       callbackURL: '/api/v1/auth/oauth/facebook/callback',
       scope: ['email'],
       profileFields: ['id', 'emails', 'name']
