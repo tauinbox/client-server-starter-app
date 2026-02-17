@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { Logger } from '@nestjs/common';
 import { Request as ExpressRequest, Response } from 'express';
 import { OAuthController } from './oauth.controller';
 import { AuthService } from '../services/auth.service';
@@ -56,6 +57,9 @@ describe('OAuthController', () => {
   };
 
   beforeEach(async () => {
+    jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+
     jwtServiceMock = {
       sign: jest.fn().mockReturnValue('signed-link-token'),
       verify: jest.fn().mockReturnValue({ sub: 'user-1' })
@@ -96,6 +100,10 @@ describe('OAuthController', () => {
     }).compile();
 
     controller = module.get<OAuthController>(OAuthController);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('should be defined', () => {
