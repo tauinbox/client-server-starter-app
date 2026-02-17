@@ -106,8 +106,28 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!**/*.spec.ts",
+      "!**/*.module.ts",
+      "!**/*.dto.ts",
+      "!**/index.ts",
+      "!main.ts",
+      "!postgres-data-source.ts",
+      "!postgres.config.ts",
+      "!cors-options.ts",
+      "!modules/core/configuration.ts",
+      "!migrations/**",
+      "!seeders/**",
+      "!modules/feature/**"
     ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 60,
+        "branches": 60,
+        "functions": 50,
+        "lines": 60
+      }
+    },
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   }
