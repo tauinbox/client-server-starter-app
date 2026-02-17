@@ -53,9 +53,9 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 fullstack-starter-app/
 ├── client/                 # Angular 21 SPA
 │   ├── src/app/
-│   │   ├── core/           # Header, theme, storage, 404
+│   │   ├── core/           # Header, theme, storage, error interceptor, 404
 │   │   ├── features/
-│   │   │   ├── auth/       # Login, register, profile, guards, interceptors
+│   │   │   ├── auth/       # Login, register, profile, guards, JWT interceptor
 │   │   │   ├── users/      # User list, detail, edit, search
 │   │   │   └── feature/    # Example feature
 │   │   └── shared/         # Shared components (confirm dialog)

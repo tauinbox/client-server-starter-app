@@ -30,11 +30,11 @@ All components are standalone (no NgModules) with `OnPush` change detection and 
 
 ```
 src/app/
-├── core/                   # Header, theme toggle, storage/session-storage services, 404 page
+├── core/                   # Header, theme toggle, storage/session-storage services, error interceptor, 404 page
 ├── features/
 │   ├── auth/               # Login, register, profile, OAuth callback, forbidden
 │   │   ├── guards/         # authGuard, adminGuard
-│   │   ├── interceptors/   # jwtInterceptor, errorInterceptor
+│   │   ├── interceptors/   # jwtInterceptor
 │   │   ├── services/       # AuthService (HTTP, refresh scheduling)
 │   │   └── store/          # AuthStore (NgRx Signal Store, pure state)
 │   ├── users/              # User list, detail, edit, search (admin)
@@ -47,8 +47,8 @@ src/app/
 
 | Path | Component | Guard |
 |------|-----------|-------|
-| `/login` | LoginComponent | - |
-| `/register` | RegisterComponent | - |
+| `/login` | LoginComponent | guestGuard |
+| `/register` | RegisterComponent | guestGuard |
 | `/profile` | ProfileComponent | authGuard |
 | `/users` | UserListComponent | adminGuard |
 | `/users/search` | UserSearchComponent | adminGuard |
