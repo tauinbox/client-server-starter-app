@@ -1,5 +1,5 @@
 import { DynamicModule, Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import configuration from './configuration';
 import { CacheModule } from '@nestjs/cache-manager';
@@ -10,6 +10,7 @@ import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { GlobalExceptionFilter } from './filters';
 
 @Module({})
 export class CoreModule {
@@ -33,6 +34,10 @@ export class CoreModule {
         FeatureModule
       ],
       providers: [
+        {
+          provide: APP_FILTER,
+          useClass: GlobalExceptionFilter
+        },
         {
           provide: APP_GUARD,
           useClass: ThrottlerGuard
