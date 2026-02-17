@@ -84,6 +84,7 @@ src/
 │   ├── config/             # @nestjs/config, loads .env
 │   ├── cache/              # @nestjs/cache-manager
 │   ├── database/           # TypeORM + PostgreSQL config
+│   ├── filters/            # GlobalExceptionFilter (standardized error responses, DB error mapping)
 │   └── schedule/           # @nestjs/schedule for cron jobs
 ├── auth/
 │   ├── controllers/        # AuthController, OAuthController
@@ -119,6 +120,10 @@ Request → Global Middleware (Compression, CookieParser, CORS)
         → Controller Handler
         → Interceptors (response phase)
         → Response
+
+On exception: GlobalExceptionFilter catches all errors and returns
+standardized error responses with timestamp, path, and user-friendly messages.
+TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 ```
 
 ### Authentication
