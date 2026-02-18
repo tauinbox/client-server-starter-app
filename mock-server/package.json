@@ -1,6 +1,6 @@
 {
   "name": "mock-server",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "In-memory mock backend for development and E2E testing",
   "scripts": {

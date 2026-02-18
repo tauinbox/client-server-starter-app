@@ -1,16 +1,21 @@
 {
   "name": "client",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "scripts": {
     "ng": "ng",
+    "prestart": "node scripts/version.mjs",
     "start": "ng serve",
+    "prebuild": "node scripts/version.mjs",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
+    "pretest": "node scripts/version.mjs",
     "test": "ng test",
     "lint": "ng lint",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "prepare": "cd .. && husky client/.husky"
+    "postinstall": "node scripts/version.mjs",
+    "prepare": "cd .. && husky client/.husky",
+    "release": "commit-and-tag-version"
   },
   "private": true,
   "dependencies": {
@@ -35,11 +40,14 @@
     "@angular/build": "^21.1.3",
     "@angular/cli": "~21.1.3",
     "@angular/compiler-cli": "^21.1.3",
+    "@commitlint/cli": "^20.4.1",
+    "@commitlint/config-conventional": "^20.4.1",
     "@eslint/compat": "^2.0.2",
     "@playwright/test": "^1.58.2",
     "angular-eslint": "21.2.0",
     "baseline-browser-mapping": "^2.9.7",
     "browser-sync": "^3.0.3",
+    "commit-and-tag-version": "^12.6.1",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",

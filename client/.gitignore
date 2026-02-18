@@ -42,6 +42,9 @@ testem.log
 /test-results/
 /playwright-report/
 
+# Auto-generated
+/src/environments/version.ts
+
 # System files
 .DS_Store
 Thumbs.db

@@ -1,0 +1,9 @@
+{
+  "packageFiles": [{ "filename": "package.json", "type": "json" }],
+  "bumpFiles": [
+    { "filename": "package.json", "type": "json" },
+    { "filename": "../server/package.json", "type": "json" },
+    { "filename": "../mock-server/package.json", "type": "json" }
+  ],
+  "infile": "../CHANGELOG.md"
+}

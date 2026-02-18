@@ -221,6 +221,10 @@ npx jest --testPathPattern=auth   # Run specific tests
 npm run test:e2e
 ```
 
+## Versioning
+
+This package's version is kept in sync with `client/` and `mock-server/` via `commit-and-tag-version`. To cut a release, run `npm run release` from `client/` — it bumps `server/package.json` automatically.
+
 ## Tech Stack
 
 | Technology | Version |

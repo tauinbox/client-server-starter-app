@@ -21,6 +21,7 @@ The dev proxy (`proxy.conf.mjs`) forwards `/api` and `/ws` requests to `BACKEND_
 | Unit tests | `npm test` (Vitest) |
 | E2E tests | `npm run test:e2e` (Playwright) |
 | E2E tests (UI) | `npm run test:e2e:ui` |
+| Release | `npm run release` (bump versions, generate CHANGELOG.md, create git tag) |
 
 ## Architecture
 
@@ -80,6 +81,7 @@ NgRx Signal Store (`@ngrx/signals`):
 | `@core/*` | `src/app/core/*` |
 | `@features/*` | `src/app/features/*` |
 | `@shared/*` | `src/app/shared/*` |
+| `@environments/*` | `src/environments/*` |
 
 ## Styling
 
@@ -132,6 +134,30 @@ npm run test:e2e           # Headless
 npm run test:e2e:ui        # Interactive UI
 ```
 
+## Versioning
+
+The version string is generated at build/start/test time by `scripts/version.mjs`:
+
+1. Reads `version` from `client/package.json`
+2. Gets the current git short hash via `git rev-parse --short HEAD`
+3. Writes `src/environments/version.ts` (gitignored):
+
+```typescript
+export const APP_VERSION = '0.1.0';
+export const BUILD_HASH = 'abc1234';
+```
+
+`HeaderComponent` imports these values and displays them as a `MatTooltip` on the "Pet project" toolbar span.
+
+To cut a new release (from `client/`):
+
+```bash
+npm run release    # bumps client + server + mock-server package.json, writes repo CHANGELOG.md, tags commit
+git push --follow-tags
+```
+
+Commits must follow [Conventional Commits](https://www.conventionalcommits.org/) — enforced by the `commit-msg` husky hook.
+
 ## Tech Stack
 
 | Technology | Version |
@@ -146,3 +172,5 @@ npm run test:e2e:ui        # Interactive UI
 | ESLint | 9.x |
 | Prettier | 3.x |
 | Stylelint | 17.x |
+| commitlint | 20.x |
+| commit-and-tag-version | 12.x |
