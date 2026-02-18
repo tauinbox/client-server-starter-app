@@ -58,6 +58,8 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 
 ```
 fullstack-starter-app/
+├── .github/workflows/      # CI/CD pipeline (GitHub Actions)
+│   └── ci.yml              # Lint, test, build on push/PR to master
 ├── client/                 # Angular 21 SPA
 │   ├── src/app/
 │   │   ├── core/           # Header, theme, storage, error interceptor, 404
@@ -92,7 +94,7 @@ fullstack-starter-app/
 
 ## Prerequisites
 
-- **Node.js** (see `package.json` engines)
+- **Node.js 22** (pinned via `.nvmrc`)
 - **PostgreSQL** running locally or remotely
 - **npm**
 
@@ -313,6 +315,19 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 | Client unit tests | Vitest | `*.spec.ts` alongside source |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (in-memory Express API) |
 | Mock server | Express | `mock-server/` directory, provides full API simulation for E2E tests |
+
+## CI/CD
+
+GitHub Actions runs on every push and pull request to `master` with 4 parallel jobs:
+
+| Job | Steps | Artifacts |
+|-----|-------|-----------|
+| **Server** | lint, format:check, test:cov (60/60/50/60 thresholds), build | Coverage report |
+| **Mock Server** | lint, format:check | - |
+| **Client** | lint, unit test, build | - |
+| **Client E2E** (needs: mock-server) | Playwright with Chromium caching | HTML report, test results |
+
+Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file required — all tests run against mocks.
 
 ## Security
 
