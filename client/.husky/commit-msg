@@ -1,0 +1,1 @@
+cd client && npx commitlint --edit "$1"

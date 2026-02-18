@@ -40,6 +40,13 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - Snackbar error notifications
 - Form validation with error messages
 - 404 and 403 pages
+- Version display in toolbar (version + git hash via `MatTooltip`)
+
+### Versioning
+- All three workspaces share a single version (`0.1.0`)
+- `client/scripts/version.mjs` auto-generates `src/environments/version.ts` before every build/start/test
+- `npm run release` (from `client/`) bumps all `package.json` files, generates `CHANGELOG.md`, and creates a git tag
+- Conventional Commits enforced via commitlint + husky `commit-msg` hook
 
 ### Example Feature Module
 - Demonstrates NestJS patterns: guards, interceptors, middlewares, pipes
@@ -239,6 +246,7 @@ npm run lint               # Lint check
 npm test                   # Unit tests (Vitest)
 npm run test:e2e           # E2E tests (Playwright, uses mock-server)
 npm run test:e2e:ui        # E2E tests (interactive UI)
+npm run release            # Bump versions, generate CHANGELOG.md, create git tag
 ```
 
 ## Architecture
@@ -278,6 +286,8 @@ Four tables managed via TypeORM migrations:
 | Prettier | Both (single quotes, no trailing commas) | `.prettierrc` |
 | Stylelint | Client SCSS (recess property order) | `.stylelintrc.json` |
 | Husky + lint-staged | Pre-commit hook (auto-fix staged files) | `.lintstagedrc.mjs` |
+| Commitlint | Conventional Commits enforcement | `client/commitlint.config.mjs` |
+| commit-and-tag-version | Automated versioning + CHANGELOG | `client/.versionrc.json` |
 
 ### Git Hooks
 
@@ -290,7 +300,9 @@ A pre-commit hook (via [husky](https://typicode.github.io/husky/)) runs **lint-s
 | `server/src/**/*.ts` | Prettier + ESLint (@typescript-eslint) |
 | `mock-server/src/**/*.ts` | Prettier + ESLint (@typescript-eslint) |
 
-Husky and lint-staged are installed in the `client/` sub-package. Running `npm install` inside `client/` activates the git hooks via the `prepare` script.
+A commit-msg hook (`client/.husky/commit-msg`) additionally runs **commitlint** to enforce [Conventional Commits](https://www.conventionalcommits.org/) format.
+
+Husky, lint-staged, and commitlint are installed in the `client/` sub-package. Running `npm install` inside `client/` activates the git hooks via the `prepare` script.
 
 ## Testing
 
