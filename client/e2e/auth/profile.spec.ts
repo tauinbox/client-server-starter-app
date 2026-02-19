@@ -37,8 +37,35 @@ test.describe('Profile page', () => {
   });
 
   test('should display inactive status', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { isActive: false });
+    // Login as active user first, then intercept profile response as inactive
+    await loginViaUi(page, _mockServer.url);
 
+    // Intercept GET /api/v1/auth/profile to return inactive status
+    await page.route('**/api/v1/auth/profile', (route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: '100',
+            email: 'testlogin@example.com',
+            firstName: 'John',
+            lastName: 'Doe',
+            isActive: false,
+            isAdmin: false,
+            isEmailVerified: true,
+            failedLoginAttempts: 0,
+            lockedUntil: null,
+            createdAt: '2025-01-01T00:00:00.000Z',
+            updatedAt: '2025-01-01T00:00:00.000Z'
+          })
+        });
+      }
+      return route.fallback();
+    });
+
+    // Reload profile page to get the intercepted response
+    await page.goto('/profile');
     await expect(page.getByText('Status: Inactive')).toBeVisible();
   });
 
@@ -116,17 +143,34 @@ test.describe('Profile page', () => {
     ).toBeDisabled();
   });
 
-  test('should allow submitting with valid password', async ({
+  test('should allow submitting with valid password and matching confirm', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url);
 
     await page.getByLabel('New Password (Optional)').fill('newpass123');
+    await page.getByLabel('Confirm New Password').fill('newpass123');
 
     await expect(
       page.getByRole('button', { name: 'Update Profile' })
     ).toBeEnabled();
+  });
+
+  test('should disable submit when passwords do not match', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url);
+
+    await page.getByLabel('New Password (Optional)').fill('newpass123');
+    await page.getByLabel('Confirm New Password').fill('different1');
+    await page.getByLabel('First Name').click();
+
+    await expect(page.getByText(/passwords do not match/i)).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Update Profile' })
+    ).toBeDisabled();
   });
 
   test('should update profile successfully', async ({ _mockServer, page }) => {

@@ -33,7 +33,7 @@ All components are standalone (no NgModules) with `OnPush` change detection and 
 src/app/
 ├── core/                   # Header, theme toggle, storage/session-storage services, error interceptor, 404 page
 ├── features/
-│   ├── auth/               # Login, register, profile, OAuth callback, forbidden
+│   ├── auth/               # Login, register, profile, OAuth callback, verify-email, forgot-password, reset-password, forbidden
 │   │   ├── guards/         # authGuard, adminGuard
 │   │   ├── interceptors/   # jwtInterceptor
 │   │   ├── services/       # AuthService (HTTP, refresh scheduling)
@@ -55,6 +55,9 @@ src/app/
 | `/users/search` | UserSearchComponent | adminGuard |
 | `/users/:id` | UserDetailComponent | authGuard |
 | `/users/:id/edit` | UserEditComponent | authGuard |
+| `/verify-email` | VerifyEmailComponent | - |
+| `/forgot-password` | ForgotPasswordComponent | guestGuard |
+| `/reset-password` | ResetPasswordComponent | guestGuard |
 | `/oauth/callback` | OAuthCallbackComponent | - |
 | `/feature` | FeatureComponent | - |
 | `/forbidden` | ForbiddenComponent | - |
@@ -126,7 +129,7 @@ npm test
   - `mock-data.ts` — `MockUser` type, `defaultUser`, factory re-exports (`createMockUser`, `createOAuthAccount`)
   - `helpers.ts` — `loginViaUi()`, `expectAuthRedirect()`, `expectForbiddenRedirect()`
 - Test structure: organized by module in `e2e/auth/` and `e2e/users/`
-- Coverage: 95 tests (37 auth + 58 users) covering login, register, profile, session-restore, users list/detail/edit/search
+- Coverage: 113 tests (55 auth + 58 users) covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search
 - Workers: 4 (fully parallel, per-worker mock-server instances on dynamic ports)
 
 ```bash

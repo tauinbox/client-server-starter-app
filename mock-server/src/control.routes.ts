@@ -41,6 +41,15 @@ router.post('/users', (req, res) => {
   res.json({ message: `Added/updated ${users.length} user(s)` });
 });
 
+// GET /__control/tokens — get all verification and reset tokens (for E2E)
+router.get('/tokens', (_req, res) => {
+  const state = getState();
+  res.json({
+    emailVerificationTokens: Object.fromEntries(state.emailVerificationTokens),
+    passwordResetTokens: Object.fromEntries(state.passwordResetTokens)
+  });
+});
+
 // POST /__control/oauth-accounts — add OAuth accounts for a user
 router.post('/oauth-accounts', (req, res) => {
   const { userId, accounts }: { userId: string; accounts: OAuthAccount[] } =

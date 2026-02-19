@@ -5,6 +5,16 @@
     </mat-card-header>
 
     <mat-card-content>
+      @if (pendingVerification()) {
+        <div class="info-message">
+          <mat-icon>mark_email_read</mat-icon>
+          <span
+            >Registration successful! Please check your email to verify your
+            account before logging in.</span
+          >
+        </div>
+      }
+
       <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
         <mat-form-field class="full-width">
           <mat-label>Email</mat-label>
@@ -62,6 +72,36 @@
         @if (error()) {
           <div class="error-message">
             {{ error() }}
+            @if (lockoutSeconds() > 0) {
+              <div class="lockout-countdown">
+                Try again in {{ lockoutSeconds() }} seconds
+              </div>
+            }
+          </div>
+        }
+
+        @if (emailNotVerified()) {
+          <div class="verification-actions">
+            @if (verificationResent()) {
+              <span class="verification-sent"
+                >Verification email sent! Check your inbox.</span
+              >
+            } @else {
+              <button
+                mat-button
+                type="button"
+                color="primary"
+                [disabled]="resendingVerification()"
+                (click)="resendVerification()"
+              >
+                @if (resendingVerification()) {
+                  <mat-spinner diameter="16"></mat-spinner>
+                  Sending...
+                } @else {
+                  Resend verification email
+                }
+              </button>
+            }
           </div>
         }
 
@@ -70,7 +110,7 @@
             mat-raised-button
             color="primary"
             type="submit"
-            [disabled]="loginForm.invalid || loading()"
+            [disabled]="loginForm.invalid || loading() || lockoutSeconds() > 0"
           >
             @if (loading()) {
               <mat-spinner diameter="24"></mat-spinner>
@@ -79,6 +119,10 @@
               Login
             }
           </button>
+        </div>
+
+        <div class="forgot-password-link">
+          <a routerLink="/forgot-password">Forgot password?</a>
         </div>
       </form>
 

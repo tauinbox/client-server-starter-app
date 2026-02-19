@@ -32,6 +32,10 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { UsersService } from '../../users/services/users.service';
 import { AuthResponseDto, RefreshTokenDto } from '../dtos/auth-response.dto';
 import { JwtAuthRequest, LocalAuthRequest } from '../types/auth.request';
+import { VerifyEmailDto } from '../dtos/verify-email.dto';
+import { ResendVerificationDto } from '../dtos/resend-verification.dto';
+import { ForgotPasswordDto } from '../dtos/forgot-password.dto';
+import { ResetPasswordDto } from '../dtos/reset-password.dto';
 
 @ApiTags('Auth API')
 @Controller({
@@ -49,8 +53,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Register a new user' })
   @ApiBody({ type: RegisterDto })
   @ApiCreatedResponse({
-    description: 'User has been successfully registered',
-    type: UserResponseDto
+    description: 'User has been successfully registered'
   })
   @ApiConflictResponse({ description: 'User with this email already exists' })
   register(@Body() registerDto: RegisterDto) {
@@ -134,5 +137,43 @@ export class AuthController {
     }
 
     return updatedUser;
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify email address using token' })
+  @ApiBody({ type: VerifyEmailDto })
+  @ApiOkResponse({ description: 'Email verified successfully' })
+  verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
+    return this.authService.verifyEmail(verifyEmailDto.token);
+  }
+
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend email verification link' })
+  @ApiBody({ type: ResendVerificationDto })
+  @ApiOkResponse({ description: 'Verification email sent if account exists' })
+  resendVerification(@Body() dto: ResendVerificationDto) {
+    return this.authService.resendVerificationEmail(dto.email);
+  }
+
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request a password reset link' })
+  @ApiBody({ type: ForgotPasswordDto })
+  @ApiOkResponse({ description: 'Password reset email sent if account exists' })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password using token' })
+  @ApiBody({ type: ResetPasswordDto })
+  @ApiOkResponse({ description: 'Password has been reset successfully' })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.password);
   }
 }

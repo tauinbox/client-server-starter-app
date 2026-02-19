@@ -15,9 +15,15 @@ import {
 } from '@angular/material/card';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatDivider } from '@angular/material/divider';
-import type { FormControl, FormGroup } from '@angular/forms';
+import type {
+  AbstractControl,
+  FormControl,
+  FormGroup,
+  ValidationErrors
+} from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
+import type { ErrorStateMatcher } from '@angular/material/core';
 import { MatIcon, MatIconRegistry } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatButton, MatIconButton } from '@angular/material/button';
@@ -38,7 +44,17 @@ type ProfileFormType = {
   firstName: FormControl<string>;
   lastName: FormControl<string>;
   password: FormControl<string>;
+  confirmPassword: FormControl<string>;
 };
+
+function passwordsMatchValidator(
+  group: AbstractControl
+): ValidationErrors | null {
+  const password = group.get('password')?.value;
+  const confirm = group.get('confirmPassword')?.value;
+  if (!password) return null;
+  return password === confirm ? null : { passwordsMismatch: true };
+}
 
 type OAuthAccountInfo = {
   provider: string;
@@ -84,31 +100,44 @@ export class ProfileComponent implements OnInit {
   readonly #route = inject(ActivatedRoute);
   readonly #router = inject(Router);
 
+  protected readonly confirmPasswordErrorMatcher: ErrorStateMatcher = {
+    isErrorState: () =>
+      !!this.profileForm.errors?.['passwordsMismatch'] &&
+      !!this.profileForm.get('confirmPassword')?.touched
+  };
+
   protected readonly user = signal<User | null>(null);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly showPassword = signal(false);
+  protected readonly showConfirmPassword = signal(false);
   protected readonly oauthAccounts = signal<OAuthAccountInfo[]>([]);
   protected readonly oauthLoading = signal(false);
   protected readonly allProviders = Object.keys(OAUTH_URLS);
   protected readonly providerLabels = PROVIDER_LABELS;
 
   protected readonly profileForm: FormGroup<ProfileFormType> =
-    this.#fb.group<ProfileFormType>({
-      firstName: this.#fb.control('', {
-        validators: [Validators.required],
-        nonNullable: true
-      }),
-      lastName: this.#fb.control('', {
-        validators: [Validators.required],
-        nonNullable: true
-      }),
-      password: this.#fb.control('', {
-        validators: [Validators.minLength(8)],
-        nonNullable: true
-      })
-    });
+    this.#fb.group<ProfileFormType>(
+      {
+        firstName: this.#fb.control('', {
+          validators: [Validators.required],
+          nonNullable: true
+        }),
+        lastName: this.#fb.control('', {
+          validators: [Validators.required],
+          nonNullable: true
+        }),
+        password: this.#fb.control('', {
+          validators: [Validators.minLength(8)],
+          nonNullable: true
+        }),
+        confirmPassword: this.#fb.control('', {
+          nonNullable: true
+        })
+      },
+      { validators: [passwordsMatchValidator] }
+    );
 
   constructor() {
     registerOAuthIcons(inject(MatIconRegistry), inject(DomSanitizer));
@@ -160,7 +189,8 @@ export class ProfileComponent implements OnInit {
           this.profileForm.patchValue({
             firstName: user.firstName,
             lastName: user.lastName,
-            password: ''
+            password: '',
+            confirmPassword: ''
           });
           this.loading.set(false);
           this.profileForm.markAsPristine();
@@ -244,6 +274,10 @@ export class ProfileComponent implements OnInit {
     this.showPassword.update((prev) => !prev);
   }
 
+  toggleConfirmPasswordVisibility(): void {
+    this.showConfirmPassword.update((prev) => !prev);
+  }
+
   onSubmit(): void {
     if (this.profileForm.invalid || !this.user()) return;
 
@@ -269,7 +303,7 @@ export class ProfileComponent implements OnInit {
           this.saving.set(false);
           this.user.set(updatedUser);
 
-          this.profileForm.patchValue({ password: '' });
+          this.profileForm.patchValue({ password: '', confirmPassword: '' });
           this.profileForm.markAsPristine();
 
           this.#snackBar.open('Profile updated successfully', 'Close', {

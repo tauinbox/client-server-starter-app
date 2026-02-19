@@ -6,6 +6,9 @@ export interface MockUser {
   password: string;
   isActive: boolean;
   isAdmin: boolean;
+  isEmailVerified: boolean;
+  failedLoginAttempts: number;
+  lockedUntil: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -22,6 +25,8 @@ export interface State {
   users: Map<string, MockUser>;
   oauthAccounts: Map<string, OAuthAccount[]>;
   refreshTokens: Map<string, string>;
+  emailVerificationTokens: Map<string, string>; // token -> userId
+  passwordResetTokens: Map<string, string>; // token -> userId
 }
 
 import type { Request } from 'express';

@@ -118,7 +118,7 @@ test.describe('Register page', () => {
     ).toBeVisible();
   });
 
-  test('should register successfully and redirect to login', async ({
+  test('should register successfully and redirect to login with pending verification', async ({
     _mockServer,
     page
   }) => {
@@ -131,9 +131,9 @@ test.describe('Register page', () => {
     await page.getByLabel('Password').fill('Password1');
     await main.getByRole('button', { name: 'Register' }).click();
 
-    await expect(page).toHaveURL(/.*\/login$/);
+    await expect(page).toHaveURL(/.*\/login\?registered=pending-verification$/);
     await expect(
-      page.getByText('Registration successful! Please login.')
+      page.getByText(/check your email to verify your account/i)
     ).toBeVisible();
   });
 

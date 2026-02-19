@@ -32,3 +32,26 @@ export type UpdateProfile = {
 export type CustomJwtPayload = JwtPayload & {
   userId: User['id'];
 } & Pick<User, 'email' | 'isAdmin'>;
+
+export type ForgotPasswordRequest = {
+  email: string;
+};
+
+export type ResetPasswordRequest = {
+  token: string;
+  password: string;
+};
+
+export type VerifyEmailRequest = {
+  token: string;
+};
+
+export type ResendVerificationRequest = {
+  email: string;
+};
+
+export type LockoutErrorData = {
+  message: string;
+  lockedUntil: string;
+  retryAfter: number;
+};

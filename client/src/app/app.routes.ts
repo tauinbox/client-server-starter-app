@@ -88,6 +88,29 @@ export const routes: Routes = [
       )
   },
   {
+    path: AppRouteSegmentEnum.VerifyEmail,
+    loadComponent: () =>
+      import('./features/auth/components/verify-email/verify-email.component').then(
+        (c) => c.VerifyEmailComponent
+      )
+  },
+  {
+    path: AppRouteSegmentEnum.ForgotPassword,
+    loadComponent: () =>
+      import('./features/auth/components/forgot-password/forgot-password.component').then(
+        (c) => c.ForgotPasswordComponent
+      ),
+    canActivate: [guestGuard]
+  },
+  {
+    path: AppRouteSegmentEnum.ResetPassword,
+    loadComponent: () =>
+      import('./features/auth/components/reset-password/reset-password.component').then(
+        (c) => c.ResetPasswordComponent
+      ),
+    canActivate: [guestGuard]
+  },
+  {
     path: AppRouteSegmentEnum.Forbidden,
     loadComponent: () =>
       import('./features/auth/components/forbidden/forbidden.component').then(

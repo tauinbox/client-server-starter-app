@@ -6,5 +6,8 @@ export enum AppRouteSegmentEnum {
   Feature = 'feature',
   OAuthCallback = 'oauth/callback',
   Forbidden = 'forbidden',
+  ForgotPassword = 'forgot-password',
+  ResetPassword = 'reset-password',
+  VerifyEmail = 'verify-email',
   Any = '**'
 }

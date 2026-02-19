@@ -109,6 +109,26 @@
               >
               <mat-checkbox formControlName="isActive">Active</mat-checkbox>
             </div>
+
+            <div class="account-status">
+              @if (!u.isEmailVerified) {
+                <div class="status-badge warn">Email not verified</div>
+              }
+              @if (u.lockedUntil) {
+                <div class="status-badge warn">
+                  Account locked
+                  <button
+                    mat-button
+                    type="button"
+                    color="primary"
+                    (click)="unlockAccount()"
+                    [disabled]="saving()"
+                  >
+                    Unlock
+                  </button>
+                </div>
+              }
+            </div>
           }
 
           @if (error()) {

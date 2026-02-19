@@ -20,6 +20,9 @@ const mockUser: User = {
   lastName: 'User',
   isActive: true,
   isAdmin: false,
+  isEmailVerified: true,
+  failedLoginAttempts: 0,
+  lockedUntil: null,
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01')
 };
@@ -86,7 +89,8 @@ describe('ProfileComponent', () => {
       expect(component['profileForm'].value).toEqual({
         firstName: 'Test',
         lastName: 'User',
-        password: ''
+        password: '',
+        confirmPassword: ''
       });
     });
 
@@ -160,7 +164,8 @@ describe('ProfileComponent', () => {
 
       component['profileForm'].patchValue({
         firstName: 'Updated',
-        password: 'newpassword123'
+        password: 'newpassword123',
+        confirmPassword: 'newpassword123'
       });
       component['profileForm'].markAsDirty();
       component.onSubmit();
@@ -195,11 +200,13 @@ describe('ProfileComponent', () => {
 
       component['profileForm'].patchValue({
         firstName: 'Updated',
-        password: 'newpassword'
+        password: 'newpassword',
+        confirmPassword: 'newpassword'
       });
       component.onSubmit();
 
       expect(component['profileForm'].controls.password.value).toBe('');
+      expect(component['profileForm'].controls.confirmPassword.value).toBe('');
     });
 
     it('should set error on update failure', () => {

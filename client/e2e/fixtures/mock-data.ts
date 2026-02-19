@@ -12,6 +12,9 @@ export type MockUser = {
   lastName: string;
   isActive: boolean;
   isAdmin: boolean;
+  isEmailVerified: boolean;
+  failedLoginAttempts: number;
+  lockedUntil: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -23,6 +26,9 @@ export const defaultUser: MockUser = {
   lastName: 'Doe',
   isActive: true,
   isAdmin: false,
+  isEmailVerified: true,
+  failedLoginAttempts: 0,
+  lockedUntil: null,
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt: '2025-01-01T00:00:00.000Z'
 };
@@ -41,6 +47,9 @@ export const mockUsersList: MockUser[] = [
     lastName: 'User',
     isAdmin: true,
     isActive: true,
+    isEmailVerified: true,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
     createdAt: '2025-01-01T00:00:00.000Z',
     updatedAt: '2025-01-01T00:00:00.000Z'
   },
@@ -51,6 +60,9 @@ export const mockUsersList: MockUser[] = [
     lastName: 'Smith',
     isAdmin: false,
     isActive: true,
+    isEmailVerified: true,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
     createdAt: '2025-02-01T00:00:00.000Z',
     updatedAt: '2025-02-01T00:00:00.000Z'
   },
@@ -61,6 +73,9 @@ export const mockUsersList: MockUser[] = [
     lastName: 'Doe',
     isAdmin: false,
     isActive: false,
+    isEmailVerified: true,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
     createdAt: '2025-03-01T00:00:00.000Z',
     updatedAt: '2025-03-01T00:00:00.000Z'
   }

@@ -1,6 +1,9 @@
 import {
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
+  Logger,
   UnauthorizedException
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -17,15 +20,25 @@ import { TokensResponseDto } from '../dtos/auth-response.dto';
 import { RefreshTokenService } from './refresh-token.service';
 import { OAuthAccountService } from './oauth-account.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
+import { MailService } from '../../mail/mail.service';
+import { hashToken } from '../../../common/utils/hash-token';
+
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const VERIFICATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+const RESET_TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
     private configService: ConfigService,
     private refreshTokenService: RefreshTokenService,
-    private oauthAccountService: OAuthAccountService
+    private oauthAccountService: OAuthAccountService,
+    private mailService: MailService
   ) {}
 
   // Pre-computed dummy hash for constant-time rejection (prevents timing attacks)
@@ -35,19 +48,72 @@ export class AuthService {
   async validateUser(
     email: string,
     password: string
-  ): Promise<UserResponseDto | null> {
+  ): Promise<UserResponseDto> {
     const user = await this.usersService.findByEmail(email);
+
+    // Check account lockout
+    if (user && user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+      const retryAfter = Math.ceil(
+        (user.lockedUntil.getTime() - Date.now()) / 1000
+      );
+      throw new HttpException(
+        {
+          message:
+            'Account is temporarily locked due to too many failed login attempts',
+          lockedUntil: user.lockedUntil.toISOString(),
+          retryAfter
+        },
+        HttpStatus.LOCKED
+      );
+    }
+
     const hashToCompare =
       user?.isActive && user.password ? user.password : AuthService.DUMMY_HASH;
 
     const isMatch = await bcrypt.compare(password, hashToCompare);
 
-    if (user && user.isActive && user.password && isMatch) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password, ...result } = user;
-      return result;
+    if (!user || !user.isActive || !user.password || !isMatch) {
+      // Handle failed login attempt
+      if (user && user.isActive && user.password) {
+        await this.usersService.incrementFailedAttempts(user.id);
+        const updatedUser = await this.usersService.findOne(user.id);
+
+        if (updatedUser.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+          const lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
+          await this.usersService.lockAccount(user.id, lockedUntil);
+          const retryAfter = Math.ceil(LOCKOUT_DURATION_MS / 1000);
+          throw new HttpException(
+            {
+              message:
+                'Account is temporarily locked due to too many failed login attempts',
+              lockedUntil: lockedUntil.toISOString(),
+              retryAfter
+            },
+            HttpStatus.LOCKED
+          );
+        }
+      }
+      throw new UnauthorizedException('Invalid credentials');
     }
-    return null;
+
+    // Check email verification
+    if (!user.isEmailVerified) {
+      throw new HttpException(
+        {
+          message: 'Please verify your email address before logging in',
+          errorCode: 'EMAIL_NOT_VERIFIED'
+        },
+        HttpStatus.FORBIDDEN
+      );
+    }
+
+    // Success — reset failed attempts
+    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+      await this.usersService.resetLoginAttempts(user.id);
+    }
+
+    const { password: _pw, ...result } = user;
+    return result;
   }
 
   async login(user: LocalAuthRequest['user']) {
@@ -82,6 +148,11 @@ export class AuthService {
       if (!user.isActive) {
         throw new UnauthorizedException('User account is deactivated');
       }
+      // Auto-verify email for OAuth users
+      if (!user.isEmailVerified) {
+        await this.usersService.markEmailVerified(user.id);
+        user.isEmailVerified = true;
+      }
     } else {
       // 2. Check if user exists by email
       const existingUser = await this.usersService.findByEmail(profile.email);
@@ -92,13 +163,18 @@ export class AuthService {
           throw new UnauthorizedException('User account is deactivated');
         }
         user = existingUser;
+        // Auto-verify email for OAuth users
+        if (!user.isEmailVerified) {
+          await this.usersService.markEmailVerified(user.id);
+          user.isEmailVerified = true;
+        }
         await this.safeCreateOAuthAccount(
           user.id,
           profile.provider,
           profile.providerId
         );
       } else {
-        // 3. Create new user + OAuth account
+        // 3. Create new user + OAuth account (created with isEmailVerified: true)
         user = await this.usersService.createOAuthUser({
           email: profile.email,
           firstName: profile.firstName,
@@ -175,8 +251,162 @@ export class AuthService {
     await this.safeCreateOAuthAccount(userId, provider, providerId);
   }
 
-  async register(registerDto: RegisterDto): Promise<User> {
-    return this.usersService.create(registerDto);
+  async register(registerDto: RegisterDto): Promise<{ message: string }> {
+    const user = await this.usersService.create(registerDto);
+
+    // Generate email verification token
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS);
+
+    await this.usersService.setEmailVerificationToken(
+      user.id,
+      hashedToken,
+      expiresAt
+    );
+
+    // Send verification email (fire-and-forget)
+    this.mailService
+      .sendEmailVerification(user.email, rawToken)
+      .catch((err) =>
+        this.logger.error('Failed to send verification email', err)
+      );
+
+    return {
+      message:
+        'Registration successful. Please check your email to verify your account.'
+    };
+  }
+
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    const hashedToken = hashToken(token);
+    const user =
+      await this.usersService.findByEmailVerificationToken(hashedToken);
+
+    if (!user) {
+      throw new HttpException(
+        { message: 'Invalid or expired verification token' },
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    if (
+      user.emailVerificationExpiresAt &&
+      user.emailVerificationExpiresAt.getTime() < Date.now()
+    ) {
+      throw new HttpException(
+        {
+          message: 'Verification token has expired. Please request a new one.'
+        },
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    await this.usersService.markEmailVerified(user.id);
+
+    return { message: 'Email verified successfully' };
+  }
+
+  async resendVerificationEmail(email: string): Promise<{ message: string }> {
+    const user = await this.usersService.findByEmail(email);
+
+    // Always return success to prevent email enumeration
+    if (!user || user.isEmailVerified) {
+      return {
+        message:
+          'If an account with that email exists and is not yet verified, a verification email has been sent.'
+      };
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS);
+
+    await this.usersService.setEmailVerificationToken(
+      user.id,
+      hashedToken,
+      expiresAt
+    );
+
+    this.mailService
+      .sendEmailVerification(user.email, rawToken)
+      .catch((err) =>
+        this.logger.error('Failed to resend verification email', err)
+      );
+
+    return {
+      message:
+        'If an account with that email exists and is not yet verified, a verification email has been sent.'
+    };
+  }
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const user = await this.usersService.findByEmail(email);
+
+    // Always return success to prevent email enumeration
+    if (!user || !user.isActive) {
+      return {
+        message:
+          'If an account with that email exists, a password reset link has been sent.'
+      };
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS);
+
+    await this.usersService.setPasswordResetToken(
+      user.id,
+      hashedToken,
+      expiresAt
+    );
+
+    this.mailService
+      .sendPasswordReset(user.email, rawToken)
+      .catch((err) =>
+        this.logger.error('Failed to send password reset email', err)
+      );
+
+    return {
+      message:
+        'If an account with that email exists, a password reset link has been sent.'
+    };
+  }
+
+  async resetPassword(
+    token: string,
+    newPassword: string
+  ): Promise<{ message: string }> {
+    const hashedToken = hashToken(token);
+    const user = await this.usersService.findByPasswordResetToken(hashedToken);
+
+    if (!user) {
+      throw new HttpException(
+        { message: 'Invalid or expired password reset token' },
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    if (
+      user.passwordResetExpiresAt &&
+      user.passwordResetExpiresAt.getTime() < Date.now()
+    ) {
+      throw new HttpException(
+        {
+          message: 'Password reset token has expired. Please request a new one.'
+        },
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    // update() hashes the password internally
+    await this.usersService.update(user.id, { password: newPassword });
+    await this.usersService.clearPasswordResetToken(user.id);
+
+    // Invalidate all refresh tokens
+    await this.refreshTokenService.deleteByUserId(user.id);
+
+    return { message: 'Password has been reset successfully' };
   }
 
   async refreshTokens(refreshToken: string) {

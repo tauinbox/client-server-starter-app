@@ -9,6 +9,10 @@ import {
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
 import type { MockUser } from '../types';
 
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+const PASSWORD_ERROR =
+  'Password must contain at least one uppercase letter, one lowercase letter and one number';
+
 const router = Router();
 
 // POST /api/v1/users
@@ -19,6 +23,11 @@ router.post('/', adminGuard, (req, res) => {
     res
       .status(400)
       .json({ message: 'All fields are required', statusCode: 400 });
+    return;
+  }
+
+  if (!PASSWORD_REGEX.test(password)) {
+    res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });
     return;
   }
 
@@ -39,6 +48,9 @@ router.post('/', adminGuard, (req, res) => {
     password,
     isActive: true,
     isAdmin: false,
+    isEmailVerified: true,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
     createdAt: now,
     updatedAt: now
   };
@@ -104,7 +116,15 @@ router.patch('/:id', adminGuard, (req, res) => {
     return;
   }
 
-  const { email, firstName, lastName, password, isActive, isAdmin } = req.body;
+  const {
+    email,
+    firstName,
+    lastName,
+    password,
+    isActive,
+    isAdmin,
+    unlockAccount
+  } = req.body;
 
   if (email !== undefined) {
     const existing = findUserByEmail(email);
@@ -119,9 +139,19 @@ router.patch('/:id', adminGuard, (req, res) => {
   }
   if (firstName !== undefined) user.firstName = firstName;
   if (lastName !== undefined) user.lastName = lastName;
-  if (password !== undefined) user.password = password;
+  if (password !== undefined) {
+    if (!PASSWORD_REGEX.test(password)) {
+      res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });
+      return;
+    }
+    user.password = password;
+  }
   if (isActive !== undefined) user.isActive = isActive;
   if (isAdmin !== undefined) user.isAdmin = isAdmin;
+  if (unlockAccount) {
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = null;
+  }
   user.updatedAt = new Date().toISOString();
 
   res.json(toUserResponse(user));

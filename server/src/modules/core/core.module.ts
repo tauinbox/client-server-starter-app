@@ -11,6 +11,7 @@ import { AuthModule } from '../auth/auth.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { GlobalExceptionFilter } from './filters';
+import { MailModule } from '../mail/mail.module';
 
 @Module({})
 export class CoreModule {
@@ -29,6 +30,7 @@ export class CoreModule {
         ScheduleModule.forRoot(),
         ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
         TypeOrmModule.forRootAsync({ imports: [], useFactory: postgresConfig }),
+        MailModule,
         AuthModule,
         UsersModule,
         FeatureModule

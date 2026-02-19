@@ -208,6 +208,27 @@ export class UserEditComponent implements OnInit {
     );
   }
 
+  unlockAccount(): void {
+    this.saving.set(true);
+    this.#usersStore.updateUser(this.id(), { unlockAccount: true }).subscribe({
+      next: (user) => {
+        this.saving.set(false);
+        this.user.set(user);
+        this.#snackBar.open('Account unlocked successfully', 'Close', {
+          duration: 5000
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.saving.set(false);
+        this.#snackBar.open(
+          err.error?.message || 'Failed to unlock account',
+          'Close',
+          { duration: 5000 }
+        );
+      }
+    });
+  }
+
   confirmDelete(): void {
     if (!this.user()) return;
 
