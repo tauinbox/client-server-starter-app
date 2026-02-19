@@ -77,8 +77,9 @@ test.describe('Password reset', () => {
     // Should show the password form
     await expect(page.getByLabel('New Password')).toBeVisible();
 
-    // Enter new password and submit
+    // Enter new password and confirm
     await page.getByLabel('New Password').fill('NewPassword123');
+    await page.getByLabel('Confirm Password').fill('NewPassword123');
     await page.getByRole('button', { name: /reset password/i }).click();
 
     // Should redirect to login
@@ -103,6 +104,7 @@ test.describe('Password reset', () => {
     // if token is present. Let's fill in the password and submit.
     await expect(page.getByLabel('New Password')).toBeVisible();
     await page.getByLabel('New Password').fill('NewPassword123');
+    await page.getByLabel('Confirm Password').fill('NewPassword123');
     await page.getByRole('button', { name: /reset password/i }).click();
 
     // Should show error
@@ -120,6 +122,20 @@ test.describe('Password reset', () => {
     await page.getByText('Reset Password').first().click();
 
     await expect(page.getByText(/at least 8 characters/i)).toBeVisible();
+  });
+
+  test('should show error when passwords do not match', async ({
+    _mockServer,
+    page
+  }) => {
+    await page.goto('/reset-password?token=some-token');
+
+    await page.getByLabel('New Password').fill('NewPassword123');
+    await page.getByLabel('Confirm Password').fill('DifferentPassword1');
+    // Blur to trigger validation
+    await page.getByText('Reset Password').first().click();
+
+    await expect(page.getByText(/passwords do not match/i)).toBeVisible();
   });
 
   test('should reject login with old password after reset', async ({

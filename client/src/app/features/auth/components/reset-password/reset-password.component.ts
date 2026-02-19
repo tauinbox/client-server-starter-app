@@ -12,7 +12,11 @@ import {
   MatCardHeader,
   MatCardTitle
 } from '@angular/material/card';
-import type { FormControl } from '@angular/forms';
+import type {
+  AbstractControl,
+  FormControl,
+  ValidationErrors
+} from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
@@ -27,7 +31,16 @@ import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 
 type ResetPasswordFormType = {
   password: FormControl<string>;
+  confirmPassword: FormControl<string>;
 };
+
+function passwordsMatchValidator(
+  group: AbstractControl
+): ValidationErrors | null {
+  const password = group.get('password')?.value;
+  const confirm = group.get('confirmPassword')?.value;
+  return password === confirm ? null : { passwordsMismatch: true };
+}
 
 @Component({
   selector: 'app-reset-password',
@@ -61,16 +74,24 @@ export class ResetPasswordComponent implements OnInit {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly showPassword = signal(false);
+  protected readonly showConfirmPassword = signal(false);
   protected readonly invalidToken = signal(false);
 
   #token = '';
 
-  readonly resetPasswordForm = this.#fb.group<ResetPasswordFormType>({
-    password: this.#fb.control('', {
-      validators: [Validators.required, Validators.minLength(8)],
-      nonNullable: true
-    })
-  });
+  readonly resetPasswordForm = this.#fb.group<ResetPasswordFormType>(
+    {
+      password: this.#fb.control('', {
+        validators: [Validators.required, Validators.minLength(8)],
+        nonNullable: true
+      }),
+      confirmPassword: this.#fb.control('', {
+        validators: [Validators.required],
+        nonNullable: true
+      })
+    },
+    { validators: [passwordsMatchValidator] }
+  );
 
   ngOnInit(): void {
     this.#token = this.#route.snapshot.queryParams['token'] || '';
@@ -83,6 +104,10 @@ export class ResetPasswordComponent implements OnInit {
 
   togglePasswordVisibility(): void {
     this.showPassword.update((prev) => !prev);
+  }
+
+  toggleConfirmPasswordVisibility(): void {
+    this.showConfirmPassword.update((prev) => !prev);
   }
 
   onSubmit(): void {
