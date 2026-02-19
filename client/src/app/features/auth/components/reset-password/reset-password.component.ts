@@ -19,6 +19,7 @@ import type {
 } from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
+import type { ErrorStateMatcher } from '@angular/material/core';
 import { MatInput } from '@angular/material/input';
 import { MatIcon } from '@angular/material/icon';
 import { MatButton, MatIconButton } from '@angular/material/button';
@@ -70,6 +71,12 @@ export class ResetPasswordComponent implements OnInit {
   readonly #router = inject(Router);
   readonly #route = inject(ActivatedRoute);
   readonly #destroyRef = inject(DestroyRef);
+
+  protected readonly confirmPasswordErrorMatcher: ErrorStateMatcher = {
+    isErrorState: () =>
+      !!this.resetPasswordForm.errors?.['passwordsMismatch'] &&
+      !!this.resetPasswordForm.get('confirmPassword')?.touched
+  };
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);

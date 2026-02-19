@@ -23,6 +23,7 @@ import type {
 } from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
+import type { ErrorStateMatcher } from '@angular/material/core';
 import { MatIcon, MatIconRegistry } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatButton, MatIconButton } from '@angular/material/button';
@@ -98,6 +99,12 @@ export class ProfileComponent implements OnInit {
   readonly #window = inject(DOCUMENT).defaultView;
   readonly #route = inject(ActivatedRoute);
   readonly #router = inject(Router);
+
+  protected readonly confirmPasswordErrorMatcher: ErrorStateMatcher = {
+    isErrorState: () =>
+      !!this.profileForm.errors?.['passwordsMismatch'] &&
+      !!this.profileForm.get('confirmPassword')?.touched
+  };
 
   protected readonly user = signal<User | null>(null);
   protected readonly loading = signal(true);

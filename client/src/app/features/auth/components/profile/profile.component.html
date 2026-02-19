@@ -145,6 +145,7 @@
                 autocomplete="off"
                 [type]="showConfirmPassword() ? 'text' : 'password'"
                 formControlName="confirmPassword"
+                [errorStateMatcher]="confirmPasswordErrorMatcher"
                 placeholder="Confirm new password"
               />
               <mat-icon matPrefix>lock</mat-icon>
@@ -158,12 +159,7 @@
                   showConfirmPassword() ? 'visibility_off' : 'visibility'
                 }}</mat-icon>
               </button>
-              @if (
-                profileForm.get('confirmPassword')?.touched &&
-                profileForm.errors?.['passwordsMismatch']
-              ) {
-                <mat-error>Passwords do not match</mat-error>
-              }
+              <mat-error>Passwords do not match</mat-error>
             </mat-form-field>
           }
 
