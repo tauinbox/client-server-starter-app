@@ -57,6 +57,9 @@ router.post('/register', (req, res) => {
   const verificationToken = uuidv4();
   state.emailVerificationTokens.set(verificationToken, user.id);
 
+  const verifyUrl = `http://localhost:4200/verify-email?token=${verificationToken}`;
+  console.log(`[EMAIL VERIFICATION] To: ${email}\n  Verify URL: ${verifyUrl}`);
+
   res.status(201).json({
     message:
       'Registration successful. Please check your email to verify your account.'
@@ -126,8 +129,17 @@ router.post('/login', (req, res) => {
     user.lockedUntil = null;
   }
 
+  const state = getState();
+
+  // Delete old refresh tokens for this user (matches real server behavior)
+  for (const [rt, uid] of state.refreshTokens.entries()) {
+    if (uid === user.id) {
+      state.refreshTokens.delete(rt);
+    }
+  }
+
   const tokens = generateTokens(user);
-  getState().refreshTokens.set(tokens.refresh_token, user.id);
+  state.refreshTokens.set(tokens.refresh_token, user.id);
 
   res.json({ tokens, user: toUserResponse(user) });
 });
@@ -194,6 +206,9 @@ router.post('/resend-verification', (req, res) => {
   const verificationToken = uuidv4();
   state.emailVerificationTokens.set(verificationToken, user.id);
 
+  const verifyUrl = `http://localhost:4200/verify-email?token=${verificationToken}`;
+  console.log(`[EMAIL VERIFICATION] To: ${email}\n  Verify URL: ${verifyUrl}`);
+
   res.json({ message: successMessage });
 });
 
@@ -229,6 +244,9 @@ router.post('/forgot-password', (req, res) => {
   // Create new reset token
   const resetToken = uuidv4();
   state.passwordResetTokens.set(resetToken, user.id);
+
+  const resetUrl = `http://localhost:4200/reset-password?token=${resetToken}`;
+  console.log(`[PASSWORD RESET] To: ${email}\n  Reset URL: ${resetUrl}`);
 
   res.json({ message: successMessage });
 });
@@ -306,8 +324,9 @@ router.post('/refresh-token', (req, res) => {
   }
 
   const user = findUserById(userId);
-  if (!user) {
-    res.status(401).json({ message: 'User not found', statusCode: 401 });
+  if (!user || !user.isActive) {
+    state.refreshTokens.delete(refresh_token);
+    res.status(401).json({ message: 'Invalid refresh token', statusCode: 401 });
     return;
   }
 
@@ -349,7 +368,17 @@ router.patch('/profile', authGuard, (req, res) => {
 
   if (firstName !== undefined) user.firstName = firstName;
   if (lastName !== undefined) user.lastName = lastName;
-  if (password !== undefined) user.password = password;
+  if (password !== undefined) {
+    user.password = password;
+
+    // Invalidate all refresh tokens on password change (matches real server)
+    const state = getState();
+    for (const [rt, uid] of state.refreshTokens.entries()) {
+      if (uid === user.id) {
+        state.refreshTokens.delete(rt);
+      }
+    }
+  }
   user.updatedAt = new Date().toISOString();
 
   res.json(toUserResponse(user));
