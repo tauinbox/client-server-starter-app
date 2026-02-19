@@ -12,6 +12,9 @@ import type { AuthenticatedRequest, MockUser } from '../types';
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+const PASSWORD_ERROR =
+  'Password must contain at least one uppercase letter, one lowercase letter and one number';
 
 const router = Router();
 
@@ -23,6 +26,11 @@ router.post('/register', (req, res) => {
     res
       .status(400)
       .json({ message: 'All fields are required', statusCode: 400 });
+    return;
+  }
+
+  if (!PASSWORD_REGEX.test(password)) {
+    res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });
     return;
   }
 
@@ -262,11 +270,8 @@ router.post('/reset-password', (req, res) => {
     return;
   }
 
-  if (password.length < 8) {
-    res.status(400).json({
-      message: 'Password must be at least 8 characters',
-      statusCode: 400
-    });
+  if (!PASSWORD_REGEX.test(password)) {
+    res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });
     return;
   }
 
@@ -369,6 +374,10 @@ router.patch('/profile', authGuard, (req, res) => {
   if (firstName !== undefined) user.firstName = firstName;
   if (lastName !== undefined) user.lastName = lastName;
   if (password !== undefined) {
+    if (!PASSWORD_REGEX.test(password)) {
+      res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });
+      return;
+    }
     user.password = password;
 
     // Invalidate all refresh tokens on password change (matches real server)
