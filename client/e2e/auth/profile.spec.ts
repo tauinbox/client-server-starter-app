@@ -143,17 +143,34 @@ test.describe('Profile page', () => {
     ).toBeDisabled();
   });
 
-  test('should allow submitting with valid password', async ({
+  test('should allow submitting with valid password and matching confirm', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url);
 
     await page.getByLabel('New Password (Optional)').fill('newpass123');
+    await page.getByLabel('Confirm New Password').fill('newpass123');
 
     await expect(
       page.getByRole('button', { name: 'Update Profile' })
     ).toBeEnabled();
+  });
+
+  test('should disable submit when passwords do not match', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url);
+
+    await page.getByLabel('New Password (Optional)').fill('newpass123');
+    await page.getByLabel('Confirm New Password').fill('different1');
+    await page.getByLabel('First Name').click();
+
+    await expect(page.getByText(/passwords do not match/i)).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Update Profile' })
+    ).toBeDisabled();
   });
 
   test('should update profile successfully', async ({ _mockServer, page }) => {
