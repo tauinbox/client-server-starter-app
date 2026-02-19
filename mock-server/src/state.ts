@@ -15,7 +15,9 @@ export function resetState(): void {
         v.map((a) => ({ ...a }))
       ])
     ),
-    refreshTokens: new Map()
+    refreshTokens: new Map(),
+    emailVerificationTokens: new Map(),
+    passwordResetTokens: new Map()
   };
 }
 

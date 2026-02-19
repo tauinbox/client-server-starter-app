@@ -23,6 +23,9 @@ export async function loginViaUi(
     password,
     isActive: overrides.isActive ?? true,
     isAdmin: overrides.isAdmin ?? false,
+    isEmailVerified: overrides.isEmailVerified ?? true,
+    failedLoginAttempts: overrides.failedLoginAttempts ?? 0,
+    lockedUntil: overrides.lockedUntil ?? null,
     createdAt: overrides.createdAt ?? '2025-01-01T00:00:00.000Z',
     updatedAt: overrides.updatedAt ?? '2025-01-01T00:00:00.000Z'
   };

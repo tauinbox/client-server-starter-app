@@ -6,4 +6,23 @@
   .user-edit-container {
     @include mix.centered-container(vars.$card-width-sm);
   }
+
+  .account-status {
+    margin: 8px 0 16px;
+
+    .status-badge {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      font-size: 14px;
+      border-radius: 8px;
+
+      &.warn {
+        color: var(--mat-sys-on-error-container);
+        background-color: var(--mat-sys-error-container);
+      }
+    }
+  }
 }

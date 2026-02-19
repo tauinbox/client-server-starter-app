@@ -175,6 +175,41 @@ export class AuthService {
     );
   }
 
+  forgotPassword(email: string): Observable<{ message: string }> {
+    return this.#http.post<{ message: string }>(
+      AuthApiEnum.ForgotPassword,
+      { email },
+      { context: silentContext() }
+    );
+  }
+
+  resetPassword(
+    token: string,
+    password: string
+  ): Observable<{ message: string }> {
+    return this.#http.post<{ message: string }>(
+      AuthApiEnum.ResetPassword,
+      { token, password },
+      { context: silentContext() }
+    );
+  }
+
+  verifyEmail(token: string): Observable<{ message: string }> {
+    return this.#http.post<{ message: string }>(
+      AuthApiEnum.VerifyEmail,
+      { token },
+      { context: silentContext() }
+    );
+  }
+
+  resendVerificationEmail(email: string): Observable<{ message: string }> {
+    return this.#http.post<{ message: string }>(
+      AuthApiEnum.ResendVerification,
+      { email },
+      { context: silentContext() }
+    );
+  }
+
   initSession(): void {
     if (this.#authStore.isAuthenticated()) {
       this.scheduleTokenRefresh();

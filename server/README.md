@@ -69,6 +69,11 @@ Copy `.env.example` to `.env` and configure:
 | `CLIENT_URL` | `http://localhost:4200` | Client URL for OAuth callback redirects |
 | `EXTERNAL_API` | - | Third-party API URL for feature config |
 | `EXTERNAL_API_TOKEN` | - | API token for external service |
+| `SMTP_HOST` | - | SMTP server host (if unset, emails logged to console) |
+| `SMTP_PORT` | `587` | SMTP server port |
+| `SMTP_USER` | - | SMTP username |
+| `SMTP_PASS` | - | SMTP password |
+| `SMTP_FROM` | `noreply@example.com` | Sender email address |
 | `CORS_ORIGINS` | - | Allowed origins separated by `#` |
 
 ## Architecture
@@ -93,7 +98,9 @@ src/
 │   ├── guards/             # LocalAuthGuard, JwtAuthGuard, RolesGuard, Google/Facebook/VkOAuthGuard
 │   ├── entities/           # RefreshToken, OAuthAccount
 │   ├── enums/              # OAuthProvider
-│   └── dto/                # LoginDto, RegisterDto, RefreshTokenDto, UpdateProfileDto
+│   └── dto/                # LoginDto, RegisterDto, RefreshTokenDto, UpdateProfileDto, VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto
+├── mail/
+│   └── mail.service.ts     # Email sending (verification, password reset)
 ├── users/
 │   ├── controllers/        # UsersController (CRUD + search)
 │   ├── services/           # UsersService
@@ -135,6 +142,16 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 - **Refresh tokens** — opaque 80-char hex tokens stored in DB (SHA-256 hashed), rotated on use
 - **OAuth accounts** — auto-link by email, manage linked providers, safety check on unlink
 - **Token cleanup** — daily cron removes expired tokens, weekly cron removes revoked+expired
+- **Account lockout** — 5 failed login attempts → 15 min lock (HTTP 423), admin unlock via user update
+- **Email verification** — required before login, 24-hour token expiry, resend capability, OAuth users auto-verified
+- **Password reset** — forgot-password/reset-password flow, 1-hour token expiry, invalidates all sessions
+
+### Email (MailModule)
+
+- Uses `nodemailer` for sending verification and password reset emails
+- **SMTP transport** when `SMTP_HOST` env var is set (production)
+- **Console transport** when `SMTP_HOST` is not set (development) — logs clickable URLs
+- Email links use `CLIENT_URL` env var: `${clientUrl}/verify-email?token=xxx`, `${clientUrl}/reset-password?token=xxx`
 
 ### Database
 
@@ -142,7 +159,7 @@ Four tables managed via TypeORM migrations:
 
 | Table | Description |
 |-------|-------------|
-| `users` | UUID PK, email (unique), name, bcrypt password (nullable for OAuth-only users), isAdmin, isActive |
+| `users` | UUID PK, email (unique), name, bcrypt password (nullable for OAuth-only), isAdmin, isActive, isEmailVerified, failedLoginAttempts, lockedUntil, verification/reset token fields |
 | `oauth_accounts` | UUID PK, provider + provider_id (unique), FK to users (CASCADE) |
 | `refresh_tokens` | UUID PK, token (SHA-256 hashed), FK to users (CASCADE), expires_at, revoked |
 | `feature` | Auto-increment PK, name, timestamps |
@@ -159,12 +176,16 @@ Base URL: `/api/v1`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/register` | None | Register user |
+| POST | `/register` | None | Register user (sends verification email) |
 | POST | `/login` | None | Login, returns JWT + refresh token |
 | POST | `/refresh-token` | None | Refresh access token |
 | POST | `/logout` | Bearer | Revoke all refresh tokens |
 | GET | `/profile` | Bearer | Get current user |
 | PATCH | `/profile` | Bearer | Update own profile (name, password) |
+| POST | `/verify-email` | None | Verify email address using token |
+| POST | `/resend-verification` | None | Resend email verification (3/min) |
+| POST | `/forgot-password` | None | Request password reset email (3/min) |
+| POST | `/reset-password` | None | Reset password using token |
 
 ### OAuth (`/api/v1/auth/oauth`)
 

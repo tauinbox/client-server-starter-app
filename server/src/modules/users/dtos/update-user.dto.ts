@@ -14,4 +14,10 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
     example: true
   })
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Set to true to unlock a locked account',
+    example: true
+  })
+  unlockAccount?: boolean;
 }

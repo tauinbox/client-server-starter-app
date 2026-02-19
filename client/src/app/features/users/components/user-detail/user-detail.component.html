@@ -37,6 +37,16 @@
                 } @else {
                   <mat-chip>User</mat-chip>
                 }
+
+                @if (u.isEmailVerified) {
+                  <mat-chip color="accent" selected>Email Verified</mat-chip>
+                } @else {
+                  <mat-chip color="warn" selected>Email Not Verified</mat-chip>
+                }
+
+                @if (u.lockedUntil) {
+                  <mat-chip color="warn" selected>Account Locked</mat-chip>
+                }
               </div>
             </div>
           </div>

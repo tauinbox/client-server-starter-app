@@ -1,4 +1,4 @@
-import type { OnInit } from '@angular/core';
+import type { OnDestroy, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -30,6 +30,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
 import { registerOAuthIcons } from '../../utils/register-oauth-icons';
+import type { LockoutErrorData } from '../../models/auth.types';
 
 type LoginFormType = {
   email: FormControl<string>;
@@ -66,7 +67,7 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   styleUrl: './login.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class LoginComponent implements OnInit {
+export class LoginComponent implements OnInit, OnDestroy {
   readonly #fb = inject(FormBuilder);
   readonly #authService = inject(AuthService);
   readonly #router = inject(Router);
@@ -79,6 +80,18 @@ export class LoginComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly showPassword = signal(false);
   protected readonly oauthUrls = OAUTH_URLS;
+
+  // Lockout
+  protected readonly lockoutSeconds = signal(0);
+  #lockoutTimer: ReturnType<typeof setInterval> | null = null;
+
+  // Email verification
+  protected readonly emailNotVerified = signal(false);
+  protected readonly resendingVerification = signal(false);
+  protected readonly verificationResent = signal(false);
+
+  // Post-registration banner
+  protected readonly pendingVerification = signal(false);
 
   readonly loginForm = this.#fb.group<LoginFormType>({
     email: this.#fb.control('', {
@@ -103,6 +116,15 @@ export class LoginComponent implements OnInit {
           'Authentication failed. Please try again.'
       );
     }
+
+    const registered = this.#route.snapshot.queryParams['registered'];
+    if (registered === 'pending-verification') {
+      this.pendingVerification.set(true);
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.#clearLockoutTimer();
   }
 
   togglePasswordVisibility(): void {
@@ -125,6 +147,9 @@ export class LoginComponent implements OnInit {
 
     this.loading.set(true);
     this.error.set(null);
+    this.emailNotVerified.set(false);
+    this.verificationResent.set(false);
+    this.pendingVerification.set(false);
 
     this.#authService
       .login(this.loginForm.getRawValue())
@@ -138,10 +163,69 @@ export class LoginComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.error.set(
-            err.error?.message || 'Login failed. Please check your credentials.'
-          );
+          this.#handleLoginError(err);
         }
       });
+  }
+
+  resendVerification(): void {
+    const email = this.loginForm.get('email')?.value;
+    if (!email) return;
+
+    this.resendingVerification.set(true);
+    this.#authService
+      .resendVerificationEmail(email)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.resendingVerification.set(false);
+          this.verificationResent.set(true);
+        },
+        error: () => {
+          this.resendingVerification.set(false);
+        }
+      });
+  }
+
+  #handleLoginError(err: HttpErrorResponse): void {
+    if (err.status === 423) {
+      const data = err.error as LockoutErrorData;
+      this.#startLockoutCountdown(data.retryAfter);
+      this.error.set(data.message);
+      return;
+    }
+
+    if (err.status === 403 && err.error?.errorCode === 'EMAIL_NOT_VERIFIED') {
+      this.emailNotVerified.set(true);
+      this.error.set(err.error.message);
+      return;
+    }
+
+    this.error.set(
+      err.error?.message || 'Login failed. Please check your credentials.'
+    );
+  }
+
+  #startLockoutCountdown(seconds: number): void {
+    this.#clearLockoutTimer();
+    this.lockoutSeconds.set(seconds);
+
+    this.#lockoutTimer = setInterval(() => {
+      const remaining = this.lockoutSeconds() - 1;
+      if (remaining <= 0) {
+        this.#clearLockoutTimer();
+        this.lockoutSeconds.set(0);
+        this.error.set(null);
+      } else {
+        this.lockoutSeconds.set(remaining);
+      }
+    }, 1000);
+  }
+
+  #clearLockoutTimer(): void {
+    if (this.#lockoutTimer) {
+      clearInterval(this.#lockoutTimer);
+      this.#lockoutTimer = null;
+    }
   }
 }

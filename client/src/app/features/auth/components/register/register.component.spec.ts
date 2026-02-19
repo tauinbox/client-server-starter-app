@@ -5,34 +5,24 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 
 import { RegisterComponent } from './register.component';
 import { AuthService } from '../../services/auth.service';
-import type { User } from '@shared/models/user.types';
 
-const mockUser: User = {
-  id: '1',
-  email: 'test@example.com',
-  firstName: 'Test',
-  lastName: 'User',
-  isActive: true,
-  isAdmin: false,
-  createdAt: new Date(),
-  updatedAt: new Date()
+const mockRegisterResponse = {
+  message:
+    'Registration successful. Please check your email to verify your account.'
 };
 
 describe('RegisterComponent', () => {
   let component: RegisterComponent;
   let fixture: ComponentFixture<RegisterComponent>;
   let authServiceMock: { register: ReturnType<typeof vi.fn> };
-  let snackBarMock: { open: ReturnType<typeof vi.fn> };
   let router: Router;
 
   beforeEach(async () => {
     authServiceMock = { register: vi.fn() };
-    snackBarMock = { open: vi.fn() };
 
     await TestBed.configureTestingModule({
       imports: [RegisterComponent],
@@ -41,8 +31,7 @@ describe('RegisterComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideNoopAnimations(),
-        { provide: AuthService, useValue: authServiceMock },
-        { provide: MatSnackBar, useValue: snackBarMock }
+        { provide: AuthService, useValue: authServiceMock }
       ]
     }).compileComponents();
 
@@ -133,7 +122,7 @@ describe('RegisterComponent', () => {
     });
 
     it('should call register with form values', () => {
-      authServiceMock.register.mockReturnValue(of(mockUser));
+      authServiceMock.register.mockReturnValue(of(mockRegisterResponse));
       vi.spyOn(router, 'navigate');
 
       component.registerForm.setValue(validForm);
@@ -142,19 +131,16 @@ describe('RegisterComponent', () => {
       expect(authServiceMock.register).toHaveBeenCalledWith(validForm);
     });
 
-    it('should show snackbar and navigate to login on success', () => {
-      authServiceMock.register.mockReturnValue(of(mockUser));
+    it('should navigate to login with pending-verification on success', () => {
+      authServiceMock.register.mockReturnValue(of(mockRegisterResponse));
       vi.spyOn(router, 'navigate');
 
       component.registerForm.setValue(validForm);
       component.onSubmit();
 
-      expect(snackBarMock.open).toHaveBeenCalledWith(
-        'Registration successful! Please login.',
-        'Close',
-        { duration: 5000 }
-      );
-      expect(router.navigate).toHaveBeenCalledWith(['/login']);
+      expect(router.navigate).toHaveBeenCalledWith(['/login'], {
+        queryParams: { registered: 'pending-verification' }
+      });
       expect(component['loading']()).toBe(false);
     });
 

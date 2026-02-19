@@ -12,6 +12,10 @@ export type MockServerApi = {
     oauthAccounts: Record<string, unknown[]>;
     refreshTokens: number;
   }>;
+  getTokens(): Promise<{
+    emailVerificationTokens: Record<string, string>;
+    passwordResetTokens: Record<string, string>;
+  }>;
   seedUsers(
     users: {
       id: string;
@@ -21,6 +25,9 @@ export type MockServerApi = {
       password: string;
       isActive: boolean;
       isAdmin: boolean;
+      isEmailVerified: boolean;
+      failedLoginAttempts: number;
+      lockedUntil: string | null;
       createdAt: string;
       updatedAt: string;
     }[]
@@ -82,6 +89,10 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       },
       async getState() {
         const res = await fetch(`${baseUrl}/__control/state`);
+        return res.json();
+      },
+      async getTokens() {
+        const res = await fetch(`${baseUrl}/__control/tokens`);
         return res.json();
       },
       async seedUsers(users) {

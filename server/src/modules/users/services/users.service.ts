@@ -100,10 +100,16 @@ export class UsersService {
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
 
-    const changes: Partial<UpdateUserDto> = { ...updateUserDto };
+    const { unlockAccount, ...rest } = updateUserDto;
+    const changes: Partial<User> = { ...rest };
 
-    if (changes.password) {
-      changes.password = await bcrypt.hash(changes.password, 10);
+    if (rest.password) {
+      changes.password = await bcrypt.hash(rest.password, 10);
+    }
+
+    if (unlockAccount) {
+      changes.failedLoginAttempts = 0;
+      changes.lockedUntil = null;
     }
 
     this.userRepository.merge(user, changes);
@@ -120,9 +126,80 @@ export class UsersService {
       email: data.email,
       firstName: data.firstName,
       lastName: data.lastName,
-      password: null
+      password: null,
+      isEmailVerified: true
     });
     return this.userRepository.save(user);
+  }
+
+  async incrementFailedAttempts(userId: string): Promise<void> {
+    await this.userRepository.increment(
+      { id: userId },
+      'failedLoginAttempts',
+      1
+    );
+  }
+
+  async lockAccount(userId: string, lockedUntil: Date): Promise<void> {
+    await this.userRepository.update(userId, { lockedUntil });
+  }
+
+  async resetLoginAttempts(userId: string): Promise<void> {
+    await this.userRepository.update(userId, {
+      failedLoginAttempts: 0,
+      lockedUntil: null
+    });
+  }
+
+  async setEmailVerificationToken(
+    userId: string,
+    hashedToken: string,
+    expiresAt: Date
+  ): Promise<void> {
+    await this.userRepository.update(userId, {
+      emailVerificationToken: hashedToken,
+      emailVerificationExpiresAt: expiresAt
+    });
+  }
+
+  async findByEmailVerificationToken(
+    hashedToken: string
+  ): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: { emailVerificationToken: hashedToken }
+    });
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    await this.userRepository.update(userId, {
+      isEmailVerified: true,
+      emailVerificationToken: null,
+      emailVerificationExpiresAt: null
+    });
+  }
+
+  async setPasswordResetToken(
+    userId: string,
+    hashedToken: string,
+    expiresAt: Date
+  ): Promise<void> {
+    await this.userRepository.update(userId, {
+      passwordResetToken: hashedToken,
+      passwordResetExpiresAt: expiresAt
+    });
+  }
+
+  async findByPasswordResetToken(hashedToken: string): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: { passwordResetToken: hashedToken }
+    });
+  }
+
+  async clearPasswordResetToken(userId: string): Promise<void> {
+    await this.userRepository.update(userId, {
+      passwordResetToken: null,
+      passwordResetExpiresAt: null
+    });
   }
 
   async remove(id: string): Promise<void> {

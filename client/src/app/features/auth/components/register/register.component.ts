@@ -21,7 +21,6 @@ import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -60,7 +59,6 @@ export class RegisterComponent {
   readonly #fb = inject(FormBuilder);
   readonly #authService = inject(AuthService);
   readonly #router = inject(Router);
-  readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
 
   protected readonly loading = signal(false);
@@ -105,12 +103,9 @@ export class RegisterComponent {
       .subscribe({
         next: () => {
           this.loading.set(false);
-          this.#snackBar.open(
-            'Registration successful! Please login.',
-            'Close',
-            { duration: 5000 }
-          );
-          void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`]);
+          void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`], {
+            queryParams: { registered: 'pending-verification' }
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);

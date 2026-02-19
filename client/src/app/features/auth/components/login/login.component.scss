@@ -14,6 +14,46 @@
     @include mix.error-message;
   }
 
+  .info-message {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    color: var(--mat-sys-on-primary-container);
+    background-color: var(--mat-sys-primary-container);
+    border-radius: 8px;
+
+    mat-icon {
+      flex-shrink: 0;
+    }
+  }
+
+  .lockout-countdown {
+    margin-top: 4px;
+    font-weight: 500;
+  }
+
+  .verification-actions {
+    margin-bottom: 16px;
+    text-align: center;
+
+    .verification-sent {
+      font-size: 14px;
+      color: var(--mat-sys-primary);
+    }
+  }
+
+  .forgot-password-link {
+    margin-top: 8px;
+    text-align: center;
+
+    a {
+      font-size: 14px;
+      color: var(--mat-sys-primary);
+    }
+  }
+
   button[type='submit'] {
     @include mix.button-with-spinner;
   }

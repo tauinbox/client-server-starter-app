@@ -20,6 +20,9 @@ const mockUser: User = {
   lastName: 'User',
   isActive: true,
   isAdmin: false,
+  isEmailVerified: true,
+  failedLoginAttempts: 0,
+  lockedUntil: null,
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01')
 };

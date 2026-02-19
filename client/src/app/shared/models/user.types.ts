@@ -5,6 +5,9 @@ export type User = {
   lastName: string;
   isActive: boolean;
   isAdmin: boolean;
+  isEmailVerified: boolean;
+  failedLoginAttempts: number;
+  lockedUntil: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -23,4 +26,5 @@ export type UpdateUser = Pick<
   'email' | 'firstName' | 'lastName' | 'isAdmin' | 'isActive'
 > & {
   password?: string;
+  unlockAccount?: boolean;
 };

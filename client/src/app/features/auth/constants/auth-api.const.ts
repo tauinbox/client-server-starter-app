@@ -7,7 +7,11 @@ export enum AuthApiEnum {
   Profile = `${AUTH_API_V1}/profile`,
   RefreshToken = `${AUTH_API_V1}/refresh-token`,
   OAuthAccounts = `${AUTH_API_V1}/oauth/accounts`,
-  OAuthLinkInit = `${AUTH_API_V1}/oauth/link-init`
+  OAuthLinkInit = `${AUTH_API_V1}/oauth/link-init`,
+  VerifyEmail = `${AUTH_API_V1}/verify-email`,
+  ResendVerification = `${AUTH_API_V1}/resend-verification`,
+  ForgotPassword = `${AUTH_API_V1}/forgot-password`,
+  ResetPassword = `${AUTH_API_V1}/reset-password`
 }
 
 export const OAUTH_URLS = {

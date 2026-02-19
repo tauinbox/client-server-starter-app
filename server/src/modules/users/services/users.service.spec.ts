@@ -15,6 +15,8 @@ describe('UsersService', () => {
     remove: jest.Mock;
     merge: jest.Mock;
     createQueryBuilder: jest.Mock;
+    increment: jest.Mock;
+    update: jest.Mock;
   };
   let mockQueryBuilder: {
     andWhere: jest.Mock;
@@ -46,7 +48,9 @@ describe('UsersService', () => {
       save: jest.fn(),
       remove: jest.fn(),
       merge: jest.fn(),
-      createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder)
+      createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+      increment: jest.fn().mockResolvedValue(undefined),
+      update: jest.fn().mockResolvedValue(undefined)
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -284,16 +288,40 @@ describe('UsersService', () => {
         service.update('nonexistent', { firstName: 'Updated' })
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('should unlock account when unlockAccount is true', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        failedLoginAttempts: 5,
+        lockedUntil: new Date()
+      });
+      mockRepository.save.mockResolvedValue(mockUser);
+
+      await service.update('user-1', { unlockAccount: true });
+
+      expect(mockRepository.merge).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          failedLoginAttempts: 0,
+          lockedUntil: null
+        })
+      );
+    });
   });
 
   describe('createOAuthUser', () => {
-    it('should create a user without password', async () => {
+    it('should create a user without password and with email verified', async () => {
       const oauthData = {
         email: 'oauth@example.com',
         firstName: 'OAuth',
         lastName: 'User'
       };
-      const oauthUser = { ...mockUser, ...oauthData, password: null };
+      const oauthUser = {
+        ...mockUser,
+        ...oauthData,
+        password: null,
+        isEmailVerified: true
+      };
       mockRepository.create.mockReturnValue(oauthUser);
       mockRepository.save.mockResolvedValue(oauthUser);
 
@@ -303,7 +331,8 @@ describe('UsersService', () => {
         email: 'oauth@example.com',
         firstName: 'OAuth',
         lastName: 'User',
-        password: null
+        password: null,
+        isEmailVerified: true
       });
       expect(mockRepository.save).toHaveBeenCalledWith(oauthUser);
       expect(result.password).toBeNull();
@@ -329,6 +358,137 @@ describe('UsersService', () => {
       await expect(service.remove('nonexistent')).rejects.toThrow(
         NotFoundException
       );
+    });
+  });
+
+  describe('incrementFailedAttempts', () => {
+    it('should increment failed login attempts', async () => {
+      await service.incrementFailedAttempts('user-1');
+
+      expect(mockRepository.increment).toHaveBeenCalledWith(
+        { id: 'user-1' },
+        'failedLoginAttempts',
+        1
+      );
+    });
+  });
+
+  describe('lockAccount', () => {
+    it('should set lockedUntil for user', async () => {
+      const lockedUntil = new Date('2025-06-01');
+
+      await service.lockAccount('user-1', lockedUntil);
+
+      expect(mockRepository.update).toHaveBeenCalledWith('user-1', {
+        lockedUntil
+      });
+    });
+  });
+
+  describe('resetLoginAttempts', () => {
+    it('should reset failed attempts and clear lock', async () => {
+      await service.resetLoginAttempts('user-1');
+
+      expect(mockRepository.update).toHaveBeenCalledWith('user-1', {
+        failedLoginAttempts: 0,
+        lockedUntil: null
+      });
+    });
+  });
+
+  describe('setEmailVerificationToken', () => {
+    it('should store hashed token and expiry', async () => {
+      const expiresAt = new Date('2025-06-01');
+
+      await service.setEmailVerificationToken(
+        'user-1',
+        'hashed-token',
+        expiresAt
+      );
+
+      expect(mockRepository.update).toHaveBeenCalledWith('user-1', {
+        emailVerificationToken: 'hashed-token',
+        emailVerificationExpiresAt: expiresAt
+      });
+    });
+  });
+
+  describe('findByEmailVerificationToken', () => {
+    it('should find user by verification token', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+
+      const result = await service.findByEmailVerificationToken('hashed-token');
+
+      expect(mockRepository.findOne).toHaveBeenCalledWith({
+        where: { emailVerificationToken: 'hashed-token' }
+      });
+      expect(result).toEqual(mockUser);
+    });
+
+    it('should return null when token not found', async () => {
+      mockRepository.findOne.mockResolvedValue(null);
+
+      const result =
+        await service.findByEmailVerificationToken('invalid-token');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('markEmailVerified', () => {
+    it('should set isEmailVerified and clear token fields', async () => {
+      await service.markEmailVerified('user-1');
+
+      expect(mockRepository.update).toHaveBeenCalledWith('user-1', {
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpiresAt: null
+      });
+    });
+  });
+
+  describe('setPasswordResetToken', () => {
+    it('should store hashed token and expiry', async () => {
+      const expiresAt = new Date('2025-06-01');
+
+      await service.setPasswordResetToken('user-1', 'hashed-token', expiresAt);
+
+      expect(mockRepository.update).toHaveBeenCalledWith('user-1', {
+        passwordResetToken: 'hashed-token',
+        passwordResetExpiresAt: expiresAt
+      });
+    });
+  });
+
+  describe('findByPasswordResetToken', () => {
+    it('should find user by reset token', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+
+      const result = await service.findByPasswordResetToken('hashed-token');
+
+      expect(mockRepository.findOne).toHaveBeenCalledWith({
+        where: { passwordResetToken: 'hashed-token' }
+      });
+      expect(result).toEqual(mockUser);
+    });
+
+    it('should return null when token not found', async () => {
+      mockRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.findByPasswordResetToken('invalid-token');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('clearPasswordResetToken', () => {
+    it('should clear reset token fields', async () => {
+      await service.clearPasswordResetToken('user-1');
+
+      expect(mockRepository.update).toHaveBeenCalledWith('user-1', {
+        passwordResetToken: null,
+        passwordResetExpiresAt: null
+      });
     });
   });
 });

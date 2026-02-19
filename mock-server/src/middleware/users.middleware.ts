@@ -39,6 +39,9 @@ router.post('/', adminGuard, (req, res) => {
     password,
     isActive: true,
     isAdmin: false,
+    isEmailVerified: true,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
     createdAt: now,
     updatedAt: now
   };
@@ -104,7 +107,15 @@ router.patch('/:id', adminGuard, (req, res) => {
     return;
   }
 
-  const { email, firstName, lastName, password, isActive, isAdmin } = req.body;
+  const {
+    email,
+    firstName,
+    lastName,
+    password,
+    isActive,
+    isAdmin,
+    unlockAccount
+  } = req.body;
 
   if (email !== undefined) {
     const existing = findUserByEmail(email);
@@ -122,6 +133,10 @@ router.patch('/:id', adminGuard, (req, res) => {
   if (password !== undefined) user.password = password;
   if (isActive !== undefined) user.isActive = isActive;
   if (isAdmin !== undefined) user.isAdmin = isAdmin;
+  if (unlockAccount) {
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = null;
+  }
   user.updatedAt = new Date().toISOString();
 
   res.json(toUserResponse(user));

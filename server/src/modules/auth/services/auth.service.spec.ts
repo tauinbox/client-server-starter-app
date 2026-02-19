@@ -1,12 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  UnauthorizedException
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { UsersService } from '../../users/services/users.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { OAuthAccountService } from './oauth-account.service';
+import { MailService } from '../../mail/mail.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
 
 describe('AuthService', () => {
@@ -16,6 +22,16 @@ describe('AuthService', () => {
     findOne: jest.Mock;
     create: jest.Mock;
     createOAuthUser: jest.Mock;
+    incrementFailedAttempts: jest.Mock;
+    lockAccount: jest.Mock;
+    resetLoginAttempts: jest.Mock;
+    setEmailVerificationToken: jest.Mock;
+    findByEmailVerificationToken: jest.Mock;
+    markEmailVerified: jest.Mock;
+    setPasswordResetToken: jest.Mock;
+    findByPasswordResetToken: jest.Mock;
+    clearPasswordResetToken: jest.Mock;
+    update: jest.Mock;
   };
   let mockJwtService: {
     sign: jest.Mock;
@@ -33,6 +49,10 @@ describe('AuthService', () => {
     findByProviderAndProviderId: jest.Mock;
     createOAuthAccount: jest.Mock;
   };
+  let mockMailService: {
+    sendEmailVerification: jest.Mock;
+    sendPasswordReset: jest.Mock;
+  };
 
   const mockUser = {
     id: 'user-1',
@@ -42,6 +62,13 @@ describe('AuthService', () => {
     password: '$2b$10$hashedpassword',
     isActive: true,
     isAdmin: false,
+    isEmailVerified: true,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
+    emailVerificationToken: null,
+    emailVerificationExpiresAt: null,
+    passwordResetToken: null,
+    passwordResetExpiresAt: null,
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01')
   };
@@ -53,6 +80,13 @@ describe('AuthService', () => {
     lastName: mockUser.lastName,
     isActive: mockUser.isActive,
     isAdmin: mockUser.isAdmin,
+    isEmailVerified: mockUser.isEmailVerified,
+    failedLoginAttempts: mockUser.failedLoginAttempts,
+    lockedUntil: mockUser.lockedUntil,
+    emailVerificationToken: mockUser.emailVerificationToken,
+    emailVerificationExpiresAt: mockUser.emailVerificationExpiresAt,
+    passwordResetToken: mockUser.passwordResetToken,
+    passwordResetExpiresAt: mockUser.passwordResetExpiresAt,
     createdAt: mockUser.createdAt,
     updatedAt: mockUser.updatedAt
   };
@@ -62,7 +96,17 @@ describe('AuthService', () => {
       findByEmail: jest.fn(),
       findOne: jest.fn(),
       create: jest.fn(),
-      createOAuthUser: jest.fn()
+      createOAuthUser: jest.fn(),
+      incrementFailedAttempts: jest.fn().mockResolvedValue(undefined),
+      lockAccount: jest.fn().mockResolvedValue(undefined),
+      resetLoginAttempts: jest.fn().mockResolvedValue(undefined),
+      setEmailVerificationToken: jest.fn().mockResolvedValue(undefined),
+      findByEmailVerificationToken: jest.fn(),
+      markEmailVerified: jest.fn().mockResolvedValue(undefined),
+      setPasswordResetToken: jest.fn().mockResolvedValue(undefined),
+      findByPasswordResetToken: jest.fn(),
+      clearPasswordResetToken: jest.fn().mockResolvedValue(undefined),
+      update: jest.fn().mockResolvedValue(mockUser)
     };
 
     mockJwtService = {
@@ -91,6 +135,11 @@ describe('AuthService', () => {
       createOAuthAccount: jest.fn().mockResolvedValue(undefined)
     };
 
+    mockMailService = {
+      sendEmailVerification: jest.fn().mockResolvedValue(undefined),
+      sendPasswordReset: jest.fn().mockResolvedValue(undefined)
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -98,7 +147,8 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: RefreshTokenService, useValue: mockRefreshTokenService },
-        { provide: OAuthAccountService, useValue: mockOAuthAccountService }
+        { provide: OAuthAccountService, useValue: mockOAuthAccountService },
+        { provide: MailService, useValue: mockMailService }
       ]
     }).compile();
 
@@ -122,48 +172,46 @@ describe('AuthService', () => {
       );
     });
 
-    it('should return null when password does not match', async () => {
+    it('should throw UnauthorizedException when password does not match', async () => {
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        failedLoginAttempts: 1
+      });
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
-      const result = await service.validateUser(
-        'test@example.com',
-        'wrong-password'
-      );
-
-      expect(result).toBeNull();
+      await expect(
+        service.validateUser('test@example.com', 'wrong-password')
+      ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should return null when user does not exist', async () => {
+    it('should throw UnauthorizedException when user does not exist', async () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
-      const result = await service.validateUser(
-        'nonexistent@example.com',
-        'password'
-      );
-
-      expect(result).toBeNull();
+      await expect(
+        service.validateUser('nonexistent@example.com', 'password')
+      ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should return null when user is inactive', async () => {
+    it('should throw UnauthorizedException when user is inactive', async () => {
       const inactiveUser = { ...mockUser, isActive: false };
       mockUsersService.findByEmail.mockResolvedValue(inactiveUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
-      const result = await service.validateUser('test@example.com', 'password');
-
-      expect(result).toBeNull();
+      await expect(
+        service.validateUser('test@example.com', 'password')
+      ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should return null when user has no password (OAuth-only)', async () => {
+    it('should throw UnauthorizedException when user has no password (OAuth-only)', async () => {
       const oauthUser = { ...mockUser, password: null };
       mockUsersService.findByEmail.mockResolvedValue(oauthUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
-      const result = await service.validateUser('test@example.com', 'password');
-
-      expect(result).toBeNull();
+      await expect(
+        service.validateUser('test@example.com', 'password')
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('should use dummy hash for timing attack protection when user not found', async () => {
@@ -172,10 +220,94 @@ describe('AuthService', () => {
         .spyOn(bcrypt, 'compare')
         .mockResolvedValue(false as never);
 
-      await service.validateUser('nonexistent@example.com', 'password');
+      await expect(
+        service.validateUser('nonexistent@example.com', 'password')
+      ).rejects.toThrow(UnauthorizedException);
 
       // bcrypt.compare should still be called (with dummy hash) for constant-time behavior
       expect(compareSpy).toHaveBeenCalled();
+    });
+
+    it('should throw 423 when account is locked', async () => {
+      const lockedUser = {
+        ...mockUser,
+        lockedUntil: new Date(Date.now() + 600000) // 10 min from now
+      };
+      mockUsersService.findByEmail.mockResolvedValue(lockedUser);
+
+      try {
+        await service.validateUser('test@example.com', 'password');
+        fail('Expected HttpException');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpException);
+        expect((error as HttpException).getStatus()).toBe(HttpStatus.LOCKED);
+        const response = (error as HttpException).getResponse();
+        expect(response).toHaveProperty('lockedUntil');
+        expect(response).toHaveProperty('retryAfter');
+      }
+    });
+
+    it('should lock account after 5 failed attempts', async () => {
+      const userNearLockout = { ...mockUser, failedLoginAttempts: 4 };
+      mockUsersService.findByEmail.mockResolvedValue(userNearLockout);
+      mockUsersService.findOne.mockResolvedValue({
+        ...userNearLockout,
+        failedLoginAttempts: 5
+      });
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+
+      try {
+        await service.validateUser('test@example.com', 'wrong-password');
+        fail('Expected HttpException');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpException);
+        expect((error as HttpException).getStatus()).toBe(HttpStatus.LOCKED);
+      }
+
+      expect(mockUsersService.incrementFailedAttempts).toHaveBeenCalledWith(
+        'user-1'
+      );
+      expect(mockUsersService.lockAccount).toHaveBeenCalledWith(
+        'user-1',
+        expect.any(Date)
+      );
+    });
+
+    it('should throw 403 when email is not verified', async () => {
+      const unverifiedUser = { ...mockUser, isEmailVerified: false };
+      mockUsersService.findByEmail.mockResolvedValue(unverifiedUser);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      try {
+        await service.validateUser('test@example.com', 'password');
+        fail('Expected HttpException');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpException);
+        expect((error as HttpException).getStatus()).toBe(HttpStatus.FORBIDDEN);
+        const response = (error as HttpException).getResponse();
+        expect(response).toHaveProperty('errorCode', 'EMAIL_NOT_VERIFIED');
+      }
+    });
+
+    it('should reset failed attempts on successful login', async () => {
+      const userWithAttempts = { ...mockUser, failedLoginAttempts: 3 };
+      mockUsersService.findByEmail.mockResolvedValue(userWithAttempts);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      await service.validateUser('test@example.com', 'password');
+
+      expect(mockUsersService.resetLoginAttempts).toHaveBeenCalledWith(
+        'user-1'
+      );
+    });
+
+    it('should not reset attempts when count is zero', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(mockUser);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      await service.validateUser('test@example.com', 'password');
+
+      expect(mockUsersService.resetLoginAttempts).not.toHaveBeenCalled();
     });
   });
 
@@ -221,7 +353,7 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    it('should delegate to usersService.create', async () => {
+    it('should create user and send verification email', async () => {
       const registerDto = {
         email: 'new@example.com',
         password: 'Password1',
@@ -230,13 +362,179 @@ describe('AuthService', () => {
       };
       mockUsersService.create.mockResolvedValue({
         ...mockUser,
-        ...registerDto
+        ...registerDto,
+        id: 'new-user-1'
       });
 
       const result = await service.register(registerDto);
 
       expect(mockUsersService.create).toHaveBeenCalledWith(registerDto);
-      expect(result).toBeDefined();
+      expect(mockUsersService.setEmailVerificationToken).toHaveBeenCalledWith(
+        'new-user-1',
+        expect.any(String),
+        expect.any(Date)
+      );
+      expect(mockMailService.sendEmailVerification).toHaveBeenCalledWith(
+        'new@example.com',
+        expect.any(String)
+      );
+      expect(result.message).toContain('Registration successful');
+    });
+  });
+
+  describe('verifyEmail', () => {
+    it('should verify email with valid token', async () => {
+      const user = {
+        ...mockUser,
+        isEmailVerified: false,
+        emailVerificationExpiresAt: new Date(Date.now() + 86400000)
+      };
+      mockUsersService.findByEmailVerificationToken.mockResolvedValue(user);
+
+      const result = await service.verifyEmail('valid-token');
+
+      expect(mockUsersService.markEmailVerified).toHaveBeenCalledWith('user-1');
+      expect(result.message).toContain('verified successfully');
+    });
+
+    it('should throw 400 when token not found', async () => {
+      mockUsersService.findByEmailVerificationToken.mockResolvedValue(null);
+
+      await expect(service.verifyEmail('invalid-token')).rejects.toThrow(
+        HttpException
+      );
+    });
+
+    it('should throw 400 when token is expired', async () => {
+      const user = {
+        ...mockUser,
+        emailVerificationExpiresAt: new Date(Date.now() - 1000)
+      };
+      mockUsersService.findByEmailVerificationToken.mockResolvedValue(user);
+
+      try {
+        await service.verifyEmail('expired-token');
+        fail('Expected HttpException');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpException);
+        expect((error as HttpException).getStatus()).toBe(
+          HttpStatus.BAD_REQUEST
+        );
+      }
+    });
+  });
+
+  describe('resendVerificationEmail', () => {
+    it('should resend verification email for unverified user', async () => {
+      const unverifiedUser = { ...mockUser, isEmailVerified: false };
+      mockUsersService.findByEmail.mockResolvedValue(unverifiedUser);
+
+      const result = await service.resendVerificationEmail('test@example.com');
+
+      expect(mockUsersService.setEmailVerificationToken).toHaveBeenCalledWith(
+        'user-1',
+        expect.any(String),
+        expect.any(Date)
+      );
+      expect(mockMailService.sendEmailVerification).toHaveBeenCalled();
+      expect(result.message).toBeDefined();
+    });
+
+    it('should return success even when user not found (prevent enumeration)', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(null);
+
+      const result = await service.resendVerificationEmail(
+        'nonexistent@example.com'
+      );
+
+      expect(mockMailService.sendEmailVerification).not.toHaveBeenCalled();
+      expect(result.message).toBeDefined();
+    });
+
+    it('should return success when user already verified', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(mockUser); // isEmailVerified: true
+
+      const result = await service.resendVerificationEmail('test@example.com');
+
+      expect(mockMailService.sendEmailVerification).not.toHaveBeenCalled();
+      expect(result.message).toBeDefined();
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('should send password reset email for valid user', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(mockUser);
+
+      const result = await service.forgotPassword('test@example.com');
+
+      expect(mockUsersService.setPasswordResetToken).toHaveBeenCalledWith(
+        'user-1',
+        expect.any(String),
+        expect.any(Date)
+      );
+      expect(mockMailService.sendPasswordReset).toHaveBeenCalledWith(
+        'test@example.com',
+        expect.any(String)
+      );
+      expect(result.message).toBeDefined();
+    });
+
+    it('should return success even when user not found (prevent enumeration)', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(null);
+
+      const result = await service.forgotPassword('nonexistent@example.com');
+
+      expect(mockMailService.sendPasswordReset).not.toHaveBeenCalled();
+      expect(result.message).toBeDefined();
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('should reset password with valid token', async () => {
+      const user = {
+        ...mockUser,
+        passwordResetExpiresAt: new Date(Date.now() + 3600000)
+      };
+      mockUsersService.findByPasswordResetToken.mockResolvedValue(user);
+
+      const result = await service.resetPassword('valid-token', 'NewPassword1');
+
+      expect(mockUsersService.update).toHaveBeenCalledWith('user-1', {
+        password: 'NewPassword1'
+      });
+      expect(mockUsersService.clearPasswordResetToken).toHaveBeenCalledWith(
+        'user-1'
+      );
+      expect(mockRefreshTokenService.deleteByUserId).toHaveBeenCalledWith(
+        'user-1'
+      );
+      expect(result.message).toContain('reset successfully');
+    });
+
+    it('should throw 400 when token not found', async () => {
+      mockUsersService.findByPasswordResetToken.mockResolvedValue(null);
+
+      await expect(
+        service.resetPassword('invalid-token', 'NewPassword1')
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should throw 400 when token is expired', async () => {
+      const user = {
+        ...mockUser,
+        passwordResetExpiresAt: new Date(Date.now() - 1000)
+      };
+      mockUsersService.findByPasswordResetToken.mockResolvedValue(user);
+
+      try {
+        await service.resetPassword('expired-token', 'NewPassword1');
+        fail('Expected HttpException');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpException);
+        expect((error as HttpException).getStatus()).toBe(
+          HttpStatus.BAD_REQUEST
+        );
+      }
     });
   });
 
@@ -350,7 +648,8 @@ describe('AuthService', () => {
       email: 'oauth@example.com',
       firstName: 'OAuth',
       lastName: 'User',
-      password: null
+      password: null,
+      isEmailVerified: true
     };
 
     it('should login returning OAuth user', async () => {
@@ -370,6 +669,29 @@ describe('AuthService', () => {
       expect(result.user.email).toBe('oauth@example.com');
       expect(result.tokens).toBeDefined();
       expect(mockRefreshTokenService.deleteByUserId).toHaveBeenCalledWith(
+        'oauth-user-1'
+      );
+    });
+
+    it('should auto-verify email for returning OAuth user', async () => {
+      const unverifiedOauthUser = {
+        ...oauthUser,
+        isEmailVerified: false
+      };
+      const existingOAuth = {
+        id: '1',
+        provider: 'google',
+        providerId: 'google-123',
+        userId: 'oauth-user-1'
+      };
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
+        existingOAuth
+      );
+      mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
+
+      await service.loginWithOAuth(oauthProfile);
+
+      expect(mockUsersService.markEmailVerified).toHaveBeenCalledWith(
         'oauth-user-1'
       );
     });

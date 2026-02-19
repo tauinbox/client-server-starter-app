@@ -19,6 +19,9 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 
 ### Authentication
 - Email/password registration and login
+- **Account lockout** — 5 consecutive failed login attempts lock the account for 15 minutes (HTTP 423 with countdown); admin can unlock early via user-edit page
+- **Email verification** — new registrations require email verification before login (HTTP 403); resend-verification endpoint; OAuth users auto-verified
+- **Password reset** — forgot-password sends a reset link (1-hour token expiry); reset invalidates all active sessions
 - **OAuth2 login via Google, Facebook, VK** — auto-links by email, creates OAuth-only users
 - JWT access tokens (1h) + opaque refresh tokens (7d)
 - Automatic token refresh 60 seconds before expiry
@@ -64,7 +67,7 @@ fullstack-starter-app/
 │   ├── src/app/
 │   │   ├── core/           # Header, theme, storage, error interceptor, 404
 │   │   ├── features/
-│   │   │   ├── auth/       # Login, register, profile, guards, JWT interceptor
+│   │   │   ├── auth/       # Login, register, profile, verify-email, forgot/reset-password, guards, JWT interceptor
 │   │   │   ├── users/      # User list, detail, edit, search
 │   │   │   └── feature/    # Example feature
 │   │   └── shared/         # Shared components (confirm dialog)
@@ -73,7 +76,8 @@ fullstack-starter-app/
 ├── server/                 # NestJS 11 API
 │   ├── src/modules/
 │   │   ├── core/           # Config, caching, database, scheduling
-│   │   ├── auth/           # JWT + refresh token auth (Passport strategies)
+│   │   ├── auth/           # JWT + refresh token auth, lockout, verification, reset
+│   │   ├── mail/           # Email delivery (nodemailer, console/SMTP transports)
 │   │   ├── users/          # User CRUD
 │   │   └── feature/        # Example module
 │   ├── src/migrations/     # TypeORM migrations
@@ -139,6 +143,11 @@ Edit `.env` with your database credentials and settings:
 | `VK_CLIENT_ID` | - | VK OAuth client ID |
 | `VK_CLIENT_SECRET` | - | VK OAuth client secret |
 | `CLIENT_URL` | `http://localhost:4200` | Client URL for OAuth redirects |
+| `SMTP_HOST` | - | SMTP server host (enables email delivery) |
+| `SMTP_PORT` | `587` | SMTP server port |
+| `SMTP_USER` | - | SMTP username |
+| `SMTP_PASS` | - | SMTP password |
+| `SMTP_FROM` | `noreply@example.com` | Default "from" address for emails |
 
 ### 3. Set up the database
 
@@ -199,6 +208,10 @@ API base URL: `/api/v1`
 | PATCH | `/auth/profile` | Bearer | Update own profile (name, password) |
 | GET | `/auth/oauth/:provider` | None | Initiate OAuth login (google, facebook, vk) |
 | GET | `/auth/oauth/:provider/callback` | None | OAuth provider callback |
+| POST | `/auth/verify-email` | None | Verify email with token |
+| POST | `/auth/resend-verification` | None | Resend verification email |
+| POST | `/auth/forgot-password` | None | Request password reset email |
+| POST | `/auth/reset-password` | None | Reset password with token |
 | GET | `/auth/oauth/accounts` | Bearer | List linked OAuth accounts |
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink OAuth provider |
 | GET | `/users` | Admin | List all users |
@@ -274,7 +287,7 @@ npm run release            # Bump versions, generate CHANGELOG.md, create git ta
 
 Four tables managed via TypeORM migrations:
 
-- **users** — UUID primary key, email (unique), name, bcrypt password hash (nullable for OAuth-only users), role/active flags
+- **users** — UUID primary key, email (unique), name, bcrypt password hash (nullable for OAuth-only users), role/active flags, email verification (isEmailVerified, token, expiresAt), account lockout (failedLoginAttempts, lockedUntil), password reset (token, expiresAt)
 - **oauth_accounts** — Linked to users (CASCADE delete), provider + provider_id (unique), timestamps
 - **refresh_tokens** — Linked to users (CASCADE delete), token string (SHA-256 hashed), expiry, revoked flag
 - **feature** — Auto-increment ID, name, timestamps
@@ -332,6 +345,9 @@ Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file
 ## Security
 
 - Passwords hashed with **bcrypt** (salt rounds = 10)
+- **Account lockout** after 5 failed login attempts (15-minute cooldown)
+- **Email verification** required before first login
+- **Password reset tokens** are single-use with 1-hour expiry; reset revokes all sessions
 - JWT access tokens (1h) + opaque refresh tokens (7d) with rotation
 - `@Exclude()` decorator hides password in API responses
 - `class-validator` on server DTOs, Angular `Validators` on client forms

@@ -10,6 +10,9 @@ import {
 import { authGuard } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest, MockUser } from '../types';
 
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
 const router = Router();
 
 // POST /api/v1/auth/register
@@ -40,13 +43,24 @@ router.post('/register', (req, res) => {
     password, // Stored as plaintext — mock only. Real server uses bcrypt.
     isActive: true,
     isAdmin: false,
+    isEmailVerified: false,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
     createdAt: now,
     updatedAt: now
   };
 
-  getState().users.set(user.id, user);
+  const state = getState();
+  state.users.set(user.id, user);
 
-  res.status(201).json(toUserResponse(user));
+  // Store a verification token (plain UUID — no hashing in mock)
+  const verificationToken = uuidv4();
+  state.emailVerificationTokens.set(verificationToken, user.id);
+
+  res.status(201).json({
+    message:
+      'Registration successful. Please check your email to verify your account.'
+  });
 });
 
 // POST /api/v1/auth/login
@@ -54,16 +68,223 @@ router.post('/login', (req, res) => {
   const { email, password } = req.body;
 
   const user = findUserByEmail(email);
+
+  // Check account lockout
+  if (user && user.lockedUntil) {
+    const lockedUntilTime = new Date(user.lockedUntil).getTime();
+    if (lockedUntilTime > Date.now()) {
+      const retryAfter = Math.ceil((lockedUntilTime - Date.now()) / 1000);
+      res.status(423).json({
+        message:
+          'Account is temporarily locked due to too many failed login attempts',
+        lockedUntil: user.lockedUntil,
+        retryAfter
+      });
+      return;
+    }
+    // Lock expired — clear it
+    user.lockedUntil = null;
+    user.failedLoginAttempts = 0;
+  }
+
   // Plaintext comparison — mock only. Real server uses bcrypt.compare().
-  if (!user || user.password !== password) {
+  if (!user || !user.isActive || user.password !== password) {
+    // Handle failed login attempt tracking
+    if (user && user.isActive) {
+      user.failedLoginAttempts++;
+
+      if (user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+        user.lockedUntil = new Date(
+          Date.now() + LOCKOUT_DURATION_MS
+        ).toISOString();
+        const retryAfter = Math.ceil(LOCKOUT_DURATION_MS / 1000);
+        res.status(423).json({
+          message:
+            'Account is temporarily locked due to too many failed login attempts',
+          lockedUntil: user.lockedUntil,
+          retryAfter
+        });
+        return;
+      }
+    }
     res.status(401).json({ message: 'Invalid credentials', statusCode: 401 });
     return;
+  }
+
+  // Check email verification
+  if (!user.isEmailVerified) {
+    res.status(403).json({
+      message: 'Please verify your email address before logging in',
+      errorCode: 'EMAIL_NOT_VERIFIED'
+    });
+    return;
+  }
+
+  // Success — reset failed attempts
+  if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = null;
   }
 
   const tokens = generateTokens(user);
   getState().refreshTokens.set(tokens.refresh_token, user.id);
 
   res.json({ tokens, user: toUserResponse(user) });
+});
+
+// POST /api/v1/auth/verify-email
+router.post('/verify-email', (req, res) => {
+  const { token } = req.body;
+
+  if (!token) {
+    res.status(400).json({ message: 'Token is required', statusCode: 400 });
+    return;
+  }
+
+  const state = getState();
+  const userId = state.emailVerificationTokens.get(token);
+
+  if (!userId) {
+    res.status(400).json({ message: 'Invalid or expired verification token' });
+    return;
+  }
+
+  const user = findUserById(userId);
+  if (!user) {
+    res.status(400).json({ message: 'Invalid or expired verification token' });
+    return;
+  }
+
+  user.isEmailVerified = true;
+  state.emailVerificationTokens.delete(token);
+
+  res.json({ message: 'Email verified successfully' });
+});
+
+// POST /api/v1/auth/resend-verification
+router.post('/resend-verification', (req, res) => {
+  const { email } = req.body;
+
+  const successMessage =
+    'If an account with that email exists and is not yet verified, a verification email has been sent.';
+
+  if (!email) {
+    res.json({ message: successMessage });
+    return;
+  }
+
+  const user = findUserByEmail(email);
+
+  // Always return success to prevent email enumeration
+  if (!user || user.isEmailVerified) {
+    res.json({ message: successMessage });
+    return;
+  }
+
+  const state = getState();
+
+  // Remove any existing verification token for this user
+  for (const [token, uid] of state.emailVerificationTokens.entries()) {
+    if (uid === user.id) {
+      state.emailVerificationTokens.delete(token);
+    }
+  }
+
+  // Create new verification token
+  const verificationToken = uuidv4();
+  state.emailVerificationTokens.set(verificationToken, user.id);
+
+  res.json({ message: successMessage });
+});
+
+// POST /api/v1/auth/forgot-password
+router.post('/forgot-password', (req, res) => {
+  const { email } = req.body;
+
+  const successMessage =
+    'If an account with that email exists, a password reset link has been sent.';
+
+  if (!email) {
+    res.json({ message: successMessage });
+    return;
+  }
+
+  const user = findUserByEmail(email);
+
+  // Always return success to prevent email enumeration
+  if (!user || !user.isActive) {
+    res.json({ message: successMessage });
+    return;
+  }
+
+  const state = getState();
+
+  // Remove any existing reset token for this user
+  for (const [token, uid] of state.passwordResetTokens.entries()) {
+    if (uid === user.id) {
+      state.passwordResetTokens.delete(token);
+    }
+  }
+
+  // Create new reset token
+  const resetToken = uuidv4();
+  state.passwordResetTokens.set(resetToken, user.id);
+
+  res.json({ message: successMessage });
+});
+
+// POST /api/v1/auth/reset-password
+router.post('/reset-password', (req, res) => {
+  const { token, password } = req.body;
+
+  if (!token || !password) {
+    res
+      .status(400)
+      .json({ message: 'Token and password are required', statusCode: 400 });
+    return;
+  }
+
+  if (password.length < 8) {
+    res.status(400).json({
+      message: 'Password must be at least 8 characters',
+      statusCode: 400
+    });
+    return;
+  }
+
+  const state = getState();
+  const userId = state.passwordResetTokens.get(token);
+
+  if (!userId) {
+    res
+      .status(400)
+      .json({ message: 'Invalid or expired password reset token' });
+    return;
+  }
+
+  const user = findUserById(userId);
+  if (!user) {
+    res
+      .status(400)
+      .json({ message: 'Invalid or expired password reset token' });
+    return;
+  }
+
+  // Update password
+  user.password = password;
+  user.updatedAt = new Date().toISOString();
+
+  // Clear the reset token
+  state.passwordResetTokens.delete(token);
+
+  // Invalidate all refresh tokens for this user
+  for (const [rt, uid] of state.refreshTokens.entries()) {
+    if (uid === user.id) {
+      state.refreshTokens.delete(rt);
+    }
+  }
+
+  res.json({ message: 'Password has been reset successfully' });
 });
 
 // POST /api/v1/auth/refresh-token

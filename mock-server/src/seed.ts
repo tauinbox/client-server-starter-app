@@ -18,6 +18,9 @@ function generateUsers(): MockUser[] {
       password: 'Password1',
       isActive: true,
       isAdmin: true,
+      isEmailVerified: true,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z'
     },
@@ -29,6 +32,9 @@ function generateUsers(): MockUser[] {
       password: 'Password1',
       isActive: true,
       isAdmin: false,
+      isEmailVerified: true,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
       createdAt: '2025-01-15T00:00:00.000Z',
       updatedAt: '2025-01-15T00:00:00.000Z'
     },
@@ -40,6 +46,9 @@ function generateUsers(): MockUser[] {
       password: 'Password1',
       isActive: true,
       isAdmin: false,
+      isEmailVerified: true,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
       createdAt: '2025-02-01T00:00:00.000Z',
       updatedAt: '2025-02-01T00:00:00.000Z'
     },
@@ -51,6 +60,9 @@ function generateUsers(): MockUser[] {
       password: 'Password1',
       isActive: false,
       isAdmin: false,
+      isEmailVerified: true,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
       createdAt: '2025-03-01T00:00:00.000Z',
       updatedAt: '2025-03-01T00:00:00.000Z'
     },
@@ -62,6 +74,9 @@ function generateUsers(): MockUser[] {
       password: 'Password1',
       isActive: true,
       isAdmin: false,
+      isEmailVerified: true,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
       createdAt: '2025-04-01T00:00:00.000Z',
       updatedAt: '2025-04-01T00:00:00.000Z'
     }
