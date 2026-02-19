@@ -129,7 +129,7 @@ npm test
   - `mock-data.ts` — `MockUser` type, `defaultUser`, factory re-exports (`createMockUser`, `createOAuthAccount`)
   - `helpers.ts` — `loginViaUi()`, `expectAuthRedirect()`, `expectForbiddenRedirect()`
 - Test structure: organized by module in `e2e/auth/` and `e2e/users/`
-- Coverage: 111 tests (53 auth + 58 users) covering login, register, profile, session-restore, lockout, email verification, password reset, users list/detail/edit/search
+- Coverage: 113 tests (55 auth + 58 users) covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search
 - Workers: 4 (fully parallel, per-worker mock-server instances on dynamic ports)
 
 ```bash
