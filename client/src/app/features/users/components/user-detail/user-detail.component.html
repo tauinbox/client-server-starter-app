@@ -27,25 +27,27 @@
               <p class="email">{{ u.email }}</p>
               <div class="chips">
                 @if (u.isActive) {
-                  <mat-chip color="accent" selected>Active</mat-chip>
+                  <mat-chip color="accent" highlighted>Active</mat-chip>
                 } @else {
-                  <mat-chip color="warn" selected>Inactive</mat-chip>
+                  <mat-chip color="warn" highlighted>Inactive</mat-chip>
                 }
 
                 @if (user()!.isAdmin) {
-                  <mat-chip color="primary" selected>Administrator</mat-chip>
+                  <mat-chip color="primary" highlighted>Administrator</mat-chip>
                 } @else {
                   <mat-chip>User</mat-chip>
                 }
 
                 @if (u.isEmailVerified) {
-                  <mat-chip color="accent" selected>Email Verified</mat-chip>
+                  <mat-chip color="accent" highlighted>Email Verified</mat-chip>
                 } @else {
-                  <mat-chip color="warn" selected>Email Not Verified</mat-chip>
+                  <mat-chip color="warn" highlighted
+                    >Email Not Verified</mat-chip
+                  >
                 }
 
                 @if (u.lockedUntil) {
-                  <mat-chip color="warn" selected>Account Locked</mat-chip>
+                  <mat-chip color="warn" highlighted>Account Locked</mat-chip>
                 }
               </div>
             </div>
