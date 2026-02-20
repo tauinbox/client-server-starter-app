@@ -1,6 +1,22 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import {
+  PASSWORD_REGEX,
+  PASSWORD_ERROR
+} from '@app/shared/constants/password.constants';
+import {
+  ALLOWED_USER_SORT_COLUMNS,
+  type UserSortColumn
+} from '@app/shared/constants/user.constants';
+import {
+  DEFAULT_PAGE,
+  DEFAULT_PAGE_SIZE,
+  DEFAULT_SORT_BY,
+  DEFAULT_SORT_ORDER,
+  MAX_PAGE_SIZE
+} from '@app/shared/constants/pagination.constants';
+import type { SortOrder } from '@app/shared/types/pagination.types';
+import {
   findUserByEmail,
   findUserById,
   getState,
@@ -9,9 +25,74 @@ import {
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
 import type { MockUser } from '../types';
 
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-const PASSWORD_ERROR =
-  'Password must contain at least one uppercase letter, one lowercase letter and one number';
+interface PaginationParams {
+  page: number;
+  limit: number;
+  sortBy: UserSortColumn;
+  sortOrder: SortOrder;
+}
+
+function parsePaginationParams(
+  query: Record<string, unknown>
+): PaginationParams {
+  let page = Number(query.page) || DEFAULT_PAGE;
+  if (page < 1) page = 1;
+
+  let limit = Number(query.limit) || DEFAULT_PAGE_SIZE;
+  if (limit < 1) limit = 1;
+  if (limit > MAX_PAGE_SIZE) limit = MAX_PAGE_SIZE;
+
+  const sortByRaw = String(query.sortBy || DEFAULT_SORT_BY);
+  const sortBy = (ALLOWED_USER_SORT_COLUMNS as readonly string[]).includes(
+    sortByRaw
+  )
+    ? (sortByRaw as UserSortColumn)
+    : (DEFAULT_SORT_BY as UserSortColumn);
+
+  const sortOrderRaw = String(
+    query.sortOrder || DEFAULT_SORT_ORDER
+  ).toLowerCase();
+  const sortOrder: SortOrder = sortOrderRaw === 'asc' ? 'asc' : 'desc';
+
+  return { page, limit, sortBy, sortOrder };
+}
+
+function paginateAndSort<T extends Record<string, unknown>>(
+  items: T[],
+  params: PaginationParams
+): {
+  data: T[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+} {
+  const { page, limit, sortBy, sortOrder } = params;
+
+  const sorted = [...items].sort((a, b) => {
+    const aVal = a[sortBy];
+    const bVal = b[sortBy];
+
+    if (aVal == null && bVal == null) return 0;
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
+
+    let cmp: number;
+    if (typeof aVal === 'boolean' && typeof bVal === 'boolean') {
+      cmp = Number(aVal) - Number(bVal);
+    } else if (typeof aVal === 'string' && typeof bVal === 'string') {
+      cmp = aVal.localeCompare(bVal);
+    } else {
+      cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+    }
+
+    return sortOrder === 'asc' ? cmp : -cmp;
+  });
+
+  const total = sorted.length;
+  const totalPages = Math.ceil(total / limit);
+  const start = (page - 1) * limit;
+  const data = sorted.slice(start, start + limit);
+
+  return { data, meta: { page, limit, total, totalPages } };
+}
 
 const router = Router();
 
@@ -63,7 +144,9 @@ router.post('/', adminGuard, (req, res) => {
 // GET /api/v1/users
 router.get('/', adminGuard, (req, res) => {
   const users = Array.from(getState().users.values()).map(toUserResponse);
-  res.json(users);
+  const params = parsePaginationParams(req.query as Record<string, unknown>);
+  const result = paginateAndSort(users, params);
+  res.json(result);
 });
 
 // GET /api/v1/users/search
@@ -92,7 +175,10 @@ router.get('/search', adminGuard, (req, res) => {
     users = users.filter((u) => u.isActive === activeBool);
   }
 
-  res.json(users.map(toUserResponse));
+  const userResponses = users.map(toUserResponse);
+  const params = parsePaginationParams(req.query as Record<string, unknown>);
+  const result = paginateAndSort(userResponses, params);
+  res.json(result);
 });
 
 // GET /api/v1/users/:id — requires auth (not admin), matching client authGuard

@@ -83,6 +83,7 @@ Copy `.env.example` to `.env` and configure:
 ```
 src/
 ├── common/
+│   ├── dtos/               # PaginationQueryDto, PaginatedResponseDto<T> (barrel export)
 │   └── utils/              # Shared utilities (escapeLikePattern, hashToken)
 └── modules/
 ├── core/                   # Dynamic root module
@@ -201,11 +202,30 @@ Base URL: `/api/v1`
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/` | Admin | Create user |
-| GET | `/` | Admin | List all users |
-| GET | `/search` | Admin | Search users (query params: email, firstName, lastName, isAdmin, isActive) |
+| GET | `/` | Admin | List all users (paginated: page, limit, sortBy, sortOrder query params) |
+| GET | `/search` | Admin | Search users (paginated + filters: email, firstName, lastName, isAdmin, isActive) |
 | GET | `/:id` | Admin | Get user by ID |
 | PATCH | `/:id` | Admin | Update user |
 | DELETE | `/:id` | Admin | Delete user |
+
+**Pagination query params:**
+- `page` (default 1)
+- `limit` (default 10, max 100)
+- `sortBy` (default createdAt)
+- `sortOrder` (default desc for list, asc for search)
+
+**Response format for paginated endpoints:**
+```json
+{
+  "data": [UserResponseDto, ...],
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 70,
+    "totalPages": 7
+  }
+}
+```
 
 ### Feature (`/api/v1/feature`)
 
@@ -241,6 +261,15 @@ npx jest --testPathPattern=auth   # Run specific tests
 ```bash
 npm run test:e2e
 ```
+
+## Shared Module
+
+Server imports common types and constants from the root `shared/` directory via `@app/shared/*` path alias (maps to `../shared/src/*` in `tsconfig.json`). This includes:
+
+- **Types**: `UserResponse`, `OAuthAccountResponse`, `TokensResponse`, `AuthResponse`, `PaginationMeta`, `PaginatedResponse<T>`, `SortOrder`
+- **Constants**: `PASSWORD_REGEX`, `PASSWORD_ERROR`, `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, pagination defaults, user sort columns
+
+NestJS build compiles shared files into `dist/shared/` alongside `dist/server/`. Migration and seed scripts use paths like `dist/server/src/...` to reflect the nested output structure.
 
 ## Versioning
 

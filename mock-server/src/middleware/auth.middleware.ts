@@ -1,5 +1,13 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  MAX_FAILED_ATTEMPTS,
+  LOCKOUT_DURATION_MS
+} from '@app/shared/constants/auth.constants';
+import {
+  PASSWORD_REGEX,
+  PASSWORD_ERROR
+} from '@app/shared/constants/password.constants';
 import { generateTokens } from '../jwt.utils';
 import {
   findUserByEmail,
@@ -9,12 +17,6 @@ import {
 } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest, MockUser } from '../types';
-
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-const PASSWORD_ERROR =
-  'Password must contain at least one uppercase letter, one lowercase letter and one number';
 
 const router = Router();
 

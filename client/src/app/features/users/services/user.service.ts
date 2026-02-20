@@ -3,8 +3,10 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import type {
   CreateUser,
+  PaginatedResponse,
   UpdateUser,
   User,
+  UserListParams,
   UserSearch
 } from '../models/user.types';
 
@@ -16,8 +18,11 @@ export const USERS_API_V1 = 'api/v1/users';
 export class UserService {
   readonly #http = inject(HttpClient);
 
-  getAll(): Observable<User[]> {
-    return this.#http.get<User[]>(USERS_API_V1);
+  getAll(params: UserListParams): Observable<PaginatedResponse<User>> {
+    const httpParams = this.#buildPaginationParams(params);
+    return this.#http.get<PaginatedResponse<User>>(USERS_API_V1, {
+      params: httpParams
+    });
   }
 
   getById(id: string): Observable<User> {
@@ -36,29 +41,42 @@ export class UserService {
     return this.#http.delete<void>(`${USERS_API_V1}/${id}`);
   }
 
-  search(criteria: UserSearch): Observable<User[]> {
-    let params = new HttpParams();
+  search(
+    criteria: UserSearch,
+    params: UserListParams
+  ): Observable<PaginatedResponse<User>> {
+    let httpParams = this.#buildPaginationParams(params);
 
     if (criteria.email) {
-      params = params.set('email', criteria.email);
+      httpParams = httpParams.set('email', criteria.email);
     }
 
     if (criteria.firstName) {
-      params = params.set('firstName', criteria.firstName);
+      httpParams = httpParams.set('firstName', criteria.firstName);
     }
 
     if (criteria.lastName) {
-      params = params.set('lastName', criteria.lastName);
+      httpParams = httpParams.set('lastName', criteria.lastName);
     }
 
     if (criteria.isAdmin !== undefined) {
-      params = params.set('isAdmin', criteria.isAdmin.toString());
+      httpParams = httpParams.set('isAdmin', criteria.isAdmin.toString());
     }
 
     if (criteria.isActive !== undefined) {
-      params = params.set('isActive', criteria.isActive.toString());
+      httpParams = httpParams.set('isActive', criteria.isActive.toString());
     }
 
-    return this.#http.get<User[]>(`${USERS_API_V1}/search`, { params });
+    return this.#http.get<PaginatedResponse<User>>(`${USERS_API_V1}/search`, {
+      params: httpParams
+    });
+  }
+
+  #buildPaginationParams(params: UserListParams): HttpParams {
+    return new HttpParams()
+      .set('page', params.page.toString())
+      .set('limit', params.limit.toString())
+      .set('sortBy', params.sortBy)
+      .set('sortOrder', params.sortOrder);
   }
 }

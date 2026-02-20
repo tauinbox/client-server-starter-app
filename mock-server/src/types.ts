@@ -1,3 +1,12 @@
+import type { Request } from 'express';
+
+export type {
+  UserResponse,
+  OAuthAccountResponse,
+  TokensResponse,
+  AuthResponse
+} from '@app/shared/types';
+
 export interface MockUser {
   id: string;
   email: string;
@@ -13,8 +22,6 @@ export interface MockUser {
   updatedAt: string;
 }
 
-export type UserResponse = Omit<MockUser, 'password'>;
-
 export interface OAuthAccount {
   provider: string;
   providerId: string;
@@ -29,19 +36,6 @@ export interface State {
   passwordResetTokens: Map<string, string>; // token -> userId
 }
 
-import type { Request } from 'express';
-
 export interface AuthenticatedRequest extends Request {
   user: MockUser;
-}
-
-export interface TokensResponse {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-}
-
-export interface AuthResponse {
-  tokens: TokensResponse;
-  user: UserResponse;
 }

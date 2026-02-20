@@ -6,6 +6,10 @@ import {
   MaxLength,
   MinLength
 } from 'class-validator';
+import {
+  PASSWORD_REGEX,
+  PASSWORD_ERROR
+} from '@app/shared/constants/password.constants';
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({
@@ -35,9 +39,6 @@ export class UpdateProfileDto {
   @IsOptional()
   @MinLength(8)
   @MaxLength(128)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/, {
-    message:
-      'Password must contain at least one uppercase letter, one lowercase letter and one number'
-  })
+  @Matches(PASSWORD_REGEX, { message: PASSWORD_ERROR })
   password?: string;
 }

@@ -31,10 +31,11 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - Server-side token cleanup via cron jobs
 
 ### User Management (Admin)
-- Paginated user list with column sorting
+- **Server-side paginated** user list with column sorting (page, limit, sortBy, sortOrder query params)
 - User detail, edit, and delete
-- Search by email, name, admin/active status
+- **Server-side paginated** search by email, name, admin/active status
 - Role and status management
+- Pagination response envelope: `{ data: User[], meta: { page, limit, total, totalPages } }`
 
 ### UI/UX
 - Angular Material component library
@@ -63,6 +64,12 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 fullstack-starter-app/
 ├── .github/workflows/      # CI/CD pipeline (GitHub Actions)
 │   └── ci.yml              # Lint, test, build on push/PR to master
+├── shared/                 # Shared types and constants (no build step)
+│   ├── tsconfig.json       # Minimal config for IDE support
+│   └── src/
+│       ├── types/          # UserResponse, AuthResponse, PaginatedResponse<T>, etc.
+│       ├── constants/      # PASSWORD_REGEX, pagination defaults, etc.
+│       └── index.ts        # Barrel exports
 ├── client/                 # Angular 21 SPA
 │   ├── src/app/
 │   │   ├── core/           # Header, theme, storage, error interceptor, 404
@@ -95,6 +102,8 @@ fullstack-starter-app/
 │       └── control.routes.ts  # Test control API (reset, seed)
 └── doc/                    # Project documentation
 ```
+
+All three workspaces import from `@app/shared/*` path alias (maps to `../shared/src/*` in each workspace's `tsconfig.json`).
 
 ## Prerequisites
 
@@ -214,8 +223,8 @@ API base URL: `/api/v1`
 | POST | `/auth/reset-password` | None | Reset password with token |
 | GET | `/auth/oauth/accounts` | Bearer | List linked OAuth accounts |
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink OAuth provider |
-| GET | `/users` | Admin | List all users |
-| GET | `/users/search` | Admin | Search users by criteria |
+| GET | `/users` | Admin | List all users (paginated: page, limit, sortBy, sortOrder) |
+| GET | `/users/search` | Admin | Search users by criteria (paginated + filters) |
 | GET | `/users/:id` | Admin | Get user by ID |
 | PATCH | `/users/:id` | Admin | Update user |
 | DELETE | `/users/:id` | Admin | Delete user |
@@ -280,6 +289,7 @@ npm run release            # Bump versions, generate CHANGELOG.md, create git ta
 - **Modular NestJS architecture** with dynamic root `CoreModule`
 - **Passport strategies**: `LocalStrategy` (email/password), `JwtStrategy` (Bearer token), `GoogleStrategy`, `FacebookStrategy`, `VkStrategy` (OAuth, conditionally registered)
 - **Request pipeline**: Global middleware -> Module middleware -> Guards -> Interceptors -> Pipes -> Controller
+- **Pagination**: Common `PaginationQueryDto` and `PaginatedResponseDto<T>` for consistent server-side pagination across endpoints
 - **Cron jobs**: Daily expired token cleanup, weekly revoked token cleanup
 - **Swagger** auto-generated API documentation
 
@@ -321,13 +331,13 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 ## Testing
 
-| Type | Tool | Scope |
-|------|------|-------|
-| Server unit tests | Jest | `*.spec.ts` alongside source |
-| Server E2E tests | Jest | Separate config in `test/` |
-| Client unit tests | Vitest | `*.spec.ts` alongside source |
-| Client E2E tests | Playwright | `e2e/` directory, uses mock-server (in-memory Express API) |
-| Mock server | Express | `mock-server/` directory, provides full API simulation for E2E tests |
+| Type | Tool | Scope | Status |
+|------|------|-------|--------|
+| Server unit tests | Jest | `*.spec.ts` alongside source | 150 tests passing |
+| Server E2E tests | Jest | Separate config in `test/` | Configured |
+| Client unit tests | Vitest | `*.spec.ts` alongside source | 154 tests passing |
+| Client E2E tests | Playwright | `e2e/` directory, uses mock-server (in-memory Express API) | 113 tests passing |
+| Mock server | Express | `mock-server/` directory, provides full API simulation with pagination support | In use |
 
 ## CI/CD
 

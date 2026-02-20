@@ -126,6 +126,7 @@
           <mat-paginator
             [length]="totalUsers()"
             [pageSize]="pageSize()"
+            [pageIndex]="currentPage()"
             [pageSizeOptions]="[5, 10, 25, 50]"
             (page)="handlePageEvent($event)"
           ></mat-paginator>

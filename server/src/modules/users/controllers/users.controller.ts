@@ -18,6 +18,7 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { UpdateUserDto } from '../dtos/update-user.dto';
+import { SearchUsersQueryDto } from '../dtos/search-users-query.dto';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -27,7 +28,6 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
-  ApiQuery,
   ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse
@@ -68,15 +68,14 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RolesEnum.Admin)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get all users (admin only)' })
+  @ApiOperation({ summary: 'Get paginated list of users (admin only)' })
   @ApiOkResponse({
-    description: 'List of all users',
-    type: [UserResponseDto]
+    description: 'Paginated list of users'
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - requires admin role' })
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@Query() query: SearchUsersQueryDto) {
+    return this.usersService.findPaginated(query);
   }
 
   @Get('search')
@@ -84,49 +83,13 @@ export class UsersController {
   @Roles(RolesEnum.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Search users by criteria (admin only)' })
-  @ApiQuery({ name: 'email', required: false, description: 'Filter by email' })
-  @ApiQuery({
-    name: 'firstName',
-    required: false,
-    description: 'Filter by first name'
-  })
-  @ApiQuery({
-    name: 'lastName',
-    required: false,
-    description: 'Filter by last name'
-  })
-  @ApiQuery({
-    name: 'isAdmin',
-    required: false,
-    description: 'Filter by admin status',
-    type: Boolean
-  })
-  @ApiQuery({
-    name: 'isActive',
-    required: false,
-    description: 'Filter by active status',
-    type: Boolean
-  })
   @ApiOkResponse({
-    description: 'List of filtered users',
-    type: [UserResponseDto]
+    description: 'Paginated list of filtered users'
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - requires admin role' })
-  searchUsers(
-    @Query('email') email?: string,
-    @Query('firstName') firstName?: string,
-    @Query('lastName') lastName?: string,
-    @Query('isAdmin') isAdmin?: boolean,
-    @Query('isActive') isActive?: boolean
-  ) {
-    return this.usersService.searchUsers({
-      email,
-      firstName,
-      lastName,
-      isAdmin,
-      isActive
-    });
+  searchUsers(@Query() query: SearchUsersQueryDto) {
+    return this.usersService.findPaginated(query);
   }
 
   @Get(':id')

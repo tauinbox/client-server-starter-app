@@ -17,8 +17,19 @@ import {
   withEntities
 } from '@ngrx/signals/entities';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
+import {
+  DEFAULT_PAGE_SIZE,
+  DEFAULT_SORT_BY,
+  DEFAULT_SORT_ORDER
+} from '@app/shared/constants';
 import { UserService } from '../services/user.service';
-import type { UpdateUser, User, UserSearch } from '../models/user.types';
+import type {
+  SortOrder,
+  UpdateUser,
+  User,
+  UserSearch,
+  UserSortColumn
+} from '../models/user.types';
 
 type UsersExtraState = {
   listLoading: boolean;
@@ -31,6 +42,15 @@ type UsersExtraState = {
   searchPerformed: boolean;
   currentPage: number;
   pageSize: number;
+  totalUsers: number;
+  sortBy: UserSortColumn;
+  sortOrder: SortOrder;
+  searchCurrentPage: number;
+  searchPageSize: number;
+  searchTotalUsers: number;
+  searchSortBy: UserSortColumn;
+  searchSortOrder: SortOrder;
+  lastSearchCriteria: UserSearch | null;
 };
 
 export const UsersStore = signalStore(
@@ -45,16 +65,19 @@ export const UsersStore = signalStore(
     searchResultIds: [],
     searchPerformed: false,
     currentPage: 0,
-    pageSize: 10
+    pageSize: DEFAULT_PAGE_SIZE,
+    totalUsers: 0,
+    sortBy: DEFAULT_SORT_BY as UserSortColumn,
+    sortOrder: DEFAULT_SORT_ORDER,
+    searchCurrentPage: 0,
+    searchPageSize: DEFAULT_PAGE_SIZE,
+    searchTotalUsers: 0,
+    searchSortBy: DEFAULT_SORT_BY as UserSortColumn,
+    searchSortOrder: DEFAULT_SORT_ORDER,
+    lastSearchCriteria: null
   }),
   withComputed((store) => ({
-    displayedUsers: computed(() => {
-      const all = store.entities();
-      const start = store.currentPage() * store.pageSize();
-      const end = start + store.pageSize();
-      return all.slice(start, end);
-    }),
-    totalUsers: computed(() => store.entities().length),
+    displayedUsers: computed(() => store.entities()),
     searchResultUsers: computed(() => {
       const map = store.entityMap();
       return store
@@ -72,25 +95,35 @@ export const UsersStore = signalStore(
         pipe(
           tap(() => patchState(store, { listLoading: true, listError: null })),
           switchMap(() =>
-            userService.getAll().pipe(
-              tapResponse({
-                next: (users) => {
-                  patchState(store, setAllEntities(users));
-                  patchState(store, { listLoading: false });
-                },
-                error: () => {
-                  patchState(store, {
-                    listLoading: false,
-                    listError: 'Failed to load users. Please try again.'
-                  });
-                  snackBar.open(
-                    'Failed to load users. Please try again.',
-                    'Close',
-                    { duration: 5000 }
-                  );
-                }
+            userService
+              .getAll({
+                page: store.currentPage() + 1,
+                limit: store.pageSize(),
+                sortBy: store.sortBy(),
+                sortOrder: store.sortOrder()
               })
-            )
+              .pipe(
+                tapResponse({
+                  next: (response) => {
+                    patchState(store, setAllEntities(response.data));
+                    patchState(store, {
+                      listLoading: false,
+                      totalUsers: response.meta.total
+                    });
+                  },
+                  error: () => {
+                    patchState(store, {
+                      listLoading: false,
+                      listError: 'Failed to load users. Please try again.'
+                    });
+                    snackBar.open(
+                      'Failed to load users. Please try again.',
+                      'Close',
+                      { duration: 5000 }
+                    );
+                  }
+                })
+              )
           )
         )
       ),
@@ -143,39 +176,48 @@ export const UsersStore = signalStore(
 
       search: rxMethod<UserSearch>(
         pipe(
-          tap(() =>
+          tap((criteria) =>
             patchState(store, {
               searchLoading: true,
               searchError: null,
-              searchPerformed: false
+              searchPerformed: false,
+              lastSearchCriteria: criteria
             })
           ),
           switchMap((criteria) =>
-            userService.search(criteria).pipe(
-              tapResponse({
-                next: (users) => {
-                  for (const user of users) {
-                    patchState(store, setEntity(user));
-                  }
-                  patchState(store, {
-                    searchResultIds: users.map((u) => u.id),
-                    searchLoading: false,
-                    searchPerformed: true
-                  });
-                },
-                error: () => {
-                  patchState(store, {
-                    searchLoading: false,
-                    searchError: 'Failed to search users. Please try again.'
-                  });
-                  snackBar.open(
-                    'Failed to search users. Please try again.',
-                    'Close',
-                    { duration: 5000 }
-                  );
-                }
+            userService
+              .search(criteria, {
+                page: store.searchCurrentPage() + 1,
+                limit: store.searchPageSize(),
+                sortBy: store.searchSortBy(),
+                sortOrder: store.searchSortOrder()
               })
-            )
+              .pipe(
+                tapResponse({
+                  next: (response) => {
+                    for (const user of response.data) {
+                      patchState(store, setEntity(user));
+                    }
+                    patchState(store, {
+                      searchResultIds: response.data.map((u) => u.id),
+                      searchLoading: false,
+                      searchPerformed: true,
+                      searchTotalUsers: response.meta.total
+                    });
+                  },
+                  error: () => {
+                    patchState(store, {
+                      searchLoading: false,
+                      searchError: 'Failed to search users. Please try again.'
+                    });
+                    snackBar.open(
+                      'Failed to search users. Please try again.',
+                      'Close',
+                      { duration: 5000 }
+                    );
+                  }
+                })
+              )
           )
         )
       ),
@@ -188,11 +230,34 @@ export const UsersStore = signalStore(
         patchState(store, { pageSize: size, currentPage: 0 });
       },
 
+      setSorting(sortBy: UserSortColumn, sortOrder: SortOrder): void {
+        patchState(store, { sortBy, sortOrder, currentPage: 0 });
+      },
+
+      setSearchPage(page: number): void {
+        patchState(store, { searchCurrentPage: page });
+      },
+
+      setSearchPageSize(size: number): void {
+        patchState(store, { searchPageSize: size, searchCurrentPage: 0 });
+      },
+
+      setSearchSorting(sortBy: UserSortColumn, sortOrder: SortOrder): void {
+        patchState(store, {
+          searchSortBy: sortBy,
+          searchSortOrder: sortOrder,
+          searchCurrentPage: 0
+        });
+      },
+
       clearSearch(): void {
         patchState(store, {
           searchResultIds: [],
           searchPerformed: false,
-          searchError: null
+          searchError: null,
+          searchTotalUsers: 0,
+          searchCurrentPage: 0,
+          lastSearchCriteria: null
         });
       }
     };
