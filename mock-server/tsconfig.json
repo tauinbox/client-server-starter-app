@@ -17,6 +17,6 @@
       "@app/shared/*": ["../shared/src/*"]
     }
   },
-  "include": ["src/**/*", "../shared/src/**/*"],
+  "include": ["src/**/*", "../shared/src/**/*", "eslint.config.ts"],
   "exclude": ["node_modules", "dist"]
 }
