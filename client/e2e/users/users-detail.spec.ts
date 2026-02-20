@@ -44,6 +44,9 @@ test.describe('User Detail page', () => {
         password: 'Password1',
         isActive: true,
         isAdmin: false,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z'
       }
@@ -67,6 +70,9 @@ test.describe('User Detail page', () => {
         password: 'Password1',
         isActive: false,
         isAdmin: false,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z'
       }

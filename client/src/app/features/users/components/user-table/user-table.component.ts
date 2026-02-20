@@ -17,7 +17,7 @@ import {
   MatTable
 } from '@angular/material/table';
 import type { Sort } from '@angular/material/sort';
-import { MatSort } from '@angular/material/sort';
+import { MatSort, MatSortHeader } from '@angular/material/sort';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatIconButton } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
@@ -41,6 +41,7 @@ export const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
   imports: [
     MatTable,
     MatSort,
+    MatSortHeader,
     MatColumnDef,
     MatHeaderCell,
     MatHeaderCellDef,
@@ -81,4 +82,8 @@ export class UserTableComponent {
     'createdAt',
     'actions'
   ];
+
+  trackById(_index: number, user: User): string {
+    return user.id;
+  }
 }

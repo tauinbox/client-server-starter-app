@@ -5,7 +5,7 @@ import {
 import { Request } from 'express';
 
 export const corsOptions = (): CorsOptions | CorsOptionsDelegate<Request> => {
-  const originsString = process.env.CORS_ORIGINS;
+  const originsString = process.env['CORS_ORIGINS'];
   if (originsString) {
     return {
       origin: originsString === '*' ? '*' : originsString.split('#'),
@@ -14,6 +14,6 @@ export const corsOptions = (): CorsOptions | CorsOptionsDelegate<Request> => {
     };
   }
   return {
-    origin: process.env.ENVIRONMENT === 'local'
+    origin: process.env['ENVIRONMENT'] === 'local'
   };
 };

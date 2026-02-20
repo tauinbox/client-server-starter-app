@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  PASSWORD_REGEX,
-  PASSWORD_ERROR
+  PASSWORD_ERROR,
+  PASSWORD_REGEX
 } from '@app/shared/constants/password.constants';
 import {
   ALLOWED_USER_SORT_COLUMNS,
@@ -35,14 +35,14 @@ interface PaginationParams {
 function parsePaginationParams(
   query: Record<string, unknown>
 ): PaginationParams {
-  let page = Number(query.page) || DEFAULT_PAGE;
+  let page = Number(query['page']) || DEFAULT_PAGE;
   if (page < 1) page = 1;
 
-  let limit = Number(query.limit) || DEFAULT_PAGE_SIZE;
+  let limit = Number(query['limit']) || DEFAULT_PAGE_SIZE;
   if (limit < 1) limit = 1;
   if (limit > MAX_PAGE_SIZE) limit = MAX_PAGE_SIZE;
 
-  const sortByRaw = String(query.sortBy || DEFAULT_SORT_BY);
+  const sortByRaw = String(query['sortBy'] || DEFAULT_SORT_BY);
   const sortBy = (ALLOWED_USER_SORT_COLUMNS as readonly string[]).includes(
     sortByRaw
   )
@@ -50,11 +50,21 @@ function parsePaginationParams(
     : (DEFAULT_SORT_BY as UserSortColumn);
 
   const sortOrderRaw = String(
-    query.sortOrder || DEFAULT_SORT_ORDER
+    query['sortOrder'] || DEFAULT_SORT_ORDER
   ).toLowerCase();
   const sortOrder: SortOrder = sortOrderRaw === 'asc' ? 'asc' : 'desc';
 
   return { page, limit, sortBy, sortOrder };
+}
+
+function compareValues(a: unknown, b: unknown): number {
+  if (typeof a === 'boolean' && typeof b === 'boolean') {
+    return Number(a) - Number(b);
+  }
+  if (typeof a === 'string' && typeof b === 'string') {
+    return a.localeCompare(b);
+  }
+  return String(a).localeCompare(String(b));
 }
 
 function paginateAndSort<T extends Record<string, unknown>>(
@@ -67,22 +77,14 @@ function paginateAndSort<T extends Record<string, unknown>>(
   const { page, limit, sortBy, sortOrder } = params;
 
   const sorted = [...items].sort((a, b) => {
-    const aVal = a[sortBy];
-    const bVal = b[sortBy];
+    const aVal: unknown = a[sortBy];
+    const bVal: unknown = b[sortBy];
 
     if (aVal == null && bVal == null) return 0;
     if (aVal == null) return 1;
     if (bVal == null) return -1;
 
-    let cmp: number;
-    if (typeof aVal === 'boolean' && typeof bVal === 'boolean') {
-      cmp = Number(aVal) - Number(bVal);
-    } else if (typeof aVal === 'string' && typeof bVal === 'string') {
-      cmp = aVal.localeCompare(bVal);
-    } else {
-      cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-    }
-
+    const cmp = compareValues(aVal, bVal);
     return sortOrder === 'asc' ? cmp : -cmp;
   });
 
@@ -183,7 +185,7 @@ router.get('/search', adminGuard, (req, res) => {
 
 // GET /api/v1/users/:id — requires auth (not admin), matching client authGuard
 router.get('/:id', authGuard, (req, res) => {
-  const id = req.params.id as string;
+  const id = req.params['id'] as string;
   const user = findUserById(id);
   if (!user) {
     res.status(404).json({ message: 'User not found', statusCode: 404 });
@@ -195,7 +197,7 @@ router.get('/:id', authGuard, (req, res) => {
 
 // PATCH /api/v1/users/:id
 router.patch('/:id', adminGuard, (req, res) => {
-  const id = req.params.id as string;
+  const id = req.params['id'] as string;
   const user = findUserById(id);
   if (!user) {
     res.status(404).json({ message: 'User not found', statusCode: 404 });
@@ -245,7 +247,7 @@ router.patch('/:id', adminGuard, (req, res) => {
 
 // DELETE /api/v1/users/:id
 router.delete('/:id', adminGuard, (req, res) => {
-  const id = req.params.id as string;
+  const id = req.params['id'] as string;
   const state = getState();
   if (!state.users.has(id)) {
     res.status(404).json({ message: 'User not found', statusCode: 404 });

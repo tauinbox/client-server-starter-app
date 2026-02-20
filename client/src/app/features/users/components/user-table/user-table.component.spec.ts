@@ -44,4 +44,34 @@ describe('UserTableComponent', () => {
       'actions'
     ]);
   });
+
+  describe('trackById', () => {
+    const mockUser = {
+      id: 'test-user-id',
+      email: 'test@example.com',
+      firstName: 'Test',
+      lastName: 'User',
+      isAdmin: false,
+      isActive: true,
+      isEmailVerified: true,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z'
+    };
+
+    it('should return user id', () => {
+      const result = component.trackById(0, mockUser);
+
+      expect(result).toBe('test-user-id');
+    });
+
+    it('should return different ids for different users', () => {
+      const user1 = { ...mockUser, id: 'user-1' };
+      const user2 = { ...mockUser, id: 'user-2' };
+
+      expect(component.trackById(0, user1)).toBe('user-1');
+      expect(component.trackById(0, user2)).toBe('user-2');
+    });
+  });
 });
