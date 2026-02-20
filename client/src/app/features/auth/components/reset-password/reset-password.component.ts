@@ -18,7 +18,12 @@ import type {
   ValidationErrors
 } from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
+import {
+  MatError,
+  MatFormField,
+  MatLabel,
+  MatSuffix
+} from '@angular/material/form-field';
 import type { ErrorStateMatcher } from '@angular/material/core';
 import { MatInput } from '@angular/material/input';
 import { MatIcon } from '@angular/material/icon';
@@ -60,7 +65,8 @@ function passwordsMatchValidator(
     MatButton,
     MatProgressSpinner,
     RouterLink,
-    PasswordToggleComponent
+    PasswordToggleComponent,
+    MatSuffix
   ],
   templateUrl: './reset-password.component.html',
   styleUrl: './reset-password.component.scss',

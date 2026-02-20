@@ -22,7 +22,12 @@ import type {
   ValidationErrors
 } from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
+import {
+  MatError,
+  MatFormField,
+  MatLabel,
+  MatSuffix
+} from '@angular/material/form-field';
 import type { ErrorStateMatcher } from '@angular/material/core';
 import { MatIcon, MatIconRegistry } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
@@ -85,7 +90,8 @@ const PROVIDER_LABELS: Record<string, string> = {
     MatInput,
     MatButton,
     DatePipe,
-    PasswordToggleComponent
+    PasswordToggleComponent,
+    MatSuffix
   ],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',

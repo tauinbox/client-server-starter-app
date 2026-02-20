@@ -39,9 +39,16 @@ src/app/
 │   │   ├── services/       # AuthService (HTTP, refresh scheduling)
 │   │   └── store/          # AuthStore (NgRx Signal Store, pure state)
 │   ├── users/              # User list, detail, edit, search (admin)
+│   │   ├── components/
+│   │   │   └── user-table/ # UserTableComponent (shared table for user-list and user-search)
 │   │   └── store/          # UsersStore (NgRx Signal Store, route-level)
 │   └── feature/            # Example feature module
-└── shared/                 # Confirm dialog, shared utilities
+└── shared/
+    ├── components/
+    │   ├── confirm-dialog/ # Confirmation dialog
+    │   └── password-toggle/# PasswordToggleComponent (reusable password visibility toggle)
+    ├── models/             # user.types
+    └── utils/              # css.utils
 ```
 
 ### Routes

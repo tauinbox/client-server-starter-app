@@ -77,7 +77,7 @@
             required
           />
           <mat-icon matPrefix>lock</mat-icon>
-          <app-password-toggle #pwdToggle />
+          <app-password-toggle matSuffix #pwdToggle />
           @if (
             registerForm.get('password')?.invalid &&
             registerForm.get('password')?.touched

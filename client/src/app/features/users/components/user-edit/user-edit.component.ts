@@ -20,7 +20,12 @@ import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import type { FormControl, FormGroup } from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
+import {
+  MatError,
+  MatFormField,
+  MatLabel,
+  MatSuffix
+} from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { UserService } from '../../services/user.service';
@@ -61,7 +66,8 @@ type UserFormType = {
     MatInput,
     MatCheckbox,
     MatButton,
-    PasswordToggleComponent
+    PasswordToggleComponent,
+    MatSuffix
   ],
   templateUrl: './user-edit.component.html',
   styleUrl: './user-edit.component.scss',

@@ -84,7 +84,7 @@
               placeholder="Leave blank to keep current password"
             />
             <mat-icon matPrefix>lock</mat-icon>
-            <app-password-toggle #pwdToggle />
+            <app-password-toggle matSuffix #pwdToggle />
             @if (
               userForm.get('password')?.invalid &&
               userForm.get('password')?.touched

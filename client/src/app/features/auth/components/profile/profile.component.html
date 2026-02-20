@@ -119,7 +119,7 @@
               placeholder="Leave blank to keep current password"
             />
             <mat-icon matPrefix>lock</mat-icon>
-            <app-password-toggle #pwdToggle />
+            <app-password-toggle matSuffix #pwdToggle />
             @if (
               profileForm.get('password')?.invalid &&
               profileForm.get('password')?.touched
@@ -140,7 +140,7 @@
                 placeholder="Confirm new password"
               />
               <mat-icon matPrefix>lock</mat-icon>
-              <app-password-toggle #confirmPwdToggle />
+              <app-password-toggle matSuffix #confirmPwdToggle />
               <mat-error>Passwords do not match</mat-error>
             </mat-form-field>
           }

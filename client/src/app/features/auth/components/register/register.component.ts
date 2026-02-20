@@ -12,7 +12,12 @@ import {
   MatCardHeader,
   MatCardTitle
 } from '@angular/material/card';
-import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
+import {
+  MatError,
+  MatFormField,
+  MatLabel,
+  MatSuffix
+} from '@angular/material/form-field';
 import type { FormControl, FormGroup } from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatInput } from '@angular/material/input';
@@ -50,7 +55,8 @@ type RegisterFormType = {
     MatProgressSpinner,
     MatCardActions,
     RouterLink,
-    PasswordToggleComponent
+    PasswordToggleComponent,
+    MatSuffix
   ],
   templateUrl: './register.component.html',
   styleUrl: './register.component.scss',

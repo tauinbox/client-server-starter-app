@@ -15,7 +15,12 @@ import {
 } from '@angular/material/card';
 import type { FormControl } from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
+import {
+  MatError,
+  MatFormField,
+  MatLabel,
+  MatSuffix
+} from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatIcon, MatIconRegistry } from '@angular/material/icon';
 import { MatButton } from '@angular/material/button';
@@ -62,7 +67,8 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
     MatCardActions,
     MatDivider,
     RouterLink,
-    PasswordToggleComponent
+    PasswordToggleComponent,
+    MatSuffix
   ],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
