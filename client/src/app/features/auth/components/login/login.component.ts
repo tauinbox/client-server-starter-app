@@ -15,10 +15,15 @@ import {
 } from '@angular/material/card';
 import type { FormControl } from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
+import {
+  MatError,
+  MatFormField,
+  MatLabel,
+  MatSuffix
+} from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatIcon, MatIconRegistry } from '@angular/material/icon';
-import { MatButton, MatIconButton } from '@angular/material/button';
+import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatDivider } from '@angular/material/divider';
 import { DOCUMENT } from '@angular/common';
@@ -31,6 +36,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
 import { registerOAuthIcons } from '../../utils/register-oauth-icons';
 import type { LockoutErrorData } from '../../models/auth.types';
+import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 
 type LoginFormType = {
   email: FormControl<string>;
@@ -56,12 +62,13 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
     MatFormField,
     MatInput,
     MatIcon,
-    MatIconButton,
     MatButton,
     MatProgressSpinner,
     MatCardActions,
     MatDivider,
-    RouterLink
+    RouterLink,
+    PasswordToggleComponent,
+    MatSuffix
   ],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
@@ -78,7 +85,6 @@ export class LoginComponent implements OnInit, OnDestroy {
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly showPassword = signal(false);
   protected readonly oauthUrls = OAUTH_URLS;
 
   // Lockout
@@ -125,10 +131,6 @@ export class LoginComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.#clearLockoutTimer();
-  }
-
-  togglePasswordVisibility(): void {
-    this.showPassword.update((prev) => !prev);
   }
 
   onOAuthLogin(provider: string): void {

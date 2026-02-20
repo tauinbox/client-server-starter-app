@@ -1,6 +1,4 @@
-@use 'abstracts/variables' as vars;
 @use 'abstracts/mixins' as mix;
-@use 'abstracts/functions' as func;
 
 :host {
   .user-list-container {
@@ -13,29 +11,5 @@
 
   .empty-state {
     @include mix.empty-state;
-  }
-
-  .table-container {
-    @include mix.table-container;
-  }
-
-  .mat-column-id {
-    max-width: func.rem(80);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .truncate-text {
-    display: inline-block;
-    max-width: func.rem(60);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  mat-chip {
-    min-height: func.rem(24);
-    font-size: vars.$font-size-sm;
   }
 }

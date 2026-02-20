@@ -22,11 +22,16 @@ import type {
   ValidationErrors
 } from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
+import {
+  MatError,
+  MatFormField,
+  MatLabel,
+  MatSuffix
+} from '@angular/material/form-field';
 import type { ErrorStateMatcher } from '@angular/material/core';
 import { MatIcon, MatIconRegistry } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
-import { MatButton, MatIconButton } from '@angular/material/button';
+import { MatButton } from '@angular/material/button';
 import { DOCUMENT } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 import { SessionStorageService } from '@core/services/session-storage.service';
@@ -39,6 +44,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DomSanitizer } from '@angular/platform-browser';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
 import { registerOAuthIcons } from '../../utils/register-oauth-icons';
+import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 
 type ProfileFormType = {
   firstName: FormControl<string>;
@@ -82,9 +88,10 @@ const PROVIDER_LABELS: Record<string, string> = {
     MatFormField,
     MatIcon,
     MatInput,
-    MatIconButton,
     MatButton,
-    DatePipe
+    DatePipe,
+    PasswordToggleComponent,
+    MatSuffix
   ],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
@@ -110,8 +117,6 @@ export class ProfileComponent implements OnInit {
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly showPassword = signal(false);
-  protected readonly showConfirmPassword = signal(false);
   protected readonly oauthAccounts = signal<OAuthAccountInfo[]>([]);
   protected readonly oauthLoading = signal(false);
   protected readonly allProviders = Object.keys(OAUTH_URLS);
@@ -268,14 +273,6 @@ export class ProfileComponent implements OnInit {
           );
         }
       });
-  }
-
-  togglePasswordVisibility(): void {
-    this.showPassword.update((prev) => !prev);
-  }
-
-  toggleConfirmPasswordVisibility(): void {
-    this.showConfirmPassword.update((prev) => !prev);
   }
 
   onSubmit(): void {

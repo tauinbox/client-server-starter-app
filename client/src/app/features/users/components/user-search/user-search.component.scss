@@ -1,6 +1,5 @@
-@use 'abstracts/variables' as vars;
-@use 'abstracts/mixins' as mix;
 @use 'abstracts/functions' as func;
+@use 'abstracts/mixins' as mix;
 
 :host {
   width: 100%;
@@ -46,16 +45,5 @@
     margin-bottom: func.rem(16);
     font-size: func.rem(48);
     opacity: 0.5;
-  }
-
-  .table-container {
-    @include mix.table-container;
-  }
-
-  .mat-column-id {
-    max-width: func.rem(80);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 }

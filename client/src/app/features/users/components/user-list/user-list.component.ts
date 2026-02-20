@@ -8,41 +8,21 @@ import {
 } from '@angular/material/card';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import {
-  MatCell,
-  MatCellDef,
-  MatColumnDef,
-  MatHeaderCell,
-  MatHeaderCellDef,
-  MatHeaderRow,
-  MatHeaderRowDef,
-  MatRow,
-  MatRowDef,
-  MatTable
-} from '@angular/material/table';
 import type { Sort } from '@angular/material/sort';
-import { MatSort } from '@angular/material/sort';
 import { MatTooltip } from '@angular/material/tooltip';
-import { MatIconButton, MatMiniFabButton } from '@angular/material/button';
+import { MatMiniFabButton } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
-import { MatChip } from '@angular/material/chips';
 import type { PageEvent } from '@angular/material/paginator';
-import { MatPaginator } from '@angular/material/paginator';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import type { User, UserSortColumn } from '../../models/user.types';
-import { DatePipe } from '@angular/common';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { rem } from '@shared/utils/css.utils';
 import { UsersStore } from '../../store/users.store';
-
-const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
-  email: 'email',
-  name: 'firstName',
-  status: 'isActive',
-  role: 'isAdmin',
-  createdAt: 'createdAt'
-};
+import {
+  COLUMN_TO_SORT_MAP,
+  UserTableComponent
+} from '../user-table/user-table.component';
 
 @Component({
   selector: 'app-user-list',
@@ -53,24 +33,10 @@ const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
     MatCardContent,
     MatCardTitle,
     MatProgressSpinner,
-    MatTable,
-    MatSort,
-    MatColumnDef,
-    MatHeaderCell,
-    MatHeaderCellDef,
-    MatCell,
-    MatCellDef,
     MatTooltip,
     MatMiniFabButton,
     RouterLink,
-    MatChip,
-    MatIconButton,
-    MatHeaderRow,
-    MatRow,
-    MatHeaderRowDef,
-    MatRowDef,
-    MatPaginator,
-    DatePipe
+    UserTableComponent
   ],
   templateUrl: './user-list.component.html',
   styleUrl: './user-list.component.scss',
@@ -86,16 +52,6 @@ export class UserListComponent implements OnInit {
   readonly pageSize = this.#usersStore.pageSize;
   readonly currentPage = this.#usersStore.currentPage;
   readonly displayedUsers = this.#usersStore.displayedUsers;
-
-  displayedColumns: string[] = [
-    'id',
-    'email',
-    'name',
-    'status',
-    'role',
-    'createdAt',
-    'actions'
-  ];
 
   ngOnInit(): void {
     this.#usersStore.loadAll();
@@ -114,7 +70,8 @@ export class UserListComponent implements OnInit {
     if (!sort.active || sort.direction === '') {
       this.#usersStore.setSorting('createdAt', 'desc');
     } else {
-      const sortBy = COLUMN_TO_SORT_MAP[sort.active] ?? 'createdAt';
+      const sortBy =
+        (COLUMN_TO_SORT_MAP[sort.active] as UserSortColumn) ?? 'createdAt';
       this.#usersStore.setSorting(sortBy, sort.direction);
     }
     this.#usersStore.loadAll();

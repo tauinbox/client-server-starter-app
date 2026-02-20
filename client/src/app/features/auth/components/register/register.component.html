@@ -71,22 +71,13 @@
           <input
             matInput
             autocomplete="off"
-            [type]="showPassword() ? 'text' : 'password'"
+            [type]="pwdToggle.show() ? 'text' : 'password'"
             formControlName="password"
             placeholder="Password (min 8 characters)"
             required
           />
           <mat-icon matPrefix>lock</mat-icon>
-          <button
-            mat-icon-button
-            matSuffix
-            type="button"
-            (click)="togglePasswordVisibility()"
-          >
-            <mat-icon>{{
-              showPassword() ? 'visibility_off' : 'visibility'
-            }}</mat-icon>
-          </button>
+          <app-password-toggle matSuffix #pwdToggle />
           @if (
             registerForm.get('password')?.invalid &&
             registerForm.get('password')?.touched
