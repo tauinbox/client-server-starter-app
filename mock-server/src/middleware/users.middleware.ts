@@ -13,6 +13,83 @@ const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const PASSWORD_ERROR =
   'Password must contain at least one uppercase letter, one lowercase letter and one number';
 
+const ALLOWED_SORT_COLUMNS = [
+  'email',
+  'firstName',
+  'lastName',
+  'isActive',
+  'isAdmin',
+  'createdAt'
+] as const;
+
+type UserSortColumn = (typeof ALLOWED_SORT_COLUMNS)[number];
+type SortOrder = 'asc' | 'desc';
+
+interface PaginationParams {
+  page: number;
+  limit: number;
+  sortBy: UserSortColumn;
+  sortOrder: SortOrder;
+}
+
+function parsePaginationParams(
+  query: Record<string, unknown>
+): PaginationParams {
+  let page = Number(query.page) || 1;
+  if (page < 1) page = 1;
+
+  let limit = Number(query.limit) || 10;
+  if (limit < 1) limit = 1;
+  if (limit > 100) limit = 100;
+
+  const sortByRaw = String(query.sortBy || 'createdAt');
+  const sortBy = (ALLOWED_SORT_COLUMNS as readonly string[]).includes(sortByRaw)
+    ? (sortByRaw as UserSortColumn)
+    : 'createdAt';
+
+  const sortOrderRaw = String(query.sortOrder || 'desc').toLowerCase();
+  const sortOrder: SortOrder = sortOrderRaw === 'asc' ? 'asc' : 'desc';
+
+  return { page, limit, sortBy, sortOrder };
+}
+
+function paginateAndSort<T extends Record<string, unknown>>(
+  items: T[],
+  params: PaginationParams
+): {
+  data: T[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+} {
+  const { page, limit, sortBy, sortOrder } = params;
+
+  const sorted = [...items].sort((a, b) => {
+    const aVal = a[sortBy];
+    const bVal = b[sortBy];
+
+    if (aVal == null && bVal == null) return 0;
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
+
+    let cmp: number;
+    if (typeof aVal === 'boolean' && typeof bVal === 'boolean') {
+      cmp = Number(aVal) - Number(bVal);
+    } else if (typeof aVal === 'string' && typeof bVal === 'string') {
+      cmp = aVal.localeCompare(bVal);
+    } else {
+      cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+    }
+
+    return sortOrder === 'asc' ? cmp : -cmp;
+  });
+
+  const total = sorted.length;
+  const totalPages = Math.ceil(total / limit);
+  const start = (page - 1) * limit;
+  const data = sorted.slice(start, start + limit);
+
+  return { data, meta: { page, limit, total, totalPages } };
+}
+
 const router = Router();
 
 // POST /api/v1/users
@@ -63,7 +140,9 @@ router.post('/', adminGuard, (req, res) => {
 // GET /api/v1/users
 router.get('/', adminGuard, (req, res) => {
   const users = Array.from(getState().users.values()).map(toUserResponse);
-  res.json(users);
+  const params = parsePaginationParams(req.query as Record<string, unknown>);
+  const result = paginateAndSort(users, params);
+  res.json(result);
 });
 
 // GET /api/v1/users/search
@@ -92,7 +171,10 @@ router.get('/search', adminGuard, (req, res) => {
     users = users.filter((u) => u.isActive === activeBool);
   }
 
-  res.json(users.map(toUserResponse));
+  const userResponses = users.map(toUserResponse);
+  const params = parsePaginationParams(req.query as Record<string, unknown>);
+  const result = paginateAndSort(userResponses, params);
+  res.json(result);
 });
 
 // GET /api/v1/users/:id — requires auth (not admin), matching client authGuard

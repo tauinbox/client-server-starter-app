@@ -28,3 +28,32 @@ export type UpdateUser = Pick<
   password?: string;
   unlockAccount?: boolean;
 };
+
+export type PaginationMeta = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+export type PaginatedResponse<T> = {
+  data: T[];
+  meta: PaginationMeta;
+};
+
+export type SortOrder = 'asc' | 'desc';
+
+export type UserSortColumn =
+  | 'email'
+  | 'firstName'
+  | 'lastName'
+  | 'isActive'
+  | 'isAdmin'
+  | 'createdAt';
+
+export type UserListParams = {
+  page: number;
+  limit: number;
+  sortBy: UserSortColumn;
+  sortOrder: SortOrder;
+};

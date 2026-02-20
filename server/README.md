@@ -201,11 +201,30 @@ Base URL: `/api/v1`
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/` | Admin | Create user |
-| GET | `/` | Admin | List all users |
-| GET | `/search` | Admin | Search users (query params: email, firstName, lastName, isAdmin, isActive) |
+| GET | `/` | Admin | List all users (paginated: page, limit, sortBy, sortOrder query params) |
+| GET | `/search` | Admin | Search users (paginated + filters: email, firstName, lastName, isAdmin, isActive) |
 | GET | `/:id` | Admin | Get user by ID |
 | PATCH | `/:id` | Admin | Update user |
 | DELETE | `/:id` | Admin | Delete user |
+
+**Pagination query params:**
+- `page` (default 1)
+- `limit` (default 10, max 100)
+- `sortBy` (default createdAt)
+- `sortOrder` (default desc for list, asc for search)
+
+**Response format for paginated endpoints:**
+```json
+{
+  "data": [UserResponseDto, ...],
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 70,
+    "totalPages": 7
+  }
+}
+```
 
 ### Feature (`/api/v1/feature`)
 

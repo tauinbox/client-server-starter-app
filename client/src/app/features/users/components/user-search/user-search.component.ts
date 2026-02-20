@@ -30,7 +30,11 @@ import { RouterLink } from '@angular/router';
 import { MatInput } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
-import type { User, UserSearch } from '../../models/user.types';
+import type { Sort } from '@angular/material/sort';
+import { MatSort } from '@angular/material/sort';
+import type { PageEvent } from '@angular/material/paginator';
+import { MatPaginator } from '@angular/material/paginator';
+import type { User, UserSearch, UserSortColumn } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { DatePipe } from '@angular/common';
 import { rem } from '@shared/utils/css.utils';
@@ -42,6 +46,14 @@ type UserSearchFormType = {
   lastName: FormControl<string>;
   isAdmin: FormControl<string>;
   isActive: FormControl<string>;
+};
+
+const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
+  email: 'email',
+  name: 'firstName',
+  status: 'isActive',
+  role: 'isAdmin',
+  createdAt: 'createdAt'
 };
 
 @Component({
@@ -59,6 +71,7 @@ type UserSearchFormType = {
     MatButton,
     MatDivider,
     MatTable,
+    MatSort,
     MatColumnDef,
     MatHeaderCell,
     MatCell,
@@ -74,6 +87,7 @@ type UserSearchFormType = {
     MatRowDef,
     MatInput,
     MatLabel,
+    MatPaginator,
     DatePipe
   ],
   templateUrl: './user-search.component.html',
@@ -98,6 +112,9 @@ export class UserSearchComponent {
   readonly users = this.#usersStore.searchResultUsers;
   readonly searching = this.#usersStore.searchLoading;
   readonly searched = this.#usersStore.searchPerformed;
+  readonly searchTotalUsers = this.#usersStore.searchTotalUsers;
+  readonly searchCurrentPage = this.#usersStore.searchCurrentPage;
+  readonly searchPageSize = this.#usersStore.searchPageSize;
 
   displayedColumns: string[] = [
     'id',
@@ -112,6 +129,7 @@ export class UserSearchComponent {
   onSubmit(): void {
     const formValues = this.searchForm.getRawValue();
     const criteria = this.#buildSearchCriteria(formValues);
+    this.#usersStore.setSearchPage(0);
     this.#usersStore.search(criteria);
   }
 
@@ -133,6 +151,25 @@ export class UserSearchComponent {
     }
 
     return criteria;
+  }
+
+  handleSearchPageEvent(event: PageEvent): void {
+    if (event.pageSize !== this.#usersStore.searchPageSize()) {
+      this.#usersStore.setSearchPageSize(event.pageSize);
+    } else {
+      this.#usersStore.setSearchPage(event.pageIndex);
+    }
+    this.#reSearch();
+  }
+
+  searchSortData(sort: Sort): void {
+    if (!sort.active || sort.direction === '') {
+      this.#usersStore.setSearchSorting('createdAt', 'desc');
+    } else {
+      const sortBy = COLUMN_TO_SORT_MAP[sort.active] ?? 'createdAt';
+      this.#usersStore.setSearchSorting(sortBy, sort.direction);
+    }
+    this.#reSearch();
   }
 
   resetForm(): void {
@@ -169,10 +206,10 @@ export class UserSearchComponent {
   #deleteUser(id: string): void {
     this.#usersStore.deleteUser(id).subscribe({
       next: () => {
-        this.#usersStore.clearSearch();
         this.#snackBar.open('User deleted successfully', 'Close', {
           duration: 5000
         });
+        this.#reSearch();
       },
       error: () => {
         this.#snackBar.open(
@@ -182,5 +219,12 @@ export class UserSearchComponent {
         );
       }
     });
+  }
+
+  #reSearch(): void {
+    const criteria = this.#usersStore.lastSearchCriteria();
+    if (criteria) {
+      this.#usersStore.search(criteria);
+    }
   }
 }

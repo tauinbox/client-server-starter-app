@@ -53,11 +53,9 @@ test.describe('User Search page', () => {
     await page.getByRole('button', { name: 'Search' }).click();
 
     await expect(page.getByText('Search Results')).toBeVisible();
+    // Results are paginated — check that at least one example.com user appears
     await expect(
-      page.getByRole('cell', { name: 'admin@example.com' })
-    ).toBeVisible();
-    await expect(
-      page.getByRole('cell', { name: 'john@example.com' })
+      page.getByRole('cell', { name: /example\.com/ }).first()
     ).toBeVisible();
   });
 
@@ -111,6 +109,7 @@ test.describe('User Search page', () => {
     await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/search');
 
+    await page.getByLabel('Email').fill('admin@example.com');
     await page.getByRole('button', { name: 'Search' }).click();
 
     const row = page.getByRole('row', { name: /admin@example\.com/ });
@@ -130,6 +129,7 @@ test.describe('User Search page', () => {
     await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/search');
 
+    await page.getByLabel('Email').fill('admin@example.com');
     await page.getByRole('button', { name: 'Search' }).click();
 
     const row = page.getByRole('row', { name: /admin@example\.com/ });
@@ -187,6 +187,7 @@ test.describe('User Search page', () => {
     await loginViaUi(page, _mockServer.url, { isAdmin: true });
     await page.goto('/users/search');
 
+    await page.getByLabel('Email').fill('john@example.com');
     await page.getByRole('button', { name: 'Search' }).click();
 
     const row = page.getByRole('row', { name: /john@example\.com/ });

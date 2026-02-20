@@ -20,7 +20,11 @@ describe('UsersService', () => {
   };
   let mockQueryBuilder: {
     andWhere: jest.Mock;
+    orderBy: jest.Mock;
+    skip: jest.Mock;
+    take: jest.Mock;
     getMany: jest.Mock;
+    getManyAndCount: jest.Mock;
   };
 
   const mockUser: User = {
@@ -38,7 +42,11 @@ describe('UsersService', () => {
   beforeEach(async () => {
     mockQueryBuilder = {
       andWhere: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue([])
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+      getManyAndCount: jest.fn().mockResolvedValue([[], 0])
     };
 
     mockRepository = {
@@ -251,6 +259,127 @@ describe('UsersService', () => {
         'user.email LIKE :email',
         { email: '%50\\%\\_off\\\\%' }
       );
+    });
+  });
+
+  describe('findPaginated', () => {
+    it('should return paginated results with default params', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockUser], 1]);
+
+      const result = await service.findPaginated({
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      });
+
+      expect(mockRepository.createQueryBuilder).toHaveBeenCalledWith('user');
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+        'user.createdAt',
+        'DESC'
+      );
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
+      expect(result.data).toEqual([mockUser]);
+      expect(result.meta).toEqual({
+        page: 1,
+        limit: 10,
+        total: 1,
+        totalPages: 1
+      });
+    });
+
+    it('should apply custom page and limit', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 25]);
+
+      const result = await service.findPaginated({
+        page: 3,
+        limit: 5,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      });
+
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(10);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(5);
+      expect(result.meta).toEqual({
+        page: 3,
+        limit: 5,
+        total: 25,
+        totalPages: 5
+      });
+    });
+
+    it('should apply sorting', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.findPaginated({
+        page: 1,
+        limit: 10,
+        sortBy: 'email',
+        sortOrder: 'asc'
+      });
+
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+        'user.email',
+        'ASC'
+      );
+    });
+
+    it('should apply filters along with pagination', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockUser], 1]);
+
+      await service.findPaginated({
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        email: 'test',
+        isAdmin: true
+      });
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'user.email LIKE :email',
+        { email: '%test%' }
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'user.isAdmin = :isAdmin',
+        { isAdmin: true }
+      );
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalled();
+      expect(mockQueryBuilder.skip).toHaveBeenCalled();
+      expect(mockQueryBuilder.take).toHaveBeenCalled();
+    });
+
+    it('should return empty data with correct meta when no results', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      const result = await service.findPaginated({
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      });
+
+      expect(result.data).toEqual([]);
+      expect(result.meta).toEqual({
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0
+      });
+    });
+
+    it('should compute totalPages correctly', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 71]);
+
+      const result = await service.findPaginated({
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      });
+
+      expect(result.meta.totalPages).toBe(8);
     });
   });
 

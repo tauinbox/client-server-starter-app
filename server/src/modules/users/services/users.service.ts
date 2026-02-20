@@ -9,6 +9,8 @@ import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
+import { SearchUsersQueryDto } from '../dtos/search-users-query.dto';
+import { PaginatedResponseDto } from '../../../common/dtos';
 import { escapeLikePattern } from '../../../common/utils/escape-like';
 
 @Injectable()
@@ -40,6 +42,52 @@ export class UsersService {
 
   async findAll(): Promise<User[]> {
     return this.userRepository.find();
+  }
+
+  async findPaginated(
+    query: SearchUsersQueryDto
+  ): Promise<PaginatedResponseDto<User>> {
+    const { page, limit, sortBy, sortOrder, ...filters } = query;
+
+    const qb = this.userRepository.createQueryBuilder('user');
+
+    if (filters.email) {
+      qb.andWhere('user.email LIKE :email', {
+        email: `%${escapeLikePattern(filters.email)}%`
+      });
+    }
+
+    if (filters.firstName) {
+      qb.andWhere('user.firstName ILIKE :firstName', {
+        firstName: `%${escapeLikePattern(filters.firstName)}%`
+      });
+    }
+
+    if (filters.lastName) {
+      qb.andWhere('user.lastName ILIKE :lastName', {
+        lastName: `%${escapeLikePattern(filters.lastName)}%`
+      });
+    }
+
+    if (filters.isAdmin !== undefined) {
+      qb.andWhere('user.isAdmin = :isAdmin', {
+        isAdmin: filters.isAdmin
+      });
+    }
+
+    if (filters.isActive !== undefined) {
+      qb.andWhere('user.isActive = :isActive', {
+        isActive: filters.isActive
+      });
+    }
+
+    qb.orderBy(`user.${sortBy}`, sortOrder.toUpperCase() as 'ASC' | 'DESC');
+    qb.skip((page - 1) * limit);
+    qb.take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    return new PaginatedResponseDto(data, total, page, limit);
   }
 
   async findOne(id: string): Promise<User> {

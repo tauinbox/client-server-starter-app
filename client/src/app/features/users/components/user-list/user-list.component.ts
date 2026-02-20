@@ -1,11 +1,5 @@
 import type { OnInit } from '@angular/core';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  signal
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import {
   MatCard,
   MatCardContent,
@@ -36,13 +30,19 @@ import type { PageEvent } from '@angular/material/paginator';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
-import type { User } from '../../models/user.types';
+import type { User, UserSortColumn } from '../../models/user.types';
 import { DatePipe } from '@angular/common';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { rem } from '@shared/utils/css.utils';
 import { UsersStore } from '../../store/users.store';
 
-type SortableValue = string | number | boolean | Date;
+const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
+  email: 'email',
+  name: 'firstName',
+  status: 'isActive',
+  role: 'isAdmin',
+  createdAt: 'createdAt'
+};
 
 @Component({
   selector: 'app-user-list',
@@ -81,49 +81,11 @@ export class UserListComponent implements OnInit {
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
 
-  readonly #sortState = signal<Sort>({ active: '', direction: '' });
-
   readonly loading = this.#usersStore.listLoading;
   readonly totalUsers = this.#usersStore.totalUsers;
   readonly pageSize = this.#usersStore.pageSize;
   readonly currentPage = this.#usersStore.currentPage;
-
-  readonly displayedUsers = computed(() => {
-    const sort = this.#sortState();
-    const users = this.#usersStore.displayedUsers();
-
-    if (!sort.active || sort.direction === '') {
-      return users;
-    }
-
-    return [...users].sort((a, b) => {
-      const isAsc = sort.direction === 'asc';
-      switch (sort.active) {
-        case 'id':
-          return this.compare(a.id, b.id, isAsc);
-        case 'email':
-          return this.compare(a.email, b.email, isAsc);
-        case 'name':
-          return this.compare(
-            a.firstName + a.lastName,
-            b.firstName + b.lastName,
-            isAsc
-          );
-        case 'status':
-          return this.compare(a.isActive, b.isActive, isAsc);
-        case 'role':
-          return this.compare(a.isAdmin, b.isAdmin, isAsc);
-        case 'createdAt':
-          return this.compare(
-            new Date(a.createdAt).getTime(),
-            new Date(b.createdAt).getTime(),
-            isAsc
-          );
-        default:
-          return 0;
-      }
-    });
-  });
+  readonly displayedUsers = this.#usersStore.displayedUsers;
 
   displayedColumns: string[] = [
     'id',
@@ -140,16 +102,22 @@ export class UserListComponent implements OnInit {
   }
 
   handlePageEvent(event: PageEvent): void {
-    this.#usersStore.setPageSize(event.pageSize);
-    this.#usersStore.setPage(event.pageIndex);
+    if (event.pageSize !== this.#usersStore.pageSize()) {
+      this.#usersStore.setPageSize(event.pageSize);
+    } else {
+      this.#usersStore.setPage(event.pageIndex);
+    }
+    this.#usersStore.loadAll();
   }
 
   sortData(sort: Sort): void {
-    this.#sortState.set(sort);
-  }
-
-  compare<T extends SortableValue>(a: T, b: T, isAsc: boolean): number {
-    return (a < b ? -1 : 1) * (isAsc ? 1 : -1);
+    if (!sort.active || sort.direction === '') {
+      this.#usersStore.setSorting('createdAt', 'desc');
+    } else {
+      const sortBy = COLUMN_TO_SORT_MAP[sort.active] ?? 'createdAt';
+      this.#usersStore.setSorting(sortBy, sort.direction);
+    }
+    this.#usersStore.loadAll();
   }
 
   confirmDelete(user: User): void {
@@ -176,6 +144,7 @@ export class UserListComponent implements OnInit {
         this.#snackBar.open('User deleted successfully', 'Close', {
           duration: 5000
         });
+        this.#usersStore.loadAll();
       },
       error: () => {
         this.#snackBar.open(

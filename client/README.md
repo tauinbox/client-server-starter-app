@@ -69,7 +69,7 @@ NgRx Signal Store (`@ngrx/signals`):
 
 - **AuthStore** (`providedIn: 'root'`) — pure state container managing `localStorage('auth_storage')`, exposes `user`, `isAuthenticated`, `isAdmin` computed signals. No `HttpClient` dependency
 - **AuthService** (`providedIn: 'root'`) — HTTP operations (login/register/logout/refresh/profile/OAuth accounts), token refresh scheduling via `provideAppInitializer`. Eliminates the circular dependency chain
-- **UsersStore** (route-level at `/users`) — entity-based store with `withEntities<User>()`. Manages user list, detail, search state with pagination and loading indicators
+- **UsersStore** (route-level at `/users`) — entity-based store with `withEntities<User>()`. Manages user list, detail, search state with **server-side pagination** (calls API with page/limit/sort params, stores totalItems/totalPages from server response) and loading indicators
 - **ThemeService** — `theme` signal (`'light'` | `'dark'`), system preference detection, persists to localStorage
 
 ### HTTP Interceptors
@@ -129,7 +129,7 @@ npm test
   - `mock-data.ts` — `MockUser` type, `defaultUser`, factory re-exports (`createMockUser`, `createOAuthAccount`)
   - `helpers.ts` — `loginViaUi()`, `expectAuthRedirect()`, `expectForbiddenRedirect()`
 - Test structure: organized by module in `e2e/auth/` and `e2e/users/`
-- Coverage: 113 tests (55 auth + 58 users) covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search
+- Coverage: 113 tests (55 auth + 58 users) covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search. User list and search tests updated to work with server-side paginated responses from mock-server
 - Workers: 4 (fully parallel, per-worker mock-server instances on dynamic ports)
 
 ```bash
