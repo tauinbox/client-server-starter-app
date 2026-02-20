@@ -6,6 +6,10 @@ import {
   MinLength
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import {
+  PASSWORD_REGEX,
+  PASSWORD_ERROR
+} from '@app/shared/constants/password.constants';
 
 export class CreateUserDto {
   @ApiProperty({
@@ -41,9 +45,6 @@ export class CreateUserDto {
   @IsNotEmpty()
   @MinLength(8)
   @MaxLength(128)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/, {
-    message:
-      'Password must contain at least one uppercase letter, one lowercase letter and one number'
-  })
+  @Matches(PASSWORD_REGEX, { message: PASSWORD_ERROR })
   password: string;
 }

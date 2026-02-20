@@ -1,18 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsIn, IsOptional } from 'class-validator';
+import { ALLOWED_USER_SORT_COLUMNS } from '@app/shared/constants/user.constants';
 import { PaginationQueryDto } from '../../../common/dtos';
-
-export const ALLOWED_USER_SORT_COLUMNS = [
-  'email',
-  'firstName',
-  'lastName',
-  'isActive',
-  'isAdmin',
-  'createdAt'
-] as const;
-
-export type UserSortColumn = (typeof ALLOWED_USER_SORT_COLUMNS)[number];
 
 export class SearchUsersQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({

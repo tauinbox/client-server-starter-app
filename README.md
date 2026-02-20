@@ -64,6 +64,12 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 fullstack-starter-app/
 ├── .github/workflows/      # CI/CD pipeline (GitHub Actions)
 │   └── ci.yml              # Lint, test, build on push/PR to master
+├── shared/                 # Shared types and constants (no build step)
+│   ├── tsconfig.json       # Minimal config for IDE support
+│   └── src/
+│       ├── types/          # UserResponse, AuthResponse, PaginatedResponse<T>, etc.
+│       ├── constants/      # PASSWORD_REGEX, pagination defaults, etc.
+│       └── index.ts        # Barrel exports
 ├── client/                 # Angular 21 SPA
 │   ├── src/app/
 │   │   ├── core/           # Header, theme, storage, error interceptor, 404
@@ -96,6 +102,8 @@ fullstack-starter-app/
 │       └── control.routes.ts  # Test control API (reset, seed)
 └── doc/                    # Project documentation
 ```
+
+All three workspaces import from `@app/shared/*` path alias (maps to `../shared/src/*` in each workspace's `tsconfig.json`).
 
 ## Prerequisites
 

@@ -17,6 +17,11 @@ import {
   withEntities
 } from '@ngrx/signals/entities';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
+import {
+  DEFAULT_PAGE_SIZE,
+  DEFAULT_SORT_BY,
+  DEFAULT_SORT_ORDER
+} from '@app/shared/constants';
 import { UserService } from '../services/user.service';
 import type {
   SortOrder,
@@ -60,15 +65,15 @@ export const UsersStore = signalStore(
     searchResultIds: [],
     searchPerformed: false,
     currentPage: 0,
-    pageSize: 10,
+    pageSize: DEFAULT_PAGE_SIZE,
     totalUsers: 0,
-    sortBy: 'createdAt',
-    sortOrder: 'desc',
+    sortBy: DEFAULT_SORT_BY as UserSortColumn,
+    sortOrder: DEFAULT_SORT_ORDER,
     searchCurrentPage: 0,
-    searchPageSize: 10,
+    searchPageSize: DEFAULT_PAGE_SIZE,
     searchTotalUsers: 0,
-    searchSortBy: 'createdAt',
-    searchSortOrder: 'desc',
+    searchSortBy: DEFAULT_SORT_BY as UserSortColumn,
+    searchSortOrder: DEFAULT_SORT_ORDER,
     lastSearchCriteria: null
   }),
   withComputed((store) => ({

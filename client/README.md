@@ -85,6 +85,7 @@ NgRx Signal Store (`@ngrx/signals`):
 | `@features/*` | `src/app/features/*` |
 | `@shared/*` | `src/app/shared/*` |
 | `@environments/*` | `src/environments/*` |
+| `@app/shared/*` | `../shared/src/*` (shared types/constants across all 3 workspaces) |
 
 ## Styling
 

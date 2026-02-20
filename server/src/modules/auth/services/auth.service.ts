@@ -22,9 +22,11 @@ import { OAuthAccountService } from './oauth-account.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { MailService } from '../../mail/mail.service';
 import { hashToken } from '../../../common/utils/hash-token';
+import {
+  MAX_FAILED_ATTEMPTS,
+  LOCKOUT_DURATION_MS
+} from '@app/shared/constants/auth.constants';
 
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 const VERIFICATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 const RESET_TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 

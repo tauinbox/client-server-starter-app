@@ -1,6 +1,22 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import {
+  PASSWORD_REGEX,
+  PASSWORD_ERROR
+} from '@app/shared/constants/password.constants';
+import {
+  ALLOWED_USER_SORT_COLUMNS,
+  type UserSortColumn
+} from '@app/shared/constants/user.constants';
+import {
+  DEFAULT_PAGE,
+  DEFAULT_PAGE_SIZE,
+  DEFAULT_SORT_BY,
+  DEFAULT_SORT_ORDER,
+  MAX_PAGE_SIZE
+} from '@app/shared/constants/pagination.constants';
+import type { SortOrder } from '@app/shared/types/pagination.types';
+import {
   findUserByEmail,
   findUserById,
   getState,
@@ -8,22 +24,6 @@ import {
 } from '../state';
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
 import type { MockUser } from '../types';
-
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-const PASSWORD_ERROR =
-  'Password must contain at least one uppercase letter, one lowercase letter and one number';
-
-const ALLOWED_SORT_COLUMNS = [
-  'email',
-  'firstName',
-  'lastName',
-  'isActive',
-  'isAdmin',
-  'createdAt'
-] as const;
-
-type UserSortColumn = (typeof ALLOWED_SORT_COLUMNS)[number];
-type SortOrder = 'asc' | 'desc';
 
 interface PaginationParams {
   page: number;
@@ -35,19 +35,23 @@ interface PaginationParams {
 function parsePaginationParams(
   query: Record<string, unknown>
 ): PaginationParams {
-  let page = Number(query.page) || 1;
+  let page = Number(query.page) || DEFAULT_PAGE;
   if (page < 1) page = 1;
 
-  let limit = Number(query.limit) || 10;
+  let limit = Number(query.limit) || DEFAULT_PAGE_SIZE;
   if (limit < 1) limit = 1;
-  if (limit > 100) limit = 100;
+  if (limit > MAX_PAGE_SIZE) limit = MAX_PAGE_SIZE;
 
-  const sortByRaw = String(query.sortBy || 'createdAt');
-  const sortBy = (ALLOWED_SORT_COLUMNS as readonly string[]).includes(sortByRaw)
+  const sortByRaw = String(query.sortBy || DEFAULT_SORT_BY);
+  const sortBy = (ALLOWED_USER_SORT_COLUMNS as readonly string[]).includes(
+    sortByRaw
+  )
     ? (sortByRaw as UserSortColumn)
-    : 'createdAt';
+    : (DEFAULT_SORT_BY as UserSortColumn);
 
-  const sortOrderRaw = String(query.sortOrder || 'desc').toLowerCase();
+  const sortOrderRaw = String(
+    query.sortOrder || DEFAULT_SORT_ORDER
+  ).toLowerCase();
   const sortOrder: SortOrder = sortOrderRaw === 'asc' ? 'asc' : 'desc';
 
   return { page, limit, sortBy, sortOrder };

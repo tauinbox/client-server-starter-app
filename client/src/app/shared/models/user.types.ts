@@ -1,16 +1,15 @@
-export type User = {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  isActive: boolean;
-  isAdmin: boolean;
-  isEmailVerified: boolean;
-  failedLoginAttempts: number;
-  lockedUntil: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-};
+import type { UserResponse, SortOrder } from '@app/shared/types';
+import type { UserSortColumn } from '@app/shared/constants';
+
+export type {
+  PaginationMeta,
+  PaginatedResponse,
+  SortOrder
+} from '@app/shared/types';
+export type { UserSortColumn } from '@app/shared/constants';
+
+// Re-export UserResponse as User for backward compatibility across client code
+export type User = UserResponse;
 
 export type UserSearch = Pick<
   Partial<User>,
@@ -28,28 +27,6 @@ export type UpdateUser = Pick<
   password?: string;
   unlockAccount?: boolean;
 };
-
-export type PaginationMeta = {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-};
-
-export type PaginatedResponse<T> = {
-  data: T[];
-  meta: PaginationMeta;
-};
-
-export type SortOrder = 'asc' | 'desc';
-
-export type UserSortColumn =
-  | 'email'
-  | 'firstName'
-  | 'lastName'
-  | 'isActive'
-  | 'isAdmin'
-  | 'createdAt';
 
 export type UserListParams = {
   page: number;

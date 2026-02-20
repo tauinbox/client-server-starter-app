@@ -83,6 +83,7 @@ Copy `.env.example` to `.env` and configure:
 ```
 src/
 ├── common/
+│   ├── dtos/               # PaginationQueryDto, PaginatedResponseDto<T> (barrel export)
 │   └── utils/              # Shared utilities (escapeLikePattern, hashToken)
 └── modules/
 ├── core/                   # Dynamic root module
@@ -260,6 +261,15 @@ npx jest --testPathPattern=auth   # Run specific tests
 ```bash
 npm run test:e2e
 ```
+
+## Shared Module
+
+Server imports common types and constants from the root `shared/` directory via `@app/shared/*` path alias (maps to `../shared/src/*` in `tsconfig.json`). This includes:
+
+- **Types**: `UserResponse`, `OAuthAccountResponse`, `TokensResponse`, `AuthResponse`, `PaginationMeta`, `PaginatedResponse<T>`, `SortOrder`
+- **Constants**: `PASSWORD_REGEX`, `PASSWORD_ERROR`, `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, pagination defaults, user sort columns
+
+NestJS build compiles shared files into `dist/shared/` alongside `dist/server/`. Migration and seed scripts use paths like `dist/server/src/...` to reflect the nested output structure.
 
 ## Versioning
 
