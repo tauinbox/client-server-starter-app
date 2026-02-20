@@ -14,6 +14,7 @@ import {
   MatCardTitle
 } from '@angular/material/card';
 import { MatButton, MatIconButton } from '@angular/material/button';
+import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { Router, RouterLink } from '@angular/router';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
@@ -59,7 +60,8 @@ type UserFormType = {
     MatFormField,
     MatInput,
     MatCheckbox,
-    MatButton
+    MatButton,
+    PasswordToggleComponent
   ],
   templateUrl: './user-edit.component.html',
   styleUrl: './user-edit.component.scss',
@@ -79,7 +81,6 @@ export class UserEditComponent implements OnInit {
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
-  readonly showPassword = signal(false);
 
   protected readonly userForm: FormGroup<UserFormType> =
     this.#fb.group<UserFormType>({
@@ -144,10 +145,6 @@ export class UserEditComponent implements OnInit {
         this.#snackBar.open(errorMessage, 'Close', { duration: 5000 });
       }
     });
-  }
-
-  togglePasswordVisibility(): void {
-    this.showPassword.update((prev) => !prev);
   }
 
   onSubmit(): void {

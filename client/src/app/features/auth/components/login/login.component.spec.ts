@@ -106,16 +106,6 @@ describe('LoginComponent', () => {
     });
   });
 
-  describe('togglePasswordVisibility', () => {
-    it('should toggle showPassword signal', () => {
-      expect(component['showPassword']()).toBe(false);
-      component.togglePasswordVisibility();
-      expect(component['showPassword']()).toBe(true);
-      component.togglePasswordVisibility();
-      expect(component['showPassword']()).toBe(false);
-    });
-  });
-
   describe('onSubmit', () => {
     it('should not call login when form is invalid', () => {
       component.onSubmit();

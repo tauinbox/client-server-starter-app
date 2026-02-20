@@ -10,35 +10,21 @@ import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatOption, MatSelect } from '@angular/material/select';
-import { MatButton, MatIconButton } from '@angular/material/button';
+import { MatButton } from '@angular/material/button';
 import { MatDivider } from '@angular/material/divider';
-import {
-  MatCell,
-  MatCellDef,
-  MatColumnDef,
-  MatHeaderCell,
-  MatHeaderCellDef,
-  MatHeaderRow,
-  MatHeaderRowDef,
-  MatRow,
-  MatRowDef,
-  MatTable
-} from '@angular/material/table';
-import { MatTooltip } from '@angular/material/tooltip';
-import { MatChip } from '@angular/material/chips';
-import { RouterLink } from '@angular/router';
 import { MatInput } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import type { Sort } from '@angular/material/sort';
-import { MatSort } from '@angular/material/sort';
 import type { PageEvent } from '@angular/material/paginator';
-import { MatPaginator } from '@angular/material/paginator';
 import type { User, UserSearch, UserSortColumn } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
-import { DatePipe } from '@angular/common';
 import { rem } from '@shared/utils/css.utils';
 import { UsersStore } from '../../store/users.store';
+import {
+  COLUMN_TO_SORT_MAP,
+  UserTableComponent
+} from '../user-table/user-table.component';
 
 type UserSearchFormType = {
   email: FormControl<string>;
@@ -46,14 +32,6 @@ type UserSearchFormType = {
   lastName: FormControl<string>;
   isAdmin: FormControl<string>;
   isActive: FormControl<string>;
-};
-
-const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
-  email: 'email',
-  name: 'firstName',
-  status: 'isActive',
-  role: 'isAdmin',
-  createdAt: 'createdAt'
 };
 
 @Component({
@@ -70,25 +48,9 @@ const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
     MatOption,
     MatButton,
     MatDivider,
-    MatTable,
-    MatSort,
-    MatColumnDef,
-    MatHeaderCell,
-    MatCell,
-    MatCellDef,
-    MatHeaderCellDef,
-    MatTooltip,
-    MatChip,
-    MatIconButton,
-    RouterLink,
-    MatHeaderRow,
-    MatRow,
-    MatHeaderRowDef,
-    MatRowDef,
     MatInput,
     MatLabel,
-    MatPaginator,
-    DatePipe
+    UserTableComponent
   ],
   templateUrl: './user-search.component.html',
   styleUrl: './user-search.component.scss',
@@ -115,16 +77,6 @@ export class UserSearchComponent {
   readonly searchTotalUsers = this.#usersStore.searchTotalUsers;
   readonly searchCurrentPage = this.#usersStore.searchCurrentPage;
   readonly searchPageSize = this.#usersStore.searchPageSize;
-
-  displayedColumns: string[] = [
-    'id',
-    'email',
-    'name',
-    'status',
-    'role',
-    'createdAt',
-    'actions'
-  ];
 
   onSubmit(): void {
     const formValues = this.searchForm.getRawValue();
@@ -166,7 +118,8 @@ export class UserSearchComponent {
     if (!sort.active || sort.direction === '') {
       this.#usersStore.setSearchSorting('createdAt', 'desc');
     } else {
-      const sortBy = COLUMN_TO_SORT_MAP[sort.active] ?? 'createdAt';
+      const sortBy =
+        (COLUMN_TO_SORT_MAP[sort.active] as UserSortColumn) ?? 'createdAt';
       this.#usersStore.setSearchSorting(sortBy, sort.direction);
     }
     this.#reSearch();

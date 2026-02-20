@@ -17,13 +17,14 @@ import type { FormControl, FormGroup } from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatInput } from '@angular/material/input';
 import { MatIcon } from '@angular/material/icon';
-import { MatButton, MatIconButton } from '@angular/material/button';
+import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 
 type RegisterFormType = {
   email: FormControl<string>;
@@ -44,12 +45,12 @@ type RegisterFormType = {
     ReactiveFormsModule,
     MatInput,
     MatIcon,
-    MatIconButton,
     MatButton,
     MatError,
     MatProgressSpinner,
     MatCardActions,
-    RouterLink
+    RouterLink,
+    PasswordToggleComponent
   ],
   templateUrl: './register.component.html',
   styleUrl: './register.component.scss',
@@ -63,7 +64,6 @@ export class RegisterComponent {
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly showPassword = signal(false);
 
   protected readonly appRouteSegmentEnum = AppRouteSegmentEnum;
 
@@ -86,10 +86,6 @@ export class RegisterComponent {
         nonNullable: true
       })
     });
-
-  togglePasswordVisibility(): void {
-    this.showPassword.update((prev) => !prev);
-  }
 
   onSubmit(): void {
     if (this.registerForm.invalid) return;

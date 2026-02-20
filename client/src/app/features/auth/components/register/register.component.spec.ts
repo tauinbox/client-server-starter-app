@@ -100,14 +100,6 @@ describe('RegisterComponent', () => {
     });
   });
 
-  describe('togglePasswordVisibility', () => {
-    it('should toggle showPassword signal', () => {
-      expect(component['showPassword']()).toBe(false);
-      component.togglePasswordVisibility();
-      expect(component['showPassword']()).toBe(true);
-    });
-  });
-
   describe('onSubmit', () => {
     const validForm = {
       email: 'test@example.com',

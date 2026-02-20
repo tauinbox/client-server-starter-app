@@ -114,21 +114,12 @@
             <input
               matInput
               autocomplete="off"
-              [type]="showPassword() ? 'text' : 'password'"
+              [type]="pwdToggle.show() ? 'text' : 'password'"
               formControlName="password"
               placeholder="Leave blank to keep current password"
             />
             <mat-icon matPrefix>lock</mat-icon>
-            <button
-              mat-icon-button
-              matSuffix
-              type="button"
-              (click)="togglePasswordVisibility()"
-            >
-              <mat-icon>{{
-                showPassword() ? 'visibility_off' : 'visibility'
-              }}</mat-icon>
-            </button>
+            <app-password-toggle #pwdToggle />
             @if (
               profileForm.get('password')?.invalid &&
               profileForm.get('password')?.touched
@@ -143,22 +134,13 @@
               <input
                 matInput
                 autocomplete="off"
-                [type]="showConfirmPassword() ? 'text' : 'password'"
+                [type]="confirmPwdToggle.show() ? 'text' : 'password'"
                 formControlName="confirmPassword"
                 [errorStateMatcher]="confirmPasswordErrorMatcher"
                 placeholder="Confirm new password"
               />
               <mat-icon matPrefix>lock</mat-icon>
-              <button
-                mat-icon-button
-                matSuffix
-                type="button"
-                (click)="toggleConfirmPasswordVisibility()"
-              >
-                <mat-icon>{{
-                  showConfirmPassword() ? 'visibility_off' : 'visibility'
-                }}</mat-icon>
-              </button>
+              <app-password-toggle #confirmPwdToggle />
               <mat-error>Passwords do not match</mat-error>
             </mat-form-field>
           }

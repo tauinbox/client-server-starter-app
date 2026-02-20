@@ -242,13 +242,4 @@ describe('ProfileComponent', () => {
       );
     });
   });
-
-  describe('togglePasswordVisibility', () => {
-    it('should toggle showPassword signal', () => {
-      fixture.detectChanges();
-      expect(component['showPassword']()).toBe(false);
-      component.togglePasswordVisibility();
-      expect(component['showPassword']()).toBe(true);
-    });
-  });
 });

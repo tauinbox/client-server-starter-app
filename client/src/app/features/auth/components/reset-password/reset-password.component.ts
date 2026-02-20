@@ -22,13 +22,14 @@ import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
 import type { ErrorStateMatcher } from '@angular/material/core';
 import { MatInput } from '@angular/material/input';
 import { MatIcon } from '@angular/material/icon';
-import { MatButton, MatIconButton } from '@angular/material/button';
+import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
+import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 
 type ResetPasswordFormType = {
   password: FormControl<string>;
@@ -56,10 +57,10 @@ function passwordsMatchValidator(
     MatFormField,
     MatInput,
     MatIcon,
-    MatIconButton,
     MatButton,
     MatProgressSpinner,
-    RouterLink
+    RouterLink,
+    PasswordToggleComponent
   ],
   templateUrl: './reset-password.component.html',
   styleUrl: './reset-password.component.scss',
@@ -80,8 +81,6 @@ export class ResetPasswordComponent implements OnInit {
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly showPassword = signal(false);
-  protected readonly showConfirmPassword = signal(false);
   protected readonly invalidToken = signal(false);
 
   #token = '';
@@ -107,14 +106,6 @@ export class ResetPasswordComponent implements OnInit {
       this.invalidToken.set(true);
       this.error.set('No reset token provided.');
     }
-  }
-
-  togglePasswordVisibility(): void {
-    this.showPassword.update((prev) => !prev);
-  }
-
-  toggleConfirmPasswordVisibility(): void {
-    this.showConfirmPassword.update((prev) => !prev);
   }
 
   onSubmit(): void {
