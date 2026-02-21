@@ -4,7 +4,12 @@
     <mat-card-header>
       <mat-card-title>Edit User</mat-card-title>
       <div class="spacer"></div>
-      <button mat-icon-button color="primary" [routerLink]="['/users', id()]">
+      <button
+        mat-icon-button
+        color="primary"
+        [routerLink]="['/users', id()]"
+        aria-label="Back to user detail"
+      >
         <mat-icon>arrow_back</mat-icon>
       </button>
     </mat-card-header>
@@ -123,7 +128,7 @@
           }
 
           @if (error()) {
-            <div class="error-message">
+            <div class="error-message" role="alert">
               {{ error() }}
             </div>
           }

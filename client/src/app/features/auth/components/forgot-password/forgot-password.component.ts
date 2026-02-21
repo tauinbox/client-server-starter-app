@@ -3,7 +3,9 @@ import {
   Component,
   DestroyRef,
   inject,
-  signal
+  signal,
+  ViewChild,
+  type ElementRef
 } from '@angular/core';
 import {
   MatCard,
@@ -54,6 +56,8 @@ export class ForgotPasswordComponent {
   readonly #authService = inject(AuthService);
   readonly #destroyRef = inject(DestroyRef);
 
+  @ViewChild('successHeading') successHeading?: ElementRef<HTMLElement>;
+
   protected readonly loading = signal(false);
   protected readonly success = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -78,6 +82,7 @@ export class ForgotPasswordComponent {
         next: () => {
           this.loading.set(false);
           this.success.set(true);
+          setTimeout(() => this.successHeading?.nativeElement.focus());
         },
         error: () => {
           this.loading.set(false);

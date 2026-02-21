@@ -6,7 +6,12 @@ import { MatIconButton } from '@angular/material/button';
   selector: 'app-password-toggle',
   imports: [MatIcon, MatIconButton],
   template: `
-    <button mat-icon-button type="button" (click)="toggle()">
+    <button
+      mat-icon-button
+      type="button"
+      (click)="toggle()"
+      [attr.aria-label]="show() ? 'Hide password' : 'Show password'"
+    >
       <mat-icon>{{ show() ? 'visibility_off' : 'visibility' }}</mat-icon>
     </button>
   `,
