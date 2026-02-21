@@ -157,6 +157,10 @@ Edit `.env` with your database credentials and settings:
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
 | `SMTP_FROM` | `noreply@example.com` | Default "from" address for emails |
+| `ADMIN_EMAIL` | - | Email for the initial admin user (seeded on startup; skip if empty) |
+| `ADMIN_PASSWORD` | - | Password for the initial admin user |
+| `ADMIN_FIRST_NAME` | `Admin` | First name for the initial admin user |
+| `ADMIN_LAST_NAME` | `User` | Last name for the initial admin user |
 
 ### 3. Set up the database
 
@@ -198,6 +202,44 @@ Open http://localhost:4200 in your browser.
 **Mock server credentials:**
 - Admin: `admin@example.com` / `Password1`
 - User: `user@example.com` / `Password1`
+
+## Docker Deployment
+
+The project ships with Dockerfiles and a Compose file for production deployment.
+
+### Build and run
+
+```bash
+# Build all images
+docker-compose build
+
+# Start all services (PostgreSQL, server, client)
+docker-compose up -d
+```
+
+Services:
+- **db** — postgres:16-alpine, persistent named volume
+- **server** — NestJS API on port 3000; entrypoint runs migrations, optional admin seed, then starts the server
+- **client** — Angular SPA served by nginx on port 4200 (maps to container port 80); built with `--base-href /nexus/`
+
+### Docker environment variables
+
+In addition to the standard server env vars, set these in `server/.env` to provision an initial admin account on first startup:
+
+```
+ADMIN_EMAIL=admin@yourdomain.com
+ADMIN_PASSWORD=YourSecurePass1
+ADMIN_FIRST_NAME=Admin
+ADMIN_LAST_NAME=User
+```
+
+The admin seeder is idempotent — it skips creation if the user already exists and does nothing if `ADMIN_EMAIL` is empty.
+
+### Deploy pipeline
+
+`.github/workflows/deploy.yml` — triggered manually (`workflow_dispatch`) or on push to `master`. Builds and pushes Docker images to a container registry.
+
+---
 
 ## API Documentation
 

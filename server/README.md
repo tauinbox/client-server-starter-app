@@ -69,6 +69,10 @@ Copy `.env.example` to `.env` and configure:
 | `CLIENT_URL` | `http://localhost:4200` | Client URL for OAuth callback redirects |
 | `EXTERNAL_API` | - | Third-party API URL for feature config |
 | `EXTERNAL_API_TOKEN` | - | API token for external service |
+| `ADMIN_EMAIL` | - | Email for the initial admin user (created on startup if not exists; skip if empty) |
+| `ADMIN_PASSWORD` | - | Password for the initial admin user |
+| `ADMIN_FIRST_NAME` | `Admin` | First name for the initial admin user |
+| `ADMIN_LAST_NAME` | `User` | Last name for the initial admin user |
 | `SMTP_HOST` | - | SMTP server host (if unset, emails logged to console) |
 | `SMTP_PORT` | `587` | SMTP server port |
 | `SMTP_USER` | - | SMTP username |
@@ -166,6 +170,28 @@ Four tables managed via TypeORM migrations:
 | `feature` | Auto-increment PK, name, timestamps |
 
 Migration and seed commands operate on compiled JS in `dist/` — always run `npm run build` first.
+
+## Docker
+
+A multi-stage `Dockerfile` is provided for production builds.
+
+**Build stages:**
+1. **deps** — installs production `node_modules` only (with `npm ci --omit=dev`)
+2. **builder** — installs all deps + compiles TypeScript (`nest build`) including `shared/`
+3. **runner** — copies `dist/` and production `node_modules`, runs `docker-entrypoint.sh`
+
+**`docker-entrypoint.sh`** (executed on container start):
+```sh
+typeorm migration:run      # Apply pending migrations
+node dist/server/src/seed-admin.js   # Create admin user if ADMIN_EMAIL set
+exec node dist/server/src/main       # Start NestJS
+```
+
+The admin seeder (`src/seed-admin.ts`) reads `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_FIRST_NAME`, `ADMIN_LAST_NAME` from the environment. It is idempotent — skips if the user already exists or if `ADMIN_EMAIL` is not set.
+
+Use `docker-compose.yml` at the repo root to run the full stack (db + server + client).
+
+---
 
 ## API
 

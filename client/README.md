@@ -145,6 +145,19 @@ npm run test:e2e           # Headless
 npm run test:e2e:ui        # Interactive UI
 ```
 
+## Docker
+
+A 2-stage `Dockerfile` is provided for production builds:
+
+1. **builder** — installs deps (`npm ci --ignore-scripts`), builds Angular with `NODE_OPTIONS="--max-old-space-size=2048" npm run build -- --base-href /nexus/`
+2. **runner** — copies built assets to nginx:1.27-alpine with `client/nginx.conf` (gzip enabled, HTML5 pushState support via `try_files`)
+
+The Angular app is served from `/nexus/` base href. All internal API URLs must use absolute paths starting with `/` (e.g. `/api/v1/users`) so they resolve to the server root, not to `/nexus/api/v1/users`.
+
+Use `docker-compose.yml` at the repo root to run the full stack.
+
+---
+
 ## Versioning
 
 The version string is generated at build/start/test time by `scripts/version.mjs`:
