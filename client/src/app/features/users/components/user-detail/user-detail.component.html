@@ -5,7 +5,12 @@
       <mat-card-title>User Details</mat-card-title>
       <div class="spacer"></div>
       @if (u?.isAdmin) {
-        <button mat-icon-button color="primary" routerLink="/users">
+        <button
+          mat-icon-button
+          color="primary"
+          routerLink="/users"
+          aria-label="Back to users list"
+        >
           <mat-icon>arrow_back</mat-icon>
         </button>
       }

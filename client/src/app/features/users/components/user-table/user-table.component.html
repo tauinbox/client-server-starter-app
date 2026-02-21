@@ -69,6 +69,9 @@
           color="primary"
           [routerLink]="['/users', user.id]"
           matTooltip="View Details"
+          [attr.aria-label]="
+            'View details for ' + user.firstName + ' ' + user.lastName
+          "
         >
           <mat-icon>visibility</mat-icon>
         </button>
@@ -77,6 +80,7 @@
           color="accent"
           [routerLink]="['/users', user.id, 'edit']"
           matTooltip="Edit User"
+          [attr.aria-label]="'Edit ' + user.firstName + ' ' + user.lastName"
         >
           <mat-icon>edit</mat-icon>
         </button>
@@ -85,6 +89,7 @@
           color="warn"
           (click)="deleteUser.emit(user)"
           matTooltip="Delete User"
+          [attr.aria-label]="'Delete ' + user.firstName + ' ' + user.lastName"
         >
           <mat-icon>delete</mat-icon>
         </button>
