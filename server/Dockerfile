@@ -1,12 +1,12 @@
 # Stage 1: install production dependencies
-FROM node:18-alpine AS deps
+FROM node:22-alpine AS deps
 RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY server/package*.json ./server/
 RUN cd server && npm ci --omit=dev
 
 # Stage 2: build
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY server/package*.json ./server/
@@ -16,7 +16,7 @@ COPY server/ ./server/
 RUN cd server && npm run build
 
 # Stage 3: runtime
-FROM node:18-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 COPY --from=deps /app/server/node_modules ./server/node_modules
 COPY --from=builder /app/server/dist ./server/dist
