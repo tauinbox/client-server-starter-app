@@ -12,6 +12,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { GlobalExceptionFilter } from './filters';
 import { MailModule } from '../mail/mail.module';
+import { HealthModule } from './health/health.module';
 
 @Module({})
 export class CoreModule {
@@ -33,7 +34,8 @@ export class CoreModule {
         MailModule,
         AuthModule,
         UsersModule,
-        FeatureModule
+        FeatureModule,
+        HealthModule
       ],
       providers: [
         {
