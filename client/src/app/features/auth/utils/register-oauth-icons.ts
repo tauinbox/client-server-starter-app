@@ -10,7 +10,7 @@ export function registerOAuthIcons(
   for (const icon of OAUTH_ICONS) {
     iconRegistry.addSvgIcon(
       icon,
-      sanitizer.bypassSecurityTrustResourceUrl(`/assets/icons/${icon}.svg`)
+      sanitizer.bypassSecurityTrustResourceUrl(`assets/icons/${icon}.svg`)
     );
   }
 }
