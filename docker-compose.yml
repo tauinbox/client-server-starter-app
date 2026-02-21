@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  server:
+    image: ${SERVER_IMAGE:-nexus-server:latest}
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    env_file: server/.env
+    environment:
+      DB_HOST: db
+      ENVIRONMENT: production
+    ports:
+      - "3000:3000"
+    volumes:
+      - uploads:/app/server/dist/server/public/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  client:
+    image: ${CLIENT_IMAGE:-nexus-client:latest}
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    ports:
+      - "4200:80"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  uploads:
