@@ -5,7 +5,7 @@ COPY client/package*.json ./client/
 RUN cd client && npm ci
 COPY shared/ ./shared/
 COPY client/ ./client/
-RUN cd client && npm run build
+RUN cd client && npm run build -- --base-href /nexus/
 
 # Stage 2: runtime
 FROM nginx:1.27-alpine AS runner
