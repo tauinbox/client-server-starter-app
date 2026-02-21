@@ -38,7 +38,7 @@ export async function loginViaUi(
 
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('main').getByRole('button', { name: 'Login' }).click();
   await page.waitForURL(/.*\/profile$/);
 }

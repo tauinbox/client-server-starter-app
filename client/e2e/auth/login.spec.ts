@@ -6,7 +6,7 @@ test.describe('Login page', () => {
 
     const main = page.getByRole('main');
     await expect(page.getByLabel('Email')).toBeVisible();
-    await expect(page.getByLabel('Password')).toBeVisible();
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
     await expect(main.getByRole('button', { name: 'Login' })).toBeVisible();
   });
 
@@ -28,7 +28,7 @@ test.describe('Login page', () => {
 
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('user@example.com');
-    await page.getByLabel('Password').fill('Password1');
+    await page.getByLabel('Password', { exact: true }).fill('Password1');
     await main.getByRole('button', { name: 'Login' }).click();
 
     await expect(page).toHaveURL(/.*\/profile$/);
@@ -43,7 +43,7 @@ test.describe('Login page', () => {
 
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('wrong@example.com');
-    await page.getByLabel('Password').fill('wrongpassword');
+    await page.getByLabel('Password', { exact: true }).fill('wrongpassword');
     await main.getByRole('button', { name: 'Login' }).click();
 
     await expect(page.locator('.error-message')).toBeVisible();

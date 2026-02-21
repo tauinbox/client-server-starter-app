@@ -11,7 +11,7 @@ test.describe('Register page', () => {
     await expect(page.getByLabel('Email')).toBeVisible();
     await expect(page.getByLabel('First Name')).toBeVisible();
     await expect(page.getByLabel('Last Name')).toBeVisible();
-    await expect(page.getByLabel('Password')).toBeVisible();
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
     await expect(main.getByRole('button', { name: 'Register' })).toBeVisible();
   });
 
@@ -35,7 +35,7 @@ test.describe('Register page', () => {
     await page.getByLabel('Email').fill('not-an-email');
     await page.getByLabel('First Name').fill('John');
     await page.getByLabel('Last Name').fill('Doe');
-    await page.getByLabel('Password').fill('password123');
+    await page.getByLabel('Password', { exact: true }).fill('password123');
 
     await expect(main.getByRole('button', { name: 'Register' })).toBeDisabled();
   });
@@ -50,7 +50,7 @@ test.describe('Register page', () => {
     await page.getByLabel('Email').fill('test@example.com');
     await page.getByLabel('First Name').fill('John');
     await page.getByLabel('Last Name').fill('Doe');
-    await page.getByLabel('Password').fill('short');
+    await page.getByLabel('Password', { exact: true }).fill('short');
 
     await expect(main.getByRole('button', { name: 'Register' })).toBeDisabled();
   });
@@ -65,7 +65,7 @@ test.describe('Register page', () => {
     await page.getByLabel('Email').fill('test@example.com');
     await page.getByLabel('First Name').fill('John');
     await page.getByLabel('Last Name').fill('Doe');
-    await page.getByLabel('Password').fill('password123');
+    await page.getByLabel('Password', { exact: true }).fill('password123');
 
     await expect(main.getByRole('button', { name: 'Register' })).toBeEnabled();
   });
@@ -80,7 +80,7 @@ test.describe('Register page', () => {
     await page.getByLabel('Email').click();
     await page.getByLabel('First Name').click();
     await page.getByLabel('Last Name').click();
-    await page.getByLabel('Password').click();
+    await page.getByLabel('Password', { exact: true }).click();
     // Blur last field
     await page.getByLabel('Email').click();
 
@@ -110,7 +110,7 @@ test.describe('Register page', () => {
   }) => {
     await page.goto('/register');
 
-    await page.getByLabel('Password').fill('short');
+    await page.getByLabel('Password', { exact: true }).fill('short');
     await page.getByLabel('Email').click();
 
     await expect(
@@ -128,7 +128,7 @@ test.describe('Register page', () => {
     await page.getByLabel('Email').fill('newuser@example.com');
     await page.getByLabel('First Name').fill('Jane');
     await page.getByLabel('Last Name').fill('Smith');
-    await page.getByLabel('Password').fill('Password1');
+    await page.getByLabel('Password', { exact: true }).fill('Password1');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(page).toHaveURL(/.*\/login\?registered=pending-verification$/);
@@ -148,7 +148,7 @@ test.describe('Register page', () => {
     await page.getByLabel('Email').fill('admin@example.com');
     await page.getByLabel('First Name').fill('John');
     await page.getByLabel('Last Name').fill('Doe');
-    await page.getByLabel('Password').fill('Password1');
+    await page.getByLabel('Password', { exact: true }).fill('Password1');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(
@@ -177,7 +177,7 @@ test.describe('Register page', () => {
     await page.getByLabel('Email').fill('test@example.com');
     await page.getByLabel('First Name').fill('John');
     await page.getByLabel('Last Name').fill('Doe');
-    await page.getByLabel('Password').fill('Password1');
+    await page.getByLabel('Password', { exact: true }).fill('Password1');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(page.locator('.error-message')).toBeVisible();

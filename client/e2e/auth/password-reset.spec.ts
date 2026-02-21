@@ -88,7 +88,7 @@ test.describe('Password reset', () => {
     // Login with the new password
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('user@example.com');
-    await page.getByLabel('Password').fill('NewPassword123');
+    await page.getByLabel('Password', { exact: true }).fill('NewPassword123');
     await main.getByRole('button', { name: 'Login' }).click();
 
     await expect(page).toHaveURL(/.*\/profile$/);
@@ -167,7 +167,7 @@ test.describe('Password reset', () => {
     await page.goto('/login');
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('user@example.com');
-    await page.getByLabel('Password').fill('Password1');
+    await page.getByLabel('Password', { exact: true }).fill('Password1');
     await main.getByRole('button', { name: 'Login' }).click();
 
     // Should fail

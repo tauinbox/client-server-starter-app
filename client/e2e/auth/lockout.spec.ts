@@ -12,14 +12,14 @@ test.describe('Account lockout', () => {
     // Enter 5 wrong passwords
     for (let i = 0; i < 5; i++) {
       await page.getByLabel('Email').fill('user@example.com');
-      await page.getByLabel('Password').fill('WrongPassword');
+      await page.getByLabel('Password', { exact: true }).fill('WrongPassword');
       await main.getByRole('button', { name: 'Login' }).click();
 
       if (i < 4) {
         // First 4 attempts should show "Invalid credentials"
         await expect(page.getByText('Invalid credentials')).toBeVisible();
         // Clear error state for next attempt
-        await page.getByLabel('Password').clear();
+        await page.getByLabel('Password', { exact: true }).clear();
       }
     }
 
@@ -56,7 +56,7 @@ test.describe('Account lockout', () => {
 
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('locked@example.com');
-    await page.getByLabel('Password').fill('Password1');
+    await page.getByLabel('Password', { exact: true }).fill('Password1');
     await main.getByRole('button', { name: 'Login' }).click();
 
     await expect(page.getByText(/temporarily locked/i)).toBeVisible();

@@ -11,7 +11,7 @@ test.describe('Email verification', () => {
     await page.getByLabel('Email').fill('verify-test@example.com');
     await page.getByLabel('First Name').fill('Verify');
     await page.getByLabel('Last Name').fill('Test');
-    await page.getByLabel('Password').fill('Password1');
+    await page.getByLabel('Password', { exact: true }).fill('Password1');
     await main.getByRole('button', { name: 'Register' }).click();
 
     // Should redirect to login with pending-verification
@@ -59,7 +59,7 @@ test.describe('Email verification', () => {
 
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('unverified@example.com');
-    await page.getByLabel('Password').fill('Password1');
+    await page.getByLabel('Password', { exact: true }).fill('Password1');
     await main.getByRole('button', { name: 'Login' }).click();
 
     // Should show email not verified error
@@ -94,7 +94,7 @@ test.describe('Email verification', () => {
 
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('resend@example.com');
-    await page.getByLabel('Password').fill('Password1');
+    await page.getByLabel('Password', { exact: true }).fill('Password1');
     await main.getByRole('button', { name: 'Login' }).click();
 
     // Wait for verification actions to appear
@@ -167,7 +167,7 @@ test.describe('Email verification', () => {
 
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('verifythenlogin@example.com');
-    await page.getByLabel('Password').fill('Password1');
+    await page.getByLabel('Password', { exact: true }).fill('Password1');
     await main.getByRole('button', { name: 'Login' }).click();
 
     await expect(page).toHaveURL(/.*\/profile$/);
