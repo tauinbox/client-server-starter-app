@@ -5,7 +5,7 @@ COPY client/package*.json ./client/
 RUN cd client && npm ci --ignore-scripts
 COPY shared/ ./shared/
 COPY client/ ./client/
-RUN cd client && npm run build -- --base-href /nexus/
+RUN cd client && NODE_OPTIONS="--max-old-space-size=2048" npm run build -- --base-href /nexus/
 
 # Stage 2: runtime
 FROM nginx:1.27-alpine AS runner
