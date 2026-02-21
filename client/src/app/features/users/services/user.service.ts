@@ -10,7 +10,7 @@ import type {
   UserSearch
 } from '../models/user.types';
 
-export const USERS_API_V1 = 'api/v1/users';
+export const USERS_API_V1 = '/api/v1/users';
 
 @Injectable({
   providedIn: 'root'
