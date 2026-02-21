@@ -2,7 +2,7 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 COPY client/package*.json ./client/
-RUN cd client && npm ci
+RUN cd client && npm ci --ignore-scripts
 COPY shared/ ./shared/
 COPY client/ ./client/
 RUN cd client && npm run build -- --base-href /nexus/
