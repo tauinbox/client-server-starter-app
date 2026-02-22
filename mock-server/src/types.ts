@@ -28,12 +28,39 @@ export interface OAuthAccount {
   createdAt: string;
 }
 
+export interface MockRole {
+  id: string;
+  name: string;
+  description: string | null;
+  isSystem: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MockPermission {
+  id: string;
+  resource: string;
+  action: string;
+  description: string | null;
+  createdAt: string;
+}
+
+export interface MockRolePermission {
+  id: string;
+  roleId: string;
+  permissionId: string;
+  conditions: unknown | null;
+}
+
 export interface State {
   users: Map<string, MockUser>;
   oauthAccounts: Map<string, OAuthAccount[]>;
   refreshTokens: Map<string, string>;
   emailVerificationTokens: Map<string, string>; // token -> userId
   passwordResetTokens: Map<string, string>; // token -> userId
+  roles: Map<string, MockRole>;
+  permissions: Map<string, MockPermission>;
+  rolePermissions: MockRolePermission[];
 }
 
 export interface AuthenticatedRequest extends Request {

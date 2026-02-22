@@ -32,14 +32,14 @@ test.describe('User Edit page', () => {
     await expect(page.getByLabel('Active')).toBeVisible();
   });
 
-  test('should not show status checkboxes when logged in as non-admin', async ({
+  test('should redirect non-admin to forbidden on edit page', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url, {});
     await page.goto('/users/3/edit');
 
-    await expect(page.getByLabel('Active')).toBeHidden();
+    await expect(page).toHaveURL(/.*\/forbidden$/);
   });
 
   test('should show "Delete User" button for admin editing another user', async ({
@@ -68,16 +68,14 @@ test.describe('User Edit page', () => {
     ).toBeHidden();
   });
 
-  test('should not show "Delete User" button for non-admin', async ({
+  test('should redirect non-admin to forbidden on edit self', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url, {});
     await page.goto('/users/100/edit');
 
-    await expect(
-      page.getByRole('button', { name: 'Delete User' })
-    ).toBeHidden();
+    await expect(page).toHaveURL(/.*\/forbidden$/);
   });
 
   test('should disable Save button when form is pristine', async ({

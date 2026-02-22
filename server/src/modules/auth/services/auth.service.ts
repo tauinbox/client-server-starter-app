@@ -86,15 +86,19 @@ export class AuthService {
     const isMatch = await bcrypt.compare(password, hashToCompare);
 
     if (!user || !user.isActive || !user.password || !isMatch) {
-      // Handle failed login attempt
+      // Handle failed login attempt atomically to prevent race conditions
       if (user && user.isActive && user.password) {
-        await this.usersService.incrementFailedAttempts(user.id);
-        const updatedUser = await this.usersService.findOne(user.id);
+        const { failedLoginAttempts, lockedUntil } =
+          await this.usersService.incrementFailedAttemptsAndLockIfNeeded(
+            user.id,
+            MAX_FAILED_ATTEMPTS,
+            LOCKOUT_DURATION_MS
+          );
 
-        if (updatedUser.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
-          const lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
-          await this.usersService.lockAccount(user.id, lockedUntil);
-          const retryAfter = Math.ceil(LOCKOUT_DURATION_MS / 1000);
+        if (failedLoginAttempts >= MAX_FAILED_ATTEMPTS && lockedUntil) {
+          const retryAfter = Math.ceil(
+            (lockedUntil.getTime() - Date.now()) / 1000
+          );
           throw new HttpException(
             {
               message:
@@ -506,16 +510,25 @@ export class AuthService {
       throw new UnauthorizedException('User account is deactivated');
     }
 
-    await this.refreshTokenService.revokeToken(tokenDoc.id);
-
     const roles = await this.permissionService.getRoleNamesForUser(user.id);
     const tokens = this.generateTokens(user.id, user.email, roles);
 
-    await this.refreshTokenService.createRefreshToken(
-      user.id,
-      tokens.refresh_token,
-      parseInt(this.configService.get('JWT_REFRESH_EXPIRATION') || '604800', 10)
+    const expiresIn = parseInt(
+      this.configService.get('JWT_REFRESH_EXPIRATION') || '604800',
+      10
     );
+    const expiresAt = new Date(Date.now() + expiresIn * 1000);
+
+    // Revoke old token and create new one atomically to prevent
+    // concurrent requests from producing multiple valid sessions
+    await withTransaction(this.dataSource, async (manager) => {
+      await manager.update(RefreshToken, tokenDoc.id, { revoked: true });
+      await manager.save(RefreshToken, {
+        userId: user.id,
+        token: hashToken(tokens.refresh_token),
+        expiresAt
+      });
+    });
 
     const { password: _, ...userWithoutPassword } = user;
 

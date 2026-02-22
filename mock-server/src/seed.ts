@@ -1,6 +1,12 @@
 import { faker } from '@faker-js/faker';
 import { createMockUser, createOAuthAccount } from './factories';
-import type { MockUser, OAuthAccount } from './types';
+import type {
+  MockUser,
+  OAuthAccount,
+  MockRole,
+  MockPermission,
+  MockRolePermission
+} from './types';
 
 // Fixed seed for reproducible data across restarts
 faker.seed(12345);
@@ -120,6 +126,94 @@ function generateOAuthAccounts(): Map<string, OAuthAccount[]> {
   return accounts;
 }
 
+function generateRoles(): MockRole[] {
+  return [
+    {
+      id: 'role-admin',
+      name: 'admin',
+      description: 'System administrator with full access',
+      isSystem: true,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z'
+    },
+    {
+      id: 'role-user',
+      name: 'user',
+      description: 'Regular user with basic access',
+      isSystem: true,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z'
+    }
+  ];
+}
+
+function generatePermissions(): MockPermission[] {
+  const now = '2025-01-01T00:00:00.000Z';
+  const perms: Array<[string, string, string]> = [
+    ['users', 'create', 'Create new users'],
+    ['users', 'read', 'View user details'],
+    ['users', 'update', 'Update user information'],
+    ['users', 'delete', 'Delete users'],
+    ['users', 'list', 'List all users'],
+    ['users', 'search', 'Search users'],
+    ['profile', 'read', 'View own profile'],
+    ['profile', 'update', 'Update own profile'],
+    ['roles', 'create', 'Create new roles'],
+    ['roles', 'read', 'View roles'],
+    ['roles', 'update', 'Update roles'],
+    ['roles', 'delete', 'Delete roles'],
+    ['roles', 'assign', 'Assign roles to users']
+  ];
+
+  return perms.map(([resource, action, description], i) => ({
+    id: `perm-${i + 1}`,
+    resource,
+    action,
+    description,
+    createdAt: now
+  }));
+}
+
+function generateRolePermissions(
+  roles: MockRole[],
+  permissions: MockPermission[]
+): MockRolePermission[] {
+  const result: MockRolePermission[] = [];
+  const adminRole = roles.find((r) => r.name === 'admin');
+  const userRole = roles.find((r) => r.name === 'user');
+  let id = 1;
+
+  // Admin gets all permissions
+  if (adminRole) {
+    for (const perm of permissions) {
+      result.push({
+        id: `rp-${id++}`,
+        roleId: adminRole.id,
+        permissionId: perm.id,
+        conditions: null
+      });
+    }
+  }
+
+  // User gets profile permissions only
+  if (userRole) {
+    for (const perm of permissions.filter((p) => p.resource === 'profile')) {
+      result.push({
+        id: `rp-${id++}`,
+        roleId: userRole.id,
+        permissionId: perm.id,
+        conditions: null
+      });
+    }
+  }
+
+  return result;
+}
+
 export const seedUsers: MockUser[] = generateUsers();
 export const seedOAuthAccounts: Map<string, OAuthAccount[]> =
   generateOAuthAccounts();
+export const seedRoles: MockRole[] = generateRoles();
+export const seedPermissions: MockPermission[] = generatePermissions();
+export const seedRolePermissions: MockRolePermission[] =
+  generateRolePermissions(seedRoles, seedPermissions);

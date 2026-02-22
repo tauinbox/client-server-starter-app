@@ -42,8 +42,7 @@ describe('AuthService', () => {
     findOne: jest.Mock;
     create: jest.Mock;
     createOAuthUser: jest.Mock;
-    incrementFailedAttempts: jest.Mock;
-    lockAccount: jest.Mock;
+    incrementFailedAttemptsAndLockIfNeeded: jest.Mock;
     resetLoginAttempts: jest.Mock;
     setEmailVerificationToken: jest.Mock;
     findByEmailVerificationToken: jest.Mock;
@@ -148,8 +147,10 @@ describe('AuthService', () => {
       findOne: jest.fn(),
       create: jest.fn(),
       createOAuthUser: jest.fn(),
-      incrementFailedAttempts: jest.fn().mockResolvedValue(undefined),
-      lockAccount: jest.fn().mockResolvedValue(undefined),
+      incrementFailedAttemptsAndLockIfNeeded: jest.fn().mockResolvedValue({
+        failedLoginAttempts: 1,
+        lockedUntil: null
+      }),
       resetLoginAttempts: jest.fn().mockResolvedValue(undefined),
       setEmailVerificationToken: jest.fn().mockResolvedValue(undefined),
       findByEmailVerificationToken: jest.fn(),
@@ -240,10 +241,6 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException when password does not match', async () => {
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
-      mockUsersService.findOne.mockResolvedValue({
-        ...mockUser,
-        failedLoginAttempts: 1
-      });
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
       await expect(
@@ -316,10 +313,13 @@ describe('AuthService', () => {
     it('should lock account after 5 failed attempts', async () => {
       const userNearLockout = { ...mockUser, failedLoginAttempts: 4 };
       mockUsersService.findByEmail.mockResolvedValue(userNearLockout);
-      mockUsersService.findOne.mockResolvedValue({
-        ...userNearLockout,
-        failedLoginAttempts: 5
-      });
+      const lockedUntil = new Date(Date.now() + 900000);
+      mockUsersService.incrementFailedAttemptsAndLockIfNeeded.mockResolvedValue(
+        {
+          failedLoginAttempts: 5,
+          lockedUntil
+        }
+      );
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
       try {
@@ -330,13 +330,9 @@ describe('AuthService', () => {
         expect((error as HttpException).getStatus()).toBe(HttpStatus.LOCKED);
       }
 
-      expect(mockUsersService.incrementFailedAttempts).toHaveBeenCalledWith(
-        'user-1'
-      );
-      expect(mockUsersService.lockAccount).toHaveBeenCalledWith(
-        'user-1',
-        expect.any(Date)
-      );
+      expect(
+        mockUsersService.incrementFailedAttemptsAndLockIfNeeded
+      ).toHaveBeenCalledWith('user-1', expect.any(Number), expect.any(Number));
     });
 
     it('should throw 403 when email is not verified', async () => {
@@ -653,7 +649,7 @@ describe('AuthService', () => {
       isExpired: () => false
     };
 
-    it('should issue new tokens and revoke old token', async () => {
+    it('should issue new tokens and revoke old token atomically', async () => {
       mockRefreshTokenService.findByToken.mockResolvedValue(mockTokenDoc);
       mockUsersService.findOne.mockResolvedValue(mockUser);
 
@@ -662,14 +658,10 @@ describe('AuthService', () => {
       expect(mockRefreshTokenService.findByToken).toHaveBeenCalledWith(
         'valid-refresh-token'
       );
-      expect(mockRefreshTokenService.revokeToken).toHaveBeenCalledWith(
-        'token-1'
-      );
-      expect(mockRefreshTokenService.createRefreshToken).toHaveBeenCalledWith(
-        'user-1',
-        expect.any(String),
-        604800
-      );
+      // Revoke + create happen inside a transaction via manager
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockManager.update).toHaveBeenCalled();
+      expect(mockManager.save).toHaveBeenCalled();
       expect(result.tokens.access_token).toBe('mock-access-token');
       expect(typeof result.tokens.refresh_token).toBe('string');
       expect(result.tokens.expires_in).toBe(3600);

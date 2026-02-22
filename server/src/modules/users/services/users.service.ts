@@ -175,16 +175,35 @@ export class UsersService {
     return this.userRepository.save(user);
   }
 
-  async incrementFailedAttempts(userId: string): Promise<void> {
-    await this.userRepository.increment(
-      { id: userId },
-      'failedLoginAttempts',
-      1
-    );
-  }
+  async incrementFailedAttemptsAndLockIfNeeded(
+    userId: string,
+    maxAttempts: number,
+    lockDurationMs: number
+  ): Promise<{ failedLoginAttempts: number; lockedUntil: Date | null }> {
+    const result = await this.userRepository
+      .createQueryBuilder()
+      .update(User)
+      .set({
+        failedLoginAttempts: () => '"failed_login_attempts" + 1',
+        lockedUntil: () =>
+          `CASE WHEN "failed_login_attempts" + 1 >= ${maxAttempts} ` +
+          `THEN NOW() + INTERVAL '${lockDurationMs} milliseconds' ` +
+          `ELSE "locked_until" END`
+      })
+      .where('id = :userId', { userId })
+      .returning(['"failed_login_attempts"', '"locked_until"'])
+      .execute();
 
-  async lockAccount(userId: string, lockedUntil: Date): Promise<void> {
-    await this.userRepository.update(userId, { lockedUntil });
+    const raw = (
+      result.raw as {
+        failed_login_attempts: number;
+        locked_until: string | null;
+      }[]
+    )[0];
+    return {
+      failedLoginAttempts: raw.failed_login_attempts,
+      lockedUntil: raw.locked_until ? new Date(raw.locked_until) : null
+    };
   }
 
   async resetLoginAttempts(userId: string): Promise<void> {
