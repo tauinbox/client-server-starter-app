@@ -100,7 +100,6 @@ fullstack-starter-app/
 │       ├── middleware/      # Route handlers (auth, users, OAuth) + guards
 │       ├── helpers/        # Auth helper utilities
 │       └── control.routes.ts  # Test control API (reset, seed)
-└── doc/                    # Project documentation
 ```
 
 All three workspaces import from `@app/shared/*` path alias (maps to `../shared/src/*` in each workspace's `tsconfig.json`).
