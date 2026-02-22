@@ -14,3 +14,10 @@ export {
   ALLOWED_USER_SORT_COLUMNS,
   type UserSortColumn
 } from './user.constants';
+
+export {
+  PERMISSIONS,
+  type Permission,
+  SYSTEM_ROLES,
+  type SystemRole
+} from './permission.constants';

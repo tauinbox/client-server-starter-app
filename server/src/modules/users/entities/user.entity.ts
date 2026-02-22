@@ -2,10 +2,13 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinTable,
+  ManyToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
+import { Role } from '../../auth/entities/role.entity';
 
 @Entity('users')
 export class User {
@@ -30,6 +33,14 @@ export class User {
 
   @Column({ default: false })
   isAdmin: boolean;
+
+  @ManyToMany(() => Role, (role) => role.users)
+  @JoinTable({
+    name: 'user_roles',
+    joinColumn: { name: 'user_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'role_id', referencedColumnName: 'id' }
+  })
+  roles: Role[];
 
   @Column({ name: 'failed_login_attempts', default: 0 })
   failedLoginAttempts: number;

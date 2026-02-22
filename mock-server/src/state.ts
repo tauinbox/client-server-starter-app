@@ -1,3 +1,5 @@
+import type { ResolvedPermission } from '@app/shared/types';
+import { PERMISSIONS } from '@app/shared/constants';
 import type { MockUser, OAuthAccount, State } from './types';
 import { seedOAuthAccounts, seedUsers } from './seed';
 
@@ -47,6 +49,24 @@ export function addOAuthAccounts(
 ): void {
   const existing = state.oauthAccounts.get(userId) || [];
   state.oauthAccounts.set(userId, [...existing, ...accounts]);
+}
+
+const ALL_PERMISSIONS: ResolvedPermission[] = Object.values(PERMISSIONS).map(
+  (p) => {
+    const [resource, action] = p.split(':');
+    return { resource, action, permission: p, conditions: null };
+  }
+);
+
+const USER_PERMISSIONS: ResolvedPermission[] = ALL_PERMISSIONS.filter(
+  (p) => p.resource === 'profile'
+);
+
+export function getPermissionsForUser(user: MockUser): ResolvedPermission[] {
+  if (user.roles?.includes('admin')) {
+    return ALL_PERMISSIONS;
+  }
+  return USER_PERMISSIONS;
 }
 
 // Initialize on import

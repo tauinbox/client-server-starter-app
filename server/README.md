@@ -88,29 +88,36 @@ Copy `.env.example` to `.env` and configure:
 src/
 ├── common/
 │   ├── dtos/               # PaginationQueryDto, PaginatedResponseDto<T> (barrel export)
-│   └── utils/              # Shared utilities (escapeLikePattern, hashToken)
+│   └── utils/              # Shared utilities (escapeLikePattern, hashToken, withTransaction)
 └── modules/
 ├── core/                   # Dynamic root module
 │   ├── config/             # @nestjs/config, loads .env
 │   ├── cache/              # @nestjs/cache-manager
 │   ├── database/           # TypeORM + PostgreSQL config
 │   ├── filters/            # GlobalExceptionFilter (standardized error responses, DB error mapping)
+│   ├── health/             # HealthModule (GET /api/health, TypeORM DB ping)
 │   └── schedule/           # @nestjs/schedule for cron jobs
 ├── auth/
-│   ├── controllers/        # AuthController, OAuthController
+│   ├── controllers/        # AuthController (includes GET /permissions), OAuthController
 │   ├── services/           # AuthService, RefreshTokenService, OAuthAccountService, TokenCleanupService
-│   ├── strategies/         # LocalStrategy, JwtStrategy, GoogleStrategy, FacebookStrategy, VkStrategy
-│   ├── guards/             # LocalAuthGuard, JwtAuthGuard, RolesGuard, Google/Facebook/VkOAuthGuard
+│   ├── strategies/         # LocalStrategy, JwtStrategy (extracts roles), GoogleStrategy, FacebookStrategy, VkStrategy
+│   ├── guards/             # LocalAuthGuard, JwtAuthGuard, Google/Facebook/VkOAuthGuard
 │   ├── entities/           # RefreshToken, OAuthAccount
 │   ├── enums/              # OAuthProvider
 │   └── dto/                # LoginDto, RegisterDto, RefreshTokenDto, UpdateProfileDto, VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto
 ├── mail/
 │   └── mail.service.ts     # Email sending (verification, password reset)
+├── roles/
+│   ├── controllers/        # RolesController (CRUD + permission + user assignment at /api/v1/roles)
+│   ├── services/           # RoleService, PermissionService, PolicyEvaluatorService
+│   ├── entities/           # Role, Permission, RolePermission
+│   ├── guards/             # PermissionsGuard (resolves + checks permissions; admin bypasses)
+│   └── decorators/         # @RequirePermissions(), @Authorize() (composite: JwtAuthGuard + PermissionsGuard + RequirePermissions)
 ├── users/
-│   ├── controllers/        # UsersController (CRUD + search)
+│   ├── controllers/        # UsersController (CRUD + search, all endpoints use @Authorize(PERMISSIONS.*))
 │   ├── services/           # UsersService
-│   ├── entities/           # User entity
-│   └── dto/                # CreateUserDto, UpdateUserDto, UserResponseDto
+│   ├── entities/           # User entity (ManyToMany to Role via user_roles)
+│   └── dto/                # CreateUserDto, UpdateUserDto, UserResponseDto (includes roles: string[])
 └── feature/
     ├── controllers/        # FeatureController (CRUD, config, upload)
     ├── services/           # FeatureService
@@ -141,9 +148,11 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 ### Authentication
 
 - **LocalStrategy** — validates email/password via bcrypt on login
-- **JwtStrategy** — extracts and verifies Bearer token on protected routes
+- **JwtStrategy** — extracts and verifies Bearer token; extracts `roles[]` from payload, computes `isAdmin` from roles
 - **GoogleStrategy / FacebookStrategy / VkStrategy** — OAuth2 login (conditionally registered when env vars are set)
-- **RolesGuard** — checks `@Roles()` decorator for admin-only endpoints
+- **PermissionsGuard** — resolves user permissions (cached 5 min), checks required permissions from `@RequirePermissions()`; admin role bypasses all checks
+- **@Authorize() decorator** — composite: `JwtAuthGuard` + `PermissionsGuard` + `@RequirePermissions()`. Replaces `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` pattern
+- **JWT payload** — includes `roles: string[]` alongside `isAdmin` (kept for backward compatibility in transition period)
 - **Refresh tokens** — opaque 80-char hex tokens stored in DB (SHA-256 hashed), rotated on use
 - **OAuth accounts** — auto-link by email, manage linked providers, safety check on unlink
 - **Token cleanup** — daily cron removes expired tokens, weekly cron removes revoked+expired
@@ -164,9 +173,13 @@ Four tables managed via TypeORM migrations:
 
 | Table | Description |
 |-------|-------------|
-| `users` | UUID PK, email (unique), name, bcrypt password (nullable for OAuth-only), isAdmin, isActive, isEmailVerified, failedLoginAttempts, lockedUntil, verification/reset token fields |
+| `users` | UUID PK, email (unique), name, bcrypt password (nullable for OAuth-only), isAdmin, isActive, isEmailVerified, failedLoginAttempts, lockedUntil, verification/reset token fields; ManyToMany to roles via user_roles |
 | `oauth_accounts` | UUID PK, provider + provider_id (unique), FK to users (CASCADE) |
 | `refresh_tokens` | UUID PK, token (SHA-256 hashed), FK to users (CASCADE), expires_at, revoked |
+| `roles` | UUID PK, name (unique), description, isSystem flag |
+| `permissions` | UUID PK, resource + action (unique constraint) |
+| `role_permissions` | FK to roles + permissions, optional jsonb `conditions` |
+| `user_roles` | Join table: user_id + role_id (composite PK) |
 | `feature` | Auto-increment PK, name, timestamps |
 
 Migration and seed commands operate on compiled JS in `dist/` — always run `npm run build` first.
@@ -209,6 +222,7 @@ Base URL: `/api/v1`
 | POST | `/logout` | Bearer | Revoke all refresh tokens |
 | GET | `/profile` | Bearer | Get current user |
 | PATCH | `/profile` | Bearer | Update own profile (name, password) |
+| GET | `/permissions` | Bearer | Get current user's resolved permissions |
 | POST | `/verify-email` | None | Verify email address using token |
 | POST | `/resend-verification` | None | Resend email verification (3/min) |
 | POST | `/forgot-password` | None | Request password reset email (3/min) |
@@ -223,16 +237,30 @@ Base URL: `/api/v1`
 | GET | `/accounts` | Bearer | List linked OAuth accounts |
 | DELETE | `/accounts/:provider` | Bearer | Unlink OAuth provider |
 
+### Roles (`/api/v1/roles`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/` | `roles:create` | Create role |
+| GET | `/` | `roles:read` | List all roles with permissions |
+| GET | `/:id` | `roles:read` | Get role by ID |
+| PATCH | `/:id` | `roles:update` | Update role |
+| DELETE | `/:id` | `roles:delete` | Delete role |
+| POST | `/:id/permissions` | `roles:assign` | Assign permission to role |
+| DELETE | `/:id/permissions/:permId` | `roles:assign` | Remove permission from role |
+| POST | `/:id/users` | `roles:assign` | Assign role to user |
+| DELETE | `/:id/users/:userId` | `roles:assign` | Remove role from user |
+
 ### Users (`/api/v1/users`)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/` | Admin | Create user |
-| GET | `/` | Admin | List all users (paginated: page, limit, sortBy, sortOrder query params) |
-| GET | `/search` | Admin | Search users (paginated + filters: email, firstName, lastName, isAdmin, isActive) |
-| GET | `/:id` | Admin | Get user by ID |
-| PATCH | `/:id` | Admin | Update user |
-| DELETE | `/:id` | Admin | Delete user |
+| POST | `/` | `users:create` | Create user |
+| GET | `/` | `users:list` | List all users (paginated: page, limit, sortBy, sortOrder query params) |
+| GET | `/search` | `users:search` | Search users (paginated + filters: email, firstName, lastName, isAdmin, isActive) |
+| GET | `/:id` | `users:read` | Get user by ID |
+| PATCH | `/:id` | `users:update` | Update user |
+| DELETE | `/:id` | `users:delete` | Delete user |
 
 **Pagination query params:**
 - `page` (default 1)
@@ -292,8 +320,8 @@ npm run test:e2e
 
 Server imports common types and constants from the root `shared/` directory via `@app/shared/*` path alias (maps to `../shared/src/*` in `tsconfig.json`). This includes:
 
-- **Types**: `UserResponse`, `OAuthAccountResponse`, `TokensResponse`, `AuthResponse`, `PaginationMeta`, `PaginatedResponse<T>`, `SortOrder`
-- **Constants**: `PASSWORD_REGEX`, `PASSWORD_ERROR`, `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, pagination defaults, user sort columns
+- **Types**: `UserResponse`, `OAuthAccountResponse`, `TokensResponse`, `AuthResponse`, `PaginationMeta`, `PaginatedResponse<T>`, `SortOrder`; `RoleResponse`, `PermissionResponse`, `RolePermissionResponse`, `RoleWithPermissionsResponse`, `PermissionCondition`, `ResolvedPermission`, `UserPermissionsResponse`
+- **Constants**: `PASSWORD_REGEX`, `PASSWORD_ERROR`, `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, pagination defaults, user sort columns; `PERMISSIONS`, `Permission`, `SYSTEM_ROLES`, `SystemRole`
 
 NestJS build compiles shared files into `dist/shared/` alongside `dist/server/`. Migration and seed scripts use paths like `dist/server/src/...` to reflect the nested output structure.
 

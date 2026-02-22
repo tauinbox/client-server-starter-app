@@ -11,12 +11,20 @@ import { OAuthController } from './controllers/oauth.controller';
 import { AuthService } from './services/auth.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { OAuthAccount } from './entities/oauth-account.entity';
+import { Role } from './entities/role.entity';
+import { Permission } from './entities/permission.entity';
+import { RolePermission } from './entities/role-permission.entity';
 import { TokenCleanupService } from './services/token-cleanup.service';
 import { RefreshTokenService } from './services/refresh-token.service';
 import { OAuthAccountService } from './services/oauth-account.service';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { FacebookStrategy } from './strategies/facebook.strategy';
 import { VkStrategy } from './strategies/vk.strategy';
+import { User } from '../users/entities/user.entity';
+import { PermissionService } from './services/permission.service';
+import { PolicyEvaluatorService } from './services/policy-evaluator.service';
+import { RoleService } from './services/role.service';
+import { RolesController } from './controllers/roles.controller';
 
 function conditionalProvider(
   envVar: string,
@@ -39,7 +47,14 @@ function conditionalProvider(
   imports: [
     UsersModule,
     PassportModule,
-    TypeOrmModule.forFeature([RefreshToken, OAuthAccount]),
+    TypeOrmModule.forFeature([
+      RefreshToken,
+      OAuthAccount,
+      Role,
+      Permission,
+      RolePermission,
+      User
+    ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -52,7 +67,7 @@ function conditionalProvider(
       })
     })
   ],
-  controllers: [AuthController, OAuthController],
+  controllers: [AuthController, OAuthController, RolesController],
   providers: [
     AuthService,
     LocalStrategy,
@@ -60,10 +75,13 @@ function conditionalProvider(
     RefreshTokenService,
     TokenCleanupService,
     OAuthAccountService,
+    PermissionService,
+    PolicyEvaluatorService,
+    RoleService,
     conditionalProvider('GOOGLE_CLIENT_ID', GoogleStrategy),
     conditionalProvider('FACEBOOK_CLIENT_ID', FacebookStrategy),
     conditionalProvider('VK_CLIENT_ID', VkStrategy)
   ],
-  exports: [AuthService]
+  exports: [AuthService, PermissionService, RoleService]
 })
 export class AuthModule {}

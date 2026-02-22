@@ -20,6 +20,7 @@ const mockUser: User = {
   lastName: 'User',
   isActive: true,
   isAdmin: false,
+  roles: ['user'],
   isEmailVerified: true,
   failedLoginAttempts: 0,
   lockedUntil: null,

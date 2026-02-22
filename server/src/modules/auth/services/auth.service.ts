@@ -22,10 +22,13 @@ import { LocalAuthRequest } from '../types/auth.request';
 import { TokensResponseDto } from '../dtos/auth-response.dto';
 import { RefreshTokenService } from './refresh-token.service';
 import { OAuthAccountService } from './oauth-account.service';
+import { PermissionService } from './permission.service';
+import { RoleService } from './role.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { MailService } from '../../mail/mail.service';
 import { hashToken } from '../../../common/utils/hash-token';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
+import { SYSTEM_ROLES } from '@app/shared/constants';
 import {
   MAX_FAILED_ATTEMPTS,
   LOCKOUT_DURATION_MS,
@@ -46,6 +49,8 @@ export class AuthService {
     private configService: ConfigService,
     private refreshTokenService: RefreshTokenService,
     private oauthAccountService: OAuthAccountService,
+    private permissionService: PermissionService,
+    private roleService: RoleService,
     private mailService: MailService
   ) {}
 
@@ -120,12 +125,17 @@ export class AuthService {
       await this.usersService.resetLoginAttempts(user.id);
     }
 
-    const { password: _pw, ...result } = user;
+    const { password: _pw, roles: roleEntities, ...rest } = user;
+    const result: UserResponseDto = {
+      ...rest,
+      roles: roleEntities?.map((r) => r.name) ?? []
+    };
     return result;
   }
 
   async login(user: LocalAuthRequest['user']) {
-    const tokens = this.generateTokens(user.id, user.email, user.isAdmin);
+    const roles = await this.permissionService.getRoleNamesForUser(user.id);
+    const tokens = this.generateTokens(user.id, user.email, roles);
 
     const expiresIn = parseInt(
       this.configService.get('JWT_REFRESH_EXPIRATION') || '604800',
@@ -143,7 +153,7 @@ export class AuthService {
 
     return {
       tokens,
-      user
+      user: { ...user, roles }
     };
   }
 
@@ -205,6 +215,17 @@ export class AuthService {
             provider: profile.provider,
             providerId: profile.providerId
           });
+
+          // Assign default 'user' role
+          const userRole = await this.roleService.findRoleByName(
+            SYSTEM_ROLES.USER
+          );
+          await manager
+            .createQueryBuilder()
+            .relation(User, 'roles')
+            .of(newUser.id)
+            .add(userRole.id);
+
           return newUser;
         });
       }
@@ -213,7 +234,8 @@ export class AuthService {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = user;
 
-    const tokens = this.generateTokens(user.id, user.email, user.isAdmin);
+    const roles = await this.permissionService.getRoleNamesForUser(user.id);
+    const tokens = this.generateTokens(user.id, user.email, roles);
 
     const expiresIn = parseInt(
       this.configService.get('JWT_REFRESH_EXPIRATION') || '604800',
@@ -231,7 +253,7 @@ export class AuthService {
 
     return {
       tokens,
-      user: userWithoutPassword
+      user: { ...userWithoutPassword, roles }
     };
   }
 
@@ -297,12 +319,22 @@ export class AuthService {
         throw new ConflictException('User with this email already exists');
       }
 
-      return manager.save(User, {
+      const newUser = await manager.save(User, {
         ...registerDto,
         password: hashedPassword,
         emailVerificationToken: hashedToken,
         emailVerificationExpiresAt: expiresAt
       });
+
+      // Assign default 'user' role
+      const userRole = await this.roleService.findRoleByName(SYSTEM_ROLES.USER);
+      await manager
+        .createQueryBuilder()
+        .relation(User, 'roles')
+        .of(newUser.id)
+        .add(userRole.id);
+
+      return newUser;
     });
 
     // Send verification email (fire-and-forget — delivery failure is non-fatal)
@@ -476,7 +508,8 @@ export class AuthService {
 
     await this.refreshTokenService.revokeToken(tokenDoc.id);
 
-    const tokens = this.generateTokens(user.id, user.email, user.isAdmin);
+    const roles = await this.permissionService.getRoleNamesForUser(user.id);
+    const tokens = this.generateTokens(user.id, user.email, roles);
 
     await this.refreshTokenService.createRefreshToken(
       user.id,
@@ -488,7 +521,7 @@ export class AuthService {
 
     return {
       tokens,
-      user: userWithoutPassword
+      user: { ...userWithoutPassword, roles }
     };
   }
 
@@ -499,12 +532,13 @@ export class AuthService {
   private generateTokens(
     userId: string,
     email: string,
-    isAdmin: boolean
+    roles: string[]
   ): TokensResponseDto {
     const jwtPayload: CustomJwtPayload = {
       sub: userId,
       email,
-      isAdmin
+      isAdmin: roles.includes(SYSTEM_ROLES.ADMIN),
+      roles
     };
 
     const accessTokenExpiration = parseInt(

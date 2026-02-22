@@ -39,6 +39,7 @@ function createMockAuthResponse(
       lastName: 'User',
       isActive: true,
       isAdmin: false,
+      roles: ['user'],
       isEmailVerified: true,
       failedLoginAttempts: 0,
       lockedUntil: null,
@@ -125,6 +126,7 @@ describe('AuthStore', () => {
     it('should compute isAdmin from user', () => {
       const savedAuth = createMockAuthResponse();
       savedAuth.user.isAdmin = true;
+      savedAuth.user.roles = ['admin'];
       const store = createStore(savedAuth);
 
       expect(store.isAdmin()).toBe(true);

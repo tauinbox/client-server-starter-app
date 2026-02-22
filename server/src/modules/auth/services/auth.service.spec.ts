@@ -13,17 +13,26 @@ import { AuthService } from './auth.service';
 import { UsersService } from '../../users/services/users.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { OAuthAccountService } from './oauth-account.service';
+import { PermissionService } from './permission.service';
+import { RoleService } from './role.service';
 import { MailService } from '../../mail/mail.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
 
 describe('AuthService', () => {
   let service: AuthService;
+  let mockRelationQb: {
+    relation: jest.Mock;
+    of: jest.Mock;
+    add: jest.Mock;
+    remove: jest.Mock;
+  };
   let mockManager: {
     findOne: jest.Mock;
     save: jest.Mock;
     update: jest.Mock;
     delete: jest.Mock;
+    createQueryBuilder: jest.Mock;
   };
   let mockDataSource: {
     transaction: jest.Mock;
@@ -65,6 +74,13 @@ describe('AuthService', () => {
     sendEmailVerification: jest.Mock;
     sendPasswordReset: jest.Mock;
   };
+  let mockPermissionService: {
+    getRoleNamesForUser: jest.Mock;
+    invalidateUserPermissions: jest.Mock;
+  };
+  let mockRoleService: {
+    findRoleByName: jest.Mock;
+  };
 
   const mockUser = {
     id: 'user-1',
@@ -92,6 +108,7 @@ describe('AuthService', () => {
     lastName: mockUser.lastName,
     isActive: mockUser.isActive,
     isAdmin: mockUser.isAdmin,
+    roles: [] as string[],
     isEmailVerified: mockUser.isEmailVerified,
     failedLoginAttempts: mockUser.failedLoginAttempts,
     lockedUntil: mockUser.lockedUntil,
@@ -104,11 +121,19 @@ describe('AuthService', () => {
   };
 
   beforeEach(async () => {
+    mockRelationQb = {
+      relation: jest.fn().mockReturnThis(),
+      of: jest.fn().mockReturnThis(),
+      add: jest.fn().mockResolvedValue(undefined),
+      remove: jest.fn().mockResolvedValue(undefined)
+    };
+
     mockManager = {
       findOne: jest.fn().mockResolvedValue(null),
       save: jest.fn(),
       update: jest.fn().mockResolvedValue({ affected: 1 }),
-      delete: jest.fn().mockResolvedValue({ affected: 1 })
+      delete: jest.fn().mockResolvedValue({ affected: 1 }),
+      createQueryBuilder: jest.fn().mockReturnValue(mockRelationQb)
     };
 
     mockDataSource = {
@@ -169,6 +194,17 @@ describe('AuthService', () => {
       sendPasswordReset: jest.fn().mockResolvedValue(undefined)
     };
 
+    mockPermissionService = {
+      getRoleNamesForUser: jest.fn().mockResolvedValue(['user']),
+      invalidateUserPermissions: jest.fn().mockResolvedValue(undefined)
+    };
+
+    mockRoleService = {
+      findRoleByName: jest
+        .fn()
+        .mockResolvedValue({ id: 'role-uuid', name: 'user' })
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -178,6 +214,8 @@ describe('AuthService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: RefreshTokenService, useValue: mockRefreshTokenService },
         { provide: OAuthAccountService, useValue: mockOAuthAccountService },
+        { provide: PermissionService, useValue: mockPermissionService },
+        { provide: RoleService, useValue: mockRoleService },
         { provide: MailService, useValue: mockMailService }
       ]
     }).compile();
@@ -358,7 +396,7 @@ describe('AuthService', () => {
       expect(result.tokens.access_token).toBe('mock-access-token');
       expect(typeof result.tokens.refresh_token).toBe('string');
       expect(result.tokens.expires_in).toBe(3600);
-      expect(result.user).toEqual(mockUserResponse);
+      expect(result.user).toEqual({ ...mockUserResponse, roles: ['user'] });
     });
 
     it('should use default expiration when config is not set', async () => {
@@ -378,7 +416,12 @@ describe('AuthService', () => {
       await service.login(mockUserResponse);
 
       expect(mockJwtService.sign).toHaveBeenCalledWith(
-        { sub: 'user-1', email: 'test@example.com', isAdmin: false },
+        {
+          sub: 'user-1',
+          email: 'test@example.com',
+          isAdmin: false,
+          roles: ['user']
+        },
         { expiresIn: 3600 }
       );
     });
@@ -633,7 +676,13 @@ describe('AuthService', () => {
       expect(result.tokens.access_token).toBe('mock-access-token');
       expect(typeof result.tokens.refresh_token).toBe('string');
       expect(result.tokens.expires_in).toBe(3600);
-      expect(result.user).toEqual(mockUserResponse);
+      expect(result.user).toEqual(
+        expect.objectContaining({
+          id: 'user-1',
+          email: 'test@example.com',
+          roles: ['user']
+        })
+      );
     });
 
     it('should throw UnauthorizedException when token not found', async () => {

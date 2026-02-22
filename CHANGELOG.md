@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.3](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.2...v0.1.3) (2026-02-22)
+
+
+### Features
+
+* **auth:** implement RBAC with conditional permissions system ([6f25677](https://github.com/tauinbox/client-server-starter-app/commit/6f25677f1d08f7b5f14843cee7ca41a6fc455081))
+
+
+### Bug Fixes
+
+* **migrations:** add uuid-ossp extension migration for fresh database setup ([0f2b511](https://github.com/tauinbox/client-server-starter-app/commit/0f2b5114c91474fc3382da85cbd11daedc9627eb))
+
 ## [0.1.2](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.1...v0.1.2) (2026-02-22)
 
 

@@ -131,6 +131,7 @@ router.post('/', adminGuard, (req, res) => {
     password,
     isActive: true,
     isAdmin: false,
+    roles: ['user'],
     isEmailVerified: true,
     failedLoginAttempts: 0,
     lockedUntil: null,
@@ -183,7 +184,7 @@ router.get('/search', adminGuard, (req, res) => {
   res.json(result);
 });
 
-// GET /api/v1/users/:id — requires auth (not admin), matching client authGuard
+// GET /api/v1/users/:id — requires auth (not admin) to match client route guards
 router.get('/:id', authGuard, (req, res) => {
   const id = req.params['id'] as string;
   const user = findUserById(id);

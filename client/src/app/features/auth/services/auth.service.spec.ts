@@ -48,6 +48,7 @@ function createMockAuthResponse(
       lastName: 'User',
       isActive: true,
       isAdmin: false,
+      roles: ['user'],
       isEmailVerified: true,
       failedLoginAttempts: 0,
       lockedUntil: null,
@@ -67,6 +68,7 @@ describe('AuthService', () => {
     saveAuthResponse: ReturnType<typeof vi.fn>;
     updateCurrentUser: ReturnType<typeof vi.fn>;
     clearSession: ReturnType<typeof vi.fn>;
+    setPermissions: ReturnType<typeof vi.fn>;
   };
   beforeEach(() => {
     authStoreMock = {
@@ -75,7 +77,8 @@ describe('AuthService', () => {
       getTokenExpiryTime: vi.fn().mockReturnValue(null),
       saveAuthResponse: vi.fn(),
       updateCurrentUser: vi.fn(),
-      clearSession: vi.fn()
+      clearSession: vi.fn(),
+      setPermissions: vi.fn()
     };
 
     TestBed.configureTestingModule({
@@ -92,6 +95,10 @@ describe('AuthService', () => {
   });
 
   afterEach(() => {
+    // Flush any pending permissions requests fired as side effects
+    httpMock
+      .match(AuthApiEnum.Permissions)
+      .forEach((req) => req.flush({ permissions: [] }));
     httpMock.verify();
     TestBed.resetTestingModule();
   });
