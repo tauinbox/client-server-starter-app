@@ -7,6 +7,7 @@ import {
   HttpStatus,
   UnauthorizedException
 } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { UsersService } from '../../users/services/users.service';
@@ -18,6 +19,15 @@ import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
 
 describe('AuthService', () => {
   let service: AuthService;
+  let mockManager: {
+    findOne: jest.Mock;
+    save: jest.Mock;
+    update: jest.Mock;
+    delete: jest.Mock;
+  };
+  let mockDataSource: {
+    transaction: jest.Mock;
+  };
   let mockUsersService: {
     findByEmail: jest.Mock;
     findOne: jest.Mock;
@@ -94,6 +104,22 @@ describe('AuthService', () => {
   };
 
   beforeEach(async () => {
+    mockManager = {
+      findOne: jest.fn().mockResolvedValue(null),
+      save: jest.fn(),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+      delete: jest.fn().mockResolvedValue({ affected: 1 })
+    };
+
+    mockDataSource = {
+      transaction: jest
+        .fn()
+        .mockImplementation(
+          (callback: (manager: typeof mockManager) => Promise<unknown>) =>
+            callback(mockManager)
+        )
+    };
+
     mockUsersService = {
       findByEmail: jest.fn(),
       findOne: jest.fn(),
@@ -146,6 +172,7 @@ describe('AuthService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
+        { provide: DataSource, useValue: mockDataSource },
         { provide: UsersService, useValue: mockUsersService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
@@ -358,32 +385,47 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    it('should create user and send verification email', async () => {
-      const registerDto = {
-        email: 'new@example.com',
-        password: 'Password1',
-        firstName: 'Jane',
-        lastName: 'Doe'
-      };
-      mockUsersService.create.mockResolvedValue({
-        ...mockUser,
-        ...registerDto,
-        id: 'new-user-1'
-      });
+    const registerDto = {
+      email: 'new@example.com',
+      password: 'Password1',
+      firstName: 'Jane',
+      lastName: 'Doe'
+    };
+
+    const savedUser = { ...mockUser, ...registerDto, id: 'new-user-1' };
+
+    it('should create user with verification token atomically and send email', async () => {
+      mockManager.findOne.mockResolvedValue(null); // no conflict
+      mockManager.save.mockResolvedValue(savedUser);
 
       const result = await service.register(registerDto);
 
-      expect(mockUsersService.create).toHaveBeenCalledWith(registerDto);
-      expect(mockUsersService.setEmailVerificationToken).toHaveBeenCalledWith(
-        'new-user-1',
-        expect.any(String),
-        expect.any(Date)
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      // User should be saved with verification token fields included
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.anything(), // User entity class
+        expect.objectContaining({
+          email: 'new@example.com',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          emailVerificationToken: expect.any(String),
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          emailVerificationExpiresAt: expect.any(Date)
+        })
       );
       expect(mockMailService.sendEmailVerification).toHaveBeenCalledWith(
         'new@example.com',
         expect.any(String)
       );
       expect(result.message).toContain('Registration successful');
+    });
+
+    it('should throw ConflictException when email already exists', async () => {
+      mockManager.findOne.mockResolvedValue(mockUser); // conflict
+
+      await expect(service.register(registerDto)).rejects.toThrow(
+        ConflictException
+      );
+      expect(mockManager.save).not.toHaveBeenCalled();
     });
   });
 
@@ -495,7 +537,7 @@ describe('AuthService', () => {
   });
 
   describe('resetPassword', () => {
-    it('should reset password with valid token', async () => {
+    it('should reset password, clear token, and invalidate sessions atomically', async () => {
       const user = {
         ...mockUser,
         passwordResetExpiresAt: new Date(Date.now() + 3600000)
@@ -504,14 +546,22 @@ describe('AuthService', () => {
 
       const result = await service.resetPassword('valid-token', 'NewPassword1');
 
-      expect(mockUsersService.update).toHaveBeenCalledWith('user-1', {
-        password: 'NewPassword1'
-      });
-      expect(mockUsersService.clearPasswordResetToken).toHaveBeenCalledWith(
-        'user-1'
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      // Password update + token clear in one manager.update call
+      expect(mockManager.update).toHaveBeenCalledWith(
+        expect.anything(), // User entity class
+        'user-1',
+        expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          password: expect.any(String), // bcrypt hash
+          passwordResetToken: null,
+          passwordResetExpiresAt: null
+        })
       );
-      expect(mockRefreshTokenService.deleteByUserId).toHaveBeenCalledWith(
-        'user-1'
+      // Session invalidation
+      expect(mockManager.delete).toHaveBeenCalledWith(
+        expect.anything(), // RefreshToken entity class
+        { userId: 'user-1' }
       );
       expect(result.message).toContain('reset successfully');
     });
@@ -757,24 +807,41 @@ describe('AuthService', () => {
       );
     });
 
-    it('should create new user when no existing account found', async () => {
+    it('should create new user and OAuth account atomically when no existing account found', async () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         null
       );
       mockUsersService.findByEmail.mockResolvedValue(null);
-      mockUsersService.createOAuthUser.mockResolvedValue(oauthUser);
+      // manager.save called twice: first for User, then for OAuthAccount
+      mockManager.save.mockResolvedValueOnce(oauthUser).mockResolvedValueOnce({
+        id: 'oauth-account-1',
+        userId: 'oauth-user-1',
+        provider: 'google',
+        providerId: 'google-123'
+      });
 
       const result = await service.loginWithOAuth(oauthProfile);
 
-      expect(mockUsersService.createOAuthUser).toHaveBeenCalledWith({
-        email: 'oauth@example.com',
-        firstName: 'OAuth',
-        lastName: 'User'
-      });
-      expect(mockOAuthAccountService.createOAuthAccount).toHaveBeenCalledWith(
-        'oauth-user-1',
-        'google',
-        'google-123'
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      // First save: User with OAuth profile data
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.anything(), // User entity class
+        expect.objectContaining({
+          email: 'oauth@example.com',
+          firstName: 'OAuth',
+          lastName: 'User',
+          password: null,
+          isEmailVerified: true
+        })
+      );
+      // Second save: OAuthAccount linking user to provider
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.anything(), // OAuthAccount entity class
+        expect.objectContaining({
+          userId: 'oauth-user-1',
+          provider: 'google',
+          providerId: 'google-123'
+        })
       );
       expect(result.user).toBeDefined();
     });
