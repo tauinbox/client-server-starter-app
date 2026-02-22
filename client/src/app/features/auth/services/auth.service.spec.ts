@@ -7,9 +7,10 @@ import {
 } from '@angular/common/http/testing';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from './auth.service';
-import { AuthStore } from '../store/auth.store';
+import { AuthStore, AUTH_STORAGE_KEY } from '../store/auth.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import type { AuthResponse } from '../models/auth.types';
+import { LocalStorageService } from '@core/services/local-storage.service';
 
 // Helper: create a base64url-encoded JWT with given payload
 function createJwt(payload: Record<string, unknown>): string {
@@ -209,6 +210,48 @@ describe('AuthService', () => {
       const [tokens1, tokens2] = await Promise.all([promise1, promise2]);
       expect(tokens1).toEqual(newAuth.tokens);
       expect(tokens2).toEqual(newAuth.tokens);
+    });
+
+    it('should skip HTTP and adopt tokens when another tab already refreshed', async () => {
+      const originalToken = 'old-refresh-token';
+      const newAuth = createMockAuthResponse(); // has 'valid-refresh-token'
+
+      authStoreMock.getRefreshToken.mockReturnValue(originalToken);
+
+      // Simulate another tab having written fresh tokens to localStorage
+      const localStorageService = TestBed.inject(LocalStorageService);
+      localStorageService.setItem(AUTH_STORAGE_KEY, newAuth);
+
+      const tokens = await firstValueFrom(service.refreshTokens());
+
+      // No HTTP call should have been made
+      httpMock.expectNone(AuthApiEnum.RefreshToken);
+
+      // Should have adopted the tokens from localStorage
+      expect(authStoreMock.saveAuthResponse).toHaveBeenCalledWith(newAuth);
+      expect(tokens).toEqual(newAuth.tokens);
+    });
+
+    it('should make HTTP call when localStorage has same refresh token as in-memory', async () => {
+      const sharedToken = 'valid-refresh-token';
+      const currentAuth = createMockAuthResponse(); // has 'valid-refresh-token'
+      const newAuth = createMockAuthResponse();
+
+      authStoreMock.getRefreshToken.mockReturnValue(sharedToken);
+
+      // localStorage has the same refresh token — no other tab has refreshed
+      const localStorageService = TestBed.inject(LocalStorageService);
+      localStorageService.setItem(AUTH_STORAGE_KEY, currentAuth);
+
+      const tokensPromise = firstValueFrom(service.refreshTokens());
+
+      // HTTP call should still be made
+      const req = httpMock.expectOne(AuthApiEnum.RefreshToken);
+      req.flush(newAuth);
+
+      const tokens = await tokensPromise;
+      expect(tokens).toEqual(newAuth.tokens);
+      expect(authStoreMock.saveAuthResponse).toHaveBeenCalledWith(newAuth);
     });
   });
 
