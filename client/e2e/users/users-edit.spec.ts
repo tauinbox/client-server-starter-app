@@ -14,7 +14,7 @@ test.describe('User Edit page', () => {
   });
 
   test('should populate form with user data', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1/edit');
 
     await expect(page.getByLabel('Email')).toHaveValue('admin@example.com');
@@ -22,25 +22,23 @@ test.describe('User Edit page', () => {
     await expect(page.getByLabel('Last Name')).toHaveValue('User');
   });
 
-  test('should show admin checkboxes when logged in as admin', async ({
+  test('should show status checkbox when logged in as admin', async ({
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1/edit');
 
-    await expect(page.getByLabel('Administrator')).toBeVisible();
     await expect(page.getByLabel('Active')).toBeVisible();
   });
 
-  test('should not show admin checkboxes when logged in as non-admin', async ({
+  test('should not show status checkboxes when logged in as non-admin', async ({
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: false });
+    await loginViaUi(page, _mockServer.url, {});
     await page.goto('/users/3/edit');
 
-    await expect(page.getByLabel('Administrator')).toBeHidden();
     await expect(page.getByLabel('Active')).toBeHidden();
   });
 
@@ -49,7 +47,7 @@ test.describe('User Edit page', () => {
     page
   }) => {
     // Login as user id=100 (admin), edit user id=3 (another user)
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/3/edit');
 
     await expect(
@@ -62,7 +60,7 @@ test.describe('User Edit page', () => {
     page
   }) => {
     // Login as user id=100 (admin), edit user id=100 (self)
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/100/edit');
 
     await expect(
@@ -74,7 +72,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: false });
+    await loginViaUi(page, _mockServer.url, {});
     await page.goto('/users/100/edit');
 
     await expect(
@@ -86,7 +84,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1/edit');
 
     await expect(
@@ -98,7 +96,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1/edit');
 
     await page.getByLabel('First Name').fill('Updated');
@@ -112,7 +110,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1/edit');
 
     await page.getByLabel('Email').clear();
@@ -126,7 +124,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1/edit');
 
     await page.getByLabel('First Name').clear();
@@ -140,7 +138,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1/edit');
 
     await page.getByLabel('Last Name').clear();
@@ -154,7 +152,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1/edit');
 
     await page.getByLabel('New Password (Optional)').fill('short');
@@ -168,7 +166,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1/edit');
 
     await page.getByLabel('Email').clear();
@@ -188,7 +186,7 @@ test.describe('User Edit page', () => {
   });
 
   test('should update user successfully', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1/edit');
 
     await page.getByLabel('First Name').fill('Updated');
@@ -202,7 +200,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     // Intercept PATCH to return 500
     await page.route('**/api/v1/users/*', (route) => {
       if (route.request().method() === 'PATCH') {
@@ -229,7 +227,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/3/edit');
 
     await page.getByRole('button', { name: 'Delete User' }).click();
@@ -242,7 +240,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/3/edit');
 
     await page.getByRole('button', { name: 'Delete User' }).click();

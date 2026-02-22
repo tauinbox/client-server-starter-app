@@ -35,7 +35,6 @@ function createMockAuthResponse(
       access_token: createJwt({
         sub: '1',
         email: 'test@example.com',
-        isAdmin: false,
         exp
       }),
       refresh_token: 'valid-refresh-token',
@@ -47,7 +46,6 @@ function createMockAuthResponse(
       firstName: 'Test',
       lastName: 'User',
       isActive: true,
-      isAdmin: false,
       roles: ['user'],
       isEmailVerified: true,
       failedLoginAttempts: 0,

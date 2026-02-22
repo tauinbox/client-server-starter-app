@@ -3,7 +3,6 @@ export const ALLOWED_USER_SORT_COLUMNS = [
   'firstName',
   'lastName',
   'isActive',
-  'isAdmin',
   'createdAt'
 ] as const;
 

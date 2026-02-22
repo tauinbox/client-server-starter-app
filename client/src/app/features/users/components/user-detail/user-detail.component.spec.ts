@@ -7,6 +7,7 @@ import type { WritableSignal } from '@angular/core';
 
 import { UserDetailComponent } from './user-detail.component';
 import { UsersStore } from '../../store/users.store';
+import { AuthStore } from '../../../auth/store/auth.store';
 import type { User } from '../../models/user.types';
 
 const mockUser: User = {
@@ -14,7 +15,6 @@ const mockUser: User = {
   email: 'test@example.com',
   firstName: 'Test',
   lastName: 'User',
-  isAdmin: false,
   roles: ['user'],
   isActive: true,
   isEmailVerified: true,
@@ -33,6 +33,7 @@ describe('UserDetailComponent', () => {
     detailLoading: WritableSignal<boolean>;
     loadOne: ReturnType<typeof vi.fn>;
   };
+  let authStoreMock: { hasPermission: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     entityMapSignal = signal({});
@@ -43,12 +44,15 @@ describe('UserDetailComponent', () => {
       loadOne: vi.fn()
     };
 
+    authStoreMock = { hasPermission: vi.fn().mockReturnValue(false) };
+
     await TestBed.configureTestingModule({
       imports: [UserDetailComponent],
       providers: [
         provideRouter([]),
         provideNoopAnimations(),
-        { provide: UsersStore, useValue: usersStoreMock }
+        { provide: UsersStore, useValue: usersStoreMock },
+        { provide: AuthStore, useValue: authStoreMock }
       ]
     }).compileComponents();
 

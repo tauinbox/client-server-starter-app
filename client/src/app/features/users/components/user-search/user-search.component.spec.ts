@@ -42,33 +42,6 @@ describe('UserSearchComponent', () => {
       searchSpy = vi.spyOn(usersStore, 'search').mockImplementation(vi.fn());
     });
 
-    it('should pass isAdmin=true when Role is "Admin"', () => {
-      component.searchForm.patchValue({ isAdmin: 'true' });
-      component.onSubmit();
-
-      expect(searchSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ isAdmin: true })
-      );
-    });
-
-    it('should pass isAdmin=false when Role is "User"', () => {
-      component.searchForm.patchValue({ isAdmin: 'false' });
-      component.onSubmit();
-
-      expect(searchSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ isAdmin: false })
-      );
-    });
-
-    it('should exclude isAdmin when Role is "All"', () => {
-      component.searchForm.patchValue({ isAdmin: '' });
-      component.onSubmit();
-
-      expect(searchSpy).toHaveBeenCalledWith(
-        expect.not.objectContaining({ isAdmin: expect.anything() })
-      );
-    });
-
     it('should pass isActive=true when Status is "Active"', () => {
       component.searchForm.patchValue({ isActive: 'true' });
       component.onSubmit();

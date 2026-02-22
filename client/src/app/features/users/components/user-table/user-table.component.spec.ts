@@ -12,7 +12,6 @@ const mockUser: User = {
   email: 'test@example.com',
   firstName: 'Test',
   lastName: 'User',
-  isAdmin: false,
   roles: ['user'],
   isActive: true,
   isEmailVerified: true,
@@ -87,10 +86,6 @@ describe('UserTableComponent', () => {
 
     it('should map status column to isActive sort key', () => {
       expect(COLUMN_TO_SORT_MAP['status']).toBe('isActive');
-    });
-
-    it('should map role column to isAdmin sort key', () => {
-      expect(COLUMN_TO_SORT_MAP['role']).toBe('isAdmin');
     });
 
     it('should map createdAt column to createdAt sort key', () => {

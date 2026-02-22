@@ -31,7 +31,7 @@ test.describe('Profile page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
 
     await expect(page.getByText('Role: Administrator')).toBeVisible();
   });
@@ -52,7 +52,7 @@ test.describe('Profile page', () => {
             firstName: 'John',
             lastName: 'Doe',
             isActive: false,
-            isAdmin: false,
+            roles: ['user'],
             isEmailVerified: true,
             failedLoginAttempts: 0,
             lockedUntil: null,

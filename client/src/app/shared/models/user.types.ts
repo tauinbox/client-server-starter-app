@@ -13,7 +13,7 @@ export type User = UserResponse;
 
 export type UserSearch = Pick<
   Partial<User>,
-  'email' | 'firstName' | 'lastName' | 'isAdmin' | 'isActive'
+  'email' | 'firstName' | 'lastName' | 'isActive'
 >;
 
 export type CreateUser = Pick<User, 'email' | 'firstName' | 'lastName'> & {
@@ -22,7 +22,7 @@ export type CreateUser = Pick<User, 'email' | 'firstName' | 'lastName'> & {
 
 export type UpdateUser = Pick<
   Partial<User>,
-  'email' | 'firstName' | 'lastName' | 'isAdmin' | 'isActive'
+  'email' | 'firstName' | 'lastName' | 'isActive'
 > & {
   password?: string;
   unlockAccount?: boolean;

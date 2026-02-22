@@ -17,7 +17,6 @@ function generateUsers(): MockUser[] {
       lastName: 'User',
       password: 'Password1',
       isActive: true,
-      isAdmin: true,
       roles: ['admin'],
       isEmailVerified: true,
       failedLoginAttempts: 0,
@@ -32,7 +31,6 @@ function generateUsers(): MockUser[] {
       lastName: 'User',
       password: 'Password1',
       isActive: true,
-      isAdmin: false,
       roles: ['user'],
       isEmailVerified: true,
       failedLoginAttempts: 0,
@@ -47,7 +45,6 @@ function generateUsers(): MockUser[] {
       lastName: 'Smith',
       password: 'Password1',
       isActive: true,
-      isAdmin: false,
       roles: ['user'],
       isEmailVerified: true,
       failedLoginAttempts: 0,
@@ -62,7 +59,6 @@ function generateUsers(): MockUser[] {
       lastName: 'Doe',
       password: 'Password1',
       isActive: false,
-      isAdmin: false,
       roles: ['user'],
       isEmailVerified: true,
       failedLoginAttempts: 0,
@@ -77,7 +73,6 @@ function generateUsers(): MockUser[] {
       lastName: 'Wilson',
       password: 'Password1',
       isActive: true,
-      isAdmin: false,
       roles: ['user'],
       isEmailVerified: true,
       failedLoginAttempts: 0,
@@ -89,13 +84,12 @@ function generateUsers(): MockUser[] {
 
   const generated: MockUser[] = [];
   for (let i = 0; i < 65; i++) {
-    const isAdmin = i % 20 === 0;
+    const roles = i % 20 === 0 ? ['admin'] : ['user'];
     generated.push(
       createMockUser({
         id: String(i + 6),
         isActive: i % 5 !== 0,
-        isAdmin,
-        roles: isAdmin ? ['admin'] : ['user']
+        roles
       })
     );
   }

@@ -59,10 +59,6 @@ export class UserService {
       httpParams = httpParams.set('lastName', criteria.lastName);
     }
 
-    if (criteria.isAdmin !== undefined) {
-      httpParams = httpParams.set('isAdmin', criteria.isAdmin.toString());
-    }
-
     if (criteria.isActive !== undefined) {
       httpParams = httpParams.set('isActive', criteria.isActive.toString());
     }

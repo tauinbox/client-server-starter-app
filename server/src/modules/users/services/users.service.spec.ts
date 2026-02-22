@@ -35,7 +35,6 @@ describe('UsersService', () => {
     lastName: 'Doe',
     password: '$2b$10$hashedpassword',
     isActive: true,
-    isAdmin: false,
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01')
   } as User;
@@ -219,15 +218,6 @@ describe('UsersService', () => {
       );
     });
 
-    it('should search by isAdmin filter', async () => {
-      await service.searchUsers({ isAdmin: true });
-
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'user.isAdmin = :isAdmin',
-        { isAdmin: true }
-      );
-    });
-
     it('should search by isActive filter', async () => {
       await service.searchUsers({ isActive: false });
 
@@ -240,11 +230,10 @@ describe('UsersService', () => {
     it('should combine multiple filters', async () => {
       await service.searchUsers({
         email: 'test',
-        firstName: 'John',
-        isAdmin: true
+        firstName: 'John'
       });
 
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledTimes(3);
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledTimes(2);
     });
 
     it('should return all users when no filters provided', async () => {
@@ -337,17 +326,12 @@ describe('UsersService', () => {
         limit: 10,
         sortBy: 'createdAt',
         sortOrder: 'desc',
-        email: 'test',
-        isAdmin: true
+        email: 'test'
       });
 
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         'user.email LIKE :email',
         { email: '%test%' }
-      );
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'user.isAdmin = :isAdmin',
-        { isAdmin: true }
       );
       expect(mockQueryBuilder.orderBy).toHaveBeenCalled();
       expect(mockQueryBuilder.skip).toHaveBeenCalled();

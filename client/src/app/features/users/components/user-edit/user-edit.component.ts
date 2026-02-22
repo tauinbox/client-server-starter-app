@@ -44,7 +44,6 @@ type UserFormType = {
   firstName: FormControl<string>;
   lastName: FormControl<string>;
   password: FormControl<string>;
-  isAdmin: FormControl<boolean>;
   isActive: FormControl<boolean>;
 };
 
@@ -106,7 +105,6 @@ export class UserEditComponent implements OnInit {
         validators: [Validators.minLength(8)],
         nonNullable: true
       }),
-      isAdmin: this.#fb.control(false, { nonNullable: true }),
       isActive: this.#fb.control(true, { nonNullable: true })
     });
 
@@ -134,7 +132,6 @@ export class UserEditComponent implements OnInit {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          isAdmin: user.isAdmin,
           isActive: user.isActive,
           password: ''
         });
@@ -180,7 +177,6 @@ export class UserEditComponent implements OnInit {
     }
 
     if (this.authStore.isAdmin()) {
-      updateData.isAdmin = formValues.isAdmin;
       updateData.isActive = formValues.isActive;
     }
 

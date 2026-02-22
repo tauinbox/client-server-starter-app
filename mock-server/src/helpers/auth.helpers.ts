@@ -37,8 +37,7 @@ export function requireAdmin(
 ): { user: MockUser; decoded: DecodedToken } | { error: number } {
   const result = requireAuth(req);
   if ('error' in result) return result;
-  if (!result.user.roles?.includes('admin') && !result.user.isAdmin)
-    return { error: 403 };
+  if (!result.user.roles?.includes('admin')) return { error: 403 };
   return result;
 }
 

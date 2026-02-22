@@ -71,7 +71,6 @@ router.post('/register', (req, res) => {
     lastName,
     password, // Stored as plaintext — mock only. Real server uses bcrypt.
     isActive: true,
-    isAdmin: false,
     roles: ['user'],
     isEmailVerified: false,
     failedLoginAttempts: 0,

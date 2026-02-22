@@ -18,7 +18,6 @@ const mockUser: User = {
   email: 'test@example.com',
   firstName: 'Test',
   lastName: 'User',
-  isAdmin: false,
   roles: ['user'],
   isActive: true,
   isEmailVerified: true,

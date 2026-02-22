@@ -4,7 +4,7 @@
     <mat-card-header>
       <mat-card-title>User Details</mat-card-title>
       <div class="spacer"></div>
-      @if (u?.isAdmin) {
+      <ng-container *appRequirePermission="'users:list'">
         <button
           mat-icon-button
           color="primary"
@@ -13,7 +13,7 @@
         >
           <mat-icon>arrow_back</mat-icon>
         </button>
-      }
+      </ng-container>
     </mat-card-header>
 
     <mat-card-content>
@@ -37,7 +37,7 @@
                   <mat-chip color="warn" highlighted>Inactive</mat-chip>
                 }
 
-                @if (user()!.isAdmin) {
+                @if (user()!.roles.includes('admin')) {
                   <mat-chip color="primary" highlighted>Administrator</mat-chip>
                 } @else {
                   <mat-chip>User</mat-chip>

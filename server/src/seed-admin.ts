@@ -35,7 +35,6 @@ async function seedAdmin(): Promise<void> {
       password: hashedPassword,
       firstName,
       lastName,
-      isAdmin: true,
       isActive: true,
       isEmailVerified: true
     });

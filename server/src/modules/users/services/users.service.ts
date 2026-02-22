@@ -71,12 +71,6 @@ export class UsersService {
       });
     }
 
-    if (filters.isAdmin !== undefined) {
-      qb.andWhere('user.isAdmin = :isAdmin', {
-        isAdmin: filters.isAdmin
-      });
-    }
-
     if (filters.isActive !== undefined) {
       qb.andWhere('user.isActive = :isActive', {
         isActive: filters.isActive
@@ -115,7 +109,6 @@ export class UsersService {
     email?: string;
     firstName?: string;
     lastName?: string;
-    isAdmin?: boolean;
     isActive?: boolean;
   }): Promise<User[]> {
     const queryBuilder = this.userRepository.createQueryBuilder('user');
@@ -135,12 +128,6 @@ export class UsersService {
     if (filters.lastName) {
       queryBuilder.andWhere('user.lastName ILIKE :lastName', {
         lastName: `%${escapeLikePattern(filters.lastName)}%`
-      });
-    }
-
-    if (filters.isAdmin !== undefined) {
-      queryBuilder.andWhere('user.isAdmin = :isAdmin', {
-        isAdmin: filters.isAdmin
       });
     }
 

@@ -22,7 +22,6 @@ const mockAuthResponse: AuthResponse = {
     firstName: 'Test',
     lastName: 'User',
     isActive: true,
-    isAdmin: false,
     roles: ['user'],
     isEmailVerified: true,
     failedLoginAttempts: 0,

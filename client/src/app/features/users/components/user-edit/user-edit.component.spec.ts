@@ -22,7 +22,6 @@ const mockUser: User = {
   email: 'test@example.com',
   firstName: 'Test',
   lastName: 'User',
-  isAdmin: false,
   roles: ['user'],
   isActive: true,
   isEmailVerified: true,
@@ -111,7 +110,6 @@ describe('UserEditComponent', () => {
         firstName: 'Test',
         lastName: 'User',
         password: '',
-        isAdmin: false,
         isActive: true
       });
     });
@@ -271,7 +269,6 @@ describe('UserEditComponent', () => {
         email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
-        isAdmin: false,
         isActive: true
       });
     });
@@ -286,7 +283,7 @@ describe('UserEditComponent', () => {
       );
     });
 
-    it('should not include isAdmin/isActive when not admin', () => {
+    it('should not include isActive when not admin', () => {
       isAdminSignal.set(false);
       component['userForm'].controls.password.setValue('');
       component.onSubmit();

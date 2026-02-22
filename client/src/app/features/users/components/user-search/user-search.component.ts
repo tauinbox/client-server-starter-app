@@ -30,7 +30,6 @@ type UserSearchFormType = {
   email: FormControl<string>;
   firstName: FormControl<string>;
   lastName: FormControl<string>;
-  isAdmin: FormControl<string>;
   isActive: FormControl<string>;
 };
 
@@ -67,7 +66,6 @@ export class UserSearchComponent {
       email: this.#fb.control('', { nonNullable: true }),
       firstName: this.#fb.control('', { nonNullable: true }),
       lastName: this.#fb.control('', { nonNullable: true }),
-      isAdmin: this.#fb.control('', { nonNullable: true }),
       isActive: this.#fb.control('', { nonNullable: true })
     });
 
@@ -93,10 +91,6 @@ export class UserSearchComponent {
     if (formValues.email?.trim()) criteria.email = formValues.email;
     if (formValues.firstName?.trim()) criteria.firstName = formValues.firstName;
     if (formValues.lastName?.trim()) criteria.lastName = formValues.lastName;
-
-    if (formValues.isAdmin !== '') {
-      criteria.isAdmin = formValues.isAdmin === 'true';
-    }
 
     if (formValues.isActive !== '') {
       criteria.isActive = formValues.isActive === 'true';
@@ -130,7 +124,6 @@ export class UserSearchComponent {
       email: '',
       firstName: '',
       lastName: '',
-      isAdmin: '',
       isActive: ''
     });
 

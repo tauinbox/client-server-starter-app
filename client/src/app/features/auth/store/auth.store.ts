@@ -32,10 +32,7 @@ export const AuthStore = signalStore(
     user: computed<User | null>(() => store.authResponse()?.user ?? null),
     isAuthenticated: computed(() => store.authResponse() !== null),
     isAdmin: computed(
-      () =>
-        store.authResponse()?.user?.roles?.includes('admin') ??
-        store.authResponse()?.user?.isAdmin ??
-        false
+      () => store.authResponse()?.user?.roles?.includes('admin') ?? false
     ),
     roles: computed<string[]>(() => store.authResponse()?.user?.roles ?? [])
   })),

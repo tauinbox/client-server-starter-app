@@ -22,7 +22,7 @@ export async function loginViaUi(
     lastName: overrides.lastName ?? 'Doe',
     password,
     isActive: overrides.isActive ?? true,
-    isAdmin: overrides.isAdmin ?? false,
+    roles: overrides.roles ?? ['user'],
     isEmailVerified: overrides.isEmailVerified ?? true,
     failedLoginAttempts: overrides.failedLoginAttempts ?? 0,
     lockedUntil: overrides.lockedUntil ?? null,
@@ -56,7 +56,7 @@ export async function expectForbiddenRedirect(
   mockServerUrl: string,
   url: string
 ): Promise<void> {
-  await loginViaUi(page, mockServerUrl, { isAdmin: false });
+  await loginViaUi(page, mockServerUrl, { roles: ['user'] });
   await page.goto(url);
   await expect(page).toHaveURL(/.*\/forbidden/);
 }
