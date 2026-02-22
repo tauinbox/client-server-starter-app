@@ -17,6 +17,33 @@ jobs:
     defaults:
       run:
         working-directory: server
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: testdb
+      DB_SCHEMA: public
+      JWT_SECRET: ci-test-secret-not-for-production
+      JWT_EXPIRATION: 3600
+      JWT_REFRESH_EXPIRATION: 604800
+
     steps:
       - uses: actions/checkout@v4
 
@@ -34,6 +61,12 @@ jobs:
       - run: npm run format:check
       - run: npm run test:cov
       - run: npm run build
+
+      - name: Run migrations
+        run: npm run migrations:run
+
+      - name: E2E – bootstrap & DI
+        run: npm run test:e2e
 
       - uses: actions/upload-artifact@v4
         if: always()
