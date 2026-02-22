@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -45,7 +45,7 @@ function conditionalProvider(
 
 @Module({
   imports: [
-    UsersModule,
+    forwardRef(() => UsersModule),
     PassportModule,
     TypeOrmModule.forFeature([
       RefreshToken,
