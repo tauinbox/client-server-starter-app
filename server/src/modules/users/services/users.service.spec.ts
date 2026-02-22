@@ -19,6 +19,7 @@ describe('UsersService', () => {
     update: jest.Mock;
   };
   let mockQueryBuilder: {
+    leftJoinAndSelect: jest.Mock;
     andWhere: jest.Mock;
     orderBy: jest.Mock;
     skip: jest.Mock;
@@ -41,6 +42,7 @@ describe('UsersService', () => {
 
   beforeEach(async () => {
     mockQueryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       skip: jest.fn().mockReturnThis(),
@@ -145,7 +147,8 @@ describe('UsersService', () => {
       const result = await service.findOne('user-1');
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 'user-1' }
+        where: { id: 'user-1' },
+        relations: ['roles']
       });
       expect(result).toEqual(mockUser);
     });
@@ -169,7 +172,8 @@ describe('UsersService', () => {
       const result = await service.findByEmail('test@example.com');
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
-        where: { email: 'test@example.com' }
+        where: { email: 'test@example.com' },
+        relations: ['roles']
       });
       expect(result).toEqual(mockUser);
     });
@@ -476,7 +480,8 @@ describe('UsersService', () => {
       await service.remove('user-1');
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 'user-1' }
+        where: { id: 'user-1' },
+        relations: ['roles']
       });
       expect(mockRepository.remove).toHaveBeenCalledWith(mockUser);
     });

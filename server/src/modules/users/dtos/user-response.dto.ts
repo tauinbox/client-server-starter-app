@@ -19,6 +19,9 @@ export class UserResponseDto {
   @ApiProperty({ example: false })
   isAdmin: boolean;
 
+  @ApiProperty({ example: ['user'] })
+  roles: string[];
+
   @ApiProperty({ example: true })
   isEmailVerified: boolean;
 

@@ -18,6 +18,7 @@ export function generateAccessToken(
     sub: user.id,
     email: user.email,
     isAdmin: user.isAdmin,
+    roles: user.roles,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + expiresInSeconds
   });
@@ -43,6 +44,7 @@ export interface DecodedToken {
   sub: string;
   email: string;
   isAdmin: boolean;
+  roles: string[];
   iat: number;
   exp: number;
 }

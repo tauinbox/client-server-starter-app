@@ -34,10 +34,11 @@ src/app/
 ├── core/                   # Header, theme toggle, storage/session-storage services, error interceptor, 404 page
 ├── features/
 │   ├── auth/               # Login, register, profile, OAuth callback, verify-email, forgot-password, reset-password, forbidden
+│   │   ├── directives/     # RequirePermissionDirective (*appRequirePermission structural directive)
 │   │   ├── guards/         # authGuard, adminGuard
 │   │   ├── interceptors/   # jwtInterceptor
-│   │   ├── services/       # AuthService (HTTP, refresh scheduling)
-│   │   └── store/          # AuthStore (NgRx Signal Store, pure state)
+│   │   ├── services/       # AuthService (HTTP, refresh scheduling, fetchPermissions)
+│   │   └── store/          # AuthStore (NgRx Signal Store — state: authResponse + permissions; computed: roles, isAdmin)
 │   ├── users/              # User list, detail, edit, search (admin)
 │   │   ├── components/
 │   │   │   └── user-table/ # UserTableComponent (shared table for user-list and user-search)
@@ -74,8 +75,8 @@ src/app/
 
 NgRx Signal Store (`@ngrx/signals`):
 
-- **AuthStore** (`providedIn: 'root'`) — pure state container managing `localStorage('auth_storage')`, exposes `user`, `isAuthenticated`, `isAdmin` computed signals. No `HttpClient` dependency
-- **AuthService** (`providedIn: 'root'`) — HTTP operations (login/register/logout/refresh/profile/OAuth accounts), token refresh scheduling via `provideAppInitializer`. Eliminates the circular dependency chain
+- **AuthStore** (`providedIn: 'root'`) — pure state container managing `localStorage('auth_storage')`. State: `authResponse`, `permissions` (ResolvedPermission[]). Computed: `user`, `isAuthenticated`, `roles`, `isAdmin` (derived from roles). Methods: `hasPermission(permission: string)`, `setPermissions()`. No `HttpClient` dependency
+- **AuthService** (`providedIn: 'root'`) — HTTP operations (login/register/logout/refresh/profile/OAuth accounts/`fetchPermissions`), token refresh scheduling via `provideAppInitializer`. `fetchPermissions()` called after login, token refresh, and `initSession`. Eliminates the circular dependency chain
 - **UsersStore** (route-level at `/users`) — entity-based store with `withEntities<User>()`. Manages user list, detail, search state with **server-side pagination** (calls API with page/limit/sort params, stores totalItems/totalPages from server response) and loading indicators
 - **ThemeService** — `theme` signal (`'light'` | `'dark'`), system preference detection, persists to localStorage
 

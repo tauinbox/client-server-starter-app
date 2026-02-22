@@ -49,7 +49,9 @@ export class UsersService {
   ): Promise<PaginatedResponseDto<User>> {
     const { page, limit, sortBy, sortOrder, ...filters } = query;
 
-    const qb = this.userRepository.createQueryBuilder('user');
+    const qb = this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.roles', 'role');
 
     if (filters.email) {
       qb.andWhere('user.email LIKE :email', {
@@ -91,7 +93,10 @@ export class UsersService {
   }
 
   async findOne(id: string): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id } });
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ['roles']
+    });
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
@@ -100,7 +105,10 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findOne({ where: { email } });
+    return this.userRepository.findOne({
+      where: { email },
+      relations: ['roles']
+    });
   }
 
   async searchUsers(filters: {

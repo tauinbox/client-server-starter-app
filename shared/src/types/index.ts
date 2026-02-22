@@ -13,3 +13,13 @@ export type {
   PaginatedResponse,
   SortOrder
 } from './pagination.types';
+
+export type {
+  RoleResponse,
+  PermissionResponse,
+  RolePermissionResponse,
+  RoleWithPermissionsResponse,
+  PermissionCondition,
+  ResolvedPermission,
+  UserPermissionsResponse
+} from './role.types';

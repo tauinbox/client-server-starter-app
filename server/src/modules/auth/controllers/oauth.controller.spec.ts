@@ -13,7 +13,7 @@ import { OAuthUserProfile } from '../types/oauth-profile';
 
 function mockJwtRequest(userId: string): { user: JwtAuthRequest['user'] } {
   return {
-    user: { userId, email: 'test@example.com', isAdmin: false }
+    user: { userId, email: 'test@example.com', isAdmin: false, roles: [] }
   };
 }
 

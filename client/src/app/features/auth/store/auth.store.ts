@@ -8,6 +8,7 @@ import {
   withState
 } from '@ngrx/signals';
 import type { User } from '@shared/models/user.types';
+import type { ResolvedPermission } from '@app/shared/types';
 import type { AuthResponse, CustomJwtPayload } from '../models/auth.types';
 import { LocalStorageService } from '@core/services/local-storage.service';
 
@@ -15,6 +16,7 @@ export const AUTH_STORAGE_KEY = 'auth_storage';
 
 type AuthState = {
   authResponse: AuthResponse | null;
+  permissions: ResolvedPermission[];
 };
 
 export const AuthStore = signalStore(
@@ -22,13 +24,20 @@ export const AuthStore = signalStore(
   withState<AuthState>(() => {
     const storage = inject(LocalStorageService);
     return {
-      authResponse: storage.getItem<AuthResponse>(AUTH_STORAGE_KEY) ?? null
+      authResponse: storage.getItem<AuthResponse>(AUTH_STORAGE_KEY) ?? null,
+      permissions: []
     };
   }),
   withComputed((store) => ({
     user: computed<User | null>(() => store.authResponse()?.user ?? null),
     isAuthenticated: computed(() => store.authResponse() !== null),
-    isAdmin: computed(() => store.authResponse()?.user?.isAdmin ?? false)
+    isAdmin: computed(
+      () =>
+        store.authResponse()?.user?.roles?.includes('admin') ??
+        store.authResponse()?.user?.isAdmin ??
+        false
+    ),
+    roles: computed<string[]>(() => store.authResponse()?.user?.roles ?? [])
   })),
   withMethods((store) => {
     const storage = inject(LocalStorageService);
@@ -81,7 +90,16 @@ export const AuthStore = signalStore(
 
     function clearSession(): void {
       storage.removeItem(AUTH_STORAGE_KEY);
-      patchState(store, { authResponse: null });
+      patchState(store, { authResponse: null, permissions: [] });
+    }
+
+    function setPermissions(permissions: ResolvedPermission[]): void {
+      patchState(store, { permissions });
+    }
+
+    function hasPermission(permission: string): boolean {
+      if (store.isAdmin()) return true;
+      return store.permissions().some((p) => p.permission === permission);
     }
 
     return {
@@ -91,7 +109,9 @@ export const AuthStore = signalStore(
       getTokenExpiryTime,
       saveAuthResponse,
       updateCurrentUser,
-      clearSession
+      clearSession,
+      setPermissions,
+      hasPermission
     };
   })
 );

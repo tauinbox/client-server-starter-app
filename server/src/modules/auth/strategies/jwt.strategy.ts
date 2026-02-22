@@ -16,10 +16,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: CustomJwtPayload): PayloadFromJwt {
+    const roles = payload.roles ?? [];
     return {
       userId: payload.sub!,
       email: payload.email,
-      isAdmin: payload.isAdmin
+      isAdmin: roles.includes('admin') || payload.isAdmin,
+      roles
     };
   }
 }

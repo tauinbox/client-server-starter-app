@@ -11,7 +11,8 @@ export enum AuthApiEnum {
   VerifyEmail = `${AUTH_API_V1}/verify-email`,
   ResendVerification = `${AUTH_API_V1}/resend-verification`,
   ForgotPassword = `${AUTH_API_V1}/forgot-password`,
-  ResetPassword = `${AUTH_API_V1}/reset-password`
+  ResetPassword = `${AUTH_API_V1}/reset-password`,
+  Permissions = `${AUTH_API_V1}/permissions`
 }
 
 export const OAUTH_URLS = {

@@ -24,6 +24,7 @@ import {
 } from '@nestjs/swagger';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { AuthService } from '../services/auth.service';
+import { PermissionService } from '../services/permission.service';
 import { RegisterDto } from '../dtos/register.dto';
 import { UpdateProfileDto } from '../dtos/update-profile.dto';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
@@ -46,7 +47,8 @@ import { ResetPasswordDto } from '../dtos/reset-password.dto';
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
-    private readonly userService: UsersService
+    private readonly userService: UsersService,
+    private readonly permissionService: PermissionService
   ) {}
 
   @Post('register')
@@ -137,6 +139,20 @@ export class AuthController {
     }
 
     return updatedUser;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('permissions')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user permissions' })
+  @ApiOkResponse({ description: 'User permissions' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  async getPermissions(@Request() req: JwtAuthRequest) {
+    const [roles, permissions] = await Promise.all([
+      this.permissionService.getRoleNamesForUser(req.user.userId),
+      this.permissionService.getPermissionsForUser(req.user.userId)
+    ]);
+    return { roles, permissions };
   }
 
   @Post('verify-email')
