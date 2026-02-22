@@ -41,6 +41,9 @@ export async function loginViaUi(
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('main').getByRole('button', { name: 'Login' }).click();
   await page.waitForURL(/.*\/profile$/);
+  // Wait for the permissions fetch to complete so CASL ability is set
+  // before tests navigate to permission-guarded routes or check guarded UI
+  await page.waitForLoadState('networkidle');
 }
 
 export async function expectAuthRedirect(
