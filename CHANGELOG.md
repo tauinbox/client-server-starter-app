@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.4](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.2...v0.1.4) (2026-02-22)
+
+
+### Features
+
+* **auth:** implement RBAC with conditional permissions system ([#24](https://github.com/tauinbox/client-server-starter-app/issues/24)) ([059666e](https://github.com/tauinbox/client-server-starter-app/commit/059666e80f32bd4259207ed860fe39f40225c442))
+* RBAC system with typed CASL permission checks and remove isAdmin field ([#25](https://github.com/tauinbox/client-server-starter-app/issues/25)) ([59d8179](https://github.com/tauinbox/client-server-starter-app/commit/59d8179ce5fc488d46947ef7ad23766a0e61247e))
+
 ## [0.1.3](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.2...v0.1.3) (2026-02-22)
 
 
