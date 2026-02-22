@@ -43,6 +43,8 @@ export class AuthService {
   readonly #localStorage = inject(LocalStorageService);
   readonly #window = inject(DOCUMENT).defaultView;
 
+  readonly isAuthenticated = this.#authStore.isAuthenticated;
+
   #refreshSubscription: Subscription | undefined;
   #refreshInFlight$: Observable<TokensResponse | null> | null = null;
 
@@ -216,7 +218,7 @@ export class AuthService {
   }
 
   initSession(): void {
-    if (this.#authStore.isAuthenticated()) {
+    if (this.isAuthenticated()) {
       this.scheduleTokenRefresh();
     }
   }
