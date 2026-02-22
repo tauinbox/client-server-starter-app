@@ -22,7 +22,7 @@ export async function loginViaUi(
     lastName: overrides.lastName ?? 'Doe',
     password,
     isActive: overrides.isActive ?? true,
-    isAdmin: overrides.isAdmin ?? false,
+    roles: overrides.roles ?? ['user'],
     isEmailVerified: overrides.isEmailVerified ?? true,
     failedLoginAttempts: overrides.failedLoginAttempts ?? 0,
     lockedUntil: overrides.lockedUntil ?? null,
@@ -41,6 +41,9 @@ export async function loginViaUi(
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('main').getByRole('button', { name: 'Login' }).click();
   await page.waitForURL(/.*\/profile$/);
+  // Wait for the permissions fetch to complete so CASL ability is set
+  // before tests navigate to permission-guarded routes or check guarded UI
+  await page.waitForLoadState('networkidle');
 }
 
 export async function expectAuthRedirect(
@@ -56,7 +59,7 @@ export async function expectForbiddenRedirect(
   mockServerUrl: string,
   url: string
 ): Promise<void> {
-  await loginViaUi(page, mockServerUrl, { isAdmin: false });
+  await loginViaUi(page, mockServerUrl, { roles: ['user'] });
   await page.goto(url);
   await expect(page).toHaveURL(/.*\/forbidden/);
 }

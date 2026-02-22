@@ -30,7 +30,6 @@ import {
 } from '@nestjs/swagger';
 import { UserResponseDto } from '../dtos/user-response.dto';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
-import { PERMISSIONS } from '@app/shared/constants';
 
 @ApiTags('Users API')
 @Controller({
@@ -42,7 +41,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  @Authorize(PERMISSIONS.USERS_CREATE)
+  @Authorize(['create', 'User'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new user (admin only)' })
   @ApiBody({ type: CreateUserDto })
@@ -61,7 +60,7 @@ export class UsersController {
   }
 
   @Get()
-  @Authorize(PERMISSIONS.USERS_LIST)
+  @Authorize(['list', 'User'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get paginated list of users (admin only)' })
   @ApiOkResponse({
@@ -74,7 +73,7 @@ export class UsersController {
   }
 
   @Get('search')
-  @Authorize(PERMISSIONS.USERS_SEARCH)
+  @Authorize(['search', 'User'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Search users by criteria (admin only)' })
   @ApiOkResponse({
@@ -87,7 +86,7 @@ export class UsersController {
   }
 
   @Get(':id')
-  @Authorize(PERMISSIONS.USERS_READ)
+  @Authorize(['read', 'User'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get a user by ID (admin only)' })
   @ApiParam({ name: 'id', description: 'The user ID' })
@@ -103,7 +102,7 @@ export class UsersController {
   }
 
   @Patch(':id')
-  @Authorize(PERMISSIONS.USERS_UPDATE)
+  @Authorize(['update', 'User'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a user (admin only)' })
   @ApiParam({ name: 'id', description: 'The user ID' })
@@ -120,7 +119,7 @@ export class UsersController {
   }
 
   @Delete(':id')
-  @Authorize(PERMISSIONS.USERS_DELETE)
+  @Authorize(['delete', 'User'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a user (admin only)' })
   @ApiParam({ name: 'id', description: 'The user ID' })

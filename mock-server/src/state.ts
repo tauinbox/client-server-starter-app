@@ -1,5 +1,10 @@
-import type { ResolvedPermission } from '@app/shared/types';
-import { PERMISSIONS } from '@app/shared/constants';
+import {
+  AbilityBuilder,
+  createMongoAbility,
+  MongoAbility
+} from '@casl/ability';
+import type { MongoQuery } from '@casl/ability';
+import { packRules } from '@casl/ability/extra';
 import type { MockUser, OAuthAccount, State } from './types';
 import { seedOAuthAccounts, seedUsers } from './seed';
 
@@ -51,22 +56,22 @@ export function addOAuthAccounts(
   state.oauthAccounts.set(userId, [...existing, ...accounts]);
 }
 
-const ALL_PERMISSIONS: ResolvedPermission[] = Object.values(PERMISSIONS).map(
-  (p) => {
-    const [resource, action] = p.split(':');
-    return { resource, action, permission: p, conditions: null };
-  }
-);
+type Actions = 'manage' | 'read' | 'update';
+type Subjects = 'User' | 'Role' | 'Permission' | 'Profile' | 'all';
+type MockAbility = MongoAbility<[Actions, Subjects]>;
 
-const USER_PERMISSIONS: ResolvedPermission[] = ALL_PERMISSIONS.filter(
-  (p) => p.resource === 'profile'
-);
+export function getPackedRulesForUser(user: MockUser): unknown[][] {
+  const { can, build } = new AbilityBuilder<MockAbility>(createMongoAbility);
 
-export function getPermissionsForUser(user: MockUser): ResolvedPermission[] {
   if (user.roles?.includes('admin')) {
-    return ALL_PERMISSIONS;
+    can('manage', 'all');
+  } else {
+    can('read', 'Profile');
+    // CASL infers MongoQuery<never> for string subjects — cast is required
+    can('update', 'Profile', { id: user.id } as MongoQuery<never>);
   }
-  return USER_PERMISSIONS;
+
+  return packRules(build().rules);
 }
 
 // Initialize on import

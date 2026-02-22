@@ -17,14 +17,14 @@ test.describe('User Detail page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: false });
+    await loginViaUi(page, _mockServer.url, {});
     await page.goto('/users/3');
 
     await expect(page.getByText('User Details')).toBeVisible();
   });
 
   test('should display user name and email', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1');
 
     await expect(page.locator('h2', { hasText: 'Admin User' })).toBeVisible();
@@ -43,7 +43,7 @@ test.describe('User Detail page', () => {
         lastName: 'User',
         password: 'Password1',
         isActive: true,
-        isAdmin: false,
+        roles: ['user'],
         isEmailVerified: true,
         failedLoginAttempts: 0,
         lockedUntil: null,
@@ -51,7 +51,7 @@ test.describe('User Detail page', () => {
         updatedAt: '2025-01-01T00:00:00.000Z'
       }
     ]);
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/50');
 
     await expect(page.locator('.chips').getByText('Active')).toBeVisible();
@@ -69,7 +69,7 @@ test.describe('User Detail page', () => {
         lastName: 'User',
         password: 'Password1',
         isActive: false,
-        isAdmin: false,
+        roles: ['user'],
         isEmailVerified: true,
         failedLoginAttempts: 0,
         lockedUntil: null,
@@ -77,7 +77,7 @@ test.describe('User Detail page', () => {
         updatedAt: '2025-01-01T00:00:00.000Z'
       }
     ]);
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/50');
 
     await expect(page.locator('.chips').getByText('Inactive')).toBeVisible();
@@ -87,7 +87,7 @@ test.describe('User Detail page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1');
 
     await expect(
@@ -99,7 +99,7 @@ test.describe('User Detail page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/3');
 
     await expect(page.locator('.chips').getByText('User')).toBeVisible();
@@ -109,7 +109,7 @@ test.describe('User Detail page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1');
 
     await expect(page.getByText('User ID')).toBeVisible();
@@ -118,7 +118,7 @@ test.describe('User Detail page', () => {
   });
 
   test('should show "Edit User" button', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1');
 
     await expect(page.getByRole('button', { name: 'Edit User' })).toBeVisible();
@@ -128,7 +128,7 @@ test.describe('User Detail page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1');
 
     await page.getByRole('button', { name: 'Edit User' }).click();
@@ -136,12 +136,12 @@ test.describe('User Detail page', () => {
     await expect(page).toHaveURL(/.*\/users\/1\/edit$/);
   });
 
-  test('should show back button when viewed user is admin', async ({
+  test('should show back button when logged in as admin', async ({
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
-    await page.goto('/users/1');
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await page.goto('/users/3');
 
     await expect(
       page.locator('mat-card-header button', {
@@ -150,11 +150,11 @@ test.describe('User Detail page', () => {
     ).toBeVisible();
   });
 
-  test('should not show back button when viewed user is not admin', async ({
+  test('should not show back button when logged in as non-admin', async ({
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, {});
     await page.goto('/users/3');
 
     await expect(
@@ -168,7 +168,7 @@ test.describe('User Detail page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/999');
 
     await expect(

@@ -15,7 +15,7 @@
         <span>Profile</span>
       </a>
 
-      @if (authStore.isAdmin()) {
+      <ng-container *appRequirePermission="{ action: 'list', subject: 'User' }">
         <a mat-menu-item [routerLink]="'/' + routes.Users">
           <mat-icon>people</mat-icon>
           <span>Manage Users</span>
@@ -24,7 +24,7 @@
           <mat-icon>search</mat-icon>
           <span>Search Users</span>
         </a>
-      }
+      </ng-container>
 
       <button mat-menu-item (click)="logout()">
         <mat-icon>logout</mat-icon>

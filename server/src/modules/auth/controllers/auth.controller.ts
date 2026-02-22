@@ -22,9 +22,11 @@ import {
   ApiTags,
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
+import { packRules } from '@casl/ability/extra';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { AuthService } from '../services/auth.service';
 import { PermissionService } from '../services/permission.service';
+import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { RegisterDto } from '../dtos/register.dto';
 import { UpdateProfileDto } from '../dtos/update-profile.dto';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
@@ -48,7 +50,8 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly userService: UsersService,
-    private readonly permissionService: PermissionService
+    private readonly permissionService: PermissionService,
+    private readonly caslAbilityFactory: CaslAbilityFactory
   ) {}
 
   @Post('register')
@@ -152,7 +155,12 @@ export class AuthController {
       this.permissionService.getRoleNamesForUser(req.user.userId),
       this.permissionService.getPermissionsForUser(req.user.userId)
     ]);
-    return { roles, permissions };
+    const ability = this.caslAbilityFactory.createForUser(
+      req.user.userId,
+      roles,
+      permissions
+    );
+    return { roles, rules: packRules(ability.rules) };
   }
 
   @Post('verify-email')

@@ -15,9 +15,4 @@ export {
   type UserSortColumn
 } from './user.constants';
 
-export {
-  PERMISSIONS,
-  type Permission,
-  SYSTEM_ROLES,
-  type SystemRole
-} from './permission.constants';
+export { SYSTEM_ROLES, type SystemRole } from './permission.constants';

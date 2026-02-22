@@ -25,7 +25,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     await expect(page.getByText('User Management')).toBeVisible();
@@ -35,7 +35,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     await expect(
@@ -62,7 +62,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     // Wait for table to load
@@ -79,7 +79,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     // Override the users endpoint to return empty paginated response
     await page.route('**/api/v1/users?*', (route) => {
       if (route.request().method() === 'GET') {
@@ -100,7 +100,7 @@ test.describe('User List page', () => {
   });
 
   test('should display paginator', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     await expect(page.locator('mat-paginator')).toBeVisible();
@@ -110,7 +110,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     // Wait for first page to load
@@ -131,7 +131,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
 
     // Override to return a known user on page 1
     const knownUser = {
@@ -140,7 +140,7 @@ test.describe('User List page', () => {
       firstName: 'Admin',
       lastName: 'User',
       isActive: true,
-      isAdmin: true,
+      roles: ['admin'],
       isEmailVerified: true,
       failedLoginAttempts: 0,
       lockedUntil: null,
@@ -179,7 +179,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
 
     const knownUser = {
       id: '1',
@@ -187,7 +187,7 @@ test.describe('User List page', () => {
       firstName: 'Admin',
       lastName: 'User',
       isActive: true,
-      isAdmin: true,
+      roles: ['admin'],
       isEmailVerified: true,
       failedLoginAttempts: 0,
       lockedUntil: null,
@@ -224,7 +224,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     await page
@@ -240,7 +240,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
 
     const knownUser = {
       id: '3',
@@ -248,7 +248,7 @@ test.describe('User List page', () => {
       firstName: 'John',
       lastName: 'Smith',
       isActive: true,
-      isAdmin: false,
+      roles: ['user'],
       isEmailVerified: true,
       failedLoginAttempts: 0,
       lockedUntil: null,
@@ -288,7 +288,7 @@ test.describe('User List page', () => {
   });
 
   test('should delete user after confirming', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     // Wait for table to load
@@ -317,7 +317,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     await expect(page.locator('mat-paginator')).toBeVisible();

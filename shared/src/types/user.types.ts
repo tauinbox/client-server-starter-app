@@ -4,7 +4,6 @@ export type UserResponse = {
   firstName: string;
   lastName: string;
   isActive: boolean;
-  isAdmin: boolean;
   roles: string[];
   isEmailVerified: boolean;
   failedLoginAttempts: number;

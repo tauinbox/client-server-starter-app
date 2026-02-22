@@ -22,7 +22,9 @@ export type UpdateProfile = {
 
 export type CustomJwtPayload = JwtPayload & {
   userId: User['id'];
-} & Pick<User, 'email' | 'isAdmin'> & { roles?: string[] };
+  email: string;
+  roles?: string[];
+};
 
 export type ForgotPasswordRequest = {
   email: string;

@@ -39,5 +39,5 @@ export type ResolvedPermission = {
 
 export type UserPermissionsResponse = {
   roles: string[];
-  permissions: ResolvedPermission[];
+  rules: unknown[][];
 };

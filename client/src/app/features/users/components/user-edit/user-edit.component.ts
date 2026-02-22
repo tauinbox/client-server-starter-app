@@ -44,7 +44,6 @@ type UserFormType = {
   firstName: FormControl<string>;
   lastName: FormControl<string>;
   password: FormControl<string>;
-  isAdmin: FormControl<boolean>;
   isActive: FormControl<boolean>;
 };
 
@@ -106,7 +105,6 @@ export class UserEditComponent implements OnInit {
         validators: [Validators.minLength(8)],
         nonNullable: true
       }),
-      isAdmin: this.#fb.control(false, { nonNullable: true }),
       isActive: this.#fb.control(true, { nonNullable: true })
     });
 
@@ -114,8 +112,14 @@ export class UserEditComponent implements OnInit {
     () => this.userForm.valid && !this.saving() && this.userForm.dirty
   );
 
+  protected readonly canManageUser = computed(() =>
+    this.authStore.hasPermission('update', 'User')
+  );
+
   protected readonly canDelete = computed(
-    () => this.authStore.isAdmin() && this.id() !== this.authStore.user()?.id
+    () =>
+      this.authStore.hasPermission('delete', 'User') &&
+      this.id() !== this.authStore.user()?.id
   );
 
   ngOnInit() {
@@ -134,7 +138,6 @@ export class UserEditComponent implements OnInit {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          isAdmin: user.isAdmin,
           isActive: user.isActive,
           password: ''
         });
@@ -179,8 +182,7 @@ export class UserEditComponent implements OnInit {
       updateData.password = formValues.password;
     }
 
-    if (this.authStore.isAdmin()) {
-      updateData.isAdmin = formValues.isAdmin;
+    if (this.authStore.hasPermission('update', 'User')) {
       updateData.isActive = formValues.isActive;
     }
 

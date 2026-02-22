@@ -22,7 +22,7 @@ import { FacebookStrategy } from './strategies/facebook.strategy';
 import { VkStrategy } from './strategies/vk.strategy';
 import { User } from '../users/entities/user.entity';
 import { PermissionService } from './services/permission.service';
-import { PolicyEvaluatorService } from './services/policy-evaluator.service';
+import { CaslAbilityFactory } from './casl/casl-ability.factory';
 import { RoleService } from './services/role.service';
 import { RolesController } from './controllers/roles.controller';
 
@@ -76,7 +76,7 @@ function conditionalProvider(
     TokenCleanupService,
     OAuthAccountService,
     PermissionService,
-    PolicyEvaluatorService,
+    CaslAbilityFactory,
     RoleService,
     conditionalProvider('GOOGLE_CLIENT_ID', GoogleStrategy),
     conditionalProvider('FACEBOOK_CLIENT_ID', FacebookStrategy),

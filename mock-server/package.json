@@ -12,6 +12,7 @@
     "format:check": "prettier --check \"src/**/*.ts\""
   },
   "dependencies": {
+    "@casl/ability": "^6.8.0",
     "@faker-js/faker": "^10.3.0",
     "cors": "^2.8.5",
     "express": "^4.21.0",

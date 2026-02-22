@@ -26,6 +26,7 @@
     "migrations:revert": "npx typeorm-ts-node-esm migration:revert -d dist/server/src/postgres-data-source.js"
   },
   "dependencies": {
+    "@casl/ability": "^6.8.0",
     "@jorgebodega/typeorm-seeding": "^7.1.0",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/cache-manager": "^3.1.0",

@@ -25,15 +25,6 @@ export class SearchUsersQueryDto extends PaginationQueryDto {
   @IsOptional()
   lastName?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by admin status' })
-  @IsOptional()
-  @Transform(({ value }: { value: unknown }) => {
-    if (value === 'true' || value === true) return true;
-    if (value === 'false' || value === false) return false;
-    return undefined;
-  })
-  isAdmin?: boolean;
-
   @ApiPropertyOptional({ description: 'Filter by active status' })
   @IsOptional()
   @Transform(({ value }: { value: unknown }) => {

@@ -1,6 +1,6 @@
 import type { Routes } from '@angular/router';
 import { authGuard } from '@features/auth/guards/auth.guard';
-import { adminGuard } from '@features/auth/guards/admin.guard';
+import { permissionGuard } from '@features/auth/guards/permission.guard';
 import { guestGuard } from '@features/auth/guards/guest.guard';
 import { AppRouteSegmentEnum } from './app.route-segment.enum';
 import { UsersStore } from '@features/users/store/users.store';
@@ -45,7 +45,7 @@ export const routes: Routes = [
           import('./features/users/components/user-list/user-list.component').then(
             (c) => c.UserListComponent
           ),
-        canActivate: [adminGuard]
+        canActivate: [permissionGuard('list', 'User')]
       },
       {
         path: 'search',
@@ -53,7 +53,7 @@ export const routes: Routes = [
           import('./features/users/components/user-search/user-search.component').then(
             (c) => c.UserSearchComponent
           ),
-        canActivate: [adminGuard]
+        canActivate: [permissionGuard('search', 'User')]
       },
       {
         path: ':id',

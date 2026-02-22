@@ -537,7 +537,6 @@ export class AuthService {
     const jwtPayload: CustomJwtPayload = {
       sub: userId,
       email,
-      isAdmin: roles.includes(SYSTEM_ROLES.ADMIN),
       roles
     };
 

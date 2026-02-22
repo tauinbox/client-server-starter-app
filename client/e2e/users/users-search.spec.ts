@@ -25,20 +25,19 @@ test.describe('User Search page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/search');
 
     await expect(page.getByText('Search Users')).toBeVisible();
   });
 
   test('should display search form fields', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/search');
 
     await expect(page.getByLabel('Email')).toBeVisible();
     await expect(page.getByLabel('First Name')).toBeVisible();
     await expect(page.getByLabel('Last Name')).toBeVisible();
-    await expect(page.getByLabel('Role')).toBeVisible();
     await expect(page.getByLabel('Status')).toBeVisible();
   });
 
@@ -46,7 +45,7 @@ test.describe('User Search page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/search');
 
     await page.getByLabel('Email').fill('example');
@@ -60,7 +59,7 @@ test.describe('User Search page', () => {
   });
 
   test('should display result count', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/search');
 
     // Search for "Smith" last name — only John Smith matches
@@ -74,7 +73,7 @@ test.describe('User Search page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/search');
 
     // Search for a non-existent email
@@ -88,7 +87,7 @@ test.describe('User Search page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/search');
 
     await page.getByLabel('Email').fill('example');
@@ -106,7 +105,7 @@ test.describe('User Search page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/search');
 
     await page.getByLabel('Email').fill('admin@example.com');
@@ -126,7 +125,7 @@ test.describe('User Search page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/search');
 
     await page.getByLabel('Email').fill('admin@example.com');
@@ -140,32 +139,12 @@ test.describe('User Search page', () => {
     await expect(page).toHaveURL(/.*\/users\/1\/edit$/);
   });
 
-  test('should send isAdmin=true when "Admin" role is selected', async ({
-    _mockServer,
-    page
-  }) => {
-    const capturedUrls: string[] = [];
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
-    await page.route('**/api/v1/users/search*', (route) => {
-      capturedUrls.push(route.request().url());
-      return route.fallback();
-    });
-    await page.goto('/users/search');
-
-    await page.getByLabel('Role').click();
-    await page.getByRole('option', { name: 'Admin' }).click();
-    await page.getByRole('button', { name: 'Search' }).click();
-
-    await expect(page.getByText('Search Results')).toBeVisible();
-    expect(capturedUrls[0]).toContain('isAdmin=true');
-  });
-
   test('should send isActive=true when "Active" status is selected', async ({
     _mockServer,
     page
   }) => {
     const capturedUrls: string[] = [];
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.route('**/api/v1/users/search*', (route) => {
       capturedUrls.push(route.request().url());
       return route.fallback();
@@ -184,7 +163,7 @@ test.describe('User Search page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { isAdmin: true });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/search');
 
     await page.getByLabel('Email').fill('john@example.com');

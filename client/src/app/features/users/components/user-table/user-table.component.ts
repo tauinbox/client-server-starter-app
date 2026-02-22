@@ -32,7 +32,6 @@ export const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
   email: 'email',
   name: 'firstName',
   status: 'isActive',
-  role: 'isAdmin',
   createdAt: 'createdAt'
 };
 

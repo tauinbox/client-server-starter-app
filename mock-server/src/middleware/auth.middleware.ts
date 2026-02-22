@@ -13,7 +13,7 @@ import { generateTokens } from '../jwt.utils';
 import {
   findUserByEmail,
   findUserById,
-  getPermissionsForUser,
+  getPackedRulesForUser,
   getState,
   toUserResponse
 } from '../state';
@@ -71,7 +71,6 @@ router.post('/register', (req, res) => {
     lastName,
     password, // Stored as plaintext — mock only. Real server uses bcrypt.
     isActive: true,
-    isAdmin: false,
     roles: ['user'],
     isEmailVerified: false,
     failedLoginAttempts: 0,
@@ -385,8 +384,8 @@ router.get('/profile', authGuard, (req, res) => {
 // GET /api/v1/auth/permissions
 router.get('/permissions', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
-  const permissions = getPermissionsForUser(user);
-  res.json({ roles: user.roles, permissions });
+  const rules = getPackedRulesForUser(user);
+  res.json({ roles: user.roles, rules });
 });
 
 // PATCH /api/v1/auth/profile

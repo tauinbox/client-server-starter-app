@@ -7,12 +7,13 @@ import {
   ViewContainerRef
 } from '@angular/core';
 import { AuthStore } from '../store/auth.store';
+import type { PermissionCheck } from '../casl/app-ability';
 
 @Directive({
   selector: '[appRequirePermission]'
 })
 export class RequirePermissionDirective {
-  readonly appRequirePermission = input.required<string>();
+  readonly appRequirePermission = input.required<PermissionCheck>();
 
   readonly #templateRef = inject(TemplateRef<unknown>);
   readonly #viewContainer = inject(ViewContainerRef);
@@ -22,8 +23,8 @@ export class RequirePermissionDirective {
 
   constructor() {
     effect(() => {
-      const permission = this.appRequirePermission();
-      const hasPermission = this.#authStore.hasPermission(permission);
+      const { action, subject } = this.appRequirePermission();
+      const hasPermission = this.#authStore.hasPermission(action, subject);
 
       if (hasPermission && !this.#hasView) {
         this.#viewContainer.createEmbeddedView(this.#templateRef);

@@ -22,7 +22,6 @@ const mockUser: User = {
   email: 'test@example.com',
   firstName: 'Test',
   lastName: 'User',
-  isAdmin: false,
   roles: ['user'],
   isActive: true,
   isEmailVerified: true,
@@ -40,10 +39,10 @@ describe('UserEditComponent', () => {
     updateUser: ReturnType<typeof vi.fn>;
     deleteUser: ReturnType<typeof vi.fn>;
   };
-  let isAdminSignal: WritableSignal<boolean>;
+  let permittedSignal: WritableSignal<boolean>;
   let currentUserSignal: WritableSignal<{ id: string } | null>;
   let authStoreMock: {
-    isAdmin: WritableSignal<boolean>;
+    hasPermission: ReturnType<typeof vi.fn>;
     user: WritableSignal<{ id: string } | null>;
     updateCurrentUser: ReturnType<typeof vi.fn>;
   };
@@ -52,7 +51,7 @@ describe('UserEditComponent', () => {
   let router: Router;
 
   beforeEach(async () => {
-    isAdminSignal = signal(true);
+    permittedSignal = signal(true);
     currentUserSignal = signal({ id: 'admin-id' });
 
     userServiceMock = {
@@ -65,7 +64,7 @@ describe('UserEditComponent', () => {
     };
 
     authStoreMock = {
-      isAdmin: isAdminSignal,
+      hasPermission: vi.fn().mockImplementation(() => permittedSignal()),
       user: currentUserSignal,
       updateCurrentUser: vi.fn()
     };
@@ -111,7 +110,6 @@ describe('UserEditComponent', () => {
         firstName: 'Test',
         lastName: 'User',
         password: '',
-        isAdmin: false,
         isActive: true
       });
     });
@@ -232,20 +230,20 @@ describe('UserEditComponent', () => {
       fixture.detectChanges();
     });
 
-    it('should be true when admin editing another user', () => {
-      isAdminSignal.set(true);
+    it('should be true when permitted editing another user', () => {
+      permittedSignal.set(true);
       currentUserSignal.set({ id: 'admin-id' }); // not 'user-1'
       expect(component['canDelete']()).toBe(true);
     });
 
     it('should be false when editing own account', () => {
-      isAdminSignal.set(true);
+      permittedSignal.set(true);
       currentUserSignal.set({ id: 'user-1' }); // same as the input id
       expect(component['canDelete']()).toBe(false);
     });
 
-    it('should be false when not admin', () => {
-      isAdminSignal.set(false);
+    it('should be false when lacking delete permission', () => {
+      permittedSignal.set(false);
       currentUserSignal.set({ id: 'admin-id' });
       expect(component['canDelete']()).toBe(false);
     });
@@ -271,7 +269,6 @@ describe('UserEditComponent', () => {
         email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
-        isAdmin: false,
         isActive: true
       });
     });
@@ -286,8 +283,8 @@ describe('UserEditComponent', () => {
       );
     });
 
-    it('should not include isAdmin/isActive when not admin', () => {
-      isAdminSignal.set(false);
+    it('should not include isActive when lacking update permission', () => {
+      permittedSignal.set(false);
       component['userForm'].controls.password.setValue('');
       component.onSubmit();
 

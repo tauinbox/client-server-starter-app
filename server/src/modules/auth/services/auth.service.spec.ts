@@ -89,7 +89,6 @@ describe('AuthService', () => {
     lastName: 'Doe',
     password: '$2b$10$hashedpassword',
     isActive: true,
-    isAdmin: false,
     isEmailVerified: true,
     failedLoginAttempts: 0,
     lockedUntil: null,
@@ -107,7 +106,6 @@ describe('AuthService', () => {
     firstName: mockUser.firstName,
     lastName: mockUser.lastName,
     isActive: mockUser.isActive,
-    isAdmin: mockUser.isAdmin,
     roles: [] as string[],
     isEmailVerified: mockUser.isEmailVerified,
     failedLoginAttempts: mockUser.failedLoginAttempts,
@@ -419,7 +417,6 @@ describe('AuthService', () => {
         {
           sub: 'user-1',
           email: 'test@example.com',
-          isAdmin: false,
           roles: ['user']
         },
         { expiresIn: 3600 }

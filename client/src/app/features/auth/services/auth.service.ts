@@ -58,7 +58,7 @@ export class AuthService {
         tap((response) => {
           this.#authStore.saveAuthResponse(response);
           this.scheduleTokenRefresh();
-          this.fetchPermissions();
+          void this.fetchPermissions();
         })
       );
   }
@@ -219,24 +219,24 @@ export class AuthService {
     );
   }
 
-  fetchPermissions(): void {
-    this.#http
-      .get<UserPermissionsResponse>(AuthApiEnum.Permissions, {
+  fetchPermissions(): Promise<void> {
+    return firstValueFrom(
+      this.#http.get<UserPermissionsResponse>(AuthApiEnum.Permissions, {
         context: silentContext()
       })
-      .subscribe({
-        next: (response) =>
-          this.#authStore.setPermissions(response.permissions),
-        error: () => {
-          // Permissions fetch failed — keep going with empty permissions
-        }
+    )
+      .then((response) => {
+        this.#authStore.setRules(response.rules);
+      })
+      .catch(() => {
+        // Permissions fetch failed — keep going with empty permissions
       });
   }
 
   initSession(): void {
     if (this.isAuthenticated()) {
       this.scheduleTokenRefresh();
-      this.fetchPermissions();
+      void this.fetchPermissions();
     }
   }
 
@@ -303,7 +303,7 @@ export class AuthService {
 
     this.#authStore.saveAuthResponse(response);
     this.scheduleTokenRefresh();
-    this.fetchPermissions();
+    void this.fetchPermissions();
     return response.tokens;
   }
 }

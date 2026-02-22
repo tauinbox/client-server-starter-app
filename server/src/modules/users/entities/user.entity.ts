@@ -31,9 +31,6 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
-  @Column({ default: false })
-  isAdmin: boolean;
-
   @ManyToMany(() => Role, (role) => role.users)
   @JoinTable({
     name: 'user_roles',

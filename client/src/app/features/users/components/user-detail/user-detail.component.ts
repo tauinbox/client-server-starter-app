@@ -20,6 +20,7 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatChip } from '@angular/material/chips';
 import { MatDivider } from '@angular/material/divider';
 import { UsersStore } from '../../store/users.store';
+import { RequirePermissionDirective } from '../../../auth/directives/require-permission.directive';
 
 @Component({
   selector: 'app-user-detail',
@@ -35,7 +36,8 @@ import { UsersStore } from '../../store/users.store';
     MatChip,
     MatDivider,
     MatButton,
-    DatePipe
+    DatePipe,
+    RequirePermissionDirective
   ],
   templateUrl: './user-detail.component.html',
   styleUrl: './user-detail.component.scss',

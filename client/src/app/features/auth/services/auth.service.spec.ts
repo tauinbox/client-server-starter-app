@@ -35,7 +35,6 @@ function createMockAuthResponse(
       access_token: createJwt({
         sub: '1',
         email: 'test@example.com',
-        isAdmin: false,
         exp
       }),
       refresh_token: 'valid-refresh-token',
@@ -47,7 +46,6 @@ function createMockAuthResponse(
       firstName: 'Test',
       lastName: 'User',
       isActive: true,
-      isAdmin: false,
       roles: ['user'],
       isEmailVerified: true,
       failedLoginAttempts: 0,
@@ -68,7 +66,7 @@ describe('AuthService', () => {
     saveAuthResponse: ReturnType<typeof vi.fn>;
     updateCurrentUser: ReturnType<typeof vi.fn>;
     clearSession: ReturnType<typeof vi.fn>;
-    setPermissions: ReturnType<typeof vi.fn>;
+    setRules: ReturnType<typeof vi.fn>;
   };
   beforeEach(() => {
     authStoreMock = {
@@ -78,7 +76,7 @@ describe('AuthService', () => {
       saveAuthResponse: vi.fn(),
       updateCurrentUser: vi.fn(),
       clearSession: vi.fn(),
-      setPermissions: vi.fn()
+      setRules: vi.fn()
     };
 
     TestBed.configureTestingModule({
@@ -98,7 +96,7 @@ describe('AuthService', () => {
     // Flush any pending permissions requests fired as side effects
     httpMock
       .match(AuthApiEnum.Permissions)
-      .forEach((req) => req.flush({ permissions: [] }));
+      .forEach((req) => req.flush({ rules: [] }));
     httpMock.verify();
     TestBed.resetTestingModule();
   });

@@ -11,7 +11,7 @@ export type MockUser = {
   firstName: string;
   lastName: string;
   isActive: boolean;
-  isAdmin: boolean;
+  roles: string[];
   isEmailVerified: boolean;
   failedLoginAttempts: number;
   lockedUntil: string | null;
@@ -25,7 +25,7 @@ export const defaultUser: MockUser = {
   firstName: 'John',
   lastName: 'Doe',
   isActive: true,
-  isAdmin: false,
+  roles: ['user'],
   isEmailVerified: true,
   failedLoginAttempts: 0,
   lockedUntil: null,
@@ -45,7 +45,7 @@ export const mockUsersList: MockUser[] = [
     email: 'admin@example.com',
     firstName: 'Admin',
     lastName: 'User',
-    isAdmin: true,
+    roles: ['admin'],
     isActive: true,
     isEmailVerified: true,
     failedLoginAttempts: 0,
@@ -58,7 +58,7 @@ export const mockUsersList: MockUser[] = [
     email: 'john@example.com',
     firstName: 'John',
     lastName: 'Smith',
-    isAdmin: false,
+    roles: ['user'],
     isActive: true,
     isEmailVerified: true,
     failedLoginAttempts: 0,
@@ -71,7 +71,7 @@ export const mockUsersList: MockUser[] = [
     email: 'jane@example.com',
     firstName: 'Jane',
     lastName: 'Doe',
-    isAdmin: false,
+    roles: ['user'],
     isActive: false,
     isEmailVerified: true,
     failedLoginAttempts: 0,

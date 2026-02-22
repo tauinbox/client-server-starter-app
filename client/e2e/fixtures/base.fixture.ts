@@ -24,7 +24,7 @@ export type MockServerApi = {
       lastName: string;
       password: string;
       isActive: boolean;
-      isAdmin: boolean;
+      roles: string[];
       isEmailVerified: boolean;
       failedLoginAttempts: number;
       lockedUntil: string | null;

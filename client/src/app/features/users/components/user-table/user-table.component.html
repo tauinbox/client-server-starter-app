@@ -44,7 +44,7 @@
     <ng-container matColumnDef="role">
       <th mat-header-cell *matHeaderCellDef mat-sort-header>Role</th>
       <td mat-cell *matCellDef="let user">
-        @if (user.isAdmin) {
+        @if (user.roles?.includes('admin')) {
           <mat-chip color="primary" highlighted>Admin</mat-chip>
         } @else {
           <mat-chip>User</mat-chip>

@@ -43,7 +43,7 @@ test.describe('Account lockout', () => {
         lastName: 'User',
         password: 'Password1',
         isActive: true,
-        isAdmin: false,
+        roles: ['user'],
         isEmailVerified: true,
         failedLoginAttempts: 5,
         lockedUntil,
@@ -78,7 +78,7 @@ test.describe('Account lockout', () => {
         lastName: 'Account',
         password: 'Password1',
         isActive: true,
-        isAdmin: false,
+        roles: ['user'],
         isEmailVerified: true,
         failedLoginAttempts: 5,
         lockedUntil,
@@ -91,7 +91,7 @@ test.describe('Account lockout', () => {
     await loginViaUi(page, _mockServer.url, {
       id: '1',
       email: 'admin@example.com',
-      isAdmin: true
+      roles: ['admin']
     });
 
     // Navigate to the locked user's edit page

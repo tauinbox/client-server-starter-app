@@ -20,7 +20,7 @@
           </p>
           <p>
             <strong>Role:</strong>
-            {{ u.isAdmin ? 'Administrator' : 'User' }}
+            {{ u.roles.includes('admin') ? 'Administrator' : 'User' }}
           </p>
           <p>
             <strong>Status:</strong>
