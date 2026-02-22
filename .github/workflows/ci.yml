@@ -43,6 +43,7 @@ jobs:
       JWT_SECRET: ci-test-secret-not-for-production
       JWT_EXPIRATION: 3600
       JWT_REFRESH_EXPIRATION: 604800
+      CLIENT_URL: http://localhost:4200
 
     steps:
       - uses: actions/checkout@v4
