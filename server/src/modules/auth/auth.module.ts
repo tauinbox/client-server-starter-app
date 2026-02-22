@@ -82,6 +82,6 @@ function conditionalProvider(
     conditionalProvider('FACEBOOK_CLIENT_ID', FacebookStrategy),
     conditionalProvider('VK_CLIENT_ID', VkStrategy)
   ],
-  exports: [AuthService, PermissionService, RoleService]
+  exports: [AuthService, PermissionService, RoleService, CaslAbilityFactory]
 })
 export class AuthModule {}
