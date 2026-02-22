@@ -4,7 +4,7 @@
     <mat-card-header>
       <mat-card-title>User Details</mat-card-title>
       <div class="spacer"></div>
-      <ng-container *appRequirePermission="'users:list'">
+      <ng-container *appRequirePermission="{ action: 'list', subject: 'User' }">
         <button
           mat-icon-button
           color="primary"

@@ -74,7 +74,7 @@ describe('PermissionsGuard', () => {
   it('should pass when user has admin role', async () => {
     jest
       .spyOn(reflector, 'getAllAndOverride')
-      .mockReturnValue(['users:delete']);
+      .mockReturnValue([['delete', 'User']]);
     const context = createMockContext({
       userId: 'user-1',
       roles: ['admin']
@@ -87,7 +87,9 @@ describe('PermissionsGuard', () => {
   });
 
   it('should pass when user has all required permissions', async () => {
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['users:read']);
+    jest
+      .spyOn(reflector, 'getAllAndOverride')
+      .mockReturnValue([['read', 'User']]);
     permissionService.getPermissionsForUser.mockResolvedValue([
       {
         permission: 'users:read',
@@ -111,7 +113,7 @@ describe('PermissionsGuard', () => {
   it('should throw ForbiddenException when user lacks permissions', async () => {
     jest
       .spyOn(reflector, 'getAllAndOverride')
-      .mockReturnValue(['users:delete']);
+      .mockReturnValue([['delete', 'User']]);
     permissionService.getPermissionsForUser.mockResolvedValue([
       {
         permission: 'users:read',
@@ -134,9 +136,10 @@ describe('PermissionsGuard', () => {
   });
 
   it('should require ALL permissions when multiple are specified', async () => {
-    jest
-      .spyOn(reflector, 'getAllAndOverride')
-      .mockReturnValue(['users:read', 'users:update']);
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([
+      ['read', 'User'],
+      ['update', 'User']
+    ]);
     permissionService.getPermissionsForUser.mockResolvedValue([
       {
         permission: 'users:read',

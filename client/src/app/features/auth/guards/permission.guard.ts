@@ -5,8 +5,12 @@ import { AuthStore } from '../store/auth.store';
 import { AuthService } from '../services/auth.service';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { ensureAuthenticated } from '../utils/ensure-authenticated';
+import type { Actions, Subjects } from '../casl/app-ability';
 
-export function permissionGuard(permission: string): CanActivateFn {
+export function permissionGuard(
+  action: Actions,
+  subject: Subjects
+): CanActivateFn {
   return (route, state) => {
     const authStore = inject(AuthStore);
     const authService = inject(AuthService);
@@ -18,7 +22,7 @@ export function permissionGuard(permission: string): CanActivateFn {
       router,
       state.url,
       () => {
-        if (authStore.hasPermission(permission)) return true;
+        if (authStore.hasPermission(action, subject)) return true;
         void router.navigate([`/${AppRouteSegmentEnum.Forbidden}`]);
         return false;
       }

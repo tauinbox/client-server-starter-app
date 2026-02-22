@@ -208,7 +208,7 @@ describe('AuthStore', () => {
     it('should return false when no rules are set', () => {
       const store = createStore(null);
 
-      expect(store.hasPermission('users:list')).toBe(false);
+      expect(store.hasPermission('list', 'User')).toBe(false);
     });
 
     it('should return true for a permitted action after setRules', () => {
@@ -220,7 +220,7 @@ describe('AuthStore', () => {
 
       store.setRules(packed);
 
-      expect(store.hasPermission('users:list')).toBe(true);
+      expect(store.hasPermission('list', 'User')).toBe(true);
     });
 
     it('should return false for an action not in rules', () => {
@@ -232,7 +232,7 @@ describe('AuthStore', () => {
 
       store.setRules(packed);
 
-      expect(store.hasPermission('users:delete')).toBe(false);
+      expect(store.hasPermission('delete', 'User')).toBe(false);
     });
 
     it('should return true for all actions when manage+all rule is set (admin)', () => {
@@ -244,9 +244,9 @@ describe('AuthStore', () => {
 
       store.setRules(packed);
 
-      expect(store.hasPermission('users:list')).toBe(true);
-      expect(store.hasPermission('users:delete')).toBe(true);
-      expect(store.hasPermission('profile:update')).toBe(true);
+      expect(store.hasPermission('list', 'User')).toBe(true);
+      expect(store.hasPermission('delete', 'User')).toBe(true);
+      expect(store.hasPermission('update', 'Profile')).toBe(true);
     });
 
     it('should reset ability to null on clearSession', () => {
@@ -260,7 +260,7 @@ describe('AuthStore', () => {
 
       store.clearSession();
 
-      expect(store.hasPermission('users:list')).toBe(false);
+      expect(store.hasPermission('list', 'User')).toBe(false);
     });
   });
 });

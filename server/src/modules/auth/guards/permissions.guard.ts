@@ -8,7 +8,7 @@ import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
 import { PermissionService } from '../services/permission.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
-import { SUBJECT_MAP, Actions } from '../casl/app-ability';
+import type { PermissionCheck } from '../casl/app-ability';
 import { JwtAuthRequest } from '../types/auth.request';
 import { SYSTEM_ROLES } from '@app/shared/constants';
 
@@ -21,10 +21,9 @@ export class PermissionsGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(
-      PERMISSIONS_KEY,
-      [context.getHandler(), context.getClass()]
-    );
+    const requiredPermissions = this.reflector.getAllAndOverride<
+      PermissionCheck[]
+    >(PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
 
     if (!requiredPermissions || requiredPermissions.length === 0) {
       return true;
@@ -47,12 +46,9 @@ export class PermissionsGuard implements CanActivate {
       userPermissions
     );
 
-    const hasAll = requiredPermissions.every((p) => {
-      const [resource, action] = p.split(':');
-      const subject = SUBJECT_MAP[resource];
-      if (!subject) return false;
-      return ability.can(action as Actions, subject);
-    });
+    const hasAll = requiredPermissions.every(([action, subject]) =>
+      ability.can(action, subject)
+    );
 
     if (!hasAll) {
       throw new ForbiddenException('Insufficient permissions');

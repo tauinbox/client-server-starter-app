@@ -23,7 +23,6 @@ describe('permissionGuard', () => {
 
   const mockRoute = {} as ActivatedRouteSnapshot;
   const mockState = { url: '/users' } as RouterStateSnapshot;
-  const testPermission = 'users:list';
 
   beforeEach(() => {
     authStoreMock = {
@@ -50,7 +49,7 @@ describe('permissionGuard', () => {
     authStoreMock.hasPermission.mockReturnValue(true);
 
     const result = TestBed.runInInjectionContext(() =>
-      permissionGuard(testPermission)(mockRoute, mockState)
+      permissionGuard('list', 'User')(mockRoute, mockState)
     );
 
     expect(result).toBe(true);
@@ -62,7 +61,7 @@ describe('permissionGuard', () => {
     vi.spyOn(router, 'navigate');
 
     const result = TestBed.runInInjectionContext(() =>
-      permissionGuard(testPermission)(mockRoute, mockState)
+      permissionGuard('list', 'User')(mockRoute, mockState)
     );
 
     expect(result).toBe(false);
@@ -77,7 +76,7 @@ describe('permissionGuard', () => {
     vi.spyOn(router, 'navigate');
 
     const result = TestBed.runInInjectionContext(() =>
-      permissionGuard(testPermission)(mockRoute, mockState)
+      permissionGuard('list', 'User')(mockRoute, mockState)
     );
 
     const value = await firstValueFrom(result as Observable<boolean>);
@@ -97,7 +96,7 @@ describe('permissionGuard', () => {
     authStoreMock.hasPermission.mockReturnValue(true);
 
     const result = TestBed.runInInjectionContext(() =>
-      permissionGuard(testPermission)(mockRoute, mockState)
+      permissionGuard('list', 'User')(mockRoute, mockState)
     );
 
     const value = await firstValueFrom(result as Observable<boolean>);
@@ -115,7 +114,7 @@ describe('permissionGuard', () => {
     vi.spyOn(router, 'navigate');
 
     const result = TestBed.runInInjectionContext(() =>
-      permissionGuard(testPermission)(mockRoute, mockState)
+      permissionGuard('list', 'User')(mockRoute, mockState)
     );
 
     const value = await firstValueFrom(result as Observable<boolean>);

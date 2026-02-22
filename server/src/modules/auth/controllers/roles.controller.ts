@@ -27,7 +27,6 @@ import {
   AssignRoleDto
 } from '../dtos/assign-permissions.dto';
 import { Authorize } from '../decorators/authorize.decorator';
-import { PERMISSIONS } from '@app/shared/constants';
 
 @ApiTags('Roles API')
 @Controller({
@@ -38,7 +37,7 @@ export class RolesController {
   constructor(private readonly roleService: RoleService) {}
 
   @Get()
-  @Authorize(PERMISSIONS.ROLES_READ)
+  @Authorize(['read', 'Role'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List all roles' })
   @ApiOkResponse({ description: 'List of roles' })
@@ -49,7 +48,7 @@ export class RolesController {
   }
 
   @Get('permissions')
-  @Authorize(PERMISSIONS.ROLES_READ)
+  @Authorize(['read', 'Role'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List all available permissions' })
   @ApiOkResponse({ description: 'List of permissions' })
@@ -58,7 +57,7 @@ export class RolesController {
   }
 
   @Get(':id')
-  @Authorize(PERMISSIONS.ROLES_READ)
+  @Authorize(['read', 'Role'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get a role by ID' })
   @ApiParam({ name: 'id', description: 'The role ID' })
@@ -69,7 +68,7 @@ export class RolesController {
   }
 
   @Post()
-  @Authorize(PERMISSIONS.ROLES_CREATE)
+  @Authorize(['create', 'Role'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new role' })
   @ApiBody({ type: CreateRoleDto })
@@ -79,7 +78,7 @@ export class RolesController {
   }
 
   @Patch(':id')
-  @Authorize(PERMISSIONS.ROLES_UPDATE)
+  @Authorize(['update', 'Role'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a role' })
   @ApiParam({ name: 'id', description: 'The role ID' })
@@ -91,7 +90,7 @@ export class RolesController {
   }
 
   @Delete(':id')
-  @Authorize(PERMISSIONS.ROLES_DELETE)
+  @Authorize(['delete', 'Role'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a role' })
   @ApiParam({ name: 'id', description: 'The role ID' })
@@ -102,7 +101,7 @@ export class RolesController {
   }
 
   @Post(':id/permissions')
-  @Authorize(PERMISSIONS.ROLES_UPDATE)
+  @Authorize(['update', 'Role'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Assign permissions to a role' })
   @ApiParam({ name: 'id', description: 'The role ID' })
@@ -120,7 +119,7 @@ export class RolesController {
   }
 
   @Delete(':id/permissions/:permissionId')
-  @Authorize(PERMISSIONS.ROLES_UPDATE)
+  @Authorize(['update', 'Role'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Remove a permission from a role' })
   @ApiParam({ name: 'id', description: 'The role ID' })
@@ -134,7 +133,7 @@ export class RolesController {
   }
 
   @Post('assign/:userId')
-  @Authorize(PERMISSIONS.ROLES_ASSIGN)
+  @Authorize(['assign', 'Role'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Assign a role to a user' })
   @ApiParam({ name: 'userId', description: 'The user ID' })
@@ -145,7 +144,7 @@ export class RolesController {
   }
 
   @Delete('assign/:userId/:roleId')
-  @Authorize(PERMISSIONS.ROLES_ASSIGN)
+  @Authorize(['assign', 'Role'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Remove a role from a user' })
   @ApiParam({ name: 'userId', description: 'The user ID' })

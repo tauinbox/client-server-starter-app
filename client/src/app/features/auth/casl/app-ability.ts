@@ -14,9 +14,4 @@ export type Subjects = 'User' | 'Role' | 'Permission' | 'Profile' | 'all';
 
 export type AppAbility = MongoAbility<[Actions, Subjects]>;
 
-export const SUBJECT_MAP: Partial<Record<string, Subjects>> = {
-  users: 'User',
-  roles: 'Role',
-  permissions: 'Permission',
-  profile: 'Profile'
-};
+export type PermissionCheck = { action: Actions; subject: Subjects };

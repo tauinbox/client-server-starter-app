@@ -13,8 +13,7 @@ import { unpackRules } from '@casl/ability/extra';
 import type { PackRule } from '@casl/ability/extra';
 import type { User } from '@shared/models/user.types';
 import type { AuthResponse, CustomJwtPayload } from '../models/auth.types';
-import type { AppAbility, Actions } from '../casl/app-ability';
-import { SUBJECT_MAP } from '../casl/app-ability';
+import type { AppAbility, Actions, Subjects } from '../casl/app-ability';
 import { LocalStorageService } from '@core/services/local-storage.service';
 
 export const AUTH_STORAGE_KEY = 'auth_storage';
@@ -106,11 +105,8 @@ export const AuthStore = signalStore(
       patchState(store, { ability });
     }
 
-    function hasPermission(permission: string): boolean {
-      const [resource, action] = permission.split(':');
-      const subject = SUBJECT_MAP[resource];
-      if (!subject) return false;
-      return store.ability()?.can(action as Actions, subject) ?? false;
+    function hasPermission(action: Actions, subject: Subjects): boolean {
+      return store.ability()?.can(action, subject) ?? false;
     }
 
     return {

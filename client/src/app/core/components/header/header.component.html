@@ -15,7 +15,7 @@
         <span>Profile</span>
       </a>
 
-      <ng-container *appRequirePermission="'users:list'">
+      <ng-container *appRequirePermission="{ action: 'list', subject: 'User' }">
         <a mat-menu-item [routerLink]="'/' + routes.Users">
           <mat-icon>people</mat-icon>
           <span>Manage Users</span>
