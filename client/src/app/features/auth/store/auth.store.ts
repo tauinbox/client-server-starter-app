@@ -31,6 +31,10 @@ export const AuthStore = signalStore(
   withComputed((store) => ({
     user: computed<User | null>(() => store.authResponse()?.user ?? null),
     isAuthenticated: computed(() => store.authResponse() !== null),
+    /**
+     * For displaying the current user's role label only.
+     * Use hasPermission() for all access control decisions.
+     */
     isAdmin: computed(
       () => store.authResponse()?.user?.roles?.includes('admin') ?? false
     ),

@@ -38,6 +38,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import { rem } from '@shared/utils/css.utils';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { UsersStore } from '../../store/users.store';
+import { PERMISSIONS } from '@app/shared/constants';
 
 type UserFormType = {
   email: FormControl<string>;
@@ -112,8 +113,14 @@ export class UserEditComponent implements OnInit {
     () => this.userForm.valid && !this.saving() && this.userForm.dirty
   );
 
+  protected readonly canManageUser = computed(() =>
+    this.authStore.hasPermission(PERMISSIONS.USERS_UPDATE)
+  );
+
   protected readonly canDelete = computed(
-    () => this.authStore.isAdmin() && this.id() !== this.authStore.user()?.id
+    () =>
+      this.authStore.hasPermission(PERMISSIONS.USERS_DELETE) &&
+      this.id() !== this.authStore.user()?.id
   );
 
   ngOnInit() {
@@ -176,7 +183,7 @@ export class UserEditComponent implements OnInit {
       updateData.password = formValues.password;
     }
 
-    if (this.authStore.isAdmin()) {
+    if (this.authStore.hasPermission(PERMISSIONS.USERS_UPDATE)) {
       updateData.isActive = formValues.isActive;
     }
 

@@ -20,7 +20,7 @@ describe('HeaderComponent', () => {
           useValue: {
             isAuthenticated: vi.fn().mockReturnValue(false),
             user: vi.fn().mockReturnValue(null),
-            isAdmin: vi.fn().mockReturnValue(false)
+            hasPermission: vi.fn().mockReturnValue(false)
           }
         },
         {
