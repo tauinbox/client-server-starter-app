@@ -277,6 +277,16 @@ describe('AuthService', () => {
     });
   });
 
+  describe('isAuthenticated', () => {
+    it('should reflect the store isAuthenticated state', () => {
+      authStoreMock.isAuthenticated.mockReturnValue(true);
+      expect(service.isAuthenticated()).toBe(true);
+
+      authStoreMock.isAuthenticated.mockReturnValue(false);
+      expect(service.isAuthenticated()).toBe(false);
+    });
+  });
+
   describe('initSession', () => {
     it('should not schedule refresh when not authenticated', () => {
       authStoreMock.isAuthenticated.mockReturnValue(false);

@@ -21,7 +21,10 @@ export const appConfig: ApplicationConfig = {
     // JWT handles 401s (refresh + retry), error interceptor handles everything else
     provideHttpClient(withInterceptors([errorInterceptor, jwtInterceptor])),
     provideAppInitializer(() => {
-      inject(AuthService).initSession();
+      const authService = inject(AuthService);
+      if (authService.isAuthenticated()) {
+        authService.scheduleTokenRefresh();
+      }
     }),
     {
       provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,

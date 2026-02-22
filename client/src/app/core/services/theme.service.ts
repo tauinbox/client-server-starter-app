@@ -1,4 +1,4 @@
-import { effect, inject, Injectable, signal } from '@angular/core';
+import { DestroyRef, effect, inject, Injectable, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { LocalStorageService } from './local-storage.service';
 
@@ -13,6 +13,7 @@ export class ThemeService {
   readonly #storage = inject(LocalStorageService);
   readonly #document = inject(DOCUMENT);
   readonly #window = this.#document.defaultView;
+  readonly #destroyRef = inject(DestroyRef);
 
   readonly #themeSignal = signal<ThemeMode>(this.#getInitialTheme());
   readonly theme = this.#themeSignal.asReadonly();
@@ -22,13 +23,20 @@ export class ThemeService {
       this.#applyTheme(this.#themeSignal());
     });
 
-    this.#window
-      ?.matchMedia('(prefers-color-scheme: dark)')
-      .addEventListener('change', (e) => {
+    const mediaQuery = this.#window?.matchMedia('(prefers-color-scheme: dark)');
+
+    if (mediaQuery) {
+      const handler = (e: MediaQueryListEvent) => {
         if (!this.#storage.getItem(THEME_KEY)) {
           this.#themeSignal.set(e.matches ? 'dark' : 'light');
         }
-      });
+      };
+
+      mediaQuery.addEventListener('change', handler);
+      this.#destroyRef.onDestroy(() =>
+        mediaQuery.removeEventListener('change', handler)
+      );
+    }
   }
 
   toggleTheme(): void {
