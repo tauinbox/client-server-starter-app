@@ -20,10 +20,11 @@ export const appConfig: ApplicationConfig = {
     // Error interceptor must be registered before JWT interceptor:
     // JWT handles 401s (refresh + retry), error interceptor handles everything else
     provideHttpClient(withInterceptors([errorInterceptor, jwtInterceptor])),
-    provideAppInitializer(() => {
+    provideAppInitializer(async () => {
       const authService = inject(AuthService);
       if (authService.isAuthenticated()) {
         authService.scheduleTokenRefresh();
+        await authService.fetchPermissions();
       }
     }),
     {
