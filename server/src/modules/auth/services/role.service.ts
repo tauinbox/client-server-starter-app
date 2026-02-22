@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -8,6 +9,7 @@ import { Repository } from 'typeorm';
 import { Role } from '../entities/role.entity';
 import { Permission } from '../entities/permission.entity';
 import { RolePermission } from '../entities/role-permission.entity';
+import { User } from '../../users/entities/user.entity';
 import { PermissionService } from './permission.service';
 import { PermissionCondition } from '@app/shared/types';
 
@@ -78,32 +80,20 @@ export class RoleService {
 
   async assignRoleToUser(userId: string, roleId: string): Promise<void> {
     await this.findOne(roleId);
-    const queryRunner =
-      this.roleRepository.manager.connection.createQueryRunner();
-    await queryRunner.connect();
-    try {
-      await queryRunner.query(
-        `INSERT INTO "user_roles" ("user_id", "role_id") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-        [userId, roleId]
-      );
-    } finally {
-      await queryRunner.release();
-    }
+    await this.roleRepository.manager
+      .createQueryBuilder()
+      .relation(User, 'roles')
+      .of(userId)
+      .add(roleId);
     await this.permissionService.invalidateUserPermissions(userId);
   }
 
   async removeRoleFromUser(userId: string, roleId: string): Promise<void> {
-    const queryRunner =
-      this.roleRepository.manager.connection.createQueryRunner();
-    await queryRunner.connect();
-    try {
-      await queryRunner.query(
-        `DELETE FROM "user_roles" WHERE "user_id" = $1 AND "role_id" = $2`,
-        [userId, roleId]
-      );
-    } finally {
-      await queryRunner.release();
-    }
+    await this.roleRepository.manager
+      .createQueryBuilder()
+      .relation(User, 'roles')
+      .of(userId)
+      .remove(roleId);
     await this.permissionService.invalidateUserPermissions(userId);
   }
 
@@ -152,7 +142,13 @@ export class RoleService {
     });
   }
 
-  async findRoleByName(name: string): Promise<Role | null> {
-    return this.roleRepository.findOne({ where: { name } });
+  async findRoleByName(name: string): Promise<Role> {
+    const role = await this.roleRepository.findOne({ where: { name } });
+    if (!role) {
+      throw new InternalServerErrorException(
+        `System role "${name}" not found. Run migrations.`
+      );
+    }
+    return role;
   }
 }

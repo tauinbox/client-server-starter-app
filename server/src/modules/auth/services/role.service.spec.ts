@@ -15,7 +15,7 @@ describe('RoleService', () => {
     create: jest.Mock;
     save: jest.Mock;
     remove: jest.Mock;
-    manager: { connection: { createQueryRunner: jest.Mock } };
+    manager: { createQueryBuilder: jest.Mock };
     createQueryBuilder: jest.Mock;
   };
   let mockPermissionRepo: { find: jest.Mock };
@@ -26,10 +26,11 @@ describe('RoleService', () => {
     delete: jest.Mock;
   };
   let mockPermissionService: { invalidateUserPermissions: jest.Mock };
-  let mockQueryRunner: {
-    connect: jest.Mock;
-    release: jest.Mock;
-    query: jest.Mock;
+  let mockRelationQueryBuilder: {
+    relation: jest.Mock;
+    of: jest.Mock;
+    add: jest.Mock;
+    remove: jest.Mock;
   };
 
   const systemRole: Role = {
@@ -55,10 +56,11 @@ describe('RoleService', () => {
   };
 
   beforeEach(async () => {
-    mockQueryRunner = {
-      connect: jest.fn(),
-      release: jest.fn(),
-      query: jest.fn()
+    mockRelationQueryBuilder = {
+      relation: jest.fn().mockReturnThis(),
+      of: jest.fn().mockReturnThis(),
+      add: jest.fn().mockResolvedValue(undefined),
+      remove: jest.fn().mockResolvedValue(undefined)
     };
 
     mockRoleRepo = {
@@ -74,9 +76,7 @@ describe('RoleService', () => {
         ),
       remove: jest.fn(),
       manager: {
-        connection: {
-          createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner)
-        }
+        createQueryBuilder: jest.fn().mockReturnValue(mockRelationQueryBuilder)
       },
       createQueryBuilder: jest.fn()
     };
@@ -205,7 +205,7 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       await service.assignRoleToUser('user-1', 'role-2');
 
-      expect(mockQueryRunner.query).toHaveBeenCalled();
+      expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
       expect(
         mockPermissionService.invalidateUserPermissions
       ).toHaveBeenCalledWith('user-1');
@@ -216,7 +216,7 @@ describe('RoleService', () => {
     it('should remove role and invalidate cache', async () => {
       await service.removeRoleFromUser('user-1', 'role-2');
 
-      expect(mockQueryRunner.query).toHaveBeenCalled();
+      expect(mockRelationQueryBuilder.remove).toHaveBeenCalledWith('role-2');
       expect(
         mockPermissionService.invalidateUserPermissions
       ).toHaveBeenCalledWith('user-1');

@@ -220,12 +220,11 @@ export class AuthService {
           const userRole = await this.roleService.findRoleByName(
             SYSTEM_ROLES.USER
           );
-          if (userRole) {
-            await manager.query(
-              `INSERT INTO "user_roles" ("user_id", "role_id") VALUES ($1, $2)`,
-              [newUser.id, userRole.id]
-            );
-          }
+          await manager
+            .createQueryBuilder()
+            .relation(User, 'roles')
+            .of(newUser.id)
+            .add(userRole.id);
 
           return newUser;
         });
@@ -329,12 +328,11 @@ export class AuthService {
 
       // Assign default 'user' role
       const userRole = await this.roleService.findRoleByName(SYSTEM_ROLES.USER);
-      if (userRole) {
-        await manager.query(
-          `INSERT INTO "user_roles" ("user_id", "role_id") VALUES ($1, $2)`,
-          [newUser.id, userRole.id]
-        );
-      }
+      await manager
+        .createQueryBuilder()
+        .relation(User, 'roles')
+        .of(newUser.id)
+        .add(userRole.id);
 
       return newUser;
     });

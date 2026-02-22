@@ -21,12 +21,18 @@ import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
 
 describe('AuthService', () => {
   let service: AuthService;
+  let mockRelationQb: {
+    relation: jest.Mock;
+    of: jest.Mock;
+    add: jest.Mock;
+    remove: jest.Mock;
+  };
   let mockManager: {
     findOne: jest.Mock;
     save: jest.Mock;
     update: jest.Mock;
     delete: jest.Mock;
-    query: jest.Mock;
+    createQueryBuilder: jest.Mock;
   };
   let mockDataSource: {
     transaction: jest.Mock;
@@ -115,12 +121,19 @@ describe('AuthService', () => {
   };
 
   beforeEach(async () => {
+    mockRelationQb = {
+      relation: jest.fn().mockReturnThis(),
+      of: jest.fn().mockReturnThis(),
+      add: jest.fn().mockResolvedValue(undefined),
+      remove: jest.fn().mockResolvedValue(undefined)
+    };
+
     mockManager = {
       findOne: jest.fn().mockResolvedValue(null),
       save: jest.fn(),
       update: jest.fn().mockResolvedValue({ affected: 1 }),
       delete: jest.fn().mockResolvedValue({ affected: 1 }),
-      query: jest.fn().mockResolvedValue(undefined)
+      createQueryBuilder: jest.fn().mockReturnValue(mockRelationQb)
     };
 
     mockDataSource = {
