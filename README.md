@@ -26,8 +26,8 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - JWT access tokens (1h) + opaque refresh tokens (7d)
 - Automatic token refresh 60 seconds before expiry
 - 401 handling with request retry in JWT interceptor
-- **Role-Based Access Control (RBAC)** — roles, permissions, and conditional permission evaluation; `@Authorize()` decorator on server; `*appRequirePermission` directive on client; admin role bypasses all permission checks
-- `GET /api/v1/auth/permissions` endpoint returns the current user's resolved permissions
+- **Role-Based Access Control (RBAC)** — roles, permissions, and conditional permission evaluation; `@Authorize(['action', 'Subject'])` typed tuples on server; `permissionGuard(action, subject)` + `*appRequirePermission="{ action, subject }"` directive on client; admin role bypasses all permission checks
+- `GET /api/v1/auth/permissions` returns CASL packed rules; client hydrates into `AppAbility` at bootstrap before route activation
 - OAuth account management (link/unlink providers in profile)
 - Server-side token cleanup via cron jobs
 
@@ -70,7 +70,7 @@ fullstack-starter-app/
 │   └── src/
 │       ├── types/          # UserResponse, AuthResponse, PaginatedResponse<T>, RoleResponse,
 │       │                   # PermissionResponse, UserPermissionsResponse, etc.
-│       ├── constants/      # PASSWORD_REGEX, pagination defaults, PERMISSIONS, SYSTEM_ROLES, etc.
+│       ├── constants/      # PASSWORD_REGEX, pagination defaults, SYSTEM_ROLES, MAX_CONCURRENT_SESSIONS, etc.
 │       └── index.ts        # Barrel exports
 ├── client/                 # Angular 21 SPA
 │   ├── src/app/
@@ -269,7 +269,7 @@ API base URL: `/api/v1`
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink OAuth provider |
 | GET | `/auth/permissions` | Bearer | Get current user's resolved permissions |
 | GET | `/users` | `users:list` | List all users (paginated: page, limit, sortBy, sortOrder) |
-| GET | `/users/search` | `users:search` | Search users by criteria (paginated + filters) |
+| GET | `/users/search` | `users:search` | Search users (paginated + filters: email, firstName, lastName, isActive) |
 | GET | `/users/:id` | `users:read` | Get user by ID |
 | POST | `/users` | `users:create` | Create user |
 | PATCH | `/users/:id` | `users:update` | Update user |
@@ -279,10 +279,11 @@ API base URL: `/api/v1`
 | GET | `/roles/:id` | `roles:read` | Get role by ID |
 | PATCH | `/roles/:id` | `roles:update` | Update role |
 | DELETE | `/roles/:id` | `roles:delete` | Delete role |
-| POST | `/roles/:id/permissions` | `roles:assign` | Assign permission to role |
-| DELETE | `/roles/:id/permissions/:permId` | `roles:assign` | Remove permission from role |
-| POST | `/roles/:id/users` | `roles:assign` | Assign role to user |
-| DELETE | `/roles/:id/users/:userId` | `roles:assign` | Remove role from user |
+| GET | `/roles/permissions` | `roles:read` | List all available permissions |
+| POST | `/roles/:id/permissions` | `roles:update` | Assign permissions to role |
+| DELETE | `/roles/:id/permissions/:permId` | `roles:update` | Remove permission from role |
+| POST | `/roles/assign/:userId` | `roles:assign` | Assign role to user |
+| DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove role from user |
 | GET | `/feature` | None | Example endpoint |
 | GET | `/feature/entities` | None | List feature entities |
 | POST | `/feature/entities` | None | Create feature entity |
@@ -336,14 +337,14 @@ npm run release            # Bump versions, generate CHANGELOG.md, create git ta
 - **Lazy loading** via `loadComponent` on all routes
 - **NgRx Signal Store** for state management (`AuthStore` global, `UsersStore` route-level)
 - **HTTP interceptors**: JWT (auto-attach token, handle 401 refresh) and error (snackbar notifications)
-- **Guards**: `authGuard` (checks authentication + token refresh), `adminGuard` (checks admin role via roles array), `PermissionsGuard` (checks resolved RBAC permissions on server)
+- **Guards**: `authGuard` (checks authentication + token refresh), `permissionGuard(action, subject)` (typed CASL check for route-level access), `guestGuard` (redirects authenticated users); `PermissionsGuard` checks RBAC permissions on server
 - **Path aliases**: `@core/*`, `@features/*`, `@shared/*`
 
 ### Server
 
 - **Modular NestJS architecture** with dynamic root `CoreModule`
 - **Passport strategies**: `LocalStrategy` (email/password), `JwtStrategy` (Bearer token; extracts roles, computes isAdmin), `GoogleStrategy`, `FacebookStrategy`, `VkStrategy` (OAuth, conditionally registered)
-- **RBAC**: `RolesModule` provides `PermissionsGuard`, `PolicyEvaluatorService`, `PermissionService`. `@Authorize('permission:action')` replaces `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` on all protected endpoints
+- **RBAC**: `RolesModule` provides `PermissionsGuard`, `PolicyEvaluatorService`, `PermissionService`, `CaslAbilityFactory`. `@Authorize(['action', 'Subject'])` typed tuples replace `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` on all protected endpoints
 - **Request pipeline**: Global middleware -> Module middleware -> Guards -> Interceptors -> Pipes -> Controller
 - **Pagination**: Common `PaginationQueryDto` and `PaginatedResponseDto<T>` for consistent server-side pagination across endpoints
 - **Cron jobs**: Daily expired token cleanup, weekly revoked token cleanup
@@ -393,10 +394,10 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 195 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 194 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | Configured |
-| Client unit tests | Vitest | `*.spec.ts` alongside source | 265 tests passing |
-| Client E2E tests | Playwright | `e2e/` directory, uses mock-server (in-memory Express API) | 113 tests passing |
+| Client unit tests | Vitest | `*.spec.ts` alongside source | 261 tests passing |
+| Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 113 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
 
 ## CI/CD
@@ -420,7 +421,7 @@ Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file
 - **Password reset tokens** are single-use with 1-hour expiry; reset revokes all sessions
 - JWT access tokens (1h) + opaque refresh tokens (7d) with rotation
 - `@Exclude()` decorator hides password in API responses
-- **RBAC** — fine-grained permission checks via `PermissionsGuard` + `@Authorize()`; permissions cached per user (5 min); admin role bypasses all checks; `*appRequirePermission` directive for template-level visibility
+- **RBAC** — typed CASL permission checks via `PermissionsGuard` + `@Authorize(['action', 'Subject'])`; CASL ability hydrated at bootstrap before route activation; permissions cached per user (5 min); admin role bypasses all checks; `*appRequirePermission="{ action, subject }"` directive for template-level visibility
 - `class-validator` on server DTOs, Angular `Validators` on client forms
 - LIKE query pattern escaping to prevent SQL injection via wildcards
 - File upload security: auth required, 5 MB limit, type whitelist, filename sanitization

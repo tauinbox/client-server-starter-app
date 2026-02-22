@@ -111,10 +111,12 @@ src/
 │   ├── controllers/        # RolesController (CRUD + permission + user assignment at /api/v1/roles)
 │   ├── services/           # RoleService, PermissionService, PolicyEvaluatorService
 │   ├── entities/           # Role, Permission, RolePermission
-│   ├── guards/             # PermissionsGuard (resolves + checks permissions; admin bypasses)
-│   └── decorators/         # @RequirePermissions(), @Authorize() (composite: JwtAuthGuard + PermissionsGuard + RequirePermissions)
+│   ├── guards/             # PermissionsGuard (resolves + checks typed permissions; admin bypasses)
+│   ├── decorators/         # @RequirePermissions([Actions,Subjects]), @Authorize([action,subject]) composite
+│   └── casl/               # app-ability.ts (AppAbility, Actions, Subjects, PermissionCheck types)
+│                           # CaslAbilityFactory (builds AppAbility, used by AuthController /permissions)
 ├── users/
-│   ├── controllers/        # UsersController (CRUD + search, all endpoints use @Authorize(PERMISSIONS.*))
+│   ├── controllers/        # UsersController (CRUD + search, all endpoints use @Authorize([action, 'User']))
 │   ├── services/           # UsersService
 │   ├── entities/           # User entity (ManyToMany to Role via user_roles)
 │   └── dto/                # CreateUserDto, UpdateUserDto, UserResponseDto (includes roles: string[])
@@ -150,9 +152,10 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 - **LocalStrategy** — validates email/password via bcrypt on login
 - **JwtStrategy** — extracts and verifies Bearer token; extracts `roles[]` from payload, computes `isAdmin` from roles
 - **GoogleStrategy / FacebookStrategy / VkStrategy** — OAuth2 login (conditionally registered when env vars are set)
-- **PermissionsGuard** — resolves user permissions (cached 5 min), checks required permissions from `@RequirePermissions()`; admin role bypasses all checks
-- **@Authorize() decorator** — composite: `JwtAuthGuard` + `PermissionsGuard` + `@RequirePermissions()`. Replaces `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` pattern
-- **JWT payload** — includes `roles: string[]` alongside `isAdmin` (kept for backward compatibility in transition period)
+- **PermissionsGuard** — resolves user permissions (cached 5 min), checks required permissions from typed `@RequirePermissions([Actions, Subjects])`; admin role bypasses all checks
+- **@Authorize([action, subject]) decorator** — composite: `JwtAuthGuard` + `PermissionsGuard` + typed `@RequirePermissions()`. Replaces `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` pattern
+- **CaslAbilityFactory** — builds `AppAbility` from user roles + permissions; used by `AuthController` to return CASL packed rules via `packRules()` from `GET /permissions`
+- **JWT payload** — includes `roles: string[]`; `isAdmin` column removed from database (migration `drop-is-admin`)
 - **Refresh tokens** — opaque 80-char hex tokens stored in DB (SHA-256 hashed), rotated on use
 - **OAuth accounts** — auto-link by email, manage linked providers, safety check on unlink
 - **Token cleanup** — daily cron removes expired tokens, weekly cron removes revoked+expired
@@ -173,7 +176,7 @@ Four tables managed via TypeORM migrations:
 
 | Table | Description |
 |-------|-------------|
-| `users` | UUID PK, email (unique), name, bcrypt password (nullable for OAuth-only), isAdmin, isActive, isEmailVerified, failedLoginAttempts, lockedUntil, verification/reset token fields; ManyToMany to roles via user_roles |
+| `users` | UUID PK, email (unique), name, bcrypt password (nullable for OAuth-only), isActive, isEmailVerified, failedLoginAttempts, lockedUntil, verification/reset token fields; ManyToMany to roles via user_roles (`isAdmin` column removed — roles-based RBAC) |
 | `oauth_accounts` | UUID PK, provider + provider_id (unique), FK to users (CASCADE) |
 | `refresh_tokens` | UUID PK, token (SHA-256 hashed), FK to users (CASCADE), expires_at, revoked |
 | `roles` | UUID PK, name (unique), description, isSystem flag |
@@ -246,10 +249,11 @@ Base URL: `/api/v1`
 | GET | `/:id` | `roles:read` | Get role by ID |
 | PATCH | `/:id` | `roles:update` | Update role |
 | DELETE | `/:id` | `roles:delete` | Delete role |
-| POST | `/:id/permissions` | `roles:assign` | Assign permission to role |
-| DELETE | `/:id/permissions/:permId` | `roles:assign` | Remove permission from role |
-| POST | `/:id/users` | `roles:assign` | Assign role to user |
-| DELETE | `/:id/users/:userId` | `roles:assign` | Remove role from user |
+| GET | `/permissions` | `roles:read` | List all available permissions |
+| POST | `/:id/permissions` | `roles:update` | Assign permissions to role |
+| DELETE | `/:id/permissions/:permissionId` | `roles:update` | Remove permission from role |
+| POST | `/assign/:userId` | `roles:assign` | Assign role to user |
+| DELETE | `/assign/:userId/:roleId` | `roles:assign` | Remove role from user |
 
 ### Users (`/api/v1/users`)
 
@@ -257,7 +261,7 @@ Base URL: `/api/v1`
 |--------|------|------|-------------|
 | POST | `/` | `users:create` | Create user |
 | GET | `/` | `users:list` | List all users (paginated: page, limit, sortBy, sortOrder query params) |
-| GET | `/search` | `users:search` | Search users (paginated + filters: email, firstName, lastName, isAdmin, isActive) |
+| GET | `/search` | `users:search` | Search users (paginated + filters: email, firstName, lastName, isActive) |
 | GET | `/:id` | `users:read` | Get user by ID |
 | PATCH | `/:id` | `users:update` | Update user |
 | DELETE | `/:id` | `users:delete` | Delete user |
@@ -321,7 +325,7 @@ npm run test:e2e
 Server imports common types and constants from the root `shared/` directory via `@app/shared/*` path alias (maps to `../shared/src/*` in `tsconfig.json`). This includes:
 
 - **Types**: `UserResponse`, `OAuthAccountResponse`, `TokensResponse`, `AuthResponse`, `PaginationMeta`, `PaginatedResponse<T>`, `SortOrder`; `RoleResponse`, `PermissionResponse`, `RolePermissionResponse`, `RoleWithPermissionsResponse`, `PermissionCondition`, `ResolvedPermission`, `UserPermissionsResponse`
-- **Constants**: `PASSWORD_REGEX`, `PASSWORD_ERROR`, `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, pagination defaults, user sort columns; `PERMISSIONS`, `Permission`, `SYSTEM_ROLES`, `SystemRole`
+- **Constants**: `PASSWORD_REGEX`, `PASSWORD_ERROR`, `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, `MAX_CONCURRENT_SESSIONS`, pagination defaults, user sort columns; `SYSTEM_ROLES`, `SystemRole` (note: `PERMISSIONS` + `Permission` removed — typed `[Actions, Subjects]` tuples used instead)
 
 NestJS build compiles shared files into `dist/shared/` alongside `dist/server/`. Migration and seed scripts use paths like `dist/server/src/...` to reflect the nested output structure.
 
