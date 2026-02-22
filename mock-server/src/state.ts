@@ -6,7 +6,13 @@ import {
 import type { MongoQuery } from '@casl/ability';
 import { packRules } from '@casl/ability/extra';
 import type { MockUser, OAuthAccount, State } from './types';
-import { seedOAuthAccounts, seedUsers } from './seed';
+import {
+  seedOAuthAccounts,
+  seedUsers,
+  seedRoles,
+  seedPermissions,
+  seedRolePermissions
+} from './seed';
 
 // Each Playwright worker imports this module in its own process,
 // so state is isolated per worker. Do NOT share a single process
@@ -24,7 +30,10 @@ export function resetState(): void {
     ),
     refreshTokens: new Map(),
     emailVerificationTokens: new Map(),
-    passwordResetTokens: new Map()
+    passwordResetTokens: new Map(),
+    roles: new Map(seedRoles.map((r) => [r.id, { ...r }])),
+    permissions: new Map(seedPermissions.map((p) => [p.id, { ...p }])),
+    rolePermissions: seedRolePermissions.map((rp) => ({ ...rp }))
   };
 }
 

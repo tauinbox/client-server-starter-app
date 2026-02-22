@@ -61,7 +61,7 @@ export const routes: Routes = [
           import('./features/users/components/user-detail/user-detail.component').then(
             (c) => c.UserDetailComponent
           ),
-        canActivate: [authGuard]
+        canActivate: [permissionGuard('read', 'User')]
       },
       {
         path: ':id/edit',
@@ -69,7 +69,7 @@ export const routes: Routes = [
           import('./features/users/components/user-edit/user-edit.component').then(
             (c) => c.UserEditComponent
           ),
-        canActivate: [authGuard]
+        canActivate: [permissionGuard('update', 'User')]
       }
     ]
   },

@@ -479,27 +479,59 @@ describe('UsersService', () => {
     });
   });
 
-  describe('incrementFailedAttempts', () => {
-    it('should increment failed login attempts', async () => {
-      await service.incrementFailedAttempts('user-1');
+  describe('incrementFailedAttemptsAndLockIfNeeded', () => {
+    let mockUpdateQb: {
+      update: jest.Mock;
+      set: jest.Mock;
+      where: jest.Mock;
+      returning: jest.Mock;
+      execute: jest.Mock;
+    };
 
-      expect(mockRepository.increment).toHaveBeenCalledWith(
-        { id: 'user-1' },
-        'failedLoginAttempts',
-        1
-      );
+    beforeEach(() => {
+      mockUpdateQb = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({
+          raw: [{ failed_login_attempts: 1, locked_until: null }]
+        })
+      };
+      mockRepository.createQueryBuilder.mockReturnValue(mockUpdateQb);
     });
-  });
 
-  describe('lockAccount', () => {
-    it('should set lockedUntil for user', async () => {
-      const lockedUntil = new Date('2025-06-01');
+    it('should atomically increment and return new count', async () => {
+      const result = await service.incrementFailedAttemptsAndLockIfNeeded(
+        'user-1',
+        5,
+        900000
+      );
 
-      await service.lockAccount('user-1', lockedUntil);
-
-      expect(mockRepository.update).toHaveBeenCalledWith('user-1', {
-        lockedUntil
+      expect(mockRepository.createQueryBuilder).toHaveBeenCalled();
+      expect(mockUpdateQb.where).toHaveBeenCalledWith('id = :userId', {
+        userId: 'user-1'
       });
+      expect(result).toEqual({
+        failedLoginAttempts: 1,
+        lockedUntil: null
+      });
+    });
+
+    it('should return lockedUntil when threshold is reached', async () => {
+      const lockedDate = new Date(Date.now() + 900000).toISOString();
+      mockUpdateQb.execute.mockResolvedValue({
+        raw: [{ failed_login_attempts: 5, locked_until: lockedDate }]
+      });
+
+      const result = await service.incrementFailedAttemptsAndLockIfNeeded(
+        'user-1',
+        5,
+        900000
+      );
+
+      expect(result.failedLoginAttempts).toBe(5);
+      expect(result.lockedUntil).toBeInstanceOf(Date);
     });
   });
 

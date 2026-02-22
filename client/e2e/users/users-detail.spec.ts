@@ -13,14 +13,14 @@ test.describe('User Detail page', () => {
     await expectAuthRedirect(page, '/users/1');
   });
 
-  test('should allow non-admin authenticated users', async ({
+  test('should redirect non-admin users to forbidden', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url, {});
     await page.goto('/users/3');
 
-    await expect(page.getByText('User Details')).toBeVisible();
+    await expect(page).toHaveURL(/.*\/forbidden$/);
   });
 
   test('should display user name and email', async ({ _mockServer, page }) => {
@@ -150,18 +150,14 @@ test.describe('User Detail page', () => {
     ).toBeVisible();
   });
 
-  test('should not show back button when logged in as non-admin', async ({
+  test('should redirect non-admin to forbidden when viewing user detail', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url, {});
     await page.goto('/users/3');
 
-    await expect(
-      page.locator('mat-card-header button', {
-        has: page.locator('mat-icon', { hasText: 'arrow_back' })
-      })
-    ).toBeHidden();
+    await expect(page).toHaveURL(/.*\/forbidden$/);
   });
 
   test('should show "User Not Found" when API returns 404', async ({
