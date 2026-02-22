@@ -10,9 +10,12 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { DataSource } from 'typeorm';
 import { UsersService } from '../../users/services/users.service';
 import { RegisterDto } from '../dtos/register.dto';
 import { User } from '../../users/entities/user.entity';
+import { RefreshToken } from '../entities/refresh-token.entity';
+import { OAuthAccount } from '../entities/oauth-account.entity';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { CustomJwtPayload } from '../types/jwt-payload';
 import { LocalAuthRequest } from '../types/auth.request';
@@ -22,6 +25,7 @@ import { OAuthAccountService } from './oauth-account.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { MailService } from '../../mail/mail.service';
 import { hashToken } from '../../../common/utils/hash-token';
+import { withTransaction } from '../../../common/utils/with-transaction.util';
 import {
   MAX_FAILED_ATTEMPTS,
   LOCKOUT_DURATION_MS
@@ -35,6 +39,7 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
+    private dataSource: DataSource,
     private usersService: UsersService,
     private jwtService: JwtService,
     private configService: ConfigService,
@@ -176,17 +181,24 @@ export class AuthService {
           profile.providerId
         );
       } else {
-        // 3. Create new user + OAuth account (created with isEmailVerified: true)
-        user = await this.usersService.createOAuthUser({
-          email: profile.email,
-          firstName: profile.firstName,
-          lastName: profile.lastName
+        // 3. Create new user + OAuth account atomically (isEmailVerified: true).
+        // Without a transaction, a failure after user creation would leave an
+        // orphaned user with no OAuth account — they would be unable to log in.
+        user = await withTransaction(this.dataSource, async (manager) => {
+          const newUser = await manager.save(User, {
+            email: profile.email,
+            firstName: profile.firstName,
+            lastName: profile.lastName,
+            password: null,
+            isEmailVerified: true
+          });
+          await manager.save(OAuthAccount, {
+            userId: newUser.id,
+            provider: profile.provider,
+            providerId: profile.providerId
+          });
+          return newUser;
         });
-        await this.safeCreateOAuthAccount(
-          user.id,
-          profile.provider,
-          profile.providerId
-        );
       }
     }
 
@@ -254,20 +266,31 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto): Promise<{ message: string }> {
-    const user = await this.usersService.create(registerDto);
-
-    // Generate email verification token
+    // Compute hash outside the transaction (CPU-intensive, no DB involvement)
+    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = hashToken(rawToken);
     const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS);
 
-    await this.usersService.setEmailVerificationToken(
-      user.id,
-      hashedToken,
-      expiresAt
-    );
+    // Create user and set verification token atomically so a partial failure
+    // never leaves a user without a token (which would prevent email verification).
+    const user = await withTransaction(this.dataSource, async (manager) => {
+      const existing = await manager.findOne(User, {
+        where: { email: registerDto.email }
+      });
+      if (existing) {
+        throw new ConflictException('User with this email already exists');
+      }
 
-    // Send verification email (fire-and-forget)
+      return manager.save(User, {
+        ...registerDto,
+        password: hashedPassword,
+        emailVerificationToken: hashedToken,
+        emailVerificationExpiresAt: expiresAt
+      });
+    });
+
+    // Send verification email (fire-and-forget — delivery failure is non-fatal)
     this.mailService
       .sendEmailVerification(user.email, rawToken)
       .catch((err) =>
@@ -401,12 +424,20 @@ export class AuthService {
       );
     }
 
-    // update() hashes the password internally
-    await this.usersService.update(user.id, { password: newPassword });
-    await this.usersService.clearPasswordResetToken(user.id);
+    // Compute hash outside the transaction (CPU-intensive, no DB involvement)
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Invalidate all refresh tokens
-    await this.refreshTokenService.deleteByUserId(user.id);
+    // Update password, clear reset token, and invalidate all sessions atomically.
+    // Without a transaction, a failure between steps could leave the account in an
+    // inconsistent state (e.g. password changed but old sessions still active).
+    await withTransaction(this.dataSource, async (manager) => {
+      await manager.update(User, user.id, {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetExpiresAt: null
+      });
+      await manager.delete(RefreshToken, { userId: user.id });
+    });
 
     return { message: 'Password has been reset successfully' };
   }
