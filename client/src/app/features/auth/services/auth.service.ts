@@ -225,8 +225,7 @@ export class AuthService {
         context: silentContext()
       })
       .subscribe({
-        next: (response) =>
-          this.#authStore.setPermissions(response.permissions),
+        next: (response) => this.#authStore.setRules(response.rules),
         error: () => {
           // Permissions fetch failed — keep going with empty permissions
         }

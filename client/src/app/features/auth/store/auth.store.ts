@@ -7,16 +7,21 @@ import {
   withMethods,
   withState
 } from '@ngrx/signals';
+import { createMongoAbility } from '@casl/ability';
+import type { RawRuleOf } from '@casl/ability';
+import { unpackRules } from '@casl/ability/extra';
+import type { PackRule } from '@casl/ability/extra';
 import type { User } from '@shared/models/user.types';
-import type { ResolvedPermission } from '@app/shared/types';
 import type { AuthResponse, CustomJwtPayload } from '../models/auth.types';
+import type { AppAbility, Actions } from '../casl/app-ability';
+import { SUBJECT_MAP } from '../casl/app-ability';
 import { LocalStorageService } from '@core/services/local-storage.service';
 
 export const AUTH_STORAGE_KEY = 'auth_storage';
 
 type AuthState = {
   authResponse: AuthResponse | null;
-  permissions: ResolvedPermission[];
+  ability: AppAbility | null;
 };
 
 export const AuthStore = signalStore(
@@ -25,7 +30,7 @@ export const AuthStore = signalStore(
     const storage = inject(LocalStorageService);
     return {
       authResponse: storage.getItem<AuthResponse>(AUTH_STORAGE_KEY) ?? null,
-      permissions: []
+      ability: null
     };
   }),
   withComputed((store) => ({
@@ -91,16 +96,21 @@ export const AuthStore = signalStore(
 
     function clearSession(): void {
       storage.removeItem(AUTH_STORAGE_KEY);
-      patchState(store, { authResponse: null, permissions: [] });
+      patchState(store, { authResponse: null, ability: null });
     }
 
-    function setPermissions(permissions: ResolvedPermission[]): void {
-      patchState(store, { permissions });
+    function setRules(rules: unknown): void {
+      const ability = createMongoAbility<AppAbility>(
+        unpackRules(rules as PackRule<RawRuleOf<AppAbility>>[])
+      );
+      patchState(store, { ability });
     }
 
     function hasPermission(permission: string): boolean {
-      if (store.isAdmin()) return true;
-      return store.permissions().some((p) => p.permission === permission);
+      const [resource, action] = permission.split(':');
+      const subject = SUBJECT_MAP[resource];
+      if (!subject) return false;
+      return store.ability()?.can(action as Actions, subject) ?? false;
     }
 
     return {
@@ -111,7 +121,7 @@ export const AuthStore = signalStore(
       saveAuthResponse,
       updateCurrentUser,
       clearSession,
-      setPermissions,
+      setRules,
       hasPermission
     };
   })

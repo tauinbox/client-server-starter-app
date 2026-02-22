@@ -7,6 +7,8 @@ import {
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
 import { PermissionService } from '../services/permission.service';
+import { CaslAbilityFactory } from '../casl/casl-ability.factory';
+import { SUBJECT_MAP, Actions } from '../casl/app-ability';
 import { JwtAuthRequest } from '../types/auth.request';
 import { SYSTEM_ROLES } from '@app/shared/constants';
 
@@ -14,7 +16,8 @@ import { SYSTEM_ROLES } from '@app/shared/constants';
 export class PermissionsGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly permissionService: PermissionService
+    private readonly permissionService: PermissionService,
+    private readonly caslAbilityFactory: CaslAbilityFactory
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -29,7 +32,7 @@ export class PermissionsGuard implements CanActivate {
 
     const { user } = context.switchToHttp().getRequest<JwtAuthRequest>();
 
-    // Admin role bypasses all permission checks
+    // Admin role bypasses all permission checks (performance optimization — skip DB call)
     if (user.roles?.includes(SYSTEM_ROLES.ADMIN)) {
       return true;
     }
@@ -37,11 +40,19 @@ export class PermissionsGuard implements CanActivate {
     const userPermissions = await this.permissionService.getPermissionsForUser(
       user.userId
     );
-    const userPermissionStrings = userPermissions.map((p) => p.permission);
 
-    const hasAll = requiredPermissions.every((p) =>
-      userPermissionStrings.includes(p)
+    const ability = this.caslAbilityFactory.createForUser(
+      user.userId,
+      user.roles ?? [],
+      userPermissions
     );
+
+    const hasAll = requiredPermissions.every((p) => {
+      const [resource, action] = p.split(':');
+      const subject = SUBJECT_MAP[resource];
+      if (!subject) return false;
+      return ability.can(action as Actions, subject);
+    });
 
     if (!hasAll) {
       throw new ForbiddenException('Insufficient permissions');

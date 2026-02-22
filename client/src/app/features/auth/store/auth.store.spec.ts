@@ -1,5 +1,8 @@
 import { TestBed } from '@angular/core/testing';
+import { packRules } from '@casl/ability/extra';
+import { createMongoAbility } from '@casl/ability';
 import { AuthStore } from './auth.store';
+import type { AppAbility } from '../casl/app-ability';
 import { LocalStorageService } from '@core/services/local-storage.service';
 import type { AuthResponse } from '../models/auth.types';
 
@@ -198,6 +201,66 @@ describe('AuthStore', () => {
       const store = createStore(null);
 
       expect(store.getTokenExpiryTime()).toBeNull();
+    });
+  });
+
+  describe('setRules and hasPermission', () => {
+    it('should return false when no rules are set', () => {
+      const store = createStore(null);
+
+      expect(store.hasPermission('users:list')).toBe(false);
+    });
+
+    it('should return true for a permitted action after setRules', () => {
+      const store = createStore(null);
+      const ability = createMongoAbility<AppAbility>([
+        { action: 'list', subject: 'User' }
+      ]);
+      const packed = packRules(ability.rules) as unknown[][];
+
+      store.setRules(packed);
+
+      expect(store.hasPermission('users:list')).toBe(true);
+    });
+
+    it('should return false for an action not in rules', () => {
+      const store = createStore(null);
+      const ability = createMongoAbility<AppAbility>([
+        { action: 'read', subject: 'Profile' }
+      ]);
+      const packed = packRules(ability.rules) as unknown[][];
+
+      store.setRules(packed);
+
+      expect(store.hasPermission('users:delete')).toBe(false);
+    });
+
+    it('should return true for all actions when manage+all rule is set (admin)', () => {
+      const store = createStore(null);
+      const ability = createMongoAbility<AppAbility>([
+        { action: 'manage', subject: 'all' }
+      ]);
+      const packed = packRules(ability.rules) as unknown[][];
+
+      store.setRules(packed);
+
+      expect(store.hasPermission('users:list')).toBe(true);
+      expect(store.hasPermission('users:delete')).toBe(true);
+      expect(store.hasPermission('profile:update')).toBe(true);
+    });
+
+    it('should reset ability to null on clearSession', () => {
+      const savedAuth = createMockAuthResponse();
+      const store = createStore(savedAuth);
+      const ability = createMongoAbility<AppAbility>([
+        { action: 'list', subject: 'User' }
+      ]);
+      const packed = packRules(ability.rules) as unknown[][];
+      store.setRules(packed);
+
+      store.clearSession();
+
+      expect(store.hasPermission('users:list')).toBe(false);
     });
   });
 });
