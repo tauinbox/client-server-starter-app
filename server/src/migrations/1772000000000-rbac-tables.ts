@@ -103,7 +103,7 @@ export class RbacTables1772000000000 implements MigrationInterface {
       SELECT u."id", r."id"
       FROM "users" u
       CROSS JOIN "roles" r
-      WHERE u."is_admin" = true AND r."name" = 'admin'
+      WHERE u."isAdmin" = true AND r."name" = 'admin'
     `);
 
     // Data migration: assign user role to existing non-admin users
@@ -112,7 +112,7 @@ export class RbacTables1772000000000 implements MigrationInterface {
       SELECT u."id", r."id"
       FROM "users" u
       CROSS JOIN "roles" r
-      WHERE u."is_admin" = false AND r."name" = 'user'
+      WHERE u."isAdmin" = false AND r."name" = 'user'
     `);
   }
 
