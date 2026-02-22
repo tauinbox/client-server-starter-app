@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import {
   MAX_FAILED_ATTEMPTS,
-  LOCKOUT_DURATION_MS
+  LOCKOUT_DURATION_MS,
+  MAX_CONCURRENT_SESSIONS
 } from '@app/shared/constants/auth.constants';
 import {
   PASSWORD_REGEX,
@@ -19,6 +20,23 @@ import { authGuard } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest, MockUser } from '../types';
 
 const router = Router();
+
+function pruneOldestUserTokens(
+  refreshTokens: Map<string, string>,
+  userId: string,
+  maxSessions: number
+): void {
+  const userTokens: string[] = [];
+  for (const [token, uid] of refreshTokens.entries()) {
+    if (uid === userId) userTokens.push(token);
+  }
+  if (userTokens.length > maxSessions) {
+    const excess = userTokens.length - maxSessions;
+    for (let i = 0; i < excess; i++) {
+      refreshTokens.delete(userTokens[i]);
+    }
+  }
+}
 
 // POST /api/v1/auth/register
 router.post('/register', (req, res) => {
@@ -141,15 +159,9 @@ router.post('/login', (req, res) => {
 
   const state = getState();
 
-  // Delete old refresh tokens for this user (matches real server behavior)
-  for (const [rt, uid] of state.refreshTokens.entries()) {
-    if (uid === user.id) {
-      state.refreshTokens.delete(rt);
-    }
-  }
-
   const tokens = generateTokens(user);
   state.refreshTokens.set(tokens.refresh_token, user.id);
+  pruneOldestUserTokens(state.refreshTokens, user.id, MAX_CONCURRENT_SESSIONS);
 
   res.json({ tokens, user: toUserResponse(user) });
 });

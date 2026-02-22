@@ -9,6 +9,7 @@ describe('RefreshTokenService', () => {
   let mockRepository: {
     create: jest.Mock;
     save: jest.Mock;
+    find: jest.Mock;
     findOne: jest.Mock;
     delete: jest.Mock;
     update: jest.Mock;
@@ -33,6 +34,7 @@ describe('RefreshTokenService', () => {
     mockRepository = {
       create: jest.fn(),
       save: jest.fn(),
+      find: jest.fn(),
       findOne: jest.fn(),
       delete: jest.fn(),
       update: jest.fn(),
@@ -201,6 +203,68 @@ describe('RefreshTokenService', () => {
           _type: 'lessThan'
         }) as Date
       });
+    });
+  });
+
+  describe('pruneOldestTokens', () => {
+    const makeToken = (id: string, createdAt: Date) =>
+      ({ id, userId: 'user-1', revoked: false, createdAt }) as RefreshToken;
+
+    it('should do nothing when token count is within limit', async () => {
+      mockRepository.find.mockResolvedValue([
+        makeToken('t1', new Date('2025-01-01')),
+        makeToken('t2', new Date('2025-01-02'))
+      ]);
+
+      await service.pruneOldestTokens('user-1', 5);
+
+      expect(mockRepository.delete).not.toHaveBeenCalled();
+    });
+
+    it('should delete oldest tokens when count exceeds limit', async () => {
+      mockRepository.find.mockResolvedValue([
+        makeToken('t1', new Date('2025-01-01')),
+        makeToken('t2', new Date('2025-01-02')),
+        makeToken('t3', new Date('2025-01-03')),
+        makeToken('t4', new Date('2025-01-04')),
+        makeToken('t5', new Date('2025-01-05')),
+        makeToken('t6', new Date('2025-01-06')) // 6th = 1 over limit of 5
+      ]);
+      mockRepository.delete.mockResolvedValue({ affected: 1 });
+
+      await service.pruneOldestTokens('user-1', 5);
+
+      expect(mockRepository.find).toHaveBeenCalledWith({
+        where: { userId: 'user-1', revoked: false },
+        order: { createdAt: 'ASC' }
+      });
+      // Should delete only the oldest (t1) to bring count down to 5
+      expect(mockRepository.delete).toHaveBeenCalledTimes(1);
+    });
+
+    it('should delete multiple oldest tokens when far over limit', async () => {
+      mockRepository.find.mockResolvedValue([
+        makeToken('t1', new Date('2025-01-01')),
+        makeToken('t2', new Date('2025-01-02')),
+        makeToken('t3', new Date('2025-01-03')),
+        makeToken('t4', new Date('2025-01-04')),
+        makeToken('t5', new Date('2025-01-05')),
+        makeToken('t6', new Date('2025-01-06')),
+        makeToken('t7', new Date('2025-01-07')) // 7 tokens, limit 5 → delete 2 oldest
+      ]);
+      mockRepository.delete.mockResolvedValue({ affected: 2 });
+
+      await service.pruneOldestTokens('user-1', 5);
+
+      expect(mockRepository.delete).toHaveBeenCalledTimes(1);
+    });
+
+    it('should do nothing when user has no tokens', async () => {
+      mockRepository.find.mockResolvedValue([]);
+
+      await service.pruneOldestTokens('user-1', 5);
+
+      expect(mockRepository.delete).not.toHaveBeenCalled();
     });
   });
 

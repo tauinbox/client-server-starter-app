@@ -28,7 +28,8 @@ import { hashToken } from '../../../common/utils/hash-token';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import {
   MAX_FAILED_ATTEMPTS,
-  LOCKOUT_DURATION_MS
+  LOCKOUT_DURATION_MS,
+  MAX_CONCURRENT_SESSIONS
 } from '@app/shared/constants/auth.constants';
 
 const VERIFICATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -126,11 +127,18 @@ export class AuthService {
   async login(user: LocalAuthRequest['user']) {
     const tokens = this.generateTokens(user.id, user.email, user.isAdmin);
 
-    await this.refreshTokenService.deleteByUserId(user.id);
+    const expiresIn = parseInt(
+      this.configService.get('JWT_REFRESH_EXPIRATION') || '604800',
+      10
+    );
     await this.refreshTokenService.createRefreshToken(
       user.id,
       tokens.refresh_token,
-      parseInt(this.configService.get('JWT_REFRESH_EXPIRATION') || '604800', 10)
+      expiresIn
+    );
+    await this.refreshTokenService.pruneOldestTokens(
+      user.id,
+      MAX_CONCURRENT_SESSIONS
     );
 
     return {
@@ -207,11 +215,18 @@ export class AuthService {
 
     const tokens = this.generateTokens(user.id, user.email, user.isAdmin);
 
-    await this.refreshTokenService.deleteByUserId(user.id);
+    const expiresIn = parseInt(
+      this.configService.get('JWT_REFRESH_EXPIRATION') || '604800',
+      10
+    );
     await this.refreshTokenService.createRefreshToken(
       user.id,
       tokens.refresh_token,
-      parseInt(this.configService.get('JWT_REFRESH_EXPIRATION') || '604800', 10)
+      expiresIn
+    );
+    await this.refreshTokenService.pruneOldestTokens(
+      user.id,
+      MAX_CONCURRENT_SESSIONS
     );
 
     return {

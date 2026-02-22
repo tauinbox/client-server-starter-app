@@ -15,6 +15,7 @@ import { RefreshTokenService } from './refresh-token.service';
 import { OAuthAccountService } from './oauth-account.service';
 import { MailService } from '../../mail/mail.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
+import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -54,6 +55,7 @@ describe('AuthService', () => {
     findByToken: jest.Mock;
     deleteByUserId: jest.Mock;
     revokeToken: jest.Mock;
+    pruneOldestTokens: jest.Mock;
   };
   let mockOAuthAccountService: {
     findByProviderAndProviderId: jest.Mock;
@@ -153,7 +155,8 @@ describe('AuthService', () => {
       createRefreshToken: jest.fn().mockResolvedValue(undefined),
       findByToken: jest.fn(),
       deleteByUserId: jest.fn().mockResolvedValue(undefined),
-      revokeToken: jest.fn().mockResolvedValue(undefined)
+      revokeToken: jest.fn().mockResolvedValue(undefined),
+      pruneOldestTokens: jest.fn().mockResolvedValue(undefined)
     };
 
     mockOAuthAccountService = {
@@ -339,16 +342,18 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    it('should delete old tokens, create new ones, and return auth response', async () => {
+    it('should create a new session token and prune oldest beyond limit', async () => {
       const result = await service.login(mockUserResponse);
 
-      expect(mockRefreshTokenService.deleteByUserId).toHaveBeenCalledWith(
-        'user-1'
-      );
+      expect(mockRefreshTokenService.deleteByUserId).not.toHaveBeenCalled();
       expect(mockRefreshTokenService.createRefreshToken).toHaveBeenCalledWith(
         'user-1',
         expect.any(String),
         604800
+      );
+      expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
+        'user-1',
+        MAX_CONCURRENT_SESSIONS
       );
       expect(result.tokens.access_token).toBe('mock-access-token');
       expect(typeof result.tokens.refresh_token).toBe('string');
@@ -718,8 +723,10 @@ describe('AuthService', () => {
 
       expect(result.user.email).toBe('oauth@example.com');
       expect(result.tokens).toBeDefined();
-      expect(mockRefreshTokenService.deleteByUserId).toHaveBeenCalledWith(
-        'oauth-user-1'
+      expect(mockRefreshTokenService.deleteByUserId).not.toHaveBeenCalled();
+      expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
+        'oauth-user-1',
+        MAX_CONCURRENT_SESSIONS
       );
     });
 

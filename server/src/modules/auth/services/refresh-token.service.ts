@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, MoreThan, Repository } from 'typeorm';
+import { In, LessThan, MoreThan, Repository } from 'typeorm';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { hashToken } from '../../../common/utils/hash-token';
 
@@ -31,6 +31,19 @@ export class RefreshTokenService {
 
   async deleteByUserId(userId: string): Promise<void> {
     await this.repository.delete({ userId });
+  }
+
+  async pruneOldestTokens(userId: string, maxSessions: number): Promise<void> {
+    const tokens = await this.repository.find({
+      where: { userId, revoked: false },
+      order: { createdAt: 'ASC' }
+    });
+
+    if (tokens.length > maxSessions) {
+      const excess = tokens.length - maxSessions;
+      const toDelete = tokens.slice(0, excess).map((t) => t.id);
+      await this.repository.delete({ id: In(toDelete) });
+    }
   }
 
   async revokeToken(id: string): Promise<void> {
