@@ -102,7 +102,7 @@ describe('PermissionService', () => {
       expect(mockCacheManager.set).toHaveBeenCalledWith(
         'permissions:user-1',
         result,
-        300_000
+        120_000
       );
     });
 

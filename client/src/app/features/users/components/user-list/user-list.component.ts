@@ -1,5 +1,11 @@
 import type { OnInit } from '@angular/core';
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  inject
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   MatCard,
   MatCardContent,
@@ -46,6 +52,7 @@ export class UserListComponent implements OnInit {
   readonly #usersStore = inject(UsersStore);
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
+  readonly #destroyRef = inject(DestroyRef);
 
   readonly loading = this.#usersStore.listLoading;
   readonly totalUsers = this.#usersStore.totalUsers;
@@ -88,28 +95,34 @@ export class UserListComponent implements OnInit {
       }
     });
 
-    dialogRef.afterClosed().subscribe((result) => {
-      if (result) {
-        this.deleteUser(user.id);
-      }
-    });
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe((result) => {
+        if (result) {
+          this.deleteUser(user.id);
+        }
+      });
   }
 
   deleteUser(id: string): void {
-    this.#usersStore.deleteUser(id).subscribe({
-      next: () => {
-        this.#snackBar.open('User deleted successfully', 'Close', {
-          duration: 5000
-        });
-        this.#usersStore.loadAll();
-      },
-      error: () => {
-        this.#snackBar.open(
-          'Failed to delete user. Please try again.',
-          'Close',
-          { duration: 5000 }
-        );
-      }
-    });
+    this.#usersStore
+      .deleteUser(id)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.#snackBar.open('User deleted successfully', 'Close', {
+            duration: 5000
+          });
+          this.#usersStore.loadAll();
+        },
+        error: () => {
+          this.#snackBar.open(
+            'Failed to delete user. Please try again.',
+            'Close',
+            { duration: 5000 }
+          );
+        }
+      });
   }
 }

@@ -9,6 +9,11 @@ import {
   PASSWORD_REGEX,
   PASSWORD_ERROR
 } from '@app/shared/constants/password.constants';
+import {
+  isValidEmail,
+  validateMaxLength,
+  validateMinLength
+} from '../utils/validation';
 import { generateTokens } from '../jwt.utils';
 import {
   findUserByEmail,
@@ -47,6 +52,24 @@ router.post('/register', (req, res) => {
     res
       .status(400)
       .json({ message: 'All fields are required', statusCode: 400 });
+    return;
+  }
+
+  if (!isValidEmail(email)) {
+    res
+      .status(400)
+      .json({ message: 'email must be an email', statusCode: 400 });
+    return;
+  }
+
+  const emailMaxErr = validateMaxLength(email, 255, 'email');
+  const fnMaxErr = validateMaxLength(firstName, 255, 'firstName');
+  const lnMaxErr = validateMaxLength(lastName, 255, 'lastName');
+  const pwMinErr = validateMinLength(password, 8, 'password');
+  const pwMaxErr = validateMaxLength(password, 128, 'password');
+  const lengthErr = emailMaxErr || fnMaxErr || lnMaxErr || pwMinErr || pwMaxErr;
+  if (lengthErr) {
+    res.status(400).json({ message: lengthErr, statusCode: 400 });
     return;
   }
 
@@ -98,6 +121,29 @@ router.post('/register', (req, res) => {
 // POST /api/v1/auth/login
 router.post('/login', (req, res) => {
   const { email, password } = req.body;
+
+  if (email && !isValidEmail(email)) {
+    res
+      .status(400)
+      .json({ message: 'email must be an email', statusCode: 400 });
+    return;
+  }
+
+  if (email) {
+    const emailMaxErr = validateMaxLength(email, 255, 'email');
+    if (emailMaxErr) {
+      res.status(400).json({ message: emailMaxErr, statusCode: 400 });
+      return;
+    }
+  }
+
+  if (password) {
+    const pwMaxErr = validateMaxLength(password, 128, 'password');
+    if (pwMaxErr) {
+      res.status(400).json({ message: pwMaxErr, statusCode: 400 });
+      return;
+    }
+  }
 
   const user = findUserByEmail(email);
 
@@ -208,6 +254,13 @@ router.post('/resend-verification', (req, res) => {
     return;
   }
 
+  if (!isValidEmail(email)) {
+    res
+      .status(400)
+      .json({ message: 'email must be an email', statusCode: 400 });
+    return;
+  }
+
   const user = findUserByEmail(email);
 
   // Always return success to prevent email enumeration
@@ -247,6 +300,13 @@ router.post('/forgot-password', (req, res) => {
     return;
   }
 
+  if (!isValidEmail(email)) {
+    res
+      .status(400)
+      .json({ message: 'email must be an email', statusCode: 400 });
+    return;
+  }
+
   const user = findUserByEmail(email);
 
   // Always return success to prevent email enumeration
@@ -282,6 +342,13 @@ router.post('/reset-password', (req, res) => {
     res
       .status(400)
       .json({ message: 'Token and password are required', statusCode: 400 });
+    return;
+  }
+
+  const pwMinErr = validateMinLength(password, 8, 'password');
+  const pwMaxErr = validateMaxLength(password, 128, 'password');
+  if (pwMinErr || pwMaxErr) {
+    res.status(400).json({ message: pwMinErr || pwMaxErr, statusCode: 400 });
     return;
   }
 
@@ -392,6 +459,31 @@ router.get('/permissions', authGuard, (req, res) => {
 router.patch('/profile', authGuard, (req, res) => {
   const { firstName, lastName, password } = req.body;
   const { user } = req as AuthenticatedRequest;
+
+  if (firstName !== undefined) {
+    const fnMaxErr = validateMaxLength(firstName, 255, 'firstName');
+    if (fnMaxErr) {
+      res.status(400).json({ message: fnMaxErr, statusCode: 400 });
+      return;
+    }
+  }
+
+  if (lastName !== undefined) {
+    const lnMaxErr = validateMaxLength(lastName, 255, 'lastName');
+    if (lnMaxErr) {
+      res.status(400).json({ message: lnMaxErr, statusCode: 400 });
+      return;
+    }
+  }
+
+  if (password !== undefined) {
+    const pwMinErr = validateMinLength(password, 8, 'password');
+    const pwMaxErr = validateMaxLength(password, 128, 'password');
+    if (pwMinErr || pwMaxErr) {
+      res.status(400).json({ message: pwMinErr || pwMaxErr, statusCode: 400 });
+      return;
+    }
+  }
 
   if (firstName !== undefined) user.firstName = firstName;
   if (lastName !== undefined) user.lastName = lastName;

@@ -1,4 +1,10 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  inject
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   MatCard,
   MatCardContent,
@@ -60,6 +66,7 @@ export class UserSearchComponent {
   readonly #usersStore = inject(UsersStore);
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
+  readonly #destroyRef = inject(DestroyRef);
 
   readonly searchForm: FormGroup<UserSearchFormType> =
     this.#fb.group<UserSearchFormType>({
@@ -142,29 +149,35 @@ export class UserSearchComponent {
       }
     });
 
-    dialogRef.afterClosed().subscribe((result) => {
-      if (result) {
-        this.#deleteUser(user.id);
-      }
-    });
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe((result) => {
+        if (result) {
+          this.#deleteUser(user.id);
+        }
+      });
   }
 
   #deleteUser(id: string): void {
-    this.#usersStore.deleteUser(id).subscribe({
-      next: () => {
-        this.#snackBar.open('User deleted successfully', 'Close', {
-          duration: 5000
-        });
-        this.#reSearch();
-      },
-      error: () => {
-        this.#snackBar.open(
-          'Failed to delete user. Please try again.',
-          'Close',
-          { duration: 5000 }
-        );
-      }
-    });
+    this.#usersStore
+      .deleteUser(id)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.#snackBar.open('User deleted successfully', 'Close', {
+            duration: 5000
+          });
+          this.#reSearch();
+        },
+        error: () => {
+          this.#snackBar.open(
+            'Failed to delete user. Please try again.',
+            'Close',
+            { duration: 5000 }
+          );
+        }
+      });
   }
 
   #reSearch(): void {

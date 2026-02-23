@@ -5,6 +5,11 @@ import {
   PASSWORD_REGEX
 } from '@app/shared/constants/password.constants';
 import {
+  isValidEmail,
+  validateMaxLength,
+  validateMinLength
+} from '../utils/validation';
+import {
   ALLOWED_USER_SORT_COLUMNS,
   type UserSortColumn
 } from '@app/shared/constants/user.constants';
@@ -109,6 +114,24 @@ router.post('/', adminGuard, (req, res) => {
     return;
   }
 
+  if (!isValidEmail(email)) {
+    res
+      .status(400)
+      .json({ message: 'email must be an email', statusCode: 400 });
+    return;
+  }
+
+  const emailMaxErr = validateMaxLength(email, 255, 'email');
+  const fnMaxErr = validateMaxLength(firstName, 255, 'firstName');
+  const lnMaxErr = validateMaxLength(lastName, 255, 'lastName');
+  const pwMinErr = validateMinLength(password, 8, 'password');
+  const pwMaxErr = validateMaxLength(password, 128, 'password');
+  const lengthErr = emailMaxErr || fnMaxErr || lnMaxErr || pwMinErr || pwMaxErr;
+  if (lengthErr) {
+    res.status(400).json({ message: lengthErr, statusCode: 400 });
+    return;
+  }
+
   if (!PASSWORD_REGEX.test(password)) {
     res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });
     return;
@@ -202,6 +225,45 @@ router.patch('/:id', adminGuard, (req, res) => {
 
   const { email, firstName, lastName, password, isActive, unlockAccount } =
     req.body;
+
+  if (email !== undefined) {
+    if (!isValidEmail(email)) {
+      res
+        .status(400)
+        .json({ message: 'email must be an email', statusCode: 400 });
+      return;
+    }
+    const emailMaxErr = validateMaxLength(email, 255, 'email');
+    if (emailMaxErr) {
+      res.status(400).json({ message: emailMaxErr, statusCode: 400 });
+      return;
+    }
+  }
+
+  if (firstName !== undefined) {
+    const fnMaxErr = validateMaxLength(firstName, 255, 'firstName');
+    if (fnMaxErr) {
+      res.status(400).json({ message: fnMaxErr, statusCode: 400 });
+      return;
+    }
+  }
+
+  if (lastName !== undefined) {
+    const lnMaxErr = validateMaxLength(lastName, 255, 'lastName');
+    if (lnMaxErr) {
+      res.status(400).json({ message: lnMaxErr, statusCode: 400 });
+      return;
+    }
+  }
+
+  if (password !== undefined) {
+    const pwMinErr = validateMinLength(password, 8, 'password');
+    const pwMaxErr = validateMaxLength(password, 128, 'password');
+    if (pwMinErr || pwMaxErr) {
+      res.status(400).json({ message: pwMinErr || pwMaxErr, statusCode: 400 });
+      return;
+    }
+  }
 
   if (email !== undefined) {
     const existing = findUserByEmail(email);
