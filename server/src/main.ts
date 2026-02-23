@@ -13,7 +13,6 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(
     CoreModule.forRoot(),
     {
-      cors: true,
       bufferLogs: true,
       logger: ['fatal', 'error', 'warn', 'log']
     }
@@ -39,25 +38,27 @@ async function bootstrap() {
   app.use(compression());
   app.use(cookieParser()); // this wil allow to get parsed cookie from req.cookies instead of req.get('Cookie')
 
-  const config = new DocumentBuilder()
-    .setTitle('Swagger')
-    .setDescription('Starter Project API')
-    .setContact(
-      'Alexander Tupavov',
-      'https://github.com/tauinbox',
-      'tauinbox@gmail.com'
-    )
-    .setVersion('1.0')
-    .addBearerAuth()
-    .addServer('/')
-    .build();
+  if (process.env['ENVIRONMENT'] !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Swagger')
+      .setDescription('Starter Project API')
+      .setContact(
+        'Alexander Tupavov',
+        'https://github.com/tauinbox',
+        'tauinbox@gmail.com'
+      )
+      .setVersion('1.0')
+      .addBearerAuth()
+      .addServer('/')
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
+    const document = SwaggerModule.createDocument(app, config);
 
-  SwaggerModule.setup('swagger', app, document, {
-    swaggerOptions: {},
-    customCss: ''
-  });
+    SwaggerModule.setup('swagger', app, document, {
+      swaggerOptions: {},
+      customCss: ''
+    });
+  }
 
   const port = process.env['APPLICATION_PORT']
     ? Number(process.env['APPLICATION_PORT'])
