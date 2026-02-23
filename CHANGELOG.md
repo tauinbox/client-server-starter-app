@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.5](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.4...v0.1.5) (2026-02-23)
+
+
+### Features
+
+* update docs ([2687a6c](https://github.com/tauinbox/client-server-starter-app/commit/2687a6cc0fe09d7064284c282154606bd2c090d4))
+
+
+### Bug Fixes
+
+* ci/cd fixes ([e1c5231](https://github.com/tauinbox/client-server-starter-app/commit/e1c523168c44c2b65c36f18c43803f877556f06a))
+* ci/cd fixes ([13cb448](https://github.com/tauinbox/client-server-starter-app/commit/13cb44811fbf80e999465fdfa3fa9d01b9899ec4))
+* deploy fix ([7df1759](https://github.com/tauinbox/client-server-starter-app/commit/7df17597e5acc1807ab2948acfa57a82c5849fe9))
+* export fix ([11b27ee](https://github.com/tauinbox/client-server-starter-app/commit/11b27ee556b76c0aad3a01bc4626b1fbac2e5057))
+* migrations ([ab9d8f7](https://github.com/tauinbox/client-server-starter-app/commit/ab9d8f7224d32ba46c10434105b50a4845e84df2))
+* resolve P0 security and infrastructure issues from architectural review ([#26](https://github.com/tauinbox/client-server-starter-app/issues/26)) ([30abfcc](https://github.com/tauinbox/client-server-starter-app/commit/30abfcc9bcdce50314a5c4b1cfa72d8d1822b302))
+* resolve S16, S18, S19 security issues from architectural review ([cd3e3ea](https://github.com/tauinbox/client-server-starter-app/commit/cd3e3ea2ecf239369ad307c1106d357448fe6765))
+* test migrations with test DB ([8dfad90](https://github.com/tauinbox/client-server-starter-app/commit/8dfad906670eaf3b14c59ab8244f5f1a9699a18d))
+
 ## [0.1.4](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.2...v0.1.4) (2026-02-22)
 
 
