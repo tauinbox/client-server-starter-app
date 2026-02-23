@@ -29,7 +29,9 @@ export class CaslAbilityFactory {
 
         if (p.conditions?.ownership) {
           // CASL infers MongoQuery<never> for string subjects — cast is required
-          can(action, subject, { id: userId } as MongoQuery<never>);
+          can(action, subject, {
+            [p.conditions.ownership.userField]: userId
+          } as MongoQuery<never>);
         } else {
           can(action, subject);
         }
