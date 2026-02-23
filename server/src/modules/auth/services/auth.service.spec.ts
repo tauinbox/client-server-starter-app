@@ -57,6 +57,7 @@ describe('AuthService', () => {
   };
   let mockConfigService: {
     get: jest.Mock;
+    getOrThrow: jest.Mock;
   };
   let mockRefreshTokenService: {
     createRefreshToken: jest.Mock;
@@ -172,6 +173,17 @@ describe('AuthService', () => {
           JWT_REFRESH_EXPIRATION: '604800'
         };
         return config[key];
+      }),
+      getOrThrow: jest.fn().mockImplementation((key: string) => {
+        const config: Record<string, string> = {
+          JWT_EXPIRATION: '3600',
+          JWT_REFRESH_EXPIRATION: '604800'
+        };
+        const value = config[key];
+        if (value === undefined) {
+          throw new Error(`Configuration key "${key}" does not exist`);
+        }
+        return value;
       })
     };
 
@@ -393,16 +405,13 @@ describe('AuthService', () => {
       expect(result.user).toEqual({ ...mockUserResponse, roles: ['user'] });
     });
 
-    it('should use default expiration when config is not set', async () => {
-      mockConfigService.get.mockReturnValue(undefined);
+    it('should throw when config values are missing', async () => {
+      mockConfigService.getOrThrow.mockImplementation((key: string) => {
+        throw new Error(`Configuration key "${key}" does not exist`);
+      });
 
-      const result = await service.login(mockUserResponse);
-
-      expect(result.tokens.expires_in).toBe(3600);
-      expect(mockRefreshTokenService.createRefreshToken).toHaveBeenCalledWith(
-        'user-1',
-        expect.any(String),
-        604800
+      await expect(service.login(mockUserResponse)).rejects.toThrow(
+        'Configuration key "JWT_EXPIRATION" does not exist'
       );
     });
 

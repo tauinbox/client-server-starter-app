@@ -10,6 +10,8 @@
     "watch": "ng build --watch --configuration development",
     "pretest": "node scripts/version.mjs",
     "test": "ng test",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
     "lint": "ng lint",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

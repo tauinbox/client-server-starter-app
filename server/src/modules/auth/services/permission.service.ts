@@ -6,7 +6,7 @@ import { Cache } from 'cache-manager';
 import { User } from '../../users/entities/user.entity';
 import { ResolvedPermission } from '@app/shared/types';
 
-const CACHE_TTL = 300_000; // 5 minutes
+const CACHE_TTL = 120_000; // 2 minutes
 const CACHE_PREFIX = 'permissions:';
 
 @Injectable()

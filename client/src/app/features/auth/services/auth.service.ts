@@ -228,8 +228,8 @@ export class AuthService {
       .then((response) => {
         this.#authStore.setRules(response.rules);
       })
-      .catch(() => {
-        // Permissions fetch failed — keep going with empty permissions
+      .catch((error) => {
+        console.error('Failed to fetch permissions:', error);
       });
   }
 

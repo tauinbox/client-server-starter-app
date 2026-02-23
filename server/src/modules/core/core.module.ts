@@ -1,3 +1,4 @@
+import type { MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
@@ -13,9 +14,14 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { GlobalExceptionFilter } from './filters';
 import { MailModule } from '../mail/mail.module';
 import { HealthModule } from './health/health.module';
+import { RequestIdMiddleware } from './middleware/request-id.middleware';
 
 @Module({})
-export class CoreModule {
+export class CoreModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
+  }
+
   static forRoot(): DynamicModule {
     return {
       module: CoreModule,

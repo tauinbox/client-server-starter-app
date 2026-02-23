@@ -142,7 +142,7 @@ export class AuthService {
     const tokens = this.generateTokens(user.id, user.email, roles);
 
     const expiresIn = parseInt(
-      this.configService.get('JWT_REFRESH_EXPIRATION') || '604800',
+      this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION'),
       10
     );
     await this.refreshTokenService.createRefreshToken(
@@ -242,7 +242,7 @@ export class AuthService {
     const tokens = this.generateTokens(user.id, user.email, roles);
 
     const expiresIn = parseInt(
-      this.configService.get('JWT_REFRESH_EXPIRATION') || '604800',
+      this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION'),
       10
     );
     await this.refreshTokenService.createRefreshToken(
@@ -514,7 +514,7 @@ export class AuthService {
     const tokens = this.generateTokens(user.id, user.email, roles);
 
     const expiresIn = parseInt(
-      this.configService.get('JWT_REFRESH_EXPIRATION') || '604800',
+      this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION'),
       10
     );
     const expiresAt = new Date(Date.now() + expiresIn * 1000);
@@ -554,7 +554,7 @@ export class AuthService {
     };
 
     const accessTokenExpiration = parseInt(
-      this.configService.get('JWT_EXPIRATION') || '3600',
+      this.configService.getOrThrow<string>('JWT_EXPIRATION'),
       10
     );
 

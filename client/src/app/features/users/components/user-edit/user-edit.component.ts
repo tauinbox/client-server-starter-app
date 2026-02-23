@@ -3,10 +3,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject,
   input,
   signal
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   MatCard,
   MatCardContent,
@@ -80,6 +82,7 @@ export class UserEditComponent implements OnInit {
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
   protected readonly authStore = inject(AuthStore);
+  readonly #destroyRef = inject(DestroyRef);
 
   readonly id = input.required<string>();
   readonly user = signal<User | null>(null);
@@ -130,30 +133,33 @@ export class UserEditComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.#userService.getById(this.id()).subscribe({
-      next: (user) => {
-        this.user.set(user);
+    this.#userService
+      .getById(this.id())
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: (user) => {
+          this.user.set(user);
 
-        this.userForm.patchValue({
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          isActive: user.isActive,
-          password: ''
-        });
+          this.userForm.patchValue({
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            isActive: user.isActive,
+            password: ''
+          });
 
-        this.userForm.markAsPristine();
-        this.loading.set(false);
-      },
-      error: (err: HttpErrorResponse) => {
-        this.loading.set(false);
-        const errorMessage =
-          err.error?.message ||
-          'Failed to load user details. Please try again.';
-        this.error.set(errorMessage);
-        this.#snackBar.open(errorMessage, 'Close', { duration: 5000 });
-      }
-    });
+          this.userForm.markAsPristine();
+          this.loading.set(false);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loading.set(false);
+          const errorMessage =
+            err.error?.message ||
+            'Failed to load user details. Please try again.';
+          this.error.set(errorMessage);
+          this.#snackBar.open(errorMessage, 'Close', { duration: 5000 });
+        }
+      });
   }
 
   onSubmit(): void {
@@ -165,10 +171,13 @@ export class UserEditComponent implements OnInit {
     this.saving.set(true);
     this.error.set(null);
 
-    this.#usersStore.updateUser(this.id(), updateData).subscribe({
-      next: (user) => this.#handleUpdateSuccess(user),
-      error: (err) => this.#handleUpdateError(err)
-    });
+    this.#usersStore
+      .updateUser(this.id(), updateData)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: (user) => this.#handleUpdateSuccess(user),
+        error: (err) => this.#handleUpdateError(err)
+      });
   }
 
   #prepareUpdateData(formValues: FormGroup<UserFormType>['value']): UpdateUser {
@@ -215,23 +224,26 @@ export class UserEditComponent implements OnInit {
 
   unlockAccount(): void {
     this.saving.set(true);
-    this.#usersStore.updateUser(this.id(), { unlockAccount: true }).subscribe({
-      next: (user) => {
-        this.saving.set(false);
-        this.user.set(user);
-        this.#snackBar.open('Account unlocked successfully', 'Close', {
-          duration: 5000
-        });
-      },
-      error: (err: HttpErrorResponse) => {
-        this.saving.set(false);
-        this.#snackBar.open(
-          err.error?.message || 'Failed to unlock account',
-          'Close',
-          { duration: 5000 }
-        );
-      }
-    });
+    this.#usersStore
+      .updateUser(this.id(), { unlockAccount: true })
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: (user) => {
+          this.saving.set(false);
+          this.user.set(user);
+          this.#snackBar.open('Account unlocked successfully', 'Close', {
+            duration: 5000
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.saving.set(false);
+          this.#snackBar.open(
+            err.error?.message || 'Failed to unlock account',
+            'Close',
+            { duration: 5000 }
+          );
+        }
+      });
   }
 
   confirmDelete(): void {
@@ -249,6 +261,7 @@ export class UserEditComponent implements OnInit {
         }
       })
       .afterClosed()
+      .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((result) => {
         if (result) {
           this.#deleteUser();
@@ -257,20 +270,23 @@ export class UserEditComponent implements OnInit {
   }
 
   #deleteUser(): void {
-    this.#usersStore.deleteUser(this.id()).subscribe({
-      next: () => {
-        this.#snackBar.open('User deleted successfully', 'Close', {
-          duration: 5000
-        });
-        void this.#router.navigate([`/${AppRouteSegmentEnum.Users}`]);
-      },
-      error: (err: HttpErrorResponse) => {
-        this.#snackBar.open(
-          err.error?.message || 'Failed to delete user. Please try again.',
-          'Close',
-          { duration: 5000 }
-        );
-      }
-    });
+    this.#usersStore
+      .deleteUser(this.id())
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.#snackBar.open('User deleted successfully', 'Close', {
+            duration: 5000
+          });
+          void this.#router.navigate([`/${AppRouteSegmentEnum.Users}`]);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.#snackBar.open(
+            err.error?.message || 'Failed to delete user. Please try again.',
+            'Close',
+            { duration: 5000 }
+          );
+        }
+      });
   }
 }
