@@ -10,8 +10,9 @@ RUN cd client && COMMIT_HASH=$COMMIT_HASH NODE_OPTIONS="--max-old-space-size=204
 
 # Stage 2: runtime
 FROM nginx:1.27-alpine AS runner
-RUN mkdir -p /var/cache/nginx /var/run && \
-    chown -R nginx:nginx /var/cache/nginx /var/run /usr/share/nginx/html
+RUN mkdir -p /var/cache/nginx /tmp/nginx && \
+    chown -R nginx:nginx /var/cache/nginx /tmp/nginx /usr/share/nginx/html && \
+    sed -i 's|/run/nginx.pid|/tmp/nginx/nginx.pid|' /etc/nginx/nginx.conf
 COPY --from=builder /app/client/dist/client/browser /usr/share/nginx/html
 COPY client/nginx.conf /etc/nginx/conf.d/default.conf
 USER nginx
