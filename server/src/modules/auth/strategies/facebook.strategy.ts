@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
+import type { StrategyOptions } from 'passport-facebook';
 import { Strategy } from 'passport-facebook';
 import { ConfigService } from '@nestjs/config';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
+import { CookieStateStore } from '../utils/cookie-state-store';
 
 @Injectable()
 export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
@@ -13,8 +15,12 @@ export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
       clientSecret: configService.getOrThrow('FACEBOOK_CLIENT_SECRET'),
       callbackURL: '/api/v1/auth/oauth/facebook/callback',
       scope: ['email'],
-      profileFields: ['id', 'emails', 'name']
-    });
+      profileFields: ['id', 'emails', 'name'],
+      state: true,
+      store: new CookieStateStore(
+        configService.get('NODE_ENV') === 'production'
+      )
+    } as StrategyOptions);
   }
 
   validate(

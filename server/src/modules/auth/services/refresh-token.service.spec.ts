@@ -207,64 +207,50 @@ describe('RefreshTokenService', () => {
   });
 
   describe('pruneOldestTokens', () => {
-    const makeToken = (id: string, createdAt: Date) =>
-      ({ id, userId: 'user-1', revoked: false, createdAt }) as RefreshToken;
-
     it('should do nothing when token count is within limit', async () => {
-      mockRepository.find.mockResolvedValue([
-        makeToken('t1', new Date('2025-01-01')),
-        makeToken('t2', new Date('2025-01-02'))
-      ]);
+      mockRepository.count.mockResolvedValue(2);
 
       await service.pruneOldestTokens('user-1', 5);
 
-      expect(mockRepository.delete).not.toHaveBeenCalled();
+      expect(mockRepository.count).toHaveBeenCalledWith({
+        where: { userId: 'user-1', revoked: false }
+      });
+      expect(mockRepository.createQueryBuilder).not.toHaveBeenCalled();
     });
 
     it('should delete oldest tokens when count exceeds limit', async () => {
-      mockRepository.find.mockResolvedValue([
-        makeToken('t1', new Date('2025-01-01')),
-        makeToken('t2', new Date('2025-01-02')),
-        makeToken('t3', new Date('2025-01-03')),
-        makeToken('t4', new Date('2025-01-04')),
-        makeToken('t5', new Date('2025-01-05')),
-        makeToken('t6', new Date('2025-01-06')) // 6th = 1 over limit of 5
-      ]);
-      mockRepository.delete.mockResolvedValue({ affected: 1 });
+      mockRepository.count.mockResolvedValue(6);
 
       await service.pruneOldestTokens('user-1', 5);
 
-      expect(mockRepository.find).toHaveBeenCalledWith({
-        where: { userId: 'user-1', revoked: false },
-        order: { createdAt: 'ASC' }
-      });
-      // Should delete only the oldest (t1) to bring count down to 5
-      expect(mockRepository.delete).toHaveBeenCalledTimes(1);
+      expect(mockRepository.createQueryBuilder).toHaveBeenCalled();
+      expect(mockQueryBuilder.delete).toHaveBeenCalled();
+      expect(mockQueryBuilder.from).toHaveBeenCalledWith(RefreshToken);
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        expect.stringContaining('LIMIT :excess'),
+        { userId: 'user-1', excess: 1 }
+      );
+      expect(mockQueryBuilder.execute).toHaveBeenCalled();
     });
 
     it('should delete multiple oldest tokens when far over limit', async () => {
-      mockRepository.find.mockResolvedValue([
-        makeToken('t1', new Date('2025-01-01')),
-        makeToken('t2', new Date('2025-01-02')),
-        makeToken('t3', new Date('2025-01-03')),
-        makeToken('t4', new Date('2025-01-04')),
-        makeToken('t5', new Date('2025-01-05')),
-        makeToken('t6', new Date('2025-01-06')),
-        makeToken('t7', new Date('2025-01-07')) // 7 tokens, limit 5 → delete 2 oldest
-      ]);
-      mockRepository.delete.mockResolvedValue({ affected: 2 });
+      mockRepository.count.mockResolvedValue(7);
 
       await service.pruneOldestTokens('user-1', 5);
 
-      expect(mockRepository.delete).toHaveBeenCalledTimes(1);
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        expect.stringContaining('LIMIT :excess'),
+        { userId: 'user-1', excess: 2 }
+      );
+      expect(mockQueryBuilder.execute).toHaveBeenCalled();
     });
 
     it('should do nothing when user has no tokens', async () => {
-      mockRepository.find.mockResolvedValue([]);
+      mockRepository.count.mockResolvedValue(0);
 
       await service.pruneOldestTokens('user-1', 5);
 
-      expect(mockRepository.delete).not.toHaveBeenCalled();
+      expect(mockRepository.createQueryBuilder).not.toHaveBeenCalled();
     });
   });
 

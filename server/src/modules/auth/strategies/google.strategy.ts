@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
+import type { StrategyOptions } from 'passport-google-oauth20';
 import { Strategy, VerifyCallback } from 'passport-google-oauth20';
 import { ConfigService } from '@nestjs/config';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
+import { CookieStateStore } from '../utils/cookie-state-store';
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
@@ -12,8 +14,12 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       clientID: configService.getOrThrow('GOOGLE_CLIENT_ID'),
       clientSecret: configService.getOrThrow('GOOGLE_CLIENT_SECRET'),
       callbackURL: '/api/v1/auth/oauth/google/callback',
-      scope: ['email', 'profile']
-    });
+      scope: ['email', 'profile'],
+      state: true,
+      store: new CookieStateStore(
+        configService.get('NODE_ENV') === 'production'
+      )
+    } as StrategyOptions);
   }
 
   validate(

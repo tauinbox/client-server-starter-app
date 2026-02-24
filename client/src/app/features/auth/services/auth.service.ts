@@ -174,6 +174,14 @@ export class AuthService {
     );
   }
 
+  exchangeOAuthData(): Observable<AuthResponse> {
+    return this.#http.post<AuthResponse>(
+      AuthApiEnum.OAuthExchange,
+      {},
+      { withCredentials: true }
+    );
+  }
+
   initOAuthLink(): Observable<{ message: string }> {
     return this.#http.post<{ message: string }>(AuthApiEnum.OAuthLinkInit, {});
   }

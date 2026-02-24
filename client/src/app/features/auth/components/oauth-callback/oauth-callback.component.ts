@@ -1,9 +1,7 @@
 import type { OnInit } from '@angular/core';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { DOCUMENT } from '@angular/common';
 import { Router } from '@angular/router';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import type { AuthResponse } from '../../models/auth.types';
 import { AuthStore } from '../../store/auth.store';
 import { AuthService } from '../../services/auth.service';
 import { SessionStorageService } from '@core/services/session-storage.service';
@@ -35,46 +33,37 @@ export class OAuthCallbackComponent implements OnInit {
   readonly #authStore = inject(AuthStore);
   readonly #authService = inject(AuthService);
   readonly #sessionStorage = inject(SessionStorageService);
-  readonly #window = inject(DOCUMENT).defaultView;
 
   ngOnInit(): void {
-    try {
-      const fragment = this.#window?.location.hash ?? '';
-      const dataMatch = fragment.match(/data=([^&]+)/);
+    this.#authService.exchangeOAuthData().subscribe({
+      next: (authResponse) => {
+        if (
+          !authResponse.tokens?.access_token ||
+          !authResponse.user?.id ||
+          !authResponse.user?.email
+        ) {
+          this.#redirectToLogin('auth_failed');
+          return;
+        }
 
-      if (!dataMatch?.[1]) {
+        this.#authStore.saveAuthResponse(authResponse);
+        this.#authService.scheduleTokenRefresh();
+
+        const returnUrl =
+          this.#sessionStorage.getItem<string>('oauth_return_url');
+        this.#sessionStorage.removeItem('oauth_return_url');
+
+        const safeUrl =
+          returnUrl && returnUrl.startsWith('/') && !returnUrl.includes('//')
+            ? returnUrl
+            : `/${AppRouteSegmentEnum.Profile}`;
+
+        void this.#router.navigateByUrl(safeUrl, { replaceUrl: true });
+      },
+      error: () => {
         this.#redirectToLogin('auth_failed');
-        return;
       }
-
-      const decoded = atob(dataMatch[1].replace(/-/g, '+').replace(/_/g, '/'));
-      const authResponse: AuthResponse = JSON.parse(decoded);
-
-      if (
-        !authResponse.tokens?.access_token ||
-        !authResponse.user?.id ||
-        !authResponse.user?.email
-      ) {
-        this.#redirectToLogin('auth_failed');
-        return;
-      }
-
-      this.#authStore.saveAuthResponse(authResponse);
-      this.#authService.scheduleTokenRefresh();
-
-      const returnUrl =
-        this.#sessionStorage.getItem<string>('oauth_return_url');
-      this.#sessionStorage.removeItem('oauth_return_url');
-
-      const safeUrl =
-        returnUrl && returnUrl.startsWith('/') && !returnUrl.includes('//')
-          ? returnUrl
-          : `/${AppRouteSegmentEnum.Profile}`;
-
-      void this.#router.navigateByUrl(safeUrl, { replaceUrl: true });
-    } catch {
-      this.#redirectToLogin('auth_failed');
-    }
+    });
   }
 
   #redirectToLogin(error: string): void {
