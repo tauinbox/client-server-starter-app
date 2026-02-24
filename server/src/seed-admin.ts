@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
+import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
 import { postgresConfig } from './postgres.config';
 import { User } from './modules/users/entities/user.entity';
 
@@ -29,7 +30,7 @@ async function seedAdmin(): Promise<void> {
       return;
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
     const admin = userRepo.create({
       email,
       password: hashedPassword,

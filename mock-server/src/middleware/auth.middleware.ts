@@ -46,7 +46,8 @@ function pruneOldestUserTokens(
 
 // POST /api/v1/auth/register
 router.post('/register', (req, res) => {
-  const { email, firstName, lastName, password } = req.body;
+  const { firstName, lastName, password } = req.body;
+  const email = req.body.email?.trim().toLowerCase();
 
   if (!email || !firstName || !lastName || !password) {
     res
@@ -120,7 +121,8 @@ router.post('/register', (req, res) => {
 
 // POST /api/v1/auth/login
 router.post('/login', (req, res) => {
-  const { email, password } = req.body;
+  const email = req.body.email?.trim().toLowerCase();
+  const { password } = req.body;
 
   if (email && !isValidEmail(email)) {
     res
@@ -244,7 +246,7 @@ router.post('/verify-email', (req, res) => {
 
 // POST /api/v1/auth/resend-verification
 router.post('/resend-verification', (req, res) => {
-  const { email } = req.body;
+  const email = req.body.email?.trim().toLowerCase();
 
   const successMessage =
     'If an account with that email exists and is not yet verified, a verification email has been sent.';
@@ -290,7 +292,7 @@ router.post('/resend-verification', (req, res) => {
 
 // POST /api/v1/auth/forgot-password
 router.post('/forgot-password', (req, res) => {
-  const { email } = req.body;
+  const email = req.body.email?.trim().toLowerCase();
 
   const successMessage =
     'If an account with that email exists, a password reset link has been sent.';
