@@ -8,6 +8,7 @@ import { ResolvedPermission } from '@app/shared/types';
 
 const CACHE_TTL = 120_000; // 2 minutes
 const CACHE_PREFIX = 'permissions:';
+const ROLES_CACHE_PREFIX = 'roles:';
 
 @Injectable()
 export class PermissionService {
@@ -60,16 +61,25 @@ export class PermissionService {
   }
 
   async getRoleNamesForUser(userId: string): Promise<string[]> {
+    const cacheKey = `${ROLES_CACHE_PREFIX}${userId}`;
+    const cached = await this.cacheManager.get<string[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['roles']
     });
 
-    return user?.roles?.map((r) => r.name) ?? [];
+    const roleNames = user?.roles?.map((r) => r.name) ?? [];
+    await this.cacheManager.set(cacheKey, roleNames, CACHE_TTL);
+    return roleNames;
   }
 
-  async invalidateUserPermissions(userId: string): Promise<void> {
+  async invalidateUserCache(userId: string): Promise<void> {
     await this.cacheManager.del(`${CACHE_PREFIX}${userId}`);
+    await this.cacheManager.del(`${ROLES_CACHE_PREFIX}${userId}`);
   }
 
   async hasPermission(userId: string, permission: string): Promise<boolean> {

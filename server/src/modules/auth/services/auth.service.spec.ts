@@ -76,7 +76,7 @@ describe('AuthService', () => {
   };
   let mockPermissionService: {
     getRoleNamesForUser: jest.Mock;
-    invalidateUserPermissions: jest.Mock;
+    invalidateUserCache: jest.Mock;
   };
   let mockRoleService: {
     findRoleByName: jest.Mock;
@@ -207,7 +207,7 @@ describe('AuthService', () => {
 
     mockPermissionService = {
       getRoleNamesForUser: jest.fn().mockResolvedValue(['user']),
-      invalidateUserPermissions: jest.fn().mockResolvedValue(undefined)
+      invalidateUserCache: jest.fn().mockResolvedValue(undefined)
     };
 
     mockRoleService = {

@@ -141,7 +141,17 @@ describe('PermissionService', () => {
   });
 
   describe('getRoleNamesForUser', () => {
-    it('should return role names', async () => {
+    it('should return cached role names if available', async () => {
+      const cachedRoles = ['admin', 'user'];
+      mockCacheManager.get.mockResolvedValue(cachedRoles);
+
+      const result = await service.getRoleNamesForUser('user-1');
+
+      expect(result).toEqual(cachedRoles);
+      expect(mockUserRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it('should query and cache role names when not cached', async () => {
       mockUserRepository.findOne.mockResolvedValue({
         roles: [{ name: 'admin' }, { name: 'user' }]
       });
@@ -149,6 +159,11 @@ describe('PermissionService', () => {
       const result = await service.getRoleNamesForUser('user-1');
 
       expect(result).toEqual(['admin', 'user']);
+      expect(mockCacheManager.set).toHaveBeenCalledWith(
+        'roles:user-1',
+        ['admin', 'user'],
+        120_000
+      );
     });
 
     it('should return empty array if user not found', async () => {
@@ -160,11 +175,13 @@ describe('PermissionService', () => {
     });
   });
 
-  describe('invalidateUserPermissions', () => {
-    it('should delete cache entry', async () => {
-      await service.invalidateUserPermissions('user-1');
+  describe('invalidateUserCache', () => {
+    it('should delete both permissions and roles cache entries', async () => {
+      await service.invalidateUserCache('user-1');
 
       expect(mockCacheManager.del).toHaveBeenCalledWith('permissions:user-1');
+      expect(mockCacheManager.del).toHaveBeenCalledWith('roles:user-1');
+      expect(mockCacheManager.del).toHaveBeenCalledTimes(2);
     });
   });
 

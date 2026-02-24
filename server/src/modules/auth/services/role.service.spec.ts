@@ -25,7 +25,7 @@ describe('RoleService', () => {
     save: jest.Mock;
     delete: jest.Mock;
   };
-  let mockPermissionService: { invalidateUserPermissions: jest.Mock };
+  let mockPermissionService: { invalidateUserCache: jest.Mock };
   let mockRelationQueryBuilder: {
     relation: jest.Mock;
     of: jest.Mock;
@@ -95,7 +95,7 @@ describe('RoleService', () => {
     };
 
     mockPermissionService = {
-      invalidateUserPermissions: jest.fn()
+      invalidateUserCache: jest.fn()
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -206,9 +206,9 @@ describe('RoleService', () => {
       await service.assignRoleToUser('user-1', 'role-2');
 
       expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
-      expect(
-        mockPermissionService.invalidateUserPermissions
-      ).toHaveBeenCalledWith('user-1');
+      expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
+        'user-1'
+      );
     });
   });
 
@@ -217,9 +217,9 @@ describe('RoleService', () => {
       await service.removeRoleFromUser('user-1', 'role-2');
 
       expect(mockRelationQueryBuilder.remove).toHaveBeenCalledWith('role-2');
-      expect(
-        mockPermissionService.invalidateUserPermissions
-      ).toHaveBeenCalledWith('user-1');
+      expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
+        'user-1'
+      );
     });
   });
 
