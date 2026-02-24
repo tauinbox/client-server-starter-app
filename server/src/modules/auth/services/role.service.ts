@@ -85,7 +85,7 @@ export class RoleService {
       .relation(User, 'roles')
       .of(userId)
       .add(roleId);
-    await this.permissionService.invalidateUserPermissions(userId);
+    await this.permissionService.invalidateUserCache(userId);
   }
 
   async removeRoleFromUser(userId: string, roleId: string): Promise<void> {
@@ -94,7 +94,7 @@ export class RoleService {
       .relation(User, 'roles')
       .of(userId)
       .remove(roleId);
-    await this.permissionService.invalidateUserPermissions(userId);
+    await this.permissionService.invalidateUserCache(userId);
   }
 
   async findRolesForUser(userId: string): Promise<Role[]> {
