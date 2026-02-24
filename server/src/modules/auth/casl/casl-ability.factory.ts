@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { MongoQuery } from '@casl/ability';
 import { ResolvedPermission } from '@app/shared/types';
 import {
@@ -11,6 +11,8 @@ import {
 
 @Injectable()
 export class CaslAbilityFactory {
+  private readonly logger = new Logger(CaslAbilityFactory.name);
+
   createForUser(
     userId: string,
     roles: string[],
@@ -23,7 +25,12 @@ export class CaslAbilityFactory {
     } else {
       for (const p of permissions) {
         const subject = SUBJECT_MAP[p.resource];
-        if (!subject) continue;
+        if (!subject) {
+          this.logger.warn(
+            `Unknown resource "${p.resource}" in permissions for user ${userId} — skipping`
+          );
+          continue;
+        }
 
         const action = p.action as Actions;
 
