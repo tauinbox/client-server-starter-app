@@ -22,19 +22,17 @@ import {
   MatSuffix
 } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
-import { MatIcon, MatIconRegistry } from '@angular/material/icon';
+import { MatIcon } from '@angular/material/icon';
 import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatDivider } from '@angular/material/divider';
 import { DOCUMENT } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { DomSanitizer } from '@angular/platform-browser';
 import { AuthService } from '../../services/auth.service';
 import { SessionStorageService } from '@core/services/session-storage.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
-import { registerOAuthIcons } from '../../utils/register-oauth-icons';
 import type { LockoutErrorData } from '../../models/auth.types';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 
@@ -109,10 +107,6 @@ export class LoginComponent implements OnInit, OnDestroy {
       nonNullable: true
     })
   });
-
-  constructor() {
-    registerOAuthIcons(inject(MatIconRegistry), inject(DomSanitizer));
-  }
 
   ngOnInit(): void {
     const oauthError = this.#route.snapshot.queryParams['oauth_error'];

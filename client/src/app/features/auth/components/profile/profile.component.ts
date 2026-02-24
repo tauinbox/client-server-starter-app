@@ -29,7 +29,7 @@ import {
   MatSuffix
 } from '@angular/material/form-field';
 import type { ErrorStateMatcher } from '@angular/material/core';
-import { MatIcon, MatIconRegistry } from '@angular/material/icon';
+import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatButton } from '@angular/material/button';
 import { DOCUMENT } from '@angular/common';
@@ -41,9 +41,7 @@ import type { UpdateProfile } from '../../models/auth.types';
 import { DatePipe } from '@angular/common';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { DomSanitizer } from '@angular/platform-browser';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
-import { registerOAuthIcons } from '../../utils/register-oauth-icons';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 
 type ProfileFormType = {
@@ -143,10 +141,6 @@ export class ProfileComponent implements OnInit {
       },
       { validators: [passwordsMatchValidator] }
     );
-
-  constructor() {
-    registerOAuthIcons(inject(MatIconRegistry), inject(DomSanitizer));
-  }
 
   ngOnInit() {
     this.loadProfile();
