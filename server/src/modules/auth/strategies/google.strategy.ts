@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
+import type { StrategyOptions } from 'passport-google-oauth20';
 import { Strategy, VerifyCallback } from 'passport-google-oauth20';
 import { ConfigService } from '@nestjs/config';
 import { OAuthUserProfile } from '../types/oauth-profile';
@@ -18,7 +19,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       store: new CookieStateStore(
         configService.get('NODE_ENV') === 'production'
       )
-    });
+    } as StrategyOptions);
   }
 
   validate(

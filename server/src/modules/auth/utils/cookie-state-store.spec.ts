@@ -25,7 +25,7 @@ describe('CookieStateStore', () => {
         expect(err).toBeNull();
         expect(state).toBeDefined();
         expect(typeof state).toBe('string');
-        expect(state!.length).toBe(64); // 32 bytes = 64 hex chars
+        expect(String(state).length).toBe(64); // 32 bytes = 64 hex chars
         expect(cookieFn).toHaveBeenCalledWith(
           'oauth_state',
           state,

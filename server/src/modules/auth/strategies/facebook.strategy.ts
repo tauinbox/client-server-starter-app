@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
+import type { StrategyOptions } from 'passport-facebook';
 import { Strategy } from 'passport-facebook';
 import { ConfigService } from '@nestjs/config';
 import { OAuthUserProfile } from '../types/oauth-profile';
@@ -19,7 +20,7 @@ export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
       store: new CookieStateStore(
         configService.get('NODE_ENV') === 'production'
       )
-    });
+    } as StrategyOptions);
   }
 
   validate(
