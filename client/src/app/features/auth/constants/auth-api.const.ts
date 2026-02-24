@@ -8,6 +8,7 @@ export enum AuthApiEnum {
   RefreshToken = `${AUTH_API_V1}/refresh-token`,
   OAuthAccounts = `${AUTH_API_V1}/oauth/accounts`,
   OAuthLinkInit = `${AUTH_API_V1}/oauth/link-init`,
+  OAuthExchange = `${AUTH_API_V1}/oauth/exchange`,
   VerifyEmail = `${AUTH_API_V1}/verify-email`,
   ResendVerification = `${AUTH_API_V1}/resend-verification`,
   ForgotPassword = `${AUTH_API_V1}/forgot-password`,

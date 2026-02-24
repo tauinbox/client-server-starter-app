@@ -4,6 +4,7 @@ import { Strategy } from 'passport-vkontakte';
 import { ConfigService } from '@nestjs/config';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
+import { CookieStateStore } from '../utils/cookie-state-store';
 
 @Injectable()
 export class VkStrategy extends PassportStrategy(Strategy, 'vkontakte') {
@@ -12,7 +13,11 @@ export class VkStrategy extends PassportStrategy(Strategy, 'vkontakte') {
       clientID: configService.getOrThrow('VK_CLIENT_ID'),
       clientSecret: configService.getOrThrow('VK_CLIENT_SECRET'),
       callbackURL: '/api/v1/auth/oauth/vk/callback',
-      scope: ['email']
+      scope: ['email'],
+      state: true,
+      store: new CookieStateStore(
+        configService.get('NODE_ENV') === 'production'
+      )
     } as ConstructorParameters<typeof Strategy>[0] & { scope: string[] });
   }
 

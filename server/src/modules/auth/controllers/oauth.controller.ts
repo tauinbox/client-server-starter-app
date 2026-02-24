@@ -42,6 +42,8 @@ export class OAuthController {
 
   private static readonly OAUTH_LINK_COOKIE = 'oauth_link';
   private static readonly OAUTH_LINK_MAX_AGE_SECONDS = 300;
+  private static readonly OAUTH_DATA_COOKIE = 'oauth_data';
+  private static readonly OAUTH_DATA_MAX_AGE_SECONDS = 60;
 
   constructor(
     private readonly authService: AuthService,
@@ -208,6 +210,33 @@ export class OAuthController {
 
   // --- Common callback handler ---
 
+  @Post('exchange')
+  @ApiOperation({ summary: 'Exchange OAuth data cookie for auth response' })
+  @ApiOkResponse({ description: 'Auth response from OAuth login' })
+  exchangeOAuthData(
+    @Request() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    const cookie = (req.cookies as Record<string, string> | undefined)?.[
+      OAuthController.OAUTH_DATA_COOKIE
+    ];
+
+    res.clearCookie(OAuthController.OAUTH_DATA_COOKIE, {
+      path: '/api/v1/auth/oauth'
+    });
+
+    if (!cookie) {
+      throw new BadRequestException('Missing OAuth data');
+    }
+
+    try {
+      const payload = this.jwtService.verify<{ data: unknown }>(cookie);
+      return payload.data;
+    } catch {
+      throw new BadRequestException('Invalid or expired OAuth data');
+    }
+  }
+
   private async handleOAuthCallback(
     profile: OAuthUserProfile,
     req: ExpressRequest,
@@ -232,11 +261,20 @@ export class OAuthController {
 
       const authResponse = await this.authService.loginWithOAuth(profile);
 
-      const encodedData = Buffer.from(JSON.stringify(authResponse)).toString(
-        'base64url'
+      const signedData = this.jwtService.sign(
+        { data: authResponse },
+        { expiresIn: OAuthController.OAUTH_DATA_MAX_AGE_SECONDS }
       );
 
-      res.redirect(`${this.clientUrl}/oauth/callback#data=${encodedData}`);
+      res.cookie(OAuthController.OAUTH_DATA_COOKIE, signedData, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: this.configService.get('NODE_ENV') === 'production',
+        path: '/api/v1/auth/oauth',
+        maxAge: OAuthController.OAUTH_DATA_MAX_AGE_SECONDS * 1000
+      });
+
+      res.redirect(`${this.clientUrl}/oauth/callback`);
     } catch (error) {
       this.logger.error('OAuth callback error', error);
       res.redirect(`${this.clientUrl}/login?oauth_error=auth_failed`);

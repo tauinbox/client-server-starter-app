@@ -68,6 +68,15 @@ for (const provider of ['google', 'facebook', 'vk']) {
   });
 }
 
+// POST /api/v1/auth/oauth/exchange (stub)
+router.post('/exchange', (_req, res) => {
+  res.status(501).json({
+    message:
+      'OAuth exchange requires a real backend. Use the mock-server for API-level testing only.',
+    statusCode: 501
+  });
+});
+
 // POST /api/v1/auth/oauth/link-init (stub)
 router.post('/link-init', authGuard, (_req, res) => {
   res.json({ message: 'Link initiated' });

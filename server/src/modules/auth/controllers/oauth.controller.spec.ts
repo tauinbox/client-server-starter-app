@@ -227,7 +227,7 @@ describe('OAuthController', () => {
   });
 
   describe('handleOAuthCallback', () => {
-    it('should redirect with encoded auth response on success', async () => {
+    it('should set oauth_data cookie and redirect without fragment on success', async () => {
       const mockAuthResponse = {
         tokens: {
           access_token: 'token',
@@ -249,8 +249,21 @@ describe('OAuthController', () => {
 
       await controller.googleCallback(mockExpressRequest(profile), res);
 
+      expect(jwtServiceMock.sign).toHaveBeenCalledWith(
+        { data: mockAuthResponse },
+        { expiresIn: 60 }
+      );
+      expect(res.cookie).toHaveBeenCalledWith(
+        'oauth_data',
+        'signed-link-token',
+        expect.objectContaining({
+          httpOnly: true,
+          sameSite: 'lax',
+          path: '/api/v1/auth/oauth'
+        })
+      );
       expect(res.redirect).toHaveBeenCalledWith(
-        expect.stringContaining('http://localhost:4200/oauth/callback#data=')
+        'http://localhost:4200/oauth/callback'
       );
     });
 
@@ -368,6 +381,53 @@ describe('OAuthController', () => {
 
       expect(authServiceMock.loginWithOAuth).toHaveBeenCalledWith(profile);
       expect(authServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('exchangeOAuthData', () => {
+    it('should return auth data from valid cookie', () => {
+      const mockAuthResponse = {
+        tokens: { access_token: 'token' },
+        user: { id: '1', email: 'test@example.com' }
+      };
+      jwtServiceMock.verify.mockReturnValue({ data: mockAuthResponse });
+
+      const req = mockExpressRequest({} as OAuthUserProfile, {
+        oauth_data: 'signed-jwt'
+      });
+      const res = mockResponse();
+
+      const result = controller.exchangeOAuthData(req, res);
+
+      expect(jwtServiceMock.verify).toHaveBeenCalledWith('signed-jwt');
+      expect(res.clearCookie).toHaveBeenCalledWith('oauth_data', {
+        path: '/api/v1/auth/oauth'
+      });
+      expect(result).toEqual(mockAuthResponse);
+    });
+
+    it('should throw BadRequestException when cookie is missing', () => {
+      const req = mockExpressRequest({} as OAuthUserProfile, {});
+      const res = mockResponse();
+
+      expect(() => controller.exchangeOAuthData(req, res)).toThrow(
+        'Missing OAuth data'
+      );
+    });
+
+    it('should throw BadRequestException when JWT is expired', () => {
+      jwtServiceMock.verify.mockImplementation(() => {
+        throw new Error('jwt expired');
+      });
+
+      const req = mockExpressRequest({} as OAuthUserProfile, {
+        oauth_data: 'expired-jwt'
+      });
+      const res = mockResponse();
+
+      expect(() => controller.exchangeOAuthData(req, res)).toThrow(
+        'Invalid or expired OAuth data'
+      );
     });
   });
 });

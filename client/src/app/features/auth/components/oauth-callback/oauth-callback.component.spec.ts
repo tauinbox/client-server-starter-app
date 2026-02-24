@@ -2,7 +2,7 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { DOCUMENT } from '@angular/common';
+import { of, throwError } from 'rxjs';
 
 import { OAuthCallbackComponent } from './oauth-callback.component';
 import { AuthStore } from '../../store/auth.store';
@@ -31,13 +31,6 @@ const mockAuthResponse: AuthResponse = {
   }
 };
 
-function encodeAuthResponse(response: AuthResponse): string {
-  return btoa(JSON.stringify(response))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
 describe('OAuthCallbackComponent', () => {
   let fixture: ComponentFixture<OAuthCallbackComponent>;
   let authStoreMock: {
@@ -45,6 +38,7 @@ describe('OAuthCallbackComponent', () => {
   };
   let authServiceMock: {
     scheduleTokenRefresh: ReturnType<typeof vi.fn>;
+    exchangeOAuthData: ReturnType<typeof vi.fn>;
   };
   let sessionStorageMock: {
     getItem: ReturnType<typeof vi.fn>;
@@ -52,8 +46,6 @@ describe('OAuthCallbackComponent', () => {
     removeItem: ReturnType<typeof vi.fn>;
   };
   let router: Router;
-  let mockLocationHash: string;
-  let mockDoc: Document;
 
   beforeEach(async () => {
     authStoreMock = {
@@ -61,7 +53,8 @@ describe('OAuthCallbackComponent', () => {
     };
 
     authServiceMock = {
-      scheduleTokenRefresh: vi.fn()
+      scheduleTokenRefresh: vi.fn(),
+      exchangeOAuthData: vi.fn().mockReturnValue(of(mockAuthResponse))
     };
 
     sessionStorageMock = {
@@ -70,32 +63,6 @@ describe('OAuthCallbackComponent', () => {
       removeItem: vi.fn()
     };
 
-    mockLocationHash = '';
-
-    // Create a proxy for document that intercepts defaultView.location.hash
-    const realDoc = document;
-    const locationProxy = new Proxy(realDoc.defaultView!.location, {
-      get(target, prop) {
-        if (prop === 'hash') return mockLocationHash;
-        const value = Reflect.get(target, prop);
-        return typeof value === 'function' ? value.bind(target) : value;
-      }
-    });
-    const viewProxy = new Proxy(realDoc.defaultView!, {
-      get(target, prop) {
-        if (prop === 'location') return locationProxy;
-        const value = Reflect.get(target, prop);
-        return typeof value === 'function' ? value.bind(target) : value;
-      }
-    });
-    mockDoc = new Proxy(realDoc, {
-      get(target, prop) {
-        if (prop === 'defaultView') return viewProxy;
-        const value = Reflect.get(target, prop);
-        return typeof value === 'function' ? value.bind(target) : value;
-      }
-    });
-
     await TestBed.configureTestingModule({
       imports: [OAuthCallbackComponent],
       providers: [
@@ -103,8 +70,7 @@ describe('OAuthCallbackComponent', () => {
         provideNoopAnimations(),
         { provide: AuthStore, useValue: authStoreMock },
         { provide: AuthService, useValue: authServiceMock },
-        { provide: SessionStorageService, useValue: sessionStorageMock },
-        { provide: DOCUMENT, useValue: mockDoc }
+        { provide: SessionStorageService, useValue: sessionStorageMock }
       ]
     }).compileComponents();
 
@@ -113,14 +79,14 @@ describe('OAuthCallbackComponent', () => {
     vi.spyOn(router, 'navigate');
   });
 
-  it('should parse fragment and save auth response', () => {
-    const encoded = encodeAuthResponse(mockAuthResponse);
-    mockLocationHash = `#data=${encoded}`;
-
+  it('should exchange OAuth data and save auth response', () => {
     fixture = TestBed.createComponent(OAuthCallbackComponent);
     fixture.detectChanges();
 
-    expect(authStoreMock.saveAuthResponse).toHaveBeenCalled();
+    expect(authServiceMock.exchangeOAuthData).toHaveBeenCalled();
+    expect(authStoreMock.saveAuthResponse).toHaveBeenCalledWith(
+      mockAuthResponse
+    );
     expect(authServiceMock.scheduleTokenRefresh).toHaveBeenCalled();
     expect(router.navigateByUrl).toHaveBeenCalledWith('/profile', {
       replaceUrl: true
@@ -128,8 +94,6 @@ describe('OAuthCallbackComponent', () => {
   });
 
   it('should navigate to returnUrl from sessionStorage', () => {
-    const encoded = encodeAuthResponse(mockAuthResponse);
-    mockLocationHash = `#data=${encoded}`;
     sessionStorageMock.getItem.mockReturnValue('/dashboard');
 
     fixture = TestBed.createComponent(OAuthCallbackComponent);
@@ -144,20 +108,10 @@ describe('OAuthCallbackComponent', () => {
     });
   });
 
-  it('should redirect to login on missing fragment data', () => {
-    mockLocationHash = '';
-
-    fixture = TestBed.createComponent(OAuthCallbackComponent);
-    fixture.detectChanges();
-
-    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
-      queryParams: { oauth_error: 'auth_failed' },
-      replaceUrl: true
-    });
-  });
-
-  it('should redirect to login on invalid JSON', () => {
-    mockLocationHash = '#data=not-valid-base64!!!';
+  it('should redirect to login on exchange error', () => {
+    authServiceMock.exchangeOAuthData.mockReturnValue(
+      throwError(() => new Error('exchange failed'))
+    );
 
     fixture = TestBed.createComponent(OAuthCallbackComponent);
     fixture.detectChanges();
@@ -177,8 +131,7 @@ describe('OAuthCallbackComponent', () => {
       },
       user: { id: '', email: '', firstName: 'Test', lastName: 'User' }
     };
-    const encoded = encodeAuthResponse(incompleteResponse as AuthResponse);
-    mockLocationHash = `#data=${encoded}`;
+    authServiceMock.exchangeOAuthData.mockReturnValue(of(incompleteResponse));
 
     fixture = TestBed.createComponent(OAuthCallbackComponent);
     fixture.detectChanges();
@@ -190,8 +143,6 @@ describe('OAuthCallbackComponent', () => {
   });
 
   it('should reject returnUrl with double slashes', () => {
-    const encoded = encodeAuthResponse(mockAuthResponse);
-    mockLocationHash = `#data=${encoded}`;
     sessionStorageMock.getItem.mockReturnValue('//evil.com');
 
     fixture = TestBed.createComponent(OAuthCallbackComponent);
