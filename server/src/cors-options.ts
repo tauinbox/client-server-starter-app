@@ -13,7 +13,13 @@ export const corsOptions = (): CorsOptions | CorsOptionsDelegate<Request> => {
       optionsSuccessStatus: 204
     };
   }
-  return {
-    origin: process.env['ENVIRONMENT'] === 'local'
-  };
+  if (process.env['ENVIRONMENT'] === 'local') {
+    return {
+      origin: ['http://localhost:4200', 'http://localhost:3000'],
+      preflightContinue: false,
+      optionsSuccessStatus: 204
+    };
+  }
+
+  return { origin: false };
 };

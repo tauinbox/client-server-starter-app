@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
 import { UsersService } from './users.service';
 import { User } from '../entities/user.entity';
 
@@ -98,7 +99,7 @@ describe('UsersService', () => {
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { email: 'new@example.com' }
       });
-      expect(bcrypt.hash).toHaveBeenCalledWith('Password1', 10);
+      expect(bcrypt.hash).toHaveBeenCalledWith('Password1', BCRYPT_SALT_ROUNDS);
       expect(mockRepository.create).toHaveBeenCalledWith({
         ...createUserDto,
         password: 'hashed'
@@ -392,7 +393,10 @@ describe('UsersService', () => {
 
       await service.update('user-1', updateDto);
 
-      expect(bcrypt.hash).toHaveBeenCalledWith('NewPassword1', 10);
+      expect(bcrypt.hash).toHaveBeenCalledWith(
+        'NewPassword1',
+        BCRYPT_SALT_ROUNDS
+      );
       expect(mockRepository.merge).toHaveBeenCalledWith(mockUser, {
         password: 'new-hashed'
       });

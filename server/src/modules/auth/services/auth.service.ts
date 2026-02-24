@@ -32,7 +32,8 @@ import { SYSTEM_ROLES } from '@app/shared/constants';
 import {
   MAX_FAILED_ATTEMPTS,
   LOCKOUT_DURATION_MS,
-  MAX_CONCURRENT_SESSIONS
+  MAX_CONCURRENT_SESSIONS,
+  BCRYPT_SALT_ROUNDS
 } from '@app/shared/constants/auth.constants';
 
 const VERIFICATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -308,7 +309,10 @@ export class AuthService {
 
   async register(registerDto: RegisterDto): Promise<{ message: string }> {
     // Compute hash outside the transaction (CPU-intensive, no DB involvement)
-    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+    const hashedPassword = await bcrypt.hash(
+      registerDto.password,
+      BCRYPT_SALT_ROUNDS
+    );
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = hashToken(rawToken);
     const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS);
@@ -476,7 +480,7 @@ export class AuthService {
     }
 
     // Compute hash outside the transaction (CPU-intensive, no DB involvement)
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
 
     // Update password, clear reset token, and invalidate all sessions atomically.
     // Without a transaction, a failure between steps could leave the account in an

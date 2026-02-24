@@ -6,6 +6,7 @@ import {
   MinLength
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   PASSWORD_REGEX,
   PASSWORD_ERROR
@@ -16,6 +17,9 @@ export class CreateUserDto {
     description: 'The email of the user',
     example: 'user@example.com'
   })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value
+  )
   @IsEmail()
   @MaxLength(255)
   email: string;

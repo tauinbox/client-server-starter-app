@@ -105,7 +105,8 @@ const router = Router();
 
 // POST /api/v1/users
 router.post('/', adminGuard, (req, res) => {
-  const { email, firstName, lastName, password } = req.body;
+  const { firstName, lastName, password } = req.body;
+  const email = req.body.email?.trim().toLowerCase();
 
   if (!email || !firstName || !lastName || !password) {
     res
@@ -223,8 +224,8 @@ router.patch('/:id', adminGuard, (req, res) => {
     return;
   }
 
-  const { email, firstName, lastName, password, isActive, unlockAccount } =
-    req.body;
+  const { firstName, lastName, password, isActive, unlockAccount } = req.body;
+  const email = req.body.email?.trim().toLowerCase();
 
   if (email !== undefined) {
     if (!isValidEmail(email)) {
