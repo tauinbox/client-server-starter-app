@@ -92,17 +92,17 @@ fullstack-starter-app/
 │   │   └── feature/        # Example module
 │   ├── src/migrations/     # TypeORM migrations
 │   └── src/seeders/        # Database seeders
-├── mock-server/            # In-memory Express server for dev/testing
-│   └── src/
-│       ├── index.ts        # Server entry point
-│       ├── app.ts          # Express app factory (createApp)
-│       ├── state.ts        # In-memory state management
-│       ├── seed.ts         # Faker-based seed data (70 users)
-│       ├── factories.ts    # createMockUser, createOAuthAccount
-│       ├── jwt.utils.ts    # JWT generation/validation
-│       ├── middleware/      # Route handlers (auth, users, OAuth) + guards
-│       ├── helpers/        # Auth helper utilities
-│       └── control.routes.ts  # Test control API (reset, seed)
+└── mock-server/            # In-memory Express server for dev/testing
+    └── src/
+        ├── index.ts        # Server entry point
+        ├── app.ts          # Express app factory (createApp)
+        ├── state.ts        # In-memory state management
+        ├── seed.ts         # Faker-based seed data (70 users)
+        ├── factories.ts    # createMockUser, createOAuthAccount
+        ├── jwt.utils.ts    # JWT generation/validation
+        ├── middleware/      # Route handlers (auth, users, OAuth) + guards
+        ├── helpers/        # Auth helper utilities
+        └── control.routes.ts  # Test control API (reset, seed)
 ```
 
 All three workspaces import from `@app/shared/*` path alias (maps to `../shared/src/*` in each workspace's `tsconfig.json`).
