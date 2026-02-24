@@ -23,5 +23,7 @@ COPY --from=builder /app/server/dist ./server/dist
 RUN mkdir -p server/dist/server/public/uploads
 COPY server/docker-entrypoint.sh ./server/docker-entrypoint.sh
 RUN chmod +x server/docker-entrypoint.sh
+RUN chown -R node:node /app/server
+USER node
 WORKDIR /app/server
 ENTRYPOINT ["./docker-entrypoint.sh"]

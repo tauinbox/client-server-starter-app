@@ -9,9 +9,12 @@ import { routes } from './app.routes';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { MAT_SNACK_BAR_DEFAULT_OPTIONS } from '@angular/material/snack-bar';
+import { MatIconRegistry } from '@angular/material/icon';
+import { DomSanitizer } from '@angular/platform-browser';
 import { jwtInterceptor } from '@features/auth/interceptors/jwt.interceptor';
 import { errorInterceptor } from '@core/interceptors/error.interceptor';
 import { AuthService } from '@features/auth/services/auth.service';
+import { registerOAuthIcons } from '@features/auth/utils/register-oauth-icons';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -20,6 +23,9 @@ export const appConfig: ApplicationConfig = {
     // Error interceptor must be registered before JWT interceptor:
     // JWT handles 401s (refresh + retry), error interceptor handles everything else
     provideHttpClient(withInterceptors([errorInterceptor, jwtInterceptor])),
+    provideAppInitializer(() => {
+      registerOAuthIcons(inject(MatIconRegistry), inject(DomSanitizer));
+    }),
     provideAppInitializer(async () => {
       const authService = inject(AuthService);
       if (authService.isAuthenticated()) {
