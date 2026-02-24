@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { CaslAbilityFactory } from './casl-ability.factory';
 import { ResolvedPermission } from '@app/shared/types';
 
@@ -84,7 +85,9 @@ describe('CaslAbilityFactory', () => {
     ).toBe(false);
   });
 
-  it('should skip permissions for unknown resources', () => {
+  it('should skip permissions for unknown resources and log a warning', () => {
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+
     const permissions: ResolvedPermission[] = [
       {
         resource: 'unknown-resource',
@@ -97,6 +100,12 @@ describe('CaslAbilityFactory', () => {
     const ability = factory.createForUser('user-1', ['viewer'], permissions);
 
     expect(ability.can('read', 'User')).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('unknown-resource')
+    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('user-1'));
+
+    warnSpy.mockRestore();
   });
 
   it('should handle multiple permissions for different resources', () => {
