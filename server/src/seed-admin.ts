@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
 import { postgresConfig } from './postgres.config';
 import { User } from './modules/users/entities/user.entity';
+import { Role } from './modules/auth/entities/role.entity';
 
 dotenv.config();
 
@@ -23,11 +24,33 @@ async function seedAdmin(): Promise<void> {
 
   try {
     const userRepo = dataSource.getRepository(User);
-    const existing = await userRepo.findOne({ where: { email } });
+    const roleRepo = dataSource.getRepository(Role);
+
+    const existing = await userRepo.findOne({
+      where: { email },
+      relations: ['roles']
+    });
 
     if (existing) {
-      console.log(`Admin user ${email} already exists, skipping`);
+      if (existing.roles.some((r) => r.name === 'admin')) {
+        console.log(
+          `Admin user ${email} already exists with admin role, skipping`
+        );
+        return;
+      }
+      const adminRole = await roleRepo.findOne({ where: { name: 'admin' } });
+      if (adminRole) {
+        existing.roles = [...existing.roles, adminRole];
+        await userRepo.save(existing);
+        console.log(`Admin role assigned to existing user ${email}`);
+      }
       return;
+    }
+
+    const adminRole = await roleRepo.findOne({ where: { name: 'admin' } });
+    if (!adminRole) {
+      console.error('Admin role not found — ensure migrations have run first');
+      process.exit(1);
     }
 
     const hashedPassword = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
@@ -37,11 +60,12 @@ async function seedAdmin(): Promise<void> {
       firstName,
       lastName,
       isActive: true,
-      isEmailVerified: true
+      isEmailVerified: true,
+      roles: [adminRole]
     });
 
     await userRepo.save(admin);
-    console.log(`Admin user ${email} created successfully`);
+    console.log(`Admin user ${email} created with admin role`);
   } finally {
     await dataSource.destroy();
   }
