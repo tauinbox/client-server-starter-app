@@ -24,8 +24,8 @@ services:
     environment:
       DB_HOST: db
       ENVIRONMENT: production
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     volumes:
       - uploads:/app/server/dist/server/public/uploads
     healthcheck:
@@ -46,6 +46,15 @@ services:
       dockerfile: client/Dockerfile
     ports:
       - "4200:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      server:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
