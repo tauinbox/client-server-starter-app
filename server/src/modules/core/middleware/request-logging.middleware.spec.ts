@@ -44,6 +44,7 @@ describe('RequestLoggingMiddleware', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    delete process.env['REQUEST_LOG_LEVEL'];
   });
 
   it('should call next()', () => {
@@ -113,5 +114,99 @@ describe('RequestLoggingMiddleware', () => {
     expect(logSpy).toHaveBeenCalledWith(
       expect.not.stringContaining('[req-id:')
     );
+  });
+
+  it('should skip logging for /api/v1/health', () => {
+    req.originalUrl = '/api/v1/health';
+
+    middleware.use(req as Request, res, next);
+    res.emit('finish');
+
+    expect(next).toHaveBeenCalled();
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  describe('REQUEST_LOG_LEVEL', () => {
+    it('should log all requests when level is "all"', () => {
+      process.env['REQUEST_LOG_LEVEL'] = 'all';
+      res.statusCode = 200;
+
+      middleware.use(req as Request, res, next);
+      res.emit('finish');
+
+      expect(logSpy).toHaveBeenCalled();
+    });
+
+    it('should skip 2xx when level is "warn"', () => {
+      process.env['REQUEST_LOG_LEVEL'] = 'warn';
+      res.statusCode = 200;
+
+      middleware.use(req as Request, res, next);
+      res.emit('finish');
+
+      expect(logSpy).not.toHaveBeenCalled();
+    });
+
+    it('should skip 3xx when level is "warn"', () => {
+      process.env['REQUEST_LOG_LEVEL'] = 'warn';
+      res.statusCode = 301;
+
+      middleware.use(req as Request, res, next);
+      res.emit('finish');
+
+      expect(logSpy).not.toHaveBeenCalled();
+    });
+
+    it('should log 4xx when level is "warn"', () => {
+      process.env['REQUEST_LOG_LEVEL'] = 'warn';
+      res.statusCode = 404;
+
+      middleware.use(req as Request, res, next);
+      res.emit('finish');
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('404'));
+    });
+
+    it('should log 5xx when level is "warn"', () => {
+      process.env['REQUEST_LOG_LEVEL'] = 'warn';
+      res.statusCode = 500;
+
+      middleware.use(req as Request, res, next);
+      res.emit('finish');
+
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('500'));
+    });
+
+    it('should skip 2xx when level is "error"', () => {
+      process.env['REQUEST_LOG_LEVEL'] = 'error';
+      res.statusCode = 200;
+
+      middleware.use(req as Request, res, next);
+      res.emit('finish');
+
+      expect(logSpy).not.toHaveBeenCalled();
+    });
+
+    it('should skip 4xx when level is "error"', () => {
+      process.env['REQUEST_LOG_LEVEL'] = 'error';
+      res.statusCode = 404;
+
+      middleware.use(req as Request, res, next);
+      res.emit('finish');
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('should log 5xx when level is "error"', () => {
+      process.env['REQUEST_LOG_LEVEL'] = 'error';
+      res.statusCode = 500;
+
+      middleware.use(req as Request, res, next);
+      res.emit('finish');
+
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('500'));
+    });
   });
 });
