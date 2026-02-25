@@ -37,7 +37,9 @@ export type ResolvedPermission = {
   conditions: PermissionCondition | null;
 };
 
+export type PackedRules = unknown[][];
+
 export type UserPermissionsResponse = {
   roles: string[];
-  rules: unknown[][];
+  rules: PackedRules;
 };

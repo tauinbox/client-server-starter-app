@@ -72,6 +72,7 @@ describe('AuthStore', () => {
   }
 
   afterEach(() => {
+    vi.restoreAllMocks();
     TestBed.resetTestingModule();
   });
 
@@ -247,6 +248,24 @@ describe('AuthStore', () => {
       expect(store.hasPermission('list', 'User')).toBe(true);
       expect(store.hasPermission('delete', 'User')).toBe(true);
       expect(store.hasPermission('update', 'Profile')).toBe(true);
+    });
+
+    it('should silently skip when rules is not an array', () => {
+      const store = createStore(null);
+
+      // @ts-expect-error testing invalid input shape
+      store.setRules('invalid');
+
+      expect(store.hasPermission('list', 'User')).toBe(false);
+    });
+
+    it('should silently skip when rules contains non-array elements', () => {
+      const store = createStore(null);
+
+      // @ts-expect-error testing invalid input shape
+      store.setRules([['read', 'User'], 'invalid']);
+
+      expect(store.hasPermission('list', 'User')).toBe(false);
     });
 
     it('should reset ability to null on clearSession', () => {

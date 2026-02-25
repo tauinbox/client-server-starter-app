@@ -17,6 +17,34 @@ export function createApp() {
     next();
   });
 
+  // Request logging middleware (mirrors server's RequestLoggingMiddleware)
+  app.use((req, res, next) => {
+    if (req.originalUrl === '/api/v1/health') {
+      next();
+      return;
+    }
+
+    const start = Date.now();
+    const logLevel = (process.env.REQUEST_LOG_LEVEL || 'all').toLowerCase();
+
+    res.on('finish', () => {
+      const statusCode = res.statusCode;
+
+      if (logLevel === 'error' && statusCode < 500) return;
+      if (logLevel === 'warn' && statusCode < 400) return;
+
+      const duration = Date.now() - start;
+      const reqId = res.getHeader('X-Request-Id');
+      const level =
+        statusCode >= 500 ? 'ERROR' : statusCode >= 400 ? 'WARN' : 'LOG';
+      const reqIdSuffix = reqId ? ` [req-id: ${reqId}]` : '';
+      console.log(
+        `[HTTP] [${level}] ${req.method} ${req.originalUrl} ${statusCode} ${duration}ms${reqIdSuffix}`
+      );
+    });
+    next();
+  });
+
   // Control API (for E2E tests and debugging)
   app.use('/__control', controlRouter);
 

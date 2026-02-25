@@ -15,11 +15,16 @@ import { GlobalExceptionFilter } from './filters';
 import { MailModule } from '../mail/mail.module';
 import { HealthModule } from './health/health.module';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
+import { RequestLoggingMiddleware } from './middleware/request-logging.middleware';
 
 @Module({})
 export class CoreModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(RequestIdMiddleware).forRoutes('*');
+    consumer
+      .apply(RequestIdMiddleware)
+      .forRoutes('*')
+      .apply(RequestLoggingMiddleware)
+      .forRoutes('*');
   }
 
   static forRoot(): DynamicModule {

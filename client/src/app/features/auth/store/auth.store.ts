@@ -12,6 +12,7 @@ import type { RawRuleOf } from '@casl/ability';
 import { unpackRules } from '@casl/ability/extra';
 import type { PackRule } from '@casl/ability/extra';
 import type { User } from '@shared/models/user.types';
+import type { UserPermissionsResponse } from '@app/shared/types/role.types';
 import type { AuthResponse, CustomJwtPayload } from '../models/auth.types';
 import type { AppAbility, Actions, Subjects } from '../casl/app-ability';
 import { LocalStorageService } from '@core/services/local-storage.service';
@@ -98,7 +99,12 @@ export const AuthStore = signalStore(
       patchState(store, { authResponse: null, ability: null });
     }
 
-    function setRules(rules: unknown): void {
+    function setRules(rules: UserPermissionsResponse['rules']): void {
+      if (!Array.isArray(rules) || !rules.every(Array.isArray)) {
+        return;
+      }
+      // Safe cast: validation above guarantees rules is unknown[][]
+      // which matches PackRule<RawRuleOf<AppAbility>>[] structure
       const ability = createMongoAbility<AppAbility>(
         unpackRules(rules as PackRule<RawRuleOf<AppAbility>>[])
       );
