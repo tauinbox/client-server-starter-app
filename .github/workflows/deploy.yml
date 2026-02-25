@@ -61,6 +61,14 @@ jobs:
           cache-from: type=gha,scope=server
           cache-to: type=gha,scope=server,mode=max
 
+      - name: Scan server image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.meta-server.outputs.tags }}
+          format: table
+          exit-code: 1
+          severity: HIGH,CRITICAL
+
       - name: Build and push client image
         uses: docker/build-push-action@v6
         with:
@@ -71,6 +79,14 @@ jobs:
           build-args: COMMIT_HASH=${{ env.COMMIT_HASH }}
           cache-from: type=gha,scope=client
           cache-to: type=gha,scope=client,mode=max
+
+      - name: Scan client image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.meta-client.outputs.tags }}
+          format: table
+          exit-code: 1
+          severity: HIGH,CRITICAL
 
   deploy:
     name: Deploy to VPS
@@ -86,6 +102,42 @@ jobs:
           script: |
             cd /home/deploy/nexus
             git pull --ff-only
+
+            # Save current image digests for rollback
+            SERVER_OLD=$(docker inspect --format='{{.Image}}' nexus-server-1 2>/dev/null || true)
+            CLIENT_OLD=$(docker inspect --format='{{.Image}}' nexus-client-1 2>/dev/null || true)
+
             docker compose pull
             docker compose up -d --remove-orphans
-            docker image prune -f
+
+            # Health check with timeout
+            echo "Waiting for services to become healthy..."
+            TIMEOUT=120
+            ELAPSED=0
+            while [ $ELAPSED -lt $TIMEOUT ]; do
+              if docker compose ps --format json | grep -q '"unhealthy"'; then
+                sleep 5
+                ELAPSED=$((ELAPSED + 5))
+                continue
+              fi
+              HEALTHY=$(docker compose ps --format json | grep -c '"healthy"' || true)
+              if [ "$HEALTHY" -ge 1 ]; then
+                echo "Deploy successful"
+                docker image prune -f
+                exit 0
+              fi
+              sleep 5
+              ELAPSED=$((ELAPSED + 5))
+            done
+
+            # Rollback on failure
+            echo "Health check failed — rolling back"
+            if [ -n "$SERVER_OLD" ]; then
+              docker tag "$SERVER_OLD" nexus-server:rollback 2>/dev/null || true
+            fi
+            if [ -n "$CLIENT_OLD" ]; then
+              docker tag "$CLIENT_OLD" nexus-client:rollback 2>/dev/null || true
+            fi
+            docker compose down
+            docker compose up -d
+            exit 1

@@ -119,8 +119,15 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
-      - run: npm test
+      - run: npm run test:cov
       - run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: client-coverage
+          path: client/coverage/
+          retention-days: 7
 
   client-e2e:
     name: Client E2E
