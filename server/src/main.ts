@@ -37,6 +37,8 @@ async function bootstrap() {
   app.enableVersioning({ type: VersioningType.URI });
   app.use(compression());
   app.use(cookieParser()); // this wil allow to get parsed cookie from req.cookies instead of req.get('Cookie')
+  app.useBodyParser('json', { limit: '100kb' });
+  app.useBodyParser('urlencoded', { extended: true, limit: '100kb' });
 
   if (process.env['ENVIRONMENT'] !== 'production') {
     const config = new DocumentBuilder()
