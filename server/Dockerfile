@@ -1,13 +1,13 @@
 # Stage 1: install production dependencies
 FROM node:22-alpine AS deps
-RUN apk add --no-cache python3 make g++ && npm install -g npm@latest
+RUN apk upgrade --no-cache && apk add --no-cache python3 make g++ && npm install -g npm@latest
 WORKDIR /app
 COPY server/package*.json ./server/
 RUN cd server && npm ci --omit=dev
 
 # Stage 2: build
 FROM node:22-alpine AS builder
-RUN apk add --no-cache python3 make g++ && npm install -g npm@latest
+RUN apk upgrade --no-cache && apk add --no-cache python3 make g++ && npm install -g npm@latest
 WORKDIR /app
 COPY server/package*.json ./server/
 RUN cd server && npm ci
@@ -17,7 +17,7 @@ RUN cd server && npm run build
 
 # Stage 3: runtime
 FROM node:22-alpine AS runner
-RUN npm install -g npm@latest && npm cache clean --force
+RUN apk upgrade --no-cache && npm install -g npm@latest && npm cache clean --force
 WORKDIR /app
 COPY --from=deps /app/server/node_modules ./server/node_modules
 COPY --from=builder /app/server/dist ./server/dist
