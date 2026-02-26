@@ -5,7 +5,8 @@ import {
   Get,
   Param,
   Patch,
-  Post
+  Post,
+  Request
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -27,6 +28,10 @@ import {
   AssignRoleDto
 } from '../dtos/assign-permissions.dto';
 import { Authorize } from '../decorators/authorize.decorator';
+import { AuditService } from '../../audit/audit.service';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { extractAuditContext } from '../../../common/utils/audit-context.util';
+import { JwtAuthRequest } from '../types/auth.request';
 
 @ApiTags('Roles API')
 @Controller({
@@ -34,7 +39,10 @@ import { Authorize } from '../decorators/authorize.decorator';
   version: '1'
 })
 export class RolesController {
-  constructor(private readonly roleService: RoleService) {}
+  constructor(
+    private readonly roleService: RoleService,
+    private readonly auditService: AuditService
+  ) {}
 
   @Get()
   @Authorize(['read', 'Role'])
@@ -73,8 +81,21 @@ export class RolesController {
   @ApiOperation({ summary: 'Create a new role' })
   @ApiBody({ type: CreateRoleDto })
   @ApiCreatedResponse({ description: 'Role created' })
-  create(@Body() createRoleDto: CreateRoleDto) {
-    return this.roleService.create(createRoleDto);
+  async create(
+    @Body() createRoleDto: CreateRoleDto,
+    @Request() req: JwtAuthRequest
+  ) {
+    const role = await this.roleService.create(createRoleDto);
+    await this.auditService.log({
+      action: AuditAction.ROLE_CREATE,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      targetId: (role as { id: string }).id,
+      targetType: 'Role',
+      details: { name: createRoleDto.name },
+      context: extractAuditContext(req)
+    });
+    return role;
   }
 
   @Patch(':id')
@@ -85,8 +106,22 @@ export class RolesController {
   @ApiBody({ type: UpdateRoleDto })
   @ApiOkResponse({ description: 'Role updated' })
   @ApiNotFoundResponse({ description: 'Role not found' })
-  update(@Param('id') id: string, @Body() updateRoleDto: UpdateRoleDto) {
-    return this.roleService.update(id, updateRoleDto);
+  async update(
+    @Param('id') id: string,
+    @Body() updateRoleDto: UpdateRoleDto,
+    @Request() req: JwtAuthRequest
+  ) {
+    const result = await this.roleService.update(id, updateRoleDto);
+    await this.auditService.log({
+      action: AuditAction.ROLE_UPDATE,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      targetId: id,
+      targetType: 'Role',
+      details: { changedFields: Object.keys(updateRoleDto) },
+      context: extractAuditContext(req)
+    });
+    return result;
   }
 
   @Delete(':id')
@@ -96,8 +131,17 @@ export class RolesController {
   @ApiParam({ name: 'id', description: 'The role ID' })
   @ApiOkResponse({ description: 'Role deleted' })
   @ApiNotFoundResponse({ description: 'Role not found' })
-  remove(@Param('id') id: string) {
-    return this.roleService.delete(id);
+  async remove(@Param('id') id: string, @Request() req: JwtAuthRequest) {
+    const result = await this.roleService.delete(id);
+    await this.auditService.log({
+      action: AuditAction.ROLE_DELETE,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      targetId: id,
+      targetType: 'Role',
+      context: extractAuditContext(req)
+    });
+    return result;
   }
 
   @Post(':id/permissions')
@@ -107,15 +151,26 @@ export class RolesController {
   @ApiParam({ name: 'id', description: 'The role ID' })
   @ApiBody({ type: AssignPermissionsDto })
   @ApiOkResponse({ description: 'Permissions assigned' })
-  assignPermissions(
+  async assignPermissions(
     @Param('id') id: string,
-    @Body() dto: AssignPermissionsDto
+    @Body() dto: AssignPermissionsDto,
+    @Request() req: JwtAuthRequest
   ) {
-    return this.roleService.assignPermissionsToRole(
+    const result = await this.roleService.assignPermissionsToRole(
       id,
       dto.permissionIds,
       dto.conditions
     );
+    await this.auditService.log({
+      action: AuditAction.PERMISSION_ASSIGN,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      targetId: id,
+      targetType: 'Role',
+      details: { permissionIds: dto.permissionIds },
+      context: extractAuditContext(req)
+    });
+    return result;
   }
 
   @Delete(':id/permissions/:permissionId')
@@ -125,11 +180,25 @@ export class RolesController {
   @ApiParam({ name: 'id', description: 'The role ID' })
   @ApiParam({ name: 'permissionId', description: 'The permission ID' })
   @ApiOkResponse({ description: 'Permission removed' })
-  removePermission(
+  async removePermission(
     @Param('id') id: string,
-    @Param('permissionId') permissionId: string
+    @Param('permissionId') permissionId: string,
+    @Request() req: JwtAuthRequest
   ) {
-    return this.roleService.removePermissionFromRole(id, permissionId);
+    const result = await this.roleService.removePermissionFromRole(
+      id,
+      permissionId
+    );
+    await this.auditService.log({
+      action: AuditAction.PERMISSION_UNASSIGN,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      targetId: id,
+      targetType: 'Role',
+      details: { permissionId },
+      context: extractAuditContext(req)
+    });
+    return result;
   }
 
   @Post('assign/:userId')
@@ -139,8 +208,22 @@ export class RolesController {
   @ApiParam({ name: 'userId', description: 'The user ID' })
   @ApiBody({ type: AssignRoleDto })
   @ApiOkResponse({ description: 'Role assigned' })
-  assignRole(@Param('userId') userId: string, @Body() dto: AssignRoleDto) {
-    return this.roleService.assignRoleToUser(userId, dto.roleId);
+  async assignRole(
+    @Param('userId') userId: string,
+    @Body() dto: AssignRoleDto,
+    @Request() req: JwtAuthRequest
+  ) {
+    const result = await this.roleService.assignRoleToUser(userId, dto.roleId);
+    await this.auditService.log({
+      action: AuditAction.ROLE_ASSIGN,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      targetId: userId,
+      targetType: 'User',
+      details: { roleId: dto.roleId },
+      context: extractAuditContext(req)
+    });
+    return result;
   }
 
   @Delete('assign/:userId/:roleId')
@@ -150,7 +233,21 @@ export class RolesController {
   @ApiParam({ name: 'userId', description: 'The user ID' })
   @ApiParam({ name: 'roleId', description: 'The role ID' })
   @ApiOkResponse({ description: 'Role removed' })
-  removeRole(@Param('userId') userId: string, @Param('roleId') roleId: string) {
-    return this.roleService.removeRoleFromUser(userId, roleId);
+  async removeRole(
+    @Param('userId') userId: string,
+    @Param('roleId') roleId: string,
+    @Request() req: JwtAuthRequest
+  ) {
+    const result = await this.roleService.removeRoleFromUser(userId, roleId);
+    await this.auditService.log({
+      action: AuditAction.ROLE_UNASSIGN,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      targetId: userId,
+      targetType: 'User',
+      details: { roleId },
+      context: extractAuditContext(req)
+    });
+    return result;
   }
 }

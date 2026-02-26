@@ -30,6 +30,9 @@ import { OAuthUserProfile } from '../types/oauth-profile';
 import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { UsersService } from '../../users/services/users.service';
+import { AuditService } from '../../audit/audit.service';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { extractAuditContext } from '../../../common/utils/audit-context.util';
 
 @ApiTags('OAuth API')
 @Controller({
@@ -50,7 +53,8 @@ export class OAuthController {
     private readonly oauthAccountService: OAuthAccountService,
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
-    private readonly jwtService: JwtService
+    private readonly jwtService: JwtService,
+    private readonly auditService: AuditService
   ) {
     const url = this.configService.get<string>('CLIENT_URL');
     if (!url) {
@@ -205,6 +209,17 @@ export class OAuthController {
     }
 
     await this.oauthAccountService.deleteByUserIdAndProvider(userId, provider);
+
+    await this.auditService.log({
+      action: AuditAction.OAUTH_UNLINK,
+      actorId: userId,
+      actorEmail: req.user.email,
+      targetId: userId,
+      targetType: 'User',
+      details: { provider },
+      context: extractAuditContext(req)
+    });
+
     return { message: `${provider} account unlinked successfully` };
   }
 
@@ -248,7 +263,7 @@ export class OAuthController {
       ];
 
       if (linkToken) {
-        return this.handleOAuthLink(linkToken, profile, res);
+        return this.handleOAuthLink(linkToken, profile, req, res);
       }
 
       if (!profile.email) {
@@ -284,6 +299,7 @@ export class OAuthController {
   private async handleOAuthLink(
     linkToken: string,
     profile: OAuthUserProfile,
+    req: ExpressRequest,
     res: Response
   ): Promise<void> {
     res.clearCookie(OAuthController.OAUTH_LINK_COOKIE, {
@@ -297,7 +313,8 @@ export class OAuthController {
       await this.authService.linkOAuthToUser(
         userId,
         profile.provider,
-        profile.providerId
+        profile.providerId,
+        extractAuditContext(req)
       );
 
       res.redirect(

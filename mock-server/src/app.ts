@@ -25,7 +25,7 @@ export function createApp() {
     }
 
     const start = Date.now();
-    const logLevel = (process.env.REQUEST_LOG_LEVEL || 'all').toLowerCase();
+    const logLevel = (process.env['REQUEST_LOG_LEVEL'] || 'all').toLowerCase();
 
     res.on('finish', () => {
       const statusCode = res.statusCode;

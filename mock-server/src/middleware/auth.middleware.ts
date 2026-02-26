@@ -20,6 +20,7 @@ import {
   findUserById,
   getPackedRulesForUser,
   getState,
+  logAudit,
   toUserResponse
 } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
@@ -110,6 +111,14 @@ router.post('/register', (req, res) => {
   const verificationToken = uuidv4();
   state.emailVerificationTokens.set(verificationToken, user.id);
 
+  logAudit('USER_REGISTER', {
+    actorId: user.id,
+    actorEmail: user.email,
+    targetId: user.id,
+    targetType: 'User',
+    ip: req.ip
+  });
+
   const verifyUrl = `http://localhost:4200/verify-email?token=${verificationToken}`;
   console.log(`[EMAIL VERIFICATION] To: ${email}\n  Verify URL: ${verifyUrl}`);
 
@@ -154,6 +163,13 @@ router.post('/login', (req, res) => {
     const lockedUntilTime = new Date(user.lockedUntil).getTime();
     if (lockedUntilTime > Date.now()) {
       const retryAfter = Math.ceil((lockedUntilTime - Date.now()) / 1000);
+      logAudit('USER_LOGIN_FAILURE', {
+        actorEmail: email,
+        targetId: user.id,
+        targetType: 'User',
+        details: { reason: 'account_locked' },
+        ip: req.ip
+      });
       res.status(423).json({
         message:
           'Account is temporarily locked due to too many failed login attempts',
@@ -178,6 +194,13 @@ router.post('/login', (req, res) => {
           Date.now() + LOCKOUT_DURATION_MS
         ).toISOString();
         const retryAfter = Math.ceil(LOCKOUT_DURATION_MS / 1000);
+        logAudit('USER_LOGIN_FAILURE', {
+          actorEmail: email,
+          targetId: user.id,
+          targetType: 'User',
+          details: { reason: 'account_locked_after_max_attempts' },
+          ip: req.ip
+        });
         res.status(423).json({
           message:
             'Account is temporarily locked due to too many failed login attempts',
@@ -187,6 +210,11 @@ router.post('/login', (req, res) => {
         return;
       }
     }
+    logAudit('USER_LOGIN_FAILURE', {
+      actorEmail: email,
+      details: { reason: 'invalid_credentials' },
+      ip: req.ip
+    });
     res.status(401).json({ message: 'Invalid credentials', statusCode: 401 });
     return;
   }
@@ -211,6 +239,14 @@ router.post('/login', (req, res) => {
   const tokens = generateTokens(user);
   state.refreshTokens.set(tokens.refresh_token, user.id);
   pruneOldestUserTokens(state.refreshTokens, user.id, MAX_CONCURRENT_SESSIONS);
+
+  logAudit('USER_LOGIN_SUCCESS', {
+    actorId: user.id,
+    actorEmail: user.email,
+    targetId: user.id,
+    targetType: 'User',
+    ip: req.ip
+  });
 
   res.json({ tokens, user: toUserResponse(user) });
 });
@@ -330,6 +366,13 @@ router.post('/forgot-password', (req, res) => {
   const resetToken = uuidv4();
   state.passwordResetTokens.set(resetToken, user.id);
 
+  logAudit('PASSWORD_RESET_REQUEST', {
+    actorEmail: email,
+    targetId: user.id,
+    targetType: 'User',
+    ip: req.ip
+  });
+
   const resetUrl = `http://localhost:4200/reset-password?token=${resetToken}`;
   console.log(`[PASSWORD RESET] To: ${email}\n  Reset URL: ${resetUrl}`);
 
@@ -391,6 +434,14 @@ router.post('/reset-password', (req, res) => {
     }
   }
 
+  logAudit('PASSWORD_RESET_COMPLETE', {
+    actorId: user.id,
+    actorEmail: user.email,
+    targetId: user.id,
+    targetType: 'User',
+    ip: req.ip
+  });
+
   res.json({ message: 'Password has been reset successfully' });
 });
 
@@ -408,12 +459,23 @@ router.post('/refresh-token', (req, res) => {
   const state = getState();
   const userId = state.refreshTokens.get(refresh_token);
   if (!userId) {
+    logAudit('TOKEN_REFRESH_FAILURE', {
+      details: { reason: 'invalid_or_expired_token' },
+      ip: req.ip
+    });
     res.status(401).json({ message: 'Invalid refresh token', statusCode: 401 });
     return;
   }
 
   const user = findUserById(userId);
   if (!user || !user.isActive) {
+    logAudit('TOKEN_REFRESH_FAILURE', {
+      actorId: userId,
+      details: {
+        reason: !user ? 'user_not_found' : 'user_deactivated'
+      },
+      ip: req.ip
+    });
     state.refreshTokens.delete(refresh_token);
     res.status(401).json({ message: 'Invalid refresh token', statusCode: 401 });
     return;
@@ -440,6 +502,12 @@ router.post('/logout', authGuard, (req, res) => {
       state.refreshTokens.delete(token);
     }
   }
+
+  logAudit('USER_LOGOUT', {
+    actorId: user.id,
+    actorEmail: user.email,
+    ip: req.ip
+  });
 
   res.json({ message: 'Successfully logged out' });
 });
@@ -495,6 +563,15 @@ router.patch('/profile', authGuard, (req, res) => {
       return;
     }
     user.password = password;
+
+    logAudit('PASSWORD_CHANGE', {
+      actorId: user.id,
+      actorEmail: user.email,
+      targetId: user.id,
+      targetType: 'User',
+      details: { source: 'self' },
+      ip: req.ip
+    });
 
     // Invalidate all refresh tokens on password change (matches real server)
     const state = getState();

@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { findUserById, getState } from '../state';
+import { findUserById, getState, logAudit } from '../state';
 import { adminGuard } from '../helpers/auth.helpers';
+import type { AuthenticatedRequest } from '../types';
 
 const router = Router();
 
@@ -89,6 +90,17 @@ router.post('/', adminGuard, (req, res) => {
   };
 
   state.roles.set(role.id, role);
+
+  const actor = (req as AuthenticatedRequest).user;
+  logAudit('ROLE_CREATE', {
+    actorId: actor.id,
+    actorEmail: actor.email,
+    targetId: role.id,
+    targetType: 'Role',
+    details: { name },
+    ip: req.ip
+  });
+
   res.status(201).json({ ...role, permissions: [] });
 });
 
@@ -132,6 +144,16 @@ router.patch('/:id', adminGuard, (req, res) => {
 
   role.updatedAt = new Date().toISOString();
 
+  const actor = (req as AuthenticatedRequest).user;
+  logAudit('ROLE_UPDATE', {
+    actorId: actor.id,
+    actorEmail: actor.email,
+    targetId: id,
+    targetType: 'Role',
+    details: { changedFields: Object.keys(req.body) },
+    ip: req.ip
+  });
+
   res.json(role);
 });
 
@@ -165,6 +187,16 @@ router.delete('/:id', adminGuard, (req, res) => {
   }
 
   state.roles.delete(id);
+
+  const actor = (req as AuthenticatedRequest).user;
+  logAudit('ROLE_DELETE', {
+    actorId: actor.id,
+    actorEmail: actor.email,
+    targetId: id,
+    targetType: 'Role',
+    ip: req.ip
+  });
+
   res.json({ message: 'Role deleted successfully' });
 });
 
@@ -205,6 +237,16 @@ router.post('/:id/permissions', adminGuard, (req, res) => {
     });
   }
 
+  const actor = (req as AuthenticatedRequest).user;
+  logAudit('PERMISSION_ASSIGN', {
+    actorId: actor.id,
+    actorEmail: actor.email,
+    targetId: id,
+    targetType: 'Role',
+    details: { permissionIds },
+    ip: req.ip
+  });
+
   res.json({ message: 'Permissions assigned successfully' });
 });
 
@@ -217,6 +259,16 @@ router.delete('/:id/permissions/:permissionId', adminGuard, (req, res) => {
   state.rolePermissions = state.rolePermissions.filter(
     (rp) => !(rp.roleId === id && rp.permissionId === permissionId)
   );
+
+  const actor = (req as AuthenticatedRequest).user;
+  logAudit('PERMISSION_UNASSIGN', {
+    actorId: actor.id,
+    actorEmail: actor.email,
+    targetId: id,
+    targetType: 'Role',
+    details: { permissionId },
+    ip: req.ip
+  });
 
   res.json({ message: 'Permission removed successfully' });
 });
@@ -243,6 +295,16 @@ router.post('/assign/:userId', adminGuard, (req, res) => {
     user.roles.push(role.name);
   }
 
+  const actor = (req as AuthenticatedRequest).user;
+  logAudit('ROLE_ASSIGN', {
+    actorId: actor.id,
+    actorEmail: actor.email,
+    targetId: userId,
+    targetType: 'User',
+    details: { roleId },
+    ip: req.ip
+  });
+
   res.json({ message: 'Role assigned successfully' });
 });
 
@@ -265,6 +327,16 @@ router.delete('/assign/:userId/:roleId', adminGuard, (req, res) => {
   }
 
   user.roles = user.roles.filter((r) => r !== role.name);
+
+  const actor = (req as AuthenticatedRequest).user;
+  logAudit('ROLE_UNASSIGN', {
+    actorId: actor.id,
+    actorEmail: actor.email,
+    targetId: userId,
+    targetType: 'User',
+    details: { roleId },
+    ip: req.ip
+  });
 
   res.json({ message: 'Role removed successfully' });
 });

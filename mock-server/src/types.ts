@@ -52,6 +52,19 @@ export interface MockRolePermission {
   conditions: unknown | null;
 }
 
+export interface MockAuditLog {
+  id: string;
+  action: string;
+  actorId: string | null;
+  actorEmail: string | null;
+  targetId: string | null;
+  targetType: string | null;
+  details: Record<string, unknown> | null;
+  ipAddress: string | null;
+  requestId: string | null;
+  createdAt: string;
+}
+
 export interface State {
   users: Map<string, MockUser>;
   oauthAccounts: Map<string, OAuthAccount[]>;
@@ -61,6 +74,7 @@ export interface State {
   roles: Map<string, MockRole>;
   permissions: Map<string, MockPermission>;
   rolePermissions: MockRolePermission[];
+  auditLogs: MockAuditLog[];
 }
 
 export interface AuthenticatedRequest extends Request {
