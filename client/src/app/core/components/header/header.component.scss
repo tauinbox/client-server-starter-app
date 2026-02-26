@@ -1,5 +1,11 @@
 @use 'abstracts/functions' as func;
 
+:host {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
 .active {
   font-weight: bold;
   text-decoration: underline;
