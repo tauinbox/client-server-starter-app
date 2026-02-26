@@ -4,9 +4,10 @@ import {
   Component,
   DestroyRef,
   inject,
+  Injector,
   viewChild
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import {
   MatCard,
   MatCardContent,
@@ -21,6 +22,7 @@ import { MatMiniFabButton } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
+import { filter, merge } from 'rxjs';
 import type { User, UserSortColumn } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { rem } from '@shared/utils/css.utils';
@@ -53,6 +55,7 @@ export class UserListComponent implements OnInit, AfterViewInit {
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #injector = inject(Injector);
 
   readonly loading = this.#usersStore.listLoading;
   readonly totalUsers = this.#usersStore.totalUsers;
@@ -67,23 +70,38 @@ export class UserListComponent implements OnInit, AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (
-          entry.isIntersecting &&
-          this.hasMore() &&
-          !this.isLoadingMore() &&
-          !this.loading()
-        ) {
+    const sentinel = this.scrollSentinel().nativeElement;
+
+    const loadMoreIfVisible = () => {
+      if (this.hasMore() && !this.isLoadingMore() && !this.loading()) {
+        const rect = (sentinel as HTMLElement).getBoundingClientRect();
+        if (rect.top <= window.innerHeight) {
           this.#usersStore.loadMore();
         }
+      }
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMoreIfVisible();
       },
       { threshold: 0 }
     );
 
-    observer.observe(this.scrollSentinel().nativeElement);
+    observer.observe(sentinel);
     this.#destroyRef.onDestroy(() => observer.disconnect());
+
+    // Re-check sentinel visibility after each load completes so that
+    // additional pages are fetched when the initial batch fills the viewport.
+    merge(
+      toObservable(this.loading, { injector: this.#injector }),
+      toObservable(this.isLoadingMore, { injector: this.#injector })
+    )
+      .pipe(
+        filter((isLoading) => !isLoading),
+        takeUntilDestroyed(this.#destroyRef)
+      )
+      .subscribe(() => loadMoreIfVisible());
   }
 
   sortData(sort: Sort): void {
