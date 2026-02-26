@@ -30,6 +30,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - `GET /api/v1/auth/permissions` returns CASL packed rules; client hydrates into `AppAbility` at bootstrap before route activation
 - OAuth account management (link/unlink providers in profile)
 - Server-side token cleanup via cron jobs
+- **Audit logging** — security-sensitive operations recorded to `audit_logs` table (login, registration, password changes, user/role management, OAuth events)
 
 ### User Management (Admin)
 - **Server-side paginated** user list with column sorting (page, limit, sortBy, sortOrder query params)
@@ -417,13 +418,14 @@ Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file
 
 ## Security
 
-- Passwords hashed with **bcrypt** (salt rounds = 10)
+- Passwords hashed with **bcrypt** (cost factor = 12)
 - **Account lockout** after 5 failed login attempts (15-minute cooldown)
 - **Email verification** required before first login
 - **Password reset tokens** are single-use with 1-hour expiry; reset revokes all sessions
 - JWT access tokens (1h) + opaque refresh tokens (7d) with rotation
 - `@Exclude()` decorator hides password in API responses
 - **RBAC** — typed CASL permission checks via `PermissionsGuard` + `@Authorize(['action', 'Subject'])`; CASL ability hydrated at bootstrap before route activation; permissions cached per user (5 min); admin role bypasses all checks; `*appRequirePermission="{ action, subject }"` directive for template-level visibility
+- **Audit logging** — 20 security-sensitive actions (login, register, password change/reset, user/role/permission CRUD, OAuth link/unlink, logout, token refresh failures) written to a dedicated `audit_logs` table with actor, target, IP, and request ID
 - `class-validator` on server DTOs, Angular `Validators` on client forms
 - LIKE query pattern escaping to prevent SQL injection via wildcards
 - File upload security: auth required, 5 MB limit, type whitelist, filename sanitization

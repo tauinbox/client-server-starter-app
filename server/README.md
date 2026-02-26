@@ -57,6 +57,7 @@ Copy `.env.example` to `.env` and configure:
 | `DB_PASSWORD` | `password` | Database password |
 | `DB_SCHEMA` | `public` | Database schema |
 | `DB_LOGGING` | `["query","warn","error","log"]` | TypeORM logging levels |
+| `REQUEST_LOG_LEVEL` | `all` | Request logging verbosity: `all` (every request), `warn` (4xx+5xx only), `error` (5xx only) |
 | `JWT_SECRET` | `my_jwt_secret_key` | Secret for signing JWTs |
 | `JWT_EXPIRATION` | `3600` | Access token lifetime in seconds (1h) |
 | `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime in seconds (7d) |
@@ -105,6 +106,9 @@ src/
 │   ├── entities/           # RefreshToken, OAuthAccount
 │   ├── enums/              # OAuthProvider
 │   └── dto/                # LoginDto, RegisterDto, RefreshTokenDto, UpdateProfileDto, VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto
+├── audit/
+│   ├── audit.service.ts    # AuditService — records 20 security-sensitive actions to audit_logs table
+│   └── entities/           # AuditLog entity (action, actorId, actorEmail, targetId, ip, requestId, createdAt)
 ├── mail/
 │   └── mail.service.ts     # Email sending (verification, password reset)
 ├── roles/
@@ -183,6 +187,7 @@ Four tables managed via TypeORM migrations:
 | `permissions` | UUID PK, resource + action (unique constraint) |
 | `role_permissions` | FK to roles + permissions, optional jsonb `conditions` |
 | `user_roles` | Join table: user_id + role_id (composite PK) |
+| `audit_logs` | UUID PK, action (enum), actorId (nullable), actorEmail (nullable), targetId (nullable), targetType (nullable), details (jsonb), ipAddress, requestId, createdAt |
 | `feature` | Auto-increment PK, name, timestamps |
 
 Migration and seed commands operate on compiled JS in `dist/` — always run `npm run build` first.
