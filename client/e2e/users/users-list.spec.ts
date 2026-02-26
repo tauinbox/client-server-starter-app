@@ -66,13 +66,11 @@ test.describe('User List page', () => {
     await page.goto('/users');
 
     // Wait for table to load
-    await expect(page.locator('mat-paginator')).toBeVisible();
-
-    // Table should have rows (seed data + test user)
     await expect(page.locator('table tbody tr').first()).toBeVisible();
 
-    // The paginator should show a total count > 0
-    await expect(page.locator('mat-paginator')).toContainText('of');
+    // Table should have at least one row
+    const rowCount = await page.locator('table tbody tr').count();
+    expect(rowCount).toBeGreaterThan(0);
   });
 
   test('should show empty state when no users', async ({
@@ -99,32 +97,30 @@ test.describe('User List page', () => {
     await expect(page.getByText('No Users Found')).toBeVisible();
   });
 
-  test('should display paginator', async ({ _mockServer, page }) => {
+  test('should not display a paginator', async ({ _mockServer, page }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
-    await expect(page.locator('mat-paginator')).toBeVisible();
+    await expect(page.locator('table tbody tr').first()).toBeVisible();
+    await expect(page.locator('mat-paginator')).not.toBeVisible();
   });
 
-  test('should paginate when clicking next page', async ({
-    _mockServer,
-    page
-  }) => {
+  test('should load more users on scroll', async ({ _mockServer, page }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
-    // Wait for first page to load
-    await expect(page.locator('mat-paginator')).toBeVisible();
-
-    // Verify next page button is enabled (total > page size)
-    const nextButton = page.getByRole('button', { name: 'Next page' });
-    await expect(nextButton).toBeEnabled();
-
-    // Click next page
-    await nextButton.click();
-
-    // Table should still have rows
+    // Wait for initial batch
     await expect(page.locator('table tbody tr').first()).toBeVisible();
+    const initialCount = await page.locator('table tbody tr').count();
+
+    // Scroll to bottom to trigger next page load
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+
+    // More rows should appear (seed data has 70 users, page size is 20)
+    await expect(async () => {
+      const count = await page.locator('table tbody tr').count();
+      expect(count).toBeGreaterThan(initialCount);
+    }).toPass({ timeout: 5000 });
   });
 
   test('should navigate to detail page on view button click', async ({
@@ -292,7 +288,7 @@ test.describe('User List page', () => {
     await page.goto('/users');
 
     // Wait for table to load
-    await expect(page.locator('mat-paginator')).toBeVisible();
+    await expect(page.locator('table tbody tr').first()).toBeVisible();
 
     // Find any user row with a delete button and click it
     const rows = page.locator('table tbody tr');
@@ -320,7 +316,8 @@ test.describe('User List page', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
-    await expect(page.locator('mat-paginator')).toBeVisible();
+    // Wait for table to load
+    await expect(page.locator('table tbody tr').first()).toBeVisible();
 
     const rows = page.locator('table tbody tr');
     await expect(rows.first()).toBeVisible();

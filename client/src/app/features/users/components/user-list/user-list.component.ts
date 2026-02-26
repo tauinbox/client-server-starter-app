@@ -1,11 +1,13 @@
-import type { OnInit } from '@angular/core';
+import type { AfterViewInit, ElementRef, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  inject
+  inject,
+  Injector,
+  viewChild
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import {
   MatCard,
   MatCardContent,
@@ -18,9 +20,9 @@ import type { Sort } from '@angular/material/sort';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatMiniFabButton } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
-import type { PageEvent } from '@angular/material/paginator';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
+import { filter, merge } from 'rxjs';
 import type { User, UserSortColumn } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { rem } from '@shared/utils/css.utils';
@@ -48,29 +50,58 @@ import {
   styleUrl: './user-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class UserListComponent implements OnInit {
+export class UserListComponent implements OnInit, AfterViewInit {
   readonly #usersStore = inject(UsersStore);
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #injector = inject(Injector);
 
   readonly loading = this.#usersStore.listLoading;
   readonly totalUsers = this.#usersStore.totalUsers;
-  readonly pageSize = this.#usersStore.pageSize;
-  readonly currentPage = this.#usersStore.currentPage;
   readonly displayedUsers = this.#usersStore.displayedUsers;
+  readonly hasMore = this.#usersStore.hasMore;
+  readonly isLoadingMore = this.#usersStore.isLoadingMore;
+
+  readonly scrollSentinel = viewChild.required<ElementRef>('scrollSentinel');
 
   ngOnInit(): void {
     this.#usersStore.loadAll();
   }
 
-  handlePageEvent(event: PageEvent): void {
-    if (event.pageSize !== this.#usersStore.pageSize()) {
-      this.#usersStore.setPageSize(event.pageSize);
-    } else {
-      this.#usersStore.setPage(event.pageIndex);
-    }
-    this.#usersStore.loadAll();
+  ngAfterViewInit(): void {
+    const sentinel = this.scrollSentinel().nativeElement;
+
+    const loadMoreIfVisible = () => {
+      if (this.hasMore() && !this.isLoadingMore() && !this.loading()) {
+        const rect = (sentinel as HTMLElement).getBoundingClientRect();
+        if (rect.top <= window.innerHeight) {
+          this.#usersStore.loadMore();
+        }
+      }
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMoreIfVisible();
+      },
+      { threshold: 0 }
+    );
+
+    observer.observe(sentinel);
+    this.#destroyRef.onDestroy(() => observer.disconnect());
+
+    // Re-check sentinel visibility after each load completes so that
+    // additional pages are fetched when the initial batch fills the viewport.
+    merge(
+      toObservable(this.loading, { injector: this.#injector }),
+      toObservable(this.isLoadingMore, { injector: this.#injector })
+    )
+      .pipe(
+        filter((isLoading) => !isLoading),
+        takeUntilDestroyed(this.#destroyRef)
+      )
+      .subscribe(() => loadMoreIfVisible());
   }
 
   sortData(sort: Sort): void {
@@ -114,7 +145,6 @@ export class UserListComponent implements OnInit {
           this.#snackBar.open('User deleted successfully', 'Close', {
             duration: 5000
           });
-          this.#usersStore.loadAll();
         },
         error: () => {
           this.#snackBar.open(

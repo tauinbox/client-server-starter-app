@@ -33,12 +33,13 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - **Audit logging** — security-sensitive operations recorded to `audit_logs` table (login, registration, password changes, user/role management, OAuth events)
 
 ### User Management (Admin)
-- **Server-side paginated** user list with column sorting (page, limit, sortBy, sortOrder query params)
-- User detail, edit, and **soft delete** — records are preserved with a `deleted_at` timestamp; all active sessions are revoked on delete
+- **Infinite scroll** user list with column sorting — loads 20 users at a time; `IntersectionObserver` sentinel triggers additional pages automatically as the user scrolls
+- User detail, edit, and **soft delete** — records are preserved with a `deleted_at` timestamp; all active sessions are revoked on delete; count decremented inline (no reload)
 - **Restore** soft-deleted users via `POST /users/:id/restore` — reactivates the account
-- **Server-side paginated** search by email, name, admin/active status; `includeDeleted=true` query param shows soft-deleted users
+- **Infinite scroll** search by email, name, admin/active status; `includeDeleted=true` query param shows soft-deleted users; same sentinel-based scroll loading
 - Role and status management
 - Pagination response envelope: `{ data: User[], meta: { page, limit, total, totalPages } }`
+- **Sticky header** — toolbar remains fixed at the top while scrolling through long lists
 
 ### UI/UX
 - Angular Material component library
@@ -399,7 +400,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 |------|------|-------|--------|
 | Server unit tests | Jest | `*.spec.ts` alongside source | 224 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | Configured |
-| Client unit tests | Vitest | `*.spec.ts` alongside source | 268 tests passing |
+| Client unit tests | Vitest | `*.spec.ts` alongside source | 262 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 113 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
 

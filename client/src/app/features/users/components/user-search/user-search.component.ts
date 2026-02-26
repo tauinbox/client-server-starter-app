@@ -1,10 +1,13 @@
+import type { AfterViewInit, ElementRef, OnDestroy } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  inject
+  inject,
+  Injector,
+  viewChild
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import {
   MatCard,
   MatCardContent,
@@ -19,10 +22,11 @@ import { MatOption, MatSelect } from '@angular/material/select';
 import { MatButton } from '@angular/material/button';
 import { MatDivider } from '@angular/material/divider';
 import { MatInput } from '@angular/material/input';
+import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import type { Sort } from '@angular/material/sort';
-import type { PageEvent } from '@angular/material/paginator';
+import { filter, merge } from 'rxjs';
 import type { User, UserSearch, UserSortColumn } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { rem } from '@shared/utils/css.utils';
@@ -55,18 +59,20 @@ type UserSearchFormType = {
     MatDivider,
     MatInput,
     MatLabel,
+    MatProgressSpinner,
     UserTableComponent
   ],
   templateUrl: './user-search.component.html',
   styleUrl: './user-search.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class UserSearchComponent {
+export class UserSearchComponent implements AfterViewInit, OnDestroy {
   readonly #fb = inject(FormBuilder);
   readonly #usersStore = inject(UsersStore);
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #injector = inject(Injector);
 
   readonly searchForm: FormGroup<UserSearchFormType> =
     this.#fb.group<UserSearchFormType>({
@@ -80,8 +86,53 @@ export class UserSearchComponent {
   readonly searching = this.#usersStore.searchLoading;
   readonly searched = this.#usersStore.searchPerformed;
   readonly searchTotalUsers = this.#usersStore.searchTotalUsers;
-  readonly searchCurrentPage = this.#usersStore.searchCurrentPage;
-  readonly searchPageSize = this.#usersStore.searchPageSize;
+  readonly hasMoreSearch = this.#usersStore.hasMoreSearch;
+  readonly isLoadingMoreSearch = this.#usersStore.isLoadingMoreSearch;
+
+  readonly scrollSentinel = viewChild.required<ElementRef>('scrollSentinel');
+
+  #observer: IntersectionObserver | null = null;
+
+  ngAfterViewInit(): void {
+    const sentinel = this.scrollSentinel().nativeElement;
+
+    const loadMoreIfVisible = () => {
+      if (
+        this.hasMoreSearch() &&
+        !this.isLoadingMoreSearch() &&
+        !this.searching() &&
+        this.searched()
+      ) {
+        const rect = (sentinel as HTMLElement).getBoundingClientRect();
+        if (rect.top <= window.innerHeight) {
+          this.#usersStore.loadMoreSearch();
+        }
+      }
+    };
+
+    this.#observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMoreIfVisible();
+      },
+      { threshold: 0 }
+    );
+
+    this.#observer.observe(sentinel);
+
+    merge(
+      toObservable(this.searching, { injector: this.#injector }),
+      toObservable(this.isLoadingMoreSearch, { injector: this.#injector })
+    )
+      .pipe(
+        filter((isLoading) => !isLoading),
+        takeUntilDestroyed(this.#destroyRef)
+      )
+      .subscribe(() => loadMoreIfVisible());
+  }
+
+  ngOnDestroy(): void {
+    this.#observer?.disconnect();
+  }
 
   onSubmit(): void {
     const formValues = this.searchForm.getRawValue();
@@ -106,15 +157,6 @@ export class UserSearchComponent {
     return criteria;
   }
 
-  handleSearchPageEvent(event: PageEvent): void {
-    if (event.pageSize !== this.#usersStore.searchPageSize()) {
-      this.#usersStore.setSearchPageSize(event.pageSize);
-    } else {
-      this.#usersStore.setSearchPage(event.pageIndex);
-    }
-    this.#reSearch();
-  }
-
   searchSortData(sort: Sort): void {
     if (!sort.active || sort.direction === '') {
       this.#usersStore.setSearchSorting('createdAt', 'desc');
@@ -123,6 +165,7 @@ export class UserSearchComponent {
         (COLUMN_TO_SORT_MAP[sort.active] as UserSortColumn) ?? 'createdAt';
       this.#usersStore.setSearchSorting(sortBy, sort.direction);
     }
+    this.#usersStore.setSearchPage(0);
     this.#reSearch();
   }
 
@@ -168,7 +211,6 @@ export class UserSearchComponent {
           this.#snackBar.open('User deleted successfully', 'Close', {
             duration: 5000
           });
-          this.#reSearch();
         },
         error: () => {
           this.#snackBar.open(
