@@ -48,11 +48,16 @@ export class UsersService {
   async findPaginated(
     query: SearchUsersQueryDto
   ): Promise<PaginatedResponseDto<User>> {
-    const { page, limit, sortBy, sortOrder, ...filters } = query;
+    const { page, limit, sortBy, sortOrder, includeDeleted, ...filters } =
+      query;
 
     const qb = this.userRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.roles', 'role');
+
+    if (includeDeleted) {
+      qb.withDeleted();
+    }
 
     if (filters.email) {
       qb.andWhere('user.email LIKE :email', {
@@ -267,6 +272,20 @@ export class UsersService {
 
   async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
-    await this.userRepository.remove(user);
+    await this.userRepository.softRemove(user);
+  }
+
+  async restore(id: string): Promise<User> {
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ['roles'],
+      withDeleted: true
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+    await this.userRepository.restore(id);
+    await this.userRepository.update(id, { isActive: true });
+    return this.findOne(id);
   }
 }

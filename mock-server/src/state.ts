@@ -44,12 +44,17 @@ export function getState(): State {
 
 export function findUserByEmail(email: string): MockUser | undefined {
   for (const user of state.users.values()) {
-    if (user.email === email) return user;
+    if (user.email === email && !user.deletedAt) return user;
   }
   return undefined;
 }
 
 export function findUserById(id: string): MockUser | undefined {
+  const user = state.users.get(id);
+  return user && !user.deletedAt ? user : undefined;
+}
+
+export function findUserByIdWithDeleted(id: string): MockUser | undefined {
   return state.users.get(id);
 }
 

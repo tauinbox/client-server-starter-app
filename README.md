@@ -30,11 +30,13 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - `GET /api/v1/auth/permissions` returns CASL packed rules; client hydrates into `AppAbility` at bootstrap before route activation
 - OAuth account management (link/unlink providers in profile)
 - Server-side token cleanup via cron jobs
+- **Audit logging** — security-sensitive operations recorded to `audit_logs` table (login, registration, password changes, user/role management, OAuth events)
 
 ### User Management (Admin)
 - **Server-side paginated** user list with column sorting (page, limit, sortBy, sortOrder query params)
-- User detail, edit, and delete
-- **Server-side paginated** search by email, name, admin/active status
+- User detail, edit, and **soft delete** — records are preserved with a `deleted_at` timestamp; all active sessions are revoked on delete
+- **Restore** soft-deleted users via `POST /users/:id/restore` — reactivates the account
+- **Server-side paginated** search by email, name, admin/active status; `includeDeleted=true` query param shows soft-deleted users
 - Role and status management
 - Pagination response envelope: `{ data: User[], meta: { page, limit, total, totalPages } }`
 
@@ -268,12 +270,13 @@ API base URL: `/api/v1`
 | GET | `/auth/oauth/accounts` | Bearer | List linked OAuth accounts |
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink OAuth provider |
 | GET | `/auth/permissions` | Bearer | Get current user's resolved permissions |
-| GET | `/users` | `users:list` | List all users (paginated: page, limit, sortBy, sortOrder) |
-| GET | `/users/search` | `users:search` | Search users (paginated + filters: email, firstName, lastName, isActive) |
+| GET | `/users` | `users:list` | List all users (paginated; `includeDeleted=true` to include soft-deleted) |
+| GET | `/users/search` | `users:search` | Search users (paginated + filters: email, firstName, lastName, isActive; `includeDeleted=true`) |
 | GET | `/users/:id` | `users:read` | Get user by ID |
 | POST | `/users` | `users:create` | Create user |
 | PATCH | `/users/:id` | `users:update` | Update user |
-| DELETE | `/users/:id` | `users:delete` | Delete user |
+| DELETE | `/users/:id` | `users:delete` | Soft-delete user (sets `deleted_at`, revokes sessions) |
+| POST | `/users/:id/restore` | `users:delete` | Restore soft-deleted user (clears `deleted_at`, sets `isActive=true`) |
 | POST | `/roles` | `roles:create` | Create role |
 | GET | `/roles` | `roles:read` | List roles with permissions |
 | GET | `/roles/:id` | `roles:read` | Get role by ID |
@@ -354,7 +357,7 @@ npm run release            # Bump versions, generate CHANGELOG.md, create git ta
 
 Seven tables managed via TypeORM migrations:
 
-- **users** — UUID primary key, email (unique), name, bcrypt password hash (nullable for OAuth-only users), role/active flags, email verification (isEmailVerified, token, expiresAt), account lockout (failedLoginAttempts, lockedUntil), password reset (token, expiresAt); ManyToMany to roles via user_roles
+- **users** — UUID primary key, email (unique), name, bcrypt password hash (nullable for OAuth-only users), role/active flags, email verification (isEmailVerified, token, expiresAt), account lockout (failedLoginAttempts, lockedUntil), password reset (token, expiresAt), soft delete (`deleted_at TIMESTAMPTZ NULL`); ManyToMany to roles via user_roles
 - **oauth_accounts** — Linked to users (CASCADE delete), provider + provider_id (unique), timestamps
 - **refresh_tokens** — Linked to users (CASCADE delete), token string (SHA-256 hashed), expiry, revoked flag
 - **roles** — UUID PK, name (unique), description, isSystem flag; ManyToMany with users
@@ -394,9 +397,9 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 194 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 224 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | Configured |
-| Client unit tests | Vitest | `*.spec.ts` alongside source | 261 tests passing |
+| Client unit tests | Vitest | `*.spec.ts` alongside source | 268 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 113 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
 
@@ -415,13 +418,14 @@ Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file
 
 ## Security
 
-- Passwords hashed with **bcrypt** (salt rounds = 10)
+- Passwords hashed with **bcrypt** (cost factor = 12)
 - **Account lockout** after 5 failed login attempts (15-minute cooldown)
 - **Email verification** required before first login
 - **Password reset tokens** are single-use with 1-hour expiry; reset revokes all sessions
 - JWT access tokens (1h) + opaque refresh tokens (7d) with rotation
 - `@Exclude()` decorator hides password in API responses
 - **RBAC** — typed CASL permission checks via `PermissionsGuard` + `@Authorize(['action', 'Subject'])`; CASL ability hydrated at bootstrap before route activation; permissions cached per user (5 min); admin role bypasses all checks; `*appRequirePermission="{ action, subject }"` directive for template-level visibility
+- **Audit logging** — 20 security-sensitive actions (login, register, password change/reset, user/role/permission CRUD, OAuth link/unlink, logout, token refresh failures) written to a dedicated `audit_logs` table with actor, target, IP, and request ID
 - `class-validator` on server DTOs, Angular `Validators` on client forms
 - LIKE query pattern escaping to prevent SQL injection via wildcards
 - File upload security: auth required, 5 MB limit, type whitelist, filename sanitization

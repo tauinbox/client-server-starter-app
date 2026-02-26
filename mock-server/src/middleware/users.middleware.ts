@@ -24,6 +24,7 @@ import type { SortOrder } from '@app/shared/types/pagination.types';
 import {
   findUserByEmail,
   findUserById,
+  findUserByIdWithDeleted,
   getState,
   logAudit,
   toUserResponse
@@ -160,7 +161,8 @@ router.post('/', adminGuard, (req, res) => {
     failedLoginAttempts: 0,
     lockedUntil: null,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    deletedAt: null
   };
 
   getState().users.set(user.id, user);
@@ -179,7 +181,12 @@ router.post('/', adminGuard, (req, res) => {
 
 // GET /api/v1/users
 router.get('/', adminGuard, (req, res) => {
-  const users = Array.from(getState().users.values()).map(toUserResponse);
+  const includeDeleted = String(req.query['includeDeleted']) === 'true';
+  let allUsers = Array.from(getState().users.values());
+  if (!includeDeleted) {
+    allUsers = allUsers.filter((u) => !u.deletedAt);
+  }
+  const users = allUsers.map(toUserResponse);
   const params = parsePaginationParams(req.query as Record<string, unknown>);
   const result = paginateAndSort(users, params);
   res.json(result);
@@ -188,7 +195,12 @@ router.get('/', adminGuard, (req, res) => {
 // GET /api/v1/users/search
 router.get('/search', adminGuard, (req, res) => {
   const { email, firstName, lastName, isActive } = req.query;
+  const includeDeleted = String(req.query['includeDeleted']) === 'true';
   let users = Array.from(getState().users.values());
+
+  if (!includeDeleted) {
+    users = users.filter((u) => !u.deletedAt);
+  }
 
   if (email) {
     const emailStr = String(email).toLowerCase();
@@ -334,14 +346,22 @@ router.patch('/:id', adminGuard, (req, res) => {
 router.delete('/:id', adminGuard, (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
-  const targetUser = state.users.get(id);
+  const targetUser = findUserById(id);
   if (!targetUser) {
     res.status(404).json({ message: 'User not found', statusCode: 404 });
     return;
   }
 
-  state.users.delete(id);
-  state.oauthAccounts.delete(id);
+  // Soft delete: set deletedAt timestamp
+  targetUser.deletedAt = new Date().toISOString();
+  targetUser.updatedAt = new Date().toISOString();
+
+  // Revoke all refresh tokens for this user
+  for (const [token, userId] of state.refreshTokens.entries()) {
+    if (userId === id) {
+      state.refreshTokens.delete(token);
+    }
+  }
 
   const actor = (req as AuthenticatedRequest).user;
   logAudit('USER_DELETE', {
@@ -354,6 +374,32 @@ router.delete('/:id', adminGuard, (req, res) => {
   });
 
   res.json({});
+});
+
+// POST /api/v1/users/:id/restore
+router.post('/:id/restore', adminGuard, (req, res) => {
+  const id = req.params['id'] as string;
+  const targetUser = findUserByIdWithDeleted(id);
+  if (!targetUser) {
+    res.status(404).json({ message: 'User not found', statusCode: 404 });
+    return;
+  }
+
+  targetUser.deletedAt = null;
+  targetUser.isActive = true;
+  targetUser.updatedAt = new Date().toISOString();
+
+  const actor = (req as AuthenticatedRequest).user;
+  logAudit('USER_RESTORE', {
+    actorId: actor.id,
+    actorEmail: actor.email,
+    targetId: id,
+    targetType: 'User',
+    details: { targetEmail: targetUser.email },
+    ip: req.ip
+  });
+
+  res.json(toUserResponse(targetUser));
 });
 
 export default router;

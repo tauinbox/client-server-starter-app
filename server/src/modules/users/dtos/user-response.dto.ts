@@ -33,4 +33,7 @@ export class UserResponseDto {
 
   @ApiProperty({ example: '2023-01-01T00:00:00Z' })
   updatedAt: Date;
+
+  @ApiProperty({ example: null, nullable: true })
+  deletedAt: Date | null;
 }

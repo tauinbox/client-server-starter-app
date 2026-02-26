@@ -10,6 +10,7 @@ export type UserResponse = {
   lockedUntil: string | null;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
 };
 
 export type OAuthAccountResponse = {

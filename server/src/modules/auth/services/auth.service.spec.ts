@@ -102,7 +102,8 @@ describe('AuthService', () => {
     passwordResetToken: null,
     passwordResetExpiresAt: null,
     createdAt: new Date('2025-01-01'),
-    updatedAt: new Date('2025-01-01')
+    updatedAt: new Date('2025-01-01'),
+    deletedAt: null
   };
 
   const mockUserResponse = {
@@ -120,7 +121,8 @@ describe('AuthService', () => {
     passwordResetToken: mockUser.passwordResetToken,
     passwordResetExpiresAt: mockUser.passwordResetExpiresAt,
     createdAt: mockUser.createdAt,
-    updatedAt: mockUser.updatedAt
+    updatedAt: mockUser.updatedAt,
+    deletedAt: mockUser.deletedAt
   };
 
   beforeEach(async () => {

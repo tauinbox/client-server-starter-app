@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsIn, IsOptional } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional } from 'class-validator';
 import { ALLOWED_USER_SORT_COLUMNS } from '@app/shared/constants/user.constants';
 import { PaginationQueryDto } from '../../../common/dtos';
 
@@ -33,4 +33,16 @@ export class SearchUsersQueryDto extends PaginationQueryDto {
     return undefined;
   })
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Include soft-deleted users (admin only)'
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return undefined;
+  })
+  includeDeleted?: boolean;
 }

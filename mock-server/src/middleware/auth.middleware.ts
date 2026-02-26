@@ -101,7 +101,8 @@ router.post('/register', (req, res) => {
     failedLoginAttempts: 0,
     lockedUntil: null,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    deletedAt: null
   };
 
   const state = getState();
