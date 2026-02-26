@@ -627,6 +627,10 @@ export class AuthService {
     await this.refreshTokenService.deleteByUserId(userId);
   }
 
+  async revokeAllUserSessions(userId: string): Promise<void> {
+    await this.refreshTokenService.deleteByUserId(userId);
+  }
+
   private generateTokens(
     userId: string,
     email: string,

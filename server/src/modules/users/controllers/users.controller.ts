@@ -31,6 +31,7 @@ import {
 } from '@nestjs/swagger';
 import { UserResponseDto } from '../dtos/user-response.dto';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
+import { AuthService } from '../../auth/services/auth.service';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
@@ -45,6 +46,7 @@ import { JwtAuthRequest } from '../../auth/types/auth.request';
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
+    private readonly authService: AuthService,
     private readonly auditService: AuditService
   ) {}
 
@@ -171,7 +173,7 @@ export class UsersController {
   @Delete(':id')
   @Authorize(['delete', 'User'])
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete a user (admin only)' })
+  @ApiOperation({ summary: 'Soft-delete a user (admin only)' })
   @ApiParam({ name: 'id', description: 'The user ID' })
   @ApiOkResponse({ description: 'The user has been successfully deleted' })
   @ApiNotFoundResponse({ description: 'User not found' })
@@ -179,7 +181,8 @@ export class UsersController {
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   async remove(@Param('id') id: string, @Request() req: JwtAuthRequest) {
     const user = await this.usersService.findOne(id);
-    const result = await this.usersService.remove(id);
+    await this.usersService.remove(id);
+    await this.authService.revokeAllUserSessions(id);
     await this.auditService.log({
       action: AuditAction.USER_DELETE,
       actorId: req.user.userId,
@@ -189,6 +192,32 @@ export class UsersController {
       details: { targetEmail: user.email },
       context: extractAuditContext(req)
     });
-    return result;
+    return {};
+  }
+
+  @Post(':id/restore')
+  @Authorize(['delete', 'User'])
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore a soft-deleted user (admin only)' })
+  @ApiParam({ name: 'id', description: 'The user ID' })
+  @ApiOkResponse({
+    description: 'The user has been successfully restored',
+    type: UserResponseDto
+  })
+  @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
+  async restore(@Param('id') id: string, @Request() req: JwtAuthRequest) {
+    const restoredUser = await this.usersService.restore(id);
+    await this.auditService.log({
+      action: AuditAction.USER_RESTORE,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      targetId: id,
+      targetType: 'User',
+      details: { targetEmail: restoredUser.email },
+      context: extractAuditContext(req)
+    });
+    return restoredUser;
   }
 }

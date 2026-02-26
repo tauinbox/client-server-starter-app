@@ -28,7 +28,8 @@ export function createMockUser(options: MockUserOptions = {}): MockUser {
     failedLoginAttempts: options.failedLoginAttempts ?? 0,
     lockedUntil: options.lockedUntil ?? null,
     createdAt: options.createdAt ?? now,
-    updatedAt: options.updatedAt ?? now
+    updatedAt: options.updatedAt ?? now,
+    deletedAt: options.deletedAt ?? null
   };
 }
 

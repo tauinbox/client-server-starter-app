@@ -13,7 +13,8 @@ describe('UsersService', () => {
     find: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
-    remove: jest.Mock;
+    softRemove: jest.Mock;
+    restore: jest.Mock;
     merge: jest.Mock;
     createQueryBuilder: jest.Mock;
     increment: jest.Mock;
@@ -21,6 +22,7 @@ describe('UsersService', () => {
   };
   let mockQueryBuilder: {
     leftJoinAndSelect: jest.Mock;
+    withDeleted: jest.Mock;
     andWhere: jest.Mock;
     orderBy: jest.Mock;
     skip: jest.Mock;
@@ -37,12 +39,14 @@ describe('UsersService', () => {
     password: '$2b$10$hashedpassword',
     isActive: true,
     createdAt: new Date('2025-01-01'),
-    updatedAt: new Date('2025-01-01')
+    updatedAt: new Date('2025-01-01'),
+    deletedAt: null
   } as User;
 
   beforeEach(async () => {
     mockQueryBuilder = {
       leftJoinAndSelect: jest.fn().mockReturnThis(),
+      withDeleted: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       skip: jest.fn().mockReturnThis(),
@@ -56,7 +60,8 @@ describe('UsersService', () => {
       find: jest.fn(),
       create: jest.fn(),
       save: jest.fn(),
-      remove: jest.fn(),
+      softRemove: jest.fn().mockResolvedValue(undefined),
+      restore: jest.fn().mockResolvedValue(undefined),
       merge: jest.fn(),
       createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
       increment: jest.fn().mockResolvedValue(undefined),
@@ -370,6 +375,34 @@ describe('UsersService', () => {
 
       expect(result.meta.totalPages).toBe(8);
     });
+
+    it('should call withDeleted() when includeDeleted is true', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.findPaginated({
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        includeDeleted: true
+      });
+
+      expect(mockQueryBuilder.withDeleted).toHaveBeenCalled();
+    });
+
+    it('should not call withDeleted() when includeDeleted is false', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.findPaginated({
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        includeDeleted: false
+      });
+
+      expect(mockQueryBuilder.withDeleted).not.toHaveBeenCalled();
+    });
   });
 
   describe('update', () => {
@@ -461,9 +494,9 @@ describe('UsersService', () => {
   });
 
   describe('remove', () => {
-    it('should remove an existing user', async () => {
+    it('should soft-delete an existing user', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
-      mockRepository.remove.mockResolvedValue(mockUser);
+      mockRepository.softRemove.mockResolvedValue(undefined);
 
       await service.remove('user-1');
 
@@ -471,13 +504,48 @@ describe('UsersService', () => {
         where: { id: 'user-1' },
         relations: ['roles']
       });
-      expect(mockRepository.remove).toHaveBeenCalledWith(mockUser);
+      expect(mockRepository.softRemove).toHaveBeenCalledWith(mockUser);
     });
 
     it('should throw NotFoundException when user not found', async () => {
       mockRepository.findOne.mockResolvedValue(null);
 
       await expect(service.remove('nonexistent')).rejects.toThrow(
+        NotFoundException
+      );
+    });
+  });
+
+  describe('restore', () => {
+    const deletedUser: User = {
+      ...mockUser,
+      deletedAt: new Date('2025-06-01'),
+      isActive: false
+    } as User;
+
+    it('should restore a soft-deleted user', async () => {
+      mockRepository.findOne
+        .mockResolvedValueOnce(deletedUser) // withDeleted lookup
+        .mockResolvedValueOnce(mockUser); // final findOne after restore
+
+      const result = await service.restore('user-1');
+
+      expect(mockRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        relations: ['roles'],
+        withDeleted: true
+      });
+      expect(mockRepository.restore).toHaveBeenCalledWith('user-1');
+      expect(mockRepository.update).toHaveBeenCalledWith('user-1', {
+        isActive: true
+      });
+      expect(result).toEqual(mockUser);
+    });
+
+    it('should throw NotFoundException when user does not exist', async () => {
+      mockRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.restore('nonexistent')).rejects.toThrow(
         NotFoundException
       );
     });

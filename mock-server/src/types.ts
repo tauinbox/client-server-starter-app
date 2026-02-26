@@ -20,6 +20,7 @@ export interface MockUser {
   lockedUntil: string | null;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
 }
 
 export interface OAuthAccount {

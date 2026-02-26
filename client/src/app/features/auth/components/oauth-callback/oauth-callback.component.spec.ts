@@ -27,7 +27,8 @@ const mockAuthResponse: AuthResponse = {
     failedLoginAttempts: 0,
     lockedUntil: null,
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    deletedAt: null
   }
 };
 
