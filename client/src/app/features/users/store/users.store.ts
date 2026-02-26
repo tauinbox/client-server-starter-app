@@ -1,7 +1,7 @@
 import { computed, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type { Observable } from 'rxjs';
-import { map, pipe, switchMap, tap } from 'rxjs';
+import { EMPTY, map, pipe, switchMap, tap } from 'rxjs';
 import { tapResponse } from '@ngrx/operators';
 import {
   patchState,
@@ -35,6 +35,7 @@ type UsersExtraState = {
   isLoadingMore: boolean;
   detailLoading: boolean;
   searchLoading: boolean;
+  isLoadingMoreSearch: boolean;
   listError: string | null;
   detailError: string | null;
   searchError: string | null;
@@ -60,6 +61,7 @@ export const UsersStore = signalStore(
     isLoadingMore: false,
     detailLoading: false,
     searchLoading: false,
+    isLoadingMoreSearch: false,
     listError: null,
     detailError: null,
     searchError: null,
@@ -80,6 +82,9 @@ export const UsersStore = signalStore(
   withComputed((store) => ({
     displayedUsers: computed(() => store.entities()),
     hasMore: computed(() => store.totalUsers() > store.ids().length),
+    hasMoreSearch: computed(
+      () => store.searchTotalUsers() > store.searchResultIds().length
+    ),
     searchResultUsers: computed(() => {
       const map = store.entityMap();
       return store
@@ -272,16 +277,59 @@ export const UsersStore = signalStore(
         )
       ),
 
+      loadMoreSearch: rxMethod<void>(
+        pipe(
+          tap(() => {
+            patchState(store, {
+              isLoadingMoreSearch: true,
+              searchCurrentPage: store.searchCurrentPage() + 1
+            });
+          }),
+          map(() => {
+            const criteria = store.lastSearchCriteria();
+            return {
+              criteria,
+              page: store.searchCurrentPage() + 1,
+              limit: store.searchPageSize(),
+              sortBy: store.searchSortBy(),
+              sortOrder: store.searchSortOrder()
+            };
+          }),
+          switchMap(({ criteria, ...params }) => {
+            if (!criteria) return EMPTY;
+            return userService.search(criteria, params).pipe(
+              tapResponse({
+                next: (response) => {
+                  patchState(store, upsertEntities(response.data));
+                  patchState(store, {
+                    searchResultIds: [
+                      ...store.searchResultIds(),
+                      ...response.data.map((u) => u.id)
+                    ],
+                    isLoadingMoreSearch: false,
+                    searchTotalUsers: response.meta.total
+                  });
+                },
+                error: () => {
+                  patchState(store, { isLoadingMoreSearch: false });
+                  snackBar.open(
+                    'Failed to load more results. Please try again.',
+                    'Close',
+                    { duration: 5000 }
+                  );
+                }
+              })
+            );
+          })
+        )
+      ),
+
       setSorting(sortBy: UserSortColumn, sortOrder: SortOrder): void {
         patchState(store, { sortBy, sortOrder, currentPage: 0 });
       },
 
       setSearchPage(page: number): void {
         patchState(store, { searchCurrentPage: page });
-      },
-
-      setSearchPageSize(size: number): void {
-        patchState(store, { searchPageSize: size, searchCurrentPage: 0 });
       },
 
       setSearchSorting(sortBy: UserSortColumn, sortOrder: SortOrder): void {

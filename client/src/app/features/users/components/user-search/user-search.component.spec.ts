@@ -13,7 +13,16 @@ describe('UserSearchComponent', () => {
   let fixture: ComponentFixture<UserSearchComponent>;
   let usersStore: InstanceType<typeof UsersStore>;
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   beforeEach(async () => {
+    class MockIntersectionObserver {
+      observe = vi.fn();
+      disconnect = vi.fn();
+    }
+    vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
     await TestBed.configureTestingModule({
       imports: [UserSearchComponent],
       providers: [
