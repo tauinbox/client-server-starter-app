@@ -38,9 +38,6 @@ describe('UserTableComponent', () => {
     componentRef = fixture.componentRef;
 
     componentRef.setInput('users', []);
-    componentRef.setInput('totalItems', 0);
-    componentRef.setInput('currentPage', 0);
-    componentRef.setInput('pageSize', 10);
 
     fixture.detectChanges();
   });
@@ -100,31 +97,9 @@ describe('UserTableComponent', () => {
       fixture.detectChanges();
       expect(component.users()).toEqual([mockUser]);
     });
-
-    it('should accept totalItems input', () => {
-      componentRef.setInput('totalItems', 42);
-      fixture.detectChanges();
-      expect(component.totalItems()).toBe(42);
-    });
-
-    it('should accept currentPage input', () => {
-      componentRef.setInput('currentPage', 3);
-      fixture.detectChanges();
-      expect(component.currentPage()).toBe(3);
-    });
-
-    it('should accept pageSize input', () => {
-      componentRef.setInput('pageSize', 25);
-      fixture.detectChanges();
-      expect(component.pageSize()).toBe(25);
-    });
   });
 
   describe('outputs', () => {
-    it('should have pageChange output', () => {
-      expect(component.pageChange).toBeDefined();
-    });
-
     it('should have sortChange output', () => {
       expect(component.sortChange).toBeDefined();
     });

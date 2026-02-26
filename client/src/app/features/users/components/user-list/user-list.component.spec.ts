@@ -6,7 +6,6 @@ import { of, throwError } from 'rxjs';
 import { signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
-import type { PageEvent } from '@angular/material/paginator';
 import type { Sort } from '@angular/material/sort';
 
 import { UserListComponent } from './user-list.component';
@@ -31,31 +30,43 @@ const mockUser: User = {
 describe('UserListComponent', () => {
   let component: UserListComponent;
   let fixture: ComponentFixture<UserListComponent>;
+  let observeSpy: ReturnType<typeof vi.fn>;
+  let disconnectSpy: ReturnType<typeof vi.fn>;
   let usersStoreMock: {
     listLoading: ReturnType<typeof signal<boolean>>;
+    isLoadingMore: ReturnType<typeof signal<boolean>>;
     totalUsers: ReturnType<typeof signal<number>>;
-    pageSize: ReturnType<typeof signal<number>>;
-    currentPage: ReturnType<typeof signal<number>>;
     displayedUsers: ReturnType<typeof signal<User[]>>;
+    hasMore: ReturnType<typeof signal<boolean>>;
     loadAll: ReturnType<typeof vi.fn>;
-    setPage: ReturnType<typeof vi.fn>;
-    setPageSize: ReturnType<typeof vi.fn>;
+    loadMore: ReturnType<typeof vi.fn>;
     setSorting: ReturnType<typeof vi.fn>;
     deleteUser: ReturnType<typeof vi.fn>;
   };
   let snackBarMock: { open: ReturnType<typeof vi.fn> };
   let dialogMock: { open: ReturnType<typeof vi.fn> };
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   beforeEach(async () => {
+    observeSpy = vi.fn();
+    disconnectSpy = vi.fn();
+    class MockIntersectionObserver {
+      observe = observeSpy;
+      disconnect = disconnectSpy;
+    }
+    vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
+
     usersStoreMock = {
       listLoading: signal(false),
+      isLoadingMore: signal(false),
       totalUsers: signal(0),
-      pageSize: signal(10),
-      currentPage: signal(0),
       displayedUsers: signal([]),
+      hasMore: signal(false),
       loadAll: vi.fn(),
-      setPage: vi.fn(),
-      setPageSize: vi.fn(),
+      loadMore: vi.fn(),
       setSorting: vi.fn(),
       deleteUser: vi.fn().mockReturnValue(of(void 0))
     };
@@ -85,28 +96,6 @@ describe('UserListComponent', () => {
 
   it('should call loadAll on init', () => {
     expect(usersStoreMock.loadAll).toHaveBeenCalled();
-  });
-
-  describe('handlePageEvent', () => {
-    it('should call setPageSize and loadAll when page size changes', () => {
-      const event: PageEvent = { pageIndex: 0, pageSize: 25, length: 100 };
-      usersStoreMock.pageSize.set(10); // current size is 10, event is 25
-
-      component.handlePageEvent(event);
-
-      expect(usersStoreMock.setPageSize).toHaveBeenCalledWith(25);
-      expect(usersStoreMock.loadAll).toHaveBeenCalledTimes(2); // once on init, once on page event
-    });
-
-    it('should call setPage and loadAll when page index changes', () => {
-      const event: PageEvent = { pageIndex: 2, pageSize: 10, length: 100 };
-      usersStoreMock.pageSize.set(10); // same size
-
-      component.handlePageEvent(event);
-
-      expect(usersStoreMock.setPage).toHaveBeenCalledWith(2);
-      expect(usersStoreMock.loadAll).toHaveBeenCalledTimes(2);
-    });
   });
 
   describe('sortData', () => {
@@ -165,7 +154,7 @@ describe('UserListComponent', () => {
       expect(dialogMock.open).toHaveBeenCalled();
     });
 
-    it('should delete user and reload when dialog confirmed', () => {
+    it('should delete user inline (no reload) when dialog confirmed', () => {
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(true))
       };
@@ -179,7 +168,7 @@ describe('UserListComponent', () => {
         'Close',
         { duration: 5000 }
       );
-      expect(usersStoreMock.loadAll).toHaveBeenCalledTimes(2); // init + after delete
+      expect(usersStoreMock.loadAll).toHaveBeenCalledTimes(1); // only on init
     });
 
     it('should not delete when dialog is cancelled', () => {

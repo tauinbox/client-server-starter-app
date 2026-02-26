@@ -1,9 +1,10 @@
-import type { OnInit } from '@angular/core';
+import type { AfterViewInit, ElementRef, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  inject
+  inject,
+  viewChild
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
@@ -18,7 +19,6 @@ import type { Sort } from '@angular/material/sort';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatMiniFabButton } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
-import type { PageEvent } from '@angular/material/paginator';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import type { User, UserSortColumn } from '../../models/user.types';
@@ -48,7 +48,7 @@ import {
   styleUrl: './user-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class UserListComponent implements OnInit {
+export class UserListComponent implements OnInit, AfterViewInit {
   readonly #usersStore = inject(UsersStore);
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
@@ -56,21 +56,34 @@ export class UserListComponent implements OnInit {
 
   readonly loading = this.#usersStore.listLoading;
   readonly totalUsers = this.#usersStore.totalUsers;
-  readonly pageSize = this.#usersStore.pageSize;
-  readonly currentPage = this.#usersStore.currentPage;
   readonly displayedUsers = this.#usersStore.displayedUsers;
+  readonly hasMore = this.#usersStore.hasMore;
+  readonly isLoadingMore = this.#usersStore.isLoadingMore;
+
+  readonly scrollSentinel = viewChild.required<ElementRef>('scrollSentinel');
 
   ngOnInit(): void {
     this.#usersStore.loadAll();
   }
 
-  handlePageEvent(event: PageEvent): void {
-    if (event.pageSize !== this.#usersStore.pageSize()) {
-      this.#usersStore.setPageSize(event.pageSize);
-    } else {
-      this.#usersStore.setPage(event.pageIndex);
-    }
-    this.#usersStore.loadAll();
+  ngAfterViewInit(): void {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (
+          entry.isIntersecting &&
+          this.hasMore() &&
+          !this.isLoadingMore() &&
+          !this.loading()
+        ) {
+          this.#usersStore.loadMore();
+        }
+      },
+      { threshold: 0 }
+    );
+
+    observer.observe(this.scrollSentinel().nativeElement);
+    this.#destroyRef.onDestroy(() => observer.disconnect());
   }
 
   sortData(sort: Sort): void {
@@ -114,7 +127,6 @@ export class UserListComponent implements OnInit {
           this.#snackBar.open('User deleted successfully', 'Close', {
             duration: 5000
           });
-          this.#usersStore.loadAll();
         },
         error: () => {
           this.#snackBar.open(

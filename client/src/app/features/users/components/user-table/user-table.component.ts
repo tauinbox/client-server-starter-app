@@ -22,8 +22,6 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { MatIconButton } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { MatChip } from '@angular/material/chips';
-import type { PageEvent } from '@angular/material/paginator';
-import { MatPaginator } from '@angular/material/paginator';
 import { MatIcon } from '@angular/material/icon';
 import { DatePipe } from '@angular/common';
 import type { User, UserSortColumn } from '../../models/user.types';
@@ -55,7 +53,6 @@ export const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
     MatRow,
     MatHeaderRowDef,
     MatRowDef,
-    MatPaginator,
     DatePipe
   ],
   templateUrl: './user-table.component.html',
@@ -64,11 +61,7 @@ export const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
 })
 export class UserTableComponent {
   readonly users = input.required<User[]>();
-  readonly totalItems = input.required<number>();
-  readonly currentPage = input.required<number>();
-  readonly pageSize = input.required<number>();
 
-  readonly pageChange = output<PageEvent>();
   readonly sortChange = output<Sort>();
   readonly deleteUser = output<User>();
 

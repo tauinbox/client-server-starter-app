@@ -27,13 +27,17 @@
       } @else {
         <app-user-table
           [users]="displayedUsers()"
-          [totalItems]="totalUsers()"
-          [currentPage]="currentPage()"
-          [pageSize]="pageSize()"
-          (pageChange)="handlePageEvent($event)"
           (sortChange)="sortData($event)"
           (deleteUser)="confirmDelete($event)"
         />
+      }
+
+      <div #scrollSentinel class="scroll-sentinel"></div>
+
+      @if (isLoadingMore()) {
+        <div class="load-more-container">
+          <mat-spinner [diameter]="36"></mat-spinner>
+        </div>
       }
     </mat-card-content>
   </mat-card>

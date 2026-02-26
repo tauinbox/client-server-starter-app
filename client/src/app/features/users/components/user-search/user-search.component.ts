@@ -23,6 +23,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import type { Sort } from '@angular/material/sort';
 import type { PageEvent } from '@angular/material/paginator';
+import { MatPaginator } from '@angular/material/paginator';
 import type { User, UserSearch, UserSortColumn } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { rem } from '@shared/utils/css.utils';
@@ -55,6 +56,7 @@ type UserSearchFormType = {
     MatDivider,
     MatInput,
     MatLabel,
+    MatPaginator,
     UserTableComponent
   ],
   templateUrl: './user-search.component.html',

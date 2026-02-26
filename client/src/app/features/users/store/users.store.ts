@@ -18,11 +18,7 @@ import {
   withEntities
 } from '@ngrx/signals/entities';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
-import {
-  DEFAULT_PAGE_SIZE,
-  DEFAULT_SORT_BY,
-  DEFAULT_SORT_ORDER
-} from '@app/shared/constants';
+import { DEFAULT_SORT_BY, DEFAULT_SORT_ORDER } from '@app/shared/constants';
 import { UserService } from '../services/user.service';
 import type {
   SortOrder,
@@ -32,8 +28,11 @@ import type {
   UserSortColumn
 } from '../models/user.types';
 
+const INFINITE_SCROLL_PAGE_SIZE = 20;
+
 type UsersExtraState = {
   listLoading: boolean;
+  isLoadingMore: boolean;
   detailLoading: boolean;
   searchLoading: boolean;
   listError: string | null;
@@ -58,6 +57,7 @@ export const UsersStore = signalStore(
   withEntities<User>(),
   withState<UsersExtraState>({
     listLoading: false,
+    isLoadingMore: false,
     detailLoading: false,
     searchLoading: false,
     listError: null,
@@ -66,12 +66,12 @@ export const UsersStore = signalStore(
     searchResultIds: [],
     searchPerformed: false,
     currentPage: 0,
-    pageSize: DEFAULT_PAGE_SIZE,
+    pageSize: INFINITE_SCROLL_PAGE_SIZE,
     totalUsers: 0,
     sortBy: DEFAULT_SORT_BY as UserSortColumn,
     sortOrder: DEFAULT_SORT_ORDER,
     searchCurrentPage: 0,
-    searchPageSize: DEFAULT_PAGE_SIZE,
+    searchPageSize: INFINITE_SCROLL_PAGE_SIZE,
     searchTotalUsers: 0,
     searchSortBy: DEFAULT_SORT_BY as UserSortColumn,
     searchSortOrder: DEFAULT_SORT_ORDER,
@@ -79,6 +79,7 @@ export const UsersStore = signalStore(
   }),
   withComputed((store) => ({
     displayedUsers: computed(() => store.entities()),
+    hasMore: computed(() => store.totalUsers() > store.ids().length),
     searchResultUsers: computed(() => {
       const map = store.entityMap();
       return store
@@ -94,9 +95,15 @@ export const UsersStore = signalStore(
     return {
       loadAll: rxMethod<void>(
         pipe(
-          tap(() => patchState(store, { listLoading: true, listError: null })),
+          tap(() =>
+            patchState(store, {
+              listLoading: true,
+              listError: null,
+              currentPage: 0
+            })
+          ),
           map(() => ({
-            page: store.currentPage() + 1,
+            page: 1,
             limit: store.pageSize(),
             sortBy: store.sortBy(),
             sortOrder: store.sortOrder()
@@ -118,6 +125,48 @@ export const UsersStore = signalStore(
                   });
                   snackBar.open(
                     'Failed to load users. Please try again.',
+                    'Close',
+                    { duration: 5000 }
+                  );
+                }
+              })
+            )
+          )
+        )
+      ),
+
+      loadMore: rxMethod<void>(
+        pipe(
+          tap(() => {
+            patchState(store, {
+              isLoadingMore: true,
+              listError: null,
+              currentPage: store.currentPage() + 1
+            });
+          }),
+          map(() => ({
+            page: store.currentPage() + 1,
+            limit: store.pageSize(),
+            sortBy: store.sortBy(),
+            sortOrder: store.sortOrder()
+          })),
+          switchMap((params) =>
+            userService.getAll(params).pipe(
+              tapResponse({
+                next: (response) => {
+                  patchState(store, upsertEntities(response.data));
+                  patchState(store, {
+                    isLoadingMore: false,
+                    totalUsers: response.meta.total
+                  });
+                },
+                error: () => {
+                  patchState(store, {
+                    isLoadingMore: false,
+                    listError: 'Failed to load more users. Please try again.'
+                  });
+                  snackBar.open(
+                    'Failed to load more users. Please try again.',
                     'Close',
                     { duration: 5000 }
                   );
@@ -170,6 +219,9 @@ export const UsersStore = signalStore(
         return userService.delete(id).pipe(
           tap(() => {
             patchState(store, removeEntity(id));
+            patchState(store, {
+              totalUsers: Math.max(0, store.totalUsers() - 1)
+            });
           })
         );
       },
@@ -219,14 +271,6 @@ export const UsersStore = signalStore(
           )
         )
       ),
-
-      setPage(page: number): void {
-        patchState(store, { currentPage: page });
-      },
-
-      setPageSize(size: number): void {
-        patchState(store, { pageSize: size, currentPage: 0 });
-      },
 
       setSorting(sortBy: UserSortColumn, sortOrder: SortOrder): void {
         patchState(store, { sortBy, sortOrder, currentPage: 0 });

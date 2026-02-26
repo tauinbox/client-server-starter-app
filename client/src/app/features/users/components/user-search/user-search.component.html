@@ -91,13 +91,16 @@
 
           <app-user-table
             [users]="users()"
-            [totalItems]="searchTotalUsers()"
-            [currentPage]="searchCurrentPage()"
-            [pageSize]="searchPageSize()"
-            (pageChange)="handleSearchPageEvent($event)"
             (sortChange)="searchSortData($event)"
             (deleteUser)="confirmDelete($event)"
           />
+          <mat-paginator
+            [length]="searchTotalUsers()"
+            [pageSize]="searchPageSize()"
+            [pageIndex]="searchCurrentPage()"
+            [pageSizeOptions]="[5, 10, 25, 50]"
+            (page)="handleSearchPageEvent($event)"
+          ></mat-paginator>
         }
       }
     </mat-card-content>
