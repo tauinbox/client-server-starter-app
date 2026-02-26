@@ -176,7 +176,7 @@ Four tables managed via TypeORM migrations:
 
 | Table | Description |
 |-------|-------------|
-| `users` | UUID PK, email (unique), name, bcrypt password (nullable for OAuth-only), isActive, isEmailVerified, failedLoginAttempts, lockedUntil, verification/reset token fields; ManyToMany to roles via user_roles (`isAdmin` column removed — roles-based RBAC) |
+| `users` | UUID PK, email (unique), name, bcrypt password (nullable for OAuth-only), isActive, isEmailVerified, failedLoginAttempts, lockedUntil, verification/reset token fields, `deleted_at TIMESTAMPTZ NULL` (soft delete); ManyToMany to roles via user_roles |
 | `oauth_accounts` | UUID PK, provider + provider_id (unique), FK to users (CASCADE) |
 | `refresh_tokens` | UUID PK, token (SHA-256 hashed), FK to users (CASCADE), expires_at, revoked |
 | `roles` | UUID PK, name (unique), description, isSystem flag |
@@ -260,11 +260,12 @@ Base URL: `/api/v1`
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/` | `users:create` | Create user |
-| GET | `/` | `users:list` | List all users (paginated: page, limit, sortBy, sortOrder query params) |
-| GET | `/search` | `users:search` | Search users (paginated + filters: email, firstName, lastName, isActive) |
+| GET | `/` | `users:list` | List all users (paginated; `includeDeleted=true` to include soft-deleted) |
+| GET | `/search` | `users:search` | Search users (paginated + filters: email, firstName, lastName, isActive; `includeDeleted=true`) |
 | GET | `/:id` | `users:read` | Get user by ID |
 | PATCH | `/:id` | `users:update` | Update user |
-| DELETE | `/:id` | `users:delete` | Delete user |
+| DELETE | `/:id` | `users:delete` | Soft-delete user (sets `deleted_at`, revokes all active sessions) |
+| POST | `/:id/restore` | `users:delete` | Restore soft-deleted user (clears `deleted_at`, sets `isActive=true`) |
 
 **Pagination query params:**
 - `page` (default 1)
