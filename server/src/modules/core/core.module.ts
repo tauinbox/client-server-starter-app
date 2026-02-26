@@ -14,6 +14,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { GlobalExceptionFilter } from './filters';
 import { MailModule } from '../mail/mail.module';
 import { HealthModule } from './health/health.module';
+import { AuditModule } from '../audit/audit.module';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
 import { RequestLoggingMiddleware } from './middleware/request-logging.middleware';
 
@@ -43,6 +44,7 @@ export class CoreModule implements NestModule {
         ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
         TypeOrmModule.forRootAsync({ imports: [], useFactory: postgresConfig }),
         MailModule,
+        AuditModule,
         AuthModule,
         UsersModule,
         FeatureModule,

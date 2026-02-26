@@ -21,7 +21,8 @@ router.get('/state', (_req, res) => {
   res.json({
     users: Array.from(state.users.values()).map(toUserResponse),
     oauthAccounts: Object.fromEntries(state.oauthAccounts),
-    refreshTokens: state.refreshTokens.size
+    refreshTokens: state.refreshTokens.size,
+    auditLogs: state.auditLogs
   });
 });
 

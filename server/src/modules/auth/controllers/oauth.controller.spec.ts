@@ -7,13 +7,20 @@ import { OAuthController } from './oauth.controller';
 import { AuthService } from '../services/auth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
 import { UsersService } from '../../users/services/users.service';
+import { AuditService } from '../../audit/audit.service';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthUserProfile } from '../types/oauth-profile';
 
-function mockJwtRequest(userId: string): { user: JwtAuthRequest['user'] } {
+function mockJwtRequest(userId: string): {
+  user: JwtAuthRequest['user'];
+  headers: Record<string, string>;
+  ip: string;
+} {
   return {
-    user: { userId, email: 'test@example.com', roles: [] }
+    user: { userId, email: 'test@example.com', roles: [] },
+    headers: {},
+    ip: '127.0.0.1'
   };
 }
 
@@ -35,7 +42,9 @@ function mockExpressRequest(
   user: OAuthUserProfile,
   cookies: Record<string, string> = {}
 ): ExpressRequest & { user: OAuthUserProfile } {
-  return { user, cookies } as ExpressRequest & { user: OAuthUserProfile };
+  return { user, cookies, headers: {}, ip: '127.0.0.1' } as ExpressRequest & {
+    user: OAuthUserProfile;
+  };
 }
 
 describe('OAuthController', () => {
@@ -86,6 +95,13 @@ describe('OAuthController', () => {
         { provide: AuthService, useValue: authServiceMock },
         { provide: OAuthAccountService, useValue: oauthAccountServiceMock },
         { provide: UsersService, useValue: usersServiceMock },
+        {
+          provide: AuditService,
+          useValue: {
+            log: jest.fn().mockResolvedValue(undefined),
+            logFireAndForget: jest.fn()
+          }
+        },
         {
           provide: ConfigService,
           useValue: {
@@ -322,7 +338,8 @@ describe('OAuthController', () => {
       expect(authServiceMock.linkOAuthToUser).toHaveBeenCalledWith(
         'user-1',
         OAuthProvider.GOOGLE,
-        '456'
+        '456',
+        expect.objectContaining({ ip: '127.0.0.1' })
       );
       expect(res.clearCookie).toHaveBeenCalledWith('oauth_link', {
         path: '/api/v1/auth/oauth'

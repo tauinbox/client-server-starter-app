@@ -16,6 +16,7 @@ import { OAuthAccountService } from './oauth-account.service';
 import { PermissionService } from './permission.service';
 import { RoleService } from './role.service';
 import { MailService } from '../../mail/mail.service';
+import { AuditService } from '../../audit/audit.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
 
@@ -80,6 +81,10 @@ describe('AuthService', () => {
   };
   let mockRoleService: {
     findRoleByName: jest.Mock;
+  };
+  let mockAuditService: {
+    log: jest.Mock;
+    logFireAndForget: jest.Mock;
   };
 
   const mockUser = {
@@ -216,6 +221,11 @@ describe('AuthService', () => {
         .mockResolvedValue({ id: 'role-uuid', name: 'user' })
     };
 
+    mockAuditService = {
+      log: jest.fn().mockResolvedValue(undefined),
+      logFireAndForget: jest.fn()
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -227,7 +237,8 @@ describe('AuthService', () => {
         { provide: OAuthAccountService, useValue: mockOAuthAccountService },
         { provide: PermissionService, useValue: mockPermissionService },
         { provide: RoleService, useValue: mockRoleService },
-        { provide: MailService, useValue: mockMailService }
+        { provide: MailService, useValue: mockMailService },
+        { provide: AuditService, useValue: mockAuditService }
       ]
     }).compile();
 

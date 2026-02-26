@@ -5,7 +5,7 @@ import {
 } from '@casl/ability';
 import type { MongoQuery } from '@casl/ability';
 import { packRules } from '@casl/ability/extra';
-import type { MockUser, OAuthAccount, State } from './types';
+import type { MockAuditLog, MockUser, OAuthAccount, State } from './types';
 import {
   seedOAuthAccounts,
   seedUsers,
@@ -33,7 +33,8 @@ export function resetState(): void {
     passwordResetTokens: new Map(),
     roles: new Map(seedRoles.map((r) => [r.id, { ...r }])),
     permissions: new Map(seedPermissions.map((p) => [p.id, { ...p }])),
-    rolePermissions: seedRolePermissions.map((rp) => ({ ...rp }))
+    rolePermissions: seedRolePermissions.map((rp) => ({ ...rp })),
+    auditLogs: []
   };
 }
 
@@ -63,6 +64,33 @@ export function addOAuthAccounts(
 ): void {
   const existing = state.oauthAccounts.get(userId) || [];
   state.oauthAccounts.set(userId, [...existing, ...accounts]);
+}
+
+export function logAudit(
+  action: string,
+  opts: {
+    actorId?: string | null;
+    actorEmail?: string | null;
+    targetId?: string | null;
+    targetType?: string | null;
+    details?: Record<string, unknown> | null;
+    ip?: string;
+    requestId?: string;
+  } = {}
+): void {
+  const entry: MockAuditLog = {
+    id: crypto.randomUUID(),
+    action,
+    actorId: opts.actorId ?? null,
+    actorEmail: opts.actorEmail ?? null,
+    targetId: opts.targetId ?? null,
+    targetType: opts.targetType ?? null,
+    details: opts.details ?? null,
+    ipAddress: opts.ip ?? null,
+    requestId: opts.requestId ?? null,
+    createdAt: new Date().toISOString()
+  };
+  state.auditLogs.push(entry);
 }
 
 type Actions = 'manage' | 'read' | 'update';

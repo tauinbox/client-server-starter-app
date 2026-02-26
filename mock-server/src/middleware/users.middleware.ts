@@ -25,10 +25,11 @@ import {
   findUserByEmail,
   findUserById,
   getState,
+  logAudit,
   toUserResponse
 } from '../state';
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
-import type { MockUser } from '../types';
+import type { AuthenticatedRequest, MockUser } from '../types';
 
 interface PaginationParams {
   page: number;
@@ -164,6 +165,15 @@ router.post('/', adminGuard, (req, res) => {
 
   getState().users.set(user.id, user);
 
+  const actor = (req as AuthenticatedRequest).user;
+  logAudit('USER_CREATE', {
+    actorId: actor.id,
+    actorEmail: actor.email,
+    targetId: user.id,
+    targetType: 'User',
+    ip: req.ip
+  });
+
   res.status(201).json(toUserResponse(user));
 });
 
@@ -293,6 +303,30 @@ router.patch('/:id', adminGuard, (req, res) => {
   }
   user.updatedAt = new Date().toISOString();
 
+  const actor = (req as AuthenticatedRequest).user;
+  const changedFields = Object.keys(req.body).filter(
+    (k: string) => k !== 'password'
+  );
+  logAudit('USER_UPDATE', {
+    actorId: actor.id,
+    actorEmail: actor.email,
+    targetId: id,
+    targetType: 'User',
+    details: { changedFields },
+    ip: req.ip
+  });
+
+  if (password !== undefined) {
+    logAudit('PASSWORD_CHANGE', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: id,
+      targetType: 'User',
+      details: { source: 'admin' },
+      ip: req.ip
+    });
+  }
+
   res.json(toUserResponse(user));
 });
 
@@ -300,13 +334,24 @@ router.patch('/:id', adminGuard, (req, res) => {
 router.delete('/:id', adminGuard, (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
-  if (!state.users.has(id)) {
+  const targetUser = state.users.get(id);
+  if (!targetUser) {
     res.status(404).json({ message: 'User not found', statusCode: 404 });
     return;
   }
 
   state.users.delete(id);
   state.oauthAccounts.delete(id);
+
+  const actor = (req as AuthenticatedRequest).user;
+  logAudit('USER_DELETE', {
+    actorId: actor.id,
+    actorEmail: actor.email,
+    targetId: id,
+    targetType: 'User',
+    details: { targetEmail: targetUser.email },
+    ip: req.ip
+  });
 
   res.json({});
 });

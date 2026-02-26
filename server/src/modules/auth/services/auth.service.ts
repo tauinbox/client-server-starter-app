@@ -26,9 +26,11 @@ import { PermissionService } from './permission.service';
 import { RoleService } from './role.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { MailService } from '../../mail/mail.service';
+import { AuditService, AuditContext } from '../../audit/audit.service';
 import { hashToken } from '../../../common/utils/hash-token';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { SYSTEM_ROLES } from '@app/shared/constants';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
   MAX_FAILED_ATTEMPTS,
   LOCKOUT_DURATION_MS,
@@ -52,7 +54,8 @@ export class AuthService {
     private oauthAccountService: OAuthAccountService,
     private permissionService: PermissionService,
     private roleService: RoleService,
-    private mailService: MailService
+    private mailService: MailService,
+    private auditService: AuditService
   ) {}
 
   // Pre-computed dummy hash for constant-time rejection (prevents timing attacks)
@@ -70,6 +73,13 @@ export class AuthService {
       const retryAfter = Math.ceil(
         (user.lockedUntil.getTime() - Date.now()) / 1000
       );
+      this.auditService.logFireAndForget({
+        action: AuditAction.USER_LOGIN_FAILURE,
+        actorEmail: email,
+        targetId: user.id,
+        targetType: 'User',
+        details: { reason: 'account_locked' }
+      });
       throw new HttpException(
         {
           message:
@@ -100,6 +110,13 @@ export class AuthService {
           const retryAfter = Math.ceil(
             (lockedUntil.getTime() - Date.now()) / 1000
           );
+          this.auditService.logFireAndForget({
+            action: AuditAction.USER_LOGIN_FAILURE,
+            actorEmail: email,
+            targetId: user.id,
+            targetType: 'User',
+            details: { reason: 'account_locked_after_max_attempts' }
+          });
           throw new HttpException(
             {
               message:
@@ -111,6 +128,11 @@ export class AuthService {
           );
         }
       }
+      this.auditService.logFireAndForget({
+        action: AuditAction.USER_LOGIN_FAILURE,
+        actorEmail: email,
+        details: { reason: 'invalid_credentials' }
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -298,16 +320,30 @@ export class AuthService {
   async linkOAuthToUser(
     userId: string,
     provider: string,
-    providerId: string
+    providerId: string,
+    auditContext?: AuditContext
   ): Promise<void> {
     const user = await this.usersService.findOne(userId);
     if (!user || !user.isActive) {
       throw new UnauthorizedException('User account not found or deactivated');
     }
     await this.safeCreateOAuthAccount(userId, provider, providerId);
+
+    await this.auditService.log({
+      action: AuditAction.OAUTH_LINK,
+      actorId: userId,
+      actorEmail: user.email,
+      targetId: userId,
+      targetType: 'User',
+      details: { provider },
+      context: auditContext
+    });
   }
 
-  async register(registerDto: RegisterDto): Promise<{ message: string }> {
+  async register(
+    registerDto: RegisterDto,
+    auditContext?: AuditContext
+  ): Promise<{ message: string }> {
     // Compute hash outside the transaction (CPU-intensive, no DB involvement)
     const hashedPassword = await bcrypt.hash(
       registerDto.password,
@@ -343,6 +379,15 @@ export class AuthService {
         .add(userRole.id);
 
       return newUser;
+    });
+
+    await this.auditService.log({
+      action: AuditAction.USER_REGISTER,
+      actorId: user.id,
+      actorEmail: user.email,
+      targetId: user.id,
+      targetType: 'User',
+      context: auditContext
     });
 
     // Send verification email (fire-and-forget — delivery failure is non-fatal)
@@ -420,7 +465,10 @@ export class AuthService {
     };
   }
 
-  async forgotPassword(email: string): Promise<{ message: string }> {
+  async forgotPassword(
+    email: string,
+    auditContext?: AuditContext
+  ): Promise<{ message: string }> {
     const user = await this.usersService.findByEmail(email);
 
     // Always return success to prevent email enumeration
@@ -441,6 +489,14 @@ export class AuthService {
       expiresAt
     );
 
+    this.auditService.logFireAndForget({
+      action: AuditAction.PASSWORD_RESET_REQUEST,
+      actorEmail: email,
+      targetId: user.id,
+      targetType: 'User',
+      context: auditContext
+    });
+
     this.mailService
       .sendPasswordReset(user.email, rawToken)
       .catch((err) =>
@@ -455,7 +511,8 @@ export class AuthService {
 
   async resetPassword(
     token: string,
-    newPassword: string
+    newPassword: string,
+    auditContext?: AuditContext
   ): Promise<{ message: string }> {
     const hashedToken = hashToken(token);
     const user = await this.usersService.findByPasswordResetToken(hashedToken);
@@ -494,6 +551,15 @@ export class AuthService {
       await manager.delete(RefreshToken, { userId: user.id });
     });
 
+    await this.auditService.log({
+      action: AuditAction.PASSWORD_RESET_COMPLETE,
+      actorId: user.id,
+      actorEmail: user.email,
+      targetId: user.id,
+      targetType: 'User',
+      context: auditContext
+    });
+
     return { message: 'Password has been reset successfully' };
   }
 
@@ -501,16 +567,31 @@ export class AuthService {
     const tokenDoc = await this.refreshTokenService.findByToken(refreshToken);
 
     if (!tokenDoc || tokenDoc.revoked || tokenDoc.isExpired()) {
+      this.auditService.logFireAndForget({
+        action: AuditAction.TOKEN_REFRESH_FAILURE,
+        details: { reason: 'invalid_or_expired_token' }
+      });
       throw new UnauthorizedException('Invalid refresh token');
     }
 
     const user = await this.usersService.findOne(tokenDoc.userId);
     if (!user) {
+      this.auditService.logFireAndForget({
+        action: AuditAction.TOKEN_REFRESH_FAILURE,
+        actorId: tokenDoc.userId,
+        details: { reason: 'user_not_found' }
+      });
       throw new UnauthorizedException('User not found');
     }
 
     if (!user.isActive) {
       await this.refreshTokenService.revokeToken(tokenDoc.id);
+      this.auditService.logFireAndForget({
+        action: AuditAction.TOKEN_REFRESH_FAILURE,
+        actorId: user.id,
+        actorEmail: user.email,
+        details: { reason: 'user_deactivated' }
+      });
       throw new UnauthorizedException('User account is deactivated');
     }
 

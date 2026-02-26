@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getState } from '../state';
+import { getState, logAudit } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';
 
@@ -47,6 +47,15 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
     user.id,
     accounts.filter((a) => a.provider !== provider)
   );
+
+  logAudit('OAUTH_UNLINK', {
+    actorId: user.id,
+    actorEmail: user.email,
+    targetId: user.id,
+    targetType: 'User',
+    details: { provider },
+    ip: req.ip
+  });
 
   res.json({ message: `${provider} account unlinked successfully` });
 });

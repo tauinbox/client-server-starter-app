@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Query,
+  Request,
   UseInterceptors
 } from '@nestjs/common';
 import { UsersService } from '../services/users.service';
@@ -30,6 +31,10 @@ import {
 } from '@nestjs/swagger';
 import { UserResponseDto } from '../dtos/user-response.dto';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
+import { AuditService } from '../../audit/audit.service';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { extractAuditContext } from '../../../common/utils/audit-context.util';
+import { JwtAuthRequest } from '../../auth/types/auth.request';
 
 @ApiTags('Users API')
 @Controller({
@@ -38,7 +43,10 @@ import { Authorize } from '../../auth/decorators/authorize.decorator';
 })
 @UseInterceptors(ClassSerializerInterceptor)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly auditService: AuditService
+  ) {}
 
   @Post()
   @Authorize(['create', 'User'])
@@ -55,8 +63,20 @@ export class UsersController {
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  async create(
+    @Body() createUserDto: CreateUserDto,
+    @Request() req: JwtAuthRequest
+  ) {
+    const createdUser = await this.usersService.create(createUserDto);
+    await this.auditService.log({
+      action: AuditAction.USER_CREATE,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      targetId: createdUser.id,
+      targetType: 'User',
+      context: extractAuditContext(req)
+    });
+    return createdUser;
   }
 
   @Get()
@@ -114,8 +134,38 @@ export class UsersController {
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(id, updateUserDto);
+  async update(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+    @Request() req: JwtAuthRequest
+  ) {
+    const updatedUser = await this.usersService.update(id, updateUserDto);
+    const changedFields = Object.keys(updateUserDto).filter(
+      (k) => k !== 'password'
+    );
+    await this.auditService.log({
+      action: AuditAction.USER_UPDATE,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      targetId: id,
+      targetType: 'User',
+      details: { changedFields },
+      context: extractAuditContext(req)
+    });
+
+    if (updateUserDto.password) {
+      await this.auditService.log({
+        action: AuditAction.PASSWORD_CHANGE,
+        actorId: req.user.userId,
+        actorEmail: req.user.email,
+        targetId: id,
+        targetType: 'User',
+        details: { source: 'admin' },
+        context: extractAuditContext(req)
+      });
+    }
+
+    return updatedUser;
   }
 
   @Delete(':id')
@@ -127,7 +177,18 @@ export class UsersController {
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+  async remove(@Param('id') id: string, @Request() req: JwtAuthRequest) {
+    const user = await this.usersService.findOne(id);
+    const result = await this.usersService.remove(id);
+    await this.auditService.log({
+      action: AuditAction.USER_DELETE,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      targetId: id,
+      targetType: 'User',
+      details: { targetEmail: user.email },
+      context: extractAuditContext(req)
+    });
+    return result;
   }
 }

@@ -1,4 +1,4 @@
-import { Request } from '@nestjs/common';
+import { Request } from 'express';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { PayloadFromJwt } from './jwt-payload';
 

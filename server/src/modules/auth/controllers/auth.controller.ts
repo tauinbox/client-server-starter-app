@@ -39,6 +39,10 @@ import { VerifyEmailDto } from '../dtos/verify-email.dto';
 import { ResendVerificationDto } from '../dtos/resend-verification.dto';
 import { ForgotPasswordDto } from '../dtos/forgot-password.dto';
 import { ResetPasswordDto } from '../dtos/reset-password.dto';
+import { AuditService } from '../../audit/audit.service';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { extractAuditContext } from '../../../common/utils/audit-context.util';
+import { Request as ExpressRequest } from 'express';
 
 @ApiTags('Auth API')
 @Controller({
@@ -51,7 +55,8 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly userService: UsersService,
     private readonly permissionService: PermissionService,
-    private readonly caslAbilityFactory: CaslAbilityFactory
+    private readonly caslAbilityFactory: CaslAbilityFactory,
+    private readonly auditService: AuditService
   ) {}
 
   @Post('register')
@@ -61,8 +66,8 @@ export class AuthController {
     description: 'User has been successfully registered'
   })
   @ApiConflictResponse({ description: 'User with this email already exists' })
-  register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
+  register(@Body() registerDto: RegisterDto, @Request() req: ExpressRequest) {
+    return this.authService.register(registerDto, extractAuditContext(req));
   }
 
   @Throttle({ default: { ttl: 60000, limit: 5 } })
@@ -76,8 +81,17 @@ export class AuthController {
     type: AuthResponseDto
   })
   @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
-  login(@Request() req: LocalAuthRequest) {
-    return this.authService.login(req.user);
+  async login(@Request() req: LocalAuthRequest) {
+    const result = await this.authService.login(req.user);
+    await this.auditService.log({
+      action: AuditAction.USER_LOGIN_SUCCESS,
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      targetId: req.user.id,
+      targetType: 'User',
+      context: extractAuditContext(req)
+    });
+    return result;
   }
 
   @Throttle({ default: { ttl: 60000, limit: 5 } })
@@ -102,6 +116,12 @@ export class AuthController {
   @ApiOkResponse({ description: 'Successfully logged out' })
   async logout(@Request() req: JwtAuthRequest) {
     await this.authService.logout(req.user.userId);
+    await this.auditService.log({
+      action: AuditAction.USER_LOGOUT,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      context: extractAuditContext(req)
+    });
     return { message: 'Successfully logged out' };
   }
 
@@ -139,6 +159,15 @@ export class AuthController {
 
     if (updateProfileDto.password) {
       await this.authService.logout(req.user.userId);
+      await this.auditService.log({
+        action: AuditAction.PASSWORD_CHANGE,
+        actorId: req.user.userId,
+        actorEmail: req.user.email,
+        targetId: req.user.userId,
+        targetType: 'User',
+        details: { source: 'self' },
+        context: extractAuditContext(req)
+      });
     }
 
     return updatedUser;
@@ -188,8 +217,11 @@ export class AuthController {
   @ApiOperation({ summary: 'Request a password reset link' })
   @ApiBody({ type: ForgotPasswordDto })
   @ApiOkResponse({ description: 'Password reset email sent if account exists' })
-  forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(dto.email);
+  forgotPassword(
+    @Body() dto: ForgotPasswordDto,
+    @Request() req: ExpressRequest
+  ) {
+    return this.authService.forgotPassword(dto.email, extractAuditContext(req));
   }
 
   @Post('reset-password')
@@ -197,7 +229,11 @@ export class AuthController {
   @ApiOperation({ summary: 'Reset password using token' })
   @ApiBody({ type: ResetPasswordDto })
   @ApiOkResponse({ description: 'Password has been reset successfully' })
-  resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetPassword(dto.token, dto.password);
+  resetPassword(@Body() dto: ResetPasswordDto, @Request() req: ExpressRequest) {
+    return this.authService.resetPassword(
+      dto.token,
+      dto.password,
+      extractAuditContext(req)
+    );
   }
 }
