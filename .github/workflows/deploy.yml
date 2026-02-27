@@ -16,6 +16,8 @@ jobs:
       contents: read
       packages: write
     outputs:
+      sha: ${{ steps.short-sha.outputs.sha }}
+      owner: ${{ steps.lowercase-owner.outputs.owner }}
       server_image: ${{ steps.meta-server.outputs.tags }}
       client_image: ${{ steps.meta-client.outputs.tags }}
     steps:
@@ -24,7 +26,11 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Get commit short SHA
-        run: echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+        id: short-sha
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "COMMIT_HASH=$SHA" >> $GITHUB_ENV
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
 
       - uses: docker/setup-buildx-action@v3
 
@@ -35,21 +41,29 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Lowercase repository owner
-        run: echo "OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
+        id: lowercase-owner
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "OWNER=$OWNER" >> $GITHUB_ENV
+          echo "owner=$OWNER" >> $GITHUB_OUTPUT
 
       - name: Server image metadata
         id: meta-server
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ env.OWNER }}/nexus-server
-          tags: type=raw,value=latest
+          tags: |
+            type=raw,value=latest
+            type=raw,value=sha-${{ env.COMMIT_HASH }}
 
       - name: Client image metadata
         id: meta-client
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ env.OWNER }}/nexus-client
-          tags: type=raw,value=latest
+          tags: |
+            type=raw,value=latest
+            type=raw,value=sha-${{ env.COMMIT_HASH }}
 
       - name: Build and push server image
         uses: docker/build-push-action@v6
@@ -64,7 +78,7 @@ jobs:
       - name: Scan server image
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ steps.meta-server.outputs.tags }}
+          image-ref: ghcr.io/${{ env.OWNER }}/nexus-server:sha-${{ env.COMMIT_HASH }}
           format: table
           exit-code: 1
           severity: HIGH,CRITICAL
@@ -83,7 +97,7 @@ jobs:
       - name: Scan client image
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ steps.meta-client.outputs.tags }}
+          image-ref: ghcr.io/${{ env.OWNER }}/nexus-client:sha-${{ env.COMMIT_HASH }}
           format: table
           exit-code: 1
           severity: HIGH,CRITICAL
@@ -99,13 +113,19 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: DEPLOY_SHA,OWNER
           script: |
+            set -euo pipefail
             cd /home/deploy/nexus
             git pull --ff-only
 
-            # Save current image digests for rollback
-            SERVER_OLD=$(docker inspect --format='{{.Image}}' nexus-server-1 2>/dev/null || true)
-            CLIENT_OLD=$(docker inspect --format='{{.Image}}' nexus-client-1 2>/dev/null || true)
+            # Read the previously successful SHA (empty on first deploy)
+            PREV_SHA=""
+            if [ -f .deployed-sha ]; then
+              PREV_SHA=$(cat .deployed-sha)
+            fi
+
+            echo "Deploying sha-${DEPLOY_SHA} (previous: ${PREV_SHA:-none})"
 
             docker compose pull
             docker compose up -d --remove-orphans
@@ -114,6 +134,7 @@ jobs:
             echo "Waiting for services to become healthy..."
             TIMEOUT=120
             ELAPSED=0
+            HEALTHY=0
             while [ $ELAPSED -lt $TIMEOUT ]; do
               if docker compose ps --format json | grep -q '"unhealthy"'; then
                 sleep 5
@@ -122,22 +143,61 @@ jobs:
               fi
               HEALTHY=$(docker compose ps --format json | grep -c '"healthy"' || true)
               if [ "$HEALTHY" -ge 1 ]; then
-                echo "Deploy successful"
-                docker image prune -f
-                exit 0
+                break
               fi
               sleep 5
               ELAPSED=$((ELAPSED + 5))
             done
 
-            # Rollback on failure
-            echo "Health check failed — rolling back"
-            if [ -n "$SERVER_OLD" ]; then
-              docker tag "$SERVER_OLD" nexus-server:rollback 2>/dev/null || true
+            if [ "$HEALTHY" -ge 1 ]; then
+              echo "Deploy successful — sha-${DEPLOY_SHA}"
+              echo "$DEPLOY_SHA" > .deployed-sha
+              docker image prune -f
+              exit 0
             fi
-            if [ -n "$CLIENT_OLD" ]; then
-              docker tag "$CLIENT_OLD" nexus-client:rollback 2>/dev/null || true
+
+            # Health check failed — attempt rollback
+            echo "Health check failed after ${TIMEOUT}s"
+
+            if [ -z "$PREV_SHA" ]; then
+              echo "No previous version on record — bringing services down"
+              docker compose down
+              exit 1
             fi
+
+            echo "Rolling back to sha-${PREV_SHA}"
+            docker pull "ghcr.io/${OWNER}/nexus-server:sha-${PREV_SHA}"
+            docker pull "ghcr.io/${OWNER}/nexus-client:sha-${PREV_SHA}"
+            docker tag "ghcr.io/${OWNER}/nexus-server:sha-${PREV_SHA}" "ghcr.io/${OWNER}/nexus-server:latest"
+            docker tag "ghcr.io/${OWNER}/nexus-client:sha-${PREV_SHA}" "ghcr.io/${OWNER}/nexus-client:latest"
+
             docker compose down
             docker compose up -d
+
+            # Verify rollback health
+            ELAPSED=0
+            ROLLBACK_HEALTHY=0
+            while [ $ELAPSED -lt $TIMEOUT ]; do
+              if docker compose ps --format json | grep -q '"unhealthy"'; then
+                sleep 5
+                ELAPSED=$((ELAPSED + 5))
+                continue
+              fi
+              ROLLBACK_HEALTHY=$(docker compose ps --format json | grep -c '"healthy"' || true)
+              if [ "$ROLLBACK_HEALTHY" -ge 1 ]; then
+                break
+              fi
+              sleep 5
+              ELAPSED=$((ELAPSED + 5))
+            done
+
+            if [ "$ROLLBACK_HEALTHY" -ge 1 ]; then
+              echo "Rolled back to sha-${PREV_SHA} successfully"
+            else
+              echo "Rollback health check also failed — manual intervention required"
+            fi
+
             exit 1
+        env:
+          DEPLOY_SHA: ${{ needs.build-push.outputs.sha }}
+          OWNER: ${{ needs.build-push.outputs.owner }}
