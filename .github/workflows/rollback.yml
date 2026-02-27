@@ -101,7 +101,13 @@ jobs:
             set -euo pipefail
             cd /home/deploy/nexus
 
-            echo "Rolling back to sha-${{ needs.resolve.outputs.version }}..."
+            VERSION="${{ needs.resolve.outputs.version }}"
+            echo "Rolling back to sha-${VERSION}..."
+
+            # Restore docker-compose.yml from the target SHA so the health check URL
+            # and any other config matches the images being rolled back to
+            git fetch --quiet origin
+            git checkout "$VERSION" -- docker-compose.yml
 
             # :latest in the registry now points to the target SHA (retagged above)
             docker compose pull
@@ -128,9 +134,9 @@ jobs:
             done
 
             if [ "$HEALTHY" -ge 1 ]; then
-              echo "Rollback to sha-${{ needs.resolve.outputs.version }} successful"
+              echo "Rollback to sha-${VERSION} successful"
               cp -f .deployed-sha .prev-deployed-sha 2>/dev/null || true
-              echo "${{ needs.resolve.outputs.version }}" > .deployed-sha
+              echo "${VERSION}" > .deployed-sha
               docker image prune -f
               exit 0
             fi
