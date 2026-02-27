@@ -38,6 +38,14 @@ export class MailService {
     }
   }
 
+  isSmtpConfigured(): boolean {
+    return !this.useConsole;
+  }
+
+  async verifySmtp(): Promise<void> {
+    await this.transporter.verify();
+  }
+
   async sendEmailVerification(email: string, rawToken: string): Promise<void> {
     const verifyUrl = `${this.clientUrl}/verify-email?token=${rawToken}`;
 

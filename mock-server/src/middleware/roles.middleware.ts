@@ -9,22 +9,8 @@ const router = Router();
 // GET /api/v1/roles
 router.get('/', adminGuard, (_req, res) => {
   const roles = Array.from(getState().roles.values());
-  const state = getState();
 
-  const rolesWithPermissions = roles
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((role) => {
-      const rps = state.rolePermissions.filter((rp) => rp.roleId === role.id);
-      const permissions = rps
-        .map((rp) => {
-          const perm = state.permissions.get(rp.permissionId);
-          return perm ? { ...perm, conditions: rp.conditions } : null;
-        })
-        .filter(Boolean);
-      return { ...role, permissions };
-    });
-
-  res.json(rolesWithPermissions);
+  res.json(roles.sort((a, b) => a.name.localeCompare(b.name)));
 });
 
 // GET /api/v1/roles/permissions
@@ -40,23 +26,14 @@ router.get('/permissions', adminGuard, (_req, res) => {
 // GET /api/v1/roles/:id
 router.get('/:id', adminGuard, (req, res) => {
   const id = req.params['id'] as string;
-  const state = getState();
-  const role = state.roles.get(id);
+  const role = getState().roles.get(id);
 
   if (!role) {
     res.status(404).json({ message: 'Role not found', statusCode: 404 });
     return;
   }
 
-  const rps = state.rolePermissions.filter((rp) => rp.roleId === id);
-  const permissions = rps
-    .map((rp) => {
-      const perm = state.permissions.get(rp.permissionId);
-      return perm ? { ...perm, conditions: rp.conditions } : null;
-    })
-    .filter(Boolean);
-
-  res.json({ ...role, permissions });
+  res.json(role);
 });
 
 // POST /api/v1/roles
@@ -101,7 +78,7 @@ router.post('/', adminGuard, (req, res) => {
     ip: req.ip
   });
 
-  res.status(201).json({ ...role, permissions: [] });
+  res.status(201).json(role);
 });
 
 // PATCH /api/v1/roles/:id
@@ -117,7 +94,7 @@ router.patch('/:id', adminGuard, (req, res) => {
 
   if (role.isSystem) {
     res.status(400).json({
-      message: 'System roles cannot be modified',
+      message: 'Cannot modify system roles',
       statusCode: 400
     });
     return;
@@ -170,7 +147,7 @@ router.delete('/:id', adminGuard, (req, res) => {
 
   if (role.isSystem) {
     res.status(400).json({
-      message: 'System roles cannot be deleted',
+      message: 'Cannot delete system roles',
       statusCode: 400
     });
     return;
@@ -197,7 +174,7 @@ router.delete('/:id', adminGuard, (req, res) => {
     ip: req.ip
   });
 
-  res.json({ message: 'Role deleted successfully' });
+  res.send();
 });
 
 // POST /api/v1/roles/:id/permissions
@@ -247,7 +224,7 @@ router.post('/:id/permissions', adminGuard, (req, res) => {
     ip: req.ip
   });
 
-  res.json({ message: 'Permissions assigned successfully' });
+  res.send();
 });
 
 // DELETE /api/v1/roles/:id/permissions/:permissionId
@@ -270,7 +247,7 @@ router.delete('/:id/permissions/:permissionId', adminGuard, (req, res) => {
     ip: req.ip
   });
 
-  res.json({ message: 'Permission removed successfully' });
+  res.send();
 });
 
 // POST /api/v1/roles/assign/:userId
@@ -305,7 +282,7 @@ router.post('/assign/:userId', adminGuard, (req, res) => {
     ip: req.ip
   });
 
-  res.json({ message: 'Role assigned successfully' });
+  res.send();
 });
 
 // DELETE /api/v1/roles/assign/:userId/:roleId
@@ -338,7 +315,7 @@ router.delete('/assign/:userId/:roleId', adminGuard, (req, res) => {
     ip: req.ip
   });
 
-  res.json({ message: 'Role removed successfully' });
+  res.send();
 });
 
 export default router;

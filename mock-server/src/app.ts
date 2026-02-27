@@ -19,7 +19,7 @@ export function createApp() {
 
   // Request logging middleware (mirrors server's RequestLoggingMiddleware)
   app.use((req, res, next) => {
-    if (req.originalUrl === '/api/v1/health') {
+    if (req.originalUrl.startsWith('/api/health/')) {
       next();
       return;
     }
