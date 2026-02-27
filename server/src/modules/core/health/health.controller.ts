@@ -45,15 +45,4 @@ export class HealthController {
     }
     return this.health.check(checks);
   }
-
-  @Get()
-  @HealthCheck()
-  @ApiOperation({
-    summary: 'Health check (backward compatible, same as /ready)'
-  })
-  @ApiOkResponse({ description: 'Service is healthy' })
-  @ApiServiceUnavailableResponse({ description: 'Service is unavailable' })
-  check() {
-    return this.ready();
-  }
 }
