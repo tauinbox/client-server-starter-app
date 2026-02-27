@@ -168,6 +168,7 @@ export const UsersStore = signalStore(
                 error: () => {
                   patchState(store, {
                     isLoadingMore: false,
+                    currentPage: store.currentPage() - 1,
                     listError: 'Failed to load more users. Please try again.'
                   });
                   snackBar.open(
@@ -311,7 +312,10 @@ export const UsersStore = signalStore(
                   });
                 },
                 error: () => {
-                  patchState(store, { isLoadingMoreSearch: false });
+                  patchState(store, {
+                    isLoadingMoreSearch: false,
+                    searchCurrentPage: store.searchCurrentPage() - 1
+                  });
                   snackBar.open(
                     'Failed to load more results. Please try again.',
                     'Close',
