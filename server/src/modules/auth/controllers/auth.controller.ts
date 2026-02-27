@@ -59,6 +59,7 @@ export class AuthController {
     private readonly auditService: AuditService
   ) {}
 
+  @Throttle({ default: { ttl: 3600000, limit: 5 } })
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
   @ApiBody({ type: RegisterDto })
@@ -70,7 +71,7 @@ export class AuthController {
     return this.authService.register(registerDto, extractAuditContext(req));
   }
 
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
   @UseGuards(LocalAuthGuard)
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -211,7 +212,7 @@ export class AuthController {
     return this.authService.resendVerificationEmail(dto.email);
   }
 
-  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @Throttle({ default: { ttl: 300000, limit: 2 } })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request a password reset link' })
