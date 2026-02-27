@@ -172,6 +172,10 @@ jobs:
             docker tag "ghcr.io/${OWNER}/nexus-server:sha-${PREV_SHA}" "ghcr.io/${OWNER}/nexus-server:latest"
             docker tag "ghcr.io/${OWNER}/nexus-client:sha-${PREV_SHA}" "ghcr.io/${OWNER}/nexus-client:latest"
 
+            # Restore docker-compose.yml to match the rollback target SHA
+            git fetch --quiet origin
+            git checkout "${PREV_SHA}" -- docker-compose.yml
+
             docker compose down
             docker compose up -d
 
