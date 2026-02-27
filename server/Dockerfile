@@ -17,7 +17,10 @@ RUN cd server && npm run build
 
 # Stage 3: runtime
 FROM node:22-alpine AS runner
-RUN apk upgrade --no-cache
+RUN apk upgrade --no-cache && \
+    rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/bin/npm \
+           /usr/local/bin/npx
 WORKDIR /app
 COPY --from=deps /app/server/node_modules ./server/node_modules
 COPY --from=builder /app/server/dist ./server/dist
