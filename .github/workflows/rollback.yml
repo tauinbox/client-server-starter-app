@@ -4,13 +4,53 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Short commit SHA to roll back to (e.g. a1b2c3d)'
-        required: true
+        description: 'Short commit SHA to roll back to (e.g. a1b2c3d). Leave empty to roll back to the previous version automatically.'
+        required: false
         type: string
 
 jobs:
+  resolve:
+    name: Resolve Target Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - name: Resolve target version
+        id: resolve
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [ -n "$VERSION" ]; then
+            if ! echo "$VERSION" | grep -qE '^[0-9a-f]{7,40}$'; then
+              echo "ERROR: version must be a 7–40 character lowercase hex commit SHA"
+              exit 1
+            fi
+            echo "Using provided version: $VERSION"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "No version provided — fetching previous from VPS"
+            mkdir -p ~/.ssh
+            printf '%s' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+            chmod 600 ~/.ssh/deploy_key
+            PREV=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+              -i ~/.ssh/deploy_key \
+              "$VPS_USER@$VPS_HOST" \
+              'cat /home/deploy/nexus/.prev-deployed-sha 2>/dev/null || echo ""')
+            rm -f ~/.ssh/deploy_key
+            if [ -z "$PREV" ]; then
+              echo "ERROR: No previous version found on VPS. Deploy at least twice before using auto-rollback."
+              exit 1
+            fi
+            echo "Auto-resolved to previous version: $PREV"
+            echo "version=$PREV" >> $GITHUB_OUTPUT
+          fi
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+
   retag:
-    name: Retag sha-${{ inputs.version }} as latest
+    name: Retag sha-${{ needs.resolve.outputs.version }} as latest
+    needs: resolve
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30,25 +70,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Validate version input
-        run: |
-          VERSION="${{ inputs.version }}"
-          if ! echo "$VERSION" | grep -qE '^[0-9a-f]{7,40}$'; then
-            echo "ERROR: version must be a 7–40 character lowercase hex commit SHA"
-            exit 1
-          fi
-
       - name: Pull SHA-tagged images from registry
         run: |
           OWNER="${{ steps.lowercase-owner.outputs.owner }}"
-          VERSION="${{ inputs.version }}"
+          VERSION="${{ needs.resolve.outputs.version }}"
           docker pull "ghcr.io/${OWNER}/nexus-server:sha-${VERSION}"
           docker pull "ghcr.io/${OWNER}/nexus-client:sha-${VERSION}"
 
       - name: Retag as latest and push to registry
         run: |
           OWNER="${{ steps.lowercase-owner.outputs.owner }}"
-          VERSION="${{ inputs.version }}"
+          VERSION="${{ needs.resolve.outputs.version }}"
           docker tag "ghcr.io/${OWNER}/nexus-server:sha-${VERSION}" "ghcr.io/${OWNER}/nexus-server:latest"
           docker tag "ghcr.io/${OWNER}/nexus-client:sha-${VERSION}" "ghcr.io/${OWNER}/nexus-client:latest"
           docker push "ghcr.io/${OWNER}/nexus-server:latest"
@@ -56,7 +88,7 @@ jobs:
 
   deploy:
     name: Deploy Rolled-Back Version to VPS
-    needs: retag
+    needs: [resolve, retag]
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH
@@ -69,7 +101,7 @@ jobs:
             set -euo pipefail
             cd /home/deploy/nexus
 
-            echo "Rolling back to sha-${{ inputs.version }}..."
+            echo "Rolling back to sha-${{ needs.resolve.outputs.version }}..."
 
             # :latest in the registry now points to the target SHA (retagged above)
             docker compose pull
@@ -96,8 +128,9 @@ jobs:
             done
 
             if [ "$HEALTHY" -ge 1 ]; then
-              echo "Rollback to sha-${{ inputs.version }} successful"
-              echo "${{ inputs.version }}" > .deployed-sha
+              echo "Rollback to sha-${{ needs.resolve.outputs.version }} successful"
+              cp -f .deployed-sha .prev-deployed-sha 2>/dev/null || true
+              echo "${{ needs.resolve.outputs.version }}" > .deployed-sha
               docker image prune -f
               exit 0
             fi
