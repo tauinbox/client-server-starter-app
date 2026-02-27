@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.6](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.4...v0.1.6) (2026-02-27)
+
+
+### Features
+
+* add audit logging for sensitive operations ([#45](https://github.com/tauinbox/client-server-starter-app/issues/45)) ([7de5b77](https://github.com/tauinbox/client-server-starter-app/commit/7de5b77fc9093bac56579512eb54452e7c701832))
+* add explicit body size limits for JSON and URL-encoded payloads ([#43](https://github.com/tauinbox/client-server-starter-app/issues/43)) ([3b366e9](https://github.com/tauinbox/client-server-starter-app/commit/3b366e99a95ea6970e9218170f4a838937ba2aa9))
+* add request logging middleware and improve code quality ([#44](https://github.com/tauinbox/client-server-starter-app/issues/44)) ([2024ea8](https://github.com/tauinbox/client-server-starter-app/commit/2024ea890bd54c4ce49fcfc143e338994c2a3784))
+* add soft delete for users with restore endpoint ([#47](https://github.com/tauinbox/client-server-starter-app/issues/47)) ([f230df7](https://github.com/tauinbox/client-server-starter-app/commit/f230df7fa929bb8889b80495111f6093891b53b7)), closes [#44](https://github.com/tauinbox/client-server-starter-app/issues/44) [#45](https://github.com/tauinbox/client-server-starter-app/issues/45) [#45](https://github.com/tauinbox/client-server-starter-app/issues/45) [#32](https://github.com/tauinbox/client-server-starter-app/issues/32)
+* auto-resolve previous version in rollback workflow ([d1cdfd3](https://github.com/tauinbox/client-server-starter-app/commit/d1cdfd3b9b62148dde72ca478787f66b3a3d0a53))
+* infinite scroll for user list and search ([#48](https://github.com/tauinbox/client-server-starter-app/issues/48)) ([2a7305c](https://github.com/tauinbox/client-server-starter-app/commit/2a7305c657142a2f9579f1bf742b65d4078b8b8a))
+* update docs ([2687a6c](https://github.com/tauinbox/client-server-starter-app/commit/2687a6cc0fe09d7064284c282154606bd2c090d4))
+
+
+### Bug Fixes
+
+* add client healthcheck and restrict server port exposure ([#42](https://github.com/tauinbox/client-server-starter-app/issues/42)) ([69902ca](https://github.com/tauinbox/client-server-starter-app/commit/69902ca172a6a2f59abcfd8725d31b99891fed88))
+* add Content-Security-Policy header to nginx (SEC-7) ([b98c6f5](https://github.com/tauinbox/client-server-starter-app/commit/b98c6f5bb927157ef0db99563f5c45c0453dd333))
+* cache getRoleNamesForUser() with 2min TTL (A12) ([#30](https://github.com/tauinbox/client-server-starter-app/issues/30)) ([3539577](https://github.com/tauinbox/client-server-starter-app/commit/35395774323023bf9abc6a3047d306b280564ae2))
+* ci/cd fixes ([e1c5231](https://github.com/tauinbox/client-server-starter-app/commit/e1c523168c44c2b65c36f18c43803f877556f06a))
+* ci/cd fixes ([13cb448](https://github.com/tauinbox/client-server-starter-app/commit/13cb44811fbf80e999465fdfa3fa9d01b9899ec4))
+* client coverage, trivy scanning, deploy rollback (I8, I11, I16) ([#37](https://github.com/tauinbox/client-server-starter-app/issues/37)) ([261454f](https://github.com/tauinbox/client-server-starter-app/commit/261454fd1407a980776dd4aa15c00a9a5aa64fac))
+* client store signal fixes, align TS/ESLint versions (C13, C14, I13, I14) ([#33](https://github.com/tauinbox/client-server-starter-app/issues/33)) ([8222e6e](https://github.com/tauinbox/client-server-starter-app/commit/8222e6ee75ca4a1c467538ae18073222595037cd))
+* deploy fix ([7df1759](https://github.com/tauinbox/client-server-starter-app/commit/7df17597e5acc1807ab2948acfa57a82c5849fe9))
+* disable inlineCritical to resolve CSP inline event handler violation ([a26f0c9](https://github.com/tauinbox/client-server-starter-app/commit/a26f0c9f670acec6a97fc5285b19ba46502dae77))
+* docker non-root containers, OAuth icon dedup (I6, C4) ([#34](https://github.com/tauinbox/client-server-starter-app/issues/34)) ([2714cfd](https://github.com/tauinbox/client-server-starter-app/commit/2714cfd908675497473241fb57f324d11e5ee9bf))
+* export fix ([11b27ee](https://github.com/tauinbox/client-server-starter-app/commit/11b27ee556b76c0aad3a01bc4626b1fbac2e5057))
+* invalidate permission cache on role permission changes (SRV-3) ([9dfdb26](https://github.com/tauinbox/client-server-starter-app/commit/9dfdb2638335f55a44dd1a2bccdb6c10fd887c27))
+* log warning for unknown resources in CASL SUBJECT_MAP (A13) ([#31](https://github.com/tauinbox/client-server-starter-app/issues/31)) ([4945a72](https://github.com/tauinbox/client-server-starter-app/commit/4945a72383e0df947dc816694f9eb757a41f15ad))
+* migrations ([ab9d8f7](https://github.com/tauinbox/client-server-starter-app/commit/ab9d8f7224d32ba46c10434105b50a4845e84df2))
+* nginx pid path for non-root — use /tmp/nginx/nginx.pid ([#35](https://github.com/tauinbox/client-server-starter-app/issues/35)) ([0f5298b](https://github.com/tauinbox/client-server-starter-app/commit/0f5298b6f0ce397533988aea15613b1b525f90af))
+* override minimatch to 9.0.6 to resolve CVE-2026-26996 ([#40](https://github.com/tauinbox/client-server-starter-app/issues/40)) ([81e9631](https://github.com/tauinbox/client-server-starter-app/commit/81e96310d5b01f3bd6b7b7fdc322cb335e74c627))
+* readme update ([aacba6b](https://github.com/tauinbox/client-server-starter-app/commit/aacba6b369434f377ab02de21e286da63eff1de6))
+* remove backward-compat /health alias, update docker-compose to /health/ready ([34ea5e7](https://github.com/tauinbox/client-server-starter-app/commit/34ea5e7c0ff99058fdb52917a34f57d21f9b3aa9))
+* remove npm from server runtime image and fix minimatch CVEs ([72a59c5](https://github.com/tauinbox/client-server-starter-app/commit/72a59c59343e4fa1bdafeb4073fc004daad8f52a))
+* remove npm global install from server Dockerfile stages ([92741ec](https://github.com/tauinbox/client-server-starter-app/commit/92741ec07592b907d55a07fe107f908e2e45d22c))
+* repair auto-rollback and add manual rollback workflow ([9f74871](https://github.com/tauinbox/client-server-starter-app/commit/9f7487142ea2c37035443bb286149d7821a8d126))
+* reset page counter on loadMore and loadMoreSearch errors ([#49](https://github.com/tauinbox/client-server-starter-app/issues/49)) ([50d323f](https://github.com/tauinbox/client-server-starter-app/commit/50d323f178f0098308a854bb4cd0e645a70a105d))
+* resolve P0 security and infrastructure issues from architectural review ([#26](https://github.com/tauinbox/client-server-starter-app/issues/26)) ([30abfcc](https://github.com/tauinbox/client-server-starter-app/commit/30abfcc9bcdce50314a5c4b1cfa72d8d1822b302))
+* resolve Phase 2 P1 items from architectural review ([#28](https://github.com/tauinbox/client-server-starter-app/issues/28)) ([3311290](https://github.com/tauinbox/client-server-starter-app/commit/331129000f57cca64ccb1a97ff3d2a433140adbd))
+* resolve S16, S18, S19 security issues from architectural review ([#27](https://github.com/tauinbox/client-server-starter-app/issues/27)) ([163603d](https://github.com/tauinbox/client-server-starter-app/commit/163603dc41a3a9d343754835f9f89e0c2c5addc0))
+* resolve S17, S20, S21 OAuth security and token pruning ([#29](https://github.com/tauinbox/client-server-starter-app/issues/29)) ([672d889](https://github.com/tauinbox/client-server-starter-app/commit/672d889debd98a03ec3d599ed6a45012ea0b6f19))
+* restore docker-compose.yml from target SHA on rollback ([c6e923d](https://github.com/tauinbox/client-server-starter-app/commit/c6e923d28d954f42324d38b0deda931f2ffbf11e))
+* seed-admin assigns admin role to created user ([#36](https://github.com/tauinbox/client-server-starter-app/issues/36)) ([720c594](https://github.com/tauinbox/client-server-starter-app/commit/720c5944bc65f0a1bb53ad520737247c45544933))
+* seed-admin assigns admin role to created user ([#38](https://github.com/tauinbox/client-server-starter-app/issues/38)) ([847173f](https://github.com/tauinbox/client-server-starter-app/commit/847173ff0149cb5df87d85ca07cfb9ec0e66a4c4))
+* server security hardening — S22, S23, S8, A10 ([#32](https://github.com/tauinbox/client-server-starter-app/issues/32)) ([6aa577f](https://github.com/tauinbox/client-server-starter-app/commit/6aa577fa25f3a837e7e4bc0c2c8526a0dbb6ba76))
+* split health endpoint into /live and /ready (SRV-1) ([0d437ad](https://github.com/tauinbox/client-server-starter-app/commit/0d437addc29ddc1ac79994726a78ef803e5e2713))
+* sync mock-server health routes with server (SRV-1) ([53e7def](https://github.com/tauinbox/client-server-starter-app/commit/53e7defcd8695cf81e167789bca75fb804af37b7))
+* sync mock-server roles responses with real server ([3aaeeb1](https://github.com/tauinbox/client-server-starter-app/commit/3aaeeb1ccb61865678f1844a65fa77eb958b0fee))
+* test migrations with test DB ([8dfad90](https://github.com/tauinbox/client-server-starter-app/commit/8dfad906670eaf3b14c59ab8244f5f1a9699a18d))
+* tighten rate limits on sensitive auth endpoints (SEC-3) ([e88efd8](https://github.com/tauinbox/client-server-starter-app/commit/e88efd86d27e841b53fb5a3d3136f85872d3fcc5))
+* update npm in docker image to resolve node-tar vulnerabilities ([#39](https://github.com/tauinbox/client-server-starter-app/issues/39)) ([cfd3bac](https://github.com/tauinbox/client-server-starter-app/commit/cfd3bac4c9feef54bec839bd37e3eb83bd4ab74f))
+* upgrade base images and alpine packages to resolve Trivy CVEs ([#41](https://github.com/tauinbox/client-server-starter-app/issues/41)) ([abab561](https://github.com/tauinbox/client-server-starter-app/commit/abab56179048ab508200551d519eadbe09412012))
+
 ## [0.1.5](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.4...v0.1.5) (2026-02-23)
 
 
