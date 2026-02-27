@@ -75,6 +75,7 @@ export class RoleService {
     if (role.isSystem) {
       throw new BadRequestException('Cannot delete system roles');
     }
+    await this.invalidateUsersWithRole(id);
     await this.roleRepository.remove(role);
   }
 
@@ -127,6 +128,7 @@ export class RoleService {
       })
     );
     await this.rolePermissionRepository.save(rolePermissions);
+    await this.invalidateUsersWithRole(roleId);
   }
 
   async removePermissionFromRole(
@@ -134,6 +136,7 @@ export class RoleService {
     permissionId: string
   ): Promise<void> {
     await this.rolePermissionRepository.delete({ roleId, permissionId });
+    await this.invalidateUsersWithRole(roleId);
   }
 
   async findAllPermissions(): Promise<Permission[]> {
@@ -150,5 +153,16 @@ export class RoleService {
       );
     }
     return role;
+  }
+
+  private async invalidateUsersWithRole(roleId: string): Promise<void> {
+    const users = await this.roleRepository.manager
+      .createQueryBuilder(User, 'user')
+      .select('user.id')
+      .innerJoin('user.roles', 'role', 'role.id = :roleId', { roleId })
+      .getMany();
+    await Promise.all(
+      users.map((u) => this.permissionService.invalidateUserCache(u.id))
+    );
   }
 }
