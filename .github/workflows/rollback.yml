@@ -1,0 +1,139 @@
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Short commit SHA to roll back to (e.g. a1b2c3d). Leave empty to roll back to the previous version automatically.'
+        required: false
+        type: string
+
+jobs:
+  resolve:
+    name: Resolve Target Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - name: Resolve target version
+        id: resolve
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [ -n "$VERSION" ]; then
+            if ! echo "$VERSION" | grep -qE '^[0-9a-f]{7,40}$'; then
+              echo "ERROR: version must be a 7–40 character lowercase hex commit SHA"
+              exit 1
+            fi
+            echo "Using provided version: $VERSION"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "No version provided — fetching previous from VPS"
+            mkdir -p ~/.ssh
+            printf '%s' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+            chmod 600 ~/.ssh/deploy_key
+            PREV=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+              -i ~/.ssh/deploy_key \
+              "$VPS_USER@$VPS_HOST" \
+              'cat /home/deploy/nexus/.prev-deployed-sha 2>/dev/null || echo ""')
+            rm -f ~/.ssh/deploy_key
+            if [ -z "$PREV" ]; then
+              echo "ERROR: No previous version found on VPS. Deploy at least twice before using auto-rollback."
+              exit 1
+            fi
+            echo "Auto-resolved to previous version: $PREV"
+            echo "version=$PREV" >> $GITHUB_OUTPUT
+          fi
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+
+  retag:
+    name: Retag sha-${{ needs.resolve.outputs.version }} as latest
+    needs: resolve
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      owner: ${{ steps.lowercase-owner.outputs.owner }}
+    steps:
+      - name: Lowercase repository owner
+        id: lowercase-owner
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "owner=$OWNER" >> $GITHUB_OUTPUT
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull SHA-tagged images from registry
+        run: |
+          OWNER="${{ steps.lowercase-owner.outputs.owner }}"
+          VERSION="${{ needs.resolve.outputs.version }}"
+          docker pull "ghcr.io/${OWNER}/nexus-server:sha-${VERSION}"
+          docker pull "ghcr.io/${OWNER}/nexus-client:sha-${VERSION}"
+
+      - name: Retag as latest and push to registry
+        run: |
+          OWNER="${{ steps.lowercase-owner.outputs.owner }}"
+          VERSION="${{ needs.resolve.outputs.version }}"
+          docker tag "ghcr.io/${OWNER}/nexus-server:sha-${VERSION}" "ghcr.io/${OWNER}/nexus-server:latest"
+          docker tag "ghcr.io/${OWNER}/nexus-client:sha-${VERSION}" "ghcr.io/${OWNER}/nexus-client:latest"
+          docker push "ghcr.io/${OWNER}/nexus-server:latest"
+          docker push "ghcr.io/${OWNER}/nexus-client:latest"
+
+  deploy:
+    name: Deploy Rolled-Back Version to VPS
+    needs: [resolve, retag]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /home/deploy/nexus
+
+            echo "Rolling back to sha-${{ needs.resolve.outputs.version }}..."
+
+            # :latest in the registry now points to the target SHA (retagged above)
+            docker compose pull
+
+            # force-recreate ensures containers restart even if compose detects no tag change
+            docker compose up -d --force-recreate --remove-orphans
+
+            # Health check with timeout
+            TIMEOUT=120
+            ELAPSED=0
+            HEALTHY=0
+            while [ $ELAPSED -lt $TIMEOUT ]; do
+              if docker compose ps --format json | grep -q '"unhealthy"'; then
+                sleep 5
+                ELAPSED=$((ELAPSED + 5))
+                continue
+              fi
+              HEALTHY=$(docker compose ps --format json | grep -c '"healthy"' || true)
+              if [ "$HEALTHY" -ge 1 ]; then
+                break
+              fi
+              sleep 5
+              ELAPSED=$((ELAPSED + 5))
+            done
+
+            if [ "$HEALTHY" -ge 1 ]; then
+              echo "Rollback to sha-${{ needs.resolve.outputs.version }} successful"
+              cp -f .deployed-sha .prev-deployed-sha 2>/dev/null || true
+              echo "${{ needs.resolve.outputs.version }}" > .deployed-sha
+              docker image prune -f
+              exit 0
+            fi
+
+            echo "Rollback health check failed — check container logs with: docker compose logs"
+            exit 1
