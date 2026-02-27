@@ -32,6 +32,11 @@ describe('RoleService', () => {
     add: jest.Mock;
     remove: jest.Mock;
   };
+  let mockUserQueryBuilder: {
+    select: jest.Mock;
+    innerJoin: jest.Mock;
+    getMany: jest.Mock;
+  };
 
   const systemRole: Role = {
     id: 'role-1',
@@ -63,6 +68,12 @@ describe('RoleService', () => {
       remove: jest.fn().mockResolvedValue(undefined)
     };
 
+    mockUserQueryBuilder = {
+      select: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([])
+    };
+
     mockRoleRepo = {
       find: jest.fn(),
       findOne: jest.fn(),
@@ -76,7 +87,11 @@ describe('RoleService', () => {
         ),
       remove: jest.fn(),
       manager: {
-        createQueryBuilder: jest.fn().mockReturnValue(mockRelationQueryBuilder)
+        createQueryBuilder: jest
+          .fn()
+          .mockImplementation((...args: unknown[]) =>
+            args.length > 0 ? mockUserQueryBuilder : mockRelationQueryBuilder
+          )
       },
       createQueryBuilder: jest.fn()
     };
@@ -193,10 +208,82 @@ describe('RoleService', () => {
       );
     });
 
-    it('should delete a custom role', async () => {
+    it('should delete a custom role and invalidate cache for its members', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockUserQueryBuilder.getMany.mockResolvedValue([
+        { id: 'u-1' },
+        { id: 'u-2' }
+      ]);
+      await service.delete('role-2');
+      expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
+        'u-1'
+      );
+      expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
+        'u-2'
+      );
+      expect(mockRoleRepo.remove).toHaveBeenCalledWith(customRole);
+    });
+
+    it('should delete a custom role with no members without calling invalidate', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       await service.delete('role-2');
+      expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
       expect(mockRoleRepo.remove).toHaveBeenCalledWith(customRole);
+    });
+  });
+
+  describe('assignPermissionsToRole', () => {
+    it('should save permissions and invalidate cache for all role members', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRolePermissionRepo.save.mockResolvedValue([]);
+      mockUserQueryBuilder.getMany.mockResolvedValue([
+        { id: 'u-1' },
+        { id: 'u-2' }
+      ]);
+
+      await service.assignPermissionsToRole('role-2', ['perm-1', 'perm-2']);
+
+      expect(mockRolePermissionRepo.save).toHaveBeenCalled();
+      expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
+        'u-1'
+      );
+      expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
+        'u-2'
+      );
+    });
+
+    it('should not call invalidate if no users have the role', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRolePermissionRepo.save.mockResolvedValue([]);
+
+      await service.assignPermissionsToRole('role-2', ['perm-1']);
+
+      expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('removePermissionFromRole', () => {
+    it('should remove permission and invalidate cache for all role members', async () => {
+      mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+
+      await service.removePermissionFromRole('role-2', 'perm-1');
+
+      expect(mockRolePermissionRepo.delete).toHaveBeenCalledWith({
+        roleId: 'role-2',
+        permissionId: 'perm-1'
+      });
+      expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
+        'u-1'
+      );
+    });
+
+    it('should not call invalidate if no users have the role', async () => {
+      mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
+
+      await service.removePermissionFromRole('role-2', 'perm-1');
+
+      expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
   });
 
