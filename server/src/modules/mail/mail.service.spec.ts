@@ -36,6 +36,34 @@ describe('MailService', () => {
     // Service was created without SMTP_HOST, so it uses jsonTransport
   });
 
+  describe('isSmtpConfigured', () => {
+    it('should return false when SMTP_HOST is not set', () => {
+      expect(service.isSmtpConfigured()).toBe(false);
+    });
+
+    it('should return true when SMTP_HOST is set', async () => {
+      const smtpConfigService = {
+        get: jest.fn().mockImplementation((key: string) => {
+          const config: Record<string, string> = {
+            SMTP_HOST: 'smtp.example.com',
+            SMTP_PORT: '587',
+            CLIENT_URL: 'http://localhost:4200',
+            SMTP_FROM: 'test@example.com'
+          };
+          return config[key];
+        })
+      };
+      const smtpModule: TestingModule = await Test.createTestingModule({
+        providers: [
+          MailService,
+          { provide: ConfigService, useValue: smtpConfigService }
+        ]
+      }).compile();
+      const smtpService = smtpModule.get<MailService>(MailService);
+      expect(smtpService.isSmtpConfigured()).toBe(true);
+    });
+  });
+
   describe('sendEmailVerification', () => {
     it('should not throw when sending verification email', async () => {
       await expect(
