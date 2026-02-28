@@ -11,6 +11,12 @@ export type MockServerApi = {
     users: unknown[];
     oauthAccounts: Record<string, unknown[]>;
     refreshTokens: number;
+    emailVerificationTokens: number;
+    passwordResetTokens: number;
+    roles: unknown[];
+    permissions: unknown[];
+    rolePermissions: unknown[];
+    auditLogs: unknown[];
   }>;
   getTokens(): Promise<{
     emailVerificationTokens: Record<string, string>;
@@ -38,6 +44,33 @@ export type MockServerApi = {
       provider: string;
       providerId: string;
       createdAt: string;
+    }[]
+  ): Promise<void>;
+  seedRoles(
+    roles: {
+      id: string;
+      name: string;
+      description: string | null;
+      isSystem: boolean;
+      createdAt: string;
+      updatedAt: string;
+    }[]
+  ): Promise<void>;
+  seedPermissions(
+    permissions: {
+      id: string;
+      resource: string;
+      action: string;
+      description: string | null;
+      createdAt: string;
+    }[]
+  ): Promise<void>;
+  seedRolePermissions(
+    rolePermissions: {
+      id: string;
+      roleId: string;
+      permissionId: string;
+      conditions: unknown | null;
     }[]
   ): Promise<void>;
 };
@@ -107,6 +140,27 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, accounts })
+        });
+      },
+      async seedRoles(roles) {
+        await fetch(`${baseUrl}/__control/roles`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(roles)
+        });
+      },
+      async seedPermissions(permissions) {
+        await fetch(`${baseUrl}/__control/permissions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(permissions)
+        });
+      },
+      async seedRolePermissions(rolePermissions) {
+        await fetch(`${baseUrl}/__control/role-permissions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(rolePermissions)
         });
       }
     };
