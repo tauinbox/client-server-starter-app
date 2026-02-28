@@ -1,78 +1,18 @@
 import { test as base, expect } from '@playwright/test';
 import { createApp } from '../../../mock-server/src/app';
 import { resetState } from '../../../mock-server/src/state';
+import type { ControlApi } from '../../../mock-server/src/control.types';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 
-export type MockServerApi = {
+// ControlApi is the single source of truth for all __control endpoints.
+// TypeScript enforces that every ControlApi method is implemented in the
+// api object below. When a new route is added to control.routes.ts, add it
+// to ControlApi in mock-server/src/control.types.ts — TS will then error here
+// until the fixture implements it.
+export type MockServerApi = ControlApi & {
   url: string;
   reset(): void;
-  getState(): Promise<{
-    users: unknown[];
-    oauthAccounts: Record<string, unknown[]>;
-    refreshTokens: number;
-    emailVerificationTokens: number;
-    passwordResetTokens: number;
-    roles: unknown[];
-    permissions: unknown[];
-    rolePermissions: unknown[];
-    auditLogs: unknown[];
-  }>;
-  getTokens(): Promise<{
-    emailVerificationTokens: Record<string, string>;
-    passwordResetTokens: Record<string, string>;
-  }>;
-  seedUsers(
-    users: {
-      id: string;
-      email: string;
-      firstName: string;
-      lastName: string;
-      password: string;
-      isActive: boolean;
-      roles: string[];
-      isEmailVerified: boolean;
-      failedLoginAttempts: number;
-      lockedUntil: string | null;
-      createdAt: string;
-      updatedAt: string;
-    }[]
-  ): Promise<void>;
-  seedOAuthAccounts(
-    userId: string,
-    accounts: {
-      provider: string;
-      providerId: string;
-      createdAt: string;
-    }[]
-  ): Promise<void>;
-  seedRoles(
-    roles: {
-      id: string;
-      name: string;
-      description: string | null;
-      isSystem: boolean;
-      createdAt: string;
-      updatedAt: string;
-    }[]
-  ): Promise<void>;
-  seedPermissions(
-    permissions: {
-      id: string;
-      resource: string;
-      action: string;
-      description: string | null;
-      createdAt: string;
-    }[]
-  ): Promise<void>;
-  seedRolePermissions(
-    rolePermissions: {
-      id: string;
-      roleId: string;
-      permissionId: string;
-      conditions: unknown | null;
-    }[]
-  ): Promise<void>;
 };
 
 type WorkerFixtures = {

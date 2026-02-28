@@ -47,8 +47,10 @@ test.describe('User Detail page', () => {
         isEmailVerified: true,
         failedLoginAttempts: 0,
         lockedUntil: null,
+        tokenRevokedAt: null,
         createdAt: '2025-01-01T00:00:00.000Z',
-        updatedAt: '2025-01-01T00:00:00.000Z'
+        updatedAt: '2025-01-01T00:00:00.000Z',
+        deletedAt: null
       }
     ]);
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
@@ -73,8 +75,10 @@ test.describe('User Detail page', () => {
         isEmailVerified: true,
         failedLoginAttempts: 0,
         lockedUntil: null,
+        tokenRevokedAt: null,
         createdAt: '2025-01-01T00:00:00.000Z',
-        updatedAt: '2025-01-01T00:00:00.000Z'
+        updatedAt: '2025-01-01T00:00:00.000Z',
+        deletedAt: null
       }
     ]);
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });

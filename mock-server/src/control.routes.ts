@@ -5,6 +5,7 @@ import {
   resetState,
   toUserResponse
 } from './state';
+import type { StateSnapshot } from './control.types';
 import type {
   MockPermission,
   MockRole,
@@ -16,12 +17,10 @@ import type {
 
 const router = Router();
 
-// Compile-time exhaustiveness guard: SerializedState must cover every key of
-// State. When State gains a new field, TypeScript will error in
-// buildStateSnapshot until the snapshot includes that field.
-type SerializedState = { [K in keyof State]: unknown };
-
-function buildStateSnapshot(state: State): SerializedState {
+// StateSnapshot is a mapped type { [K in keyof State]: unknown }, so
+// TypeScript will error here whenever State gains a new field that is not
+// yet returned by this function.
+function buildStateSnapshot(state: State): StateSnapshot {
   return {
     users: Array.from(state.users.values()).map(toUserResponse),
     oauthAccounts: Object.fromEntries(state.oauthAccounts),

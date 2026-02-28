@@ -47,8 +47,10 @@ test.describe('Account lockout', () => {
         isEmailVerified: true,
         failedLoginAttempts: 5,
         lockedUntil,
+        tokenRevokedAt: null,
         createdAt: '2025-01-01T00:00:00.000Z',
-        updatedAt: '2025-01-01T00:00:00.000Z'
+        updatedAt: '2025-01-01T00:00:00.000Z',
+        deletedAt: null
       }
     ]);
 
@@ -82,8 +84,10 @@ test.describe('Account lockout', () => {
         isEmailVerified: true,
         failedLoginAttempts: 5,
         lockedUntil,
+        tokenRevokedAt: null,
         createdAt: '2025-01-01T00:00:00.000Z',
-        updatedAt: '2025-01-01T00:00:00.000Z'
+        updatedAt: '2025-01-01T00:00:00.000Z',
+        deletedAt: null
       }
     ]);
 
