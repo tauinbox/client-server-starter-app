@@ -2,45 +2,205 @@
   "version": "0.1.6",
   "description": "API route manifest — update whenever server endpoints change.",
   "routes": [
-    { "method": "GET", "path": "/api/health/live", "expectedStatus": 200 },
-    { "method": "GET", "path": "/api/health/ready", "expectedStatus": 200 },
-    { "method": "POST", "path": "/api/v1/auth/register", "expectedStatus": 400 },
-    { "method": "POST", "path": "/api/v1/auth/login", "expectedStatus": 401 },
-    { "method": "POST", "path": "/api/v1/auth/verify-email", "expectedStatus": 400 },
-    { "method": "POST", "path": "/api/v1/auth/resend-verification", "expectedStatus": 200 },
-    { "method": "POST", "path": "/api/v1/auth/forgot-password", "expectedStatus": 200 },
-    { "method": "POST", "path": "/api/v1/auth/reset-password", "expectedStatus": 400 },
-    { "method": "POST", "path": "/api/v1/auth/refresh-token", "expectedStatus": 401 },
-    { "method": "POST", "path": "/api/v1/auth/logout", "expectedStatus": 401 },
-    { "method": "GET", "path": "/api/v1/auth/profile", "expectedStatus": 401 },
-    { "method": "GET", "path": "/api/v1/auth/permissions", "expectedStatus": 401 },
-    { "method": "PATCH", "path": "/api/v1/auth/profile", "expectedStatus": 401 },
-    { "method": "GET", "path": "/api/v1/auth/oauth/accounts", "expectedStatus": 401 },
-    { "method": "DELETE", "path": "/api/v1/auth/oauth/accounts/google", "expectedStatus": 401 },
-    { "method": "GET", "path": "/api/v1/auth/oauth/google", "expectedStatus": 501 },
-    { "method": "GET", "path": "/api/v1/auth/oauth/google/callback", "expectedStatus": 501 },
-    { "method": "GET", "path": "/api/v1/auth/oauth/facebook", "expectedStatus": 501 },
-    { "method": "GET", "path": "/api/v1/auth/oauth/facebook/callback", "expectedStatus": 501 },
-    { "method": "GET", "path": "/api/v1/auth/oauth/vk", "expectedStatus": 501 },
-    { "method": "GET", "path": "/api/v1/auth/oauth/vk/callback", "expectedStatus": 501 },
-    { "method": "POST", "path": "/api/v1/auth/oauth/exchange", "expectedStatus": 501 },
-    { "method": "POST", "path": "/api/v1/auth/oauth/link-init", "expectedStatus": 401 },
-    { "method": "POST", "path": "/api/v1/users", "expectedStatus": 401 },
-    { "method": "GET", "path": "/api/v1/users", "expectedStatus": 401 },
-    { "method": "GET", "path": "/api/v1/users/search", "expectedStatus": 401 },
-    { "method": "GET", "path": "/api/v1/users/1", "expectedStatus": 401 },
-    { "method": "PATCH", "path": "/api/v1/users/1", "expectedStatus": 401 },
-    { "method": "DELETE", "path": "/api/v1/users/1", "expectedStatus": 401 },
-    { "method": "POST", "path": "/api/v1/users/1/restore", "expectedStatus": 401 },
-    { "method": "GET", "path": "/api/v1/roles", "expectedStatus": 401 },
-    { "method": "GET", "path": "/api/v1/roles/permissions", "expectedStatus": 401 },
-    { "method": "GET", "path": "/api/v1/roles/role-admin", "expectedStatus": 401 },
-    { "method": "POST", "path": "/api/v1/roles", "expectedStatus": 401 },
-    { "method": "PATCH", "path": "/api/v1/roles/role-admin", "expectedStatus": 401 },
-    { "method": "DELETE", "path": "/api/v1/roles/role-admin", "expectedStatus": 401 },
-    { "method": "POST", "path": "/api/v1/roles/role-admin/permissions", "expectedStatus": 401 },
-    { "method": "DELETE", "path": "/api/v1/roles/role-admin/permissions/perm-1", "expectedStatus": 401 },
-    { "method": "POST", "path": "/api/v1/roles/assign/1", "expectedStatus": 401 },
-    { "method": "DELETE", "path": "/api/v1/roles/assign/1/role-admin", "expectedStatus": 401 }
+    {
+      "method": "GET",
+      "path": "/api/health/live",
+      "expectedStatus": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/health/ready",
+      "expectedStatus": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/register",
+      "expectedStatus": 400
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/verify-email",
+      "expectedStatus": 400
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/resend-verification",
+      "expectedStatus": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/forgot-password",
+      "expectedStatus": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/reset-password",
+      "expectedStatus": 400
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/refresh-token",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/profile",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/permissions",
+      "expectedStatus": 401
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/auth/profile",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oauth/accounts",
+      "expectedStatus": 401
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/auth/oauth/accounts/google",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oauth/google",
+      "expectedStatus": 501
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oauth/google/callback",
+      "expectedStatus": 501
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oauth/facebook",
+      "expectedStatus": 501
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oauth/facebook/callback",
+      "expectedStatus": 501
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oauth/vk",
+      "expectedStatus": 501
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oauth/vk/callback",
+      "expectedStatus": 501
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/oauth/exchange",
+      "expectedStatus": 501
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/oauth/link-init",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/users",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/search",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/1",
+      "expectedStatus": 401
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/users/1",
+      "expectedStatus": 401
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/users/1",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/users/1/restore",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/roles",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/roles/permissions",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/roles/role-admin",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/roles",
+      "expectedStatus": 401
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/roles/role-admin",
+      "expectedStatus": 401
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/roles/role-admin",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/roles/role-admin/permissions",
+      "expectedStatus": 401
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/roles/role-admin/permissions/perm-1",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/roles/assign/1",
+      "expectedStatus": 401
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/roles/assign/1/role-admin",
+      "expectedStatus": 401
+    }
   ]
 }
