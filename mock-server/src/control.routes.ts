@@ -5,9 +5,35 @@ import {
   resetState,
   toUserResponse
 } from './state';
-import type { MockUser, OAuthAccount } from './types';
+import type {
+  MockPermission,
+  MockRole,
+  MockRolePermission,
+  MockUser,
+  OAuthAccount,
+  State
+} from './types';
 
 const router = Router();
+
+// Compile-time exhaustiveness guard: SerializedState must cover every key of
+// State. When State gains a new field, TypeScript will error in
+// buildStateSnapshot until the snapshot includes that field.
+type SerializedState = { [K in keyof State]: unknown };
+
+function buildStateSnapshot(state: State): SerializedState {
+  return {
+    users: Array.from(state.users.values()).map(toUserResponse),
+    oauthAccounts: Object.fromEntries(state.oauthAccounts),
+    refreshTokens: state.refreshTokens.size,
+    emailVerificationTokens: state.emailVerificationTokens.size,
+    passwordResetTokens: state.passwordResetTokens.size,
+    roles: Array.from(state.roles.values()),
+    permissions: Array.from(state.permissions.values()),
+    rolePermissions: state.rolePermissions,
+    auditLogs: state.auditLogs
+  };
+}
 
 // POST /__control/reset
 router.post('/reset', (_req, res) => {
@@ -17,13 +43,7 @@ router.post('/reset', (_req, res) => {
 
 // GET /__control/state
 router.get('/state', (_req, res) => {
-  const state = getState();
-  res.json({
-    users: Array.from(state.users.values()).map(toUserResponse),
-    oauthAccounts: Object.fromEntries(state.oauthAccounts),
-    refreshTokens: state.refreshTokens.size,
-    auditLogs: state.auditLogs
-  });
+  res.json(buildStateSnapshot(getState()));
 });
 
 // POST /__control/users — add or override users
@@ -67,6 +87,54 @@ router.post('/oauth-accounts', (req, res) => {
   res.json({
     message: `Added ${accounts.length} OAuth account(s) for user ${userId}`
   });
+});
+
+// POST /__control/roles — add or override roles
+router.post('/roles', (req, res) => {
+  const roles: MockRole[] = req.body;
+  if (!Array.isArray(roles)) {
+    res.status(400).json({ message: 'Body must be an array of roles' });
+    return;
+  }
+
+  const state = getState();
+  for (const role of roles) {
+    state.roles.set(role.id, role);
+  }
+
+  res.json({ message: `Added/updated ${roles.length} role(s)` });
+});
+
+// POST /__control/permissions — add or override permissions
+router.post('/permissions', (req, res) => {
+  const permissions: MockPermission[] = req.body;
+  if (!Array.isArray(permissions)) {
+    res.status(400).json({ message: 'Body must be an array of permissions' });
+    return;
+  }
+
+  const state = getState();
+  for (const permission of permissions) {
+    state.permissions.set(permission.id, permission);
+  }
+
+  res.json({ message: `Added/updated ${permissions.length} permission(s)` });
+});
+
+// POST /__control/role-permissions — replace all role-permission assignments
+router.post('/role-permissions', (req, res) => {
+  const rolePermissions: MockRolePermission[] = req.body;
+  if (!Array.isArray(rolePermissions)) {
+    res
+      .status(400)
+      .json({ message: 'Body must be an array of role-permissions' });
+    return;
+  }
+
+  const state = getState();
+  state.rolePermissions = rolePermissions;
+
+  res.json({ message: `Set ${rolePermissions.length} role-permission(s)` });
 });
 
 export default router;
