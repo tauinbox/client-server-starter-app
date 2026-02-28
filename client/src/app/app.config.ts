@@ -11,9 +11,11 @@ import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { MAT_SNACK_BAR_DEFAULT_OPTIONS } from '@angular/material/snack-bar';
 import { MatIconRegistry } from '@angular/material/icon';
 import { DomSanitizer } from '@angular/platform-browser';
+import { firstValueFrom } from 'rxjs';
 import { jwtInterceptor } from '@features/auth/interceptors/jwt.interceptor';
 import { errorInterceptor } from '@core/interceptors/error.interceptor';
 import { AuthService } from '@features/auth/services/auth.service';
+import { AuthStore } from '@features/auth/store/auth.store';
 import { registerOAuthIcons } from '@features/auth/utils/register-oauth-icons';
 
 export const appConfig: ApplicationConfig = {
@@ -28,9 +30,17 @@ export const appConfig: ApplicationConfig = {
     }),
     provideAppInitializer(async () => {
       const authService = inject(AuthService);
+      const authStore = inject(AuthStore);
       if (authService.isAuthenticated()) {
         authService.scheduleTokenRefresh();
         await authService.fetchPermissions();
+      } else if (authStore.hasPersistedUser()) {
+        // Page reload: access token gone from memory, try to restore via refresh cookie
+        try {
+          await firstValueFrom(authService.refreshTokens());
+        } catch {
+          authStore.clearSession();
+        }
       }
     }),
     {

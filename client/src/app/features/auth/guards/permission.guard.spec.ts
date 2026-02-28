@@ -91,7 +91,7 @@ describe('permissionGuard', () => {
     authStoreMock.isAuthenticated.mockReturnValue(false);
     authStoreMock.isAccessTokenExpired.mockReturnValue(true);
     authServiceMock.refreshTokens.mockReturnValue(
-      of({ access_token: 'new', refresh_token: 'new', expires_in: 3600 })
+      of({ access_token: 'new', expires_in: 3600 })
     );
     authStoreMock.hasPermission.mockReturnValue(true);
 
@@ -107,7 +107,7 @@ describe('permissionGuard', () => {
     authStoreMock.isAuthenticated.mockReturnValue(false);
     authStoreMock.isAccessTokenExpired.mockReturnValue(true);
     authServiceMock.refreshTokens.mockReturnValue(
-      of({ access_token: 'new', refresh_token: 'new', expires_in: 3600 })
+      of({ access_token: 'new', expires_in: 3600 })
     );
     authStoreMock.hasPermission.mockReturnValue(false);
     const router = TestBed.inject(Router);

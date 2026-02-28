@@ -105,11 +105,11 @@ describe('OAuthController', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: jest
-              .fn()
-              .mockImplementation((key: string) =>
-                key === 'CLIENT_URL' ? 'http://localhost:4200' : undefined
-              )
+            get: jest.fn().mockImplementation((key: string) => {
+              if (key === 'CLIENT_URL') return 'http://localhost:4200';
+              if (key === 'JWT_REFRESH_EXPIRATION') return '604800';
+              return undefined;
+            })
           }
         }
       ]
@@ -252,6 +252,8 @@ describe('OAuthController', () => {
         },
         user: { id: '1', email: 'test@example.com' }
       };
+      // The full auth response (with refresh_token) is passed into the JWT payload;
+      // the controller's exchangeOAuthData strips refresh_token before returning to client
       authServiceMock.loginWithOAuth.mockResolvedValue(mockAuthResponse);
 
       const res = mockResponse();
@@ -402,12 +404,16 @@ describe('OAuthController', () => {
   });
 
   describe('exchangeOAuthData', () => {
-    it('should return auth data from valid cookie', () => {
-      const mockAuthResponse = {
-        tokens: { access_token: 'token' },
+    it('should set refresh_token cookie and return auth data without refresh_token', () => {
+      const mockPayloadData = {
+        tokens: {
+          access_token: 'token',
+          refresh_token: 'refresh',
+          expires_in: 3600
+        },
         user: { id: '1', email: 'test@example.com' }
       };
-      jwtServiceMock.verify.mockReturnValue({ data: mockAuthResponse });
+      jwtServiceMock.verify.mockReturnValue({ data: mockPayloadData });
 
       const req = mockExpressRequest({} as OAuthUserProfile, {
         oauth_data: 'signed-jwt'
@@ -420,7 +426,19 @@ describe('OAuthController', () => {
       expect(res.clearCookie).toHaveBeenCalledWith('oauth_data', {
         path: '/api/v1/auth/oauth'
       });
-      expect(result).toEqual(mockAuthResponse);
+      expect(res.cookie).toHaveBeenCalledWith(
+        'refresh_token',
+        'refresh',
+        expect.objectContaining({
+          httpOnly: true,
+          sameSite: 'strict',
+          path: '/api/v1/auth'
+        })
+      );
+      expect(result).toEqual({
+        tokens: { access_token: 'token', expires_in: 3600 },
+        user: { id: '1', email: 'test@example.com' }
+      });
     });
 
     it('should throw BadRequestException when cookie is missing', () => {

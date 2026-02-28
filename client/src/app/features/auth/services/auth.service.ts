@@ -6,7 +6,6 @@ import {
   finalize,
   firstValueFrom,
   from,
-  of,
   shareReplay,
   switchMap,
   tap,
@@ -18,17 +17,15 @@ import type { UserPermissionsResponse } from '@app/shared/types';
 import type {
   AuthResponse,
   LoginCredentials,
-  RefreshTokensRequest,
   RegisterRequest,
   TokensResponse,
   UpdateProfile
 } from '../models/auth.types';
-import { AuthStore, AUTH_STORAGE_KEY } from '../store/auth.store';
+import { AuthStore, AUTH_USER_KEY } from '../store/auth.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import { navigateToLogin } from '../utils/navigate-to-login';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
-import { LocalStorageService } from '@core/services/local-storage.service';
 
 const TOKEN_REFRESH_WINDOW_SECONDS = 60;
 const REFRESH_LOCK_NAME = 'auth_token_refresh';
@@ -41,7 +38,6 @@ export class AuthService {
   readonly #http = inject(HttpClient);
   readonly #router = inject(Router);
   readonly #authStore = inject(AuthStore);
-  readonly #localStorage = inject(LocalStorageService);
   readonly #window = inject(DOCUMENT).defaultView;
 
   readonly isAuthenticated = this.#authStore.isAuthenticated;
@@ -107,21 +103,16 @@ export class AuthService {
       .pipe(tap((user) => this.#authStore.updateCurrentUser(user)));
   }
 
+  hasPersistedUser(): boolean {
+    return this.#authStore.hasPersistedUser();
+  }
+
   refreshTokens(): Observable<TokensResponse | null> {
     if (this.#refreshInFlight$) {
       return this.#refreshInFlight$;
     }
 
-    const originalRefreshToken = this.#authStore.getRefreshToken();
-
-    if (!originalRefreshToken) {
-      this.#authStore.clearSession();
-      return of(null);
-    }
-
-    this.#refreshInFlight$ = from(
-      this.#acquireRefreshLock(originalRefreshToken)
-    ).pipe(
+    this.#refreshInFlight$ = from(this.#acquireRefreshLock()).pipe(
       finalize(() => {
         this.#refreshInFlight$ = null;
       }),
@@ -255,13 +246,11 @@ export class AuthService {
    * `navigator` is accessed via `inject(DOCUMENT).defaultView` (Angular DI) rather
    * than as a bare global, so this works correctly in SSR and test environments.
    */
-  #acquireRefreshLock(
-    originalRefreshToken: string
-  ): Promise<TokensResponse | null> {
+  #acquireRefreshLock(): Promise<TokensResponse | null> {
     const win = this.#window;
 
     if (!win || !('locks' in win.navigator)) {
-      return this.#doRefresh(originalRefreshToken);
+      return this.#doRefresh();
     }
 
     // Wrap in an explicit Promise to prevent TypeScript from inferring a nested
@@ -270,7 +259,7 @@ export class AuthService {
       win.navigator.locks
         .request(REFRESH_LOCK_NAME, async () => {
           try {
-            resolve(await this.#doRefresh(originalRefreshToken));
+            resolve(await this.#doRefresh());
           } catch (err) {
             reject(err);
           }
@@ -280,33 +269,16 @@ export class AuthService {
   }
 
   /**
-   * Performs the token refresh, guarded against cross-tab duplication.
-   *
-   * If another tab already completed a refresh while this tab was waiting for
-   * the lock, the new tokens will already be in localStorage with a different
-   * refresh token. In that case we adopt the stored tokens without making an
-   * HTTP call.
+   * Performs the token refresh by sending an empty POST body.
+   * The refresh token is sent automatically as an HttpOnly cookie.
    */
-  async #doRefresh(
-    originalRefreshToken: string
-  ): Promise<TokensResponse | null> {
-    const stored = this.#localStorage.getItem<AuthResponse>(AUTH_STORAGE_KEY);
-
-    if (stored && stored.tokens.refresh_token !== originalRefreshToken) {
-      // Another tab already refreshed — adopt their tokens
-      this.#authStore.saveAuthResponse(stored);
-      this.scheduleTokenRefresh();
-      return stored.tokens;
-    }
-
-    const request: RefreshTokensRequest = {
-      refresh_token: originalRefreshToken
-    };
-
+  async #doRefresh(): Promise<TokensResponse | null> {
     const response = await firstValueFrom(
-      this.#http.post<AuthResponse>(AuthApiEnum.RefreshToken, request, {
-        context: silentContext()
-      })
+      this.#http.post<AuthResponse>(
+        AuthApiEnum.RefreshToken,
+        {},
+        { context: silentContext(), withCredentials: true }
+      )
     );
 
     this.#authStore.saveAuthResponse(response);
@@ -315,3 +287,5 @@ export class AuthService {
     return response.tokens;
   }
 }
+
+export { AUTH_USER_KEY };

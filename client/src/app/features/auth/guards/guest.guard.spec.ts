@@ -69,7 +69,7 @@ describe('guestGuard', () => {
     authStoreMock.isAuthenticated.mockReturnValue(true);
     authStoreMock.isAccessTokenExpired.mockReturnValue(true);
     authServiceMock.refreshTokens.mockReturnValue(
-      of({ access_token: 'new', refresh_token: 'new', expires_in: 3600 })
+      of({ access_token: 'new', expires_in: 3600 })
     );
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate');

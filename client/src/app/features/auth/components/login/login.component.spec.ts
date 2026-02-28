@@ -15,7 +15,6 @@ import type { AuthResponse } from '../../models/auth.types';
 const mockAuthResponse: AuthResponse = {
   tokens: {
     access_token: 'token',
-    refresh_token: 'refresh',
     expires_in: 3600
   },
   user: {

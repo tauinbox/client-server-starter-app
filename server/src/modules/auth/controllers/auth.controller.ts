@@ -8,8 +8,10 @@ import {
   Patch,
   Post,
   Request,
+  Res,
   UseGuards,
-  UseInterceptors
+  UseInterceptors,
+  UnauthorizedException
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -23,6 +25,8 @@ import {
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
 import { packRules } from '@casl/ability/extra';
+import { ConfigService } from '@nestjs/config';
+import { Response } from 'express';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { AuthService } from '../services/auth.service';
 import { PermissionService } from '../services/permission.service';
@@ -33,7 +37,7 @@ import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { LoginDto } from '../dtos/login.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { UsersService } from '../../users/services/users.service';
-import { AuthResponseDto, RefreshTokenDto } from '../dtos/auth-response.dto';
+import { AuthResponseDto } from '../dtos/auth-response.dto';
 import { JwtAuthRequest, LocalAuthRequest } from '../types/auth.request';
 import { VerifyEmailDto } from '../dtos/verify-email.dto';
 import { ResendVerificationDto } from '../dtos/resend-verification.dto';
@@ -43,6 +47,8 @@ import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { Request as ExpressRequest } from 'express';
+
+const REFRESH_TOKEN_COOKIE = 'refresh_token';
 
 @ApiTags('Auth API')
 @Controller({
@@ -56,8 +62,25 @@ export class AuthController {
     private readonly userService: UsersService,
     private readonly permissionService: PermissionService,
     private readonly caslAbilityFactory: CaslAbilityFactory,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly configService: ConfigService
   ) {}
+
+  private setRefreshTokenCookie(res: Response, token: string): void {
+    const maxAge =
+      Number(this.configService.get<string>('JWT_REFRESH_EXPIRATION')) * 1000;
+    res.cookie(REFRESH_TOKEN_COOKIE, token, {
+      httpOnly: true,
+      secure: this.configService.get('ENVIRONMENT') === 'production',
+      sameSite: 'strict',
+      path: '/api/v1/auth',
+      maxAge
+    });
+  }
+
+  private clearRefreshTokenCookie(res: Response): void {
+    res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
+  }
 
   @Throttle({ default: { ttl: 3600000, limit: 5 } })
   @Post('register')
@@ -82,7 +105,10 @@ export class AuthController {
     type: AuthResponseDto
   })
   @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
-  async login(@Request() req: LocalAuthRequest) {
+  async login(
+    @Request() req: LocalAuthRequest,
+    @Res({ passthrough: true }) res: Response
+  ) {
     const result = await this.authService.login(req.user);
     await this.auditService.log({
       action: AuditAction.USER_LOGIN_SUCCESS,
@@ -92,21 +118,36 @@ export class AuthController {
       targetType: 'User',
       context: extractAuditContext(req)
     });
-    return result;
+
+    const { refresh_token, ...publicTokens } = result.tokens;
+    this.setRefreshTokenCookie(res, refresh_token);
+    return { tokens: publicTokens, user: result.user };
   }
 
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('refresh-token')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Refresh access token using a refresh token' })
-  @ApiBody({ type: RefreshTokenDto })
+  @ApiOperation({ summary: 'Refresh access token using a refresh cookie' })
   @ApiOkResponse({
     description: 'Tokens have been refreshed',
     type: AuthResponseDto
   })
   @ApiUnauthorizedResponse({ description: 'Invalid refresh token' })
-  refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.authService.refreshTokens(refreshTokenDto.refresh_token);
+  async refreshToken(
+    @Request() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    const cookieToken = (req.cookies as Record<string, string> | undefined)?.[
+      REFRESH_TOKEN_COOKIE
+    ];
+    if (!cookieToken) {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+
+    const result = await this.authService.refreshTokens(cookieToken);
+    const { refresh_token, ...publicTokens } = result.tokens;
+    this.setRefreshTokenCookie(res, refresh_token);
+    return { tokens: publicTokens, user: result.user };
   }
 
   @UseGuards(JwtAuthGuard)
@@ -115,8 +156,12 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Logout and invalidate refresh tokens' })
   @ApiOkResponse({ description: 'Successfully logged out' })
-  async logout(@Request() req: JwtAuthRequest) {
+  async logout(
+    @Request() req: JwtAuthRequest,
+    @Res({ passthrough: true }) res: Response
+  ) {
     await this.authService.logout(req.user.userId);
+    this.clearRefreshTokenCookie(res);
     await this.auditService.log({
       action: AuditAction.USER_LOGOUT,
       actorId: req.user.userId,
@@ -151,7 +196,8 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   async updateProfile(
     @Request() req: JwtAuthRequest,
-    @Body() updateProfileDto: UpdateProfileDto
+    @Body() updateProfileDto: UpdateProfileDto,
+    @Res({ passthrough: true }) res: Response
   ) {
     const updatedUser = await this.userService.update(
       req.user.userId,
@@ -160,6 +206,7 @@ export class AuthController {
 
     if (updateProfileDto.password) {
       await this.authService.logout(req.user.userId);
+      this.clearRefreshTokenCookie(res);
       await this.auditService.log({
         action: AuditAction.PASSWORD_CHANGE,
         actorId: req.user.userId,

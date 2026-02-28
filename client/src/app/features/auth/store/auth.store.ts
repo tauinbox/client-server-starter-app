@@ -17,10 +17,11 @@ import type { AuthResponse, CustomJwtPayload } from '../models/auth.types';
 import type { AppAbility, Actions, Subjects } from '../casl/app-ability';
 import { LocalStorageService } from '@core/services/local-storage.service';
 
-export const AUTH_STORAGE_KEY = 'auth_storage';
+export const AUTH_USER_KEY = 'auth_user';
 
 type AuthState = {
-  authResponse: AuthResponse | null;
+  accessToken: string | null; // in-memory ONLY — lost on page reload
+  user: User | null; // persisted to localStorage (for reload detection)
   ability: AppAbility | null;
 };
 
@@ -29,31 +30,26 @@ export const AuthStore = signalStore(
   withState<AuthState>(() => {
     const storage = inject(LocalStorageService);
     return {
-      authResponse: storage.getItem<AuthResponse>(AUTH_STORAGE_KEY) ?? null,
+      accessToken: null,
+      user: storage.getItem<User>(AUTH_USER_KEY) ?? null,
       ability: null
     };
   }),
   withComputed((store) => ({
-    user: computed<User | null>(() => store.authResponse()?.user ?? null),
-    isAuthenticated: computed(() => store.authResponse() !== null),
+    user: computed<User | null>(() => store.user()),
+    isAuthenticated: computed(() => store.accessToken() !== null),
     /**
      * For displaying the current user's role label only.
      * Use hasPermission() for all access control decisions.
      */
-    isAdmin: computed(
-      () => store.authResponse()?.user?.roles?.includes('admin') ?? false
-    ),
-    roles: computed<string[]>(() => store.authResponse()?.user?.roles ?? [])
+    isAdmin: computed(() => store.user()?.roles?.includes('admin') ?? false),
+    roles: computed<string[]>(() => store.user()?.roles ?? [])
   })),
   withMethods((store) => {
     const storage = inject(LocalStorageService);
 
     function getAccessToken(): string | null {
-      return store.authResponse()?.tokens.access_token ?? null;
-    }
-
-    function getRefreshToken(): string | null {
-      return store.authResponse()?.tokens.refresh_token ?? null;
+      return store.accessToken();
     }
 
     function isAccessTokenExpired(): boolean {
@@ -81,22 +77,25 @@ export const AuthStore = signalStore(
     }
 
     function saveAuthResponse(response: AuthResponse): void {
-      storage.setItem(AUTH_STORAGE_KEY, response);
-      patchState(store, { authResponse: response });
+      storage.setItem(AUTH_USER_KEY, response.user);
+      patchState(store, {
+        accessToken: response.tokens.access_token,
+        user: response.user
+      });
     }
 
     function updateCurrentUser(user: User): void {
-      const current = store.authResponse();
-      if (!current) return;
-
-      const updated: AuthResponse = { ...current, user };
-      storage.setItem(AUTH_STORAGE_KEY, updated);
-      patchState(store, { authResponse: updated });
+      storage.setItem(AUTH_USER_KEY, user);
+      patchState(store, { user });
     }
 
     function clearSession(): void {
-      storage.removeItem(AUTH_STORAGE_KEY);
-      patchState(store, { authResponse: null, ability: null });
+      storage.removeItem(AUTH_USER_KEY);
+      patchState(store, { accessToken: null, user: null, ability: null });
+    }
+
+    function hasPersistedUser(): boolean {
+      return store.user() !== null;
     }
 
     function setRules(rules: UserPermissionsResponse['rules']): void {
@@ -117,12 +116,12 @@ export const AuthStore = signalStore(
 
     return {
       getAccessToken,
-      getRefreshToken,
       isAccessTokenExpired,
       getTokenExpiryTime,
       saveAuthResponse,
       updateCurrentUser,
       clearSession,
+      hasPersistedUser,
       setRules,
       hasPermission
     };

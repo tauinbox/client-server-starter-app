@@ -1,7 +1,6 @@
 import type { Page } from '@playwright/test';
 
 import {
-  createExpiredJwt,
   createValidJwt,
   defaultUser,
   expect,
@@ -16,7 +15,6 @@ function mockRefreshTokenWithNewTokens(page: Page) {
       body: JSON.stringify({
         tokens: {
           access_token: createValidJwt(),
-          refresh_token: 'new-refresh-token',
           expires_in: 3600
         },
         user: defaultUser
@@ -39,18 +37,9 @@ function mockProfile(page: Page) {
 }
 
 function setExpiredAuthInStorage(page: Page) {
-  const expiredAuthData = {
-    tokens: {
-      access_token: createExpiredJwt(),
-      refresh_token: 'valid-refresh-token',
-      expires_in: 3600
-    },
-    user: defaultUser
-  };
-
-  return page.addInitScript((authData) => {
-    localStorage.setItem('auth_storage', JSON.stringify(authData));
-  }, expiredAuthData);
+  return page.addInitScript((user) => {
+    localStorage.setItem('auth_user', JSON.stringify(user));
+  }, defaultUser);
 }
 
 test.describe('Session restoration with expired access token', () => {
@@ -69,7 +58,6 @@ test.describe('Session restoration with expired access token', () => {
         body: JSON.stringify({
           tokens: {
             access_token: createValidJwt(),
-            refresh_token: 'new-refresh-token',
             expires_in: 3600
           },
           user: defaultUser

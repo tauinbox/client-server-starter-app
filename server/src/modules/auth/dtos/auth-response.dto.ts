@@ -1,5 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { ApiHideProperty, ApiProperty } from '@nestjs/swagger';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
 
 export class TokensResponseDto {
@@ -9,10 +8,7 @@ export class TokensResponseDto {
   })
   access_token: string;
 
-  @ApiProperty({
-    description: 'JWT refresh token',
-    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
-  })
+  @ApiHideProperty()
   refresh_token: string;
 
   @ApiProperty({
@@ -34,14 +30,4 @@ export class AuthResponseDto {
     type: UserResponseDto
   })
   user: UserResponseDto;
-}
-
-export class RefreshTokenDto {
-  @ApiProperty({
-    description: 'Refresh token',
-    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
-  })
-  @IsString()
-  @IsNotEmpty()
-  refresh_token: string;
 }

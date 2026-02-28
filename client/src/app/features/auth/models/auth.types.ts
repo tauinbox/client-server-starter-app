@@ -10,10 +10,6 @@ export type LoginCredentials = {
 
 export type RegisterRequest = CreateUser;
 
-export type RefreshTokensRequest = {
-  refresh_token: string;
-};
-
 export type UpdateProfile = {
   firstName?: string;
   lastName?: string;

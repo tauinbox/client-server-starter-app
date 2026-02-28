@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { CookieOptions } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import {
   MAX_FAILED_ATTEMPTS,
@@ -25,6 +26,14 @@ import {
 } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest, MockUser } from '../types';
+
+const REFRESH_TOKEN_COOKIE = 'refresh_token';
+const COOKIE_OPTIONS: CookieOptions = {
+  httpOnly: true,
+  sameSite: 'strict',
+  path: '/api/v1/auth',
+  maxAge: 7 * 24 * 60 * 60 * 1000
+};
 
 const router = Router();
 
@@ -250,7 +259,9 @@ router.post('/login', (req, res) => {
     ip: req.ip
   });
 
-  res.json({ tokens, user: toUserResponse(user) });
+  const { refresh_token, ...publicTokens } = tokens;
+  res.cookie(REFRESH_TOKEN_COOKIE, refresh_token, COOKIE_OPTIONS);
+  res.json({ tokens: publicTokens, user: toUserResponse(user) });
 });
 
 // POST /api/v1/auth/verify-email
@@ -450,9 +461,11 @@ router.post('/reset-password', (req, res) => {
 
 // POST /api/v1/auth/refresh-token
 router.post('/refresh-token', (req, res) => {
-  const { refresh_token } = req.body;
+  const cookieToken = (req.cookies as Record<string, string> | undefined)?.[
+    REFRESH_TOKEN_COOKIE
+  ];
 
-  if (!refresh_token) {
+  if (!cookieToken) {
     res
       .status(401)
       .json({ message: 'Refresh token is required', statusCode: 401 });
@@ -460,7 +473,7 @@ router.post('/refresh-token', (req, res) => {
   }
 
   const state = getState();
-  const userId = state.refreshTokens.get(refresh_token);
+  const userId = state.refreshTokens.get(cookieToken);
   if (!userId) {
     logAudit('TOKEN_REFRESH_FAILURE', {
       details: { reason: 'invalid_or_expired_token' },
@@ -479,19 +492,21 @@ router.post('/refresh-token', (req, res) => {
       },
       ip: req.ip
     });
-    state.refreshTokens.delete(refresh_token);
+    state.refreshTokens.delete(cookieToken);
     res.status(401).json({ message: 'Invalid refresh token', statusCode: 401 });
     return;
   }
 
   // Remove old refresh token
-  state.refreshTokens.delete(refresh_token);
+  state.refreshTokens.delete(cookieToken);
 
   // Generate new tokens
   const tokens = generateTokens(user);
   state.refreshTokens.set(tokens.refresh_token, user.id);
 
-  res.json({ tokens, user: toUserResponse(user) });
+  const { refresh_token, ...publicTokens } = tokens;
+  res.cookie(REFRESH_TOKEN_COOKIE, refresh_token, COOKIE_OPTIONS);
+  res.json({ tokens: publicTokens, user: toUserResponse(user) });
 });
 
 // POST /api/v1/auth/logout
@@ -513,6 +528,7 @@ router.post('/logout', authGuard, (req, res) => {
     ip: req.ip
   });
 
+  res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
   res.json({ message: 'Successfully logged out' });
 });
 
@@ -585,6 +601,7 @@ router.patch('/profile', authGuard, (req, res) => {
         state.refreshTokens.delete(rt);
       }
     }
+    res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
   }
   user.updatedAt = new Date().toISOString();
 
