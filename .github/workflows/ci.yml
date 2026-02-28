@@ -97,6 +97,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
+      - run: npx tsc --noEmit
+      - run: npm test
 
   client:
     name: Client
