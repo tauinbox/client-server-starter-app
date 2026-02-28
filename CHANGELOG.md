@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.7](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.6...v0.1.7) (2026-02-28)
+
+
+### Features
+
+* **db-1:** add partial indexes on users.deleted_at for non-deleted rows ([7574ed0](https://github.com/tauinbox/client-server-starter-app/commit/7574ed008aabdf8a9c14f928790ea980f6795d8a))
+* **mock-1:** add contract verification for mock-server routes ([370af1a](https://github.com/tauinbox/client-server-starter-app/commit/370af1afd780cc023f5c97d62b0a8c5e6b522a36))
+* **mock-1:** generate routes.json from server controller AST ([7ced1aa](https://github.com/tauinbox/client-server-starter-app/commit/7ced1aae41a254e5b343127c713fc6c2c43ab3f1))
+* **release:** add release:publish script to push tags and create GitHub releases ([3accf3c](https://github.com/tauinbox/client-server-starter-app/commit/3accf3c6c39fc2cde9f91db1a9a0bb85e4346199))
+* **sec-5+clt-2:** move refresh token to HttpOnly cookie, access token to memory ([233bfb1](https://github.com/tauinbox/client-server-starter-app/commit/233bfb1fb7e6ac39d3eb981fb211105c916ea77d))
+
+
+### Bug Fixes
+
+* **clt-2:** await fetchPermissions after cookie-based session restore on page reload ([1a9689c](https://github.com/tauinbox/client-server-starter-app/commit/1a9689c1276f532d2141c2680e893762ea6b22a0))
+* cover every key of State in control routes ([bdeffcc](https://github.com/tauinbox/client-server-starter-app/commit/bdeffcc654bd421a530d6872e027897d37b648d1))
+* extend MockServerApi ([eac3a01](https://github.com/tauinbox/client-server-starter-app/commit/eac3a016abf8488bbae2005b66465002b0a355d3))
+* **sec-4:** revoke JWT access tokens on logout and password change ([802222d](https://github.com/tauinbox/client-server-starter-app/commit/802222dfd8bc4071c0cf6b9642fbe65f8a58e806))
+
 ## [0.1.6](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.4...v0.1.6) (2026-02-27)
 
 
