@@ -16,7 +16,6 @@ describe('ensureAuthenticated', () => {
 
   const mockTokens: TokensResponse = {
     access_token: 'access',
-    refresh_token: 'refresh',
     expires_in: 3600
   };
 

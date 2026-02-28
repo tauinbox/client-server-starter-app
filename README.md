@@ -11,7 +11,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 | Backend | NestJS | 11.1.13 |
 | Database | PostgreSQL (TypeORM) | 0.3.28 |
 | Language | TypeScript | 5.9.x |
-| Auth | JWT + Refresh Tokens + OAuth (Passport) | - |
+| Auth | JWT + HttpOnly-cookie refresh tokens + OAuth (Passport) | - |
 | Client Tests | Vitest (unit), Playwright (e2e) | 4.0.18 / 1.58.2 |
 | Server Tests | Jest (unit + e2e) | 30.2.0 |
 
@@ -23,7 +23,8 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - **Email verification** — new registrations require email verification before login (HTTP 403); resend-verification endpoint; OAuth users auto-verified
 - **Password reset** — forgot-password sends a reset link (1-hour token expiry); reset invalidates all active sessions
 - **OAuth2 login via Google, Facebook, VK** — auto-links by email, creates OAuth-only users
-- JWT access tokens (1h) + opaque refresh tokens (7d)
+- JWT access tokens (1h, stored in-memory only) + opaque refresh tokens (7d, stored as HttpOnly `SameSite=Strict` cookie — never readable by JavaScript)
+- Session restored on page reload via cookie-refresh in `provideAppInitializer` before route guards run
 - Automatic token refresh 60 seconds before expiry
 - 401 handling with request retry in JWT interceptor
 - **Role-Based Access Control (RBAC)** — roles, permissions, and conditional permission evaluation; `@Authorize(['action', 'Subject'])` typed tuples on server; `permissionGuard(action, subject)` + `*appRequirePermission="{ action, subject }"` directive on client; admin role bypasses all permission checks
@@ -257,8 +258,8 @@ API base URL: `/api/v1`
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/auth/register` | None | Register a new user |
-| POST | `/auth/login` | None | Login, returns JWT + refresh token |
-| POST | `/auth/refresh-token` | None | Refresh access token |
+| POST | `/auth/login` | None | Login — sets `refresh_token` HttpOnly cookie, returns access token |
+| POST | `/auth/refresh-token` | None | Refresh access token (reads `refresh_token` cookie, rotates cookie) |
 | POST | `/auth/logout` | Bearer | Logout, revokes refresh tokens |
 | GET | `/auth/profile` | Bearer | Get current user profile |
 | PATCH | `/auth/profile` | Bearer | Update own profile (name, password) |
@@ -398,7 +399,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 224 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 241 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | Configured |
 | Client unit tests | Vitest | `*.spec.ts` alongside source | 262 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 113 tests passing |
@@ -423,7 +424,8 @@ Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file
 - **Account lockout** after 5 failed login attempts (15-minute cooldown)
 - **Email verification** required before first login
 - **Password reset tokens** are single-use with 1-hour expiry; reset revokes all sessions
-- JWT access tokens (1h) + opaque refresh tokens (7d) with rotation
+- **HttpOnly refresh token cookie** (`SameSite=Strict`, `path=/api/v1/auth`, 7d expiry) — JavaScript cannot read or steal the token (XSS-proof); rotated on every use
+- JWT access tokens (1h) stored in Angular signals only — never written to `localStorage`; user info persisted to `localStorage` (`auth_user` key) only to detect prior sessions on page reload
 - `@Exclude()` decorator hides password in API responses
 - **RBAC** — typed CASL permission checks via `PermissionsGuard` + `@Authorize(['action', 'Subject'])`; CASL ability hydrated at bootstrap before route activation; permissions cached per user (5 min); admin role bypasses all checks; `*appRequirePermission="{ action, subject }"` directive for template-level visibility
 - **Audit logging** — 20 security-sensitive actions (login, register, password change/reset, user/role/permission CRUD, OAuth link/unlink, logout, token refresh failures) written to a dedicated `audit_logs` table with actor, target, IP, and request ID

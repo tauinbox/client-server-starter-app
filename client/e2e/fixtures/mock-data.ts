@@ -35,7 +35,6 @@ export const defaultUser: MockUser = {
 
 export const defaultTokens = {
   access_token: createMockJwt(),
-  refresh_token: createMockJwt(),
   expires_in: 3600
 };
 

@@ -245,8 +245,27 @@ export class OAuthController {
     }
 
     try {
-      const payload = this.jwtService.verify<{ data: unknown }>(cookie);
-      return payload.data;
+      const payload = this.jwtService.verify<{
+        data: {
+          tokens: {
+            refresh_token: string;
+            access_token: string;
+            expires_in: number;
+          };
+          user: unknown;
+        };
+      }>(cookie);
+      const { refresh_token, ...publicTokens } = payload.data.tokens;
+      const maxAge =
+        Number(this.configService.get<string>('JWT_REFRESH_EXPIRATION')) * 1000;
+      res.cookie('refresh_token', refresh_token, {
+        httpOnly: true,
+        secure: this.configService.get('ENVIRONMENT') === 'production',
+        sameSite: 'strict',
+        path: '/api/v1/auth',
+        maxAge
+      });
+      return { tokens: publicTokens, user: payload.data.user };
     } catch {
       throw new BadRequestException('Invalid or expired OAuth data');
     }

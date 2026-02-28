@@ -105,7 +105,7 @@ src/
 │   ├── guards/             # LocalAuthGuard, JwtAuthGuard, Google/Facebook/VkOAuthGuard
 │   ├── entities/           # RefreshToken, OAuthAccount
 │   ├── enums/              # OAuthProvider
-│   └── dto/                # LoginDto, RegisterDto, RefreshTokenDto, UpdateProfileDto, VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto
+│   └── dto/                # LoginDto, RegisterDto, UpdateProfileDto, VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto
 ├── audit/
 │   ├── audit.service.ts    # AuditService — records 20 security-sensitive actions to audit_logs table
 │   └── entities/           # AuditLog entity (action, actorId, actorEmail, targetId, ip, requestId, createdAt)
@@ -160,7 +160,7 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 - **@Authorize([action, subject]) decorator** — composite: `JwtAuthGuard` + `PermissionsGuard` + typed `@RequirePermissions()`. Replaces `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` pattern
 - **CaslAbilityFactory** — builds `AppAbility` from user roles + permissions; used by `AuthController` to return CASL packed rules via `packRules()` from `GET /permissions`
 - **JWT payload** — includes `roles: string[]`; `isAdmin` column removed from database (migration `drop-is-admin`)
-- **Refresh tokens** — opaque 80-char hex tokens stored in DB (SHA-256 hashed), rotated on use
+- **Refresh tokens** — opaque 80-char hex tokens stored in DB (SHA-256 hashed), delivered to the client as an `HttpOnly SameSite=Strict` cookie (`path=/api/v1/auth`), rotated on every use; never appear in response body
 - **OAuth accounts** — auto-link by email, manage linked providers, safety check on unlink
 - **Token cleanup** — daily cron removes expired tokens, weekly cron removes revoked+expired
 - **Account lockout** — 5 failed login attempts → 15 min lock (HTTP 423), admin unlock via user update
