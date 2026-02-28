@@ -38,6 +38,7 @@ export const appConfig: ApplicationConfig = {
         // Page reload: access token gone from memory, try to restore via refresh cookie
         try {
           await firstValueFrom(authService.refreshTokens());
+          await authService.fetchPermissions();
         } catch {
           authStore.clearSession();
         }

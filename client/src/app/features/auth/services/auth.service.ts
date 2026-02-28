@@ -283,7 +283,6 @@ export class AuthService {
 
     this.#authStore.saveAuthResponse(response);
     this.scheduleTokenRefresh();
-    void this.fetchPermissions();
     return response.tokens;
   }
 }
