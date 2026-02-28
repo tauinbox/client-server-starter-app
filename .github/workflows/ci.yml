@@ -60,6 +60,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
+      - run: npm run check:routes
       - run: npm run test:cov
       - run: npm run build
 
@@ -97,6 +98,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
+      - run: npx tsc --noEmit
+      - run: npm test
 
   client:
     name: Client
