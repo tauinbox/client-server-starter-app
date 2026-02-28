@@ -39,7 +39,7 @@ src/app/
 │   │   ├── guards/         # authGuard, guestGuard, permissionGuard(action, subject)
 │   │   ├── interceptors/   # jwtInterceptor
 │   │   ├── services/       # AuthService (HTTP, refresh scheduling, fetchPermissions: Promise<void>)
-│   │   └── store/          # AuthStore (NgRx Signal Store — state: authResponse + ability: AppAbility|null; computed: roles, isAdmin)
+│   │   └── store/          # AuthStore (NgRx Signal Store — state: accessToken (memory) + user (auth_user localStorage) + ability: AppAbility|null)
 │   ├── users/              # User list, detail, edit, search (admin)
 │   │   ├── components/
 │   │   │   └── user-table/ # UserTableComponent (shared table for user-list and user-search; sorting + actions only, no paginator)
@@ -76,8 +76,8 @@ src/app/
 
 NgRx Signal Store (`@ngrx/signals`):
 
-- **AuthStore** (`providedIn: 'root'`) — pure state container managing `localStorage('auth_storage')`. State: `authResponse`, `ability: AppAbility | null`. Computed: `user`, `isAuthenticated`, `roles`, `isAdmin` (derived from roles). Methods: `hasPermission(action, subject)` (via CASL ability.can()), `setRules(rules)` (builds AppAbility from packed rules). No `HttpClient` dependency
-- **AuthService** (`providedIn: 'root'`) — HTTP operations (login/register/logout/refresh/profile/OAuth accounts/`fetchPermissions(): Promise<void>`), token refresh scheduling via `provideAppInitializer`. `fetchPermissions()` is **awaited** in `provideAppInitializer` — Angular blocks route activation until CASL ability is fully loaded. Also called after login and token refresh. Eliminates the circular dependency chain
+- **AuthStore** (`providedIn: 'root'`) — pure state container. State: `accessToken` (in-memory signal only, never persisted), `user` (persisted to `localStorage` as `auth_user` key for page-reload detection), `ability: AppAbility | null`. Computed: `isAuthenticated` (access token present), `user`, `roles`, `isAdmin`. Methods: `hasPermission(action, subject)`, `setRules(rules)`, `hasPersistedUser()`, `saveAuthResponse()`, `clearSession()`. No `HttpClient` dependency
+- **AuthService** (`providedIn: 'root'`) — HTTP operations (login/register/logout/refresh/profile/OAuth accounts/`fetchPermissions(): Promise<void>`). `refreshTokens()` POSTs `{}` — the `refresh_token` HttpOnly cookie is sent automatically by the browser. `provideAppInitializer` awaits `fetchPermissions()` for authenticated users, or attempts a cookie-refresh when `hasPersistedUser()` is true (page reload with no in-memory token). Eliminates the circular dependency chain
 - **UsersStore** (route-level at `/users`) — entity-based store with `withEntities<User>()`. Manages user list, detail, search state with **infinite scroll** (page size 20; `loadMore`/`loadMoreSearch` rxMethods append via `upsertEntities`; `hasMore`/`hasMoreSearch` computed signals drive sentinel visibility; `isLoadingMore`/`isLoadingMoreSearch` show spinner) and loading indicators
 - **ThemeService** — `theme` signal (`'light'` | `'dark'`), system preference detection, persists to localStorage
 
