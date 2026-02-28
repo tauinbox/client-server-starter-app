@@ -160,6 +160,7 @@ router.post('/', adminGuard, (req, res) => {
     isEmailVerified: true,
     failedLoginAttempts: 0,
     lockedUntil: null,
+    tokenRevokedAt: null,
     createdAt: now,
     updatedAt: now,
     deletedAt: null

@@ -100,6 +100,7 @@ router.post('/register', (req, res) => {
     isEmailVerified: false,
     failedLoginAttempts: 0,
     lockedUntil: null,
+    tokenRevokedAt: null,
     createdAt: now,
     updatedAt: now,
     deletedAt: null
@@ -423,6 +424,7 @@ router.post('/reset-password', (req, res) => {
 
   // Update password
   user.password = password;
+  user.tokenRevokedAt = new Date().toISOString();
   user.updatedAt = new Date().toISOString();
 
   // Clear the reset token
@@ -496,13 +498,14 @@ router.post('/refresh-token', (req, res) => {
 router.post('/logout', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
 
-  // Remove all refresh tokens for this user
+  // Remove all refresh tokens for this user and revoke access tokens
   const state = getState();
   for (const [token, userId] of state.refreshTokens.entries()) {
     if (userId === user.id) {
       state.refreshTokens.delete(token);
     }
   }
+  user.tokenRevokedAt = new Date().toISOString();
 
   logAudit('USER_LOGOUT', {
     actorId: user.id,
@@ -564,6 +567,7 @@ router.patch('/profile', authGuard, (req, res) => {
       return;
     }
     user.password = password;
+    user.tokenRevokedAt = new Date().toISOString();
 
     logAudit('PASSWORD_CHANGE', {
       actorId: user.id,

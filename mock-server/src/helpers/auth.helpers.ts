@@ -21,6 +21,13 @@ export function authenticateRequest(
   const user = findUserById(decoded.sub);
   if (!user) return null;
 
+  if (
+    user.tokenRevokedAt &&
+    decoded.iat < new Date(user.tokenRevokedAt).getTime() / 1000
+  ) {
+    return null;
+  }
+
   return { user, decoded };
 }
 
