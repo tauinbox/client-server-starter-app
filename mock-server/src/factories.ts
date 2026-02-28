@@ -27,6 +27,7 @@ export function createMockUser(options: MockUserOptions = {}): MockUser {
     isEmailVerified: options.isEmailVerified ?? true,
     failedLoginAttempts: options.failedLoginAttempts ?? 0,
     lockedUntil: options.lockedUntil ?? null,
+    tokenRevokedAt: options.tokenRevokedAt ?? null,
     createdAt: options.createdAt ?? now,
     updatedAt: options.updatedAt ?? now,
     deletedAt: options.deletedAt ?? null

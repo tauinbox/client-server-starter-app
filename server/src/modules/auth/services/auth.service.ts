@@ -546,7 +546,8 @@ export class AuthService {
       await manager.update(User, user.id, {
         password: hashedPassword,
         passwordResetToken: null,
-        passwordResetExpiresAt: null
+        passwordResetExpiresAt: null,
+        tokenRevokedAt: new Date()
       });
       await manager.delete(RefreshToken, { userId: user.id });
     });
@@ -624,11 +625,21 @@ export class AuthService {
   }
 
   async logout(userId: string): Promise<void> {
-    await this.refreshTokenService.deleteByUserId(userId);
+    await Promise.all([
+      this.refreshTokenService.deleteByUserId(userId),
+      this.dataSource
+        .getRepository(User)
+        .update(userId, { tokenRevokedAt: new Date() })
+    ]);
   }
 
   async revokeAllUserSessions(userId: string): Promise<void> {
-    await this.refreshTokenService.deleteByUserId(userId);
+    await Promise.all([
+      this.refreshTokenService.deleteByUserId(userId),
+      this.dataSource
+        .getRepository(User)
+        .update(userId, { tokenRevokedAt: new Date() })
+    ]);
   }
 
   private generateTokens(

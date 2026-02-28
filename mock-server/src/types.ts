@@ -18,6 +18,7 @@ export interface MockUser {
   isEmailVerified: boolean;
   failedLoginAttempts: number;
   lockedUntil: string | null;
+  tokenRevokedAt: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;

@@ -35,8 +35,12 @@ describe('AuthService', () => {
     delete: jest.Mock;
     createQueryBuilder: jest.Mock;
   };
+  let mockUserRepository: {
+    update: jest.Mock;
+  };
   let mockDataSource: {
     transaction: jest.Mock;
+    getRepository: jest.Mock;
   };
   let mockUsersService: {
     findByEmail: jest.Mock;
@@ -141,13 +145,18 @@ describe('AuthService', () => {
       createQueryBuilder: jest.fn().mockReturnValue(mockRelationQb)
     };
 
+    mockUserRepository = {
+      update: jest.fn().mockResolvedValue({ affected: 1 })
+    };
+
     mockDataSource = {
       transaction: jest
         .fn()
         .mockImplementation(
           (callback: (manager: typeof mockManager) => Promise<unknown>) =>
             callback(mockManager)
-        )
+        ),
+      getRepository: jest.fn().mockReturnValue(mockUserRepository)
     };
 
     mockUsersService = {
@@ -605,7 +614,7 @@ describe('AuthService', () => {
       const result = await service.resetPassword('valid-token', 'NewPassword1');
 
       expect(mockDataSource.transaction).toHaveBeenCalled();
-      // Password update + token clear in one manager.update call
+      // Password update + token clear + session revocation in one manager.update call
       expect(mockManager.update).toHaveBeenCalledWith(
         expect.anything(), // User entity class
         'user-1',
@@ -613,7 +622,9 @@ describe('AuthService', () => {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           password: expect.any(String), // bcrypt hash
           passwordResetToken: null,
-          passwordResetExpiresAt: null
+          passwordResetExpiresAt: null,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          tokenRevokedAt: expect.any(Date)
         })
       );
       // Session invalidation
@@ -652,11 +663,31 @@ describe('AuthService', () => {
   });
 
   describe('logout', () => {
-    it('should delete all refresh tokens for the user', async () => {
+    it('should delete all refresh tokens and set tokenRevokedAt', async () => {
       await service.logout('user-1');
 
       expect(mockRefreshTokenService.deleteByUserId).toHaveBeenCalledWith(
         'user-1'
+      );
+      expect(mockUserRepository.update).toHaveBeenCalledWith(
+        'user-1',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        expect.objectContaining({ tokenRevokedAt: expect.any(Date) })
+      );
+    });
+  });
+
+  describe('revokeAllUserSessions', () => {
+    it('should delete all refresh tokens and set tokenRevokedAt', async () => {
+      await service.revokeAllUserSessions('user-1');
+
+      expect(mockRefreshTokenService.deleteByUserId).toHaveBeenCalledWith(
+        'user-1'
+      );
+      expect(mockUserRepository.update).toHaveBeenCalledWith(
+        'user-1',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        expect.objectContaining({ tokenRevokedAt: expect.any(Date) })
       );
     });
   });
