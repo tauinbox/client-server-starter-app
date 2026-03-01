@@ -8,7 +8,7 @@ export const corsOptions = (): CorsOptions | CorsOptionsDelegate<Request> => {
   const originsString = process.env['CORS_ORIGINS'];
   if (originsString) {
     return {
-      origin: originsString === '*' ? '*' : originsString.split('#'),
+      origin: originsString === '*' ? '*' : originsString.split(','),
       preflightContinue: false,
       optionsSuccessStatus: 204
     };

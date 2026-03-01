@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { DataSource } from 'typeorm';
 import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
 import { UsersService } from './users.service';
 import { User } from '../entities/user.entity';
@@ -20,6 +21,7 @@ describe('UsersService', () => {
     increment: jest.Mock;
     update: jest.Mock;
   };
+  let mockDataSource: { transaction: jest.Mock };
   let mockQueryBuilder: {
     leftJoinAndSelect: jest.Mock;
     withDeleted: jest.Mock;
@@ -68,12 +70,18 @@ describe('UsersService', () => {
       update: jest.fn().mockResolvedValue(undefined)
     };
 
+    mockDataSource = { transaction: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
         {
           provide: getRepositoryToken(User),
           useValue: mockRepository
+        },
+        {
+          provide: DataSource,
+          useValue: mockDataSource
         }
       ]
     }).compile();
@@ -523,7 +531,14 @@ describe('UsersService', () => {
       isActive: false
     } as User;
 
-    it('should restore a soft-deleted user', async () => {
+    it('should restore a soft-deleted user inside a transaction', async () => {
+      const mockManager = {
+        restore: jest.fn().mockResolvedValue(undefined),
+        update: jest.fn().mockResolvedValue(undefined)
+      };
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: typeof mockManager) => Promise<void>) => cb(mockManager)
+      );
       mockRepository.findOne
         .mockResolvedValueOnce(deletedUser) // withDeleted lookup
         .mockResolvedValueOnce(mockUser); // final findOne after restore
@@ -535,8 +550,9 @@ describe('UsersService', () => {
         relations: ['roles'],
         withDeleted: true
       });
-      expect(mockRepository.restore).toHaveBeenCalledWith('user-1');
-      expect(mockRepository.update).toHaveBeenCalledWith('user-1', {
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockManager.restore).toHaveBeenCalledWith(User, 'user-1');
+      expect(mockManager.update).toHaveBeenCalledWith(User, 'user-1', {
         isActive: true
       });
       expect(result).toEqual(mockUser);
