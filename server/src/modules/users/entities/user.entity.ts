@@ -78,6 +78,7 @@ export class User {
   passwordResetExpiresAt: Date | null;
 
   @Column({ name: 'token_revoked_at', type: 'timestamp', nullable: true })
+  @Exclude()
   tokenRevokedAt: Date | null;
 
   @CreateDateColumn({ name: 'created_at' })

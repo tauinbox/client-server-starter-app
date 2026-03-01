@@ -5,7 +5,13 @@ import {
 } from '@casl/ability';
 import type { MongoQuery } from '@casl/ability';
 import { packRules } from '@casl/ability/extra';
-import type { MockAuditLog, MockUser, OAuthAccount, State } from './types';
+import type {
+  MockAuditLog,
+  MockUser,
+  OAuthAccount,
+  State,
+  UserResponse
+} from './types';
 import {
   seedOAuthAccounts,
   seedUsers,
@@ -58,8 +64,8 @@ export function findUserByIdWithDeleted(id: string): MockUser | undefined {
   return state.users.get(id);
 }
 
-export function toUserResponse(user: MockUser): Omit<MockUser, 'password'> {
-  const { password: _, ...response } = user;
+export function toUserResponse(user: MockUser): UserResponse {
+  const { password: _, tokenRevokedAt: __, ...response } = user;
   return response;
 }
 

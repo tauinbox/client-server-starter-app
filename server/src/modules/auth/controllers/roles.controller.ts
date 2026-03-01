@@ -1,12 +1,14 @@
 import {
   Body,
+  ClassSerializerInterceptor,
   Controller,
   Delete,
   Get,
   Param,
   Patch,
   Post,
-  Request
+  Request,
+  UseInterceptors
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -38,6 +40,7 @@ import { JwtAuthRequest } from '../types/auth.request';
   path: 'roles',
   version: '1'
 })
+@UseInterceptors(ClassSerializerInterceptor)
 export class RolesController {
   constructor(
     private readonly roleService: RoleService,
