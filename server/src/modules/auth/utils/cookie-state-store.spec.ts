@@ -5,12 +5,14 @@ function mockReqRes(cookies: Record<string, string> = {}) {
   const cookieFn = jest.fn();
   const clearCookieFn = jest.fn();
 
-  const res = {
+  // @ts-expect-error testing mock
+  const res: Response = {
     cookie: cookieFn,
     clearCookie: clearCookieFn
-  } as unknown as Response;
+  };
 
-  const req = { cookies, res } as unknown as Request & { res: Response };
+  // @ts-expect-error testing mock
+  const req: Request & { res: Response } = { cookies, res };
 
   return { req, cookieFn, clearCookieFn };
 }

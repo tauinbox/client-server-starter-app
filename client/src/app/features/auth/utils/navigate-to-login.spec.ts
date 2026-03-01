@@ -1,25 +1,29 @@
-import { navigateToLogin } from './navigate-to-login';
+import type { Mock } from 'vitest';
 import type { Router } from '@angular/router';
+import { navigateToLogin } from './navigate-to-login';
 
 describe('navigateToLogin', () => {
-  let router: { navigate: ReturnType<typeof vi.fn> };
+  let router: Router;
+  let navigateSpy: Mock<Router['navigate']>;
 
   beforeEach(() => {
-    router = { navigate: vi.fn() };
+    navigateSpy = vi.fn<Router['navigate']>();
+    // @ts-expect-error testing mock — partial Router, only navigate is used
+    router = { navigate: navigateSpy };
   });
 
   it('should navigate to login with returnUrl query param', () => {
-    navigateToLogin(router as unknown as Router, '/dashboard');
+    navigateToLogin(router, '/dashboard');
 
-    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
+    expect(navigateSpy).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/dashboard' }
     });
   });
 
   it('should navigate to login with root returnUrl', () => {
-    navigateToLogin(router as unknown as Router, '/');
+    navigateToLogin(router, '/');
 
-    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
+    expect(navigateSpy).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/' }
     });
   });

@@ -28,9 +28,10 @@ describe('GlobalExceptionFilter', () => {
       reply: jest.fn()
     };
 
-    const httpAdapterHost = {
+    const httpAdapterHost: HttpAdapterHost = {
+      // @ts-expect-error testing mock
       httpAdapter: mockHttpAdapter
-    } as unknown as HttpAdapterHost;
+    };
 
     filter = new GlobalExceptionFilter(httpAdapterHost);
 
@@ -38,10 +39,12 @@ describe('GlobalExceptionFilter', () => {
     const mockResponse = {};
     mockHost = {
       switchToHttp: () => ({
+        // @ts-expect-error testing mock
         getRequest: () => mockRequest,
+        // @ts-expect-error testing mock
         getResponse: () => mockResponse
       })
-    } as unknown as ArgumentsHost;
+    };
 
     loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
     loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
