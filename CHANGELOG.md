@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.8](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.7...v0.1.8) (2026-03-01)
+
+
+### Bug Fixes
+
+* move [@ts-expect-error](https://github.com/ts-expect-error) to argument lines in permissions.guard.spec.ts ([356a6fa](https://github.com/tauinbox/client-server-starter-app/commit/356a6fa6c8b0d3e56e9ed60ee53a58402085b453))
+* remove redundant [@ts-expect-error](https://github.com/ts-expect-error) before caslAbilityFactory argument ([6deb8cc](https://github.com/tauinbox/client-server-starter-app/commit/6deb8cc9defaff5bb1519c2a691dc47602e75905))
+* **security:** seal API field leaks and add compile-time type contracts ([97c2d50](https://github.com/tauinbox/client-server-starter-app/commit/97c2d50057f82c37627d44863aba910c0901334a))
+* **server:** extract CaslModule to break PermissionsGuard DI dependency ([91e6f32](https://github.com/tauinbox/client-server-starter-app/commit/91e6f32652965a3363257db0d7f657c781577a3f))
+* **server:** improve reliability — CORS, restore atomicity, startup validation ([d86c69b](https://github.com/tauinbox/client-server-starter-app/commit/d86c69bd4a865f6c3666a78916f681009815c6e6))
+
 ## [0.1.7](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.6...v0.1.7) (2026-02-28)
 
 
