@@ -2,6 +2,7 @@ import type { MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import * as Joi from 'joi';
 import configuration from './configuration';
 import { CacheModule } from '@nestjs/cache-manager';
 import { FeatureModule } from '../feature/feature.module';
@@ -35,7 +36,25 @@ export class CoreModule implements NestModule {
       imports: [
         ConfigModule.forRoot({
           load: [configuration],
-          isGlobal: true
+          isGlobal: true,
+          validationSchema: Joi.object({
+            APPLICATION_PORT: Joi.number().default(3000),
+            ENVIRONMENT: Joi.string()
+              .valid('local', 'development', 'staging', 'production')
+              .default('production'),
+            DB_HOST: Joi.string().required(),
+            DB_PORT: Joi.number().default(5432),
+            DB_NAME: Joi.string().required(),
+            DB_USER: Joi.string().required(),
+            DB_PASSWORD: Joi.string().required(),
+            JWT_SECRET: Joi.string().min(16).required(),
+            JWT_EXPIRATION: Joi.number().required(),
+            JWT_REFRESH_EXPIRATION: Joi.number().required()
+          }),
+          validationOptions: {
+            allowUnknown: true,
+            abortEarly: false
+          }
         }),
         CacheModule.register({
           isGlobal: true

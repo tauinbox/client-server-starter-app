@@ -4,7 +4,8 @@ import {
   NotFoundException
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { withTransaction } from '../../../common/utils/with-transaction.util';
 import * as bcrypt from 'bcrypt';
 import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
 import { User } from '../entities/user.entity';
@@ -18,7 +19,8 @@ import { escapeLikePattern } from '../../../common/utils/escape-like';
 export class UsersService {
   constructor(
     @InjectRepository(User)
-    private userRepository: Repository<User>
+    private userRepository: Repository<User>,
+    private dataSource: DataSource
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -284,8 +286,10 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
-    await this.userRepository.restore(id);
-    await this.userRepository.update(id, { isActive: true });
+    await withTransaction(this.dataSource, async (manager) => {
+      await manager.restore(User, id);
+      await manager.update(User, id, { isActive: true });
+    });
     return this.findOne(id);
   }
 }
