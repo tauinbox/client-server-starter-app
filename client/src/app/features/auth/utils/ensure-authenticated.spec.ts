@@ -4,8 +4,6 @@ import type { Router } from '@angular/router';
 import { ensureAuthenticated } from './ensure-authenticated';
 import type { TokensResponse } from '../models/auth.types';
 
-type NavigateMock = Mock<Router['navigate']>;
-
 describe('ensureAuthenticated', () => {
   let authStoreMock: {
     isAuthenticated: ReturnType<typeof vi.fn>;
@@ -15,7 +13,8 @@ describe('ensureAuthenticated', () => {
   let authServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
   };
-  let routerMock: { navigate: NavigateMock };
+  let router: Router;
+  let navigateSpy: Mock<Router['navigate']>;
 
   const mockTokens: TokensResponse = {
     access_token: 'access',
@@ -33,9 +32,9 @@ describe('ensureAuthenticated', () => {
       refreshTokens: vi.fn()
     };
 
-    routerMock = {
-      navigate: vi.fn<Router['navigate']>()
-    };
+    navigateSpy = vi.fn<Router['navigate']>();
+    // @ts-expect-error testing mock — partial Router, only navigate is used
+    router = { navigate: navigateSpy };
   });
 
   it('should call onAuthenticated directly when authenticated and token valid', () => {
@@ -45,7 +44,7 @@ describe('ensureAuthenticated', () => {
     const result = ensureAuthenticated(
       authStoreMock as Parameters<typeof ensureAuthenticated>[0],
       authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      routerMock,
+      router,
       '/dashboard',
       () => true
     );
@@ -61,7 +60,7 @@ describe('ensureAuthenticated', () => {
     const result = ensureAuthenticated(
       authStoreMock as Parameters<typeof ensureAuthenticated>[0],
       authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      routerMock,
+      router,
       '/dashboard',
       () => true
     );
@@ -79,7 +78,7 @@ describe('ensureAuthenticated', () => {
     const result = ensureAuthenticated(
       authStoreMock as Parameters<typeof ensureAuthenticated>[0],
       authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      routerMock,
+      router,
       '/dashboard',
       () => true
     );
@@ -94,7 +93,7 @@ describe('ensureAuthenticated', () => {
     const result = ensureAuthenticated(
       authStoreMock as Parameters<typeof ensureAuthenticated>[0],
       authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      routerMock,
+      router,
       '/dashboard',
       () => true
     );
@@ -102,7 +101,7 @@ describe('ensureAuthenticated', () => {
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(false);
     expect(authStoreMock.clearSession).toHaveBeenCalled();
-    expect(routerMock.navigate).toHaveBeenCalledWith(['/login'], {
+    expect(navigateSpy).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/dashboard' }
     });
   });
@@ -115,7 +114,7 @@ describe('ensureAuthenticated', () => {
     const result = ensureAuthenticated(
       authStoreMock as Parameters<typeof ensureAuthenticated>[0],
       authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      routerMock,
+      router,
       '/settings',
       () => true
     );
@@ -123,7 +122,7 @@ describe('ensureAuthenticated', () => {
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(false);
     expect(authStoreMock.clearSession).toHaveBeenCalled();
-    expect(routerMock.navigate).toHaveBeenCalledWith(['/login'], {
+    expect(navigateSpy).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/settings' }
     });
   });
@@ -134,7 +133,7 @@ describe('ensureAuthenticated', () => {
     const result = ensureAuthenticated(
       authStoreMock as Parameters<typeof ensureAuthenticated>[0],
       authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      routerMock,
+      router,
       '/dashboard',
       () => of(true)
     );

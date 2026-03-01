@@ -15,7 +15,7 @@ type AuthServiceLike = {
 export function ensureAuthenticated(
   authStore: AuthStoreLike,
   authService: AuthServiceLike,
-  router: Pick<Router, 'navigate'>,
+  router: Router,
   returnUrl: string,
   onAuthenticated: () => boolean | Observable<boolean>
 ): boolean | Observable<boolean> {
