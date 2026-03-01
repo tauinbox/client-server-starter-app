@@ -48,10 +48,11 @@ describe('PermissionsGuard', () => {
       createForUser: jest.fn()
     };
 
-    // @ts-expect-error testing mock — partial service mocks, only used methods provided
     guard = new PermissionsGuard(
       reflector,
+      // @ts-expect-error testing mock
       permissionService,
+      // @ts-expect-error testing mock
       caslAbilityFactory
     );
   });
