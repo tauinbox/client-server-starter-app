@@ -52,7 +52,6 @@ describe('PermissionsGuard', () => {
       reflector,
       // @ts-expect-error testing mock
       permissionService,
-      // @ts-expect-error testing mock
       caslAbilityFactory
     );
   });
