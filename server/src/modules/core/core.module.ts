@@ -18,6 +18,7 @@ import { HealthModule } from './health/health.module';
 import { AuditModule } from '../audit/audit.module';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
 import { RequestLoggingMiddleware } from './middleware/request-logging.middleware';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({})
 export class CoreModule implements NestModule {
@@ -56,6 +57,7 @@ export class CoreModule implements NestModule {
             abortEarly: false
           }
         }),
+        EventEmitterModule.forRoot(),
         CacheModule.register({
           isGlobal: true
         }),

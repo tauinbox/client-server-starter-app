@@ -31,7 +31,8 @@ import {
 } from '@nestjs/swagger';
 import { UserResponseDto } from '../dtos/user-response.dto';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
-import { AuthService } from '../../auth/services/auth.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { UserDeletedEvent } from '../events/user-deleted.event';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
@@ -46,7 +47,7 @@ import { JwtAuthRequest } from '../../auth/types/auth.request';
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
-    private readonly authService: AuthService,
+    private readonly eventEmitter: EventEmitter2,
     private readonly auditService: AuditService
   ) {}
 
@@ -182,7 +183,7 @@ export class UsersController {
   async remove(@Param('id') id: string, @Request() req: JwtAuthRequest) {
     const user = await this.usersService.findOne(id);
     await this.usersService.remove(id);
-    await this.authService.revokeAllUserSessions(id);
+    this.eventEmitter.emit(UserDeletedEvent.name, new UserDeletedEvent(id));
     await this.auditService.log({
       action: AuditAction.USER_DELETE,
       actorId: req.user.userId,
