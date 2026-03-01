@@ -24,8 +24,9 @@ describe('ThemeService', () => {
       removeListener: vi.fn(),
       onchange: null,
       dispatchEvent: (): boolean => false
-    } as unknown as MediaQueryList;
+    };
 
+    // @ts-expect-error testing mock
     const matchMediaSpy = vi.spyOn(window, 'matchMedia').mockReturnValue(mql);
 
     const child = createEnvironmentInjector(

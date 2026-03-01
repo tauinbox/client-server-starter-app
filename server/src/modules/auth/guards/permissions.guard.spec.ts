@@ -1,8 +1,6 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from './permissions.guard';
-import { PermissionService } from '../services/permission.service';
-import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { createMongoAbility } from '@casl/ability';
 import type { RawRuleOf } from '@casl/ability';
 import type { AppAbility, Actions, Subjects } from '../casl/app-ability';
@@ -18,9 +16,10 @@ describe('PermissionsGuard', () => {
       getHandler: jest.fn(),
       getClass: jest.fn(),
       switchToHttp: () => ({
+        // @ts-expect-error testing mock
         getRequest: () => ({ user })
       })
-    } as unknown as ExecutionContext;
+    };
   }
 
   function buildAbilityWith(...permissionStrings: string[]): AppAbility {
@@ -49,10 +48,11 @@ describe('PermissionsGuard', () => {
       createForUser: jest.fn()
     };
 
+    // @ts-expect-error testing mock — partial service mocks, only used methods provided
     guard = new PermissionsGuard(
       reflector,
-      permissionService as unknown as PermissionService,
-      caslAbilityFactory as unknown as CaslAbilityFactory
+      permissionService,
+      caslAbilityFactory
     );
   });
 

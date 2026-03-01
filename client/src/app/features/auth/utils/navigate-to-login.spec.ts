@@ -1,5 +1,4 @@
 import { navigateToLogin } from './navigate-to-login';
-import type { Router } from '@angular/router';
 
 describe('navigateToLogin', () => {
   let router: { navigate: ReturnType<typeof vi.fn> };
@@ -9,7 +8,8 @@ describe('navigateToLogin', () => {
   });
 
   it('should navigate to login with returnUrl query param', () => {
-    navigateToLogin(router as unknown as Router, '/dashboard');
+    // @ts-expect-error testing mock
+    navigateToLogin(router, '/dashboard');
 
     expect(router.navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/dashboard' }
@@ -17,7 +17,8 @@ describe('navigateToLogin', () => {
   });
 
   it('should navigate to login with root returnUrl', () => {
-    navigateToLogin(router as unknown as Router, '/');
+    // @ts-expect-error testing mock
+    navigateToLogin(router, '/');
 
     expect(router.navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/' }
