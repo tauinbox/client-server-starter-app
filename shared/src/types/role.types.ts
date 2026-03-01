@@ -12,6 +12,7 @@ export type PermissionResponse = {
   resource: string;
   action: string;
   description: string | null;
+  createdAt: string;
 };
 
 export type RolePermissionResponse = {

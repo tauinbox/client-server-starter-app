@@ -1,23 +1,12 @@
 import { createMockJwt } from './jwt.utils';
+import type { UserResponse } from '@app/shared/types';
 
 export {
   createMockUser,
   createOAuthAccount
 } from '../../../mock-server/src/factories';
 
-export type MockUser = {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  isActive: boolean;
-  roles: string[];
-  isEmailVerified: boolean;
-  failedLoginAttempts: number;
-  lockedUntil: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
+export type MockUser = UserResponse;
 
 export const defaultUser: MockUser = {
   id: '1',
@@ -30,7 +19,8 @@ export const defaultUser: MockUser = {
   failedLoginAttempts: 0,
   lockedUntil: null,
   createdAt: '2025-01-01T00:00:00.000Z',
-  updatedAt: '2025-01-01T00:00:00.000Z'
+  updatedAt: '2025-01-01T00:00:00.000Z',
+  deletedAt: null
 };
 
 export const defaultTokens = {
@@ -50,7 +40,8 @@ export const mockUsersList: MockUser[] = [
     failedLoginAttempts: 0,
     lockedUntil: null,
     createdAt: '2025-01-01T00:00:00.000Z',
-    updatedAt: '2025-01-01T00:00:00.000Z'
+    updatedAt: '2025-01-01T00:00:00.000Z',
+    deletedAt: null
   },
   {
     id: '2',
@@ -63,7 +54,8 @@ export const mockUsersList: MockUser[] = [
     failedLoginAttempts: 0,
     lockedUntil: null,
     createdAt: '2025-02-01T00:00:00.000Z',
-    updatedAt: '2025-02-01T00:00:00.000Z'
+    updatedAt: '2025-02-01T00:00:00.000Z',
+    deletedAt: null
   },
   {
     id: '3',
@@ -76,6 +68,7 @@ export const mockUsersList: MockUser[] = [
     failedLoginAttempts: 0,
     lockedUntil: null,
     createdAt: '2025-03-01T00:00:00.000Z',
-    updatedAt: '2025-03-01T00:00:00.000Z'
+    updatedAt: '2025-03-01T00:00:00.000Z',
+    deletedAt: null
   }
 ];

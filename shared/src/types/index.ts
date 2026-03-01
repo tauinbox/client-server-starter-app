@@ -1,3 +1,5 @@
+export type { WireType, _AssertNever } from './type-utils';
+
 export type {
   UserResponse,
   OAuthAccountResponse
