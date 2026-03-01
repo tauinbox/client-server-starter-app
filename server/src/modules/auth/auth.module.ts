@@ -21,8 +21,7 @@ import { GoogleStrategy } from './strategies/google.strategy';
 import { FacebookStrategy } from './strategies/facebook.strategy';
 import { VkStrategy } from './strategies/vk.strategy';
 import { User } from '../users/entities/user.entity';
-import { PermissionService } from './services/permission.service';
-import { CaslAbilityFactory } from './casl/casl-ability.factory';
+import { CaslModule } from './casl/casl.module';
 import { RoleService } from './services/role.service';
 import { RolesController } from './controllers/roles.controller';
 import { UserDeletedListener } from './listeners/user-deleted.listener';
@@ -47,6 +46,7 @@ function conditionalProvider(
 @Module({
   imports: [
     UsersModule,
+    CaslModule,
     PassportModule,
     TypeOrmModule.forFeature([
       RefreshToken,
@@ -76,14 +76,12 @@ function conditionalProvider(
     RefreshTokenService,
     TokenCleanupService,
     OAuthAccountService,
-    PermissionService,
-    CaslAbilityFactory,
     RoleService,
     conditionalProvider('GOOGLE_CLIENT_ID', GoogleStrategy),
     conditionalProvider('FACEBOOK_CLIENT_ID', FacebookStrategy),
     conditionalProvider('VK_CLIENT_ID', VkStrategy),
     UserDeletedListener
   ],
-  exports: [AuthService, PermissionService, RoleService, CaslAbilityFactory]
+  exports: [AuthService, CaslModule, RoleService]
 })
 export class AuthModule {}
