@@ -5,9 +5,10 @@ import {
   HttpTestingController,
   provideHttpClientTesting
 } from '@angular/common/http/testing';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, of } from 'rxjs';
 import { AuthService } from './auth.service';
 import { AuthStore } from '../store/auth.store';
+import { TokenService } from './token.service';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import type { AuthResponse } from '../models/auth.types';
 
@@ -22,20 +23,11 @@ function createJwt(payload: Record<string, unknown>): string {
   return `${encode(header)}.${encode(payload)}.fake-signature`;
 }
 
-function createMockAuthResponse(
-  overrides: { expiredToken?: boolean } = {}
-): AuthResponse {
-  const exp = overrides.expiredToken
-    ? Math.floor(Date.now() / 1000) - 3600
-    : Math.floor(Date.now() / 1000) + 3600;
-
+function createMockAuthResponse(): AuthResponse {
+  const exp = Math.floor(Date.now() / 1000) + 3600;
   return {
     tokens: {
-      access_token: createJwt({
-        sub: '1',
-        email: 'test@example.com',
-        exp
-      }),
+      access_token: createJwt({ sub: '1', email: 'test@example.com', exp }),
       expires_in: 3600
     },
     user: {
@@ -68,6 +60,13 @@ describe('AuthService', () => {
     clearSession: ReturnType<typeof vi.fn>;
     setRules: ReturnType<typeof vi.fn>;
   };
+  let tokenServiceMock: {
+    refreshTokens: ReturnType<typeof vi.fn>;
+    scheduleTokenRefresh: ReturnType<typeof vi.fn>;
+    cancelRefresh: ReturnType<typeof vi.fn>;
+    forceLogout: ReturnType<typeof vi.fn>;
+  };
+
   beforeEach(() => {
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(false),
@@ -80,12 +79,20 @@ describe('AuthService', () => {
       setRules: vi.fn()
     };
 
+    tokenServiceMock = {
+      refreshTokens: vi.fn().mockReturnValue(of(null)),
+      scheduleTokenRefresh: vi.fn(),
+      cancelRefresh: vi.fn(),
+      forceLogout: vi.fn()
+    };
+
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: AuthStore, useValue: authStoreMock }
+        { provide: AuthStore, useValue: authStoreMock },
+        { provide: TokenService, useValue: tokenServiceMock }
       ]
     });
 
@@ -159,48 +166,15 @@ describe('AuthService', () => {
   });
 
   describe('refreshTokens', () => {
-    it('should POST empty body and save response (refresh token sent as cookie)', async () => {
-      const newAuth = createMockAuthResponse();
+    it('should delegate to TokenService.refreshTokens', () => {
+      const mockTokens = createMockAuthResponse().tokens;
+      tokenServiceMock.refreshTokens.mockReturnValue(of(mockTokens));
 
-      const tokensPromise = firstValueFrom(service.refreshTokens());
+      service.refreshTokens().subscribe((tokens) => {
+        expect(tokens).toEqual(mockTokens);
+      });
 
-      const req = httpMock.expectOne(AuthApiEnum.RefreshToken);
-      expect(req.request.body).toEqual({});
-      req.flush(newAuth);
-
-      const tokens = await tokensPromise;
-      expect(tokens).toEqual(newAuth.tokens);
-      expect(authStoreMock.saveAuthResponse).toHaveBeenCalledWith(newAuth);
-    });
-
-    it('should rethrow error when refresh fails (callers handle cleanup)', async () => {
-      const tokensPromise = firstValueFrom(service.refreshTokens()).catch(
-        (err) => err
-      );
-
-      const req = httpMock.expectOne(AuthApiEnum.RefreshToken);
-      req.flush(
-        { message: 'Invalid refresh token' },
-        { status: 401, statusText: 'Unauthorized' }
-      );
-
-      const error = await tokensPromise;
-      expect(error.status).toBe(401);
-      expect(authStoreMock.clearSession).not.toHaveBeenCalled();
-    });
-
-    it('should deduplicate concurrent refresh calls', async () => {
-      const newAuth = createMockAuthResponse();
-
-      const promise1 = firstValueFrom(service.refreshTokens());
-      const promise2 = firstValueFrom(service.refreshTokens());
-
-      const req = httpMock.expectOne(AuthApiEnum.RefreshToken);
-      req.flush(newAuth);
-
-      const [tokens1, tokens2] = await Promise.all([promise1, promise2]);
-      expect(tokens1).toEqual(newAuth.tokens);
-      expect(tokens2).toEqual(newAuth.tokens);
+      expect(tokenServiceMock.refreshTokens).toHaveBeenCalled();
     });
   });
 
@@ -258,7 +232,6 @@ describe('AuthService', () => {
 
     it('should schedule refresh when authenticated', () => {
       authStoreMock.isAuthenticated.mockReturnValue(true);
-      authStoreMock.getTokenExpiryTime.mockReturnValue(null);
       const scheduleSpy = vi.spyOn(service, 'scheduleTokenRefresh');
 
       service.initSession();
