@@ -37,12 +37,8 @@ describe('UserDeletedListener', () => {
     await listener.handle(event);
 
     expect(refreshTokenService.deleteByUserId).toHaveBeenCalledWith(userId);
-    expect(repositoryMock.update).toHaveBeenCalledTimes(1);
-
-    const firstCallArgs: unknown[] = repositoryMock.update.mock
-      .calls[0] as unknown[];
-    expect(firstCallArgs[0]).toBe(userId);
-    const updatePayload = firstCallArgs[1] as { tokenRevokedAt: unknown };
-    expect(updatePayload.tokenRevokedAt).toBeInstanceOf(Date);
+    expect(repositoryMock.update).toHaveBeenCalledWith(userId, {
+      tokenRevokedAt: expect.any(Date) as Date
+    });
   });
 });
