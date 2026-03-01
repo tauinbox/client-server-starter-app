@@ -1,6 +1,10 @@
 import { of, throwError, Observable, firstValueFrom } from 'rxjs';
+import type { Mock } from 'vitest';
+import type { Router } from '@angular/router';
 import { ensureAuthenticated } from './ensure-authenticated';
 import type { TokensResponse } from '../models/auth.types';
+
+type NavigateMock = Mock<Router['navigate']>;
 
 describe('ensureAuthenticated', () => {
   let authStoreMock: {
@@ -11,7 +15,7 @@ describe('ensureAuthenticated', () => {
   let authServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
   };
-  let routerMock: { navigate: ReturnType<typeof vi.fn> };
+  let routerMock: { navigate: NavigateMock };
 
   const mockTokens: TokensResponse = {
     access_token: 'access',
@@ -29,7 +33,9 @@ describe('ensureAuthenticated', () => {
       refreshTokens: vi.fn()
     };
 
-    routerMock = { navigate: vi.fn() };
+    routerMock = {
+      navigate: vi.fn<Router['navigate']>()
+    };
   });
 
   it('should call onAuthenticated directly when authenticated and token valid', () => {
@@ -39,7 +45,6 @@ describe('ensureAuthenticated', () => {
     const result = ensureAuthenticated(
       authStoreMock as Parameters<typeof ensureAuthenticated>[0],
       authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      // @ts-expect-error testing mock
       routerMock,
       '/dashboard',
       () => true
@@ -56,7 +61,6 @@ describe('ensureAuthenticated', () => {
     const result = ensureAuthenticated(
       authStoreMock as Parameters<typeof ensureAuthenticated>[0],
       authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      // @ts-expect-error testing mock
       routerMock,
       '/dashboard',
       () => true
@@ -75,7 +79,6 @@ describe('ensureAuthenticated', () => {
     const result = ensureAuthenticated(
       authStoreMock as Parameters<typeof ensureAuthenticated>[0],
       authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      // @ts-expect-error testing mock
       routerMock,
       '/dashboard',
       () => true
@@ -91,7 +94,6 @@ describe('ensureAuthenticated', () => {
     const result = ensureAuthenticated(
       authStoreMock as Parameters<typeof ensureAuthenticated>[0],
       authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      // @ts-expect-error testing mock
       routerMock,
       '/dashboard',
       () => true
@@ -113,7 +115,6 @@ describe('ensureAuthenticated', () => {
     const result = ensureAuthenticated(
       authStoreMock as Parameters<typeof ensureAuthenticated>[0],
       authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      // @ts-expect-error testing mock
       routerMock,
       '/settings',
       () => true
@@ -133,7 +134,6 @@ describe('ensureAuthenticated', () => {
     const result = ensureAuthenticated(
       authStoreMock as Parameters<typeof ensureAuthenticated>[0],
       authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      // @ts-expect-error testing mock
       routerMock,
       '/dashboard',
       () => of(true)

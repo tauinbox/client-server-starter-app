@@ -1,14 +1,19 @@
+import type { Mock } from 'vitest';
+import type { Router } from '@angular/router';
 import { navigateToLogin } from './navigate-to-login';
 
+type NavigateMock = Mock<Router['navigate']>;
+
 describe('navigateToLogin', () => {
-  let router: { navigate: ReturnType<typeof vi.fn> };
+  let router: { navigate: NavigateMock };
 
   beforeEach(() => {
-    router = { navigate: vi.fn() };
+    router = {
+      navigate: vi.fn<Router['navigate']>()
+    };
   });
 
   it('should navigate to login with returnUrl query param', () => {
-    // @ts-expect-error testing mock
     navigateToLogin(router, '/dashboard');
 
     expect(router.navigate).toHaveBeenCalledWith(['/login'], {
@@ -17,7 +22,6 @@ describe('navigateToLogin', () => {
   });
 
   it('should navigate to login with root returnUrl', () => {
-    // @ts-expect-error testing mock
     navigateToLogin(router, '/');
 
     expect(router.navigate).toHaveBeenCalledWith(['/login'], {
