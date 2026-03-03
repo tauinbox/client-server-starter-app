@@ -5,14 +5,12 @@ import { RefreshTokenService } from './refresh-token.service';
 describe('TokenCleanupService', () => {
   let service: TokenCleanupService;
   let refreshTokenService: {
-    countExpiredTokens: jest.Mock;
     removeExpiredTokens: jest.Mock;
     removeRevokedAndExpiredTokens: jest.Mock;
   };
 
   beforeEach(async () => {
     refreshTokenService = {
-      countExpiredTokens: jest.fn(),
       removeExpiredTokens: jest.fn(),
       removeRevokedAndExpiredTokens: jest.fn()
     };
@@ -35,35 +33,16 @@ describe('TokenCleanupService', () => {
   });
 
   describe('handleDailyTokenCleanup', () => {
-    it('should count and remove expired tokens', async () => {
-      refreshTokenService.countExpiredTokens.mockResolvedValue(15);
-      refreshTokenService.removeExpiredTokens.mockResolvedValue(undefined);
+    it('should remove expired tokens in a single call', async () => {
+      refreshTokenService.removeExpiredTokens.mockResolvedValue(15);
 
       await service.handleDailyTokenCleanup();
 
-      expect(refreshTokenService.countExpiredTokens).toHaveBeenCalled();
       expect(refreshTokenService.removeExpiredTokens).toHaveBeenCalled();
     });
 
-    it('should call countExpiredTokens before removeExpiredTokens', async () => {
-      const callOrder: string[] = [];
-      refreshTokenService.countExpiredTokens.mockImplementation(() => {
-        callOrder.push('count');
-        return Promise.resolve(5);
-      });
-      refreshTokenService.removeExpiredTokens.mockImplementation(() => {
-        callOrder.push('remove');
-        return Promise.resolve();
-      });
-
-      await service.handleDailyTokenCleanup();
-
-      expect(callOrder).toEqual(['count', 'remove']);
-    });
-
     it('should log the number of removed tokens', async () => {
-      refreshTokenService.countExpiredTokens.mockResolvedValue(42);
-      refreshTokenService.removeExpiredTokens.mockResolvedValue(undefined);
+      refreshTokenService.removeExpiredTokens.mockResolvedValue(42);
       const logSpy = jest.spyOn(service['logger'], 'log');
 
       await service.handleDailyTokenCleanup();
@@ -74,8 +53,7 @@ describe('TokenCleanupService', () => {
     });
 
     it('should log zero when no expired tokens exist', async () => {
-      refreshTokenService.countExpiredTokens.mockResolvedValue(0);
-      refreshTokenService.removeExpiredTokens.mockResolvedValue(undefined);
+      refreshTokenService.removeExpiredTokens.mockResolvedValue(0);
       const logSpy = jest.spyOn(service['logger'], 'log');
 
       await service.handleDailyTokenCleanup();
@@ -85,23 +63,8 @@ describe('TokenCleanupService', () => {
       );
     });
 
-    it('should catch and log errors from countExpiredTokens', async () => {
-      const error = new Error('DB connection lost');
-      refreshTokenService.countExpiredTokens.mockRejectedValue(error);
-      const errorSpy = jest.spyOn(service['logger'], 'error');
-
-      await service.handleDailyTokenCleanup();
-
-      expect(errorSpy).toHaveBeenCalledWith(
-        'Error during token cleanup:',
-        error
-      );
-      expect(refreshTokenService.removeExpiredTokens).not.toHaveBeenCalled();
-    });
-
     it('should catch and log errors from removeExpiredTokens', async () => {
       const error = new Error('Delete failed');
-      refreshTokenService.countExpiredTokens.mockResolvedValue(5);
       refreshTokenService.removeExpiredTokens.mockRejectedValue(error);
       const errorSpy = jest.spyOn(service['logger'], 'error');
 

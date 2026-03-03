@@ -57,22 +57,14 @@ export class RefreshTokenService {
     await this.repository.update(id, { revoked: true });
   }
 
-  async countExpiredTokens(): Promise<number> {
-    const now = new Date();
-    return this.repository.count({
-      where: {
-        expiresAt: LessThan(now)
-      }
-    });
-  }
-
-  async removeExpiredTokens(): Promise<void> {
-    await this.repository
+  async removeExpiredTokens(): Promise<number> {
+    const result = await this.repository
       .createQueryBuilder()
       .delete()
       .from(RefreshToken)
       .where('expires_at < :now', { now: new Date() })
       .execute();
+    return result.affected ?? 0;
   }
 
   async removeRevokedAndExpiredTokens(): Promise<void> {

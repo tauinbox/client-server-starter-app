@@ -46,7 +46,6 @@ describe('AuthService', () => {
     findByEmail: jest.Mock;
     findOne: jest.Mock;
     create: jest.Mock;
-    createOAuthUser: jest.Mock;
     incrementFailedAttemptsAndLockIfNeeded: jest.Mock;
     resetLoginAttempts: jest.Mock;
     setEmailVerificationToken: jest.Mock;
@@ -163,7 +162,6 @@ describe('AuthService', () => {
       findByEmail: jest.fn(),
       findOne: jest.fn(),
       create: jest.fn(),
-      createOAuthUser: jest.fn(),
       incrementFailedAttemptsAndLockIfNeeded: jest.fn().mockResolvedValue({
         failedLoginAttempts: 1,
         lockedUntil: null

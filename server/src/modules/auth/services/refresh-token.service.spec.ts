@@ -160,26 +160,11 @@ describe('RefreshTokenService', () => {
     });
   });
 
-  describe('countExpiredTokens', () => {
-    it('should count tokens with expiresAt before now', async () => {
-      mockRepository.count.mockResolvedValue(42);
-
-      const result = await service.countExpiredTokens();
-
-      expect(mockRepository.count).toHaveBeenCalledWith({
-        where: {
-          expiresAt: expect.objectContaining({
-            _type: 'lessThan'
-          }) as Date
-        }
-      });
-      expect(result).toBe(42);
-    });
-  });
-
   describe('removeExpiredTokens', () => {
-    it('should delete expired tokens using query builder', async () => {
-      await service.removeExpiredTokens();
+    it('should delete expired tokens using query builder and return affected count', async () => {
+      mockQueryBuilder.execute.mockResolvedValue({ affected: 7 });
+
+      const result = await service.removeExpiredTokens();
 
       expect(mockRepository.createQueryBuilder).toHaveBeenCalled();
       expect(mockQueryBuilder.delete).toHaveBeenCalled();
@@ -188,6 +173,15 @@ describe('RefreshTokenService', () => {
         now: expect.any(Date) as Date
       });
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
+      expect(result).toBe(7);
+    });
+
+    it('should return 0 when affected is undefined', async () => {
+      mockQueryBuilder.execute.mockResolvedValue({});
+
+      const result = await service.removeExpiredTokens();
+
+      expect(result).toBe(0);
     });
   });
 
