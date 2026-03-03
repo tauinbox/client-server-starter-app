@@ -14,13 +14,9 @@ export class TokenCleanupService {
     this.logger.log('Starting scheduled cleanup of expired refresh tokens');
 
     try {
-      const countBefore = await this.refreshTokenService.countExpiredTokens();
+      const removed = await this.refreshTokenService.removeExpiredTokens();
 
-      await this.refreshTokenService.removeExpiredTokens();
-
-      this.logger.log(
-        `Successfully removed ${countBefore} expired refresh tokens`
-      );
+      this.logger.log(`Successfully removed ${removed} expired refresh tokens`);
     } catch (error) {
       this.logger.error('Error during token cleanup:', error);
     }

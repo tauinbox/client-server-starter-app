@@ -43,10 +43,6 @@ export class UsersService {
     return this.userRepository.save(user);
   }
 
-  async findAll(): Promise<User[]> {
-    return this.userRepository.find();
-  }
-
   async findPaginated(
     query: SearchUsersQueryDto
   ): Promise<PaginatedResponseDto<User>> {
@@ -113,41 +109,6 @@ export class UsersService {
     });
   }
 
-  async searchUsers(filters: {
-    email?: string;
-    firstName?: string;
-    lastName?: string;
-    isActive?: boolean;
-  }): Promise<User[]> {
-    const queryBuilder = this.userRepository.createQueryBuilder('user');
-
-    if (filters.email) {
-      queryBuilder.andWhere('user.email LIKE :email', {
-        email: `%${escapeLikePattern(filters.email)}%`
-      });
-    }
-
-    if (filters.firstName) {
-      queryBuilder.andWhere('user.firstName ILIKE :firstName', {
-        firstName: `%${escapeLikePattern(filters.firstName)}%`
-      });
-    }
-
-    if (filters.lastName) {
-      queryBuilder.andWhere('user.lastName ILIKE :lastName', {
-        lastName: `%${escapeLikePattern(filters.lastName)}%`
-      });
-    }
-
-    if (filters.isActive !== undefined) {
-      queryBuilder.andWhere('user.isActive = :isActive', {
-        isActive: filters.isActive
-      });
-    }
-
-    return queryBuilder.getMany();
-  }
-
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
 
@@ -165,21 +126,6 @@ export class UsersService {
 
     this.userRepository.merge(user, changes);
 
-    return this.userRepository.save(user);
-  }
-
-  async createOAuthUser(data: {
-    email: string;
-    firstName: string;
-    lastName: string;
-  }): Promise<User> {
-    const user = this.userRepository.create({
-      email: data.email,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      password: null,
-      isEmailVerified: true
-    });
     return this.userRepository.save(user);
   }
 

@@ -133,26 +133,6 @@ describe('UsersService', () => {
     });
   });
 
-  describe('findAll', () => {
-    it('should return all users', async () => {
-      const users = [mockUser, { ...mockUser, id: 'user-2' }];
-      mockRepository.find.mockResolvedValue(users);
-
-      const result = await service.findAll();
-
-      expect(mockRepository.find).toHaveBeenCalled();
-      expect(result).toEqual(users);
-    });
-
-    it('should return empty array when no users exist', async () => {
-      mockRepository.find.mockResolvedValue([]);
-
-      const result = await service.findAll();
-
-      expect(result).toEqual([]);
-    });
-  });
-
   describe('findOne', () => {
     it('should return a user by id', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
@@ -197,75 +177,6 @@ describe('UsersService', () => {
       const result = await service.findByEmail('nonexistent@example.com');
 
       expect(result).toBeNull();
-    });
-  });
-
-  describe('searchUsers', () => {
-    it('should search by email filter', async () => {
-      mockQueryBuilder.getMany.mockResolvedValue([mockUser]);
-
-      const result = await service.searchUsers({ email: 'test' });
-
-      expect(mockRepository.createQueryBuilder).toHaveBeenCalledWith('user');
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'user.email LIKE :email',
-        { email: '%test%' }
-      );
-      expect(result).toEqual([mockUser]);
-    });
-
-    it('should search by firstName filter (ILIKE)', async () => {
-      await service.searchUsers({ firstName: 'John' });
-
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'user.firstName ILIKE :firstName',
-        { firstName: '%John%' }
-      );
-    });
-
-    it('should search by lastName filter (ILIKE)', async () => {
-      await service.searchUsers({ lastName: 'Doe' });
-
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'user.lastName ILIKE :lastName',
-        { lastName: '%Doe%' }
-      );
-    });
-
-    it('should search by isActive filter', async () => {
-      await service.searchUsers({ isActive: false });
-
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'user.isActive = :isActive',
-        { isActive: false }
-      );
-    });
-
-    it('should combine multiple filters', async () => {
-      await service.searchUsers({
-        email: 'test',
-        firstName: 'John'
-      });
-
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledTimes(2);
-    });
-
-    it('should return all users when no filters provided', async () => {
-      mockQueryBuilder.getMany.mockResolvedValue([mockUser]);
-
-      const result = await service.searchUsers({});
-
-      expect(mockQueryBuilder.andWhere).not.toHaveBeenCalled();
-      expect(result).toEqual([mockUser]);
-    });
-
-    it('should escape special LIKE characters in filters', async () => {
-      await service.searchUsers({ email: '50%_off\\' });
-
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'user.email LIKE :email',
-        { email: '%50\\%\\_off\\\\%' }
-      );
     });
   });
 
@@ -468,36 +379,6 @@ describe('UsersService', () => {
           lockedUntil: null
         })
       );
-    });
-  });
-
-  describe('createOAuthUser', () => {
-    it('should create a user without password and with email verified', async () => {
-      const oauthData = {
-        email: 'oauth@example.com',
-        firstName: 'OAuth',
-        lastName: 'User'
-      };
-      const oauthUser = {
-        ...mockUser,
-        ...oauthData,
-        password: null,
-        isEmailVerified: true
-      };
-      mockRepository.create.mockReturnValue(oauthUser);
-      mockRepository.save.mockResolvedValue(oauthUser);
-
-      const result = await service.createOAuthUser(oauthData);
-
-      expect(mockRepository.create).toHaveBeenCalledWith({
-        email: 'oauth@example.com',
-        firstName: 'OAuth',
-        lastName: 'User',
-        password: null,
-        isEmailVerified: true
-      });
-      expect(mockRepository.save).toHaveBeenCalledWith(oauthUser);
-      expect(result.password).toBeNull();
     });
   });
 
