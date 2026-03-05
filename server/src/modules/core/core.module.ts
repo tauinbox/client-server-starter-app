@@ -12,6 +12,10 @@ import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import {
+  LOCKOUT_DURATION_MS,
+  MAX_FAILED_ATTEMPTS
+} from '@app/shared/constants/auth.constants';
 import { GlobalExceptionFilter } from './filters';
 import { MailModule } from '../mail/mail.module';
 import { HealthModule } from './health/health.module';
@@ -62,7 +66,18 @@ export class CoreModule implements NestModule {
           isGlobal: true
         }),
         ScheduleModule.forRoot(),
-        ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
+        ThrottlerModule.forRoot([
+          { ttl: 60000, limit: 10 },
+          {
+            // Applied globally but overridden on the login route to prevent a
+            // single IP from accumulating enough failed attempts to trigger
+            // account lockout (SEC-6). High global limit = effectively disabled
+            // on all other routes.
+            name: 'login-long-window',
+            ttl: LOCKOUT_DURATION_MS,
+            limit: MAX_FAILED_ATTEMPTS * 1000
+          }
+        ]),
         TypeOrmModule.forRootAsync({ imports: [], useFactory: postgresConfig }),
         MailModule,
         AuditModule,
