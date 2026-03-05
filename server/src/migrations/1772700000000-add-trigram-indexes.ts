@@ -8,10 +8,10 @@ export class AddTrigramIndexes1772700000000 implements MigrationInterface {
       `CREATE INDEX "idx_users_email_trgm" ON "users" USING GIN ("email" gin_trgm_ops)`
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_users_first_name_trgm" ON "users" USING GIN ("first_name" gin_trgm_ops)`
+      `CREATE INDEX "idx_users_first_name_trgm" ON "users" USING GIN ("firstName" gin_trgm_ops)`
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_users_last_name_trgm" ON "users" USING GIN ("last_name" gin_trgm_ops)`
+      `CREATE INDEX "idx_users_last_name_trgm" ON "users" USING GIN ("lastName" gin_trgm_ops)`
     );
   }
 
