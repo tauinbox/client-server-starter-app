@@ -58,7 +58,7 @@ export class UsersService {
     }
 
     if (filters.email) {
-      qb.andWhere('user.email LIKE :email', {
+      qb.andWhere('user.email ILIKE :email', {
         email: `%${escapeLikePattern(filters.email)}%`
       });
     }
