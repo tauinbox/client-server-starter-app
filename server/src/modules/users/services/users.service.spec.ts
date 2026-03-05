@@ -255,7 +255,7 @@ describe('UsersService', () => {
       });
 
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'user.email LIKE :email',
+        'user.email ILIKE :email',
         { email: '%test%' }
       );
       expect(mockQueryBuilder.orderBy).toHaveBeenCalled();
