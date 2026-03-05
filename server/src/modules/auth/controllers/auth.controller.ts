@@ -15,6 +15,10 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
+  LOCKOUT_DURATION_MS,
+  MAX_FAILED_ATTEMPTS
+} from '@app/shared/constants/auth.constants';
+import {
   ApiBearerAuth,
   ApiBody,
   ApiConflictResponse,
@@ -94,7 +98,13 @@ export class AuthController {
     return this.authService.register(registerDto, extractAuditContext(req));
   }
 
-  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @Throttle({
+    default: { ttl: 60000, limit: 3 },
+    'login-long-window': {
+      ttl: LOCKOUT_DURATION_MS,
+      limit: MAX_FAILED_ATTEMPTS - 1
+    }
+  })
   @UseGuards(LocalAuthGuard)
   @Post('login')
   @HttpCode(HttpStatus.OK)
