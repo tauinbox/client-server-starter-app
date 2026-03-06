@@ -1,8 +1,9 @@
 import type { MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import * as Joi from 'joi';
+import { LoggerModule } from 'nestjs-pino';
 import configuration from './configuration';
 import { CacheModule } from '@nestjs/cache-manager';
 import { FeatureModule } from '../feature/feature.module';
@@ -54,12 +55,31 @@ export class CoreModule implements NestModule {
             DB_PASSWORD: Joi.string().required(),
             JWT_SECRET: Joi.string().min(16).required(),
             JWT_EXPIRATION: Joi.number().required(),
-            JWT_REFRESH_EXPIRATION: Joi.number().required()
+            JWT_REFRESH_EXPIRATION: Joi.number().required(),
+            AUDIT_LOG_RETENTION_DAYS: Joi.number().min(1).default(90)
           }),
           validationOptions: {
             allowUnknown: true,
             abortEarly: false
           }
+        }),
+        LoggerModule.forRootAsync({
+          inject: [ConfigService],
+          useFactory: (config: ConfigService) => ({
+            pinoHttp: {
+              // HTTP request logging is handled by RequestLoggingMiddleware
+              autoLogging: false,
+              level:
+                config.get('ENVIRONMENT') === 'production' ? 'info' : 'debug',
+              transport:
+                config.get('ENVIRONMENT') !== 'production'
+                  ? {
+                      target: 'pino-pretty',
+                      options: { colorize: true, singleLine: true }
+                    }
+                  : undefined
+            }
+          })
         }),
         EventEmitterModule.forRoot(),
         CacheModule.register({

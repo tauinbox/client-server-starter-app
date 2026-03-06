@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { CoreModule } from './modules/core/core.module';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as compression from 'compression';
 import helmet from 'helmet';
@@ -12,11 +13,9 @@ import { corsOptions } from './cors-options';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(
     CoreModule.forRoot(),
-    {
-      bufferLogs: true,
-      logger: ['fatal', 'error', 'warn', 'log']
-    }
+    { bufferLogs: true }
   );
+  app.useLogger(app.get(Logger));
 
   /*
    Example: getting instances to pass as dependencies into class constructors (when needed)
@@ -67,7 +66,7 @@ async function bootstrap() {
     : 3000;
 
   await app.listen(port);
-  console.log(`Server started listening on port ${port}`);
+  app.get(Logger).log(`Server started listening on port ${port}`, 'Bootstrap');
 }
 
 void bootstrap();
