@@ -79,6 +79,7 @@ Copy `.env.example` to `.env` and configure:
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
 | `SMTP_FROM` | `noreply@example.com` | Sender email address |
+| `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to retain audit log entries before nightly deletion |
 | `CORS_ORIGINS` | - | Allowed origins separated by `#` |
 
 ## Architecture
@@ -107,8 +108,9 @@ src/
 │   ├── enums/              # OAuthProvider
 │   └── dto/                # LoginDto, RegisterDto, UpdateProfileDto, VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto
 ├── audit/
-│   ├── audit.service.ts    # AuditService — records 20 security-sensitive actions to audit_logs table
-│   └── entities/           # AuditLog entity (action, actorId, actorEmail, targetId, ip, requestId, createdAt)
+│   ├── audit.service.ts         # AuditService — records 20 security-sensitive actions to audit_logs table
+│   ├── audit-cleanup.service.ts # AuditCleanupService — nightly cron deletes entries older than AUDIT_LOG_RETENTION_DAYS days
+│   └── entities/                # AuditLog entity (action, actorId, actorEmail, targetId, ip, requestId, createdAt)
 ├── mail/
 │   └── mail.service.ts     # Email sending (verification, password reset)
 ├── roles/

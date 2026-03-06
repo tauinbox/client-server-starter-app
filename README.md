@@ -31,7 +31,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - `GET /api/v1/auth/permissions` returns CASL packed rules; client hydrates into `AppAbility` at bootstrap before route activation
 - OAuth account management (link/unlink providers in profile)
 - Server-side token cleanup via cron jobs
-- **Audit logging** — security-sensitive operations recorded to `audit_logs` table (login, registration, password changes, user/role management, OAuth events)
+- **Audit logging** — security-sensitive operations recorded to `audit_logs` table (login, registration, password changes, user/role management, OAuth events); nightly cleanup removes entries older than `AUDIT_LOG_RETENTION_DAYS` days (default 90)
 
 ### User Management (Admin)
 - **Infinite scroll** user list with column sorting — loads 20 users at a time; `IntersectionObserver` sentinel triggers additional pages automatically as the user scrolls
@@ -162,6 +162,7 @@ Edit `.env` with your database credentials and settings:
 | `SMTP_PORT` | `587` | SMTP server port |
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
+| `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to retain audit log entries |
 | `SMTP_FROM` | `noreply@example.com` | Default "from" address for emails |
 | `ADMIN_EMAIL` | - | Email for the initial admin user (seeded on startup; skip if empty) |
 | `ADMIN_PASSWORD` | - | Password for the initial admin user |
