@@ -33,14 +33,15 @@ describe('UserListComponent', () => {
   let observeSpy: ReturnType<typeof vi.fn>;
   let disconnectSpy: ReturnType<typeof vi.fn>;
   let usersStoreMock: {
-    listLoading: ReturnType<typeof signal<boolean>>;
+    loading: ReturnType<typeof signal<boolean>>;
     isLoadingMore: ReturnType<typeof signal<boolean>>;
     totalUsers: ReturnType<typeof signal<number>>;
     displayedUsers: ReturnType<typeof signal<User[]>>;
     hasMore: ReturnType<typeof signal<boolean>>;
-    loadAll: ReturnType<typeof vi.fn>;
+    load: ReturnType<typeof vi.fn>;
     loadMore: ReturnType<typeof vi.fn>;
     setSorting: ReturnType<typeof vi.fn>;
+    setFilters: ReturnType<typeof vi.fn>;
     deleteUser: ReturnType<typeof vi.fn>;
   };
   let snackBarMock: { open: ReturnType<typeof vi.fn> };
@@ -60,14 +61,15 @@ describe('UserListComponent', () => {
     vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
 
     usersStoreMock = {
-      listLoading: signal(false),
+      loading: signal(false),
       isLoadingMore: signal(false),
       totalUsers: signal(0),
       displayedUsers: signal([]),
       hasMore: signal(false),
-      loadAll: vi.fn(),
+      load: vi.fn(),
       loadMore: vi.fn(),
       setSorting: vi.fn(),
+      setFilters: vi.fn(),
       deleteUser: vi.fn().mockReturnValue(of(void 0))
     };
 
@@ -94,8 +96,8 @@ describe('UserListComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should call loadAll on init', () => {
-    expect(usersStoreMock.loadAll).toHaveBeenCalled();
+  it('should call load on init', () => {
+    expect(usersStoreMock.load).toHaveBeenCalled();
   });
 
   describe('sortData', () => {
@@ -108,7 +110,7 @@ describe('UserListComponent', () => {
         'createdAt',
         'desc'
       );
-      expect(usersStoreMock.loadAll).toHaveBeenCalledTimes(2);
+      expect(usersStoreMock.load).toHaveBeenCalledTimes(2);
     });
 
     it('should sort by email column', () => {
@@ -142,6 +144,52 @@ describe('UserListComponent', () => {
     });
   });
 
+  describe('onSubmit', () => {
+    it('should set filters and load when isActive is "Active"', () => {
+      component.filterForm.patchValue({ isActive: 'true' });
+      component.onSubmit();
+
+      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
+        expect.objectContaining({ isActive: true })
+      );
+      expect(usersStoreMock.load).toHaveBeenCalledTimes(2);
+    });
+
+    it('should set filters and load when isActive is "Inactive"', () => {
+      component.filterForm.patchValue({ isActive: 'false' });
+      component.onSubmit();
+
+      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
+        expect.objectContaining({ isActive: false })
+      );
+    });
+
+    it('should exclude isActive when Status is "All"', () => {
+      component.filterForm.patchValue({ isActive: '' });
+      component.onSubmit();
+
+      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
+        expect.not.objectContaining({ isActive: expect.anything() })
+      );
+    });
+  });
+
+  describe('resetForm', () => {
+    it('should clear filters and reload', () => {
+      component.filterForm.patchValue({ email: 'test@example.com' });
+      component.resetForm();
+
+      expect(usersStoreMock.setFilters).toHaveBeenCalledWith({});
+      expect(usersStoreMock.load).toHaveBeenCalledTimes(2);
+      expect(component.filterForm.getRawValue()).toEqual({
+        email: '',
+        firstName: '',
+        lastName: '',
+        isActive: ''
+      });
+    });
+  });
+
   describe('confirmDelete', () => {
     it('should open confirm dialog', () => {
       const dialogRefMock = {
@@ -168,7 +216,7 @@ describe('UserListComponent', () => {
         'Close',
         { duration: 5000 }
       );
-      expect(usersStoreMock.loadAll).toHaveBeenCalledTimes(1); // only on init
+      expect(usersStoreMock.load).toHaveBeenCalledTimes(1); // only on init
     });
 
     it('should not delete when dialog is cancelled', () => {

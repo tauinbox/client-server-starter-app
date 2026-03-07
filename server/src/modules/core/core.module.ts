@@ -6,7 +6,6 @@ import * as Joi from 'joi';
 import { LoggerModule } from 'nestjs-pino';
 import configuration from './configuration';
 import { CacheModule } from '@nestjs/cache-manager';
-import { FeatureModule } from '../feature/feature.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { postgresConfig } from '../../postgres.config';
 import { UsersModule } from '../users/users.module';
@@ -103,7 +102,6 @@ export class CoreModule implements NestModule {
         AuditModule,
         AuthModule,
         UsersModule,
-        FeatureModule,
         HealthModule
       ],
       providers: [

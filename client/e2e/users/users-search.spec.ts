@@ -1,39 +1,9 @@
-import {
-  expect,
-  expectAuthRedirect,
-  expectForbiddenRedirect,
-  loginViaUi,
-  test
-} from '../fixtures/base.fixture';
+import { expect, loginViaUi, test } from '../fixtures/base.fixture';
 
-test.describe('User Search page', () => {
-  test('should redirect to login when not authenticated', async ({
-    _mockServer,
-    page
-  }) => {
-    await expectAuthRedirect(page, '/users/search');
-  });
-
-  test('should redirect to forbidden when non-admin', async ({
-    _mockServer,
-    page
-  }) => {
-    await expectForbiddenRedirect(page, _mockServer.url, '/users/search');
-  });
-
-  test('should display "Search Users" heading', async ({
-    _mockServer,
-    page
-  }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/search');
-
-    await expect(page.getByText('Search Users')).toBeVisible();
-  });
-
+test.describe('Inline user search (User Management page)', () => {
   test('should display search form fields', async ({ _mockServer, page }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/search');
+    await page.goto('/users');
 
     await expect(page.getByLabel('Email')).toBeVisible();
     await expect(page.getByLabel('First Name')).toBeVisible();
@@ -46,27 +16,15 @@ test.describe('User Search page', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/search');
+    await page.goto('/users');
 
     await page.getByLabel('Email').fill('example');
     await page.getByRole('button', { name: 'Search' }).click();
 
-    await expect(page.getByText('Search Results')).toBeVisible();
     // Results are paginated — check that at least one example.com user appears
     await expect(
       page.getByRole('cell', { name: /example\.com/ }).first()
     ).toBeVisible();
-  });
-
-  test('should display result count', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/search');
-
-    // Search for "Smith" last name — only John Smith matches
-    await page.getByLabel('Last Name').fill('Smith');
-    await page.getByRole('button', { name: 'Search' }).click();
-
-    await expect(page.getByText('1 user(s) found')).toBeVisible();
   });
 
   test('should show empty state when no results', async ({
@@ -74,7 +32,7 @@ test.describe('User Search page', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/search');
+    await page.goto('/users');
 
     // Search for a non-existent email
     await page.getByLabel('Email').fill('nonexistent@nowhere.com');
@@ -83,21 +41,22 @@ test.describe('User Search page', () => {
     await expect(page.getByText('No Users Found')).toBeVisible();
   });
 
-  test('should clear results and form on "Clear" button click', async ({
+  test('should clear form on "Clear" button click', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/search');
+    await page.goto('/users');
 
     await page.getByLabel('Email').fill('example');
     await page.getByRole('button', { name: 'Search' }).click();
 
-    await expect(page.getByText('Search Results')).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: /example\.com/ }).first()
+    ).toBeVisible();
 
     await page.getByRole('button', { name: 'Clear' }).click();
 
-    await expect(page.getByText('Search Results')).toBeHidden();
     await expect(page.getByLabel('Email')).toHaveValue('');
   });
 
@@ -106,7 +65,7 @@ test.describe('User Search page', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/search');
+    await page.goto('/users');
 
     await page.getByLabel('Email').fill('admin@example.com');
     await page.getByRole('button', { name: 'Search' }).click();
@@ -126,7 +85,7 @@ test.describe('User Search page', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/search');
+    await page.goto('/users');
 
     await page.getByLabel('Email').fill('admin@example.com');
     await page.getByRole('button', { name: 'Search' }).click();
@@ -149,13 +108,15 @@ test.describe('User Search page', () => {
       capturedUrls.push(route.request().url());
       return route.fallback();
     });
-    await page.goto('/users/search');
+    await page.goto('/users');
 
     await page.getByLabel('Status').click();
     await page.getByRole('option', { name: 'Active', exact: true }).click();
     await page.getByRole('button', { name: 'Search' }).click();
 
-    await expect(page.getByText('Search Results')).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: /example\.com/ }).first()
+    ).toBeVisible();
     expect(capturedUrls[0]).toContain('isActive=true');
   });
 
@@ -164,7 +125,7 @@ test.describe('User Search page', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/search');
+    await page.goto('/users');
 
     await page.getByLabel('Email').fill('john@example.com');
     await page.getByRole('button', { name: 'Search' }).click();

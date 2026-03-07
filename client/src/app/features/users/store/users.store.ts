@@ -1,7 +1,7 @@
 import { computed, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type { Observable } from 'rxjs';
-import { EMPTY, map, pipe, switchMap, tap } from 'rxjs';
+import { pipe, switchMap, tap } from 'rxjs';
 import { tapResponse } from '@ngrx/operators';
 import {
   patchState,
@@ -21,112 +21,93 @@ import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { DEFAULT_SORT_BY, DEFAULT_SORT_ORDER } from '@app/shared/constants';
 import { UserService } from '../services/user.service';
 import type {
+  PaginatedResponse,
   SortOrder,
   UpdateUser,
   User,
+  UserListParams,
   UserSearch,
   UserSortColumn
 } from '../models/user.types';
 
 const INFINITE_SCROLL_PAGE_SIZE = 20;
 
-type UsersExtraState = {
-  listLoading: boolean;
+type UsersState = {
+  loading: boolean;
   isLoadingMore: boolean;
   detailLoading: boolean;
-  searchLoading: boolean;
-  isLoadingMoreSearch: boolean;
-  listError: string | null;
+  error: string | null;
   detailError: string | null;
-  searchError: string | null;
-  searchResultIds: string[];
-  searchPerformed: boolean;
   currentPage: number;
   pageSize: number;
   totalUsers: number;
   sortBy: UserSortColumn;
   sortOrder: SortOrder;
-  searchCurrentPage: number;
-  searchPageSize: number;
-  searchTotalUsers: number;
-  searchSortBy: UserSortColumn;
-  searchSortOrder: SortOrder;
-  lastSearchCriteria: UserSearch | null;
+  filters: UserSearch;
 };
 
 export const UsersStore = signalStore(
   withEntities<User>(),
-  withState<UsersExtraState>({
-    listLoading: false,
+  withState<UsersState>({
+    loading: false,
     isLoadingMore: false,
     detailLoading: false,
-    searchLoading: false,
-    isLoadingMoreSearch: false,
-    listError: null,
+    error: null,
     detailError: null,
-    searchError: null,
-    searchResultIds: [],
-    searchPerformed: false,
     currentPage: 0,
     pageSize: INFINITE_SCROLL_PAGE_SIZE,
     totalUsers: 0,
     sortBy: DEFAULT_SORT_BY as UserSortColumn,
     sortOrder: DEFAULT_SORT_ORDER,
-    searchCurrentPage: 0,
-    searchPageSize: INFINITE_SCROLL_PAGE_SIZE,
-    searchTotalUsers: 0,
-    searchSortBy: DEFAULT_SORT_BY as UserSortColumn,
-    searchSortOrder: DEFAULT_SORT_ORDER,
-    lastSearchCriteria: null
+    filters: {}
   }),
   withComputed((store) => ({
     displayedUsers: computed(() => store.entities()),
-    hasMore: computed(() => store.totalUsers() > store.ids().length),
-    hasMoreSearch: computed(
-      () => store.searchTotalUsers() > store.searchResultIds().length
-    ),
-    searchResultUsers: computed(() => {
-      const map = store.entityMap();
-      return store
-        .searchResultIds()
-        .map((id) => map[id])
-        .filter(Boolean) as User[];
-    })
+    hasMore: computed(() => store.totalUsers() > store.ids().length)
   })),
   withMethods((store) => {
     const userService = inject(UserService);
     const snackBar = inject(MatSnackBar);
 
+    function buildRequest(page: number): Observable<PaginatedResponse<User>> {
+      const params: UserListParams = {
+        page,
+        limit: store.pageSize(),
+        sortBy: store.sortBy(),
+        sortOrder: store.sortOrder()
+      };
+      const filters = store.filters();
+      const hasFilters = !!(
+        filters.email ||
+        filters.firstName ||
+        filters.lastName ||
+        filters.isActive !== undefined
+      );
+      return hasFilters
+        ? userService.search(filters, params)
+        : userService.getAll(params);
+    }
+
     return {
-      loadAll: rxMethod<void>(
+      load: rxMethod<void>(
         pipe(
           tap(() =>
-            patchState(store, {
-              listLoading: true,
-              listError: null,
-              currentPage: 0
-            })
+            patchState(store, { loading: true, error: null, currentPage: 0 })
           ),
-          map(() => ({
-            page: 1,
-            limit: store.pageSize(),
-            sortBy: store.sortBy(),
-            sortOrder: store.sortOrder()
-          })),
-          switchMap((params) =>
-            userService.getAll(params).pipe(
+          switchMap(() =>
+            buildRequest(1).pipe(
               tapResponse({
                 next: (response) => {
                   patchState(store, setAllEntities(response.data));
                   patchState(store, {
-                    listLoading: false,
+                    loading: false,
                     totalUsers: response.meta.total
                   });
                 },
                 error: () => {
                   patchState(store, {
-                    listLoading: false,
-                    listError: 'Failed to load users. Please try again.'
+                    loading: false,
+                    error: 'Failed to load users. Please try again.'
                   });
                   snackBar.open(
                     'Failed to load users. Please try again.',
@@ -145,18 +126,12 @@ export const UsersStore = signalStore(
           tap(() => {
             patchState(store, {
               isLoadingMore: true,
-              listError: null,
+              error: null,
               currentPage: store.currentPage() + 1
             });
           }),
-          map(() => ({
-            page: store.currentPage() + 1,
-            limit: store.pageSize(),
-            sortBy: store.sortBy(),
-            sortOrder: store.sortOrder()
-          })),
-          switchMap((params) =>
-            userService.getAll(params).pipe(
+          switchMap(() =>
+            buildRequest(store.currentPage() + 1).pipe(
               tapResponse({
                 next: (response) => {
                   patchState(store, upsertEntities(response.data));
@@ -169,7 +144,7 @@ export const UsersStore = signalStore(
                   patchState(store, {
                     isLoadingMore: false,
                     currentPage: store.currentPage() - 1,
-                    listError: 'Failed to load more users. Please try again.'
+                    error: 'Failed to load more users. Please try again.'
                   });
                   snackBar.open(
                     'Failed to load more users. Please try again.',
@@ -232,127 +207,12 @@ export const UsersStore = signalStore(
         );
       },
 
-      search: rxMethod<UserSearch>(
-        pipe(
-          tap((criteria) =>
-            patchState(store, {
-              searchLoading: true,
-              searchError: null,
-              searchPerformed: false,
-              lastSearchCriteria: criteria
-            })
-          ),
-          map((criteria) => ({
-            criteria,
-            page: store.searchCurrentPage() + 1,
-            limit: store.searchPageSize(),
-            sortBy: store.searchSortBy(),
-            sortOrder: store.searchSortOrder()
-          })),
-          switchMap(({ criteria, ...params }) =>
-            userService.search(criteria, params).pipe(
-              tapResponse({
-                next: (response) => {
-                  patchState(store, upsertEntities(response.data));
-                  patchState(store, {
-                    searchResultIds: response.data.map((u) => u.id),
-                    searchLoading: false,
-                    searchPerformed: true,
-                    searchTotalUsers: response.meta.total
-                  });
-                },
-                error: () => {
-                  patchState(store, {
-                    searchLoading: false,
-                    searchError: 'Failed to search users. Please try again.'
-                  });
-                  snackBar.open(
-                    'Failed to search users. Please try again.',
-                    'Close',
-                    { duration: 5000 }
-                  );
-                }
-              })
-            )
-          )
-        )
-      ),
-
-      loadMoreSearch: rxMethod<void>(
-        pipe(
-          tap(() => {
-            patchState(store, {
-              isLoadingMoreSearch: true,
-              searchCurrentPage: store.searchCurrentPage() + 1
-            });
-          }),
-          map(() => {
-            const criteria = store.lastSearchCriteria();
-            return {
-              criteria,
-              page: store.searchCurrentPage() + 1,
-              limit: store.searchPageSize(),
-              sortBy: store.searchSortBy(),
-              sortOrder: store.searchSortOrder()
-            };
-          }),
-          switchMap(({ criteria, ...params }) => {
-            if (!criteria) return EMPTY;
-            return userService.search(criteria, params).pipe(
-              tapResponse({
-                next: (response) => {
-                  patchState(store, upsertEntities(response.data));
-                  patchState(store, {
-                    searchResultIds: [
-                      ...store.searchResultIds(),
-                      ...response.data.map((u) => u.id)
-                    ],
-                    isLoadingMoreSearch: false,
-                    searchTotalUsers: response.meta.total
-                  });
-                },
-                error: () => {
-                  patchState(store, {
-                    isLoadingMoreSearch: false,
-                    searchCurrentPage: store.searchCurrentPage() - 1
-                  });
-                  snackBar.open(
-                    'Failed to load more results. Please try again.',
-                    'Close',
-                    { duration: 5000 }
-                  );
-                }
-              })
-            );
-          })
-        )
-      ),
+      setFilters(filters: UserSearch): void {
+        patchState(store, { filters });
+      },
 
       setSorting(sortBy: UserSortColumn, sortOrder: SortOrder): void {
-        patchState(store, { sortBy, sortOrder, currentPage: 0 });
-      },
-
-      setSearchPage(page: number): void {
-        patchState(store, { searchCurrentPage: page });
-      },
-
-      setSearchSorting(sortBy: UserSortColumn, sortOrder: SortOrder): void {
-        patchState(store, {
-          searchSortBy: sortBy,
-          searchSortOrder: sortOrder,
-          searchCurrentPage: 0
-        });
-      },
-
-      clearSearch(): void {
-        patchState(store, {
-          searchResultIds: [],
-          searchPerformed: false,
-          searchError: null,
-          searchTotalUsers: 0,
-          searchCurrentPage: 0,
-          lastSearchCriteria: null
-        });
+        patchState(store, { sortBy, sortOrder });
       }
     };
   })

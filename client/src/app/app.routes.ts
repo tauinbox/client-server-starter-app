@@ -48,14 +48,6 @@ export const routes: Routes = [
         canActivate: [permissionGuard('list', 'User')]
       },
       {
-        path: 'search',
-        loadComponent: () =>
-          import('./features/users/components/user-search/user-search.component').then(
-            (c) => c.UserSearchComponent
-          ),
-        canActivate: [permissionGuard('search', 'User')]
-      },
-      {
         path: ':id',
         loadComponent: () =>
           import('./features/users/components/user-detail/user-detail.component').then(
@@ -78,13 +70,6 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/auth/components/oauth-callback/oauth-callback.component').then(
         (c) => c.OAuthCallbackComponent
-      )
-  },
-  {
-    path: AppRouteSegmentEnum.Feature,
-    loadComponent: () =>
-      import('./features/feature/feature.component').then(
-        (c) => c.FeatureComponent
       )
   },
   {

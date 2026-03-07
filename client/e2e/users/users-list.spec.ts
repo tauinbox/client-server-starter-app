@@ -216,22 +216,6 @@ test.describe('User List page', () => {
     await expect(page).toHaveURL(/.*\/users\/1\/edit$/);
   });
 
-  test('should navigate to search page on search button click', async ({
-    _mockServer,
-    page
-  }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users');
-
-    await page
-      .locator('button', {
-        has: page.locator('mat-icon', { hasText: 'search' })
-      })
-      .click();
-
-    await expect(page).toHaveURL(/.*\/users\/search$/);
-  });
-
   test('should show confirmation dialog on delete button click', async ({
     _mockServer,
     page

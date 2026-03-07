@@ -40,11 +40,10 @@ src/app/
 │   │   ├── interceptors/   # jwtInterceptor
 │   │   ├── services/       # AuthService (HTTP, refresh scheduling, fetchPermissions: Promise<void>)
 │   │   └── store/          # AuthStore (NgRx Signal Store — state: accessToken (memory) + user (auth_user localStorage) + ability: AppAbility|null)
-│   ├── users/              # User list, detail, edit, search (admin)
-│   │   ├── components/
-│   │   │   └── user-table/ # UserTableComponent (shared table for user-list and user-search; sorting + actions only, no paginator)
-│   │   └── store/          # UsersStore (NgRx Signal Store, route-level)
-│   └── feature/            # Example feature module
+│   └── users/              # User list (with inline filters), detail, edit (admin)
+│       ├── components/
+│       │   └── user-table/ # UserTableComponent (shared table; sorting + actions only, no paginator)
+│       └── store/          # UsersStore (NgRx Signal Store, route-level)
 └── shared/
     ├── components/
     │   ├── confirm-dialog/ # Confirmation dialog
@@ -61,14 +60,12 @@ src/app/
 | `/register` | RegisterComponent | guestGuard |
 | `/profile` | ProfileComponent | authGuard |
 | `/users` | UserListComponent | permissionGuard('list', 'User') |
-| `/users/search` | UserSearchComponent | permissionGuard('search', 'User') |
 | `/users/:id` | UserDetailComponent | authGuard |
 | `/users/:id/edit` | UserEditComponent | authGuard |
 | `/verify-email` | VerifyEmailComponent | - |
 | `/forgot-password` | ForgotPasswordComponent | guestGuard |
 | `/reset-password` | ResetPasswordComponent | guestGuard |
 | `/oauth/callback` | OAuthCallbackComponent | - |
-| `/feature` | FeatureComponent | - |
 | `/forbidden` | ForbiddenComponent | - |
 | `/**` | PageNotFoundComponent | - |
 
@@ -78,7 +75,7 @@ NgRx Signal Store (`@ngrx/signals`):
 
 - **AuthStore** (`providedIn: 'root'`) — pure state container. State: `accessToken` (in-memory signal only, never persisted), `user` (persisted to `localStorage` as `auth_user` key for page-reload detection), `ability: AppAbility | null`. Computed: `isAuthenticated` (access token present), `user`, `roles`, `isAdmin`. Methods: `hasPermission(action, subject)`, `setRules(rules)`, `hasPersistedUser()`, `saveAuthResponse()`, `clearSession()`. No `HttpClient` dependency
 - **AuthService** (`providedIn: 'root'`) — HTTP operations (login/register/logout/refresh/profile/OAuth accounts/`fetchPermissions(): Promise<void>`). `refreshTokens()` POSTs `{}` — the `refresh_token` HttpOnly cookie is sent automatically by the browser. `provideAppInitializer` awaits `fetchPermissions()` for authenticated users, or attempts a cookie-refresh when `hasPersistedUser()` is true (page reload with no in-memory token). Eliminates the circular dependency chain
-- **UsersStore** (route-level at `/users`) — entity-based store with `withEntities<User>()`. Manages user list, detail, search state with **infinite scroll** (page size 20; `loadMore`/`loadMoreSearch` rxMethods append via `upsertEntities`; `hasMore`/`hasMoreSearch` computed signals drive sentinel visibility; `isLoadingMore`/`isLoadingMoreSearch` show spinner) and loading indicators
+- **UsersStore** (route-level at `/users`) — entity-based store with `withEntities<User>()`. Unified state: `filters: UserSearch` (empty = all users, filled = search via `GET /users/search`), single `load()`/`loadMore()` pair with **infinite scroll** (page size 20; `upsertEntities` appends; `hasMore` computed signal drives sentinel visibility; `isLoadingMore` shows spinner). `setFilters()` and `setSorting()` update state; component calls `load()` after each change
 - **ThemeService** — `theme` signal (`'light'` | `'dark'`), system preference detection, persists to localStorage
 
 ### HTTP Interceptors

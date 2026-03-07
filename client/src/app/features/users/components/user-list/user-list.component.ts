@@ -14,16 +14,20 @@ import {
   MatCardHeader,
   MatCardTitle
 } from '@angular/material/card';
+import type { FormControl, FormGroup } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
+import { MatOption, MatSelect } from '@angular/material/select';
+import { MatButton } from '@angular/material/button';
+import { MatDivider } from '@angular/material/divider';
+import { MatInput } from '@angular/material/input';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import type { Sort } from '@angular/material/sort';
-import { MatTooltip } from '@angular/material/tooltip';
-import { MatMiniFabButton } from '@angular/material/button';
-import { RouterLink } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { filter, merge } from 'rxjs';
-import type { User, UserSortColumn } from '../../models/user.types';
+import type { User, UserSearch, UserSortColumn } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { rem } from '@shared/utils/css.utils';
 import { UsersStore } from '../../store/users.store';
@@ -32,18 +36,30 @@ import {
   UserTableComponent
 } from '../user-table/user-table.component';
 
+type UserFilterFormType = {
+  email: FormControl<string>;
+  firstName: FormControl<string>;
+  lastName: FormControl<string>;
+  isActive: FormControl<string>;
+};
+
 @Component({
   selector: 'app-user-list',
   imports: [
     MatCard,
     MatCardHeader,
-    MatIcon,
     MatCardContent,
     MatCardTitle,
+    ReactiveFormsModule,
+    MatFormField,
+    MatLabel,
+    MatIcon,
+    MatSelect,
+    MatOption,
+    MatButton,
+    MatDivider,
+    MatInput,
     MatProgressSpinner,
-    MatTooltip,
-    MatMiniFabButton,
-    RouterLink,
     UserTableComponent
   ],
   templateUrl: './user-list.component.html',
@@ -51,13 +67,22 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UserListComponent implements OnInit, AfterViewInit {
+  readonly #fb = inject(FormBuilder);
   readonly #usersStore = inject(UsersStore);
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
   readonly #destroyRef = inject(DestroyRef);
   readonly #injector = inject(Injector);
 
-  readonly loading = this.#usersStore.listLoading;
+  readonly filterForm: FormGroup<UserFilterFormType> =
+    this.#fb.group<UserFilterFormType>({
+      email: this.#fb.control('', { nonNullable: true }),
+      firstName: this.#fb.control('', { nonNullable: true }),
+      lastName: this.#fb.control('', { nonNullable: true }),
+      isActive: this.#fb.control('', { nonNullable: true })
+    });
+
+  readonly loading = this.#usersStore.loading;
   readonly totalUsers = this.#usersStore.totalUsers;
   readonly displayedUsers = this.#usersStore.displayedUsers;
   readonly hasMore = this.#usersStore.hasMore;
@@ -66,7 +91,7 @@ export class UserListComponent implements OnInit, AfterViewInit {
   readonly scrollSentinel = viewChild.required<ElementRef>('scrollSentinel');
 
   ngOnInit(): void {
-    this.#usersStore.loadAll();
+    this.#usersStore.load();
   }
 
   ngAfterViewInit(): void {
@@ -91,8 +116,6 @@ export class UserListComponent implements OnInit, AfterViewInit {
     observer.observe(sentinel);
     this.#destroyRef.onDestroy(() => observer.disconnect());
 
-    // Re-check sentinel visibility after each load completes so that
-    // additional pages are fetched when the initial batch fills the viewport.
     merge(
       toObservable(this.loading, { injector: this.#injector }),
       toObservable(this.isLoadingMore, { injector: this.#injector })
@@ -112,7 +135,24 @@ export class UserListComponent implements OnInit, AfterViewInit {
         (COLUMN_TO_SORT_MAP[sort.active] as UserSortColumn) ?? 'createdAt';
       this.#usersStore.setSorting(sortBy, sort.direction);
     }
-    this.#usersStore.loadAll();
+    this.#usersStore.load();
+  }
+
+  onSubmit(): void {
+    const filters = this.#buildFilters(this.filterForm.getRawValue());
+    this.#usersStore.setFilters(filters);
+    this.#usersStore.load();
+  }
+
+  resetForm(): void {
+    this.filterForm.reset({
+      email: '',
+      firstName: '',
+      lastName: '',
+      isActive: ''
+    });
+    this.#usersStore.setFilters({});
+    this.#usersStore.load();
   }
 
   confirmDelete(user: User): void {
@@ -131,12 +171,12 @@ export class UserListComponent implements OnInit, AfterViewInit {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((result) => {
         if (result) {
-          this.deleteUser(user.id);
+          this.#deleteUser(user.id);
         }
       });
   }
 
-  deleteUser(id: string): void {
+  #deleteUser(id: string): void {
     this.#usersStore
       .deleteUser(id)
       .pipe(takeUntilDestroyed(this.#destroyRef))
@@ -154,5 +194,21 @@ export class UserListComponent implements OnInit, AfterViewInit {
           );
         }
       });
+  }
+
+  #buildFilters(
+    formValues: FormGroup<UserFilterFormType>['value']
+  ): UserSearch {
+    const filters: UserSearch = {};
+
+    if (formValues.email?.trim()) filters.email = formValues.email;
+    if (formValues.firstName?.trim()) filters.firstName = formValues.firstName;
+    if (formValues.lastName?.trim()) filters.lastName = formValues.lastName;
+
+    if (formValues.isActive !== '') {
+      filters.isActive = formValues.isActive === 'true';
+    }
+
+    return filters;
   }
 }
