@@ -100,7 +100,21 @@ export class CoreModule implements NestModule {
             limit: MAX_FAILED_ATTEMPTS * 1000
           }
         ]),
-        TypeOrmModule.forRootAsync({ imports: [], useFactory: postgresConfig }),
+        TypeOrmModule.forRootAsync({
+          inject: [ConfigService],
+          useFactory: (config: ConfigService) => ({
+            ...postgresConfig(),
+            extra: {
+              max: config.getOrThrow<number>('DB_POOL_MAX'),
+              idleTimeoutMillis: config.getOrThrow<number>(
+                'DB_POOL_IDLE_TIMEOUT'
+              ),
+              connectionTimeoutMillis: config.getOrThrow<number>(
+                'DB_POOL_CONNECTION_TIMEOUT'
+              )
+            }
+          })
+        }),
         MailModule,
         AuditModule,
         AuthModule,
