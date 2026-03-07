@@ -35,7 +35,16 @@ export const postgresConfig: () => PostgresConnectionOptions = () => ({
   synchronize: false, // always false — run 'npm run build && npm run migrations:run' manually
   entities: [__dirname + '/modules/**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/migrations/*{ts,.js}'],
-  applicationName: 'Starter Project'
+  applicationName: 'Starter Project',
+  extra: {
+    max: process.env['DB_POOL_MAX'] ? Number(process.env['DB_POOL_MAX']) : 10,
+    idleTimeoutMillis: process.env['DB_POOL_IDLE_TIMEOUT']
+      ? Number(process.env['DB_POOL_IDLE_TIMEOUT'])
+      : 30000,
+    connectionTimeoutMillis: process.env['DB_POOL_CONNECTION_TIMEOUT']
+      ? Number(process.env['DB_POOL_CONNECTION_TIMEOUT'])
+      : 5000
+  }
 });
 
 function isJsonString(str: string) {

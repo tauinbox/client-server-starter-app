@@ -55,7 +55,10 @@ export class CoreModule implements NestModule {
             JWT_SECRET: Joi.string().min(16).required(),
             JWT_EXPIRATION: Joi.number().required(),
             JWT_REFRESH_EXPIRATION: Joi.number().required(),
-            AUDIT_LOG_RETENTION_DAYS: Joi.number().min(1).default(90)
+            AUDIT_LOG_RETENTION_DAYS: Joi.number().min(1).default(90),
+            DB_POOL_MAX: Joi.number().min(1).default(10),
+            DB_POOL_IDLE_TIMEOUT: Joi.number().min(0).default(30000),
+            DB_POOL_CONNECTION_TIMEOUT: Joi.number().min(0).default(5000)
           }),
           validationOptions: {
             allowUnknown: true,
