@@ -160,6 +160,9 @@ Edit `.env` with your database credentials and settings:
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to retain audit log entries |
+| `DB_POOL_MAX` | `10` | Maximum PostgreSQL connection pool size |
+| `DB_POOL_IDLE_TIMEOUT` | `30000` | Milliseconds before an idle connection is closed |
+| `DB_POOL_CONNECTION_TIMEOUT` | `5000` | Milliseconds to wait for a connection before erroring |
 | `SMTP_FROM` | `noreply@example.com` | Default "from" address for emails |
 | `ADMIN_EMAIL` | - | Email for the initial admin user (seeded on startup; skip if empty) |
 | `ADMIN_PASSWORD` | - | Password for the initial admin user |
