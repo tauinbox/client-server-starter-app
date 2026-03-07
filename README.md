@@ -1,6 +1,6 @@
 # Fullstack Starter App
 
-Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** server, using PostgreSQL via TypeORM. Provides a production-ready foundation with authentication, user management, theming, and an example feature module.
+Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** server, using PostgreSQL via TypeORM. Provides a production-ready foundation with authentication, user management, and theming.
 
 ## Tech Stack
 
@@ -34,10 +34,11 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - **Audit logging** — security-sensitive operations recorded to `audit_logs` table (login, registration, password changes, user/role management, OAuth events); nightly cleanup removes entries older than `AUDIT_LOG_RETENTION_DAYS` days (default 90)
 
 ### User Management (Admin)
-- **Infinite scroll** user list with column sorting — loads 20 users at a time; `IntersectionObserver` sentinel triggers additional pages automatically as the user scrolls
+- **Unified Manage Users page** — inline filter form (email, first/last name, status) on the same page as the user list; empty filters load all users, filled filters trigger a search via `GET /users/search`
+- **Infinite scroll** with column sorting — loads 20 users at a time; `IntersectionObserver` sentinel triggers additional pages automatically as the user scrolls
 - User detail, edit, and **soft delete** — records are preserved with a `deleted_at` timestamp; all active sessions are revoked on delete; count decremented inline (no reload)
 - **Restore** soft-deleted users via `POST /users/:id/restore` — reactivates the account
-- **Infinite scroll** search by email, name, admin/active status; `includeDeleted=true` query param shows soft-deleted users; same sentinel-based scroll loading
+- `includeDeleted=true` query param shows soft-deleted users in list and search
 - Role and status management
 - Pagination response envelope: `{ data: User[], meta: { page, limit, total, totalPages } }`
 - **Sticky header** — toolbar remains fixed at the top while scrolling through long lists
@@ -57,12 +58,6 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - `npm run release` (from `client/`) bumps all `package.json` files, generates `CHANGELOG.md`, and creates a git tag
 - Conventional Commits enforced via commitlint + husky `commit-msg` hook
 
-### Example Feature Module
-- Demonstrates NestJS patterns: guards, interceptors, middlewares, pipes
-- CRUD operations with validation
-- File upload with Multer
-- Database seeder for sample data
-
 ## Project Structure
 
 ```
@@ -81,8 +76,7 @@ fullstack-starter-app/
 │   │   ├── core/           # Header, theme, storage, error interceptor, 404
 │   │   ├── features/
 │   │   │   ├── auth/       # Login, register, profile, verify-email, forgot/reset-password, guards, JWT interceptor
-│   │   │   ├── users/      # User list, detail, edit, search
-│   │   │   └── feature/    # Example feature
+│   │   │   └── users/      # User list (with inline filters), detail, edit
 │   │   └── shared/         # Shared components (confirm dialog)
 │   ├── src/styles/         # SCSS architecture (themes, utilities, components)
 │   └── e2e/                # Playwright E2E tests (uses mock-server)
@@ -92,8 +86,11 @@ fullstack-starter-app/
 │   │   ├── auth/           # JWT + refresh token auth, lockout, verification, reset, permissions endpoint
 │   │   ├── mail/           # Email delivery (nodemailer, console/SMTP transports)
 │   │   ├── users/          # User CRUD
-│   │   ├── roles/          # RBAC: Role/Permission/RolePermission entities, RolesController, PermissionsGuard
-│   │   └── feature/        # Example module
+│   │   └── roles/          # RBAC: Role/Permission/RolePermission entities, RolesController, PermissionsGuard
+│   ├── src/common/
+│   │   ├── dtos/           # PaginationQueryDto, PaginatedResponseDto<T>
+│   │   ├── utils/          # escapeLikePattern, hashToken, withTransaction, extractAuditContext
+│   │   └── upload/         # createDiskStorageOptions() — reusable multer disk storage factory
 │   ├── src/migrations/     # TypeORM migrations
 │   └── src/seeders/        # Database seeders
 └── mock-server/            # In-memory Express server for dev/testing
@@ -175,7 +172,7 @@ Edit `.env` with your database credentials and settings:
 cd server
 npm run build
 npm run migrations:run
-npm run seed:run            # Optional: seed 100 sample entities
+npm run seed:run            # Optional: seed initial admin and RBAC data
 ```
 
 ### 4. Start development servers
@@ -290,10 +287,6 @@ API base URL: `/api/v1`
 | DELETE | `/roles/:id/permissions/:permId` | `roles:update` | Remove permission from role |
 | POST | `/roles/assign/:userId` | `roles:assign` | Assign role to user |
 | DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove role from user |
-| GET | `/feature` | None | Example endpoint |
-| GET | `/feature/entities` | None | List feature entities |
-| POST | `/feature/entities` | None | Create feature entity |
-| POST | `/feature/upload` | Bearer | Upload files (5 MB limit, type whitelist) |
 
 ## Available Commands
 
@@ -400,9 +393,9 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 241 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 234 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | Configured |
-| Client unit tests | Vitest | `*.spec.ts` alongside source | 262 tests passing |
+| Client unit tests | Vitest | `*.spec.ts` alongside source | 263 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 113 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
 

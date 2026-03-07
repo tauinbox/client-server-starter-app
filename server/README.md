@@ -68,8 +68,6 @@ Copy `.env.example` to `.env` and configure:
 | `VK_CLIENT_ID` | - | VK OAuth client ID |
 | `VK_CLIENT_SECRET` | - | VK OAuth client secret |
 | `CLIENT_URL` | `http://localhost:4200` | Client URL for OAuth callback redirects |
-| `EXTERNAL_API` | - | Third-party API URL for feature config |
-| `EXTERNAL_API_TOKEN` | - | API token for external service |
 | `ADMIN_EMAIL` | - | Email for the initial admin user (created on startup if not exists; skip if empty) |
 | `ADMIN_PASSWORD` | - | Password for the initial admin user |
 | `ADMIN_FIRST_NAME` | `Admin` | First name for the initial admin user |
@@ -90,7 +88,8 @@ Copy `.env.example` to `.env` and configure:
 src/
 ├── common/
 │   ├── dtos/               # PaginationQueryDto, PaginatedResponseDto<T> (barrel export)
-│   └── utils/              # Shared utilities (escapeLikePattern, hashToken, withTransaction)
+│   ├── utils/              # Shared utilities (escapeLikePattern, hashToken, withTransaction, extractAuditContext)
+│   └── upload/             # createDiskStorageOptions() — reusable multer disk storage factory (destination, allowedExtensions, maxFileSizeBytes)
 └── modules/
 ├── core/                   # Dynamic root module
 │   ├── config/             # @nestjs/config, loads .env
@@ -121,19 +120,11 @@ src/
 │   ├── decorators/         # @RequirePermissions([Actions,Subjects]), @Authorize([action,subject]) composite
 │   └── casl/               # app-ability.ts (AppAbility, Actions, Subjects, PermissionCheck types)
 │                           # CaslAbilityFactory (builds AppAbility, used by AuthController /permissions)
-├── users/
-│   ├── controllers/        # UsersController (CRUD + search, all endpoints use @Authorize([action, 'User']))
-│   ├── services/           # UsersService
-│   ├── entities/           # User entity (ManyToMany to Role via user_roles)
-│   └── dto/                # CreateUserDto, UpdateUserDto, UserResponseDto (includes roles: string[])
-└── feature/
-    ├── controllers/        # FeatureController (CRUD, config, upload)
-    ├── services/           # FeatureService
-    ├── entities/           # FeatureEntity
-    ├── guards/             # Example guard
-    ├── interceptors/       # Example interceptor (strips sensitive data)
-    ├── middlewares/         # Logging middleware
-    └── pipes/              # Name validation pipe
+└── users/
+    ├── controllers/        # UsersController (CRUD + search, all endpoints use @Authorize([action, 'User']))
+    ├── services/           # UsersService
+    ├── entities/           # User entity (ManyToMany to Role via user_roles)
+    └── dto/                # CreateUserDto, UpdateUserDto, UserResponseDto (includes roles: string[])
 ```
 
 ### Request Pipeline
@@ -190,7 +181,6 @@ Four tables managed via TypeORM migrations:
 | `role_permissions` | FK to roles + permissions, optional jsonb `conditions` |
 | `user_roles` | Join table: user_id + role_id (composite PK) |
 | `audit_logs` | UUID PK, action (enum), actorId (nullable), actorEmail (nullable), targetId (nullable), targetType (nullable), details (jsonb), ipAddress, requestId, createdAt |
-| `feature` | Auto-increment PK, name, timestamps |
 
 Migration and seed commands operate on compiled JS in `dist/` — always run `npm run build` first.
 
@@ -292,19 +282,6 @@ Base URL: `/api/v1`
   }
 }
 ```
-
-### Feature (`/api/v1/feature`)
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/` | None | Returns "Hello World!" |
-| GET | `/config` | None | Returns external API config |
-| GET | `/entities` | None | List entities (optional `searchTerm` query) |
-| POST | `/entities` | None | Create entity (name: max 20 chars, no digits) |
-| GET | `/entities/:id` | None | Get entity by ID |
-| PATCH | `/entities/:id` | None | Update entity |
-| DELETE | `/entities/:id` | None | Delete entity |
-| POST | `/upload` | Bearer | Upload files (multipart, field: `upload-artifact`, 5 MB limit, type whitelist) |
 
 ## Testing
 
