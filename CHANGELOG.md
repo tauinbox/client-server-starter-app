@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.9](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.8...v0.1.9) (2026-03-07)
+
+
+### Features
+
+* **infra:** add Cache-Control headers to nginx and configure TypeORM connection pool ([7dfaccb](https://github.com/tauinbox/client-server-starter-app/commit/7dfaccbd88bea15dbb172f216fddea5eaeb044df))
+* **server:** add Pino structured logging and audit log retention cleanup ([bdee6eb](https://github.com/tauinbox/client-server-starter-app/commit/bdee6eb29c1384e780799d2fbe4e51dd9f5d9d42))
+
+
+### Bug Fixes
+
+* **auth:** add per-IP long-window throttle on login to prevent account lockout DoS ([70aa01c](https://github.com/tauinbox/client-server-starter-app/commit/70aa01c0d40faf668fa02d86ae06447d6145d809))
+* **deps:** upgrade multer to 2.1.1 to address HIGH CVEs ([c80fb6e](https://github.com/tauinbox/client-server-starter-app/commit/c80fb6e11681b397a3ff42a2ad98bc2b3a6d42d4))
+* **e2e:** update user search tests for unified management page ([2d01adc](https://github.com/tauinbox/client-server-starter-app/commit/2d01adca83ba6205518152e7c465cb82dd732479))
+* **migrations:** correct column names in trigram index migration ([a980819](https://github.com/tauinbox/client-server-starter-app/commit/a9808193b65deff76b5b62954cdb6068e5a78744))
+
 ## [0.1.8](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.7...v0.1.8) (2026-03-01)
 
 
