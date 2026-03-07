@@ -149,7 +149,7 @@ npm run test:e2e:ui        # Interactive UI
 A 2-stage `Dockerfile` is provided for production builds:
 
 1. **builder** — installs deps (`npm ci --ignore-scripts`), builds Angular with `NODE_OPTIONS="--max-old-space-size=2048" npm run build -- --base-href /nexus/`
-2. **runner** — copies built assets to nginx:1.27-alpine with `client/nginx.conf` (gzip enabled, HTML5 pushState support via `try_files`)
+2. **runner** — copies built assets to nginx:1.27-alpine with `client/nginx.conf` (gzip enabled, HTML5 pushState support via `try_files`, `Cache-Control: public, max-age=31536000, immutable` for content-hashed bundles, `Cache-Control: no-cache` for `index.html`)
 
 The Angular app is served from `/nexus/` base href. All internal API URLs must use absolute paths starting with `/` (e.g. `/api/v1/users`) so they resolve to the server root, not to `/nexus/api/v1/users`.
 

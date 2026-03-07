@@ -55,7 +55,10 @@ export class CoreModule implements NestModule {
             JWT_SECRET: Joi.string().min(16).required(),
             JWT_EXPIRATION: Joi.number().required(),
             JWT_REFRESH_EXPIRATION: Joi.number().required(),
-            AUDIT_LOG_RETENTION_DAYS: Joi.number().min(1).default(90)
+            AUDIT_LOG_RETENTION_DAYS: Joi.number().min(1).default(90),
+            DB_POOL_MAX: Joi.number().min(1).default(10),
+            DB_POOL_IDLE_TIMEOUT: Joi.number().min(0).default(30000),
+            DB_POOL_CONNECTION_TIMEOUT: Joi.number().min(0).default(5000)
           }),
           validationOptions: {
             allowUnknown: true,
@@ -97,7 +100,21 @@ export class CoreModule implements NestModule {
             limit: MAX_FAILED_ATTEMPTS * 1000
           }
         ]),
-        TypeOrmModule.forRootAsync({ imports: [], useFactory: postgresConfig }),
+        TypeOrmModule.forRootAsync({
+          inject: [ConfigService],
+          useFactory: (config: ConfigService) => ({
+            ...postgresConfig(),
+            extra: {
+              max: config.getOrThrow<number>('DB_POOL_MAX'),
+              idleTimeoutMillis: config.getOrThrow<number>(
+                'DB_POOL_IDLE_TIMEOUT'
+              ),
+              connectionTimeoutMillis: config.getOrThrow<number>(
+                'DB_POOL_CONNECTION_TIMEOUT'
+              )
+            }
+          })
+        }),
         MailModule,
         AuditModule,
         AuthModule,
