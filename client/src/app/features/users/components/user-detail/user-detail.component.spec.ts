@@ -44,7 +44,10 @@ describe('UserDetailComponent', () => {
     detailLoading: WritableSignal<boolean>;
     loadOne: ReturnType<typeof vi.fn>;
   };
-  let authStoreMock: { hasPermission: ReturnType<typeof vi.fn> };
+  let authStoreMock: {
+    hasPermission: ReturnType<typeof vi.fn>;
+    isAdmin: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
     entityMapSignal = signal({});
@@ -55,7 +58,10 @@ describe('UserDetailComponent', () => {
       loadOne: vi.fn()
     };
 
-    authStoreMock = { hasPermission: vi.fn().mockReturnValue(false) };
+    authStoreMock = {
+      hasPermission: vi.fn().mockReturnValue(false),
+      isAdmin: vi.fn().mockReturnValue(false)
+    };
 
     await TestBed.configureTestingModule({
       imports: [UserDetailComponent],
