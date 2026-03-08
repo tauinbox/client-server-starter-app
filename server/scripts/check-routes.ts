@@ -17,6 +17,7 @@ import * as ts from 'typescript';
 const GLOBAL_PREFIX = 'api';
 const CONTROLLERS_ROOT = path.resolve(__dirname, '../src/modules');
 const ROUTES_MANIFEST = path.resolve(__dirname, '../../contracts/routes.json');
+const SERVER_PKG = path.resolve(__dirname, '../package.json');
 
 /** Controller subdirectories to skip entirely. */
 const EXCLUDE_DIRS = new Set(['feature']);
@@ -209,7 +210,19 @@ function main(): void {
 
   const manifest = JSON.parse(
     fs.readFileSync(ROUTES_MANIFEST, 'utf-8')
-  ) as { routes: RouteEntry[] };
+  ) as { version: string; routes: RouteEntry[] };
+  const serverVersion = (
+    JSON.parse(fs.readFileSync(SERVER_PKG, 'utf-8')) as { version: string }
+  ).version;
+
+  if (manifest.version !== serverVersion) {
+    console.error(
+      `✗ contracts/routes.json version mismatch: manifest is ${manifest.version}, server is ${serverVersion}\n` +
+        `  → Update "version" in contracts/routes.json to "${serverVersion}"\n`
+    );
+    process.exit(1);
+  }
+
   const manifestSet = new Set(manifest.routes.map(routeKey));
 
   const missing = [...serverSet].filter((k) => !manifestSet.has(k));
