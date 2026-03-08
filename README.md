@@ -6,9 +6,9 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| Frontend | Angular | 21.1.3 |
-| UI Library | Angular Material + CDK | 21.1.3 |
-| Backend | NestJS | 11.1.13 |
+| Frontend | Angular | 21.2.1 |
+| UI Library | Angular Material + CDK | 21.2.1 |
+| Backend | NestJS | 11.1.16 |
 | Database | PostgreSQL (TypeORM) | 0.3.28 |
 | Language | TypeScript | 5.9.x |
 | Auth | JWT + HttpOnly-cookie refresh tokens + OAuth (Passport) | - |
