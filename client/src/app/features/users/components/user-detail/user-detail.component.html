@@ -37,7 +37,7 @@
                   <mat-chip color="warn" highlighted>Inactive</mat-chip>
                 }
 
-                @if (user()!.roles.includes('admin')) {
+                @if (isAdmin()) {
                   <mat-chip color="primary" highlighted>Administrator</mat-chip>
                 } @else {
                   <mat-chip>User</mat-chip>

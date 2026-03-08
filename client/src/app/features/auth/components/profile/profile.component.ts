@@ -43,6 +43,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
+import { AuthStore } from '@features/auth/store/auth.store';
 
 type ProfileFormType = {
   firstName: FormControl<string>;
@@ -104,6 +105,7 @@ export class ProfileComponent implements OnInit {
   readonly #window = inject(DOCUMENT).defaultView;
   readonly #route = inject(ActivatedRoute);
   readonly #router = inject(Router);
+  readonly #authStore = inject(AuthStore);
 
   protected readonly confirmPasswordErrorMatcher: ErrorStateMatcher = {
     isErrorState: () =>
@@ -111,6 +113,7 @@ export class ProfileComponent implements OnInit {
       !!this.profileForm.get('confirmPassword')?.touched
   };
 
+  readonly isAdmin = this.#authStore.isAdmin;
   protected readonly user = signal<User | null>(null);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);

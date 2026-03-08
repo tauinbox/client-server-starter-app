@@ -180,10 +180,7 @@ export class UserEditComponent implements OnInit {
           });
           this.userForm.markAsPristine();
 
-          const roleNameToId = new Map(roles.map((r) => [r.name, r.id]));
-          const roleIds = user.roles
-            .map((name) => roleNameToId.get(name))
-            .filter((id): id is string => id !== undefined);
+          const roleIds = user.roles.map((role) => role.id);
           this.#initialRoleIds.set(roleIds);
           this.selectedRoleIds.set([...roleIds]);
 

@@ -155,7 +155,7 @@
               mat-raised-button
               color="primary"
               type="submit"
-              [disabled]="userForm.invalid || saving() || !userForm.dirty"
+              [disabled]="!canSubmit()"
             >
               @if (saving()) {
                 <mat-spinner diameter="24"></mat-spinner>

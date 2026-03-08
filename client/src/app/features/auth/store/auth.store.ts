@@ -7,14 +7,17 @@ import {
   withMethods,
   withState
 } from '@ngrx/signals';
-import { createMongoAbility } from '@casl/ability';
 import type { RawRuleOf } from '@casl/ability';
-import { unpackRules } from '@casl/ability/extra';
+import { createMongoAbility } from '@casl/ability';
 import type { PackRule } from '@casl/ability/extra';
+import { unpackRules } from '@casl/ability/extra';
 import type { User } from '@shared/models/user.types';
-import type { UserPermissionsResponse } from '@app/shared/types/role.types';
+import type {
+  RoleResponse,
+  UserPermissionsResponse
+} from '@app/shared/types/role.types';
 import type { AuthResponse, CustomJwtPayload } from '../models/auth.types';
-import type { AppAbility, Actions, Subjects } from '../casl/app-ability';
+import type { Actions, AppAbility, Subjects } from '../casl/app-ability';
 import { LocalStorageService } from '@core/services/local-storage.service';
 
 export const AUTH_USER_KEY = 'auth_user';
@@ -42,8 +45,14 @@ export const AuthStore = signalStore(
      * For displaying the current user's role label only.
      * Use hasPermission() for all access control decisions.
      */
-    isAdmin: computed(() => store.user()?.roles?.includes('admin') ?? false),
-    roles: computed<string[]>(() => store.user()?.roles ?? [])
+    isAdmin: computed(
+      () =>
+        store
+          .user()
+          ?.roles?.map((role) => role.name)
+          .includes('admin') ?? false
+    ),
+    roles: computed<RoleResponse[]>(() => store.user()?.roles ?? [])
   })),
   withMethods((store) => {
     const storage = inject(LocalStorageService);

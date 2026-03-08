@@ -1,10 +1,12 @@
+import { RoleResponse } from './role.types';
+
 export type UserResponse = {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
   isActive: boolean;
-  roles: string[];
+  roles: RoleResponse[];
   isEmailVerified: boolean;
   failedLoginAttempts: number;
   lockedUntil: string | null;
