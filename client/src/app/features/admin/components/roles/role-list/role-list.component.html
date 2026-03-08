@@ -1,0 +1,99 @@
+<mat-card>
+  <mat-card-header>
+    <mat-card-title>Access Control</mat-card-title>
+    <div class="spacer"></div>
+    @if (canCreate()) {
+      <button mat-raised-button color="primary" (click)="openCreateDialog()">
+        <mat-icon>add</mat-icon>
+        New Role
+      </button>
+    }
+  </mat-card-header>
+
+  <mat-card-content>
+    @if (loading()) {
+      <div class="loading-container">
+        <mat-spinner></mat-spinner>
+      </div>
+    } @else {
+      <table mat-table [dataSource]="roles()" class="roles-table">
+        <!-- Name Column -->
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>Name</th>
+          <td mat-cell *matCellDef="let role">
+            <span class="role-name">{{ role.name }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Description Column -->
+        <ng-container matColumnDef="description">
+          <th mat-header-cell *matHeaderCellDef>Description</th>
+          <td mat-cell *matCellDef="let role">
+            {{ role.description ?? '—' }}
+          </td>
+        </ng-container>
+
+        <!-- Type Column -->
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef>Type</th>
+          <td mat-cell *matCellDef="let role">
+            @if (role.isSystem) {
+              <mat-chip color="primary" highlighted>System</mat-chip>
+            } @else {
+              <mat-chip>Custom</mat-chip>
+            }
+          </td>
+        </ng-container>
+
+        <!-- Created At Column -->
+        <ng-container matColumnDef="createdAt">
+          <th mat-header-cell *matHeaderCellDef>Created</th>
+          <td mat-cell *matCellDef="let role">
+            {{ role.createdAt | date: 'medium' }}
+          </td>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let role">
+            <button
+              mat-icon-button
+              color="primary"
+              (click)="openPermissionsDialog(role)"
+              matTooltip="Manage Permissions"
+              [attr.aria-label]="'Manage permissions for ' + role.name"
+            >
+              <mat-icon>security</mat-icon>
+            </button>
+            @if (canUpdate() && !role.isSystem) {
+              <button
+                mat-icon-button
+                color="accent"
+                (click)="openEditDialog(role)"
+                matTooltip="Edit Role"
+                [attr.aria-label]="'Edit role ' + role.name"
+              >
+                <mat-icon>edit</mat-icon>
+              </button>
+            }
+            @if (canDelete() && !role.isSystem) {
+              <button
+                mat-icon-button
+                color="warn"
+                (click)="confirmDelete(role)"
+                matTooltip="Delete Role"
+                [attr.aria-label]="'Delete role ' + role.name"
+              >
+                <mat-icon>delete</mat-icon>
+              </button>
+            }
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let _; columns: displayedColumns"></tr>
+      </table>
+    }
+  </mat-card-content>
+</mat-card>

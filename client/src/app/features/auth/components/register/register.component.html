@@ -16,18 +16,13 @@
             required
           />
           <mat-icon matPrefix>email</mat-icon>
-          @if (
-            registerForm.get('email')?.invalid &&
-            registerForm.get('email')?.touched
-          ) {
-            <mat-error>
-              @if (registerForm.get('email')?.errors?.['required']) {
-                Email is required
-              } @else if (registerForm.get('email')?.errors?.['email']) {
-                Please enter a valid email address
-              }
-            </mat-error>
-          }
+          <mat-error>
+            @if (registerForm.get('email')?.errors?.['required']) {
+              Email is required
+            } @else if (registerForm.get('email')?.errors?.['email']) {
+              Please enter a valid email address
+            }
+          </mat-error>
         </mat-form-field>
 
         <mat-form-field class="full-width">
@@ -40,12 +35,7 @@
             required
           />
           <mat-icon matPrefix>person</mat-icon>
-          @if (
-            registerForm.get('firstName')?.invalid &&
-            registerForm.get('firstName')?.touched
-          ) {
-            <mat-error> First name is required </mat-error>
-          }
+          <mat-error>First name is required</mat-error>
         </mat-form-field>
 
         <mat-form-field class="full-width">
@@ -58,12 +48,7 @@
             required
           />
           <mat-icon matPrefix>person</mat-icon>
-          @if (
-            registerForm.get('lastName')?.invalid &&
-            registerForm.get('lastName')?.touched
-          ) {
-            <mat-error> Last name is required </mat-error>
-          }
+          <mat-error>Last name is required</mat-error>
         </mat-form-field>
 
         <mat-form-field class="full-width">
@@ -78,18 +63,13 @@
           />
           <mat-icon matPrefix>lock</mat-icon>
           <app-password-toggle matSuffix #pwdToggle />
-          @if (
-            registerForm.get('password')?.invalid &&
-            registerForm.get('password')?.touched
-          ) {
-            <mat-error>
-              @if (registerForm.get('password')?.errors?.['required']) {
-                Password is required
-              } @else if (registerForm.get('password')?.errors?.['minlength']) {
-                Password must be at least 8 characters
-              }
-            </mat-error>
-          }
+          <mat-error>
+            @if (registerForm.get('password')?.errors?.['required']) {
+              Password is required
+            } @else if (registerForm.get('password')?.errors?.['minlength']) {
+              Password must be at least 8 characters
+            }
+          </mat-error>
         </mat-form-field>
 
         @if (error()) {

@@ -33,6 +33,11 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - Server-side token cleanup via cron jobs
 - **Audit logging** — security-sensitive operations recorded to `audit_logs` table (login, registration, password changes, user/role management, OAuth events); nightly cleanup removes entries older than `AUDIT_LOG_RETENTION_DAYS` days (default 90)
 
+### Admin Panel
+- **Role management** — tabbed `/admin` shell (`AdminPanelComponent`) with "Users" and "Roles" tabs. Role list with create/edit/delete dialogs; `RolePermissionsDialogComponent` assigns permissions to roles with optional CASL conditions (ownership, fieldMatch, userAttr, custom)
+- **CASL condition editors** — all four condition types supported in the permissions dialog: `ownership` checkbox, `fieldMatch` / `userAttr` JSON editors, and a `custom` raw MongoQuery textarea with blur-time JSON validation
+- **Prototype-pollution-safe `custom` conditions** — `CaslAbilityFactory` uses `Object.entries()` loop instead of `Object.assign` when merging user-supplied JSON into the CASL query object
+
 ### User Management (Admin)
 - **Unified Manage Users page** — inline filter form (email, first/last name, status) on the same page as the user list; empty filters load all users, filled filters trigger a search via `GET /users/search`
 - **Infinite scroll** with column sorting — loads 20 users at a time; `IntersectionObserver` sentinel triggers additional pages automatically as the user scrolls
@@ -76,7 +81,8 @@ fullstack-starter-app/
 │   │   ├── core/           # Header, theme, storage, error interceptor, 404
 │   │   ├── features/
 │   │   │   ├── auth/       # Login, register, profile, verify-email, forgot/reset-password, guards, JWT interceptor
-│   │   │   └── users/      # User list (with inline filters), detail, edit
+│   │   │   ├── users/      # User list (with inline filters), detail, edit
+│   │   │   └── admin/      # Admin panel shell, role list/form/permissions dialogs, RolesStore
 │   │   └── shared/         # Shared components (confirm dialog)
 │   ├── src/styles/         # SCSS architecture (themes, utilities, components)
 │   └── e2e/                # Playwright E2E tests (uses mock-server)
@@ -286,6 +292,8 @@ API base URL: `/api/v1`
 | PATCH | `/roles/:id` | `roles:update` | Update role |
 | DELETE | `/roles/:id` | `roles:delete` | Delete role |
 | GET | `/roles/permissions` | `roles:read` | List all available permissions |
+| GET | `/roles/:id/permissions` | `roles:read` | Get permissions assigned to a specific role |
+| PUT | `/roles/:id/permissions` | `roles:update` | Bulk-replace the full permission set for a role |
 | POST | `/roles/:id/permissions` | `roles:update` | Assign permissions to role |
 | DELETE | `/roles/:id/permissions/:permId` | `roles:update` | Remove permission from role |
 | POST | `/roles/assign/:userId` | `roles:assign` | Assign role to user |

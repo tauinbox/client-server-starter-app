@@ -1,5 +1,5 @@
 {
-  "version": "0.1.6",
+  "version": "0.1.9",
   "description": "API route manifest — update whenever server endpoints change.",
   "routes": [
     {
@@ -180,6 +180,16 @@
     {
       "method": "DELETE",
       "path": "/api/v1/roles/role-admin",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/roles/role-admin/permissions",
+      "expectedStatus": 401
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/roles/role-admin/permissions",
       "expectedStatus": 401
     },
     {

@@ -67,7 +67,7 @@
         <button
           mat-icon-button
           color="primary"
-          [routerLink]="['/users', user.id]"
+          [routerLink]="['/admin/users', user.id]"
           matTooltip="View Details"
           [attr.aria-label]="
             'View details for ' + user.firstName + ' ' + user.lastName
@@ -78,7 +78,7 @@
         <button
           mat-icon-button
           color="accent"
-          [routerLink]="['/users', user.id, 'edit']"
+          [routerLink]="['/admin/users', user.id, 'edit']"
           matTooltip="Edit User"
           [attr.aria-label]="'Edit ' + user.firstName + ' ' + user.lastName"
         >

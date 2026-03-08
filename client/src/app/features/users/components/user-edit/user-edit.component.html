@@ -7,7 +7,7 @@
       <button
         mat-icon-button
         color="primary"
-        [routerLink]="['/users', id()]"
+        [routerLink]="['/admin/users', id()]"
         aria-label="Back to user detail"
       >
         <mat-icon>arrow_back</mat-icon>
@@ -31,17 +31,13 @@
               required
             />
             <mat-icon matPrefix>email</mat-icon>
-            @if (
-              userForm.get('email')?.invalid && userForm.get('email')?.touched
-            ) {
-              <mat-error>
-                @if (userForm.get('email')?.errors?.['required']) {
-                  Email is required
-                } @else if (userForm.get('email')?.errors?.['email']) {
-                  Please enter a valid email address
-                }
-              </mat-error>
-            }
+            <mat-error>
+              @if (userForm.get('email')?.errors?.['required']) {
+                Email is required
+              } @else if (userForm.get('email')?.errors?.['email']) {
+                Please enter a valid email address
+              }
+            </mat-error>
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="full-width">
@@ -54,12 +50,7 @@
               required
             />
             <mat-icon matPrefix>person</mat-icon>
-            @if (
-              userForm.get('firstName')?.invalid &&
-              userForm.get('firstName')?.touched
-            ) {
-              <mat-error> First name is required </mat-error>
-            }
+            <mat-error>First name is required</mat-error>
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="full-width">
@@ -72,12 +63,7 @@
               required
             />
             <mat-icon matPrefix>person</mat-icon>
-            @if (
-              userForm.get('lastName')?.invalid &&
-              userForm.get('lastName')?.touched
-            ) {
-              <mat-error> Last name is required </mat-error>
-            }
+            <mat-error>Last name is required</mat-error>
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="full-width">
@@ -90,12 +76,7 @@
             />
             <mat-icon matPrefix>lock</mat-icon>
             <app-password-toggle matSuffix #pwdToggle />
-            @if (
-              userForm.get('password')?.invalid &&
-              userForm.get('password')?.touched
-            ) {
-              <mat-error> Password must be at least 8 characters </mat-error>
-            }
+            <mat-error>Password must be at least 8 characters</mat-error>
           </mat-form-field>
 
           @if (canManageUser()) {
@@ -145,7 +126,11 @@
 
             <div class="spacer"></div>
 
-            <button mat-button type="button" [routerLink]="['/users', id()]">
+            <button
+              mat-button
+              type="button"
+              [routerLink]="['/admin/users', id()]"
+            >
               Cancel
             </button>
 
@@ -169,7 +154,7 @@
           <mat-icon class="error-icon">error_outline</mat-icon>
           <h3>User Not Found</h3>
           <p>The requested user could not be found.</p>
-          <button mat-raised-button color="primary" routerLink="/users">
+          <button mat-raised-button color="primary" routerLink="/admin/users">
             Back to Users
           </button>
         </div>

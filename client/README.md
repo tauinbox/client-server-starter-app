@@ -40,10 +40,20 @@ src/app/
 │   │   ├── interceptors/   # jwtInterceptor
 │   │   ├── services/       # AuthService (HTTP, refresh scheduling, fetchPermissions: Promise<void>)
 │   │   └── store/          # AuthStore (NgRx Signal Store — state: accessToken (memory) + user (auth_user localStorage) + ability: AppAbility|null)
-│   └── users/              # User list (with inline filters), detail, edit (admin)
+│   ├── users/              # User list (with inline filters), detail, edit (admin)
+│   │   ├── components/
+│   │   │   └── user-table/ # UserTableComponent (shared table; sorting + actions only, no paginator)
+│   │   └── store/          # UsersStore (NgRx Signal Store, route-level)
+│   └── admin/              # Admin panel (roles + user management)
+│       ├── admin.routes.ts # Lazy-loaded child routes under /admin
 │       ├── components/
-│       │   └── user-table/ # UserTableComponent (shared table; sorting + actions only, no paginator)
-│       └── store/          # UsersStore (NgRx Signal Store, route-level)
+│       │   ├── admin-panel/             # AdminPanelComponent — tabbed shell (Users / Roles)
+│       │   └── roles/
+│       │       ├── role-list/           # RoleListComponent — data table with create/edit/delete actions
+│       │       ├── role-form-dialog/    # RoleFormDialogComponent — create and edit role (name, description)
+│       │       └── role-permissions-dialog/ # RolePermissionsDialogComponent — permission matrix with CASL condition editors
+│       ├── services/       # RoleService (HTTP → /api/v1/roles)
+│       └── store/          # RolesStore (NgRx Signal Store, route-level: roles, allPermissions, loading/saving)
 └── shared/
     ├── components/
     │   ├── confirm-dialog/ # Confirmation dialog
@@ -62,6 +72,9 @@ src/app/
 | `/users` | UserListComponent | permissionGuard('list', 'User') |
 | `/users/:id` | UserDetailComponent | authGuard |
 | `/users/:id/edit` | UserEditComponent | authGuard |
+| `/admin` | AdminPanelComponent | permissionGuard('list', 'Role') |
+| `/admin/users` | UserListComponent | (inherited from /admin) |
+| `/admin/roles` | RoleListComponent | (inherited from /admin) |
 | `/verify-email` | VerifyEmailComponent | - |
 | `/forgot-password` | ForgotPasswordComponent | guestGuard |
 | `/reset-password` | ResetPasswordComponent | guestGuard |

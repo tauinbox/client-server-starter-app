@@ -66,6 +66,11 @@ export const routes: Routes = [
     ]
   },
   {
+    path: AppRouteSegmentEnum.Admin,
+    loadChildren: () =>
+      import('./features/admin/admin.routes').then((r) => r.adminRoutes)
+  },
+  {
     path: AppRouteSegmentEnum.OAuthCallback,
     loadComponent: () =>
       import('./features/auth/components/oauth-callback/oauth-callback.component').then(

@@ -131,8 +131,7 @@
       "!cors-options.ts",
       "!modules/core/configuration.ts",
       "!migrations/**",
-      "!seeders/**",
-      "!modules/feature/**"
+      "!seeders/**"
     ],
     "coverageThreshold": {
       "global": {

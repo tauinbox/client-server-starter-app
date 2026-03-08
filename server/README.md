@@ -250,6 +250,8 @@ Base URL: `/api/v1`
 | PATCH | `/:id` | `roles:update` | Update role |
 | DELETE | `/:id` | `roles:delete` | Delete role |
 | GET | `/permissions` | `roles:read` | List all available permissions |
+| GET | `/:id/permissions` | `roles:read` | Get permissions assigned to a specific role |
+| PUT | `/:id/permissions` | `roles:update` | Bulk-replace the full permission set for a role |
 | POST | `/:id/permissions` | `roles:update` | Assign permissions to role |
 | DELETE | `/:id/permissions/:permissionId` | `roles:update` | Remove permission from role |
 | POST | `/assign/:userId` | `roles:assign` | Assign role to user |

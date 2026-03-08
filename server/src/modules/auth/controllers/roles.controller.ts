@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Request,
   UseInterceptors
 } from '@nestjs/common';
@@ -27,7 +28,8 @@ import { CreateRoleDto } from '../dtos/create-role.dto';
 import { UpdateRoleDto } from '../dtos/update-role.dto';
 import {
   AssignPermissionsDto,
-  AssignRoleDto
+  AssignRoleDto,
+  SetPermissionsDto
 } from '../dtos/assign-permissions.dto';
 import { Authorize } from '../decorators/authorize.decorator';
 import { AuditService } from '../../audit/audit.service';
@@ -76,6 +78,17 @@ export class RolesController {
   @ApiNotFoundResponse({ description: 'Role not found' })
   findOne(@Param('id') id: string) {
     return this.roleService.findOne(id);
+  }
+
+  @Get(':id/permissions')
+  @Authorize(['read', 'Role'])
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get permissions assigned to a role' })
+  @ApiParam({ name: 'id', description: 'The role ID' })
+  @ApiOkResponse({ description: 'List of role permissions' })
+  @ApiNotFoundResponse({ description: 'Role not found' })
+  getPermissionsForRole(@Param('id') id: string) {
+    return this.roleService.getPermissionsForRole(id);
   }
 
   @Post()
@@ -142,6 +155,34 @@ export class RolesController {
       actorEmail: req.user.email,
       targetId: id,
       targetType: 'Role',
+      context: extractAuditContext(req)
+    });
+    return result;
+  }
+
+  @Put(':id/permissions')
+  @Authorize(['update', 'Role'])
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Set the full permission set for a role (replaces existing)'
+  })
+  @ApiParam({ name: 'id', description: 'The role ID' })
+  @ApiBody({ type: SetPermissionsDto })
+  @ApiOkResponse({ description: 'Permissions updated' })
+  @ApiNotFoundResponse({ description: 'Role not found' })
+  async setPermissions(
+    @Param('id') id: string,
+    @Body() dto: SetPermissionsDto,
+    @Request() req: JwtAuthRequest
+  ) {
+    const result = await this.roleService.setPermissionsForRole(id, dto.items);
+    await this.auditService.log({
+      action: AuditAction.PERMISSION_ASSIGN,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      targetId: id,
+      targetType: 'Role',
+      details: { permissionIds: dto.items.map((i) => i.permissionId) },
       context: extractAuditContext(req)
     });
     return result;
