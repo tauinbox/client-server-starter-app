@@ -79,6 +79,23 @@
             <mat-error>Password must be at least 8 characters</mat-error>
           </mat-form-field>
 
+          @if (canAssignRoles() && availableRoles().length > 0) {
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Roles</mat-label>
+              <mat-select
+                [value]="selectedRoleIds()"
+                multiple
+                (selectionChange)="onRolesChange($event.value)"
+                [disabled]="saving()"
+              >
+                @for (role of availableRoles(); track role.id) {
+                  <mat-option [value]="role.id">{{ role.name }}</mat-option>
+                }
+              </mat-select>
+              <mat-icon matPrefix>admin_panel_settings</mat-icon>
+            </mat-form-field>
+          }
+
           @if (canManageUser()) {
             <div class="checkbox-group">
               <mat-checkbox formControlName="isActive">Active</mat-checkbox>

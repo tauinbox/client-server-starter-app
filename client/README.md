@@ -52,7 +52,7 @@ src/app/
 │       │       ├── role-list/           # RoleListComponent — data table with create/edit/delete actions
 │       │       ├── role-form-dialog/    # RoleFormDialogComponent — create and edit role (name, description)
 │       │       └── role-permissions-dialog/ # RolePermissionsDialogComponent — permission matrix with CASL condition editors
-│       ├── services/       # RoleService (HTTP → /api/v1/roles)
+│       ├── services/       # RoleService (HTTP → /api/v1/roles; CRUD + assignRoleToUser/removeRoleFromUser)
 │       └── store/          # RolesStore (NgRx Signal Store, route-level: roles, allPermissions, loading/saving)
 └── shared/
     ├── components/
