@@ -89,11 +89,11 @@ export class UserEditComponent implements OnInit {
   readonly #userService = inject(UserService);
   readonly #roleService = inject(RoleService);
   readonly #usersStore = inject(UsersStore);
+  readonly #authStore = inject(AuthStore);
   readonly #router = inject(Router);
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
   readonly #destroyRef = inject(DestroyRef);
-  protected readonly authStore = inject(AuthStore);
 
   readonly id = input.required<string>();
   readonly user = signal<User | null>(null);
@@ -140,17 +140,17 @@ export class UserEditComponent implements OnInit {
   );
 
   protected readonly canManageUser = computed(() =>
-    this.authStore.hasPermission('update', 'User')
+    this.#authStore.hasPermission('update', 'User')
   );
 
   protected readonly canAssignRoles = computed(() =>
-    this.authStore.hasPermission('assign', 'Role')
+    this.#authStore.hasPermission('assign', 'Role')
   );
 
   protected readonly canDelete = computed(
     () =>
-      this.authStore.hasPermission('delete', 'User') &&
-      this.id() !== this.authStore.user()?.id
+      this.#authStore.hasPermission('delete', 'User') &&
+      this.id() !== this.#authStore.user()?.id
   );
 
   ngOnInit() {
@@ -246,8 +246,8 @@ export class UserEditComponent implements OnInit {
 
           if (updatedUser) {
             this.user.set(updatedUser);
-            if (this.id() === this.authStore.user()?.id) {
-              this.authStore.updateCurrentUser(updatedUser);
+            if (this.id() === this.#authStore.user()?.id) {
+              this.#authStore.updateCurrentUser(updatedUser);
             }
           }
 
@@ -279,7 +279,7 @@ export class UserEditComponent implements OnInit {
       updateData.password = formValues.password;
     }
 
-    if (this.authStore.hasPermission('update', 'User')) {
+    if (this.#authStore.hasPermission('update', 'User')) {
       updateData.isActive = formValues.isActive;
     }
 
