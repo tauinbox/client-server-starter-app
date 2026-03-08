@@ -22,6 +22,7 @@ import { MatChip } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import {
+  MatCell,
   MatCellDef,
   MatColumnDef,
   MatHeaderCell,
@@ -67,7 +68,8 @@ import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-
     MatRow,
     MatHeaderCellDef,
     MatHeaderRowDef,
-    MatRowDef
+    MatRowDef,
+    MatCell
   ],
   templateUrl: './role-list.component.html',
   styleUrl: './role-list.component.scss',
