@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.10](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.9...v0.1.10) (2026-03-08)
+
+
+### Features
+
+* admin panel with role and permission management ([e6fe6c1](https://github.com/tauinbox/client-server-starter-app/commit/e6fe6c114876f008e188a0c4d78b952cd7de38f8))
+* tie contracts/routes.json version to server package version ([8f5c667](https://github.com/tauinbox/client-server-starter-app/commit/8f5c667c6ba4cfc55ee379a932a953884aeb9c33))
+
+
+### Bug Fixes
+
+* add GET and PUT /roles/:id/permissions to route contracts ([4b8e15a](https://github.com/tauinbox/client-server-starter-app/commit/4b8e15a7c73fb163c8331ec4ed9b59e83eefeb19))
+* **docker:** upgrade zlib from edge repo to patch CVE-2026-22184 ([917fedb](https://github.com/tauinbox/client-server-starter-app/commit/917fedb37311abd6a4455b61234402283337bfe8))
+* restore /users route removed when adding /admin panel ([1c1ed9b](https://github.com/tauinbox/client-server-starter-app/commit/1c1ed9bca572993420d5d5644f4c4eb8a6c16e66))
+
 ## [0.1.9](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.8...v0.1.9) (2026-03-07)
 
 
