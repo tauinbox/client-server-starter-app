@@ -44,7 +44,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - User detail, edit, and **soft delete** — records are preserved with a `deleted_at` timestamp; all active sessions are revoked on delete; count decremented inline (no reload)
 - **Restore** soft-deleted users via `POST /users/:id/restore` — reactivates the account
 - `includeDeleted=true` query param shows soft-deleted users in list and search
-- Role and status management
+- Role assignment in user edit form — multi-select field (visible to users with `assign:Role` permission); diffs initial vs selected roles and issues `POST /roles/assign/:userId` / `DELETE /roles/assign/:userId/:roleId` calls on save
 - Pagination response envelope: `{ data: User[], meta: { page, limit, total, totalPages } }`
 - **Sticky header** — toolbar remains fixed at the top while scrolling through long lists
 
@@ -406,7 +406,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 |------|------|-------|--------|
 | Server unit tests | Jest | `*.spec.ts` alongside source | 234 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | Configured |
-| Client unit tests | Vitest | `*.spec.ts` alongside source | 263 tests passing |
+| Client unit tests | Vitest | `*.spec.ts` alongside source | 271 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 113 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
 
