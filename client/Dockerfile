@@ -11,6 +11,9 @@ RUN cd client && COMMIT_HASH=$COMMIT_HASH NODE_OPTIONS="--max-old-space-size=204
 # Stage 2: runtime
 FROM nginx:1.28-alpine AS runner
 RUN apk upgrade --no-cache && \
+    apk upgrade --no-cache \
+        --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
+        zlib && \
     mkdir -p /var/cache/nginx /tmp/nginx && \
     chown -R nginx:nginx /var/cache/nginx /tmp/nginx /usr/share/nginx/html && \
     sed -i 's|/run/nginx.pid|/tmp/nginx/nginx.pid|' /etc/nginx/nginx.conf
