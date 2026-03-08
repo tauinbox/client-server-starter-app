@@ -114,6 +114,27 @@ export class RoleService {
     });
   }
 
+  async setPermissionsForRole(
+    roleId: string,
+    items: { permissionId: string; conditions?: PermissionCondition | null }[]
+  ): Promise<void> {
+    await this.findOne(roleId);
+    await this.rolePermissionRepository.manager.transaction(async (em) => {
+      await em.delete(RolePermission, { roleId });
+      if (items.length > 0) {
+        const records = items.map(({ permissionId, conditions }) =>
+          em.create(RolePermission, {
+            roleId,
+            permissionId,
+            conditions: conditions ?? null
+          })
+        );
+        await em.save(RolePermission, records);
+      }
+    });
+    await this.invalidateUsersWithRole(roleId);
+  }
+
   async assignPermissionsToRole(
     roleId: string,
     permissionIds: string[],

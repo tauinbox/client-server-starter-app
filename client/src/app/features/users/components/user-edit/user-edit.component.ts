@@ -212,7 +212,11 @@ export class UserEditComponent implements OnInit {
     this.#snackBar.open('User updated successfully', 'Close', {
       duration: 5000
     });
-    void this.#router.navigate([`/${AppRouteSegmentEnum.Users}`, this.id()]);
+    void this.#router.navigate([
+      `/${AppRouteSegmentEnum.Admin}`,
+      AppRouteSegmentEnum.Users,
+      this.id()
+    ]);
   }
 
   #handleUpdateError(err: HttpErrorResponse): void {
@@ -278,7 +282,10 @@ export class UserEditComponent implements OnInit {
           this.#snackBar.open('User deleted successfully', 'Close', {
             duration: 5000
           });
-          void this.#router.navigate([`/${AppRouteSegmentEnum.Users}`]);
+          void this.#router.navigate([
+            `/${AppRouteSegmentEnum.Admin}`,
+            AppRouteSegmentEnum.Users
+          ]);
         },
         error: (err: HttpErrorResponse) => {
           this.#snackBar.open(

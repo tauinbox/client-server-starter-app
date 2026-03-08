@@ -3,6 +3,8 @@ export enum AppRouteSegmentEnum {
   Register = 'register',
   Profile = 'profile',
   Users = 'users',
+  Admin = 'admin',
+  Roles = 'roles',
   OAuthCallback = 'oauth/callback',
   Forbidden = 'forbidden',
   ForgotPassword = 'forgot-password',

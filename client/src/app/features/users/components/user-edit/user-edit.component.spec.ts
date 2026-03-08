@@ -305,7 +305,7 @@ describe('UserEditComponent', () => {
         'Close',
         { duration: 5000 }
       );
-      expect(navigateSpy).toHaveBeenCalledWith(['/users', 'user-1']);
+      expect(navigateSpy).toHaveBeenCalledWith(['/admin', 'users', 'user-1']);
     });
 
     it('should call updateCurrentUser when editing own account', () => {
@@ -455,7 +455,7 @@ describe('UserEditComponent', () => {
         'Close',
         { duration: 5000 }
       );
-      expect(navigateSpy).toHaveBeenCalledWith(['/users']);
+      expect(navigateSpy).toHaveBeenCalledWith(['/admin', 'users']);
     });
 
     it('should not delete when dialog is cancelled', () => {

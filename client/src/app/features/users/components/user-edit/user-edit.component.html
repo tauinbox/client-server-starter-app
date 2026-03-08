@@ -7,7 +7,7 @@
       <button
         mat-icon-button
         color="primary"
-        [routerLink]="['/users', id()]"
+        [routerLink]="['/admin/users', id()]"
         aria-label="Back to user detail"
       >
         <mat-icon>arrow_back</mat-icon>
@@ -145,7 +145,11 @@
 
             <div class="spacer"></div>
 
-            <button mat-button type="button" [routerLink]="['/users', id()]">
+            <button
+              mat-button
+              type="button"
+              [routerLink]="['/admin/users', id()]"
+            >
               Cancel
             </button>
 
@@ -169,7 +173,7 @@
           <mat-icon class="error-icon">error_outline</mat-icon>
           <h3>User Not Found</h3>
           <p>The requested user could not be found.</p>
-          <button mat-raised-button color="primary" routerLink="/users">
+          <button mat-raised-button color="primary" routerLink="/admin/users">
             Back to Users
           </button>
         </div>

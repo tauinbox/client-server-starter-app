@@ -23,6 +23,35 @@ router.get('/permissions', adminGuard, (_req, res) => {
   res.json(permissions);
 });
 
+// GET /api/v1/roles/:id/permissions
+router.get('/:id/permissions', adminGuard, (req, res) => {
+  const id = req.params['id'] as string;
+  const state = getState();
+  const role = state.roles.get(id);
+
+  if (!role) {
+    res.status(404).json({ message: 'Role not found', statusCode: 404 });
+    return;
+  }
+
+  const rolePerms = state.rolePermissions
+    .filter((rp) => rp.roleId === id)
+    .map((rp) => {
+      const permission = state.permissions.get(rp.permissionId);
+      if (!permission) return null;
+      return {
+        id: rp.id,
+        roleId: rp.roleId,
+        permissionId: rp.permissionId,
+        conditions: rp.conditions,
+        permission
+      };
+    })
+    .filter((rp): rp is NonNullable<typeof rp> => rp !== null);
+
+  res.json(rolePerms);
+});
+
 // GET /api/v1/roles/:id
 router.get('/:id', adminGuard, (req, res) => {
   const id = req.params['id'] as string;
@@ -171,6 +200,55 @@ router.delete('/:id', adminGuard, (req, res) => {
     actorEmail: actor.email,
     targetId: id,
     targetType: 'Role',
+    ip: req.ip
+  });
+
+  res.send();
+});
+
+// PUT /api/v1/roles/:id/permissions  — replaces the full permission set atomically
+router.put('/:id/permissions', adminGuard, (req, res) => {
+  const id = req.params['id'] as string;
+  const state = getState();
+  const role = state.roles.get(id);
+
+  if (!role) {
+    res.status(404).json({ message: 'Role not found', statusCode: 404 });
+    return;
+  }
+
+  const { items } = req.body as {
+    items?: { permissionId: string; conditions?: unknown }[];
+  };
+  if (!Array.isArray(items)) {
+    res
+      .status(400)
+      .json({ message: 'items must be an array', statusCode: 400 });
+    return;
+  }
+
+  // Replace all existing assignments for this role
+  state.rolePermissions = state.rolePermissions.filter(
+    (rp) => rp.roleId !== id
+  );
+
+  for (const item of items) {
+    if (!state.permissions.has(item.permissionId)) continue;
+    state.rolePermissions.push({
+      id: uuidv4(),
+      roleId: id,
+      permissionId: item.permissionId,
+      conditions: (item.conditions as null) ?? null
+    });
+  }
+
+  const actor = (req as AuthenticatedRequest).user;
+  logAudit('PERMISSION_ASSIGN', {
+    actorId: actor.id,
+    actorEmail: actor.email,
+    targetId: id,
+    targetType: 'Role',
+    details: { permissionIds: items.map((i) => i.permissionId) },
     ip: req.ip
   });
 

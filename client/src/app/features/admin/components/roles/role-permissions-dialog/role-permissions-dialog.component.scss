@@ -1,0 +1,214 @@
+.dialog-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+
+  .role-name {
+    font-weight: 600;
+  }
+}
+
+.dialog-content {
+  min-width: 520px;
+  min-height: 200px;
+  padding-top: 8px;
+}
+
+.state-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+
+  &.error {
+    color: var(--mat-sys-error);
+  }
+}
+
+.system-notice {
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// ── Permission Matrix ──────────────────────────────────────────────────────
+
+.permission-group {
+  padding: 10px 0 6px;
+
+  .group-header {
+    margin-bottom: 6px;
+
+    .resource-label {
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+  }
+
+  .permission-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding-left: 28px;
+  }
+}
+
+.permission-entry {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+
+  mat-checkbox {
+    text-transform: capitalize;
+  }
+
+  .condition-chip {
+    height: 20px;
+    min-height: unset;
+    padding: 0 6px;
+    font-size: 0.7rem;
+    line-height: 20px;
+    cursor: default;
+
+    .chip-icon {
+      width: 12px;
+      height: 12px;
+      margin-right: 2px;
+      font-size: 12px;
+      vertical-align: middle;
+    }
+  }
+}
+
+mat-divider {
+  margin: 2px 0;
+}
+
+// ── Conditions Section ─────────────────────────────────────────────────────
+
+.conditions-section {
+  padding-top: 16px;
+
+  .conditions-title {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin: 0 0 4px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--mat-sys-on-surface-variant);
+
+    mat-icon {
+      width: 18px;
+      height: 18px;
+      font-size: 18px;
+    }
+  }
+
+  .conditions-hint {
+    margin: 0 0 12px;
+    font-size: 0.8rem;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.condition-row {
+  margin-bottom: 8px;
+  overflow: hidden;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+}
+
+.condition-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  height: auto;
+  padding: 8px 12px;
+  text-align: left;
+
+  mat-icon {
+    flex-shrink: 0;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .perm-label {
+    flex: 1;
+    font-family: monospace;
+    font-size: 0.85rem;
+
+    .perm-resource {
+      color: var(--mat-sys-on-surface-variant);
+    }
+
+    .perm-action {
+      font-weight: 600;
+    }
+  }
+
+  .no-condition {
+    font-size: 0.75rem;
+    font-style: italic;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .inline-chip {
+    height: 22px;
+    min-height: unset;
+    font-size: 0.7rem;
+  }
+
+  &.has-condition {
+    background-color: color-mix(
+      in srgb,
+      var(--mat-sys-primary) 5%,
+      transparent
+    );
+  }
+}
+
+.condition-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+
+// ── Individual condition block ─────────────────────────────────────────────
+
+.condition-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  .condition-label {
+    font-weight: 500;
+  }
+
+  .checkbox-hint {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.condition-input {
+  width: 100%;
+  max-width: 480px;
+
+  &--tall textarea {
+    min-height: 80px;
+    resize: vertical;
+  }
+}
+
+.json-textarea {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}

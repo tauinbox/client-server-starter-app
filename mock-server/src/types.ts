@@ -51,7 +51,7 @@ export interface MockRolePermission {
   id: string;
   roleId: string;
   permissionId: string;
-  conditions: unknown | null;
+  conditions: import('@app/shared/types').PermissionCondition | null;
 }
 
 export interface MockAuditLog {

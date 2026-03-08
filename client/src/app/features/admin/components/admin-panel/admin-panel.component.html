@@ -1,0 +1,30 @@
+<div class="admin-panel-container">
+  <nav mat-tab-nav-bar [tabPanel]="tabPanel">
+    @if (authStore.hasPermission('list', 'User')) {
+      <a
+        mat-tab-link
+        [routerLink]="routes.Users"
+        routerLinkActive
+        #usersActive="routerLinkActive"
+        [active]="usersActive.isActive"
+      >
+        Manage Users
+      </a>
+    }
+    @if (authStore.hasPermission('read', 'Role')) {
+      <a
+        mat-tab-link
+        [routerLink]="routes.Roles"
+        routerLinkActive
+        #rolesActive="routerLinkActive"
+        [active]="rolesActive.isActive"
+      >
+        Access Control
+      </a>
+    }
+  </nav>
+
+  <mat-tab-nav-panel #tabPanel>
+    <router-outlet></router-outlet>
+  </mat-tab-nav-panel>
+</div>
