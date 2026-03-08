@@ -8,7 +8,7 @@ import {
   input,
   signal
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import {
   MatCard,
   MatCardContent,
@@ -42,7 +42,7 @@ import type { UpdateUser, User } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import { catchError, forkJoin, of, tap } from 'rxjs';
+import { catchError, forkJoin, merge, of, tap } from 'rxjs';
 import { rem } from '@shared/utils/css.utils';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { UsersStore } from '../../store/users.store';
@@ -125,6 +125,11 @@ export class UserEditComponent implements OnInit {
       isActive: this.#fb.control(true, { nonNullable: true })
     });
 
+  readonly #formChanged = toSignal(
+    merge(this.userForm.statusChanges, this.userForm.valueChanges),
+    { initialValue: null }
+  );
+
   protected readonly rolesChanged = computed(() => {
     const initial = this.#initialRoleIds();
     const selected = this.selectedRoleIds();
@@ -132,12 +137,14 @@ export class UserEditComponent implements OnInit {
     return selected.some((id) => !initial.includes(id));
   });
 
-  protected readonly canSubmit = computed(
-    () =>
+  protected readonly canSubmit = computed(() => {
+    this.#formChanged(); // track form status/value changes to re-read form state
+    return (
       this.userForm.valid &&
       !this.saving() &&
       (this.userForm.dirty || this.rolesChanged())
-  );
+    );
+  });
 
   protected readonly canManageUser = computed(() =>
     this.#authStore.hasPermission('update', 'User')

@@ -233,6 +233,7 @@ describe('UserEditComponent', () => {
     it('should be true when form is valid and dirty', () => {
       component['userForm'].controls.firstName.setValue('Changed');
       component['userForm'].markAsDirty();
+      component['userForm'].updateValueAndValidity();
       expect(component['canSubmit']()).toBe(true);
     });
 
@@ -277,6 +278,7 @@ describe('UserEditComponent', () => {
     beforeEach(() => {
       fixture.detectChanges();
       component['userForm'].markAsDirty();
+      component['userForm'].updateValueAndValidity();
     });
 
     it('should not submit when form is invalid', () => {
