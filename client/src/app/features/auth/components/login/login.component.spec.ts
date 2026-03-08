@@ -11,6 +11,16 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { LoginComponent } from './login.component';
 import { AuthService } from '../../services/auth.service';
 import type { AuthResponse } from '../../models/auth.types';
+import type { RoleResponse } from '@app/shared/types';
+
+const mockUserRole: RoleResponse = {
+  id: 'role-user',
+  name: 'user',
+  description: 'Regular user',
+  isSystem: true,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z'
+};
 
 const mockAuthResponse: AuthResponse = {
   tokens: {
@@ -23,7 +33,7 @@ const mockAuthResponse: AuthResponse = {
     firstName: 'Test',
     lastName: 'User',
     isActive: true,
-    roles: ['user'],
+    roles: [mockUserRole],
     isEmailVerified: true,
     failedLoginAttempts: 0,
     lockedUntil: null,

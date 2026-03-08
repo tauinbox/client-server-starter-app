@@ -12,6 +12,16 @@ import { ActivatedRoute } from '@angular/router';
 import { ProfileComponent } from './profile.component';
 import { AuthService } from '../../services/auth.service';
 import type { User } from '@shared/models/user.types';
+import type { RoleResponse } from '@app/shared/types';
+
+const mockUserRole: RoleResponse = {
+  id: 'role-user',
+  name: 'user',
+  description: 'Regular user',
+  isSystem: true,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z'
+};
 
 const mockUser: User = {
   id: '1',
@@ -19,7 +29,7 @@ const mockUser: User = {
   firstName: 'Test',
   lastName: 'User',
   isActive: true,
-  roles: ['user'],
+  roles: [mockUserRole],
   isEmailVerified: true,
   failedLoginAttempts: 0,
   lockedUntil: null,

@@ -6,13 +6,23 @@ import type { ComponentRef } from '@angular/core';
 
 import { COLUMN_TO_SORT_MAP, UserTableComponent } from './user-table.component';
 import type { User } from '../../models/user.types';
+import type { RoleResponse } from '@app/shared/types';
+
+const mockUserRole: RoleResponse = {
+  id: 'role-user',
+  name: 'user',
+  description: 'Regular user',
+  isSystem: true,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z'
+};
 
 const mockUser: User = {
   id: 'test-user-id',
   email: 'test@example.com',
   firstName: 'Test',
   lastName: 'User',
-  roles: ['user'],
+  roles: [mockUserRole],
   isActive: true,
   isEmailVerified: true,
   failedLoginAttempts: 0,

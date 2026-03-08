@@ -9,13 +9,23 @@ import { UserDetailComponent } from './user-detail.component';
 import { UsersStore } from '../../store/users.store';
 import { AuthStore } from '../../../auth/store/auth.store';
 import type { User } from '../../models/user.types';
+import type { RoleResponse } from '@app/shared/types';
+
+const mockUserRole: RoleResponse = {
+  id: 'role-user',
+  name: 'user',
+  description: 'Regular user',
+  isSystem: true,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z'
+};
 
 const mockUser: User = {
   id: 'user-1',
   email: 'test@example.com',
   firstName: 'Test',
   lastName: 'User',
-  roles: ['user'],
+  roles: [mockUserRole],
   isActive: true,
   isEmailVerified: true,
   failedLoginAttempts: 0,

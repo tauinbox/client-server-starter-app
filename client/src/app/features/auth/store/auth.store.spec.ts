@@ -6,6 +6,25 @@ import type { AppAbility } from '../casl/app-ability';
 import { LocalStorageService } from '@core/services/local-storage.service';
 import type { AuthResponse } from '../models/auth.types';
 import type { User } from '@shared/models/user.types';
+import type { RoleResponse } from '@app/shared/types';
+
+const mockUserRole: RoleResponse = {
+  id: 'role-user',
+  name: 'user',
+  description: 'Regular user',
+  isSystem: true,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z'
+};
+
+const mockAdminRole: RoleResponse = {
+  id: 'role-admin',
+  name: 'admin',
+  description: 'Administrator',
+  isSystem: true,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z'
+};
 
 // Helper: create a base64url-encoded JWT with given payload
 function createJwt(payload: Record<string, unknown>): string {
@@ -25,7 +44,7 @@ function createMockUser(): User {
     firstName: 'Test',
     lastName: 'User',
     isActive: true,
-    roles: ['user'],
+    roles: [mockUserRole],
     isEmailVerified: true,
     failedLoginAttempts: 0,
     lockedUntil: null,
@@ -135,7 +154,7 @@ describe('AuthStore', () => {
     it('should compute isAdmin from user', () => {
       const store = createStore(null);
       const auth = createMockAuthResponse();
-      auth.user.roles = ['admin'];
+      auth.user.roles = [mockAdminRole];
       store.saveAuthResponse(auth);
 
       expect(store.isAdmin()).toBe(true);

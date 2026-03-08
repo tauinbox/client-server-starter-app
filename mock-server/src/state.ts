@@ -66,8 +66,12 @@ export function findUserByIdWithDeleted(id: string): MockUser | undefined {
 }
 
 export function toUserResponse(user: MockUser): UserResponse {
-  const { password: _, tokenRevokedAt: __, ...response } = user;
-  return response;
+  const { password: _, tokenRevokedAt: __, roles: roleNames, ...rest } = user;
+  const roles = roleNames.flatMap((name) => {
+    const role = Array.from(state.roles.values()).find((r) => r.name === name);
+    return role ? [role] : [];
+  });
+  return { ...rest, roles };
 }
 
 export function addOAuthAccounts(

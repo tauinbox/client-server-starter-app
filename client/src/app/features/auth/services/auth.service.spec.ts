@@ -11,6 +11,16 @@ import { AuthStore } from '../store/auth.store';
 import { TokenService } from './token.service';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import type { AuthResponse } from '../models/auth.types';
+import type { RoleResponse } from '@app/shared/types';
+
+const mockUserRole: RoleResponse = {
+  id: 'role-user',
+  name: 'user',
+  description: 'Regular user',
+  isSystem: true,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z'
+};
 
 // Helper: create a base64url-encoded JWT with given payload
 function createJwt(payload: Record<string, unknown>): string {
@@ -36,7 +46,7 @@ function createMockAuthResponse(): AuthResponse {
       firstName: 'Test',
       lastName: 'User',
       isActive: true,
-      roles: ['user'],
+      roles: [mockUserRole],
       isEmailVerified: true,
       failedLoginAttempts: 0,
       lockedUntil: null,
