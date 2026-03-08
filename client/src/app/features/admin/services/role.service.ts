@@ -84,4 +84,16 @@ export class RoleService {
       `${ROLES_API_V1}/${roleId}/permissions/${permissionId}`
     );
   }
+
+  assignRoleToUser(userId: string, roleId: string): Observable<void> {
+    return this.#http.post<void>(`${ROLES_API_V1}/assign/${userId}`, {
+      roleId
+    });
+  }
+
+  removeRoleFromUser(userId: string, roleId: string): Observable<void> {
+    return this.#http.delete<void>(
+      `${ROLES_API_V1}/assign/${userId}/${roleId}`
+    );
+  }
 }

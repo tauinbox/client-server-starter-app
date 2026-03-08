@@ -13,6 +13,7 @@ import type { WritableSignal } from '@angular/core';
 
 import { UserEditComponent } from './user-edit.component';
 import { UserService } from '../../services/user.service';
+import { RoleService } from '../../../admin/services/role.service';
 import { UsersStore } from '../../store/users.store';
 import { AuthStore } from '../../../auth/store/auth.store';
 import type { User } from '../../models/user.types';
@@ -36,6 +37,11 @@ describe('UserEditComponent', () => {
   let component: UserEditComponent;
   let fixture: ComponentFixture<UserEditComponent>;
   let userServiceMock: { getById: ReturnType<typeof vi.fn> };
+  let roleServiceMock: {
+    getAll: ReturnType<typeof vi.fn>;
+    assignRoleToUser: ReturnType<typeof vi.fn>;
+    removeRoleFromUser: ReturnType<typeof vi.fn>;
+  };
   let usersStoreMock: {
     updateUser: ReturnType<typeof vi.fn>;
     deleteUser: ReturnType<typeof vi.fn>;
@@ -57,6 +63,12 @@ describe('UserEditComponent', () => {
 
     userServiceMock = {
       getById: vi.fn().mockReturnValue(of(mockUser))
+    };
+
+    roleServiceMock = {
+      getAll: vi.fn().mockReturnValue(of([])),
+      assignRoleToUser: vi.fn().mockReturnValue(of(void 0)),
+      removeRoleFromUser: vi.fn().mockReturnValue(of(void 0))
     };
 
     usersStoreMock = {
@@ -81,6 +93,7 @@ describe('UserEditComponent', () => {
         provideHttpClientTesting(),
         provideNoopAnimations(),
         { provide: UserService, useValue: userServiceMock },
+        { provide: RoleService, useValue: roleServiceMock },
         { provide: UsersStore, useValue: usersStoreMock },
         { provide: AuthStore, useValue: authStoreMock },
         { provide: MatSnackBar, useValue: snackBarMock },
@@ -412,6 +425,84 @@ describe('UserEditComponent', () => {
         'Close',
         { duration: 5000 }
       );
+    });
+  });
+
+  describe('role assignment', () => {
+    const mockRoles = [
+      {
+        id: 'role-user',
+        name: 'user',
+        description: null,
+        isSystem: true,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      },
+      {
+        id: 'role-admin',
+        name: 'admin',
+        description: null,
+        isSystem: true,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      }
+    ];
+
+    beforeEach(() => {
+      roleServiceMock.getAll.mockReturnValue(of(mockRoles));
+      fixture.detectChanges();
+    });
+
+    it('should populate selectedRoleIds from user roles on load', () => {
+      // mockUser has roles: ['user'], role-user id is 'role-user'
+      expect(component['selectedRoleIds']()).toEqual(['role-user']);
+    });
+
+    it('should update selectedRoleIds on onRolesChange', () => {
+      component.onRolesChange(['role-admin']);
+      expect(component['selectedRoleIds']()).toEqual(['role-admin']);
+    });
+
+    it('rolesChanged should be true when selection differs from initial', () => {
+      component.onRolesChange(['role-admin']);
+      expect(component['rolesChanged']()).toBe(true);
+    });
+
+    it('rolesChanged should be false when selection matches initial', () => {
+      component.onRolesChange(['role-user']);
+      expect(component['rolesChanged']()).toBe(false);
+    });
+
+    it('canSubmit should be true when only roles changed (form pristine)', () => {
+      component.onRolesChange(['role-admin']);
+      expect(component['canSubmit']()).toBe(true);
+    });
+
+    it('should call assignRoleToUser for newly added roles on submit', () => {
+      component.onRolesChange(['role-user', 'role-admin']);
+      component.onSubmit();
+
+      expect(roleServiceMock.assignRoleToUser).toHaveBeenCalledWith(
+        'user-1',
+        'role-admin'
+      );
+    });
+
+    it('should call removeRoleFromUser for removed roles on submit', () => {
+      component.onRolesChange([]);
+      component.onSubmit();
+
+      expect(roleServiceMock.removeRoleFromUser).toHaveBeenCalledWith(
+        'user-1',
+        'role-user'
+      );
+    });
+
+    it('should update initialRoleIds after successful role save', () => {
+      component.onRolesChange(['role-admin']);
+      component.onSubmit();
+
+      expect(component['selectedRoleIds']()).toEqual(['role-admin']);
     });
   });
 

@@ -26,20 +26,27 @@ import {
   MatError,
   MatFormField,
   MatLabel,
+  MatPrefix,
   MatSuffix
 } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatCheckbox } from '@angular/material/checkbox';
+import { MatSelect } from '@angular/material/select';
+import { MatOption } from '@angular/material/core';
 import { UserService } from '../../services/user.service';
+import { RoleService } from '../../../admin/services/role.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { AuthStore } from '../../../auth/store/auth.store';
 import type { UpdateUser, User } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import type { HttpErrorResponse } from '@angular/common/http';
+import type { Observable } from 'rxjs';
+import { catchError, forkJoin, of, tap } from 'rxjs';
 import { rem } from '@shared/utils/css.utils';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { UsersStore } from '../../store/users.store';
+import type { RoleResponse } from '@app/shared/types/role.types';
 
 type UserFormType = {
   email: FormControl<string>;
@@ -68,7 +75,10 @@ type UserFormType = {
     MatCheckbox,
     MatButton,
     PasswordToggleComponent,
-    MatSuffix
+    MatSuffix,
+    MatPrefix,
+    MatSelect,
+    MatOption
   ],
   templateUrl: './user-edit.component.html',
   styleUrl: './user-edit.component.scss',
@@ -77,18 +87,22 @@ type UserFormType = {
 export class UserEditComponent implements OnInit {
   readonly #fb = inject(FormBuilder);
   readonly #userService = inject(UserService);
+  readonly #roleService = inject(RoleService);
   readonly #usersStore = inject(UsersStore);
   readonly #router = inject(Router);
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
-  protected readonly authStore = inject(AuthStore);
   readonly #destroyRef = inject(DestroyRef);
+  protected readonly authStore = inject(AuthStore);
 
   readonly id = input.required<string>();
   readonly user = signal<User | null>(null);
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
+  readonly availableRoles = signal<RoleResponse[]>([]);
+  readonly selectedRoleIds = signal<string[]>([]);
+  readonly #initialRoleIds = signal<string[]>([]);
 
   protected readonly userForm: FormGroup<UserFormType> =
     this.#fb.group<UserFormType>({
@@ -111,12 +125,26 @@ export class UserEditComponent implements OnInit {
       isActive: this.#fb.control(true, { nonNullable: true })
     });
 
+  protected readonly rolesChanged = computed(() => {
+    const initial = this.#initialRoleIds();
+    const selected = this.selectedRoleIds();
+    if (initial.length !== selected.length) return true;
+    return selected.some((id) => !initial.includes(id));
+  });
+
   protected readonly canSubmit = computed(
-    () => this.userForm.valid && !this.saving() && this.userForm.dirty
+    () =>
+      this.userForm.valid &&
+      !this.saving() &&
+      (this.userForm.dirty || this.rolesChanged())
   );
 
   protected readonly canManageUser = computed(() =>
     this.authStore.hasPermission('update', 'User')
+  );
+
+  protected readonly canAssignRoles = computed(() =>
+    this.authStore.hasPermission('assign', 'Role')
   );
 
   protected readonly canDelete = computed(
@@ -133,11 +161,14 @@ export class UserEditComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.#userService
-      .getById(this.id())
+    forkJoin({
+      user: this.#userService.getById(this.id()),
+      roles: this.#roleService.getAll().pipe(catchError(() => of([])))
+    })
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
-        next: (user) => {
+        next: ({ user, roles }) => {
+          this.availableRoles.set(roles);
           this.user.set(user);
 
           this.userForm.patchValue({
@@ -147,8 +178,15 @@ export class UserEditComponent implements OnInit {
             isActive: user.isActive,
             password: ''
           });
-
           this.userForm.markAsPristine();
+
+          const roleNameToId = new Map(roles.map((r) => [r.name, r.id]));
+          const roleIds = user.roles
+            .map((name) => roleNameToId.get(name))
+            .filter((id): id is string => id !== undefined);
+          this.#initialRoleIds.set(roleIds);
+          this.selectedRoleIds.set([...roleIds]);
+
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
@@ -162,21 +200,71 @@ export class UserEditComponent implements OnInit {
       });
   }
 
+  onRolesChange(roleIds: string[]): void {
+    this.selectedRoleIds.set(roleIds);
+  }
+
   onSubmit(): void {
     if (!this.canSubmit()) return;
-
-    const formValues = this.userForm.getRawValue();
-    const updateData = this.#prepareUpdateData(formValues);
 
     this.saving.set(true);
     this.error.set(null);
 
-    this.#usersStore
-      .updateUser(this.id(), updateData)
+    const ops: Observable<unknown>[] = [];
+    let updatedUser: User | null = null;
+
+    if (this.userForm.dirty) {
+      const updateData = this.#prepareUpdateData(this.userForm.getRawValue());
+      ops.push(
+        this.#usersStore.updateUser(this.id(), updateData).pipe(
+          tap((user) => {
+            updatedUser = user;
+          })
+        )
+      );
+    }
+
+    if (this.rolesChanged()) {
+      const initial = this.#initialRoleIds();
+      const selected = this.selectedRoleIds();
+      const toAdd = selected.filter((id) => !initial.includes(id));
+      const toRemove = initial.filter((id) => !selected.includes(id));
+
+      for (const roleId of toAdd) {
+        ops.push(this.#roleService.assignRoleToUser(this.id(), roleId));
+      }
+      for (const roleId of toRemove) {
+        ops.push(this.#roleService.removeRoleFromUser(this.id(), roleId));
+      }
+    }
+
+    (ops.length ? forkJoin(ops) : of([null]))
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
-        next: (user) => this.#handleUpdateSuccess(user),
-        error: (err) => this.#handleUpdateError(err)
+        next: () => {
+          this.saving.set(false);
+
+          if (updatedUser) {
+            this.user.set(updatedUser);
+            if (this.id() === this.authStore.user()?.id) {
+              this.authStore.updateCurrentUser(updatedUser);
+            }
+          }
+
+          this.#initialRoleIds.set([...this.selectedRoleIds()]);
+          this.userForm.patchValue({ password: '' });
+          this.userForm.markAsPristine();
+
+          this.#snackBar.open('User updated successfully', 'Close', {
+            duration: 5000
+          });
+          void this.#router.navigate([
+            `/${AppRouteSegmentEnum.Admin}`,
+            AppRouteSegmentEnum.Users,
+            this.id()
+          ]);
+        },
+        error: (err: HttpErrorResponse) => this.#handleUpdateError(err)
       });
   }
 
@@ -196,27 +284,6 @@ export class UserEditComponent implements OnInit {
     }
 
     return updateData;
-  }
-
-  #handleUpdateSuccess(updatedUser: User): void {
-    this.saving.set(false);
-    this.user.set(updatedUser);
-
-    if (this.id() === this.authStore.user()?.id) {
-      this.authStore.updateCurrentUser(updatedUser);
-    }
-
-    this.userForm.patchValue({ password: '' });
-    this.userForm.markAsPristine();
-
-    this.#snackBar.open('User updated successfully', 'Close', {
-      duration: 5000
-    });
-    void this.#router.navigate([
-      `/${AppRouteSegmentEnum.Admin}`,
-      AppRouteSegmentEnum.Users,
-      this.id()
-    ]);
   }
 
   #handleUpdateError(err: HttpErrorResponse): void {
