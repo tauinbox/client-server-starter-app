@@ -14,15 +14,13 @@
         placeholder="Role name"
         [readonly]="isSystemRole"
       />
-      @if (form.get('name')?.invalid && form.get('name')?.touched) {
-        <mat-error>
-          @if (form.get('name')?.errors?.['required']) {
-            Name is required
-          } @else if (form.get('name')?.errors?.['maxlength']) {
-            Name must be at most 50 characters
-          }
-        </mat-error>
-      }
+      <mat-error>
+        @if (form.get('name')?.errors?.['required']) {
+          Name is required
+        } @else if (form.get('name')?.errors?.['maxlength']) {
+          Name must be at most 50 characters
+        }
+      </mat-error>
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="full-width">
@@ -34,15 +32,11 @@
         rows="3"
         [readonly]="isSystemRole"
       ></textarea>
-      @if (
-        form.get('description')?.invalid && form.get('description')?.touched
-      ) {
-        <mat-error>
-          @if (form.get('description')?.errors?.['maxlength']) {
-            Description must be at most 255 characters
-          }
-        </mat-error>
-      }
+      <mat-error>
+        @if (form.get('description')?.errors?.['maxlength']) {
+          Description must be at most 255 characters
+        }
+      </mat-error>
     </mat-form-field>
   </form>
 </mat-dialog-content>

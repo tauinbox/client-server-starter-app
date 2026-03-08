@@ -27,17 +27,13 @@
             required
           />
           <mat-icon matPrefix>email</mat-icon>
-          @if (
-            loginForm.get('email')?.invalid && loginForm.get('email')?.touched
-          ) {
-            <mat-error>
-              @if (loginForm.get('email')?.errors?.['required']) {
-                Email is required
-              } @else if (loginForm.get('email')?.errors?.['email']) {
-                Please enter a valid email address
-              }
-            </mat-error>
-          }
+          <mat-error>
+            @if (loginForm.get('email')?.errors?.['required']) {
+              Email is required
+            } @else if (loginForm.get('email')?.errors?.['email']) {
+              Please enter a valid email address
+            }
+          </mat-error>
         </mat-form-field>
 
         <mat-form-field class="full-width">
@@ -52,12 +48,7 @@
           />
           <mat-icon matPrefix>lock</mat-icon>
           <app-password-toggle matSuffix #pwdToggle />
-          @if (
-            loginForm.get('password')?.invalid &&
-            loginForm.get('password')?.touched
-          ) {
-            <mat-error> Password is required </mat-error>
-          }
+          <mat-error>Password is required</mat-error>
         </mat-form-field>
 
         @if (error()) {
