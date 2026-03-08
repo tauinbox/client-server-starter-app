@@ -21,7 +21,6 @@ import { MatChip } from '@angular/material/chips';
 import { MatDivider } from '@angular/material/divider';
 import { UsersStore } from '../../store/users.store';
 import { RequirePermissionDirective } from '../../../auth/directives/require-permission.directive';
-import { AuthStore } from '@features/auth/store/auth.store';
 
 @Component({
   selector: 'app-user-detail',
@@ -46,13 +45,14 @@ import { AuthStore } from '@features/auth/store/auth.store';
 })
 export class UserDetailComponent implements OnInit {
   readonly #usersStore = inject(UsersStore);
-  readonly #authStore = inject(AuthStore);
 
   readonly id = input.required<string>();
   readonly user = computed(
     () => this.#usersStore.entityMap()[this.id()] ?? null
   );
-  readonly isAdmin = this.#authStore.isAdmin;
+  readonly isAdmin = computed(
+    () => this.user()?.roles.some((r) => r.name === 'admin') ?? false
+  );
   readonly loading = this.#usersStore.detailLoading;
 
   ngOnInit(): void {
