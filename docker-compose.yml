@@ -1,4 +1,13 @@
 services:
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   db:
     image: postgres:16-alpine
     environment:
@@ -23,6 +32,7 @@ services:
     env_file: server/.env
     environment:
       DB_HOST: db
+      REDIS_URL: redis://redis:6379
       ENVIRONMENT: production
     expose:
       - "3000"
@@ -36,6 +46,8 @@ services:
       start_period: 40s
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 

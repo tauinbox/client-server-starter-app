@@ -165,6 +165,7 @@ Edit `.env` with your database credentials and settings:
 | `SMTP_PORT` | `587` | SMTP server port |
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
+| `REDIS_URL` | - | Redis connection URL (optional; enables distributed rate limiting and shared permission cache for multi-instance deployments) |
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to retain audit log entries |
 | `DB_POOL_MAX` | `10` | Maximum PostgreSQL connection pool size |
 | `DB_POOL_IDLE_TIMEOUT` | `30000` | Milliseconds before an idle connection is closed |
@@ -231,6 +232,7 @@ docker-compose up -d
 ```
 
 Services:
+- **redis** — redis:7-alpine, used for distributed rate limiting and shared permission cache
 - **db** — postgres:16-alpine, persistent named volume
 - **server** — NestJS API on port 3000; entrypoint runs migrations, optional admin seed, then starts the server
 - **client** — Angular SPA served by nginx on port 4200 (maps to container port 80); built with `--base-href /nexus/`
