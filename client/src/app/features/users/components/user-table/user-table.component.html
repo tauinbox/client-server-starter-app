@@ -92,9 +92,7 @@
             color="warn"
             (click)="deleteUser.emit(user)"
             matTooltip="Delete User"
-            [attr.aria-label]="
-              'Delete ' + user.firstName + ' ' + user.lastName
-            "
+            [attr.aria-label]="'Delete ' + user.firstName + ' ' + user.lastName"
           >
             <mat-icon>delete</mat-icon>
           </button>

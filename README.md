@@ -27,7 +27,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - Session restored on page reload via cookie-refresh in `provideAppInitializer` before route guards run
 - Automatic token refresh 60 seconds before expiry
 - 401 handling with request retry in JWT interceptor
-- **Role-Based Access Control (RBAC)** — roles, permissions, and conditional permission evaluation; `@Authorize(['action', 'Subject'])` typed tuples on server; `permissionGuard(action, subject)` + `*appRequirePermission="{ action, subject }"` directive on client; admin role bypasses all permission checks
+- **Role-Based Access Control (RBAC)** — roles, permissions, and conditional permission evaluation; `@Authorize(['action', 'Subject'])` typed tuples on server; `permissionGuard(action, subject)` + `*appRequirePermissions="{ action, subject }"` directive on client; admin role bypasses all permission checks
 - `GET /api/v1/auth/permissions` returns CASL packed rules; client hydrates into `AppAbility` at bootstrap before route activation
 - OAuth account management (link/unlink providers in profile)
 - Server-side token cleanup via cron jobs
@@ -407,7 +407,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 | Server unit tests | Jest | `*.spec.ts` alongside source | 234 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | Configured |
 | Client unit tests | Vitest | `*.spec.ts` alongside source | 271 tests passing |
-| Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 113 tests passing |
+| Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 101 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
 
 ## CI/CD
@@ -432,7 +432,7 @@ Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file
 - **HttpOnly refresh token cookie** (`SameSite=Strict`, `path=/api/v1/auth`, 7d expiry) — JavaScript cannot read or steal the token (XSS-proof); rotated on every use
 - JWT access tokens (1h) stored in Angular signals only — never written to `localStorage`; user info persisted to `localStorage` (`auth_user` key) only to detect prior sessions on page reload
 - `@Exclude()` decorator hides password in API responses
-- **RBAC** — typed CASL permission checks via `PermissionsGuard` + `@Authorize(['action', 'Subject'])`; CASL ability hydrated at bootstrap before route activation; permissions cached per user (5 min); admin role bypasses all checks; `*appRequirePermission="{ action, subject }"` directive for template-level visibility
+- **RBAC** — typed CASL permission checks via `PermissionsGuard` + `@Authorize(['action', 'Subject'])`; CASL ability hydrated at bootstrap before route activation; permissions cached per user (5 min); admin role bypasses all checks; `*appRequirePermissions="{ action, subject }"` directive for template-level visibility
 - **Audit logging** — 20 security-sensitive actions (login, register, password change/reset, user/role/permission CRUD, OAuth link/unlink, logout, token refresh failures) written to a dedicated `audit_logs` table with actor, target, IP, and request ID
 - `class-validator` on server DTOs, Angular `Validators` on client forms
 - LIKE query pattern escaping to prevent SQL injection via wildcards
