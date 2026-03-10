@@ -10,7 +10,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 import { ThemeToggleComponent } from './theme-toggle/theme-toggle.component';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { APP_VERSION, BUILD_HASH } from '@environments/version';
-import { RequirePermissionDirective } from '@features/auth/directives/require-permission.directive';
+import { RequirePermissionsDirective } from '@features/auth/directives/require-permissions.directive';
 
 @Component({
   selector: 'app-header',
@@ -23,7 +23,7 @@ import { RequirePermissionDirective } from '@features/auth/directives/require-pe
     RouterLink,
     RouterLinkActive,
     ThemeToggleComponent,
-    RequirePermissionDirective
+    RequirePermissionsDirective
   ],
   templateUrl: './header.component.html',
   styleUrl: './header.component.scss',

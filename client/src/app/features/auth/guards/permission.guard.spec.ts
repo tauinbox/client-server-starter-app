@@ -14,7 +14,7 @@ describe('permissionGuard', () => {
   let authStoreMock: {
     isAuthenticated: ReturnType<typeof vi.fn>;
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
-    hasPermission: ReturnType<typeof vi.fn>;
+    hasPermissions: ReturnType<typeof vi.fn>;
     clearSession: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
@@ -28,7 +28,7 @@ describe('permissionGuard', () => {
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(true),
       isAccessTokenExpired: vi.fn().mockReturnValue(false),
-      hasPermission: vi.fn().mockReturnValue(false),
+      hasPermissions: vi.fn().mockReturnValue(false),
       clearSession: vi.fn()
     };
 
@@ -46,7 +46,7 @@ describe('permissionGuard', () => {
   });
 
   it('should return true when user has the required permission', () => {
-    authStoreMock.hasPermission.mockReturnValue(true);
+    authStoreMock.hasPermissions.mockReturnValue(true);
 
     const result = TestBed.runInInjectionContext(() =>
       permissionGuard('list', 'User')(mockRoute, mockState)
@@ -56,7 +56,7 @@ describe('permissionGuard', () => {
   });
 
   it('should navigate to forbidden when user lacks the required permission', () => {
-    authStoreMock.hasPermission.mockReturnValue(false);
+    authStoreMock.hasPermissions.mockReturnValue(false);
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate');
 
@@ -93,7 +93,7 @@ describe('permissionGuard', () => {
     authServiceMock.refreshTokens.mockReturnValue(
       of({ access_token: 'new', expires_in: 3600 })
     );
-    authStoreMock.hasPermission.mockReturnValue(true);
+    authStoreMock.hasPermissions.mockReturnValue(true);
 
     const result = TestBed.runInInjectionContext(() =>
       permissionGuard('list', 'User')(mockRoute, mockState)
@@ -109,7 +109,7 @@ describe('permissionGuard', () => {
     authServiceMock.refreshTokens.mockReturnValue(
       of({ access_token: 'new', expires_in: 3600 })
     );
-    authStoreMock.hasPermission.mockReturnValue(false);
+    authStoreMock.hasPermissions.mockReturnValue(false);
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate');
 

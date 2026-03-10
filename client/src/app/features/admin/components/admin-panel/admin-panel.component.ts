@@ -1,8 +1,8 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatTabLink, MatTabNav, MatTabNavPanel } from '@angular/material/tabs';
-import { AuthStore } from '@features/auth/store/auth.store';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
+import { RequirePermissionsDirective } from '@features/auth/directives/require-permissions.directive';
 
 @Component({
   selector: 'app-admin-panel',
@@ -12,13 +12,13 @@ import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
     RouterLinkActive,
     MatTabNav,
     MatTabLink,
-    MatTabNavPanel
+    MatTabNavPanel,
+    RequirePermissionsDirective
   ],
   templateUrl: './admin-panel.component.html',
   styleUrl: './admin-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AdminPanelComponent {
-  protected readonly authStore = inject(AuthStore);
   protected readonly routes = AppRouteSegmentEnum;
 }

@@ -15,7 +15,9 @@
         <span>Profile</span>
       </a>
 
-      <ng-container *appRequirePermission="{ action: 'list', subject: 'User' }">
+      <ng-container
+        *appRequirePermissions="{ action: 'list', subject: 'User' }"
+      >
         <a mat-menu-item [routerLink]="'/' + routes.Admin">
           <mat-icon>admin_panel_settings</mat-icon>
           <span>Admin Panel</span>

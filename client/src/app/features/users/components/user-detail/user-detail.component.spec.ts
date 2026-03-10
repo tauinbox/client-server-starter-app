@@ -45,7 +45,7 @@ describe('UserDetailComponent', () => {
     loadOne: ReturnType<typeof vi.fn>;
   };
   let authStoreMock: {
-    hasPermission: ReturnType<typeof vi.fn>;
+    hasPermissions: ReturnType<typeof vi.fn>;
     isAdmin: ReturnType<typeof vi.fn>;
   };
 
@@ -59,7 +59,7 @@ describe('UserDetailComponent', () => {
     };
 
     authStoreMock = {
-      hasPermission: vi.fn().mockReturnValue(false),
+      hasPermissions: vi.fn().mockReturnValue(false),
       isAdmin: vi.fn().mockReturnValue(false)
     };
 

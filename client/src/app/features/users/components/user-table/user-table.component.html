@@ -75,24 +75,28 @@
         >
           <mat-icon>visibility</mat-icon>
         </button>
-        <button
-          mat-icon-button
-          color="accent"
-          [routerLink]="['/admin/users', user.id, 'edit']"
-          matTooltip="Edit User"
-          [attr.aria-label]="'Edit ' + user.firstName + ' ' + user.lastName"
-        >
-          <mat-icon>edit</mat-icon>
-        </button>
-        <button
-          mat-icon-button
-          color="warn"
-          (click)="deleteUser.emit(user)"
-          matTooltip="Delete User"
-          [attr.aria-label]="'Delete ' + user.firstName + ' ' + user.lastName"
-        >
-          <mat-icon>delete</mat-icon>
-        </button>
+        @if (canUpdate()) {
+          <button
+            mat-icon-button
+            color="accent"
+            [routerLink]="['/admin/users', user.id, 'edit']"
+            matTooltip="Edit User"
+            [attr.aria-label]="'Edit ' + user.firstName + ' ' + user.lastName"
+          >
+            <mat-icon>edit</mat-icon>
+          </button>
+        }
+        @if (canDelete()) {
+          <button
+            mat-icon-button
+            color="warn"
+            (click)="deleteUser.emit(user)"
+            matTooltip="Delete User"
+            [attr.aria-label]="'Delete ' + user.firstName + ' ' + user.lastName"
+          >
+            <mat-icon>delete</mat-icon>
+          </button>
+        }
       </td>
     </ng-container>
 

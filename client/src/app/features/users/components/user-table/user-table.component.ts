@@ -61,6 +61,8 @@ export const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
 })
 export class UserTableComponent {
   readonly users = input.required<User[]>();
+  readonly canUpdate = input(false);
+  readonly canDelete = input(false);
 
   readonly sortChange = output<Sort>();
   readonly deleteUser = output<User>();

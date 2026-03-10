@@ -147,16 +147,16 @@ export class UserEditComponent implements OnInit {
   });
 
   protected readonly canManageUser = computed(() =>
-    this.#authStore.hasPermission('update', 'User')
+    this.#authStore.hasPermissions({ action: 'update', subject: 'User' })
   );
 
   protected readonly canAssignRoles = computed(() =>
-    this.#authStore.hasPermission('assign', 'Role')
+    this.#authStore.hasPermissions({ action: 'assign', subject: 'Role' })
   );
 
   protected readonly canDelete = computed(
     () =>
-      this.#authStore.hasPermission('delete', 'User') &&
+      this.#authStore.hasPermissions({ action: 'delete', subject: 'User' }) &&
       this.id() !== this.#authStore.user()?.id
   );
 
@@ -283,7 +283,7 @@ export class UserEditComponent implements OnInit {
       updateData.password = formValues.password;
     }
 
-    if (this.#authStore.hasPermission('update', 'User')) {
+    if (this.#authStore.hasPermissions({ action: 'update', subject: 'User' })) {
       updateData.isActive = formValues.isActive;
     }
 

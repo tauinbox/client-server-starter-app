@@ -1,6 +1,6 @@
 <div class="admin-panel-container">
   <nav mat-tab-nav-bar [tabPanel]="tabPanel">
-    @if (authStore.hasPermission('list', 'User')) {
+    <ng-container *appRequirePermissions="{ action: 'list', subject: 'User' }">
       <a
         mat-tab-link
         [routerLink]="routes.Users"
@@ -10,8 +10,8 @@
       >
         Manage Users
       </a>
-    }
-    @if (authStore.hasPermission('read', 'Role')) {
+    </ng-container>
+    <ng-container *appRequirePermissions="{ action: 'read', subject: 'Role' }">
       <a
         mat-tab-link
         [routerLink]="routes.Roles"
@@ -21,7 +21,7 @@
       >
         Manage Roles
       </a>
-    }
+    </ng-container>
   </nav>
 
   <mat-tab-nav-panel #tabPanel>
