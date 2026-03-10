@@ -27,7 +27,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - Session restored on page reload via cookie-refresh in `provideAppInitializer` before route guards run
 - Automatic token refresh 60 seconds before expiry
 - 401 handling with request retry in JWT interceptor
-- **Role-Based Access Control (RBAC)** — roles, permissions, and conditional permission evaluation; `@Authorize(['action', 'Subject'])` typed tuples on server; `permissionGuard(action, subject)` + `*appRequirePermissions="{ action, subject }"` directive on client; admin role bypasses all permission checks
+- **Role-Based Access Control (RBAC)** — dynamic resources and actions with `@RegisterResource` auto-discovery; `isSuper` flag on roles replaces hardcoded admin bypass; `@Authorize(['action', 'Subject'])` typed tuples on server; `permissionGuard(action, subject)` + `*appRequirePermissions="{ action, subject }"` directive on client; `/api/v1/rbac/` endpoints for managing resources and actions
 - `GET /api/v1/auth/permissions` returns CASL packed rules; client hydrates into `AppAbility` at bootstrap before route activation
 - OAuth account management (link/unlink providers in profile)
 - Server-side token cleanup via cron jobs
@@ -281,7 +281,7 @@ API base URL: `/api/v1`
 | GET | `/auth/oauth/accounts` | Bearer | List linked OAuth accounts |
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink OAuth provider |
 | GET | `/auth/permissions` | Bearer | Get current user's resolved permissions |
-| GET | `/users` | `users:list` | List all users (paginated; `includeDeleted=true` to include soft-deleted) |
+| GET | `/users` | `users:search` | List all users (paginated; `includeDeleted=true` to include soft-deleted) |
 | GET | `/users/search` | `users:search` | Search users (paginated + filters: email, firstName, lastName, isActive; `includeDeleted=true`) |
 | GET | `/users/:id` | `users:read` | Get user by ID |
 | POST | `/users` | `users:create` | Create user |
@@ -300,6 +300,13 @@ API base URL: `/api/v1`
 | DELETE | `/roles/:id/permissions/:permId` | `roles:update` | Remove permission from role |
 | POST | `/roles/assign/:userId` | `roles:assign` | Assign role to user |
 | DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove role from user |
+| GET | `/rbac/metadata` | None | Get RBAC metadata (resources + actions) |
+| GET | `/rbac/resources` | `permissions:read` | List all resources |
+| PATCH | `/rbac/resources/:id` | `permissions:update` | Update resource display info |
+| GET | `/rbac/actions` | `permissions:read` | List all actions |
+| POST | `/rbac/actions` | `permissions:create` | Create a new action |
+| PATCH | `/rbac/actions/:id` | `permissions:update` | Update action |
+| DELETE | `/rbac/actions/:id` | `permissions:delete` | Delete custom action |
 
 ## Available Commands
 
@@ -364,13 +371,15 @@ npm run release            # Bump versions, generate CHANGELOG.md, create git ta
 
 ### Database
 
-Seven tables managed via TypeORM migrations:
+Nine tables managed via TypeORM migrations:
 
 - **users** — UUID primary key, email (unique), name, bcrypt password hash (nullable for OAuth-only users), role/active flags, email verification (isEmailVerified, token, expiresAt), account lockout (failedLoginAttempts, lockedUntil), password reset (token, expiresAt), soft delete (`deleted_at TIMESTAMPTZ NULL`); ManyToMany to roles via user_roles
 - **oauth_accounts** — Linked to users (CASCADE delete), provider + provider_id (unique), timestamps
 - **refresh_tokens** — Linked to users (CASCADE delete), token string (SHA-256 hashed), expiry, revoked flag
-- **roles** — UUID PK, name (unique), description, isSystem flag; ManyToMany with users
-- **permissions** — UUID PK, resource + action (unique constraint)
+- **roles** — UUID PK, name (unique), description, isSystem flag, isSuper flag; ManyToMany with users
+- **resources** — UUID PK, name (unique), displayName, description, isSystem flag, sortOrder
+- **actions** — UUID PK, name (unique), displayName, description, isSystem flag, sortOrder
+- **permissions** — UUID PK, resource_id + action_id (unique constraint, FKs to resources and actions)
 - **role_permissions** — FK to roles + permissions, optional jsonb `conditions` column
 - **user_roles** — Join table (user_id, role_id), composite PK
 - **feature** — Auto-increment ID, name, timestamps
@@ -406,7 +415,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 234 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 236 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | Configured |
 | Client unit tests | Vitest | `*.spec.ts` alongside source | 271 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 101 tests passing |
@@ -434,7 +443,7 @@ Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file
 - **HttpOnly refresh token cookie** (`SameSite=Strict`, `path=/api/v1/auth`, 7d expiry) — JavaScript cannot read or steal the token (XSS-proof); rotated on every use
 - JWT access tokens (1h) stored in Angular signals only — never written to `localStorage`; user info persisted to `localStorage` (`auth_user` key) only to detect prior sessions on page reload
 - `@Exclude()` decorator hides password in API responses
-- **RBAC** — typed CASL permission checks via `PermissionsGuard` + `@Authorize(['action', 'Subject'])`; CASL ability hydrated at bootstrap before route activation; permissions cached per user (5 min); admin role bypasses all checks; `*appRequirePermissions="{ action, subject }"` directive for template-level visibility
+- **RBAC** — dynamic resources and actions with `@RegisterResource` auto-discovery; typed CASL permission checks via `PermissionsGuard` + `@Authorize(['action', 'Subject'])`; CASL ability hydrated at bootstrap before route activation; permissions cached per user (5 min); `isSuper` flag on roles bypasses all checks; `*appRequirePermissions="{ action, subject }"` directive for template-level visibility
 - **Audit logging** — 20 security-sensitive actions (login, register, password change/reset, user/role/permission CRUD, OAuth link/unlink, logout, token refresh failures) written to a dedicated `audit_logs` table with actor, target, IP, and request ID
 - `class-validator` on server DTOs, Angular `Validators` on client forms
 - LIKE query pattern escaping to prevent SQL injection via wildcards
