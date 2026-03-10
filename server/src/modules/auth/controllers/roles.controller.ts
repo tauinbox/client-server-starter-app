@@ -32,6 +32,7 @@ import {
   SetPermissionsDto
 } from '../dtos/assign-permissions.dto';
 import { Authorize } from '../decorators/authorize.decorator';
+import { RegisterResource } from '../decorators/register-resource.decorator';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
@@ -42,6 +43,7 @@ import { JwtAuthRequest } from '../types/auth.request';
   path: 'roles',
   version: '1'
 })
+@RegisterResource({ name: 'roles', subject: 'Role', displayName: 'Roles' })
 @UseInterceptors(ClassSerializerInterceptor)
 export class RolesController {
   constructor(

@@ -7,15 +7,23 @@ import type { MongoQuery } from '@casl/ability';
 import { packRules } from '@casl/ability/extra';
 import type {
   MockAuditLog,
+  MockPermission,
   MockUser,
   OAuthAccount,
   State,
   UserResponse
 } from './types';
-import type { PermissionCondition } from '@app/shared/types';
+import type {
+  PermissionCondition,
+  PermissionResponse,
+  ResourceResponse,
+  ActionResponse
+} from '@app/shared/types';
 import {
   seedOAuthAccounts,
   seedUsers,
+  seedResources,
+  seedActions,
   seedRoles,
   seedPermissions,
   seedRolePermissions
@@ -38,6 +46,8 @@ export function resetState(): void {
     refreshTokens: new Map(),
     emailVerificationTokens: new Map(),
     passwordResetTokens: new Map(),
+    resources: new Map(seedResources.map((r) => [r.id, { ...r }])),
+    actions: new Map(seedActions.map((a) => [a.id, { ...a }])),
     roles: new Map(seedRoles.map((r) => [r.id, { ...r }])),
     permissions: new Map(seedPermissions.map((p) => [p.id, { ...p }])),
     rolePermissions: seedRolePermissions.map((rp) => ({ ...rp })),
@@ -63,6 +73,60 @@ export function findUserById(id: string): MockUser | undefined {
 
 export function findUserByIdWithDeleted(id: string): MockUser | undefined {
   return state.users.get(id);
+}
+
+export function toResourceResponse(resource: {
+  id: string;
+  name: string;
+  subject: string;
+  displayName: string;
+  description: string | null;
+  isSystem: boolean;
+  createdAt: string;
+}): ResourceResponse {
+  return {
+    id: resource.id,
+    name: resource.name,
+    subject: resource.subject,
+    displayName: resource.displayName,
+    description: resource.description,
+    isSystem: resource.isSystem,
+    createdAt: resource.createdAt
+  };
+}
+
+export function toActionResponse(action: {
+  id: string;
+  name: string;
+  displayName: string;
+  description: string;
+  isDefault: boolean;
+  createdAt: string;
+}): ActionResponse {
+  return {
+    id: action.id,
+    name: action.name,
+    displayName: action.displayName,
+    description: action.description,
+    isDefault: action.isDefault,
+    createdAt: action.createdAt
+  };
+}
+
+export function toPermissionResponse(
+  perm: MockPermission
+): PermissionResponse | null {
+  const resource = state.resources.get(perm.resourceId);
+  const action = state.actions.get(perm.actionId);
+  if (!resource || !action) return null;
+
+  return {
+    id: perm.id,
+    resource: toResourceResponse(resource),
+    action: toActionResponse(action),
+    description: perm.description,
+    createdAt: perm.createdAt
+  };
 }
 
 export function toUserResponse(user: MockUser): UserResponse {
@@ -115,28 +179,34 @@ type Actions =
   | 'read'
   | 'update'
   | 'delete'
-  | 'list'
   | 'search'
   | 'assign';
 type Subjects = 'User' | 'Role' | 'Permission' | 'Profile' | 'all';
 type MockAbility = MongoAbility<[Actions, Subjects]>;
 
-const SUBJECT_MAP: Partial<Record<string, Subjects>> = {
-  users: 'User',
-  roles: 'Role',
-  permissions: 'Permission',
-  profile: 'Profile'
-};
-
 export function getPackedRulesForUser(user: MockUser): unknown[][] {
   const { can, build } = new AbilityBuilder<MockAbility>(createMongoAbility);
 
-  if (user.roles?.includes('admin')) {
+  const currentState = getState();
+
+  // Check if user has any super role
+  const hasSuperRole = user.roles.some((roleName) => {
+    for (const role of currentState.roles.values()) {
+      if (role.name === roleName && role.isSuper) return true;
+    }
+    return false;
+  });
+
+  if (hasSuperRole) {
     can('manage', 'all');
     return packRules(build().rules);
   }
 
-  const currentState = getState();
+  // Build subject map from resources
+  const subjectMap = new Map<string, string>();
+  for (const resource of currentState.resources.values()) {
+    subjectMap.set(resource.name, resource.subject);
+  }
 
   // Find role IDs for this user's role names
   const roleIds: string[] = [];
@@ -158,11 +228,14 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
     )) {
       const permission = currentState.permissions.get(rp.permissionId);
       if (!permission) continue;
-      const key = `${permission.resource}:${permission.action}`;
+      const resource = currentState.resources.get(permission.resourceId);
+      const action = currentState.actions.get(permission.actionId);
+      if (!resource || !action) continue;
+      const key = `${resource.name}:${action.name}`;
       if (!permissionMap.has(key)) {
         permissionMap.set(key, {
-          resource: permission.resource,
-          action: permission.action,
+          resource: resource.name,
+          action: action.name,
           conditions: rp.conditions
         });
       }
@@ -171,7 +244,7 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
 
   // Build CASL abilities — mirrors casl-ability.factory.ts logic
   for (const { resource, action, conditions } of permissionMap.values()) {
-    const subject = SUBJECT_MAP[resource];
+    const subject = subjectMap.get(resource) as Subjects | undefined;
     if (!subject) continue;
 
     if (!conditions) {

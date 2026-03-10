@@ -24,6 +24,9 @@ export class Role {
   @Column({ name: 'is_system', default: false })
   isSystem: boolean;
 
+  @Column({ name: 'is_super', default: false })
+  isSuper: boolean;
+
   @OneToMany(() => RolePermission, (rp) => rp.role)
   rolePermissions: RolePermission[];
 

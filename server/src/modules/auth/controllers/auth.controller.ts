@@ -50,6 +50,7 @@ import { ResetPasswordDto } from '../dtos/reset-password.dto';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
+import { RegisterResource } from '../decorators/register-resource.decorator';
 import { Request as ExpressRequest } from 'express';
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
@@ -58,6 +59,11 @@ const REFRESH_TOKEN_COOKIE = 'refresh_token';
 @Controller({
   path: 'auth',
   version: '1'
+})
+@RegisterResource({
+  name: 'profile',
+  subject: 'Profile',
+  displayName: 'Profile'
 })
 @UseInterceptors(ClassSerializerInterceptor)
 export class AuthController {
@@ -239,15 +245,16 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   async getPermissions(@Request() req: JwtAuthRequest) {
     const [roles, permissions] = await Promise.all([
-      this.permissionService.getRoleNamesForUser(req.user.userId),
+      this.permissionService.getRolesForUser(req.user.userId),
       this.permissionService.getPermissionsForUser(req.user.userId)
     ]);
-    const ability = this.caslAbilityFactory.createForUser(
+    const ability = await this.caslAbilityFactory.createForUser(
       req.user.userId,
       roles,
       permissions
     );
-    return { roles, rules: packRules(ability.rules) };
+    const roleNames = roles.map((r) => r.name);
+    return { roles: roleNames, rules: packRules(ability.rules) };
   }
 
   @Post('verify-email')

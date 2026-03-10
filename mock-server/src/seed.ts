@@ -5,7 +5,9 @@ import type {
   OAuthAccount,
   MockRole,
   MockPermission,
-  MockRolePermission
+  MockRolePermission,
+  MockResource,
+  MockAction
 } from './types';
 
 // Fixed seed for reproducible data across restarts
@@ -136,6 +138,106 @@ function generateOAuthAccounts(): Map<string, OAuthAccount[]> {
   return accounts;
 }
 
+function generateResources(): MockResource[] {
+  const now = '2025-01-01T00:00:00.000Z';
+  return [
+    {
+      id: 'res-users',
+      name: 'users',
+      subject: 'User',
+      displayName: 'Users',
+      description: 'User management',
+      isSystem: true,
+      lastSyncedAt: now,
+      createdAt: now
+    },
+    {
+      id: 'res-profile',
+      name: 'profile',
+      subject: 'Profile',
+      displayName: 'Profile',
+      description: 'User profile',
+      isSystem: true,
+      lastSyncedAt: now,
+      createdAt: now
+    },
+    {
+      id: 'res-roles',
+      name: 'roles',
+      subject: 'Role',
+      displayName: 'Roles',
+      description: 'Role management',
+      isSystem: true,
+      lastSyncedAt: now,
+      createdAt: now
+    },
+    {
+      id: 'res-permissions',
+      name: 'permissions',
+      subject: 'Permission',
+      displayName: 'Permissions',
+      description: 'Permission management',
+      isSystem: true,
+      lastSyncedAt: now,
+      createdAt: now
+    }
+  ];
+}
+
+function generateActions(): MockAction[] {
+  const now = '2025-01-01T00:00:00.000Z';
+  return [
+    {
+      id: 'act-create',
+      name: 'create',
+      displayName: 'Create',
+      description: 'Create new records',
+      isDefault: true,
+      createdAt: now
+    },
+    {
+      id: 'act-read',
+      name: 'read',
+      displayName: 'Read',
+      description: 'View records',
+      isDefault: true,
+      createdAt: now
+    },
+    {
+      id: 'act-update',
+      name: 'update',
+      displayName: 'Update',
+      description: 'Modify existing records',
+      isDefault: true,
+      createdAt: now
+    },
+    {
+      id: 'act-delete',
+      name: 'delete',
+      displayName: 'Delete',
+      description: 'Remove records',
+      isDefault: true,
+      createdAt: now
+    },
+    {
+      id: 'act-search',
+      name: 'search',
+      displayName: 'Search',
+      description: 'Search and list records',
+      isDefault: true,
+      createdAt: now
+    },
+    {
+      id: 'act-assign',
+      name: 'assign',
+      displayName: 'Assign',
+      description: 'Assign associations',
+      isDefault: true,
+      createdAt: now
+    }
+  ];
+}
+
 function generateRoles(): MockRole[] {
   return [
     {
@@ -143,6 +245,7 @@ function generateRoles(): MockRole[] {
       name: 'admin',
       description: 'System administrator with full access',
       isSystem: true,
+      isSuper: true,
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z'
     },
@@ -151,42 +254,40 @@ function generateRoles(): MockRole[] {
       name: 'user',
       description: 'Regular user with basic access',
       isSystem: true,
+      isSuper: false,
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z'
     }
   ];
 }
 
-function generatePermissions(): MockPermission[] {
+function generatePermissions(
+  resources: MockResource[],
+  actions: MockAction[]
+): MockPermission[] {
   const now = '2025-01-01T00:00:00.000Z';
-  const perms: Array<[string, string, string]> = [
-    ['users', 'create', 'Create new users'],
-    ['users', 'read', 'View user details'],
-    ['users', 'update', 'Update user information'],
-    ['users', 'delete', 'Delete users'],
-    ['users', 'list', 'List all users'],
-    ['users', 'search', 'Search users'],
-    ['profile', 'read', 'View own profile'],
-    ['profile', 'update', 'Update own profile'],
-    ['roles', 'create', 'Create new roles'],
-    ['roles', 'read', 'View roles'],
-    ['roles', 'update', 'Update roles'],
-    ['roles', 'delete', 'Delete roles'],
-    ['roles', 'assign', 'Assign roles to users']
-  ];
+  const perms: MockPermission[] = [];
+  let id = 1;
 
-  return perms.map(([resource, action, description], i) => ({
-    id: `perm-${i + 1}`,
-    resource,
-    action,
-    description,
-    createdAt: now
-  }));
+  for (const resource of resources) {
+    for (const action of actions) {
+      perms.push({
+        id: `perm-${id++}`,
+        resourceId: resource.id,
+        actionId: action.id,
+        description: `${action.displayName} ${resource.displayName}`,
+        createdAt: now
+      });
+    }
+  }
+
+  return perms;
 }
 
 function generateRolePermissions(
   roles: MockRole[],
-  permissions: MockPermission[]
+  permissions: MockPermission[],
+  resources: MockResource[]
 ): MockRolePermission[] {
   const result: MockRolePermission[] = [];
   const adminRole = roles.find((r) => r.name === 'admin');
@@ -207,13 +308,18 @@ function generateRolePermissions(
 
   // User gets profile permissions only
   if (userRole) {
-    for (const perm of permissions.filter((p) => p.resource === 'profile')) {
-      result.push({
-        id: `rp-${id++}`,
-        roleId: userRole.id,
-        permissionId: perm.id,
-        conditions: null
-      });
+    const profileResource = resources.find((r) => r.name === 'profile');
+    if (profileResource) {
+      for (const perm of permissions.filter(
+        (p) => p.resourceId === profileResource.id
+      )) {
+        result.push({
+          id: `rp-${id++}`,
+          roleId: userRole.id,
+          permissionId: perm.id,
+          conditions: null
+        });
+      }
     }
   }
 
@@ -223,7 +329,12 @@ function generateRolePermissions(
 export const seedUsers: MockUser[] = generateUsers();
 export const seedOAuthAccounts: Map<string, OAuthAccount[]> =
   generateOAuthAccounts();
+export const seedResources: MockResource[] = generateResources();
+export const seedActions: MockAction[] = generateActions();
 export const seedRoles: MockRole[] = generateRoles();
-export const seedPermissions: MockPermission[] = generatePermissions();
+export const seedPermissions: MockPermission[] = generatePermissions(
+  seedResources,
+  seedActions
+);
 export const seedRolePermissions: MockRolePermission[] =
-  generateRolePermissions(seedRoles, seedPermissions);
+  generateRolePermissions(seedRoles, seedPermissions, seedResources);

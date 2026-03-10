@@ -30,19 +30,40 @@ export interface OAuthAccount {
   createdAt: string;
 }
 
+export interface MockResource {
+  id: string;
+  name: string;
+  subject: string;
+  displayName: string;
+  description: string | null;
+  isSystem: boolean;
+  lastSyncedAt: string;
+  createdAt: string;
+}
+
+export interface MockAction {
+  id: string;
+  name: string;
+  displayName: string;
+  description: string;
+  isDefault: boolean;
+  createdAt: string;
+}
+
 export interface MockRole {
   id: string;
   name: string;
   description: string | null;
   isSystem: boolean;
+  isSuper: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface MockPermission {
   id: string;
-  resource: string;
-  action: string;
+  resourceId: string;
+  actionId: string;
   description: string | null;
   createdAt: string;
 }
@@ -73,6 +94,8 @@ export interface State {
   refreshTokens: Map<string, string>;
   emailVerificationTokens: Map<string, string>; // token -> userId
   passwordResetTokens: Map<string, string>; // token -> userId
+  resources: Map<string, MockResource>;
+  actions: Map<string, MockAction>;
   roles: Map<string, MockRole>;
   permissions: Map<string, MockPermission>;
   rolePermissions: MockRolePermission[];

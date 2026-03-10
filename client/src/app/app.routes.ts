@@ -45,7 +45,7 @@ export const routes: Routes = [
           import('./features/users/components/user-list/user-list.component').then(
             (c) => c.UserListComponent
           ),
-        canActivate: [permissionGuard('list', 'User')]
+        canActivate: [permissionGuard('search', 'User')]
       },
       {
         path: ':id',

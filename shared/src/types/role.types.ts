@@ -1,16 +1,19 @@
+import type { ResourceResponse, ActionResponse } from './rbac.types';
+
 export type RoleResponse = {
   id: string;
   name: string;
   description: string | null;
   isSystem: boolean;
+  isSuper: boolean;
   createdAt: string;
   updatedAt: string;
 };
 
 export type PermissionResponse = {
   id: string;
-  resource: string;
-  action: string;
+  resource: ResourceResponse;
+  action: ActionResponse;
   description: string | null;
   createdAt: string;
 };

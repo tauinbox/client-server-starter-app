@@ -16,6 +16,8 @@ import { jwtInterceptor } from '@features/auth/interceptors/jwt.interceptor';
 import { errorInterceptor } from '@core/interceptors/error.interceptor';
 import { AuthService } from '@features/auth/services/auth.service';
 import { AuthStore } from '@features/auth/store/auth.store';
+import { RbacMetadataService } from '@features/auth/services/rbac-metadata.service';
+import { RbacMetadataStore } from '@features/auth/store/rbac-metadata.store';
 import { registerOAuthIcons } from '@features/auth/utils/register-oauth-icons';
 
 export const appConfig: ApplicationConfig = {
@@ -42,6 +44,24 @@ export const appConfig: ApplicationConfig = {
         } catch {
           authStore.clearSession();
         }
+      }
+    }),
+    provideAppInitializer(async () => {
+      const rbacService = inject(RbacMetadataService);
+      const rbacStore = inject(RbacMetadataStore);
+
+      const load = () =>
+        firstValueFrom(rbacService.getMetadata())
+          .then((data) => rbacStore.setMetadata(data.resources, data.actions))
+          .catch(() => {
+            /* silently ignore — app can function without metadata */
+          });
+
+      if (rbacStore.resources().length > 0) {
+        // Stale-while-revalidate: return immediately, refresh in background
+        void load();
+      } else {
+        await load();
       }
     }),
     {

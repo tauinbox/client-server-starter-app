@@ -1,30 +1,34 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { MongoQuery } from '@casl/ability';
 import { ResolvedPermission } from '@app/shared/types';
-import {
-  AbilityBuilder,
-  Actions,
-  AppAbility,
-  createMongoAbility,
-  SUBJECT_MAP
-} from './app-ability';
+import { AbilityBuilder, AppAbility, createMongoAbility } from './app-ability';
+import { ResourceService } from '../services/resource.service';
+
+export interface RoleInfo {
+  name: string;
+  isSuper: boolean;
+}
 
 @Injectable()
 export class CaslAbilityFactory {
   private readonly logger = new Logger(CaslAbilityFactory.name);
 
-  createForUser(
+  constructor(private readonly resourceService: ResourceService) {}
+
+  async createForUser(
     userId: string,
-    roles: string[],
+    roles: RoleInfo[],
     permissions: ResolvedPermission[]
-  ): AppAbility {
+  ): Promise<AppAbility> {
     const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
 
-    if (roles.includes('admin')) {
+    if (roles.some((r) => r.isSuper)) {
       can('manage', 'all');
     } else {
+      const subjectMap = await this.resourceService.getSubjectMap();
+
       for (const p of permissions) {
-        const subject = SUBJECT_MAP[p.resource];
+        const subject = subjectMap[p.resource];
         if (!subject) {
           this.logger.warn(
             `Unknown resource "${p.resource}" in permissions for user ${userId} — skipping`
@@ -32,7 +36,7 @@ export class CaslAbilityFactory {
           continue;
         }
 
-        const action = p.action as Actions;
+        const action = p.action;
 
         if (!p.conditions) {
           can(action, subject);

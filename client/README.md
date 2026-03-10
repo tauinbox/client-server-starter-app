@@ -38,8 +38,8 @@ src/app/
 │   │   ├── directives/     # RequirePermissionsDirective (*appRequirePermissions="{ action, subject } | [...]")
 │   │   ├── guards/         # authGuard, guestGuard, permissionGuard(action, subject)
 │   │   ├── interceptors/   # jwtInterceptor
-│   │   ├── services/       # AuthService (HTTP, refresh scheduling, fetchPermissions: Promise<void>)
-│   │   └── store/          # AuthStore (NgRx Signal Store — state: accessToken (memory) + user (auth_user localStorage) + ability: AppAbility|null)
+│   │   ├── services/       # AuthService (HTTP, refresh scheduling, fetchPermissions: Promise<void>), rbac-metadata.service.ts
+│   │   └── store/          # AuthStore (NgRx Signal Store — state: accessToken (memory) + user (auth_user localStorage) + ability: AppAbility|null), RbacMetadataStore
 │   ├── users/              # User list (with inline filters), detail, edit (admin)
 │   │   ├── components/
 │   │   │   └── user-table/ # UserTableComponent (shared table; sorting + actions only, no paginator)
@@ -69,10 +69,10 @@ src/app/
 | `/login` | LoginComponent | guestGuard |
 | `/register` | RegisterComponent | guestGuard |
 | `/profile` | ProfileComponent | authGuard |
-| `/users` | UserListComponent | permissionGuard('list', 'User') |
+| `/users` | UserListComponent | permissionGuard('search', 'User') |
 | `/users/:id` | UserDetailComponent | authGuard |
 | `/users/:id/edit` | UserEditComponent | authGuard |
-| `/admin` | AdminPanelComponent | permissionGuard('list', 'Role') |
+| `/admin` | AdminPanelComponent | permissionGuard('search', 'User') |
 | `/admin/users` | UserListComponent | (inherited from /admin) |
 | `/admin/roles` | RoleListComponent | (inherited from /admin) |
 | `/verify-email` | VerifyEmailComponent | - |
@@ -89,6 +89,7 @@ NgRx Signal Store (`@ngrx/signals`):
 - **AuthStore** (`providedIn: 'root'`) — pure state container. State: `accessToken` (in-memory signal only, never persisted), `user` (persisted to `localStorage` as `auth_user` key for page-reload detection), `ability: AppAbility | null`. Computed: `isAuthenticated` (access token present), `user`, `roles`, `isAdmin`. Methods: `hasPermissions(action, subject)`, `setRules(rules)`, `hasPersistedUser()`, `saveAuthResponse()`, `clearSession()`. No `HttpClient` dependency
 - **AuthService** (`providedIn: 'root'`) — HTTP operations (login/register/logout/refresh/profile/OAuth accounts/`fetchPermissions(): Promise<void>`). `refreshTokens()` POSTs `{}` — the `refresh_token` HttpOnly cookie is sent automatically by the browser. `provideAppInitializer` awaits `fetchPermissions()` for authenticated users, or attempts a cookie-refresh when `hasPersistedUser()` is true (page reload with no in-memory token). Eliminates the circular dependency chain
 - **UsersStore** (route-level at `/users`) — entity-based store with `withEntities<User>()`. Unified state: `filters: UserSearch` (empty = all users, filled = search via `GET /users/search`), single `load()`/`loadMore()` pair with **infinite scroll** (page size 20; `upsertEntities` appends; `hasMore` computed signal drives sentinel visibility; `isLoadingMore` shows spinner). `setFilters()` and `setSorting()` update state; component calls `load()` after each change
+- **RbacMetadataStore** (`providedIn: 'root'`) — NgRx Signal Store with stale-while-revalidate localStorage caching for resources/actions metadata. Loaded via `APP_INITIALIZER` at bootstrap. Computed: `subjectMap` (resource name to CASL subject)
 - **ThemeService** — `theme` signal (`'light'` | `'dark'`), system preference detection, persists to localStorage
 
 ### HTTP Interceptors

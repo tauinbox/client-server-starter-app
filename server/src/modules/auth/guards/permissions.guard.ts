@@ -10,7 +10,6 @@ import { PermissionService } from '../services/permission.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import type { PermissionCheck } from '../casl/app-ability';
 import { JwtAuthRequest } from '../types/auth.request';
-import { SYSTEM_ROLES } from '@app/shared/constants';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -31,18 +30,14 @@ export class PermissionsGuard implements CanActivate {
 
     const { user } = context.switchToHttp().getRequest<JwtAuthRequest>();
 
-    // Admin role bypasses all permission checks (performance optimization — skip DB call)
-    if (user.roles?.includes(SYSTEM_ROLES.ADMIN)) {
-      return true;
-    }
+    const [roles, userPermissions] = await Promise.all([
+      this.permissionService.getRolesForUser(user.userId),
+      this.permissionService.getPermissionsForUser(user.userId)
+    ]);
 
-    const userPermissions = await this.permissionService.getPermissionsForUser(
-      user.userId
-    );
-
-    const ability = this.caslAbilityFactory.createForUser(
+    const ability = await this.caslAbilityFactory.createForUser(
       user.userId,
-      user.roles ?? [],
+      roles,
       userPermissions
     );
 

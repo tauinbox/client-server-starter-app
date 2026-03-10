@@ -52,11 +52,14 @@ export class RoleService {
 
   async update(
     id: string,
-    data: { name?: string; description?: string }
+    data: { name?: string; description?: string; isSuper?: boolean }
   ): Promise<Role> {
     const role = await this.findOne(id);
     if (role.isSystem) {
       throw new BadRequestException('Cannot modify system roles');
+    }
+    if (data.isSuper !== undefined) {
+      throw new BadRequestException('isSuper flag cannot be changed via API');
     }
     if (data.name) {
       const existing = await this.roleRepository.findOne({
@@ -162,7 +165,8 @@ export class RoleService {
 
   async findAllPermissions(): Promise<Permission[]> {
     return this.permissionRepository.find({
-      order: { resource: 'ASC', action: 'ASC' }
+      relations: ['resource', 'action'],
+      order: { resourceId: 'ASC', actionId: 'ASC' }
     });
   }
 

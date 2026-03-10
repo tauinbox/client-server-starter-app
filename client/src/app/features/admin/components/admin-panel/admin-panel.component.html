@@ -1,6 +1,8 @@
 <div class="admin-panel-container">
   <nav mat-tab-nav-bar [tabPanel]="tabPanel">
-    <ng-container *appRequirePermissions="{ action: 'list', subject: 'User' }">
+    <ng-container
+      *appRequirePermissions="{ action: 'search', subject: 'User' }"
+    >
       <a
         mat-tab-link
         [routerLink]="routes.Users"
