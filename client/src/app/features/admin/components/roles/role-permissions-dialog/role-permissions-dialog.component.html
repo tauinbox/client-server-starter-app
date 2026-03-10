@@ -41,7 +41,7 @@
                 [disabled]="role.isSystem"
                 (change)="togglePermission(permission.id)"
               >
-                {{ permission.action }}
+                {{ permission.action.name }}
               </mat-checkbox>
               @if (isChecked(permission.id) && hasAnyCondition(permission.id)) {
                 <mat-chip
@@ -86,8 +86,8 @@
                   : 'keyboard_arrow_down'
               }}</mat-icon>
               <span class="perm-label">
-                <span class="perm-resource">{{ permission.resource }}</span
-                >:<span class="perm-action">{{ permission.action }}</span>
+                <span class="perm-resource">{{ permission.resource.name }}</span
+                >:<span class="perm-action">{{ permission.action.name }}</span>
               </span>
               @if (hasAnyCondition(permission.id)) {
                 @for (type of activeConditionTypes(permission.id); track type) {

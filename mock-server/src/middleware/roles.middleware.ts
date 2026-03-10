@@ -1,6 +1,11 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { findUserById, getState, logAudit } from '../state';
+import {
+  findUserById,
+  getState,
+  logAudit,
+  toPermissionResponse
+} from '../state';
 import { adminGuard } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';
 
@@ -15,10 +20,13 @@ router.get('/', adminGuard, (_req, res) => {
 
 // GET /api/v1/roles/permissions
 router.get('/permissions', adminGuard, (_req, res) => {
-  const permissions = Array.from(getState().permissions.values());
+  const state = getState();
+  const permissions = Array.from(state.permissions.values())
+    .map((p) => toPermissionResponse(p))
+    .filter((p): p is NonNullable<typeof p> => p !== null);
   permissions.sort((a, b) => {
-    const cmp = a.resource.localeCompare(b.resource);
-    return cmp !== 0 ? cmp : a.action.localeCompare(b.action);
+    const cmp = a.resource.name.localeCompare(b.resource.name);
+    return cmp !== 0 ? cmp : a.action.name.localeCompare(b.action.name);
   });
   res.json(permissions);
 });
@@ -39,12 +47,11 @@ router.get('/:id/permissions', adminGuard, (req, res) => {
     .map((rp) => {
       const permission = state.permissions.get(rp.permissionId);
       if (!permission) return null;
+      const permResponse = toPermissionResponse(permission);
+      if (!permResponse) return null;
       return {
-        id: rp.id,
-        roleId: rp.roleId,
-        permissionId: rp.permissionId,
-        conditions: rp.conditions,
-        permission
+        permission: permResponse,
+        conditions: rp.conditions
       };
     })
     .filter((rp): rp is NonNullable<typeof rp> => rp !== null);
@@ -91,6 +98,7 @@ router.post('/', adminGuard, (req, res) => {
     name,
     description: description ?? null,
     isSystem: false,
+    isSuper: false,
     createdAt: now,
     updatedAt: now
   };
@@ -129,7 +137,15 @@ router.patch('/:id', adminGuard, (req, res) => {
     return;
   }
 
-  const { name, description } = req.body;
+  const { name, description, isSuper } = req.body;
+
+  if (isSuper !== undefined) {
+    res.status(400).json({
+      message: 'isSuper flag cannot be changed via API',
+      statusCode: 400
+    });
+    return;
+  }
 
   if (name !== undefined && name !== role.name) {
     for (const existing of state.roles.values()) {

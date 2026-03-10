@@ -13,6 +13,7 @@ const mockUserRole: RoleResponse = {
   name: 'user',
   description: 'Regular user',
   isSystem: true,
+  isSuper: false,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z'
 };
@@ -22,6 +23,7 @@ const mockAdminRole: RoleResponse = {
   name: 'admin',
   description: 'Administrator',
   isSystem: true,
+  isSuper: true,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z'
 };
@@ -252,7 +254,7 @@ describe('AuthStore', () => {
     it('should return false when no rules are set', () => {
       const store = createStore(null);
 
-      expect(store.hasPermissions({ action: 'list', subject: 'User' })).toBe(
+      expect(store.hasPermissions({ action: 'search', subject: 'User' })).toBe(
         false
       );
     });
@@ -260,13 +262,13 @@ describe('AuthStore', () => {
     it('should return true for a permitted action after setRules', () => {
       const store = createStore(null);
       const ability = createMongoAbility<AppAbility>([
-        { action: 'list', subject: 'User' }
+        { action: 'search', subject: 'User' }
       ]);
       const packed = packRules(ability.rules) as unknown[][];
 
       store.setRules(packed);
 
-      expect(store.hasPermissions({ action: 'list', subject: 'User' })).toBe(
+      expect(store.hasPermissions({ action: 'search', subject: 'User' })).toBe(
         true
       );
     });
@@ -294,7 +296,7 @@ describe('AuthStore', () => {
 
       store.setRules(packed);
 
-      expect(store.hasPermissions({ action: 'list', subject: 'User' })).toBe(
+      expect(store.hasPermissions({ action: 'search', subject: 'User' })).toBe(
         true
       );
       expect(store.hasPermissions({ action: 'delete', subject: 'User' })).toBe(
@@ -311,7 +313,7 @@ describe('AuthStore', () => {
       // @ts-expect-error testing invalid input shape
       store.setRules('invalid');
 
-      expect(store.hasPermissions({ action: 'list', subject: 'User' })).toBe(
+      expect(store.hasPermissions({ action: 'search', subject: 'User' })).toBe(
         false
       );
     });
@@ -322,7 +324,7 @@ describe('AuthStore', () => {
       // @ts-expect-error testing invalid input shape
       store.setRules([['read', 'User'], 'invalid']);
 
-      expect(store.hasPermissions({ action: 'list', subject: 'User' })).toBe(
+      expect(store.hasPermissions({ action: 'search', subject: 'User' })).toBe(
         false
       );
     });
@@ -330,14 +332,14 @@ describe('AuthStore', () => {
     it('should reset ability to null on clearSession', () => {
       const store = createStore(null);
       const ability = createMongoAbility<AppAbility>([
-        { action: 'list', subject: 'User' }
+        { action: 'search', subject: 'User' }
       ]);
       const packed = packRules(ability.rules) as unknown[][];
       store.setRules(packed);
 
       store.clearSession();
 
-      expect(store.hasPermissions({ action: 'list', subject: 'User' })).toBe(
+      expect(store.hasPermissions({ action: 'search', subject: 'User' })).toBe(
         false
       );
     });

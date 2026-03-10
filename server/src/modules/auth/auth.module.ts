@@ -24,6 +24,9 @@ import { User } from '../users/entities/user.entity';
 import { CaslModule } from './casl/casl.module';
 import { RoleService } from './services/role.service';
 import { RolesController } from './controllers/roles.controller';
+import { RbacController } from './controllers/rbac.controller';
+import { Resource } from './entities/resource.entity';
+import { Action } from './entities/action.entity';
 import { UserDeletedListener } from './listeners/user-deleted.listener';
 
 function conditionalProvider(
@@ -54,6 +57,8 @@ function conditionalProvider(
       Role,
       Permission,
       RolePermission,
+      Resource,
+      Action,
       User
     ]),
     JwtModule.registerAsync({
@@ -68,7 +73,12 @@ function conditionalProvider(
       })
     })
   ],
-  controllers: [AuthController, OAuthController, RolesController],
+  controllers: [
+    AuthController,
+    OAuthController,
+    RolesController,
+    RbacController
+  ],
   providers: [
     AuthService,
     LocalStrategy,

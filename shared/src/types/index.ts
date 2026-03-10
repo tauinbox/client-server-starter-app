@@ -25,3 +25,9 @@ export type {
   ResolvedPermission,
   UserPermissionsResponse
 } from './role.types';
+
+export type {
+  ResourceResponse,
+  ActionResponse,
+  RbacMetadataResponse
+} from './rbac.types';

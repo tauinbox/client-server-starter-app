@@ -10,7 +10,7 @@ export const adminRoutes: Routes = [
       import('./components/admin-panel/admin-panel.component').then(
         (c) => c.AdminPanelComponent
       ),
-    canActivate: [permissionGuard('list', 'User')],
+    canActivate: [permissionGuard('search', 'User')],
     providers: [UsersStore, RolesStore],
     children: [
       {
@@ -27,7 +27,7 @@ export const adminRoutes: Routes = [
               import('@features/users/components/user-list/user-list.component').then(
                 (c) => c.UserListComponent
               ),
-            canActivate: [permissionGuard('list', 'User')]
+            canActivate: [permissionGuard('search', 'User')]
           },
           {
             path: ':id',

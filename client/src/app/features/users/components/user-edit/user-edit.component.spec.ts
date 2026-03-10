@@ -24,6 +24,7 @@ const mockUserRole: RoleResponse = {
   name: 'user',
   description: 'Regular user',
   isSystem: true,
+  isSuper: false,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z'
 };
@@ -447,6 +448,7 @@ describe('UserEditComponent', () => {
         name: 'user',
         description: null,
         isSystem: true,
+        isSuper: false,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z'
       },
@@ -455,6 +457,7 @@ describe('UserEditComponent', () => {
         name: 'admin',
         description: null,
         isSystem: true,
+        isSuper: false,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z'
       }

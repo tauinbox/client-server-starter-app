@@ -1,16 +1,10 @@
 import type { MongoAbility } from '@casl/ability';
 
-export type Actions =
-  | 'manage'
-  | 'create'
-  | 'read'
-  | 'update'
-  | 'delete'
-  | 'list'
-  | 'search'
-  | 'assign';
+/** Known actions: 'create' | 'read' | 'update' | 'delete' | 'search' | 'assign' */
+export type Actions = string;
 
-export type Subjects = 'User' | 'Role' | 'Permission' | 'Profile' | 'all';
+/** Known subjects: 'User' | 'Role' | 'Permission' | 'Profile' | 'all' */
+export type Subjects = string;
 
 export type AppAbility = MongoAbility<[Actions, Subjects]>;
 

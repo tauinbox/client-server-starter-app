@@ -27,6 +27,8 @@ function buildStateSnapshot(state: State): StateSnapshot {
     refreshTokens: state.refreshTokens.size,
     emailVerificationTokens: state.emailVerificationTokens.size,
     passwordResetTokens: state.passwordResetTokens.size,
+    resources: Array.from(state.resources.values()),
+    actions: Array.from(state.actions.values()),
     roles: Array.from(state.roles.values()),
     permissions: Array.from(state.permissions.values()),
     rolePermissions: state.rolePermissions,

@@ -31,6 +31,7 @@ import {
 } from '@nestjs/swagger';
 import { UserResponseDto } from '../dtos/user-response.dto';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
+import { RegisterResource } from '../../auth/decorators/register-resource.decorator';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserDeletedEvent } from '../events/user-deleted.event';
 import { AuditService } from '../../audit/audit.service';
@@ -43,6 +44,7 @@ import { JwtAuthRequest } from '../../auth/types/auth.request';
   path: 'users',
   version: '1'
 })
+@RegisterResource({ name: 'users', subject: 'User', displayName: 'Users' })
 @UseInterceptors(ClassSerializerInterceptor)
 export class UsersController {
   constructor(
@@ -83,7 +85,7 @@ export class UsersController {
   }
 
   @Get()
-  @Authorize(['list', 'User'])
+  @Authorize(['search', 'User'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get paginated list of users (admin only)' })
   @ApiOkResponse({

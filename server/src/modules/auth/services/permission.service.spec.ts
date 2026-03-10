@@ -13,10 +13,15 @@ describe('PermissionService', () => {
     del: jest.Mock;
   };
 
+  const mockResource = { id: 'res-1', name: 'users', subject: 'User' };
+  const mockAction = { id: 'act-1', name: 'read', displayName: 'Read' };
+
   const mockPermission = {
     id: 'perm-1',
-    resource: 'users',
-    action: 'read'
+    resourceId: 'res-1',
+    actionId: 'act-1',
+    resource: mockResource,
+    action: mockAction
   };
 
   const mockRolePermission = {
@@ -28,6 +33,7 @@ describe('PermissionService', () => {
   const mockRole = {
     id: 'role-1',
     name: 'admin',
+    isSuper: true,
     rolePermissions: [mockRolePermission]
   };
 
@@ -121,11 +127,13 @@ describe('PermissionService', () => {
           {
             id: 'role-1',
             name: 'admin',
+            isSuper: true,
             rolePermissions: [mockRolePermission]
           },
           {
             id: 'role-2',
             name: 'editor',
+            isSuper: false,
             rolePermissions: [
               { ...mockRolePermission, id: 'rp-2' } // same permission
             ]
@@ -140,28 +148,34 @@ describe('PermissionService', () => {
     });
   });
 
-  describe('getRoleNamesForUser', () => {
-    it('should return cached role names if available', async () => {
-      const cachedRoles = ['admin', 'user'];
+  describe('getRolesForUser', () => {
+    it('should return cached roles if available', async () => {
+      const cachedRoles = [{ name: 'admin', isSuper: true }];
       mockCacheManager.get.mockResolvedValue(cachedRoles);
 
-      const result = await service.getRoleNamesForUser('user-1');
+      const result = await service.getRolesForUser('user-1');
 
       expect(result).toEqual(cachedRoles);
       expect(mockUserRepository.findOne).not.toHaveBeenCalled();
     });
 
-    it('should query and cache role names when not cached', async () => {
+    it('should query and cache roles when not cached', async () => {
       mockUserRepository.findOne.mockResolvedValue({
-        roles: [{ name: 'admin' }, { name: 'user' }]
+        roles: [
+          { name: 'admin', isSuper: true },
+          { name: 'user', isSuper: false }
+        ]
       });
 
-      const result = await service.getRoleNamesForUser('user-1');
+      const result = await service.getRolesForUser('user-1');
 
-      expect(result).toEqual(['admin', 'user']);
+      expect(result).toEqual([
+        { name: 'admin', isSuper: true },
+        { name: 'user', isSuper: false }
+      ]);
       expect(mockCacheManager.set).toHaveBeenCalledWith(
         'roles:user-1',
-        ['admin', 'user'],
+        result,
         120_000
       );
     });
@@ -169,9 +183,24 @@ describe('PermissionService', () => {
     it('should return empty array if user not found', async () => {
       mockUserRepository.findOne.mockResolvedValue(null);
 
-      const result = await service.getRoleNamesForUser('nonexistent');
+      const result = await service.getRolesForUser('nonexistent');
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('getRoleNamesForUser', () => {
+    it('should return role name strings', async () => {
+      mockUserRepository.findOne.mockResolvedValue({
+        roles: [
+          { name: 'admin', isSuper: true },
+          { name: 'user', isSuper: false }
+        ]
+      });
+
+      const result = await service.getRoleNamesForUser('user-1');
+
+      expect(result).toEqual(['admin', 'user']);
     });
   });
 

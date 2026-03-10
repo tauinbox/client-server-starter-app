@@ -5,6 +5,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { User } from '../../users/entities/user.entity';
 import { ResolvedPermission } from '@app/shared/types';
+import type { RoleInfo } from '../casl/casl-ability.factory';
 
 const CACHE_TTL = 120_000; // 2 minutes
 const CACHE_PREFIX = 'permissions:';
@@ -31,7 +32,9 @@ export class PermissionService {
       relations: [
         'roles',
         'roles.rolePermissions',
-        'roles.rolePermissions.permission'
+        'roles.rolePermissions.permission',
+        'roles.rolePermissions.permission.resource',
+        'roles.rolePermissions.permission.action'
       ]
     });
 
@@ -43,11 +46,13 @@ export class PermissionService {
 
     for (const role of user.roles) {
       for (const rp of role.rolePermissions) {
-        const key = `${rp.permission.resource}:${rp.permission.action}`;
+        const resourceName = rp.permission.resource.name;
+        const actionName = rp.permission.action.name;
+        const key = `${resourceName}:${actionName}`;
         if (!permissionMap.has(key)) {
           permissionMap.set(key, {
-            resource: rp.permission.resource,
-            action: rp.permission.action,
+            resource: resourceName,
+            action: actionName,
             permission: key,
             conditions: rp.conditions
           });
@@ -60,9 +65,9 @@ export class PermissionService {
     return permissions;
   }
 
-  async getRoleNamesForUser(userId: string): Promise<string[]> {
+  async getRolesForUser(userId: string): Promise<RoleInfo[]> {
     const cacheKey = `${ROLES_CACHE_PREFIX}${userId}`;
-    const cached = await this.cacheManager.get<string[]>(cacheKey);
+    const cached = await this.cacheManager.get<RoleInfo[]>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -72,9 +77,15 @@ export class PermissionService {
       relations: ['roles']
     });
 
-    const roleNames = user?.roles?.map((r) => r.name) ?? [];
-    await this.cacheManager.set(cacheKey, roleNames, CACHE_TTL);
-    return roleNames;
+    const roles: RoleInfo[] =
+      user?.roles?.map((r) => ({ name: r.name, isSuper: r.isSuper })) ?? [];
+    await this.cacheManager.set(cacheKey, roles, CACHE_TTL);
+    return roles;
+  }
+
+  async getRoleNamesForUser(userId: string): Promise<string[]> {
+    const roles = await this.getRolesForUser(userId);
+    return roles.map((r) => r.name);
   }
 
   async invalidateUserCache(userId: string): Promise<void> {
