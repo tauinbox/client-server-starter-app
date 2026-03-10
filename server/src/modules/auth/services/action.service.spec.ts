@@ -38,7 +38,7 @@ describe('ActionService', () => {
     getCount: jest.Mock;
   };
 
-  const defaultAction: Action = {
+  const makeDefaultAction = (): Action => ({
     id: 'action-1',
     name: 'read',
     displayName: 'Read',
@@ -46,9 +46,9 @@ describe('ActionService', () => {
     isDefault: true,
     permissions: [],
     createdAt: new Date()
-  };
+  });
 
-  const customAction: Action = {
+  const makeCustomAction = (): Action => ({
     id: 'action-2',
     name: 'export',
     displayName: 'Export',
@@ -56,7 +56,7 @@ describe('ActionService', () => {
     isDefault: false,
     permissions: [],
     createdAt: new Date()
-  };
+  });
 
   beforeEach(async () => {
     mockQueryBuilder = {
@@ -120,7 +120,10 @@ describe('ActionService', () => {
 
   describe('findAll', () => {
     it('should return all actions ordered by name ASC', async () => {
-      mockActionRepo.find.mockResolvedValue([customAction, defaultAction]);
+      mockActionRepo.find.mockResolvedValue([
+        makeCustomAction(),
+        makeDefaultAction()
+      ]);
       const result = await service.findAll();
       expect(result).toHaveLength(2);
       expect(mockActionRepo.find).toHaveBeenCalledWith({
@@ -137,7 +140,7 @@ describe('ActionService', () => {
 
   describe('findOne', () => {
     it('should return an action by id', async () => {
-      mockActionRepo.findOne.mockResolvedValue(defaultAction);
+      mockActionRepo.findOne.mockResolvedValue(makeDefaultAction());
       const result = await service.findOne('action-1');
       expect(result.name).toBe('read');
       expect(mockActionRepo.findOne).toHaveBeenCalledWith({
@@ -188,7 +191,7 @@ describe('ActionService', () => {
     });
 
     it('should throw BadRequestException if name already exists', async () => {
-      mockActionRepo.findOne.mockResolvedValue(customAction);
+      mockActionRepo.findOne.mockResolvedValue(makeCustomAction());
       await expect(service.create(createData)).rejects.toThrow(
         BadRequestException
       );
@@ -229,9 +232,9 @@ describe('ActionService', () => {
 
   describe('update', () => {
     it('should update an existing action', async () => {
-      mockActionRepo.findOne.mockResolvedValue(customAction);
+      mockActionRepo.findOne.mockResolvedValue(makeCustomAction());
       mockActionRepo.save.mockResolvedValue({
-        ...customAction,
+        ...makeCustomAction(),
         description: 'Updated'
       });
 
@@ -250,7 +253,15 @@ describe('ActionService', () => {
     });
 
     it('should update only provided fields', async () => {
-      const action = { ...customAction };
+      const action: Action = {
+        id: 'action-2',
+        name: 'export',
+        displayName: 'Export',
+        description: 'Export data',
+        isDefault: false,
+        permissions: [],
+        createdAt: new Date()
+      };
       mockActionRepo.findOne.mockResolvedValue(action);
       mockActionRepo.save.mockImplementation((data: Record<string, unknown>) =>
         Promise.resolve(data)
@@ -269,14 +280,14 @@ describe('ActionService', () => {
 
   describe('delete', () => {
     it('should throw ForbiddenException if action is default', async () => {
-      mockActionRepo.findOne.mockResolvedValue(defaultAction);
+      mockActionRepo.findOne.mockResolvedValue(makeDefaultAction());
       await expect(service.delete('action-1')).rejects.toThrow(
         ForbiddenException
       );
     });
 
     it('should throw ConflictException if action is used by role permissions', async () => {
-      mockActionRepo.findOne.mockResolvedValue(customAction);
+      mockActionRepo.findOne.mockResolvedValue(makeCustomAction());
       mockQueryBuilder.getCount.mockResolvedValue(3);
 
       await expect(service.delete('action-2')).rejects.toThrow(
@@ -285,7 +296,7 @@ describe('ActionService', () => {
     });
 
     it('should delete associated permissions then the action', async () => {
-      mockActionRepo.findOne.mockResolvedValue(customAction);
+      mockActionRepo.findOne.mockResolvedValue(makeCustomAction());
       mockQueryBuilder.getCount.mockResolvedValue(0);
 
       await service.delete('action-2');
@@ -293,11 +304,11 @@ describe('ActionService', () => {
       expect(mockPermissionRepo.delete).toHaveBeenCalledWith({
         actionId: 'action-2'
       });
-      expect(mockActionRepo.remove).toHaveBeenCalledWith(customAction);
+      expect(mockActionRepo.remove).toHaveBeenCalledWith(makeCustomAction());
     });
 
     it('should use queryBuilder to check role permission usage', async () => {
-      mockActionRepo.findOne.mockResolvedValue(customAction);
+      mockActionRepo.findOne.mockResolvedValue(makeCustomAction());
       mockQueryBuilder.getCount.mockResolvedValue(0);
 
       await service.delete('action-2');
@@ -321,7 +332,7 @@ describe('ActionService', () => {
     });
 
     it('should delete permissions before removing action to avoid FK constraint', async () => {
-      mockActionRepo.findOne.mockResolvedValue(customAction);
+      mockActionRepo.findOne.mockResolvedValue(makeCustomAction());
       mockQueryBuilder.getCount.mockResolvedValue(0);
 
       const callOrder: string[] = [];
@@ -331,7 +342,7 @@ describe('ActionService', () => {
       });
       mockActionRepo.remove.mockImplementation(() => {
         callOrder.push('actionRemove');
-        return Promise.resolve(customAction);
+        return Promise.resolve(makeCustomAction());
       });
 
       await service.delete('action-2');
