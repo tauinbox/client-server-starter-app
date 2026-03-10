@@ -77,6 +77,7 @@ Copy `.env.example` to `.env` and configure:
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
 | `SMTP_FROM` | `noreply@example.com` | Sender email address |
+| `REDIS_URL` | - | Redis connection URL (optional; enables distributed rate limiting and shared permission cache for multi-instance deployments) |
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to retain audit log entries before nightly deletion |
 | `DB_POOL_MAX` | `10` | Maximum PostgreSQL connection pool size |
 | `DB_POOL_IDLE_TIMEOUT` | `30000` | Milliseconds before an idle connection is closed |
@@ -335,6 +336,8 @@ This package's version is kept in sync with `client/` and `mock-server/` via `co
 | class-validator | 0.14.x |
 | @nestjs/swagger | 11.x |
 | @nestjs/schedule | 6.x |
+| cache-manager-redis-yet | 5.x |
+| ioredis | 5.x |
 | TypeScript | 5.9.x |
 | Jest | 30.x |
 | ESLint | 9.x |

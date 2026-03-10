@@ -6,6 +6,8 @@ import * as Joi from 'joi';
 import { LoggerModule } from 'nestjs-pino';
 import configuration from './configuration';
 import { CacheModule } from '@nestjs/cache-manager';
+import { redisStore } from 'cache-manager-redis-yet';
+import { RedisThrottlerStorage } from './redis-throttler.storage';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { postgresConfig } from '../../postgres.config';
 import { UsersModule } from '../users/users.module';
@@ -84,22 +86,41 @@ export class CoreModule implements NestModule {
           })
         }),
         EventEmitterModule.forRoot(),
-        CacheModule.register({
-          isGlobal: true
+        CacheModule.registerAsync({
+          isGlobal: true,
+          inject: [ConfigService],
+          useFactory: async (config: ConfigService) => {
+            const redisUrl = config.get<string>('REDIS_URL');
+            if (!redisUrl) {
+              return {};
+            }
+            const store = await redisStore({ url: redisUrl });
+            return { store };
+          }
         }),
         ScheduleModule.forRoot(),
-        ThrottlerModule.forRoot([
-          { ttl: 60000, limit: 10 },
-          {
-            // Applied globally but overridden on the login route to prevent a
-            // single IP from accumulating enough failed attempts to trigger
-            // account lockout (SEC-6). High global limit = effectively disabled
-            // on all other routes.
-            name: 'login-long-window',
-            ttl: LOCKOUT_DURATION_MS,
-            limit: MAX_FAILED_ATTEMPTS * 1000
+        ThrottlerModule.forRootAsync({
+          inject: [ConfigService],
+          useFactory: (config: ConfigService) => {
+            const redisUrl = config.get<string>('REDIS_URL');
+            const throttlers = [
+              { ttl: 60000, limit: 10 },
+              {
+                // Applied globally but overridden on the login route to prevent a
+                // single IP from accumulating enough failed attempts to trigger
+                // account lockout (SEC-6). High global limit = effectively disabled
+                // on all other routes.
+                name: 'login-long-window',
+                ttl: LOCKOUT_DURATION_MS,
+                limit: MAX_FAILED_ATTEMPTS * 1000
+              }
+            ];
+            if (!redisUrl) {
+              return { throttlers };
+            }
+            return { throttlers, storage: new RedisThrottlerStorage(redisUrl) };
           }
-        ]),
+        }),
         TypeOrmModule.forRootAsync({
           inject: [ConfigService],
           useFactory: (config: ConfigService) => ({
