@@ -296,7 +296,8 @@ describe('ActionService', () => {
     });
 
     it('should delete associated permissions then the action', async () => {
-      mockActionRepo.findOne.mockResolvedValue(makeCustomAction());
+      const action = makeCustomAction();
+      mockActionRepo.findOne.mockResolvedValue(action);
       mockQueryBuilder.getCount.mockResolvedValue(0);
 
       await service.delete('action-2');
@@ -304,7 +305,7 @@ describe('ActionService', () => {
       expect(mockPermissionRepo.delete).toHaveBeenCalledWith({
         actionId: 'action-2'
       });
-      expect(mockActionRepo.remove).toHaveBeenCalledWith(makeCustomAction());
+      expect(mockActionRepo.remove).toHaveBeenCalledWith(action);
     });
 
     it('should use queryBuilder to check role permission usage', async () => {
