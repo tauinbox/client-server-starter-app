@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { packRules } from '@casl/ability/extra';
 import { createMongoAbility } from '@casl/ability';
-import { AuthStore, AUTH_USER_KEY } from './auth.store';
+import { AUTH_USER_KEY, AuthStore } from './auth.store';
 import type { AppAbility } from '../casl/app-ability';
 import { LocalStorageService } from '@core/services/local-storage.service';
 import type { AuthResponse } from '../models/auth.types';
@@ -248,11 +248,13 @@ describe('AuthStore', () => {
     });
   });
 
-  describe('setRules and hasPermission', () => {
+  describe('setRules and hasPermissions', () => {
     it('should return false when no rules are set', () => {
       const store = createStore(null);
 
-      expect(store.hasPermission('list', 'User')).toBe(false);
+      expect(store.hasPermissions({ action: 'list', subject: 'User' })).toBe(
+        false
+      );
     });
 
     it('should return true for a permitted action after setRules', () => {
@@ -264,7 +266,9 @@ describe('AuthStore', () => {
 
       store.setRules(packed);
 
-      expect(store.hasPermission('list', 'User')).toBe(true);
+      expect(store.hasPermissions({ action: 'list', subject: 'User' })).toBe(
+        true
+      );
     });
 
     it('should return false for an action not in rules', () => {
@@ -276,7 +280,9 @@ describe('AuthStore', () => {
 
       store.setRules(packed);
 
-      expect(store.hasPermission('delete', 'User')).toBe(false);
+      expect(store.hasPermissions({ action: 'delete', subject: 'User' })).toBe(
+        false
+      );
     });
 
     it('should return true for all actions when manage+all rule is set (admin)', () => {
@@ -288,9 +294,15 @@ describe('AuthStore', () => {
 
       store.setRules(packed);
 
-      expect(store.hasPermission('list', 'User')).toBe(true);
-      expect(store.hasPermission('delete', 'User')).toBe(true);
-      expect(store.hasPermission('update', 'Profile')).toBe(true);
+      expect(store.hasPermissions({ action: 'list', subject: 'User' })).toBe(
+        true
+      );
+      expect(store.hasPermissions({ action: 'delete', subject: 'User' })).toBe(
+        true
+      );
+      expect(
+        store.hasPermissions({ action: 'update', subject: 'Profile' })
+      ).toBe(true);
     });
 
     it('should silently skip when rules is not an array', () => {
@@ -299,7 +311,9 @@ describe('AuthStore', () => {
       // @ts-expect-error testing invalid input shape
       store.setRules('invalid');
 
-      expect(store.hasPermission('list', 'User')).toBe(false);
+      expect(store.hasPermissions({ action: 'list', subject: 'User' })).toBe(
+        false
+      );
     });
 
     it('should silently skip when rules contains non-array elements', () => {
@@ -308,7 +322,9 @@ describe('AuthStore', () => {
       // @ts-expect-error testing invalid input shape
       store.setRules([['read', 'User'], 'invalid']);
 
-      expect(store.hasPermission('list', 'User')).toBe(false);
+      expect(store.hasPermissions({ action: 'list', subject: 'User' })).toBe(
+        false
+      );
     });
 
     it('should reset ability to null on clearSession', () => {
@@ -321,7 +337,9 @@ describe('AuthStore', () => {
 
       store.clearSession();
 
-      expect(store.hasPermission('list', 'User')).toBe(false);
+      expect(store.hasPermissions({ action: 'list', subject: 'User' })).toBe(
+        false
+      );
     });
   });
 });

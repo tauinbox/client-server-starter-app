@@ -22,7 +22,7 @@ export function permissionGuard(
       router,
       state.url,
       () => {
-        if (authStore.hasPermission(action, subject)) return true;
+        if (authStore.hasPermissions({ action, subject })) return true;
         void router.navigate([`/${AppRouteSegmentEnum.Forbidden}`]);
         return false;
       }

@@ -85,6 +85,8 @@
       } @else {
         <app-user-table
           [users]="displayedUsers()"
+          [canUpdate]="canUpdate()"
+          [canDelete]="canDelete()"
           (sortChange)="sortData($event)"
           (deleteUser)="confirmDelete($event)"
         />

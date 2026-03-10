@@ -94,13 +94,13 @@ export class RoleListComponent implements OnInit {
   ];
 
   readonly canCreate = computed(() =>
-    this.authStore.hasPermission('create', 'Role')
+    this.authStore.hasPermissions({ action: 'create', subject: 'Role' })
   );
   readonly canUpdate = computed(() =>
-    this.authStore.hasPermission('update', 'Role')
+    this.authStore.hasPermissions({ action: 'update', subject: 'Role' })
   );
   readonly canDelete = computed(() =>
-    this.authStore.hasPermission('delete', 'Role')
+    this.authStore.hasPermissions({ action: 'delete', subject: 'Role' })
   );
 
   ngOnInit(): void {

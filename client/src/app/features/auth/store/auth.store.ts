@@ -17,7 +17,7 @@ import type {
   UserPermissionsResponse
 } from '@app/shared/types/role.types';
 import type { AuthResponse, CustomJwtPayload } from '../models/auth.types';
-import type { Actions, AppAbility, Subjects } from '../casl/app-ability';
+import type { AppAbility, PermissionCheck } from '../casl/app-ability';
 import { LocalStorageService } from '@core/services/local-storage.service';
 
 export const AUTH_USER_KEY = 'auth_user';
@@ -43,7 +43,7 @@ export const AuthStore = signalStore(
     isAuthenticated: computed(() => store.accessToken() !== null),
     /**
      * For displaying the current user's role label only.
-     * Use hasPermission() for all access control decisions.
+     * Use hasPermissions() for all access control decisions.
      */
     isAdmin: computed(
       () =>
@@ -119,8 +119,13 @@ export const AuthStore = signalStore(
       patchState(store, { ability });
     }
 
-    function hasPermission(action: Actions, subject: Subjects): boolean {
-      return store.ability()?.can(action, subject) ?? false;
+    function hasPermissions(
+      check: PermissionCheck | PermissionCheck[]
+    ): boolean {
+      const checks = Array.isArray(check) ? check : [check];
+      return checks.every(
+        ({ action, subject }) => store.ability()?.can(action, subject) ?? false
+      );
     }
 
     return {
@@ -132,7 +137,7 @@ export const AuthStore = signalStore(
       clearSession,
       hasPersistedUser,
       setRules,
-      hasPermission
+      hasPermissions
     };
   })
 );

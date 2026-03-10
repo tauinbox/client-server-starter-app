@@ -59,7 +59,7 @@ describe('UserEditComponent', () => {
   let permittedSignal: WritableSignal<boolean>;
   let currentUserSignal: WritableSignal<{ id: string } | null>;
   let authStoreMock: {
-    hasPermission: ReturnType<typeof vi.fn>;
+    hasPermissions: ReturnType<typeof vi.fn>;
     user: WritableSignal<{ id: string } | null>;
     updateCurrentUser: ReturnType<typeof vi.fn>;
   };
@@ -87,7 +87,7 @@ describe('UserEditComponent', () => {
     };
 
     authStoreMock = {
-      hasPermission: vi.fn().mockImplementation(() => permittedSignal()),
+      hasPermissions: vi.fn().mockImplementation(() => permittedSignal()),
       user: currentUserSignal,
       updateCurrentUser: vi.fn()
     };

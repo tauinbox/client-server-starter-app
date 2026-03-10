@@ -10,10 +10,12 @@ import { AuthStore } from '../store/auth.store';
 import type { PermissionCheck } from '../casl/app-ability';
 
 @Directive({
-  selector: '[appRequirePermission]'
+  selector: '[appRequirePermissions]'
 })
-export class RequirePermissionDirective {
-  readonly appRequirePermission = input.required<PermissionCheck>();
+export class RequirePermissionsDirective {
+  readonly appRequirePermissions = input.required<
+    PermissionCheck | PermissionCheck[]
+  >();
 
   readonly #templateRef = inject(TemplateRef<unknown>);
   readonly #viewContainer = inject(ViewContainerRef);
@@ -23,13 +25,14 @@ export class RequirePermissionDirective {
 
   constructor() {
     effect(() => {
-      const { action, subject } = this.appRequirePermission();
-      const hasPermission = this.#authStore.hasPermission(action, subject);
+      const hasPermissions = this.#authStore.hasPermissions(
+        this.appRequirePermissions()
+      );
 
-      if (hasPermission && !this.#hasView) {
+      if (hasPermissions && !this.#hasView) {
         this.#viewContainer.createEmbeddedView(this.#templateRef);
         this.#hasView = true;
-      } else if (!hasPermission && this.#hasView) {
+      } else if (!hasPermissions && this.#hasView) {
         this.#viewContainer.clear();
         this.#hasView = false;
       }
