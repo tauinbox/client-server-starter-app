@@ -264,7 +264,7 @@ Base URL: `/api/v1`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/metadata` | None | Get RBAC metadata (resources + actions) |
+| GET | `/metadata` | Bearer | Get RBAC metadata (resources + actions); Redis-cached 60s |
 | GET | `/resources` | `permissions:read` | List all resources |
 | PATCH | `/resources/:id` | `permissions:update` | Update resource display info |
 | GET | `/actions` | `permissions:read` | List all actions |
