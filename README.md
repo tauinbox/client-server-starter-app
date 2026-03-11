@@ -300,7 +300,7 @@ API base URL: `/api/v1`
 | DELETE | `/roles/:id/permissions/:permId` | `roles:update` | Remove permission from role |
 | POST | `/roles/assign/:userId` | `roles:assign` | Assign role to user |
 | DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove role from user |
-| GET | `/rbac/metadata` | None | Get RBAC metadata (resources + actions) |
+| GET | `/rbac/metadata` | Bearer | Get RBAC metadata (resources + actions); Redis-cached 60s |
 | GET | `/rbac/resources` | `permissions:read` | List all resources |
 | PATCH | `/rbac/resources/:id` | `permissions:update` | Update resource display info |
 | GET | `/rbac/actions` | `permissions:read` | List all actions |

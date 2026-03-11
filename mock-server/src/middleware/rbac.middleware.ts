@@ -6,15 +6,15 @@ import {
   toResourceResponse,
   toActionResponse
 } from '../state';
-import { adminGuard } from '../helpers/auth.helpers';
+import { adminGuard, authGuard } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';
 
 const router = Router();
 
 const ACTION_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
 
-// GET /api/v1/rbac/metadata — public, no auth required
-router.get('/metadata', (_req, res) => {
+// GET /api/v1/rbac/metadata
+router.get('/metadata', authGuard, (_req, res) => {
   const state = getState();
   const resources = Array.from(state.resources.values()).map(
     toResourceResponse
