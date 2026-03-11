@@ -18,6 +18,8 @@ import { navigateToLogin } from '../utils/navigate-to-login';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
 import { TokenService } from './token.service';
+import { RbacMetadataService } from './rbac-metadata.service';
+import { RbacMetadataStore } from '../store/rbac-metadata.store';
 
 const silentContext = () =>
   new HttpContext().set(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN, true);
@@ -28,6 +30,8 @@ export class AuthService {
   readonly #router = inject(Router);
   readonly #authStore = inject(AuthStore);
   readonly #tokenService = inject(TokenService);
+  readonly #rbacMetadataService = inject(RbacMetadataService);
+  readonly #rbacMetadataStore = inject(RbacMetadataStore);
 
   readonly isAuthenticated = this.#authStore.isAuthenticated;
 
@@ -41,6 +45,7 @@ export class AuthService {
           this.#authStore.saveAuthResponse(response);
           this.scheduleTokenRefresh();
           void this.fetchPermissions();
+          void this.fetchRbacMetadata();
         })
       );
   }
@@ -176,6 +181,23 @@ export class AuthService {
       .catch((error) => {
         console.error('Failed to fetch permissions:', error);
       });
+  }
+
+  fetchRbacMetadata(): Promise<void> {
+    const load = () =>
+      firstValueFrom(this.#rbacMetadataService.getMetadata())
+        .then((data) => {
+          this.#rbacMetadataStore.setMetadata(data.resources, data.actions);
+        })
+        .catch(
+          () => undefined /* silently ignore — app functions without metadata */
+        );
+
+    if (this.#rbacMetadataStore.resources().length > 0) {
+      void load();
+      return Promise.resolve();
+    }
+    return load();
   }
 
   initSession(): void {

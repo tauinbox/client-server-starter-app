@@ -215,7 +215,7 @@
     {
       "method": "GET",
       "path": "/api/v1/rbac/metadata",
-      "expectedStatus": 200
+      "expectedStatus": 401
     },
     {
       "method": "GET",

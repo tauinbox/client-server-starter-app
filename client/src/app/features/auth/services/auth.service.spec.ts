@@ -9,6 +9,8 @@ import { firstValueFrom, of } from 'rxjs';
 import { AuthService } from './auth.service';
 import { AuthStore } from '../store/auth.store';
 import { TokenService } from './token.service';
+import { RbacMetadataService } from './rbac-metadata.service';
+import { RbacMetadataStore } from '../store/rbac-metadata.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import type { AuthResponse } from '../models/auth.types';
 import type { RoleResponse } from '@app/shared/types';
@@ -61,6 +63,11 @@ function createMockAuthResponse(): AuthResponse {
 describe('AuthService', () => {
   let service: AuthService;
   let httpMock: HttpTestingController;
+  let rbacMetadataServiceMock: { getMetadata: ReturnType<typeof vi.fn> };
+  let rbacMetadataStoreMock: {
+    resources: ReturnType<typeof vi.fn>;
+    setMetadata: ReturnType<typeof vi.fn>;
+  };
   let authStoreMock: {
     isAuthenticated: ReturnType<typeof vi.fn>;
     getAccessToken: ReturnType<typeof vi.fn>;
@@ -79,6 +86,13 @@ describe('AuthService', () => {
   };
 
   beforeEach(() => {
+    rbacMetadataServiceMock = {
+      getMetadata: vi.fn().mockReturnValue(of({ resources: [], actions: [] }))
+    };
+    rbacMetadataStoreMock = {
+      resources: vi.fn().mockReturnValue([]),
+      setMetadata: vi.fn()
+    };
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(false),
       getAccessToken: vi.fn().mockReturnValue(null),
@@ -103,7 +117,9 @@ describe('AuthService', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: AuthStore, useValue: authStoreMock },
-        { provide: TokenService, useValue: tokenServiceMock }
+        { provide: TokenService, useValue: tokenServiceMock },
+        { provide: RbacMetadataService, useValue: rbacMetadataServiceMock },
+        { provide: RbacMetadataStore, useValue: rbacMetadataStoreMock }
       ]
     });
 

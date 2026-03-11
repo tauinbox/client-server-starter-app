@@ -3,10 +3,12 @@ import {
   Controller,
   Delete,
   Get,
+  Inject,
   Param,
   Patch,
   Post,
-  Request
+  Request,
+  UseGuards
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -21,9 +23,12 @@ import {
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { ResourceService } from '../services/resource.service';
 import { ActionService } from '../services/action.service';
 import { Authorize } from '../decorators/authorize.decorator';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { CreateActionDto } from '../dtos/create-action.dto';
 import { UpdateActionDto } from '../dtos/update-action.dto';
 import { UpdateResourceDto } from '../dtos/update-resource.dto';
@@ -32,6 +37,9 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { JwtAuthRequest } from '../types/auth.request';
 import { RegisterResource } from '../decorators/register-resource.decorator';
+
+const METADATA_CACHE_KEY = 'rbac:metadata';
+const METADATA_CACHE_TTL = 60_000; // 1 minute
 
 @ApiTags('RBAC Metadata')
 @Controller({
@@ -47,23 +55,30 @@ export class RbacController {
   constructor(
     private readonly resourceService: ResourceService,
     private readonly actionService: ActionService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache
   ) {}
 
-  // ── Metadata (public, no auth required) ──────────────────────────
+  // ── Metadata ──────────────────────────────────────────────────────
 
   @Get('metadata')
+  @UseGuards(JwtAuthGuard)
   @Throttle({ default: { ttl: 60000, limit: 30 } })
-  @ApiOperation({
-    summary: 'Get RBAC metadata (resources and actions)'
-  })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get RBAC metadata (resources and actions)' })
   @ApiOkResponse({ description: 'RBAC metadata' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   async getMetadata() {
+    const cached = await this.cacheManager.get(METADATA_CACHE_KEY);
+    if (cached) return cached;
+
     const [resources, actions] = await Promise.all([
       this.resourceService.findAll(),
       this.actionService.findAll()
     ]);
-    return { resources, actions };
+    const result = { resources, actions };
+    await this.cacheManager.set(METADATA_CACHE_KEY, result, METADATA_CACHE_TTL);
+    return result;
   }
 
   // ── Resources (read + update display info only) ──────────────────
@@ -93,6 +108,7 @@ export class RbacController {
     @Request() req: JwtAuthRequest
   ) {
     const result = await this.resourceService.update(id, dto);
+    await this.cacheManager.del(METADATA_CACHE_KEY);
     await this.auditService.log({
       action: AuditAction.RESOURCE_UPDATE,
       actorId: req.user.userId,
@@ -127,6 +143,7 @@ export class RbacController {
     @Request() req: JwtAuthRequest
   ) {
     const action = await this.actionService.create(dto);
+    await this.cacheManager.del(METADATA_CACHE_KEY);
     await this.auditService.log({
       action: AuditAction.ACTION_CREATE,
       actorId: req.user.userId,
@@ -153,6 +170,7 @@ export class RbacController {
     @Request() req: JwtAuthRequest
   ) {
     const result = await this.actionService.update(id, dto);
+    await this.cacheManager.del(METADATA_CACHE_KEY);
     await this.auditService.log({
       action: AuditAction.ACTION_UPDATE,
       actorId: req.user.userId,
@@ -174,6 +192,7 @@ export class RbacController {
   @ApiNotFoundResponse({ description: 'Action not found' })
   async deleteAction(@Param('id') id: string, @Request() req: JwtAuthRequest) {
     await this.actionService.delete(id);
+    await this.cacheManager.del(METADATA_CACHE_KEY);
     await this.auditService.log({
       action: AuditAction.ACTION_DELETE,
       actorId: req.user.userId,
