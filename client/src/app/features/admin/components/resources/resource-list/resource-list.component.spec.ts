@@ -22,6 +22,7 @@ const mockResource: ResourceResponse = {
   displayName: 'Users',
   description: 'User management',
   isSystem: true,
+  allowedActionNames: null,
   createdAt: '2024-01-01T00:00:00.000Z'
 };
 
@@ -230,7 +231,9 @@ describe('ResourceListComponent', () => {
 
       expect(dialogMock.open).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ data: { resource: mockResource } })
+        expect.objectContaining({
+          data: { resource: mockResource, actions: [mockAction] }
+        })
       );
     });
 

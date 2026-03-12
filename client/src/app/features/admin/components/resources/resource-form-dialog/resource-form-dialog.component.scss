@@ -2,3 +2,37 @@
   width: 100%;
   margin-bottom: 8px;
 }
+
+.allowed-actions {
+  margin-top: 16px;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  &__title {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  &__checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__hint {
+    margin: 0;
+    font-size: 13px;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.action-badge {
+  margin-left: 4px;
+  font-size: 11px;
+  color: var(--mat-sys-on-surface-variant);
+}

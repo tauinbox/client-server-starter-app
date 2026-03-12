@@ -82,6 +82,7 @@ export function toResourceResponse(resource: {
   displayName: string;
   description: string | null;
   isSystem: boolean;
+  allowedActionNames: string[] | null;
   createdAt: string;
 }): ResourceResponse {
   return {
@@ -91,6 +92,7 @@ export function toResourceResponse(resource: {
     displayName: resource.displayName,
     description: resource.description,
     isSystem: resource.isSystem,
+    allowedActionNames: resource.allowedActionNames,
     createdAt: resource.createdAt
   };
 }

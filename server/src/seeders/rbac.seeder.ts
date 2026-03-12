@@ -11,6 +11,7 @@ const DEFAULT_RESOURCES: {
   subject: string;
   displayName: string;
   description: string;
+  allowedActionNames?: string[];
 }[] = [
   {
     name: 'users',
@@ -22,7 +23,15 @@ const DEFAULT_RESOURCES: {
     name: 'roles',
     subject: 'Role',
     displayName: 'Roles',
-    description: 'Role management'
+    description: 'Role management',
+    allowedActionNames: [
+      'create',
+      'read',
+      'update',
+      'delete',
+      'search',
+      'assign'
+    ]
   },
   {
     name: 'permissions',
@@ -34,7 +43,8 @@ const DEFAULT_RESOURCES: {
     name: 'profile',
     subject: 'Profile',
     displayName: 'Profile',
-    description: 'User own profile'
+    description: 'User own profile',
+    allowedActionNames: ['read', 'update']
   }
 ];
 
@@ -42,6 +52,7 @@ const DEFAULT_ACTIONS: {
   name: string;
   displayName: string;
   description: string;
+  isDefault?: boolean;
 }[] = [
   { name: 'create', displayName: 'Create', description: 'Create a new record' },
   {
@@ -63,7 +74,8 @@ const DEFAULT_ACTIONS: {
   {
     name: 'assign',
     displayName: 'Assign',
-    description: 'Assign relationships between records'
+    description: 'Assign relationships between records',
+    isDefault: false
   }
 ];
 
@@ -88,7 +100,9 @@ export default class RbacSeeder extends Seeder {
 
     // Create default actions
     const savedActions = await actionRepo.save(
-      DEFAULT_ACTIONS.map((a) => actionRepo.create({ ...a, isDefault: true }))
+      DEFAULT_ACTIONS.map((a) =>
+        actionRepo.create({ ...a, isDefault: a.isDefault ?? true })
+      )
     );
 
     // Create system roles

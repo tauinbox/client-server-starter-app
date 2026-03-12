@@ -29,7 +29,11 @@ export class ResourceService {
 
   async update(
     id: string,
-    data: { displayName?: string; description?: string | null }
+    data: {
+      displayName?: string;
+      description?: string | null;
+      allowedActionNames?: string[] | null;
+    }
   ): Promise<Resource> {
     const resource = await this.resourceRepository.findOne({ where: { id } });
     if (!resource) {

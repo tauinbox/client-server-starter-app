@@ -29,6 +29,40 @@
       ></textarea>
     </mat-form-field>
   </form>
+
+  <mat-divider />
+
+  <div class="allowed-actions">
+    <div class="allowed-actions__header">
+      <span class="allowed-actions__title">Allowed Actions</span>
+      <mat-slide-toggle
+        [checked]="isCustomMode()"
+        (change)="toggleCustomMode($event.checked)"
+      >
+        Custom
+      </mat-slide-toggle>
+    </div>
+
+    @if (isCustomMode()) {
+      <div class="allowed-actions__checkboxes">
+        @for (action of data.actions; track action.id) {
+          <mat-checkbox
+            [checked]="isActionSelected(action.name)"
+            (change)="toggleAction(action.name)"
+          >
+            {{ action.displayName }}
+            @if (!action.isDefault) {
+              <span class="action-badge">custom</span>
+            }
+          </mat-checkbox>
+        }
+      </div>
+    } @else {
+      <p class="allowed-actions__hint">
+        All default actions are shown: create, read, update, delete, search.
+      </p>
+    }
+  </div>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
@@ -37,7 +71,7 @@
     mat-raised-button
     color="primary"
     type="button"
-    [disabled]="form.invalid || !form.dirty"
+    [disabled]="form.invalid || !isDirty"
     (click)="submit()"
   >
     Save Changes

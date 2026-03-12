@@ -148,6 +148,7 @@ function generateResources(): MockResource[] {
       displayName: 'Users',
       description: 'User management',
       isSystem: true,
+      allowedActionNames: null,
       lastSyncedAt: now,
       createdAt: now
     },
@@ -158,6 +159,7 @@ function generateResources(): MockResource[] {
       displayName: 'Profile',
       description: 'User profile',
       isSystem: true,
+      allowedActionNames: ['read', 'update'],
       lastSyncedAt: now,
       createdAt: now
     },
@@ -168,6 +170,14 @@ function generateResources(): MockResource[] {
       displayName: 'Roles',
       description: 'Role management',
       isSystem: true,
+      allowedActionNames: [
+        'create',
+        'read',
+        'update',
+        'delete',
+        'search',
+        'assign'
+      ],
       lastSyncedAt: now,
       createdAt: now
     },
@@ -178,6 +188,7 @@ function generateResources(): MockResource[] {
       displayName: 'Permissions',
       description: 'Permission management',
       isSystem: true,
+      allowedActionNames: null,
       lastSyncedAt: now,
       createdAt: now
     }
@@ -232,7 +243,7 @@ function generateActions(): MockAction[] {
       name: 'assign',
       displayName: 'Assign',
       description: 'Assign associations',
-      isDefault: true,
+      isDefault: false,
       createdAt: now
     }
   ];

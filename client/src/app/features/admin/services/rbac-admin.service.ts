@@ -9,6 +9,7 @@ import type {
 export type UpdateResource = {
   displayName?: string;
   description?: string | null;
+  allowedActionNames?: string[] | null;
 };
 
 export type CreateAction = {

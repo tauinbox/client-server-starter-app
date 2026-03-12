@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsArray, IsOptional, IsString, MaxLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateResourceDto {
@@ -19,4 +19,16 @@ export class UpdateResourceDto {
   @IsString()
   @MaxLength(500)
   description?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Allowed action names for this resource. null means show all default actions.',
+    example: ['read', 'update'],
+    type: [String],
+    nullable: true
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allowedActionNames?: string[] | null;
 }

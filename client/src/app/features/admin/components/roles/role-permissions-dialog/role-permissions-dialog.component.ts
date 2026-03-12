@@ -517,6 +517,13 @@ export class RolePermissionsDialogComponent implements OnInit {
   #groupByResource(permissions: PermissionResponse[]): PermissionGroup[] {
     const map = new Map<string, PermissionResponse[]>();
     for (const p of permissions) {
+      const { allowedActionNames } = p.resource;
+      const allowed =
+        allowedActionNames !== null
+          ? allowedActionNames.includes(p.action.name)
+          : p.action.isDefault;
+      if (!allowed) continue;
+
       const resourceName = p.resource.displayName || p.resource.name;
       if (!map.has(resourceName)) map.set(resourceName, []);
       map.get(resourceName)!.push(p);

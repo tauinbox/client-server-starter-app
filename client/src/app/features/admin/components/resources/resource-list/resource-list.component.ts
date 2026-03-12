@@ -125,7 +125,7 @@ export class ResourceListComponent implements OnInit {
   }
 
   openEditResource(resource: ResourceResponse): void {
-    const data: ResourceFormDialogData = { resource };
+    const data: ResourceFormDialogData = { resource, actions: this.actions() };
     this.#dialog
       .open(ResourceFormDialogComponent, { width: rem(480), data })
       .afterClosed()
