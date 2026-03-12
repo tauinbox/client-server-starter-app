@@ -156,9 +156,6 @@ describe('ResourceListComponent', () => {
       await setupComponent();
       fixture.detectChanges();
 
-      const addBtn = fixture.nativeElement.querySelector(
-        'button[color="primary"]'
-      );
       // "Add Action" button text check
       const allBtns = Array.from<HTMLButtonElement>(
         fixture.nativeElement.querySelectorAll('button')
