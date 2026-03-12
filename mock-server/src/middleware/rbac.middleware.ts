@@ -42,7 +42,7 @@ router.patch('/resources/:id', adminGuard, (req, res) => {
     return;
   }
 
-  const { displayName, description } = req.body;
+  const { displayName, description, allowedActionNames } = req.body;
 
   if (displayName !== undefined) {
     if (typeof displayName !== 'string' || displayName.trim().length === 0) {
@@ -64,6 +64,10 @@ router.patch('/resources/:id', adminGuard, (req, res) => {
 
   if (description !== undefined) {
     resource.description = description;
+  }
+
+  if (allowedActionNames !== undefined) {
+    resource.allowedActionNames = allowedActionNames;
   }
 
   const actor = (req as AuthenticatedRequest).user;

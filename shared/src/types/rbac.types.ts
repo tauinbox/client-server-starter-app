@@ -5,6 +5,7 @@ export type ResourceResponse = {
   displayName: string;
   description: string | null;
   isSystem: boolean;
+  allowedActionNames: string[] | null;
   createdAt: string;
 };
 

@@ -25,6 +25,7 @@ describe('ResourceService', () => {
     displayName: 'Users',
     description: 'User management',
     isSystem: true,
+    allowedActionNames: null,
     lastSyncedAt: new Date(),
     permissions: [],
     createdAt: new Date()
@@ -37,6 +38,7 @@ describe('ResourceService', () => {
     displayName: 'Articles',
     description: null,
     isSystem: false,
+    allowedActionNames: null,
     lastSyncedAt: null,
     permissions: [],
     createdAt: new Date()

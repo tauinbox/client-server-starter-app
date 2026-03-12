@@ -37,6 +37,7 @@ export interface MockResource {
   displayName: string;
   description: string | null;
   isSystem: boolean;
+  allowedActionNames: string[] | null;
   lastSyncedAt: string;
   createdAt: string;
 }

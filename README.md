@@ -35,7 +35,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 
 ### Admin Panel
 - **Role management** — tabbed `/admin` shell (`AdminPanelComponent`) with "Users", "Roles", and "Resources" tabs. Role list with create/edit/delete dialogs; `RolePermissionsDialogComponent` assigns permissions to roles with optional CASL conditions (ownership, fieldMatch, userAttr, custom)
-- **Resource/Action management** — "Manage Resources" tab at `/admin/resources` (requires `read:Permission`). Resources table allows editing display name and description; Actions table supports create, edit, and delete of non-default actions. Each mutation refreshes `RbacMetadataStore` automatically
+- **Resource/Action management** — "Manage Resources" tab at `/admin/resources` (requires `read:Permission`). Resources table allows editing display name, description, and allowed actions per resource (`allowedActionNames`); Actions table supports create, edit, and delete of non-default actions. Each mutation refreshes `RbacMetadataStore` automatically
 - **CASL condition editors** — all four condition types supported in the permissions dialog: `ownership` checkbox, `fieldMatch` / `userAttr` JSON editors, and a `custom` raw MongoQuery textarea with blur-time JSON validation
 - **Prototype-pollution-safe `custom` conditions** — `CaslAbilityFactory` uses `Object.entries()` loop instead of `Object.assign` when merging user-supplied JSON into the CASL query object
 
@@ -378,7 +378,7 @@ Nine tables managed via TypeORM migrations:
 - **oauth_accounts** — Linked to users (CASCADE delete), provider + provider_id (unique), timestamps
 - **refresh_tokens** — Linked to users (CASCADE delete), token string (SHA-256 hashed), expiry, revoked flag
 - **roles** — UUID PK, name (unique), description, isSystem flag, isSuper flag; ManyToMany with users
-- **resources** — UUID PK, name (unique), displayName, description, isSystem flag, sortOrder
+- **resources** — UUID PK, name (unique), displayName, description, isSystem flag, `allowed_action_names text[]` (null = use all default actions)
 - **actions** — UUID PK, name (unique), displayName, description, isSystem flag, sortOrder
 - **permissions** — UUID PK, resource_id + action_id (unique constraint, FKs to resources and actions)
 - **role_permissions** — FK to roles + permissions, optional jsonb `conditions` column
@@ -418,7 +418,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 |------|------|-------|--------|
 | Server unit tests | Jest | `*.spec.ts` alongside source | 236 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | Configured |
-| Client unit tests | Vitest | `*.spec.ts` alongside source | 324 tests passing |
+| Client unit tests | Vitest | `*.spec.ts` alongside source | 336 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 101 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
 

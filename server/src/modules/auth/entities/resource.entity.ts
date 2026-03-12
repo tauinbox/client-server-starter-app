@@ -27,6 +27,14 @@ export class Resource {
   @Column({ name: 'is_system', default: false })
   isSystem: boolean;
 
+  @Column('text', {
+    array: true,
+    nullable: true,
+    name: 'allowed_action_names',
+    default: null
+  })
+  allowedActionNames: string[] | null;
+
   @Column({ name: 'last_synced_at', type: 'timestamp', nullable: true })
   lastSyncedAt: Date | null;
 
