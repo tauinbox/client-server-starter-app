@@ -50,6 +50,9 @@ router.get('/:id/permissions', adminGuard, (req, res) => {
       const permResponse = toPermissionResponse(permission);
       if (!permResponse) return null;
       return {
+        id: rp.id,
+        roleId: rp.roleId,
+        permissionId: rp.permissionId,
         permission: permResponse,
         conditions: rp.conditions
       };
