@@ -44,16 +44,20 @@ src/app/
 │   │   ├── components/
 │   │   │   └── user-table/ # UserTableComponent (shared table; sorting + actions only, no paginator)
 │   │   └── store/          # UsersStore (NgRx Signal Store, route-level)
-│   └── admin/              # Admin panel (roles + user management)
+│   └── admin/              # Admin panel (roles + resource + user management)
 │       ├── admin.routes.ts # Lazy-loaded child routes under /admin
 │       ├── components/
-│       │   ├── admin-panel/             # AdminPanelComponent — tabbed shell (Users / Roles)
-│       │   └── roles/
-│       │       ├── role-list/           # RoleListComponent — data table with create/edit/delete actions
-│       │       ├── role-form-dialog/    # RoleFormDialogComponent — create and edit role (name, description)
-│       │       └── role-permissions-dialog/ # RolePermissionsDialogComponent — permission matrix with CASL condition editors
-│       ├── services/       # RoleService (HTTP → /api/v1/roles; CRUD + assignRoleToUser/removeRoleFromUser)
-│       └── store/          # RolesStore (NgRx Signal Store, route-level: roles, allPermissions, loading/saving)
+│       │   ├── admin-panel/             # AdminPanelComponent — tabbed shell (Users / Roles / Resources)
+│       │   ├── roles/
+│       │   │   ├── role-list/           # RoleListComponent — data table with create/edit/delete actions
+│       │   │   ├── role-form-dialog/    # RoleFormDialogComponent — create and edit role (name, description)
+│       │   │   └── role-permissions-dialog/ # RolePermissionsDialogComponent — permission matrix with CASL condition editors
+│       │   └── resources/
+│       │       ├── resource-list/       # ResourceListComponent — two-section page (Resources + Actions tables)
+│       │       ├── resource-form-dialog/ # ResourceFormDialogComponent — edit resource displayName/description
+│       │       └── action-form-dialog/  # ActionFormDialogComponent — create/edit action with name pattern validation
+│       ├── services/       # RoleService (HTTP → /api/v1/roles), RbacAdminService (HTTP → /api/v1/rbac/*)
+│       └── store/          # RolesStore (route-level), ResourcesStore (route-level: resources, actions, loading)
 └── shared/
     ├── components/
     │   ├── confirm-dialog/ # Confirmation dialog
@@ -74,7 +78,8 @@ src/app/
 | `/users/:id/edit` | UserEditComponent | authGuard |
 | `/admin` | AdminPanelComponent | permissionGuard('search', 'User') |
 | `/admin/users` | UserListComponent | (inherited from /admin) |
-| `/admin/roles` | RoleListComponent | (inherited from /admin) |
+| `/admin/roles` | RoleListComponent | permissionGuard('read', 'Role') |
+| `/admin/resources` | ResourceListComponent | permissionGuard('read', 'Permission') |
 | `/verify-email` | VerifyEmailComponent | - |
 | `/forgot-password` | ForgotPasswordComponent | guestGuard |
 | `/reset-password` | ResetPasswordComponent | guestGuard |
@@ -150,7 +155,7 @@ npm test
   - `mock-data.ts` — `MockUser` type, `defaultUser`, factory re-exports (`createMockUser`, `createOAuthAccount`)
   - `helpers.ts` — `loginViaUi()`, `expectAuthRedirect()`, `expectForbiddenRedirect()`
 - Test structure: organized by module in `e2e/auth/` and `e2e/users/`
-- Coverage: 113 tests (55 auth + 58 users) covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search. User list and search tests updated to work with server-side paginated responses from mock-server
+- Coverage: 113 tests (55 auth + 58 users) — unit test suite: 324 tests passing covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search. User list and search tests updated to work with server-side paginated responses from mock-server
 - Workers: 4 (fully parallel, per-worker mock-server instances on dynamic ports)
 
 ```bash

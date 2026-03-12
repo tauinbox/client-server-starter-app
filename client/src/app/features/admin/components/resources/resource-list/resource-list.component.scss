@@ -1,0 +1,30 @@
+.loading-container {
+  display: flex;
+  justify-content: center;
+  padding: 32px;
+}
+
+.section-card {
+  margin-bottom: 24px;
+}
+
+mat-card-header {
+  display: flex;
+  align-items: center;
+
+  .spacer {
+    flex: 1;
+  }
+}
+
+.resources-table,
+.actions-table {
+  width: 100%;
+}
+
+code {
+  padding: 2px 6px;
+  font-family: monospace;
+  background: rgb(0 0 0 / 4%);
+  border-radius: 4px;
+}

@@ -2,6 +2,7 @@ import type { Routes } from '@angular/router';
 import { permissionGuard } from '@features/auth/guards/permission.guard';
 import { UsersStore } from '@features/users/store/users.store';
 import { RolesStore } from './store/roles.store';
+import { ResourcesStore } from './store/resources.store';
 
 export const adminRoutes: Routes = [
   {
@@ -11,7 +12,7 @@ export const adminRoutes: Routes = [
         (c) => c.AdminPanelComponent
       ),
     canActivate: [permissionGuard('search', 'User')],
-    providers: [UsersStore, RolesStore],
+    providers: [UsersStore, RolesStore, ResourcesStore],
     children: [
       {
         path: '',
@@ -54,6 +55,14 @@ export const adminRoutes: Routes = [
             (c) => c.RoleListComponent
           ),
         canActivate: [permissionGuard('read', 'Role')]
+      },
+      {
+        path: 'resources',
+        loadComponent: () =>
+          import('./components/resources/resource-list/resource-list.component').then(
+            (c) => c.ResourceListComponent
+          ),
+        canActivate: [permissionGuard('read', 'Permission')]
       }
     ]
   }

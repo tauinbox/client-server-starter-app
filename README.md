@@ -34,7 +34,8 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - **Audit logging** — security-sensitive operations recorded to `audit_logs` table (login, registration, password changes, user/role management, OAuth events); nightly cleanup removes entries older than `AUDIT_LOG_RETENTION_DAYS` days (default 90)
 
 ### Admin Panel
-- **Role management** — tabbed `/admin` shell (`AdminPanelComponent`) with "Users" and "Roles" tabs. Role list with create/edit/delete dialogs; `RolePermissionsDialogComponent` assigns permissions to roles with optional CASL conditions (ownership, fieldMatch, userAttr, custom)
+- **Role management** — tabbed `/admin` shell (`AdminPanelComponent`) with "Users", "Roles", and "Resources" tabs. Role list with create/edit/delete dialogs; `RolePermissionsDialogComponent` assigns permissions to roles with optional CASL conditions (ownership, fieldMatch, userAttr, custom)
+- **Resource/Action management** — "Manage Resources" tab at `/admin/resources` (requires `read:Permission`). Resources table allows editing display name and description; Actions table supports create, edit, and delete of non-default actions. Each mutation refreshes `RbacMetadataStore` automatically
 - **CASL condition editors** — all four condition types supported in the permissions dialog: `ownership` checkbox, `fieldMatch` / `userAttr` JSON editors, and a `custom` raw MongoQuery textarea with blur-time JSON validation
 - **Prototype-pollution-safe `custom` conditions** — `CaslAbilityFactory` uses `Object.entries()` loop instead of `Object.assign` when merging user-supplied JSON into the CASL query object
 
@@ -82,7 +83,7 @@ fullstack-starter-app/
 │   │   ├── features/
 │   │   │   ├── auth/       # Login, register, profile, verify-email, forgot/reset-password, guards, JWT interceptor
 │   │   │   ├── users/      # User list (with inline filters), detail, edit
-│   │   │   └── admin/      # Admin panel shell, role list/form/permissions dialogs, RolesStore
+│   │   │   └── admin/      # Admin panel shell, role/resource management dialogs, RolesStore, ResourcesStore
 │   │   └── shared/         # Shared components (confirm dialog)
 │   ├── src/styles/         # SCSS architecture (themes, utilities, components)
 │   └── e2e/                # Playwright E2E tests (uses mock-server)
@@ -417,7 +418,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 |------|------|-------|--------|
 | Server unit tests | Jest | `*.spec.ts` alongside source | 236 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | Configured |
-| Client unit tests | Vitest | `*.spec.ts` alongside source | 271 tests passing |
+| Client unit tests | Vitest | `*.spec.ts` alongside source | 324 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 101 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
 

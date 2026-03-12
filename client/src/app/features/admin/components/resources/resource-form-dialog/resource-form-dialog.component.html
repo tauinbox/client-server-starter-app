@@ -1,0 +1,45 @@
+<h2 mat-dialog-title>Edit Resource</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Display Name</mat-label>
+      <input
+        matInput
+        formControlName="displayName"
+        placeholder="Display name"
+      />
+      <mat-hint>Internal name: {{ data.resource.name }}</mat-hint>
+      <mat-error>
+        @if (form.get('displayName')?.errors?.['required']) {
+          Display name is required
+        } @else if (form.get('displayName')?.errors?.['maxlength']) {
+          Display name must be at most 100 characters
+        }
+      </mat-error>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Description</mat-label>
+      <textarea
+        matInput
+        formControlName="description"
+        placeholder="Optional description"
+        rows="3"
+      ></textarea>
+    </mat-form-field>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="cancel()">Cancel</button>
+  <button
+    mat-raised-button
+    color="primary"
+    type="button"
+    [disabled]="form.invalid || !form.dirty"
+    (click)="submit()"
+  >
+    Save Changes
+  </button>
+</mat-dialog-actions>
