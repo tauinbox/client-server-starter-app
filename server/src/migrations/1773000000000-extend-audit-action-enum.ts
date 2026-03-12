@@ -19,7 +19,7 @@ export class ExtendAuditActionEnum1773000000000 implements MigrationInterface {
     );
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(_queryRunner: QueryRunner): Promise<void> {
     // PostgreSQL does not support removing enum values — manual cleanup required if needed
   }
 }
