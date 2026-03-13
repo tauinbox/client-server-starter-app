@@ -33,22 +33,19 @@ import {
   MatRowDef,
   MatTable
 } from '@angular/material/table';
-import type { RoleResponse } from '@app/shared/types/role.types';
+import type { ActionResponse } from '@app/shared/types/rbac.types';
 import { AuthStore } from '@features/auth/store/auth.store';
-import { AuthService } from '@features/auth/services/auth.service';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { rem } from '@shared/utils/css.utils';
-import { RolesStore } from '../../../store/roles.store';
+import { ResourcesStore } from '../../../store/resources.store';
 import type {
-  RoleFormDialogData,
-  RoleFormDialogResult
-} from '../role-form-dialog/role-form-dialog.component';
-import { RoleFormDialogComponent } from '../role-form-dialog/role-form-dialog.component';
-import type { RolePermissionsDialogData } from '../role-permissions-dialog/role-permissions-dialog.component';
-import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-permissions-dialog.component';
+  ActionFormDialogData,
+  ActionFormDialogResult
+} from '../action-form-dialog/action-form-dialog.component';
+import { ActionFormDialogComponent } from '../action-form-dialog/action-form-dialog.component';
 
 @Component({
-  selector: 'app-role-list',
+  selector: 'app-action-list',
   imports: [
     DatePipe,
     MatCard,
@@ -72,63 +69,63 @@ import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-
     MatRowDef,
     MatCell
   ],
-  templateUrl: './role-list.component.html',
-  styleUrl: './role-list.component.scss',
+  templateUrl: './action-list.component.html',
+  styleUrl: './action-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class RoleListComponent implements OnInit {
-  readonly #rolesStore = inject(RolesStore);
+export class ActionListComponent implements OnInit {
+  readonly #resourcesStore = inject(ResourcesStore);
   readonly #dialog = inject(MatDialog);
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
-  readonly #authService = inject(AuthService);
   protected readonly authStore = inject(AuthStore);
 
-  readonly loading = this.#rolesStore.loading;
-  readonly roles = this.#rolesStore.entities;
+  readonly loading = this.#resourcesStore.loading;
+  readonly actions = this.#resourcesStore.actions;
 
-  readonly displayedColumns = [
+  readonly actionColumns = [
+    'displayName',
     'name',
     'description',
-    'type',
+    'default',
     'createdAt',
     'actions'
   ];
 
-  readonly canCreate = computed(() =>
-    this.authStore.hasPermissions({ action: 'create', subject: 'Role' })
-  );
   readonly canUpdate = computed(() =>
-    this.authStore.hasPermissions({ action: 'update', subject: 'Role' })
+    this.authStore.hasPermissions({ action: 'update', subject: 'Permission' })
+  );
+  readonly canCreate = computed(() =>
+    this.authStore.hasPermissions({ action: 'create', subject: 'Permission' })
   );
   readonly canDelete = computed(() =>
-    this.authStore.hasPermissions({ action: 'delete', subject: 'Role' })
+    this.authStore.hasPermissions({ action: 'delete', subject: 'Permission' })
   );
 
   ngOnInit(): void {
-    this.#rolesStore.load();
+    this.#resourcesStore.load();
   }
 
-  openCreateDialog(): void {
-    const data: RoleFormDialogData = {};
+  openAddAction(): void {
+    const data: ActionFormDialogData = {};
     this.#dialog
-      .open(RoleFormDialogComponent, { width: rem(480), data })
+      .open(ActionFormDialogComponent, { width: rem(480), data })
       .afterClosed()
       .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe((result: RoleFormDialogResult | undefined) => {
+      .subscribe((result: ActionFormDialogResult | undefined) => {
         if (result) {
-          this.#rolesStore
-            .createRole(result)
+          this.#resourcesStore
+            .createAction(result)
             .pipe(takeUntilDestroyed(this.#destroyRef))
             .subscribe({
               next: () => {
-                this.#snackBar.open('Role created successfully', 'Close', {
+                this.#snackBar.open('Action created successfully', 'Close', {
                   duration: 5000
                 });
               },
-              error: (err) => {
+              error: (err: { error?: { message?: string } }) => {
                 this.#snackBar.open(
-                  (err.error?.message as string) || 'Failed to create role.',
+                  err.error?.message ?? 'Failed to create action.',
                   'Close',
                   { duration: 5000 }
                 );
@@ -138,26 +135,26 @@ export class RoleListComponent implements OnInit {
       });
   }
 
-  openEditDialog(role: RoleResponse): void {
-    const data: RoleFormDialogData = { role };
+  openEditAction(action: ActionResponse): void {
+    const data: ActionFormDialogData = { action };
     this.#dialog
-      .open(RoleFormDialogComponent, { width: rem(480), data })
+      .open(ActionFormDialogComponent, { width: rem(480), data })
       .afterClosed()
       .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe((result: RoleFormDialogResult | undefined) => {
+      .subscribe((result: ActionFormDialogResult | undefined) => {
         if (result) {
-          this.#rolesStore
-            .updateRole(role.id, result)
+          this.#resourcesStore
+            .updateAction(action.id, result)
             .pipe(takeUntilDestroyed(this.#destroyRef))
             .subscribe({
               next: () => {
-                this.#snackBar.open('Role updated successfully', 'Close', {
+                this.#snackBar.open('Action updated successfully', 'Close', {
                   duration: 5000
                 });
               },
-              error: (err) => {
+              error: (err: { error?: { message?: string } }) => {
                 this.#snackBar.open(
-                  (err.error?.message as string) || 'Failed to update role.',
+                  err.error?.message ?? 'Failed to update action.',
                   'Close',
                   { duration: 5000 }
                 );
@@ -167,52 +164,34 @@ export class RoleListComponent implements OnInit {
       });
   }
 
-  openPermissionsDialog(role: RoleResponse): void {
-    const data: RolePermissionsDialogData = {
-      role,
-      readonly: !this.canUpdate()
-    };
-    this.#dialog
-      .open(RolePermissionsDialogComponent, { width: rem(560), data })
-      .afterClosed()
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe((changed: boolean | undefined) => {
-        if (changed) {
-          this.#snackBar.open('Permissions updated successfully', 'Close', {
-            duration: 5000
-          });
-          void this.#authService.fetchPermissions();
-        }
-      });
-  }
-
-  confirmDelete(role: RoleResponse): void {
+  confirmDeleteAction(action: ActionResponse): void {
     this.#dialog
       .open(ConfirmDialogComponent, {
         width: rem(350),
         data: {
-          title: 'Delete Role',
-          message: `Are you sure you want to delete the role "${role.name}"?`,
+          title: 'Delete Action',
+          message: `Are you sure you want to delete the action "${action.displayName}"?`,
           confirmButton: 'Delete',
-          cancelButton: 'Cancel'
+          cancelButton: 'Cancel',
+          icon: 'warning'
         }
       })
       .afterClosed()
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((confirmed: boolean | undefined) => {
         if (confirmed) {
-          this.#rolesStore
-            .deleteRole(role.id)
+          this.#resourcesStore
+            .deleteAction(action.id)
             .pipe(takeUntilDestroyed(this.#destroyRef))
             .subscribe({
               next: () => {
-                this.#snackBar.open('Role deleted successfully', 'Close', {
+                this.#snackBar.open('Action deleted successfully', 'Close', {
                   duration: 5000
                 });
               },
-              error: (err) => {
+              error: (err: { error?: { message?: string } }) => {
                 this.#snackBar.open(
-                  (err.error?.message as string) || 'Failed to delete role.',
+                  err.error?.message ?? 'Failed to delete action.',
                   'Close',
                   { duration: 5000 }
                 );

@@ -487,7 +487,20 @@ describe('UsersService', () => {
       });
     });
 
-    it('should return lockedUntil when threshold is reached', async () => {
+    it('should pass entity property names (camelCase) to returning()', async () => {
+      await service.incrementFailedAttemptsAndLockIfNeeded('user-1', 5, 900000);
+
+      // TypeORM resolves property paths to DB column names internally.
+      // Passing quoted SQL names ('"failed_login_attempts"') causes
+      // findColumnsWithPropertyPath to find nothing → RETURNING clause is
+      // silently dropped → raw = [] → TypeError at runtime.
+      expect(mockUpdateQb.returning).toHaveBeenCalledWith([
+        'failedLoginAttempts',
+        'lockedUntil'
+      ]);
+    });
+
+    it('should return lockedUntil as Date when threshold is reached', async () => {
       const lockedDate = new Date(Date.now() + 900000).toISOString();
       mockUpdateQb.execute.mockResolvedValue({
         raw: [{ failed_login_attempts: 5, locked_until: lockedDate }]
@@ -501,6 +514,16 @@ describe('UsersService', () => {
 
       expect(result.failedLoginAttempts).toBe(5);
       expect(result.lockedUntil).toBeInstanceOf(Date);
+    });
+
+    it('should throw a descriptive error when UPDATE returns no rows', async () => {
+      mockUpdateQb.execute.mockResolvedValue({ raw: [] });
+
+      await expect(
+        service.incrementFailedAttemptsAndLockIfNeeded('missing-id', 5, 900000)
+      ).rejects.toThrow(
+        'incrementFailedAttemptsAndLockIfNeeded: user missing-id not found or UPDATE returned no rows'
+      );
     });
   });
 

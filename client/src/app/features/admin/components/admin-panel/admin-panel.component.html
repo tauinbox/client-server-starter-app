@@ -37,6 +37,19 @@
         Manage Resources
       </a>
     </ng-container>
+    <ng-container
+      *appRequirePermissions="{ action: 'read', subject: 'Permission' }"
+    >
+      <a
+        mat-tab-link
+        [routerLink]="routes.Actions"
+        routerLinkActive
+        #actionsActive="routerLinkActive"
+        [active]="actionsActive.isActive"
+      >
+        Manage Actions
+      </a>
+    </ng-container>
   </nav>
 
   <mat-tab-nav-panel #tabPanel>

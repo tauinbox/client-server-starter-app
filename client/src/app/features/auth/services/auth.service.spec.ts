@@ -148,6 +148,9 @@ describe('AuthService', () => {
       expect(req.request.body).toEqual(credentials);
       req.flush(mockAuth);
 
+      // login() now awaits fetchPermissions() before emitting — flush it
+      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
+
       const result = await loginPromise;
 
       expect(result).toEqual(mockAuth);

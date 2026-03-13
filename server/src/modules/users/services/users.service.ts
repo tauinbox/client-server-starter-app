@@ -145,7 +145,7 @@ export class UsersService {
           `ELSE "locked_until" END`
       })
       .where('id = :userId', { userId })
-      .returning(['"failed_login_attempts"', '"locked_until"'])
+      .returning(['failedLoginAttempts', 'lockedUntil'])
       .execute();
 
     const raw = (
@@ -154,6 +154,13 @@ export class UsersService {
         locked_until: string | null;
       }[]
     )[0];
+
+    if (!raw) {
+      throw new Error(
+        `incrementFailedAttemptsAndLockIfNeeded: user ${userId} not found or UPDATE returned no rows`
+      );
+    }
+
     return {
       failedLoginAttempts: raw.failed_login_attempts,
       lockedUntil: raw.locked_until ? new Date(raw.locked_until) : null

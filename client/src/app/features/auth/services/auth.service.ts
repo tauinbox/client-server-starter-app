@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import { finalize, firstValueFrom, tap } from 'rxjs';
+import { finalize, firstValueFrom, from, switchMap, tap } from 'rxjs';
 import { Router } from '@angular/router';
 import type { User } from '@shared/models/user.types';
 import type { UserPermissionsResponse } from '@app/shared/types';
@@ -41,11 +41,13 @@ export class AuthService {
         context: silentContext()
       })
       .pipe(
-        tap((response) => {
+        switchMap((response) => {
           this.#authStore.saveAuthResponse(response);
           this.scheduleTokenRefresh();
-          void this.fetchPermissions();
           void this.fetchRbacMetadata();
+          return from(this.fetchPermissions()).pipe(
+            switchMap(() => [response])
+          );
         })
       );
   }

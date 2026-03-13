@@ -74,7 +74,10 @@ function makeRolePermItem(permissionId: string): RolePermissionItem {
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
-function setup(rolePermItems: RolePermissionItem[]) {
+function setup(
+  rolePermItems: RolePermissionItem[],
+  options: { readonly?: boolean } = {}
+) {
   const roleServiceMock = {
     getAllPermissions: vi
       .fn()
@@ -85,11 +88,16 @@ function setup(rolePermItems: RolePermissionItem[]) {
   const dialogRefMock = { close: vi.fn() };
   const snackBarMock = { open: vi.fn() };
 
+  const dialogData =
+    options.readonly !== undefined
+      ? { role: mockRole, readonly: options.readonly }
+      : { role: mockRole };
+
   TestBed.configureTestingModule({
     imports: [RolePermissionsDialogComponent],
     providers: [
       provideNoopAnimations(),
-      { provide: MAT_DIALOG_DATA, useValue: { role: mockRole } },
+      { provide: MAT_DIALOG_DATA, useValue: dialogData },
       { provide: MatDialogRef, useValue: dialogRefMock },
       { provide: RoleService, useValue: roleServiceMock },
       { provide: MatSnackBar, useValue: snackBarMock }
@@ -266,6 +274,91 @@ describe('RolePermissionsDialogComponent', () => {
       component.togglePermission('perm-b');
 
       expect(component.canSave()).toBe(true);
+    });
+  });
+
+  describe('readonly mode', () => {
+    it('isReadonly() is false by default when readonly is not provided', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      // @ts-expect-error accessing protected signal for assertion
+      expect(component.isReadonly()).toBe(false);
+    });
+
+    it('isReadonly() is true when readonly: true is passed in data', () => {
+      const { component } = setup([makeRolePermItem('perm-a')], {
+        readonly: true
+      });
+
+      // @ts-expect-error accessing protected signal for assertion
+      expect(component.isReadonly()).toBe(true);
+    });
+
+    it('canSave() is false even when dirty if readonly: true', () => {
+      const { component } = setup([makeRolePermItem('perm-a')], {
+        readonly: true
+      });
+
+      // Attempt to make dirty — togglePermission respects isSystem, not isReadonly
+      component.togglePermission('perm-b');
+
+      expect(component.canSave()).toBe(false);
+    });
+
+    it('save() does NOT call roleService.setPermissions when readonly: true', () => {
+      const { component, roleServiceMock } = setup(
+        [makeRolePermItem('perm-a')],
+        { readonly: true }
+      );
+
+      component.togglePermission('perm-b');
+      component.save();
+
+      expect(roleServiceMock.setPermissions).not.toHaveBeenCalled();
+    });
+
+    it('save button is absent from DOM when readonly: true', () => {
+      const { fixture } = setup([makeRolePermItem('perm-a')], {
+        readonly: true
+      });
+
+      const saveButton = fixture.nativeElement.querySelector(
+        'button[color="primary"]'
+      );
+      expect(saveButton).toBeNull();
+    });
+
+    it('readonly notice is present in DOM when readonly: true', () => {
+      const { fixture } = setup([makeRolePermItem('perm-a')], {
+        readonly: true
+      });
+
+      const content: string = fixture.nativeElement.textContent ?? '';
+      expect(content).toContain('You have read-only access');
+    });
+
+    it('readonly notice is absent when readonly: false', () => {
+      const { fixture } = setup([makeRolePermItem('perm-a')], {
+        readonly: false
+      });
+
+      const content: string = fixture.nativeElement.textContent ?? '';
+      expect(content).not.toContain('You have read-only access');
+    });
+
+    it('component.isReadonly() is true and checkboxes carry disabled attribute when readonly: true', () => {
+      const { component, fixture } = setup([makeRolePermItem('perm-a')], {
+        readonly: true
+      });
+
+      // @ts-expect-error accessing protected signal for assertion
+      expect(component.isReadonly()).toBe(true);
+
+      // At least one mat-checkbox input should be disabled
+      const checkboxInputs: NodeListOf<HTMLInputElement> =
+        fixture.nativeElement.querySelectorAll('mat-checkbox input');
+      const anyDisabled = Array.from(checkboxInputs).some((el) => el.disabled);
+      expect(anyDisabled).toBe(true);
     });
   });
 });

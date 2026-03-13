@@ -19,6 +19,9 @@
     @if (role.isSystem) {
       <p class="system-notice">System role permissions are read-only.</p>
     }
+    @if (isReadonly() && !role.isSystem) {
+      <p class="system-notice">You have read-only access to this role's permissions.</p>
+    }
 
     <!-- ── Permission Matrix ── -->
     @for (group of permissionGroups(); track group.resource) {
@@ -27,7 +30,7 @@
           <mat-checkbox
             [checked]="isGroupAllChecked(group)"
             [indeterminate]="isGroupIndeterminate(group)"
-            [disabled]="role.isSystem"
+            [disabled]="role.isSystem || isReadonly()"
             (change)="toggleGroup(group)"
           >
             <span class="resource-label">{{ group.resource }}</span>
@@ -38,7 +41,7 @@
             <div class="permission-entry">
               <mat-checkbox
                 [checked]="isChecked(permission.id)"
-                [disabled]="role.isSystem"
+                [disabled]="role.isSystem || isReadonly()"
                 (change)="togglePermission(permission.id)"
               >
                 {{ permission.action.name }}
@@ -106,7 +109,7 @@
                 <div class="condition-block">
                   <mat-checkbox
                     [checked]="hasOwnership(permission.id)"
-                    [disabled]="role.isSystem"
+                    [disabled]="role.isSystem || isReadonly()"
                     (change)="toggleOwnership(permission.id)"
                   >
                     <span class="condition-label">Ownership</span>
@@ -140,7 +143,7 @@
                 <div class="condition-block">
                   <mat-checkbox
                     [checked]="hasFieldMatch(permission.id)"
-                    [disabled]="role.isSystem"
+                    [disabled]="role.isSystem || isReadonly()"
                     (change)="toggleFieldMatch(permission.id)"
                   >
                     <span class="condition-label">Field match</span>
@@ -184,7 +187,7 @@
                 <div class="condition-block">
                   <mat-checkbox
                     [checked]="hasUserAttr(permission.id)"
-                    [disabled]="role.isSystem"
+                    [disabled]="role.isSystem || isReadonly()"
                     (change)="toggleUserAttr(permission.id)"
                   >
                     <span class="condition-label">User attribute</span>
@@ -229,7 +232,7 @@
                 <div class="condition-block">
                   <mat-checkbox
                     [checked]="hasCustom(permission.id)"
-                    [disabled]="role.isSystem"
+                    [disabled]="role.isSystem || isReadonly()"
                     (change)="toggleCustom(permission.id)"
                   >
                     <span class="condition-label">Custom</span>
@@ -277,7 +280,7 @@
 
 <mat-dialog-actions align="end">
   <button mat-button type="button" (click)="cancel()">Cancel</button>
-  @if (!role.isSystem) {
+  @if (!role.isSystem && !isReadonly()) {
     <button
       mat-raised-button
       color="primary"
