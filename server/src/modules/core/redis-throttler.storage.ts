@@ -13,6 +13,10 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
     this.redis.disconnect();
   }
 
+  async decrement(key: string): Promise<void> {
+    await this.redis.zpopmax(key, 1);
+  }
+
   async increment(
     key: string,
     ttl: number,

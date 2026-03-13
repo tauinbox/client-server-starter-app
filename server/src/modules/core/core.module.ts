@@ -13,7 +13,8 @@ import { postgresConfig } from '../../postgres.config';
 import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { LoginThrottlerGuard } from './login-throttler.guard';
 import {
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS
@@ -149,7 +150,7 @@ export class CoreModule implements NestModule {
         },
         {
           provide: APP_GUARD,
-          useClass: ThrottlerGuard
+          useClass: LoginThrottlerGuard
         }
       ]
     };

@@ -1,8 +1,11 @@
+import { inject } from '@angular/core';
 import type { Routes } from '@angular/router';
 import { permissionGuard } from '@features/auth/guards/permission.guard';
+import { adminPanelGuard } from './guards/admin-panel.guard';
 import { UsersStore } from '@features/users/store/users.store';
 import { RolesStore } from './store/roles.store';
 import { ResourcesStore } from './store/resources.store';
+import { AuthStore } from '@features/auth/store/auth.store';
 
 export const adminRoutes: Routes = [
   {
@@ -11,13 +14,20 @@ export const adminRoutes: Routes = [
       import('./components/admin-panel/admin-panel.component').then(
         (c) => c.AdminPanelComponent
       ),
-    canActivate: [permissionGuard('search', 'User')],
+    canActivate: [adminPanelGuard],
     providers: [UsersStore, RolesStore, ResourcesStore],
     children: [
       {
         path: '',
-        redirectTo: 'users',
-        pathMatch: 'full'
+        pathMatch: 'full',
+        redirectTo: () => {
+          const authStore = inject(AuthStore);
+          if (authStore.hasPermissions({ action: 'search', subject: 'User' }))
+            return 'users';
+          if (authStore.hasPermissions({ action: 'read', subject: 'Role' }))
+            return 'roles';
+          return 'resources';
+        }
       },
       {
         path: 'users',
@@ -61,6 +71,14 @@ export const adminRoutes: Routes = [
         loadComponent: () =>
           import('./components/resources/resource-list/resource-list.component').then(
             (c) => c.ResourceListComponent
+          ),
+        canActivate: [permissionGuard('read', 'Permission')]
+      },
+      {
+        path: 'actions',
+        loadComponent: () =>
+          import('./components/resources/action-list/action-list.component').then(
+            (c) => c.ActionListComponent
           ),
         canActivate: [permissionGuard('read', 'Permission')]
       }

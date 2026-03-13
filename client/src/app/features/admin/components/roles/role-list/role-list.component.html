@@ -57,15 +57,17 @@
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef>Actions</th>
           <td mat-cell *matCellDef="let role">
-            <button
-              mat-icon-button
-              color="primary"
-              (click)="openPermissionsDialog(role)"
-              matTooltip="Manage Permissions"
-              [attr.aria-label]="'Manage permissions for ' + role.name"
-            >
-              <mat-icon>security</mat-icon>
-            </button>
+            @if (!role.isSuper) {
+              <button
+                mat-icon-button
+                color="primary"
+                (click)="openPermissionsDialog(role)"
+                matTooltip="Manage Permissions"
+                [attr.aria-label]="'Manage permissions for ' + role.name"
+              >
+                <mat-icon>security</mat-icon>
+              </button>
+            }
             @if (canUpdate() && !role.isSystem) {
               <button
                 mat-icon-button

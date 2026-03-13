@@ -34,6 +34,7 @@ import { RoleService } from '../../../services/role.service';
 
 export type RolePermissionsDialogData = {
   role: RoleResponse;
+  readonly?: boolean;
 };
 
 export type PermissionGroup = {
@@ -67,6 +68,7 @@ export class RolePermissionsDialogComponent implements OnInit {
 
   protected readonly data = inject<RolePermissionsDialogData>(MAT_DIALOG_DATA);
   protected readonly role = this.data.role;
+  protected readonly isReadonly = signal(this.data.readonly ?? false);
 
   readonly loading = signal(true);
   readonly saving = signal(false);
@@ -122,9 +124,13 @@ export class RolePermissionsDialogComponent implements OnInit {
     return false;
   });
 
-  /** Save is allowed only when there are changes and no JSON validation errors */
+  /** Save is allowed only when there are changes, no JSON errors and not readonly */
   readonly canSave = computed(
-    () => !this.saving() && this.isDirty() && this.jsonErrors().size === 0
+    () =>
+      !this.saving() &&
+      !this.isReadonly() &&
+      this.isDirty() &&
+      this.jsonErrors().size === 0
   );
 
   ngOnInit(): void {

@@ -234,7 +234,7 @@ docker-compose up -d
 
 Services:
 - **redis** — redis:7-alpine, used for distributed rate limiting and shared permission cache
-- **db** — postgres:16-alpine, persistent named volume
+- **db** — postgres:17-alpine, persistent named volume; port 5432 exposed to host for local development
 - **server** — NestJS API on port 3000; entrypoint runs migrations, optional admin seed, then starts the server
 - **client** — Angular SPA served by nginx on port 4200 (maps to container port 80); built with `--base-href /nexus/`
 
@@ -357,7 +357,7 @@ npm run release            # Bump versions, generate CHANGELOG.md, create git ta
 - **Lazy loading** via `loadComponent` on all routes
 - **NgRx Signal Store** for state management (`AuthStore` global, `UsersStore` route-level)
 - **HTTP interceptors**: JWT (auto-attach token, handle 401 refresh) and error (snackbar notifications)
-- **Guards**: `authGuard` (checks authentication + token refresh), `permissionGuard(action, subject)` (typed CASL check for route-level access), `guestGuard` (redirects authenticated users); `PermissionsGuard` checks RBAC permissions on server
+- **Guards**: `authGuard` (checks authentication + token refresh), `permissionGuard(action, subject)` (typed CASL check for route-level access), `adminPanelGuard` (OR check: search/User OR read/Role OR read/Permission), `guestGuard` (redirects authenticated users); `PermissionsGuard` checks RBAC permissions on server
 - **Path aliases**: `@core/*`, `@features/*`, `@shared/*`
 
 ### Server
@@ -416,9 +416,9 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 236 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 275 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | Configured |
-| Client unit tests | Vitest | `*.spec.ts` alongside source | 336 tests passing |
+| Client unit tests | Vitest | `*.spec.ts` alongside source | 351 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 101 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
 
