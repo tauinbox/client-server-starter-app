@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.11](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.10...v0.1.11) (2026-03-13)
+
+
+### Features
+
+* **client:** add Manage Resources admin tab for RBAC resource/action management ([#85](https://github.com/tauinbox/client-server-starter-app/issues/85)) ([131682d](https://github.com/tauinbox/client-server-starter-app/commit/131682d7b947e33408862ac43c7048a1234e8e38))
+* **client:** add role assignment to user edit form ([12c97ec](https://github.com/tauinbox/client-server-starter-app/commit/12c97ecbca3e60017863996fa31da7a38c8d9eda))
+* **client:** extend permission directive to support arrays, rename to RequirePermissionsDirective ([5bca737](https://github.com/tauinbox/client-server-starter-app/commit/5bca737d698937c81d381feb49ba6ca2689fbfc7))
+* implement dynamic RBAC with auto-discovered resources, editable actions, and isSuper role flag ([930c3dc](https://github.com/tauinbox/client-server-starter-app/commit/930c3dcce63723e94844bc9ff0195b5bf9df9f42))
+* **rbac:** add allowed actions per resource with UI selector ([#88](https://github.com/tauinbox/client-server-starter-app/issues/88)) ([610ad41](https://github.com/tauinbox/client-server-starter-app/commit/610ad41cfd3841b46aed799b5b443a346525a79c))
+* **security:** require auth on GET /rbac/metadata and add Redis cache ([#84](https://github.com/tauinbox/client-server-starter-app/issues/84)) ([4211701](https://github.com/tauinbox/client-server-starter-app/commit/4211701e320f86cb899bf12d8eaee50f3d3ea2e7))
+* **server:** add check:enums script to validate PostgreSQL enum coverage ([#87](https://github.com/tauinbox/client-server-starter-app/issues/87)) ([779b7d9](https://github.com/tauinbox/client-server-starter-app/commit/779b7d982713b79cfc8c6dc1c47b66b0d490142d))
+* **server:** replace in-memory throttler and cache with Redis-backed stores ([2e69d62](https://github.com/tauinbox/client-server-starter-app/commit/2e69d6222d8ca064addd6a70f547e1f6fa6789cd))
+
+
+### Bug Fixes
+
+* add isAdmin to authStoreMock in user-detail spec ([b49bd5b](https://github.com/tauinbox/client-server-starter-app/commit/b49bd5b4fda08504b4ac773d8b993368b8a83e86))
+* **admin:** resolve RBAC permission UX issues and login race condition ([#89](https://github.com/tauinbox/client-server-starter-app/issues/89)) ([507b994](https://github.com/tauinbox/client-server-starter-app/commit/507b994160a3d476ab82c0864267055701d74955))
+* **client:** add vitest/globals to root tsconfig for IDE type resolution ([f25ccc6](https://github.com/tauinbox/client-server-starter-app/commit/f25ccc6a322e05e431f28c098a4fc22eb2da1b35))
+* **client:** compute isAdmin from viewed user roles in user-detail component ([4e79a20](https://github.com/tauinbox/client-server-starter-app/commit/4e79a20297be2743ee9aaae76109910355275815))
+* **client:** fix prettier formatting on submit button in user-edit template ([8de66eb](https://github.com/tauinbox/client-server-starter-app/commit/8de66eb10a1d4c5944046a8efe8e3606a8f9269f))
+* fix roles type bug ([f8d8dd5](https://github.com/tauinbox/client-server-starter-app/commit/f8d8dd566959ed86219c01b6976023dc5bacce82))
+* **infra:** revert postgres to 16-alpine and remove exposed port ([b46360d](https://github.com/tauinbox/client-server-starter-app/commit/b46360da33d28d7abfa4b1b660e13e94535c6cbb))
+* make canSubmit reactive to form dirty state via toSignal ([0bbb842](https://github.com/tauinbox/client-server-starter-app/commit/0bbb842affb28751fc60081ca1c67760bc95d720))
+* minor naming changes ([fc086ab](https://github.com/tauinbox/client-server-starter-app/commit/fc086abbe1907e69cfabb3d3d04385166d3e922d))
+* remove disabled binding from Save button, guard remains in onSubmit ([8021022](https://github.com/tauinbox/client-server-starter-app/commit/80210225be4053075e2e4fac137417f965bc55ee))
+* **server:** extend audit_logs_action_enum with missing RBAC action values ([#86](https://github.com/tauinbox/client-server-starter-app/issues/86)) ([82ec499](https://github.com/tauinbox/client-server-starter-app/commit/82ec499c3c7636161dddd84dc582ee83ae611927))
+* update test mocks and mock-server to use RoleResponse objects ([bb96874](https://github.com/tauinbox/client-server-starter-app/commit/bb968740fc452952dc624daf97533daf8f3f8f52))
+
 ## [0.1.10](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.9...v0.1.10) (2026-03-08)
 
 
