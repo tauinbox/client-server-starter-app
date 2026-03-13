@@ -20,7 +20,9 @@
       <p class="system-notice">System role permissions are read-only.</p>
     }
     @if (isReadonly() && !role.isSystem) {
-      <p class="system-notice">You have read-only access to this role's permissions.</p>
+      <p class="system-notice">
+        You have read-only access to this role's permissions.
+      </p>
     }
 
     <!-- ── Permission Matrix ── -->
