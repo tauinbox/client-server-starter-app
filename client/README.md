@@ -76,7 +76,7 @@ src/app/
 | `/users` | UserListComponent | permissionGuard('search', 'User') |
 | `/users/:id` | UserDetailComponent | authGuard |
 | `/users/:id/edit` | UserEditComponent | authGuard |
-| `/admin` | AdminPanelComponent | permissionGuard('search', 'User') |
+| `/admin` | AdminPanelComponent | adminPanelGuard (search/User OR read/Role OR read/Permission) |
 | `/admin/users` | UserListComponent | (inherited from /admin) |
 | `/admin/roles` | RoleListComponent | permissionGuard('read', 'Role') |
 | `/admin/resources` | ResourceListComponent | permissionGuard('read', 'Permission') |
@@ -92,7 +92,7 @@ src/app/
 NgRx Signal Store (`@ngrx/signals`):
 
 - **AuthStore** (`providedIn: 'root'`) — pure state container. State: `accessToken` (in-memory signal only, never persisted), `user` (persisted to `localStorage` as `auth_user` key for page-reload detection), `ability: AppAbility | null`. Computed: `isAuthenticated` (access token present), `user`, `roles`, `isAdmin`. Methods: `hasPermissions(action, subject)`, `setRules(rules)`, `hasPersistedUser()`, `saveAuthResponse()`, `clearSession()`. No `HttpClient` dependency
-- **AuthService** (`providedIn: 'root'`) — HTTP operations (login/register/logout/refresh/profile/OAuth accounts/`fetchPermissions(): Promise<void>`/`fetchRbacMetadata(): Promise<void>`). `refreshTokens()` POSTs `{}` — the `refresh_token` HttpOnly cookie is sent automatically by the browser. `provideAppInitializer` awaits `Promise.all([fetchPermissions(), fetchRbacMetadata()])` for authenticated users, or attempts a cookie-refresh first when `hasPersistedUser()` is true (page reload with no in-memory token). `fetchRbacMetadata()` implements stale-while-revalidate: returns immediately if data is cached in `RbacMetadataStore`, refreshes in background
+- **AuthService** (`providedIn: 'root'`) — HTTP operations (login/register/logout/refresh/profile/OAuth accounts/`fetchPermissions(): Promise<void>`/`fetchRbacMetadata(): Promise<void>`). `login()` uses `switchMap` to await `fetchPermissions()` before emitting — ensures permissions are loaded before route guards evaluate. `refreshTokens()` POSTs `{}` — the `refresh_token` HttpOnly cookie is sent automatically by the browser. `provideAppInitializer` awaits `Promise.all([fetchPermissions(), fetchRbacMetadata()])` for authenticated users, or attempts a cookie-refresh first when `hasPersistedUser()` is true (page reload with no in-memory token). `fetchRbacMetadata()` implements stale-while-revalidate: returns immediately if data is cached in `RbacMetadataStore`, refreshes in background
 - **UsersStore** (route-level at `/users`) — entity-based store with `withEntities<User>()`. Unified state: `filters: UserSearch` (empty = all users, filled = search via `GET /users/search`), single `load()`/`loadMore()` pair with **infinite scroll** (page size 20; `upsertEntities` appends; `hasMore` computed signal drives sentinel visibility; `isLoadingMore` shows spinner). `setFilters()` and `setSorting()` update state; component calls `load()` after each change
 - **RbacMetadataStore** (`providedIn: 'root'`) — NgRx Signal Store with stale-while-revalidate localStorage caching for resources/actions metadata. Loaded at bootstrap via `AuthService.fetchRbacMetadata()` (only when authenticated). Computed: `subjectMap` (resource name to CASL subject)
 - **ThemeService** — `theme` signal (`'light'` | `'dark'`), system preference detection, persists to localStorage
@@ -155,7 +155,7 @@ npm test
   - `mock-data.ts` — `MockUser` type, `defaultUser`, factory re-exports (`createMockUser`, `createOAuthAccount`)
   - `helpers.ts` — `loginViaUi()`, `expectAuthRedirect()`, `expectForbiddenRedirect()`
 - Test structure: organized by module in `e2e/auth/` and `e2e/users/`
-- Coverage: 113 tests (55 auth + 58 users) — unit test suite: 324 tests passing covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search. User list and search tests updated to work with server-side paginated responses from mock-server
+- Coverage: 113 tests (55 auth + 58 users) — unit test suite: 351 tests passing covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search, admin roles/resources management. User list and search tests updated to work with server-side paginated responses from mock-server
 - Workers: 4 (fully parallel, per-worker mock-server instances on dynamic ports)
 
 ```bash
