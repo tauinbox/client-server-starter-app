@@ -10,18 +10,6 @@
       <mat-icon>expand_more</mat-icon>
     </button>
     <mat-menu #menu="matMenu">
-      <a mat-menu-item [routerLink]="'/' + routes.Profile">
-        <mat-icon>account_circle</mat-icon>
-        <span>Profile</span>
-      </a>
-
-      @if (canAccessAdmin()) {
-        <a mat-menu-item [routerLink]="'/' + routes.Admin">
-          <mat-icon>admin_panel_settings</mat-icon>
-          <span>Admin Panel</span>
-        </a>
-      }
-
       <button mat-menu-item (click)="logout()">
         <mat-icon>logout</mat-icon>
         <span>Logout</span>
