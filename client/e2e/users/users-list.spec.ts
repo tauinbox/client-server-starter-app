@@ -113,8 +113,16 @@ test.describe('User List page', () => {
     await expect(page.locator('table tbody tr').first()).toBeVisible();
     const initialCount = await page.locator('table tbody tr').count();
 
-    // Scroll to bottom to trigger next page load
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    // Scroll to bottom to trigger next page load.
+    // Content is inside mat-sidenav-content (overflow: auto) — body does not scroll.
+    await page.evaluate(() => {
+      const content = document.querySelector('mat-sidenav-content');
+      if (content) {
+        content.scrollTop = content.scrollHeight;
+      } else {
+        window.scrollTo(0, document.body.scrollHeight);
+      }
+    });
 
     // More rows should appear (seed data has 70 users, page size is 20)
     await expect(async () => {

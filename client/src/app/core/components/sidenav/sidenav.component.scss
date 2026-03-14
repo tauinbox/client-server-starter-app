@@ -1,0 +1,118 @@
+@use 'abstracts/variables' as vars;
+
+$nav-width-narrow: 4rem; // 64px
+$nav-width-wide: 13.75rem; // 220px
+
+// footer height = padding-top(0.5rem) + nav-link(3rem) = 3.5rem
+// toggle btn center on divider: bottom = 3.5rem - btn-half(0.75rem) = 2.75rem
+$footer-height: 3.5rem;
+$toggle-btn-size: 1.5rem;
+
+:host {
+  position: relative; // containing block for .toggle-btn
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.nav-container {
+  display: flex;
+  flex-direction: column;
+  width: $nav-width-narrow;
+  height: 100%;
+  overflow: hidden;
+  transition: width vars.$transition-medium ease;
+
+  &.wide {
+    width: $nav-width-wide;
+  }
+}
+
+.nav-items {
+  flex: 1;
+  padding: vars.$spacing-xs vars.$spacing-xxs;
+  overflow: hidden auto;
+}
+
+.nav-link {
+  position: relative; // required for matRipple
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 3rem; // 48px
+  margin-bottom: vars.$spacing-xxs;
+  overflow: hidden; // required for matRipple
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: vars.$border-radius-sm;
+
+  mat-icon {
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    background-color: var(--color-border);
+  }
+
+  &.active {
+    background-color: color-mix(in srgb, var(--color-primary) 20%, transparent);
+  }
+}
+
+// Wide mode: left-align content
+.nav-container.wide .nav-link {
+  gap: vars.$spacing-md;
+  justify-content: flex-start;
+  padding: 0 vars.$spacing-md;
+}
+
+.nav-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: vars.$spacing-xs;
+  border-top: 1px solid var(--color-divider);
+
+  .nav-link {
+    margin-bottom: 0;
+  }
+}
+
+.toggle-btn {
+  // Centered on the sidenav right edge: left = nav-width - half-button-size.
+  // position:absolute (not fixed) — mat-drawer-content animates margin-left which
+  // can create a stacking context and break fixed positioning.
+  position: absolute;
+  bottom: $footer-height - $toggle-btn-size * 0.5; // = 2.75rem
+  left: calc(#{$nav-width-narrow} - #{$toggle-btn-size} * 0.5); // = 3.25rem
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: $toggle-btn-size;
+  height: $toggle-btn-size;
+  padding: 0;
+  overflow: hidden; // for matRipple
+  color: var(--mat-sidenav-container-text-color, var(--color-text-primary));
+  cursor: pointer;
+  background-color: var(--mat-sidenav-container-background-color, var(--color-surface));
+  border: 1px solid var(--color-divider);
+  border-radius: 50%;
+  transition: left vars.$transition-medium ease;
+
+  mat-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  &.wide {
+    left: calc(#{$nav-width-wide} - #{$toggle-btn-size} * 0.5); // = 13rem
+  }
+}

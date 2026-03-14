@@ -1,9 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -15,6 +10,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 import { ThemeToggleComponent } from './theme-toggle/theme-toggle.component';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { APP_VERSION, BUILD_HASH } from '@environments/version';
+
 @Component({
   selector: 'app-header',
   imports: [
@@ -35,13 +31,6 @@ export class HeaderComponent {
   protected readonly authStore = inject(AuthStore);
   protected readonly routes = AppRouteSegmentEnum;
   protected readonly appVersion = `v${APP_VERSION} (${BUILD_HASH})`;
-
-  protected readonly canAccessAdmin = computed(
-    () =>
-      this.authStore.hasPermissions({ action: 'search', subject: 'User' }) ||
-      this.authStore.hasPermissions({ action: 'read', subject: 'Role' }) ||
-      this.authStore.hasPermissions({ action: 'read', subject: 'Permission' })
-  );
 
   readonly #authService = inject(AuthService);
 

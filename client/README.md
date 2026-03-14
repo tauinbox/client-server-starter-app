@@ -31,7 +31,7 @@ All components are standalone (no NgModules) with `OnPush` change detection and 
 
 ```
 src/app/
-├── core/                   # Header, theme toggle, storage/session-storage services, error interceptor, 404 page
+├── core/                   # Header, sidenav, theme toggle, storage/session-storage services, error interceptor, 404 page
 ├── features/
 │   ├── auth/               # Login, register, profile, OAuth callback, verify-email, forgot-password, reset-password, forbidden
 │   │   ├── casl/           # app-ability.ts — AppAbility, Actions, Subjects, PermissionCheck types

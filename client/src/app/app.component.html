@@ -1,4 +1,17 @@
 <app-header />
-<main class="container mx-auto p-4">
-  <router-outlet />
-</main>
+<mat-sidenav-container class="sidenav-container">
+  @if (authStore.isAuthenticated()) {
+    <mat-sidenav opened mode="side">
+      <app-sidenav />
+    </mat-sidenav>
+  }
+  <mat-sidenav-content
+    [style.margin-left]="
+      authStore.isAuthenticated() ? sidenavState.width() : null
+    "
+  >
+    <main class="container mx-auto p-4">
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

@@ -6,3 +6,19 @@
 
   @include mix.centered-container;
 }
+
+// The sidenav toggle button uses position:absolute and overhangs the drawer's right
+// edge. Both overflow layers must be visible — Material sets overflow:auto on both
+// .mat-drawer and .mat-drawer-inner-container by default. The sidenav-container
+// wrapper still clips everything at the viewport boundary.
+mat-sidenav.mat-drawer,
+mat-sidenav .mat-drawer-inner-container {
+  overflow: visible;
+}
+
+// mat-sidenav-content receives margin-left via Angular style binding (not Material's
+// autosize) to avoid ~10s delay caused by ResizeObserver + OnPush change detection.
+// Transition here keeps the content shift in sync with the sidenav width animation.
+mat-sidenav-content {
+  transition: margin-left 300ms ease;
+}
