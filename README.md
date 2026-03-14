@@ -57,6 +57,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - Form validation with error messages
 - 404 and 403 pages
 - Version display in toolbar (version + git hash via `MatTooltip`)
+- **Collapsible side navigation** — persistent left panel (narrow 64px / wide 220px) with per-user localStorage persistence
 
 ### Versioning
 - All three workspaces share a single version (`0.1.0`)
