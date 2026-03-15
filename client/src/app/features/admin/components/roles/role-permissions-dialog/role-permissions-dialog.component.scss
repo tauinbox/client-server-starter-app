@@ -24,9 +24,7 @@
   --mat-dialog-content-padding: 0;
   --mat-dialog-with-actions-content-padding: 0;
 
-  // Override Material's overflow: auto so each panel scrolls independently.
-  // .dialog-content has the same specificity (0,1,0) as Material's rule;
-  // our global styles load last so this wins by source order.
+  // Remove Material's overflow: auto — panels control their own scroll.
   overflow: hidden;
 }
 
@@ -44,17 +42,21 @@
   }
 }
 
-// Two-column grid that fills the content area
+// Two-column grid — grows with content; each panel caps itself
 .content-grid {
   display: grid;
   grid-template-columns: 2fr 3fr;
-  height: 100%;
   min-height: func.rem(300);
 }
 
 // ── Left: Permission Matrix ────────────────────────────────────────────────
 
+// Cap at 65vh so the panel scrolls before the dialog overflows the viewport.
+// Title (~3.5rem) + actions (~3.5rem) + content padding (~0.75rem) ≈ 7.75rem.
+$panel-max-height: calc(65vh - #{func.rem(124)});
+
 .permissions-panel {
+  max-height: $panel-max-height;
   padding: vars.$spacing-sm vars.$spacing-md;
   overflow-y: auto;
   border-right: 1px solid var(--mat-sys-outline-variant);
@@ -123,6 +125,7 @@ mat-divider {
 // ── Right: Conditions Panel ────────────────────────────────────────────────
 
 .conditions-panel {
+  max-height: $panel-max-height;
   padding: vars.$spacing-sm vars.$spacing-md;
   overflow-y: auto;
 }
