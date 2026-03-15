@@ -71,7 +71,7 @@ test.describe('Session restoration with expired access token', () => {
 
     // Should NOT be redirected to login — session should be restored via refresh
     await expect(page).toHaveURL(/.*\/profile$/);
-    await expect(page.getByText('My Profile')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'John Doe' })).toBeVisible();
 
     // Verify the refresh-token request was actually made
     expect(refreshTokenCalled).toBe(true);
@@ -114,6 +114,6 @@ test.describe('Session restoration with expired access token', () => {
 
     // Should end up at /profile, not /login
     await expect(page).toHaveURL(/.*\/profile$/);
-    await expect(page.getByText('My Profile')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'John Doe' })).toBeVisible();
   });
 });

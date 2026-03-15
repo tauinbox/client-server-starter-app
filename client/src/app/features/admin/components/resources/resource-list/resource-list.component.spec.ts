@@ -91,6 +91,7 @@ describe('ResourceListComponent', () => {
 
   it('shows spinner when loading', async () => {
     resourcesStoreMock.loading = signal(true);
+    resourcesStoreMock.resources = signal([]);
     await setupComponent();
     fixture.detectChanges();
 
