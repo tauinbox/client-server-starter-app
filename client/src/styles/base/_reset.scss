@@ -1,3 +1,5 @@
+@use '../abstracts/functions' as func;
+
 *,
 *::before,
 *::after {
@@ -73,8 +75,8 @@ fieldset {
 
 // Standardize focus styles
 :focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
+  outline: func.rem(2) solid var(--color-primary);
+  outline-offset: func.rem(2);
 }
 
 // Make sure textarea only resizes vertically by default

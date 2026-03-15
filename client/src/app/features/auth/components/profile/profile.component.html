@@ -1,173 +1,180 @@
-<div class="profile-container">
-  @let u = user();
-  <mat-card>
-    <mat-card-header>
-      <mat-card-title>My Profile</mat-card-title>
-    </mat-card-header>
-
-    <mat-card-content>
-      @if (loading()) {
-        <div class="loading-container">
-          <mat-spinner></mat-spinner>
-        </div>
-      } @else if (u) {
-        <div class="mt-1">
-          <h3>Account Information</h3>
-          <p><strong>Email:</strong> {{ u.email }}</p>
-          <p>
-            <strong>Name:</strong> {{ u.firstName }}
-            {{ u.lastName }}
-          </p>
-          <p>
-            <strong>Role:</strong>
-            {{ isAdmin() ? 'Administrator' : 'User' }}
-          </p>
-          <p>
-            <strong>Status:</strong>
-            {{ u.isActive ? 'Active' : 'Inactive' }}
-          </p>
-          <p>
-            <strong>Member Since:</strong>
-            {{ u.createdAt | date: 'medium' }}
-          </p>
-        </div>
-
-        <mat-divider class="my-4"></mat-divider>
-
-        <div class="oauth-section">
-          <h3>Connected Accounts</h3>
-          <div class="oauth-providers">
-            @for (provider of allProviders; track provider) {
-              <div class="oauth-provider-row">
-                <div class="oauth-provider-info">
-                  <mat-icon [svgIcon]="provider"></mat-icon>
-                  <span>{{ providerLabels[provider] }}</span>
-                </div>
-                @if (isProviderLinked(provider)) {
-                  <button
-                    mat-stroked-button
-                    color="warn"
-                    [disabled]="oauthLoading()"
-                    (click)="disconnectProvider(provider)"
-                  >
-                    Disconnect
-                  </button>
+<div class="profile-page">
+  @if (loading()) {
+    <div class="loading-container">
+      <mat-spinner></mat-spinner>
+    </div>
+  } @else {
+    @let u = user();
+    @if (u) {
+      <mat-card class="header-card">
+        <mat-card-content>
+          <div class="profile-hero">
+            <div class="avatar">{{ initials() }}</div>
+            <div class="profile-info">
+              <h2 class="profile-name">{{ u.firstName }} {{ u.lastName }}</h2>
+              <p class="profile-email">{{ u.email }}</p>
+              <div class="profile-badges">
+                @if (u.isActive) {
+                  <mat-chip color="primary" highlighted>Active</mat-chip>
                 } @else {
-                  <button
-                    mat-stroked-button
-                    [disabled]="oauthLoading()"
-                    (click)="connectProvider(provider)"
-                  >
-                    Connect
-                  </button>
+                  <mat-chip>Inactive</mat-chip>
                 }
+                <mat-chip>{{ isAdmin() ? 'Administrator' : 'User' }}</mat-chip>
+                <span class="profile-since"
+                  >Member since {{ u.createdAt | date: 'mediumDate' }}</span
+                >
               </div>
-            }
-          </div>
-        </div>
-
-        <mat-divider class="my-4"></mat-divider>
-
-        <form [formGroup]="profileForm" (ngSubmit)="onSubmit()">
-          <h3>Update Profile</h3>
-
-          <mat-form-field class="full-width">
-            <mat-label>First Name</mat-label>
-            <input
-              matInput
-              autocomplete="on"
-              type="text"
-              formControlName="firstName"
-              placeholder="First Name"
-              required
-            />
-            <mat-icon matPrefix>person</mat-icon>
-            @if (
-              profileForm.get('firstName')?.invalid &&
-              profileForm.get('firstName')?.touched
-            ) {
-              <mat-error> First name is required </mat-error>
-            }
-          </mat-form-field>
-
-          <mat-form-field class="full-width">
-            <mat-label>Last Name</mat-label>
-            <input
-              matInput
-              autocomplete="on"
-              type="text"
-              formControlName="lastName"
-              placeholder="Last Name"
-              required
-            />
-            <mat-icon matPrefix>person</mat-icon>
-            @if (
-              profileForm.get('lastName')?.invalid &&
-              profileForm.get('lastName')?.touched
-            ) {
-              <mat-error> Last name is required </mat-error>
-            }
-          </mat-form-field>
-
-          <mat-form-field class="full-width">
-            <mat-label>New Password (Optional)</mat-label>
-            <input
-              matInput
-              autocomplete="off"
-              [type]="pwdToggle.show() ? 'text' : 'password'"
-              formControlName="password"
-              placeholder="Leave blank to keep current password"
-            />
-            <mat-icon matPrefix>lock</mat-icon>
-            <app-password-toggle matSuffix #pwdToggle />
-            @if (
-              profileForm.get('password')?.invalid &&
-              profileForm.get('password')?.touched
-            ) {
-              <mat-error> Password must be at least 8 characters </mat-error>
-            }
-          </mat-form-field>
-
-          @if (profileForm.get('password')?.value) {
-            <mat-form-field class="full-width">
-              <mat-label>Confirm New Password</mat-label>
-              <input
-                matInput
-                autocomplete="off"
-                [type]="confirmPwdToggle.show() ? 'text' : 'password'"
-                formControlName="confirmPassword"
-                [errorStateMatcher]="confirmPasswordErrorMatcher"
-                placeholder="Confirm new password"
-              />
-              <mat-icon matPrefix>lock</mat-icon>
-              <app-password-toggle matSuffix #confirmPwdToggle />
-              <mat-error>Passwords do not match</mat-error>
-            </mat-form-field>
-          }
-
-          @if (error()) {
-            <div class="error-message" role="alert">
-              {{ error() }}
             </div>
-          }
-
-          <div class="form-actions">
-            <button
-              mat-raised-button
-              color="primary"
-              type="submit"
-              [disabled]="profileForm.invalid || saving() || !profileForm.dirty"
-            >
-              @if (saving()) {
-                <mat-spinner diameter="24"></mat-spinner>
-                <span class="ml-2">Saving...</span>
-              } @else {
-                Update Profile
-              }
-            </button>
           </div>
-        </form>
-      }
-    </mat-card-content>
-  </mat-card>
+        </mat-card-content>
+      </mat-card>
+
+      <div class="profile-grid">
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>Update Profile</mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            <form [formGroup]="profileForm" (ngSubmit)="onSubmit()">
+              <div class="form-name-row">
+                <mat-form-field appearance="outline">
+                  <mat-label>First Name</mat-label>
+                  <input
+                    matInput
+                    autocomplete="on"
+                    type="text"
+                    formControlName="firstName"
+                    placeholder="First Name"
+                    required
+                  />
+                  <mat-icon matPrefix>person</mat-icon>
+                  @if (
+                    profileForm.get('firstName')?.invalid &&
+                    profileForm.get('firstName')?.touched
+                  ) {
+                    <mat-error>First name is required</mat-error>
+                  }
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Last Name</mat-label>
+                  <input
+                    matInput
+                    autocomplete="on"
+                    type="text"
+                    formControlName="lastName"
+                    placeholder="Last Name"
+                    required
+                  />
+                  <mat-icon matPrefix>person</mat-icon>
+                  @if (
+                    profileForm.get('lastName')?.invalid &&
+                    profileForm.get('lastName')?.touched
+                  ) {
+                    <mat-error>Last name is required</mat-error>
+                  }
+                </mat-form-field>
+              </div>
+
+              <mat-form-field class="full-width" appearance="outline">
+                <mat-label>New Password (Optional)</mat-label>
+                <input
+                  matInput
+                  autocomplete="off"
+                  [type]="pwdToggle.show() ? 'text' : 'password'"
+                  formControlName="password"
+                  placeholder="Leave blank to keep current password"
+                />
+                <mat-icon matPrefix>lock</mat-icon>
+                <app-password-toggle matSuffix #pwdToggle />
+                @if (
+                  profileForm.get('password')?.invalid &&
+                  profileForm.get('password')?.touched
+                ) {
+                  <mat-error>Password must be at least 8 characters</mat-error>
+                }
+              </mat-form-field>
+
+              @if (profileForm.get('password')?.value) {
+                <mat-form-field class="full-width" appearance="outline">
+                  <mat-label>Confirm New Password</mat-label>
+                  <input
+                    matInput
+                    autocomplete="off"
+                    [type]="confirmPwdToggle.show() ? 'text' : 'password'"
+                    formControlName="confirmPassword"
+                    [errorStateMatcher]="confirmPasswordErrorMatcher"
+                    placeholder="Confirm new password"
+                  />
+                  <mat-icon matPrefix>lock</mat-icon>
+                  <app-password-toggle matSuffix #confirmPwdToggle />
+                  <mat-error>Passwords do not match</mat-error>
+                </mat-form-field>
+              }
+
+              @if (error()) {
+                <div class="error-message" role="alert">{{ error() }}</div>
+              }
+
+              <div class="form-actions">
+                <button
+                  mat-raised-button
+                  color="primary"
+                  type="submit"
+                  [disabled]="
+                    profileForm.invalid || saving() || !profileForm.dirty
+                  "
+                >
+                  @if (saving()) {
+                    <mat-spinner diameter="24"></mat-spinner>
+                    <span class="ml-2">Saving...</span>
+                  } @else {
+                    Update Profile
+                  }
+                </button>
+              </div>
+            </form>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>Connected Accounts</mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            <div class="oauth-providers">
+              @for (provider of allProviders; track provider) {
+                <div class="oauth-provider-row">
+                  <div class="oauth-provider-info">
+                    <mat-icon [svgIcon]="provider"></mat-icon>
+                    <span>{{ providerLabels[provider] }}</span>
+                  </div>
+                  @if (isProviderLinked(provider)) {
+                    <button
+                      mat-stroked-button
+                      color="warn"
+                      [disabled]="oauthLoading()"
+                      (click)="disconnectProvider(provider)"
+                    >
+                      Disconnect
+                    </button>
+                  } @else {
+                    <button
+                      mat-stroked-button
+                      [disabled]="oauthLoading()"
+                      (click)="connectProvider(provider)"
+                    >
+                      Connect
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    }
+  }
 </div>

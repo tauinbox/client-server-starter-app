@@ -1,0 +1,36 @@
+@use '../abstracts/variables' as vars;
+@use '../abstracts/functions' as func;
+
+// ── Standard dialog sizing ─────────────────────────────────────────────────
+// Sizes are defined in dialog.utils.ts (DialogSize enum + dialogSizeConfig()).
+// All presets use { width: '90vw', maxWidth } — never a fixed width alone,
+// so Material's calc(100vw - 32px) mobile breakpoint stays effective.
+//   Confirm → maxWidth 400px  |  Form → maxWidth 560px  |  Wide → maxWidth 1000px
+
+// ── Title ──────────────────────────────────────────────────────────────────
+
+// 1. Reduce headline padding: Material default is "6px 24px 13px" (asymmetric).
+//    Setting the CSS variable on .mat-mdc-dialog-container cascades to the title
+//    inside it through normal CSS inheritance.
+.mat-mdc-dialog-container {
+  --mat-dialog-headline-padding: #{vars.$spacing-sm} #{func.rem(24)} #{vars.$spacing-sm};
+}
+
+// 2. Remove Material's ::before { height: 40px } invisible spacer that creates
+//    excessive whitespace above the title text. The spacer was intended to enforce
+//    a minimum 40px title height; we handle height via padding instead.
+//    Specificity (0,2,1) beats Material's (0,1,1) regardless of source order.
+.mat-mdc-dialog-surface .mat-mdc-dialog-title::before {
+  height: 0;
+}
+
+// ── Content ────────────────────────────────────────────────────────────────
+
+// Workaround for Angular Material bug #26352: mat-form-field appearance="outline"
+// floats its label ~12px above the field boundary. Material hardcodes padding-top: 0
+// on dialog content that follows a title (no CSS variable for this specific rule).
+// Specificity (0,3,0) beats Material's (0,2,0) — wins regardless of injection order.
+// See: https://github.com/angular/components/issues/26352
+.mat-mdc-dialog-container .mat-mdc-dialog-surface .mat-mdc-dialog-title + .mat-mdc-dialog-content {
+  padding-top: func.rem(12);
+}

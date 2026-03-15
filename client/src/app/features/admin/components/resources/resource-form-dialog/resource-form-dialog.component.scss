@@ -1,38 +1,45 @@
+@use 'abstracts/variables' as vars;
+@use 'abstracts/functions' as func;
+
+form {
+  margin-top: vars.$spacing-md;
+}
+
 .full-width {
   width: 100%;
-  margin-bottom: 8px;
+  margin-bottom: vars.$spacing-xs;
 }
 
 .allowed-actions {
-  margin-top: 16px;
+  margin-top: vars.$spacing-md;
 
   &__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 12px;
+    margin-bottom: vars.$spacing-sm;
   }
 
   &__title {
-    font-size: 14px;
-    font-weight: 500;
+    font-size: vars.$font-size-sm;
+    font-weight: vars.$font-weight-medium;
   }
 
   &__checkboxes {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: vars.$spacing-xs;
   }
 
   &__hint {
     margin: 0;
-    font-size: 13px;
+    font-size: func.rem(13);
     color: var(--mat-sys-on-surface-variant);
   }
 }
 
 .action-badge {
-  margin-left: 4px;
-  font-size: 11px;
+  margin-left: vars.$spacing-xxs;
+  font-size: func.rem(11);
   color: var(--mat-sys-on-surface-variant);
 }

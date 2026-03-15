@@ -1,11 +1,17 @@
+@use 'abstracts/variables' as vars;
+
+form {
+  margin-top: vars.$spacing-md;
+}
+
 .full-width {
   display: block;
   width: 100%;
-  margin-bottom: 8px;
+  margin-bottom: vars.$spacing-xs;
 }
 
 .system-role-warning {
-  margin-bottom: 16px;
-  font-size: 0.875rem;
+  margin-bottom: vars.$spacing-md;
+  font-size: vars.$font-size-sm;
   color: var(--mat-sys-error);
 }

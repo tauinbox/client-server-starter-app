@@ -16,267 +16,290 @@
       <p>{{ error() }}</p>
     </div>
   } @else {
-    @if (role.isSystem) {
-      <p class="system-notice">System role permissions are read-only.</p>
-    }
-    @if (isReadonly() && !role.isSystem) {
-      <p class="system-notice">
-        You have read-only access to this role's permissions.
-      </p>
-    }
+    <div class="content-grid">
+      <!-- ── Left: Permission Matrix ── -->
+      <div class="permissions-panel">
+        @if (role.isSystem) {
+          <p class="panel-notice">System role permissions are read-only.</p>
+        } @else if (isReadonly()) {
+          <p class="panel-notice">
+            You have read-only access to this role's permissions.
+          </p>
+        }
 
-    <!-- ── Permission Matrix ── -->
-    @for (group of permissionGroups(); track group.resource) {
-      <div class="permission-group">
-        <div class="group-header">
-          <mat-checkbox
-            [checked]="isGroupAllChecked(group)"
-            [indeterminate]="isGroupIndeterminate(group)"
-            [disabled]="role.isSystem || isReadonly()"
-            (change)="toggleGroup(group)"
-          >
-            <span class="resource-label">{{ group.resource }}</span>
-          </mat-checkbox>
-        </div>
-        <div class="permission-items">
-          @for (permission of group.permissions; track permission.id) {
-            <div class="permission-entry">
+        @for (group of permissionGroups(); track group.resource) {
+          <div class="permission-group">
+            <div class="group-header">
               <mat-checkbox
-                [checked]="isChecked(permission.id)"
+                [checked]="isGroupAllChecked(group)"
+                [indeterminate]="isGroupIndeterminate(group)"
                 [disabled]="role.isSystem || isReadonly()"
-                (change)="togglePermission(permission.id)"
+                (change)="toggleGroup(group)"
               >
-                {{ permission.action.name }}
+                <span class="resource-label">{{ group.resource }}</span>
               </mat-checkbox>
-              @if (isChecked(permission.id) && hasAnyCondition(permission.id)) {
-                <mat-chip
-                  class="condition-chip"
-                  [matTooltip]="activeConditionTypes(permission.id).join(', ')"
-                >
-                  <mat-icon class="chip-icon">rule</mat-icon>
-                  {{ activeConditionTypes(permission.id).length }}
-                </mat-chip>
+            </div>
+            <div class="permission-items">
+              @for (permission of group.permissions; track permission.id) {
+                <div class="permission-entry">
+                  <mat-checkbox
+                    [checked]="isChecked(permission.id)"
+                    [disabled]="role.isSystem || isReadonly()"
+                    (change)="togglePermission(permission.id)"
+                  >
+                    {{ permission.action.name }}
+                  </mat-checkbox>
+                  @if (
+                    isChecked(permission.id) && hasAnyCondition(permission.id)
+                  ) {
+                    <mat-chip
+                      class="condition-chip"
+                      [matTooltip]="
+                        activeConditionTypes(permission.id).join(', ')
+                      "
+                    >
+                      <mat-icon class="chip-icon">rule</mat-icon>
+                      {{ activeConditionTypes(permission.id).length }}
+                    </mat-chip>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+          <mat-divider></mat-divider>
+        }
+      </div>
+
+      <!-- ── Right: Conditions Panel ── -->
+      <div class="conditions-panel">
+        @if (checkedPermissions().length === 0) {
+          <div class="conditions-empty">
+            <mat-icon>tune</mat-icon>
+            <p>Select permissions on the left to configure conditions</p>
+          </div>
+        } @else {
+          <div class="conditions-header">
+            <h3 class="conditions-title">
+              <mat-icon>tune</mat-icon>
+              Permission Conditions
+            </h3>
+            <p class="conditions-hint">
+              Optionally restrict each permission with one or more conditions.
+              All active conditions are combined (AND logic).
+            </p>
+          </div>
+
+          @for (permission of checkedPermissions(); track permission.id) {
+            <div class="condition-row">
+              <button
+                mat-button
+                class="condition-toggle"
+                [class.has-condition]="hasAnyCondition(permission.id)"
+                (click)="toggleExpand(permission.id)"
+                type="button"
+              >
+                <mat-icon>{{
+                  isExpanded(permission.id)
+                    ? 'keyboard_arrow_up'
+                    : 'keyboard_arrow_down'
+                }}</mat-icon>
+                <span class="perm-label">
+                  <span class="perm-resource">{{
+                    permission.resource.name
+                  }}</span
+                  >:<span class="perm-action">{{
+                    permission.action.name
+                  }}</span>
+                </span>
+                @if (hasAnyCondition(permission.id)) {
+                  @for (
+                    type of activeConditionTypes(permission.id);
+                    track type
+                  ) {
+                    <mat-chip class="inline-chip" color="accent" highlighted>
+                      {{ type }}
+                    </mat-chip>
+                  }
+                } @else {
+                  <span class="no-condition">No restriction</span>
+                }
+              </button>
+
+              @if (isExpanded(permission.id)) {
+                <div class="condition-editor">
+                  <!-- ── Ownership ── -->
+                  <div class="condition-block">
+                    <mat-checkbox
+                      [checked]="hasOwnership(permission.id)"
+                      [disabled]="role.isSystem || isReadonly()"
+                      (change)="toggleOwnership(permission.id)"
+                    >
+                      <span class="condition-label">Ownership</span>
+                      <span class="checkbox-hint"
+                        >— record field must equal the current user's ID</span
+                      >
+                    </mat-checkbox>
+
+                    @if (hasOwnership(permission.id)) {
+                      <mat-form-field
+                        appearance="outline"
+                        class="condition-input"
+                      >
+                        <mat-label>Record field</mat-label>
+                        <input
+                          matInput
+                          [value]="getOwnershipField(permission.id)"
+                          [readonly]="role.isSystem"
+                          (input)="setOwnershipField(permission.id, $event)"
+                          placeholder="id"
+                        />
+                        <mat-hint
+                          >The field on the record that must equal the current
+                          user's ID</mat-hint
+                        >
+                      </mat-form-field>
+                    }
+                  </div>
+
+                  <!-- ── fieldMatch ── -->
+                  <div class="condition-block">
+                    <mat-checkbox
+                      [checked]="hasFieldMatch(permission.id)"
+                      [disabled]="role.isSystem || isReadonly()"
+                      (change)="toggleFieldMatch(permission.id)"
+                    >
+                      <span class="condition-label">Field match</span>
+                      <span class="checkbox-hint"
+                        >— record field must be one of the specified
+                        values</span
+                      >
+                    </mat-checkbox>
+
+                    @if (hasFieldMatch(permission.id)) {
+                      <mat-form-field
+                        appearance="outline"
+                        class="condition-input condition-input--tall"
+                      >
+                        <mat-label
+                          >JSON object (field → allowed values)</mat-label
+                        >
+                        <textarea
+                          matInput
+                          [value]="getFieldMatchText(permission.id)"
+                          [readonly]="role.isSystem"
+                          (blur)="applyFieldMatch(permission.id, $event)"
+                          rows="4"
+                          spellcheck="false"
+                          class="json-textarea"
+                        ></textarea>
+                        @if (getFieldMatchError(permission.id)) {
+                          <mat-error>{{
+                            getFieldMatchError(permission.id)
+                          }}</mat-error>
+                        } @else {
+                          <mat-hint
+                            >e.g. &#123; "status": ["active", "pending"]
+                            &#125;</mat-hint
+                          >
+                        }
+                      </mat-form-field>
+                    }
+                  </div>
+
+                  <!-- ── userAttr ── -->
+                  <div class="condition-block">
+                    <mat-checkbox
+                      [checked]="hasUserAttr(permission.id)"
+                      [disabled]="role.isSystem || isReadonly()"
+                      (change)="toggleUserAttr(permission.id)"
+                    >
+                      <span class="condition-label">User attribute</span>
+                      <span class="checkbox-hint"
+                        >— record field must equal a property of the current
+                        user</span
+                      >
+                    </mat-checkbox>
+
+                    @if (hasUserAttr(permission.id)) {
+                      <mat-form-field
+                        appearance="outline"
+                        class="condition-input condition-input--tall"
+                      >
+                        <mat-label
+                          >JSON object (record field → user
+                          attribute)</mat-label
+                        >
+                        <textarea
+                          matInput
+                          [value]="getUserAttrText(permission.id)"
+                          [readonly]="role.isSystem"
+                          (blur)="applyUserAttr(permission.id, $event)"
+                          rows="4"
+                          spellcheck="false"
+                          class="json-textarea"
+                        ></textarea>
+                        @if (getUserAttrError(permission.id)) {
+                          <mat-error>{{
+                            getUserAttrError(permission.id)
+                          }}</mat-error>
+                        } @else {
+                          <mat-hint
+                            >e.g. &#123; "tenantId": "id" &#125; — maps
+                            record.tenantId to user.id</mat-hint
+                          >
+                        }
+                      </mat-form-field>
+                    }
+                  </div>
+
+                  <!-- ── custom ── -->
+                  <div class="condition-block">
+                    <mat-checkbox
+                      [checked]="hasCustom(permission.id)"
+                      [disabled]="role.isSystem || isReadonly()"
+                      (change)="toggleCustom(permission.id)"
+                    >
+                      <span class="condition-label">Custom</span>
+                      <span class="checkbox-hint"
+                        >— raw MongoDB query merged into conditions</span
+                      >
+                    </mat-checkbox>
+
+                    @if (hasCustom(permission.id)) {
+                      <mat-form-field
+                        appearance="outline"
+                        class="condition-input condition-input--tall"
+                      >
+                        <mat-label>Raw JSON MongoQuery</mat-label>
+                        <textarea
+                          matInput
+                          [value]="getCustomText(permission.id)"
+                          [readonly]="role.isSystem"
+                          (blur)="applyCustom(permission.id, $event)"
+                          rows="4"
+                          spellcheck="false"
+                          class="json-textarea"
+                        ></textarea>
+                        @if (getCustomError(permission.id)) {
+                          <mat-error>{{
+                            getCustomError(permission.id)
+                          }}</mat-error>
+                        } @else {
+                          <mat-hint
+                            >e.g. &#123; "$or": [&#123;"status": "active"&#125;]
+                            &#125;</mat-hint
+                          >
+                        }
+                      </mat-form-field>
+                    }
+                  </div>
+                </div>
               }
             </div>
           }
-        </div>
-      </div>
-      <mat-divider></mat-divider>
-    }
-
-    <!-- ── Conditions Section ── -->
-    @if (checkedPermissions().length > 0) {
-      <div class="conditions-section">
-        <h3 class="conditions-title">
-          <mat-icon>tune</mat-icon>
-          Permission Conditions
-        </h3>
-        <p class="conditions-hint">
-          Optionally restrict each permission with one or more conditions. All
-          active conditions are combined (AND logic).
-        </p>
-
-        @for (permission of checkedPermissions(); track permission.id) {
-          <div class="condition-row">
-            <button
-              mat-button
-              class="condition-toggle"
-              [class.has-condition]="hasAnyCondition(permission.id)"
-              (click)="toggleExpand(permission.id)"
-              type="button"
-            >
-              <mat-icon>{{
-                isExpanded(permission.id)
-                  ? 'keyboard_arrow_up'
-                  : 'keyboard_arrow_down'
-              }}</mat-icon>
-              <span class="perm-label">
-                <span class="perm-resource">{{ permission.resource.name }}</span
-                >:<span class="perm-action">{{ permission.action.name }}</span>
-              </span>
-              @if (hasAnyCondition(permission.id)) {
-                @for (type of activeConditionTypes(permission.id); track type) {
-                  <mat-chip class="inline-chip" color="accent" highlighted>
-                    {{ type }}
-                  </mat-chip>
-                }
-              } @else {
-                <span class="no-condition">No restriction</span>
-              }
-            </button>
-
-            @if (isExpanded(permission.id)) {
-              <div class="condition-editor">
-                <!-- ── Ownership ── -->
-                <div class="condition-block">
-                  <mat-checkbox
-                    [checked]="hasOwnership(permission.id)"
-                    [disabled]="role.isSystem || isReadonly()"
-                    (change)="toggleOwnership(permission.id)"
-                  >
-                    <span class="condition-label">Ownership</span>
-                    <span class="checkbox-hint"
-                      >— record field must equal the current user's ID</span
-                    >
-                  </mat-checkbox>
-
-                  @if (hasOwnership(permission.id)) {
-                    <mat-form-field
-                      appearance="outline"
-                      class="condition-input"
-                    >
-                      <mat-label>Record field</mat-label>
-                      <input
-                        matInput
-                        [value]="getOwnershipField(permission.id)"
-                        [readonly]="role.isSystem"
-                        (input)="setOwnershipField(permission.id, $event)"
-                        placeholder="id"
-                      />
-                      <mat-hint
-                        >The field on the record that must equal the current
-                        user's ID</mat-hint
-                      >
-                    </mat-form-field>
-                  }
-                </div>
-
-                <!-- ── fieldMatch ── -->
-                <div class="condition-block">
-                  <mat-checkbox
-                    [checked]="hasFieldMatch(permission.id)"
-                    [disabled]="role.isSystem || isReadonly()"
-                    (change)="toggleFieldMatch(permission.id)"
-                  >
-                    <span class="condition-label">Field match</span>
-                    <span class="checkbox-hint"
-                      >— record field must be one of the specified values</span
-                    >
-                  </mat-checkbox>
-
-                  @if (hasFieldMatch(permission.id)) {
-                    <mat-form-field
-                      appearance="outline"
-                      class="condition-input condition-input--tall"
-                    >
-                      <mat-label
-                        >JSON object (field → allowed values)</mat-label
-                      >
-                      <textarea
-                        matInput
-                        [value]="getFieldMatchText(permission.id)"
-                        [readonly]="role.isSystem"
-                        (blur)="applyFieldMatch(permission.id, $event)"
-                        rows="4"
-                        spellcheck="false"
-                        class="json-textarea"
-                      ></textarea>
-                      @if (getFieldMatchError(permission.id)) {
-                        <mat-error>{{
-                          getFieldMatchError(permission.id)
-                        }}</mat-error>
-                      } @else {
-                        <mat-hint
-                          >e.g. &#123; "status": ["active", "pending"]
-                          &#125;</mat-hint
-                        >
-                      }
-                    </mat-form-field>
-                  }
-                </div>
-
-                <!-- ── userAttr ── -->
-                <div class="condition-block">
-                  <mat-checkbox
-                    [checked]="hasUserAttr(permission.id)"
-                    [disabled]="role.isSystem || isReadonly()"
-                    (change)="toggleUserAttr(permission.id)"
-                  >
-                    <span class="condition-label">User attribute</span>
-                    <span class="checkbox-hint"
-                      >— record field must equal a property of the current
-                      user</span
-                    >
-                  </mat-checkbox>
-
-                  @if (hasUserAttr(permission.id)) {
-                    <mat-form-field
-                      appearance="outline"
-                      class="condition-input condition-input--tall"
-                    >
-                      <mat-label
-                        >JSON object (record field → user attribute)</mat-label
-                      >
-                      <textarea
-                        matInput
-                        [value]="getUserAttrText(permission.id)"
-                        [readonly]="role.isSystem"
-                        (blur)="applyUserAttr(permission.id, $event)"
-                        rows="4"
-                        spellcheck="false"
-                        class="json-textarea"
-                      ></textarea>
-                      @if (getUserAttrError(permission.id)) {
-                        <mat-error>{{
-                          getUserAttrError(permission.id)
-                        }}</mat-error>
-                      } @else {
-                        <mat-hint
-                          >e.g. &#123; "tenantId": "id" &#125; — maps
-                          record.tenantId to user.id</mat-hint
-                        >
-                      }
-                    </mat-form-field>
-                  }
-                </div>
-
-                <!-- ── custom ── -->
-                <div class="condition-block">
-                  <mat-checkbox
-                    [checked]="hasCustom(permission.id)"
-                    [disabled]="role.isSystem || isReadonly()"
-                    (change)="toggleCustom(permission.id)"
-                  >
-                    <span class="condition-label">Custom</span>
-                    <span class="checkbox-hint"
-                      >— raw MongoDB query merged into conditions</span
-                    >
-                  </mat-checkbox>
-
-                  @if (hasCustom(permission.id)) {
-                    <mat-form-field
-                      appearance="outline"
-                      class="condition-input condition-input--tall"
-                    >
-                      <mat-label>Raw JSON MongoQuery</mat-label>
-                      <textarea
-                        matInput
-                        [value]="getCustomText(permission.id)"
-                        [readonly]="role.isSystem"
-                        (blur)="applyCustom(permission.id, $event)"
-                        rows="4"
-                        spellcheck="false"
-                        class="json-textarea"
-                      ></textarea>
-                      @if (getCustomError(permission.id)) {
-                        <mat-error>{{
-                          getCustomError(permission.id)
-                        }}</mat-error>
-                      } @else {
-                        <mat-hint
-                          >e.g. &#123; "$or": [&#123;"status": "active"&#125;]
-                          &#125;</mat-hint
-                        >
-                      }
-                    </mat-form-field>
-                  }
-                </div>
-              </div>
-            }
-          </div>
         }
       </div>
-    }
+    </div>
   }
 </mat-dialog-content>
 

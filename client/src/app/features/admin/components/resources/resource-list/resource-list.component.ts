@@ -34,7 +34,7 @@ import {
 } from '@angular/material/table';
 import type { ResourceResponse } from '@app/shared/types/rbac.types';
 import { AuthStore } from '@features/auth/store/auth.store';
-import { rem } from '@shared/utils/css.utils';
+import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { ResourcesStore } from '../../../store/resources.store';
 import type {
   ResourceFormDialogData,
@@ -102,7 +102,10 @@ export class ResourceListComponent implements OnInit {
       actions: this.#resourcesStore.actions()
     };
     this.#dialog
-      .open(ResourceFormDialogComponent, { width: rem(480), data })
+      .open(ResourceFormDialogComponent, {
+        ...dialogSizeConfig(DialogSize.Form),
+        data
+      })
       .afterClosed()
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((result: ResourceFormDialogResult | undefined) => {

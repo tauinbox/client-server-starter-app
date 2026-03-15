@@ -32,7 +32,9 @@ test.describe('Login page', () => {
     await main.getByRole('button', { name: 'Login' }).click();
 
     await expect(page).toHaveURL(/.*\/profile$/);
-    await expect(page.getByText('Name: Regular User')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Regular User' })
+    ).toBeVisible();
   });
 
   test('should show error on invalid credentials', async ({

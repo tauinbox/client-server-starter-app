@@ -30,7 +30,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { filter, merge } from 'rxjs';
 import type { User, UserSearch, UserSortColumn } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
-import { rem } from '@shared/utils/css.utils';
+import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { UsersStore } from '../../store/users.store';
 import {
   COLUMN_TO_SORT_MAP,
@@ -167,7 +167,7 @@ export class UserListComponent implements OnInit, AfterViewInit {
 
   confirmDelete(user: User): void {
     const dialogRef = this.#dialog.open(ConfirmDialogComponent, {
-      width: rem(350),
+      ...dialogSizeConfig(DialogSize.Confirm),
       data: {
         title: 'Confirm Delete',
         message: `Are you sure you want to delete user ${user.firstName} ${user.lastName}?`,

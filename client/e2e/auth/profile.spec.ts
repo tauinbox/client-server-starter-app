@@ -19,12 +19,11 @@ test.describe('Profile page', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await expect(page.getByText('My Profile')).toBeVisible();
-    await expect(page.getByText('Email: testlogin@example.com')).toBeVisible();
-    await expect(page.getByText('Name: John Doe')).toBeVisible();
-    await expect(page.getByText('Role: User')).toBeVisible();
-    await expect(page.getByText('Status: Active')).toBeVisible();
-    await expect(page.getByText('Member Since:')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'John Doe' })).toBeVisible();
+    await expect(page.getByText('testlogin@example.com')).toBeVisible();
+    await expect(page.getByText('User', { exact: true })).toBeVisible();
+    await expect(page.getByText('Active', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Member since/)).toBeVisible();
   });
 
   test('should display admin role for admin user', async ({
@@ -33,7 +32,9 @@ test.describe('Profile page', () => {
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
 
-    await expect(page.getByText('Role: Administrator')).toBeVisible();
+    await expect(
+      page.getByText('Administrator', { exact: true })
+    ).toBeVisible();
   });
 
   test('should display inactive status', async ({ _mockServer, page }) => {
@@ -66,7 +67,7 @@ test.describe('Profile page', () => {
 
     // Reload profile page to get the intercepted response
     await page.goto('/profile');
-    await expect(page.getByText('Status: Inactive')).toBeVisible();
+    await expect(page.getByText('Inactive', { exact: true })).toBeVisible();
   });
 
   test('should populate form with current user data', async ({
@@ -193,7 +194,9 @@ test.describe('Profile page', () => {
     await page.getByLabel('Last Name').fill('Smith');
     await page.getByRole('button', { name: 'Update Profile' }).click();
 
-    await expect(page.getByText('Name: Jane Smith')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Jane Smith' })
+    ).toBeVisible();
   });
 
   test('should disable submit button after successful update', async ({

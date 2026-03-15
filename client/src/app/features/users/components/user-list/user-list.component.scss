@@ -2,6 +2,7 @@
 @use 'abstracts/mixins' as mix;
 
 :host {
+  display: block;
   width: 100%;
 
   .user-list-container {

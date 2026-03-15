@@ -2,6 +2,7 @@ import type { OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   inject,
   signal
@@ -13,8 +14,8 @@ import {
   MatCardHeader,
   MatCardTitle
 } from '@angular/material/card';
+import { MatChip } from '@angular/material/chips';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import { MatDivider } from '@angular/material/divider';
 import type {
   AbstractControl,
   FormControl,
@@ -79,10 +80,10 @@ const PROVIDER_LABELS: Record<string, string> = {
     MatCardHeader,
     MatCardContent,
     MatCardTitle,
+    MatChip,
     MatError,
     MatLabel,
     MatProgressSpinner,
-    MatDivider,
     ReactiveFormsModule,
     MatFormField,
     MatIcon,
@@ -115,6 +116,11 @@ export class ProfileComponent implements OnInit {
 
   readonly isAdmin = this.#authStore.isAdmin;
   protected readonly user = signal<User | null>(null);
+  readonly initials = computed(() => {
+    const u = this.user();
+    if (!u) return '';
+    return `${u.firstName.charAt(0)}${u.lastName.charAt(0)}`.toUpperCase();
+  });
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
