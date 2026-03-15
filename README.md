@@ -58,6 +58,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - 404 and 403 pages
 - Version display in toolbar (version + git hash via `MatTooltip`)
 - **Collapsible side navigation** — persistent left panel (narrow 64px / wide 220px) with per-user localStorage persistence
+- **Standardized dialog system** — `DialogSize` enum (`Confirm` / `Form` / `Wide`) with `dialogSizeConfig()` helper; all dialogs use Material Design 3 responsive `{ width: '90vw', maxWidth }` pattern; global `_dialogs.scss` handles title padding, Angular Material bug #26352 fix (floating label clipping), and `::before` spacer reset
 
 ### Versioning
 - All three workspaces share a single version (`0.1.0`)

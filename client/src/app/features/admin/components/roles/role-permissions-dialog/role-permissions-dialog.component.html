@@ -17,13 +17,14 @@
     </div>
   } @else {
     <div class="content-grid">
-
       <!-- ── Left: Permission Matrix ── -->
       <div class="permissions-panel">
         @if (role.isSystem) {
           <p class="panel-notice">System role permissions are read-only.</p>
         } @else if (isReadonly()) {
-          <p class="panel-notice">You have read-only access to this role's permissions.</p>
+          <p class="panel-notice">
+            You have read-only access to this role's permissions.
+          </p>
         }
 
         @for (group of permissionGroups(); track group.resource) {
@@ -48,10 +49,14 @@
                   >
                     {{ permission.action.name }}
                   </mat-checkbox>
-                  @if (isChecked(permission.id) && hasAnyCondition(permission.id)) {
+                  @if (
+                    isChecked(permission.id) && hasAnyCondition(permission.id)
+                  ) {
                     <mat-chip
                       class="condition-chip"
-                      [matTooltip]="activeConditionTypes(permission.id).join(', ')"
+                      [matTooltip]="
+                        activeConditionTypes(permission.id).join(', ')
+                      "
                     >
                       <mat-icon class="chip-icon">rule</mat-icon>
                       {{ activeConditionTypes(permission.id).length }}
@@ -99,11 +104,18 @@
                     : 'keyboard_arrow_down'
                 }}</mat-icon>
                 <span class="perm-label">
-                  <span class="perm-resource">{{ permission.resource.name }}</span
-                  >:<span class="perm-action">{{ permission.action.name }}</span>
+                  <span class="perm-resource">{{
+                    permission.resource.name
+                  }}</span
+                  >:<span class="perm-action">{{
+                    permission.action.name
+                  }}</span>
                 </span>
                 @if (hasAnyCondition(permission.id)) {
-                  @for (type of activeConditionTypes(permission.id); track type) {
+                  @for (
+                    type of activeConditionTypes(permission.id);
+                    track type
+                  ) {
                     <mat-chip class="inline-chip" color="accent" highlighted>
                       {{ type }}
                     </mat-chip>
@@ -129,7 +141,10 @@
                     </mat-checkbox>
 
                     @if (hasOwnership(permission.id)) {
-                      <mat-form-field appearance="outline" class="condition-input">
+                      <mat-form-field
+                        appearance="outline"
+                        class="condition-input"
+                      >
                         <mat-label>Record field</mat-label>
                         <input
                           matInput
@@ -155,7 +170,8 @@
                     >
                       <span class="condition-label">Field match</span>
                       <span class="checkbox-hint"
-                        >— record field must be one of the specified values</span
+                        >— record field must be one of the specified
+                        values</span
                       >
                     </mat-checkbox>
 
@@ -164,7 +180,9 @@
                         appearance="outline"
                         class="condition-input condition-input--tall"
                       >
-                        <mat-label>JSON object (field → allowed values)</mat-label>
+                        <mat-label
+                          >JSON object (field → allowed values)</mat-label
+                        >
                         <textarea
                           matInput
                           [value]="getFieldMatchText(permission.id)"
@@ -175,10 +193,13 @@
                           class="json-textarea"
                         ></textarea>
                         @if (getFieldMatchError(permission.id)) {
-                          <mat-error>{{ getFieldMatchError(permission.id) }}</mat-error>
+                          <mat-error>{{
+                            getFieldMatchError(permission.id)
+                          }}</mat-error>
                         } @else {
                           <mat-hint
-                            >e.g. &#123; "status": ["active", "pending"] &#125;</mat-hint
+                            >e.g. &#123; "status": ["active", "pending"]
+                            &#125;</mat-hint
                           >
                         }
                       </mat-form-field>
@@ -194,7 +215,8 @@
                     >
                       <span class="condition-label">User attribute</span>
                       <span class="checkbox-hint"
-                        >— record field must equal a property of the current user</span
+                        >— record field must equal a property of the current
+                        user</span
                       >
                     </mat-checkbox>
 
@@ -203,7 +225,10 @@
                         appearance="outline"
                         class="condition-input condition-input--tall"
                       >
-                        <mat-label>JSON object (record field → user attribute)</mat-label>
+                        <mat-label
+                          >JSON object (record field → user
+                          attribute)</mat-label
+                        >
                         <textarea
                           matInput
                           [value]="getUserAttrText(permission.id)"
@@ -214,7 +239,9 @@
                           class="json-textarea"
                         ></textarea>
                         @if (getUserAttrError(permission.id)) {
-                          <mat-error>{{ getUserAttrError(permission.id) }}</mat-error>
+                          <mat-error>{{
+                            getUserAttrError(permission.id)
+                          }}</mat-error>
                         } @else {
                           <mat-hint
                             >e.g. &#123; "tenantId": "id" &#125; — maps
@@ -254,7 +281,9 @@
                           class="json-textarea"
                         ></textarea>
                         @if (getCustomError(permission.id)) {
-                          <mat-error>{{ getCustomError(permission.id) }}</mat-error>
+                          <mat-error>{{
+                            getCustomError(permission.id)
+                          }}</mat-error>
                         } @else {
                           <mat-hint
                             >e.g. &#123; "$or": [&#123;"status": "active"&#125;]
@@ -270,7 +299,6 @@
           }
         }
       </div>
-
     </div>
   }
 </mat-dialog-content>

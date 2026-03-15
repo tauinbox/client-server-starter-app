@@ -63,7 +63,7 @@ src/app/
     │   ├── confirm-dialog/ # Confirmation dialog
     │   └── password-toggle/# PasswordToggleComponent (reusable password visibility toggle)
     ├── models/             # user.types
-    └── utils/              # css.utils
+    └── utils/              # css.utils, dialog.utils (DialogSize enum + dialogSizeConfig())
 ```
 
 ### Routes
@@ -125,9 +125,11 @@ src/styles/
 ├── base/             # Reset, typography, animations
 ├── themes/           # Light and dark Material themes + CSS vars
 ├── layout/           # Containers, grids
-├── components/       # Cards, forms, loading, tables
+├── components/       # Cards, forms, loading, tables, dialogs (_dialogs.scss — global dialog overrides)
 └── utilities/        # Flex, spacing, text, visibility helpers
 ```
+
+All size values use `func.rem(N)` (pixels → rem conversion) — never hardcoded `px`/`rem` literals. Global dialog styles live in `_dialogs.scss` (title padding, `::before` reset, bug #26352 fix). Dialog sizes are managed via `DialogSize` enum + `dialogSizeConfig()` in `shared/utils/dialog.utils.ts`.
 
 ## Testing
 
