@@ -1,4 +1,10 @@
+@use 'abstracts/variables' as vars;
+
+form {
+  margin-top: vars.$spacing-md;
+}
+
 .full-width {
   width: 100%;
-  margin-bottom: 8px;
+  margin-bottom: vars.$spacing-xs;
 }

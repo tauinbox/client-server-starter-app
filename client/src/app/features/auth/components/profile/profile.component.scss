@@ -1,29 +1,136 @@
 @use 'abstracts/variables' as vars;
+@use 'abstracts/functions' as func;
 @use 'abstracts/mixins' as mix;
 
 :host {
-  .profile-container {
-    @include mix.centered-container(vars.$card-width-md);
+  display: block;
+  width: 100%;
+}
+
+.profile-page {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-lg;
+}
+
+// ── Header card ──────────────────────────────────────────────────────────────
+
+.profile-hero {
+  display: flex;
+  gap: vars.$spacing-xl;
+  align-items: center;
+}
+
+.avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: func.rem(72);
+  height: func.rem(72);
+  font-size: func.rem(26);
+  font-weight: vars.$font-weight-medium;
+  color: #fff;
+  letter-spacing: 1px;
+  user-select: none;
+  background: var(--color-primary);
+  border-radius: vars.$border-radius-circle;
+}
+
+.profile-name {
+  margin: 0 0 vars.$spacing-xxs;
+  font-size: vars.$font-size-xl;
+  font-weight: vars.$font-weight-medium;
+  line-height: 1.2;
+}
+
+.profile-email {
+  margin: 0 0 vars.$spacing-sm;
+  font-size: vars.$font-size-sm;
+  color: var(--color-text-secondary);
+}
+
+.profile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: vars.$spacing-xs;
+  align-items: center;
+}
+
+.profile-since {
+  font-size: vars.$font-size-sm;
+  color: var(--color-text-tertiary);
+}
+
+// ── Content grid ─────────────────────────────────────────────────────────────
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: vars.$spacing-lg;
+
+  @media (max-width: vars.$breakpoint-sm) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// ── Edit profile form ─────────────────────────────────────────────────────────
+
+form {
+  margin-top: vars.$spacing-md;
+}
+
+.form-name-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: vars.$spacing-md;
+
+  mat-form-field {
+    width: 100%;
   }
 
-  .oauth-section {
-    .oauth-providers {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .oauth-provider-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 0;
-    }
-
-    .oauth-provider-info {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
+  @media (max-width: vars.$breakpoint-xs) {
+    grid-template-columns: 1fr;
   }
+}
+
+.full-width {
+  display: block;
+  width: 100%;
+}
+
+.error-message {
+  @include mix.error-message;
+}
+
+.form-actions {
+  @include mix.form-actions;
+}
+
+.loading-container {
+  @include mix.loading-container;
+}
+
+// ── Connected accounts ────────────────────────────────────────────────────────
+
+.oauth-providers {
+  display: flex;
+  flex-direction: column;
+}
+
+.oauth-provider-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: vars.$spacing-sm 0;
+
+  & + & {
+    border-top: 1px solid var(--color-divider);
+  }
+}
+
+.oauth-provider-info {
+  display: flex;
+  gap: vars.$spacing-sm;
+  align-items: center;
 }

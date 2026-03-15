@@ -7,8 +7,10 @@
 }
 
 .dialog-icon {
+  flex-shrink: 0;
   width: func.rem(24);
   height: func.rem(24);
   margin-right: func.rem(16);
+  overflow: visible;
   font-size: func.rem(24);
 }

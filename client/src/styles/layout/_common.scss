@@ -1,8 +1,15 @@
 @use 'abstracts/variables' as vars;
 @use 'abstracts/mixins' as mix;
+@use 'abstracts/functions' as func;
 
 .container {
-  display: block;
+  // The mixin's display:flex + justify-content:center was designed for centering small
+  // child elements (cards, forms). As the main page wrapper we need children to
+  // stretch to full width instead. Switching to column direction with align-items:stretch
+  // (flex default) achieves this: children fill the container width automatically,
+  // and the container itself stays centered via margin:0 auto from the mixin.
+  flex-direction: column;
+  justify-content: flex-start;
 
   @include mix.centered-container;
 }
@@ -19,6 +26,10 @@ mat-sidenav .mat-drawer-inner-container {
 // mat-sidenav-content receives margin-left via Angular style binding (not Material's
 // autosize) to avoid ~10s delay caused by ResizeObserver + OnPush change detection.
 // Transition here keeps the content shift in sync with the sidenav width animation.
+// scrollbar-gutter: stable reserves space for the scrollbar at all times — prevents
+// the ~15px layout shift when navigating between pages that do and do not overflow.
 mat-sidenav-content {
+  scrollbar-gutter: stable;
   transition: margin-left 300ms ease;
 }
+

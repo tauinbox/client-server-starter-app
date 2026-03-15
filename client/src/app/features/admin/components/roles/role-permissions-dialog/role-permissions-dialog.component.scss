@@ -1,47 +1,82 @@
+@use 'abstracts/variables' as vars;
+@use 'abstracts/functions' as func;
+
+// ── Dialog title ───────────────────────────────────────────────────────────
+
 .dialog-title {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: vars.$spacing-xs;
   align-items: center;
 
   .role-name {
-    font-weight: 600;
+    font-weight: vars.$font-weight-bold;
   }
 }
 
+// ── Dialog content: two-column layout ─────────────────────────────────────
+
 .dialog-content {
-  min-width: 520px;
-  min-height: 200px;
-  padding-top: 8px;
+  // Remove side padding — panels add their own padding.
+  // We use CSS custom properties so Material's own padding rule is overridden
+  // without !important; padding-top is still applied by the global
+  // .mat-mdc-dialog-title + .mat-mdc-dialog-content fix.
+  --mat-dialog-content-padding: 0;
+  --mat-dialog-with-actions-content-padding: 0;
+
+  // Override Material's overflow: auto so each panel scrolls independently.
+  // .dialog-content has the same specificity (0,1,0) as Material's rule;
+  // our global styles load last so this wins by source order.
+  overflow: hidden;
 }
 
+// Full-height loading / error state
 .state-container {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  height: 100%;
+  min-height: func.rem(200);
+  padding: vars.$spacing-xl;
 
   &.error {
     color: var(--mat-sys-error);
   }
 }
 
-.system-notice {
-  margin-bottom: 12px;
-  font-size: 0.875rem;
-  color: var(--mat-sys-on-surface-variant);
+// Two-column grid that fills the content area
+.content-grid {
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+  height: 100%;
+  min-height: func.rem(300);
 }
 
-// ── Permission Matrix ──────────────────────────────────────────────────────
+// ── Left: Permission Matrix ────────────────────────────────────────────────
+
+.permissions-panel {
+  padding: vars.$spacing-sm vars.$spacing-md;
+  overflow-y: auto;
+  border-right: 1px solid var(--mat-sys-outline-variant);
+}
+
+.panel-notice {
+  padding: vars.$spacing-xs vars.$spacing-sm;
+  margin: 0 0 vars.$spacing-sm;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-on-surface-variant);
+  background: color-mix(in srgb, var(--mat-sys-outline-variant) 20%, transparent);
+  border-radius: vars.$border-radius-sm;
+}
 
 .permission-group {
-  padding: 10px 0 6px;
+  padding: vars.$spacing-xs 0;
 
   .group-header {
-    margin-bottom: 6px;
+    margin-bottom: vars.$spacing-xxs;
 
     .resource-label {
-      font-weight: 600;
+      font-weight: vars.$font-weight-medium;
       text-transform: capitalize;
     }
   }
@@ -49,14 +84,14 @@
   .permission-items {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 8px;
-    padding-left: 28px;
+    gap: vars.$spacing-xxs vars.$spacing-xs;
+    padding-left: func.rem(28);
   }
 }
 
 .permission-entry {
   display: flex;
-  gap: 4px;
+  gap: vars.$spacing-xxs;
   align-items: center;
 
   mat-checkbox {
@@ -64,71 +99,102 @@
   }
 
   .condition-chip {
-    height: 20px;
+    height: func.rem(20);
     min-height: unset;
-    padding: 0 6px;
-    font-size: 0.7rem;
-    line-height: 20px;
+    padding: 0 vars.$spacing-xs;
+    font-size: func.rem(11);
+    line-height: func.rem(20);
     cursor: default;
 
     .chip-icon {
-      width: 12px;
-      height: 12px;
-      margin-right: 2px;
-      font-size: 12px;
+      width: func.rem(12);
+      height: func.rem(12);
+      margin-right: func.rem(2);
+      font-size: func.rem(12);
       vertical-align: middle;
     }
   }
 }
 
 mat-divider {
-  margin: 2px 0;
+  margin: func.rem(2) 0;
 }
 
-// ── Conditions Section ─────────────────────────────────────────────────────
+// ── Right: Conditions Panel ────────────────────────────────────────────────
 
-.conditions-section {
-  padding-top: 16px;
+.conditions-panel {
+  padding: vars.$spacing-sm vars.$spacing-md;
+  overflow-y: auto;
+}
 
-  .conditions-title {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    margin: 0 0 4px;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--mat-sys-on-surface-variant);
+.conditions-empty {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-sm;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--mat-sys-on-surface-variant);
+  text-align: center;
 
-    mat-icon {
-      width: 18px;
-      height: 18px;
-      font-size: 18px;
-    }
+  mat-icon {
+    width: func.rem(40);
+    height: func.rem(40);
+    font-size: func.rem(40);
+    opacity: 0.4;
   }
 
-  .conditions-hint {
-    margin: 0 0 12px;
-    font-size: 0.8rem;
-    color: var(--mat-sys-on-surface-variant);
+  p {
+    margin: 0;
+    font-size: vars.$font-size-sm;
+    opacity: 0.7;
   }
 }
+
+.conditions-header {
+  margin-bottom: vars.$spacing-sm;
+}
+
+.conditions-title {
+  display: flex;
+  gap: vars.$spacing-xs;
+  align-items: center;
+  margin: 0 0 vars.$spacing-xxs;
+  font-size: vars.$font-size-base;
+  font-weight: vars.$font-weight-medium;
+  color: var(--mat-sys-on-surface-variant);
+
+  mat-icon {
+    width: func.rem(18);
+    height: func.rem(18);
+    font-size: func.rem(18);
+  }
+}
+
+.conditions-hint {
+  margin: 0;
+  font-size: func.rem(12);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// ── Condition rows ─────────────────────────────────────────────────────────
 
 .condition-row {
-  margin-bottom: 8px;
+  margin-bottom: vars.$spacing-xs;
   overflow: hidden;
   border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: 8px;
+  border-radius: vars.$border-radius-md;
 }
 
 .condition-toggle {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: vars.$spacing-xs;
   align-items: center;
   justify-content: flex-start;
   width: 100%;
   height: auto;
-  padding: 8px 12px;
+  padding: vars.$spacing-xs vars.$spacing-sm;
   text-align: left;
 
   mat-icon {
@@ -139,43 +205,39 @@ mat-divider {
   .perm-label {
     flex: 1;
     font-family: monospace;
-    font-size: 0.85rem;
+    font-size: func.rem(13);
 
     .perm-resource {
       color: var(--mat-sys-on-surface-variant);
     }
 
     .perm-action {
-      font-weight: 600;
+      font-weight: vars.$font-weight-bold;
     }
   }
 
   .no-condition {
-    font-size: 0.75rem;
+    font-size: func.rem(12);
     font-style: italic;
     color: var(--mat-sys-on-surface-variant);
   }
 
   .inline-chip {
-    height: 22px;
+    height: func.rem(22);
     min-height: unset;
-    font-size: 0.7rem;
+    font-size: func.rem(11);
   }
 
   &.has-condition {
-    background-color: color-mix(
-      in srgb,
-      var(--mat-sys-primary) 5%,
-      transparent
-    );
+    background-color: color-mix(in srgb, var(--mat-sys-primary) 5%, transparent);
   }
 }
 
 .condition-editor {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 12px 16px 16px;
+  gap: vars.$spacing-md;
+  padding: vars.$spacing-sm vars.$spacing-md vars.$spacing-md;
   border-top: 1px solid var(--mat-sys-outline-variant);
 }
 
@@ -184,31 +246,30 @@ mat-divider {
 .condition-block {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: vars.$spacing-xs;
 
   .condition-label {
-    font-weight: 500;
+    font-weight: vars.$font-weight-medium;
   }
 
   .checkbox-hint {
-    font-size: 0.75rem;
-    font-weight: 400;
+    font-size: func.rem(12);
+    font-weight: vars.$font-weight-regular;
     color: var(--mat-sys-on-surface-variant);
   }
 }
 
 .condition-input {
   width: 100%;
-  max-width: 480px;
 
   &--tall textarea {
-    min-height: 80px;
+    min-height: func.rem(80);
     resize: vertical;
   }
 }
 
 .json-textarea {
   font-family: 'Courier New', Courier, monospace;
-  font-size: 0.8rem;
+  font-size: func.rem(13);
   line-height: 1.4;
 }

@@ -36,7 +36,7 @@ import {
 import type { ActionResponse } from '@app/shared/types/rbac.types';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
-import { rem } from '@shared/utils/css.utils';
+import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { ResourcesStore } from '../../../store/resources.store';
 import type {
   ActionFormDialogData,
@@ -109,7 +109,10 @@ export class ActionListComponent implements OnInit {
   openAddAction(): void {
     const data: ActionFormDialogData = {};
     this.#dialog
-      .open(ActionFormDialogComponent, { width: rem(480), data })
+      .open(ActionFormDialogComponent, {
+        ...dialogSizeConfig(DialogSize.Form),
+        data
+      })
       .afterClosed()
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((result: ActionFormDialogResult | undefined) => {
@@ -138,7 +141,10 @@ export class ActionListComponent implements OnInit {
   openEditAction(action: ActionResponse): void {
     const data: ActionFormDialogData = { action };
     this.#dialog
-      .open(ActionFormDialogComponent, { width: rem(480), data })
+      .open(ActionFormDialogComponent, {
+        ...dialogSizeConfig(DialogSize.Form),
+        data
+      })
       .afterClosed()
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((result: ActionFormDialogResult | undefined) => {
@@ -167,7 +173,7 @@ export class ActionListComponent implements OnInit {
   confirmDeleteAction(action: ActionResponse): void {
     this.#dialog
       .open(ConfirmDialogComponent, {
-        width: rem(350),
+        ...dialogSizeConfig(DialogSize.Confirm),
         data: {
           title: 'Delete Action',
           message: `Are you sure you want to delete the action "${action.displayName}"?`,

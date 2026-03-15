@@ -43,7 +43,7 @@ import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confir
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import { catchError, forkJoin, merge, of, tap } from 'rxjs';
-import { rem } from '@shared/utils/css.utils';
+import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { UsersStore } from '../../store/users.store';
 import type { RoleResponse } from '@app/shared/types/role.types';
@@ -326,7 +326,7 @@ export class UserEditComponent implements OnInit {
 
     this.#dialog
       .open(ConfirmDialogComponent, {
-        width: rem(350),
+        ...dialogSizeConfig(DialogSize.Confirm),
         data: {
           title: 'Confirm Delete',
           message: `Are you sure you want to delete user ${this.user()!.firstName} ${this.user()!.lastName}?`,

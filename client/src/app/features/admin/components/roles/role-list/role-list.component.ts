@@ -37,7 +37,7 @@ import type { RoleResponse } from '@app/shared/types/role.types';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AuthService } from '@features/auth/services/auth.service';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
-import { rem } from '@shared/utils/css.utils';
+import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { RolesStore } from '../../../store/roles.store';
 import type {
   RoleFormDialogData,
@@ -112,7 +112,10 @@ export class RoleListComponent implements OnInit {
   openCreateDialog(): void {
     const data: RoleFormDialogData = {};
     this.#dialog
-      .open(RoleFormDialogComponent, { width: rem(480), data })
+      .open(RoleFormDialogComponent, {
+        ...dialogSizeConfig(DialogSize.Form),
+        data
+      })
       .afterClosed()
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((result: RoleFormDialogResult | undefined) => {
@@ -141,7 +144,10 @@ export class RoleListComponent implements OnInit {
   openEditDialog(role: RoleResponse): void {
     const data: RoleFormDialogData = { role };
     this.#dialog
-      .open(RoleFormDialogComponent, { width: rem(480), data })
+      .open(RoleFormDialogComponent, {
+        ...dialogSizeConfig(DialogSize.Form),
+        data
+      })
       .afterClosed()
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((result: RoleFormDialogResult | undefined) => {
@@ -173,7 +179,10 @@ export class RoleListComponent implements OnInit {
       readonly: !this.canUpdate()
     };
     this.#dialog
-      .open(RolePermissionsDialogComponent, { width: rem(560), data })
+      .open(RolePermissionsDialogComponent, {
+        ...dialogSizeConfig(DialogSize.Wide),
+        data
+      })
       .afterClosed()
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((changed: boolean | undefined) => {
@@ -189,7 +198,7 @@ export class RoleListComponent implements OnInit {
   confirmDelete(role: RoleResponse): void {
     this.#dialog
       .open(ConfirmDialogComponent, {
-        width: rem(350),
+        ...dialogSizeConfig(DialogSize.Confirm),
         data: {
           title: 'Delete Role',
           message: `Are you sure you want to delete the role "${role.name}"?`,

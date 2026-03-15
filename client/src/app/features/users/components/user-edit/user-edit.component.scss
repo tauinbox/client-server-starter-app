@@ -4,25 +4,72 @@
 
 :host {
   .user-edit-container {
-    @include mix.centered-container(vars.$card-width-sm);
+    @include mix.card-container;
+  }
+
+  form {
+    margin-top: vars.$spacing-md;
+  }
+
+  .form-name-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: vars.$spacing-md;
+
+    mat-form-field {
+      width: 100%;
+    }
+
+    @media (max-width: vars.$breakpoint-xs) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .full-width {
+    display: block;
+    width: 100%;
+  }
+
+  .checkbox-group {
+    margin: vars.$spacing-xs 0;
   }
 
   .account-status {
-    margin: 8px 0 16px;
+    margin: vars.$spacing-xs 0 vars.$spacing-md;
 
     .status-badge {
       display: flex;
-      gap: 8px;
+      gap: vars.$spacing-xs;
       align-items: center;
-      padding: 8px 12px;
-      margin-bottom: 8px;
-      font-size: 14px;
-      border-radius: 8px;
+      padding: vars.$spacing-xs vars.$spacing-sm;
+      margin-bottom: vars.$spacing-xs;
+      font-size: vars.$font-size-sm;
+      border-radius: vars.$border-radius-md;
 
       &.warn {
         color: var(--mat-sys-on-error-container);
         background-color: var(--mat-sys-error-container);
       }
     }
+  }
+
+  .error-container {
+    .error-icon {
+      color: var(--color-error);
+    }
+
+    @include mix.empty-state;
+  }
+
+  .error-message {
+    @include mix.error-message;
+  }
+
+  .loading-container {
+    @include mix.loading-container;
+  }
+
+  .form-actions {
+    @include mix.form-actions;
   }
 }
