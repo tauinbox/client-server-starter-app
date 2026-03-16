@@ -14,6 +14,8 @@ describe('Application bootstrap', () => {
     const app = moduleFixture.createNestApplication();
 
     expect(app).toBeDefined();
+
+    await moduleFixture.close();
   });
 
   // Full initialization test — runs only when DB_HOST is set (i.e. in CI or
