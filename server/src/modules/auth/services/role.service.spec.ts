@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  InternalServerErrorException,
+  NotFoundException
+} from '@nestjs/common';
 import { RoleService } from './role.service';
 import { Role } from '../entities/role.entity';
 import { Permission } from '../entities/permission.entity';
@@ -24,6 +28,12 @@ describe('RoleService', () => {
     create: jest.Mock;
     save: jest.Mock;
     delete: jest.Mock;
+    manager: { transaction: jest.Mock };
+  };
+  let mockRoleRepoQB: {
+    innerJoin: jest.Mock;
+    where: jest.Mock;
+    getMany: jest.Mock;
   };
   let mockPermissionService: { invalidateUserCache: jest.Mock };
   let mockRelationQueryBuilder: {
@@ -63,6 +73,12 @@ describe('RoleService', () => {
   };
 
   beforeEach(async () => {
+    mockRoleRepoQB = {
+      innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([])
+    };
+
     mockRelationQueryBuilder = {
       relation: jest.fn().mockReturnThis(),
       of: jest.fn().mockReturnThis(),
@@ -95,7 +111,7 @@ describe('RoleService', () => {
             args.length > 0 ? mockUserQueryBuilder : mockRelationQueryBuilder
           )
       },
-      createQueryBuilder: jest.fn()
+      createQueryBuilder: jest.fn().mockReturnValue(mockRoleRepoQB)
     };
 
     mockPermissionRepo = {
@@ -108,7 +124,31 @@ describe('RoleService', () => {
         .fn()
         .mockImplementation((data: Record<string, unknown>) => data),
       save: jest.fn(),
-      delete: jest.fn()
+      delete: jest.fn(),
+      manager: {
+        transaction: jest
+          .fn()
+          .mockImplementation(
+            async (
+              cb: (em: {
+                delete: jest.Mock;
+                create: jest.Mock;
+                save: jest.Mock;
+              }) => Promise<void>
+            ) => {
+              const em = {
+                delete: jest.fn().mockResolvedValue(undefined),
+                create: jest
+                  .fn()
+                  .mockImplementation(
+                    (_, data: Record<string, unknown>) => data
+                  ),
+                save: jest.fn().mockResolvedValue(undefined)
+              };
+              await cb(em);
+            }
+          )
+      }
     };
 
     mockPermissionService = {
@@ -318,6 +358,134 @@ describe('RoleService', () => {
       mockPermissionRepo.find.mockResolvedValue(permissions);
       const result = await service.findAllPermissions();
       expect(result).toEqual(permissions);
+    });
+  });
+
+  describe('update — additional branches', () => {
+    it('should throw BadRequestException if isSuper is in update payload', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      await expect(service.update('role-2', { isSuper: true })).rejects.toThrow(
+        BadRequestException
+      );
+    });
+
+    it('should throw BadRequestException when updating name to an existing name', async () => {
+      const conflictRole: Role = {
+        ...customRole,
+        id: 'role-99',
+        name: 'viewer'
+      };
+      mockRoleRepo.findOne
+        .mockResolvedValueOnce(customRole) // findOne(id) call
+        .mockResolvedValueOnce(conflictRole); // findOne({ name }) conflict check
+      await expect(
+        service.update('role-2', { name: 'viewer' })
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should allow renaming to the same name (no conflict)', async () => {
+      mockRoleRepo.findOne
+        .mockResolvedValueOnce(customRole) // findOne(id)
+        .mockResolvedValueOnce(customRole); // same id → no conflict
+      mockRoleRepo.save.mockResolvedValue({ ...customRole, name: 'editor' });
+      const result = await service.update('role-2', { name: 'editor' });
+      expect(result.name).toBe('editor');
+    });
+  });
+
+  describe('findRolesForUser', () => {
+    it('should query roles for a user via createQueryBuilder', async () => {
+      const roles = [systemRole];
+      mockRoleRepoQB.getMany.mockResolvedValue(roles);
+
+      const result = await service.findRolesForUser('user-1');
+
+      expect(mockRoleRepo.createQueryBuilder).toHaveBeenCalledWith('role');
+      expect(mockRoleRepoQB.innerJoin).toHaveBeenCalledWith(
+        'user_roles',
+        'ur',
+        'ur.role_id = role.id'
+      );
+      expect(mockRoleRepoQB.where).toHaveBeenCalledWith(
+        'ur.user_id = :userId',
+        { userId: 'user-1' }
+      );
+      expect(result).toEqual(roles);
+    });
+  });
+
+  describe('getPermissionsForRole', () => {
+    it('should return permissions for a role', async () => {
+      const perms = [{ id: 'rp-1', roleId: 'role-2', permissionId: 'perm-1' }];
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRolePermissionRepo.find.mockResolvedValue(perms);
+
+      const result = await service.getPermissionsForRole('role-2');
+
+      expect(mockRolePermissionRepo.find).toHaveBeenCalledWith({
+        where: { roleId: 'role-2' },
+        relations: ['permission']
+      });
+      expect(result).toEqual(perms);
+    });
+
+    it('should throw NotFoundException when role does not exist', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(null);
+      await expect(service.getPermissionsForRole('bad-id')).rejects.toThrow(
+        NotFoundException
+      );
+    });
+  });
+
+  describe('setPermissionsForRole', () => {
+    it('should delete existing and save new permissions inside a transaction', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockUserQueryBuilder.getMany.mockResolvedValue([]);
+      const items = [{ permissionId: 'perm-1' }, { permissionId: 'perm-2' }];
+
+      await service.setPermissionsForRole('role-2', items);
+
+      expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalled();
+    });
+
+    it('should skip save when items array is empty', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockUserQueryBuilder.getMany.mockResolvedValue([]);
+
+      await service.setPermissionsForRole('role-2', []);
+
+      expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalled();
+    });
+
+    it('should invalidate cache for all role members after setting permissions', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+
+      await service.setPermissionsForRole('role-2', [
+        { permissionId: 'perm-1' }
+      ]);
+
+      expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
+        'u-1'
+      );
+    });
+  });
+
+  describe('findRoleByName', () => {
+    it('should return role when found by name', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(systemRole);
+      const result = await service.findRoleByName('admin');
+      expect(result).toBe(systemRole);
+      expect(mockRoleRepo.findOne).toHaveBeenCalledWith({
+        where: { name: 'admin' }
+      });
+    });
+
+    it('should throw InternalServerErrorException when role not found', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(null);
+      await expect(service.findRoleByName('nonexistent')).rejects.toThrow(
+        InternalServerErrorException
+      );
     });
   });
 });

@@ -465,4 +465,33 @@ describe('OAuthController', () => {
       );
     });
   });
+
+  describe('facebookCallback', () => {
+    it('should delegate to handleOAuthCallback and redirect on success', async () => {
+      const mockAuthResponse = {
+        tokens: {
+          access_token: 'token',
+          refresh_token: 'refresh',
+          expires_in: 3600
+        },
+        user: { id: '1', email: 'test@example.com' }
+      };
+      authServiceMock.loginWithOAuth.mockResolvedValue(mockAuthResponse);
+
+      const res = mockResponse();
+      const profile: OAuthUserProfile = {
+        provider: OAuthProvider.GOOGLE,
+        providerId: '789',
+        email: 'fb@example.com',
+        firstName: 'Face',
+        lastName: 'Book'
+      };
+
+      await controller.facebookCallback(mockExpressRequest(profile), res);
+
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://localhost:4200/oauth/callback'
+      );
+    });
+  });
 });
