@@ -19,6 +19,7 @@ COPY mock-server/package.json ./mock-server/
 RUN npm ci --workspace=server
 COPY shared/ ./shared/
 COPY server/ ./server/
+ENV PATH=/app/node_modules/.bin:$PATH
 RUN cd server && npm run build
 
 # Stage 3: runtime

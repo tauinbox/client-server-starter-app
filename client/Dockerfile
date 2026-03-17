@@ -10,6 +10,7 @@ COPY shared/ ./shared/
 COPY client/ ./client/
 ARG COMMIT_HASH=unknown
 ARG BASE_HREF=/nexus/
+ENV PATH=/app/node_modules/.bin:$PATH
 RUN cd client && COMMIT_HASH=$COMMIT_HASH NODE_OPTIONS="--max-old-space-size=2048" npm run build -- --base-href $BASE_HREF
 
 # Stage 2: runtime
