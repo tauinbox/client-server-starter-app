@@ -3,12 +3,12 @@
 .github
 doc/
 mock-server/
+!mock-server/package.json
 .env
 server/.env
 server/.env.local
 client/.env
-server/node_modules
-client/node_modules
+node_modules
 server/dist
 client/dist
 server/coverage
