@@ -7,7 +7,9 @@ async function initLocale(): Promise<void> {
   const lang = navigator.language.split('-')[0].toLowerCase();
   if (lang === 'en') return; // en-US is built in, no registration needed
   try {
-    const localeModule = await import(`@angular/common/locales/${lang}`);
+    const localeModule = await import(
+      /* @vite-ignore */ `@angular/common/locales/${lang}`
+    );
     registerLocaleData(localeModule.default);
   } catch {
     // Unknown locale — fall back to built-in en-US
