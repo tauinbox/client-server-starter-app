@@ -6,7 +6,8 @@ RUN cd client && npm ci --ignore-scripts
 COPY shared/ ./shared/
 COPY client/ ./client/
 ARG COMMIT_HASH=unknown
-RUN cd client && COMMIT_HASH=$COMMIT_HASH NODE_OPTIONS="--max-old-space-size=2048" npm run build -- --base-href /nexus/
+ARG BASE_HREF=/nexus/
+RUN cd client && COMMIT_HASH=$COMMIT_HASH NODE_OPTIONS="--max-old-space-size=2048" npm run build -- --base-href $BASE_HREF
 
 # Stage 2: runtime
 FROM nginx:1.28-alpine AS runner

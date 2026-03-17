@@ -10,6 +10,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 import { ThemeToggleComponent } from './theme-toggle/theme-toggle.component';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { APP_VERSION, BUILD_HASH } from '@environments/version';
+import { environment } from '@environments/environment';
 
 @Component({
   selector: 'app-header',
@@ -30,6 +31,7 @@ import { APP_VERSION, BUILD_HASH } from '@environments/version';
 export class HeaderComponent {
   protected readonly authStore = inject(AuthStore);
   protected readonly routes = AppRouteSegmentEnum;
+  protected readonly appName = environment.appName;
   protected readonly appVersion = `v${APP_VERSION} (${BUILD_HASH})`;
 
   readonly #authService = inject(AuthService);
