@@ -1,0 +1,27 @@
+{
+  "name": "nexus",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server",
+    "mock-server"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "format:check": "turbo run format:check",
+    "test": "turbo run test",
+    "verify": "turbo run lint format:check build test"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "4.59.0",
+    "@rollup/rollup-linux-x64-musl": "4.59.0"
+  },
+  "packageManager": "npm@10.9.3",
+  "engines": {
+    "node": ">=22"
+  }
+}
