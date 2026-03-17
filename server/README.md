@@ -101,6 +101,9 @@ src/
 │   ├── database/           # TypeORM + PostgreSQL config
 │   ├── filters/            # GlobalExceptionFilter (standardized error responses, DB error mapping)
 │   ├── health/             # HealthModule (GET /api/health, TypeORM DB ping)
+│   ├── metrics/            # MetricsModule (@Global) — Prometheus metrics via @willsoto/nestjs-prometheus
+│   │                       #   GET /metrics (excluded from /api prefix); http_requests_total,
+│   │                       #   http_request_duration_seconds, auth_events_total; HttpMetricsInterceptor
 │   └── schedule/           # @nestjs/schedule for cron jobs
 ├── auth/
 │   ├── controllers/        # AuthController (includes GET /permissions), OAuthController, RbacController

@@ -27,6 +27,7 @@ import { RoleService } from './role.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { MailService } from '../../mail/mail.service';
 import { AuditService, AuditContext } from '../../audit/audit.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { hashToken } from '../../../common/utils/hash-token';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { SYSTEM_ROLES } from '@app/shared/constants';
@@ -55,7 +56,8 @@ export class AuthService {
     private permissionService: PermissionService,
     private roleService: RoleService,
     private mailService: MailService,
-    private auditService: AuditService
+    private auditService: AuditService,
+    private metricsService: MetricsService
   ) {}
 
   // Pre-computed dummy hash for constant-time rejection (prevents timing attacks)
@@ -133,6 +135,7 @@ export class AuthService {
         actorEmail: email,
         details: { reason: 'invalid_credentials' }
       });
+      this.metricsService.recordAuthEvent('login_failure');
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -390,6 +393,8 @@ export class AuthService {
       context: auditContext
     });
 
+    this.metricsService.recordAuthEvent('register');
+
     // Send verification email (fire-and-forget — delivery failure is non-fatal)
     this.mailService
       .sendEmailVerification(user.email, rawToken)
@@ -572,6 +577,7 @@ export class AuthService {
         action: AuditAction.TOKEN_REFRESH_FAILURE,
         details: { reason: 'invalid_or_expired_token' }
       });
+      this.metricsService.recordAuthEvent('token_refresh_failure');
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -617,6 +623,8 @@ export class AuthService {
     });
 
     const { password: _, ...userWithoutPassword } = user;
+
+    this.metricsService.recordAuthEvent('token_refresh_success');
 
     return {
       tokens,

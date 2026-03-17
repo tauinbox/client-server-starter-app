@@ -52,6 +52,7 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { RegisterResource } from '../decorators/register-resource.decorator';
 import { Request as ExpressRequest } from 'express';
+import { MetricsService } from '../../core/metrics/metrics.service';
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
 
@@ -73,7 +74,8 @@ export class AuthController {
     private readonly permissionService: PermissionService,
     private readonly caslAbilityFactory: CaslAbilityFactory,
     private readonly auditService: AuditService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly metricsService: MetricsService
   ) {}
 
   private setRefreshTokenCookie(res: Response, token: string): void {
@@ -134,6 +136,7 @@ export class AuthController {
       targetType: 'User',
       context: extractAuditContext(req)
     });
+    this.metricsService.recordAuthEvent('login_success');
 
     const { refresh_token, ...publicTokens } = result.tokens;
     this.setRefreshTokenCookie(res, refresh_token);
@@ -184,6 +187,7 @@ export class AuthController {
       actorEmail: req.user.email,
       context: extractAuditContext(req)
     });
+    this.metricsService.recordAuthEvent('logout');
     return { message: 'Successfully logged out' };
   }
 

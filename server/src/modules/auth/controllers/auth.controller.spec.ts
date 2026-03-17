@@ -8,6 +8,7 @@ import { UsersService } from '../../users/services/users.service';
 import { PermissionService } from '../services/permission.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { AuditService } from '../../audit/audit.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { JwtAuthRequest, LocalAuthRequest } from '../types/auth.request';
@@ -154,6 +155,10 @@ describe('AuthController', () => {
         { provide: PermissionService, useValue: permissionServiceMock },
         { provide: CaslAbilityFactory, useValue: caslAbilityFactoryMock },
         { provide: AuditService, useValue: auditServiceMock },
+        {
+          provide: MetricsService,
+          useValue: { recordAuthEvent: jest.fn() }
+        },
         {
           provide: ConfigService,
           useValue: {
