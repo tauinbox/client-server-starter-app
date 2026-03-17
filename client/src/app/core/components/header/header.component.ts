@@ -32,7 +32,16 @@ export class HeaderComponent {
   protected readonly authStore = inject(AuthStore);
   protected readonly routes = AppRouteSegmentEnum;
   protected readonly appName = environment.appName;
-  protected readonly appVersion = `v${APP_VERSION} (${BUILD_HASH}) · ${BUILD_DATE}`;
+  protected readonly appVersion = (() => {
+    const date = new Intl.DateTimeFormat('sv-SE', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(new Date(BUILD_DATE));
+    return `v${APP_VERSION} (${BUILD_HASH}) · ${date}`;
+  })();
 
   readonly #authService = inject(AuthService);
 
