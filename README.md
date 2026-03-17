@@ -335,7 +335,7 @@ npm test                   # Unit tests (Jest)
 npm run test:cov           # Test coverage
 npm run test:e2e           # E2E tests
 npm run migrations:run     # Run migrations (build first)
-npm run migrations:gen     # Generate migration (build first)
+npm run migrations:gen -- ./src/migrations/<kebab-name>  # Generate migration (build first)
 npm run seed:run           # Run seeders (build first)
 ```
 

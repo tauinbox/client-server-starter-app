@@ -38,7 +38,7 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Test coverage | `npm run test:cov` |
 | E2E tests | `npm run test:e2e` |
 | Run migrations | `npm run migrations:run` (build first) |
-| Generate migration | `npm run migrations:gen` (build first) |
+| Generate migration | `npm run migrations:gen -- ./src/migrations/<kebab-name>` (build first) |
 | Revert migration | `npm run migrations:revert` (build first) |
 | Run seeders | `npm run seed:run` (build first) |
 
