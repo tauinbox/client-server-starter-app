@@ -39,7 +39,7 @@ export class HeaderComponent {
   protected readonly routes = AppRouteSegmentEnum;
   readonly #locale = inject(LOCALE_ID);
   protected readonly appName = environment.appName;
-  protected readonly appVersion = `v${APP_VERSION} (${BUILD_HASH}) · ${formatDate(BUILD_DATE, 'dd-MM-yyyy HH:mm', this.#locale)}`;
+  protected readonly appVersion = `v${APP_VERSION} (${BUILD_HASH}) · ${formatDate(BUILD_DATE, 'short', this.#locale)}`;
 
   readonly #authService = inject(AuthService);
 
