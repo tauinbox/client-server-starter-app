@@ -236,9 +236,11 @@ docker-compose up -d
 
 Services:
 - **redis** — redis:7-alpine, used for distributed rate limiting and shared permission cache
-- **db** — postgres:17-alpine, persistent named volume; port 5432 exposed to host for local development
-- **server** — NestJS API on port 3000; entrypoint runs migrations, optional admin seed, then starts the server
+- **db** — postgres:16-alpine, persistent named volume
+- **server** — NestJS API on port 3000; entrypoint runs migrations, optional admin seed, then starts the server; exposes `GET /metrics` for Prometheus scraping
 - **client** — Angular SPA served by nginx on port 4200 (maps to container port 80); built with `--base-href /nexus/` (overridable via `docker build --build-arg BASE_HREF=/`)
+- **prometheus** — prom/prometheus:v2.54.1, internal network only (no ports exposed); scrapes `/metrics` every 15s, 30d retention; config at `monitoring/prometheus.yml`
+- **grafana** — grafana/grafana:11.3.1, accessible at port 3001; provisioned datasource (Prometheus) and NestJS dashboard (HTTP traffic, auth events, Node.js runtime)
 
 ### Docker environment variables
 
@@ -252,6 +254,8 @@ ADMIN_LAST_NAME=User
 ```
 
 The admin seeder is idempotent — it skips creation if the user already exists and does nothing if `ADMIN_EMAIL` is empty.
+
+Set `GRAFANA_ADMIN_PASSWORD` as a shell environment variable before running `docker-compose up` to control the Grafana admin password (defaults to `admin` — change in production). Grafana is available at http://your-host:3001.
 
 ### Deploy pipeline
 

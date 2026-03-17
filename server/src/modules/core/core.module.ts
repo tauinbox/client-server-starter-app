@@ -1,6 +1,6 @@
 import type { MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { DynamicModule, Module } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import * as Joi from 'joi';
 import { LoggerModule } from 'nestjs-pino';
@@ -26,6 +26,8 @@ import { AuditModule } from '../audit/audit.module';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
 import { RequestLoggingMiddleware } from './middleware/request-logging.middleware';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { MetricsModule } from './metrics/metrics.module';
+import { HttpMetricsInterceptor } from './interceptors/http-metrics.interceptor';
 
 @Module({})
 export class CoreModule implements NestModule {
@@ -137,6 +139,7 @@ export class CoreModule implements NestModule {
             }
           })
         }),
+        MetricsModule,
         MailModule,
         AuditModule,
         AuthModule,
@@ -151,6 +154,10 @@ export class CoreModule implements NestModule {
         {
           provide: APP_GUARD,
           useClass: LoginThrottlerGuard
+        },
+        {
+          provide: APP_INTERCEPTOR,
+          useClass: HttpMetricsInterceptor
         }
       ]
     };

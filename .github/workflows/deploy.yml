@@ -113,7 +113,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: DEPLOY_SHA,OWNER
+          envs: DEPLOY_SHA,OWNER,GRAFANA_ADMIN_PASSWORD
           script: |
             set -euo pipefail
             cd /home/deploy/nexus
@@ -206,3 +206,4 @@ jobs:
         env:
           DEPLOY_SHA: ${{ needs.build-push.outputs.sha }}
           OWNER: ${{ needs.build-push.outputs.owner }}
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}

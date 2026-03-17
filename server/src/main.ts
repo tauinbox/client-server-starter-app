@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { CoreModule } from './modules/core/core.module';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { RequestMethod, ValidationPipe, VersioningType } from '@nestjs/common';
 import { Logger } from 'nestjs-pino';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as compression from 'compression';
@@ -32,7 +32,9 @@ async function bootstrap() {
   app.use(helmet());
   app.enableCors(corsOptions());
   app.useStaticAssets(join(__dirname, '..', 'public'));
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api', {
+    exclude: [{ path: 'metrics', method: RequestMethod.GET }]
+  });
   app.enableVersioning({ type: VersioningType.URI });
   app.use(compression());
   app.use(cookieParser()); // this wil allow to get parsed cookie from req.cookies instead of req.get('Cookie')
