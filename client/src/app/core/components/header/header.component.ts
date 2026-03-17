@@ -1,4 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  LOCALE_ID
+} from '@angular/core';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -9,7 +14,9 @@ import { AuthService } from '@features/auth/services/auth.service';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { ThemeToggleComponent } from './theme-toggle/theme-toggle.component';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
-import { APP_VERSION, BUILD_HASH } from '@environments/version';
+import { formatDate } from '@angular/common';
+import { APP_VERSION, BUILD_HASH, BUILD_DATE } from '@environments/version';
+import { environment } from '@environments/environment';
 
 @Component({
   selector: 'app-header',
@@ -30,7 +37,9 @@ import { APP_VERSION, BUILD_HASH } from '@environments/version';
 export class HeaderComponent {
   protected readonly authStore = inject(AuthStore);
   protected readonly routes = AppRouteSegmentEnum;
-  protected readonly appVersion = `v${APP_VERSION} (${BUILD_HASH})`;
+  readonly #locale = inject(LOCALE_ID);
+  protected readonly appName = environment.appName;
+  protected readonly appVersion = `v${APP_VERSION} (${BUILD_HASH}) · ${formatDate(BUILD_DATE, 'short', this.#locale)}`;
 
   readonly #authService = inject(AuthService);
 

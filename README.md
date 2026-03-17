@@ -238,7 +238,7 @@ Services:
 - **redis** — redis:7-alpine, used for distributed rate limiting and shared permission cache
 - **db** — postgres:17-alpine, persistent named volume; port 5432 exposed to host for local development
 - **server** — NestJS API on port 3000; entrypoint runs migrations, optional admin seed, then starts the server
-- **client** — Angular SPA served by nginx on port 4200 (maps to container port 80); built with `--base-href /nexus/`
+- **client** — Angular SPA served by nginx on port 4200 (maps to container port 80); built with `--base-href /nexus/` (overridable via `docker build --build-arg BASE_HREF=/`)
 
 ### Docker environment variables
 
@@ -335,7 +335,7 @@ npm test                   # Unit tests (Jest)
 npm run test:cov           # Test coverage
 npm run test:e2e           # E2E tests
 npm run migrations:run     # Run migrations (build first)
-npm run migrations:gen     # Generate migration (build first)
+npm run migrations:gen -- ./src/migrations/<kebab-name>  # Generate migration (build first)
 npm run seed:run           # Run seeders (build first)
 ```
 

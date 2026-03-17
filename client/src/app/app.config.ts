@@ -1,6 +1,7 @@
 import type { ApplicationConfig } from '@angular/core';
 import {
   inject,
+  LOCALE_ID,
   provideAppInitializer,
   provideZoneChangeDetection
 } from '@angular/core';
@@ -50,6 +51,7 @@ export const appConfig: ApplicationConfig = {
         }
       }
     }),
+    { provide: LOCALE_ID, useValue: navigator.language },
     {
       provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
       useValue: { appearance: 'outline' }
