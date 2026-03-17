@@ -1,4 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  LOCALE_ID
+} from '@angular/core';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -32,8 +37,9 @@ import { environment } from '@environments/environment';
 export class HeaderComponent {
   protected readonly authStore = inject(AuthStore);
   protected readonly routes = AppRouteSegmentEnum;
+  readonly #locale = inject(LOCALE_ID);
   protected readonly appName = environment.appName;
-  protected readonly appVersion = `v${APP_VERSION} (${BUILD_HASH}) · ${formatDate(BUILD_DATE, 'yyyy-MM-dd HH:mm', 'en-US')}`;
+  protected readonly appVersion = `v${APP_VERSION} (${BUILD_HASH}) · ${formatDate(BUILD_DATE, 'yyyy-MM-dd HH:mm', this.#locale)}`;
 
   readonly #authService = inject(AuthService);
 
