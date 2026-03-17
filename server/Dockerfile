@@ -28,7 +28,7 @@ RUN apk upgrade --no-cache && \
            /usr/local/bin/npm \
            /usr/local/bin/npx
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/server/node_modules ./server/node_modules
 COPY --from=builder /app/server/dist ./server/dist
 RUN mkdir -p server/dist/server/public/uploads
 COPY server/docker-entrypoint.sh ./server/docker-entrypoint.sh

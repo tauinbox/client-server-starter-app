@@ -2,7 +2,7 @@
 set -e
 
 echo "Running database migrations..."
-/app/node_modules/.bin/typeorm migration:run -d dist/server/src/postgres-data-source.js
+node_modules/.bin/typeorm migration:run -d dist/server/src/postgres-data-source.js
 
 echo "Seeding admin user..."
 node dist/server/src/seed-admin.js
