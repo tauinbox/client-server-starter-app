@@ -9,6 +9,7 @@ import { AuthService } from '@features/auth/services/auth.service';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { ThemeToggleComponent } from './theme-toggle/theme-toggle.component';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
+import { formatDate } from '@angular/common';
 import { APP_VERSION, BUILD_HASH, BUILD_DATE } from '@environments/version';
 import { environment } from '@environments/environment';
 
@@ -32,16 +33,7 @@ export class HeaderComponent {
   protected readonly authStore = inject(AuthStore);
   protected readonly routes = AppRouteSegmentEnum;
   protected readonly appName = environment.appName;
-  protected readonly appVersion = (() => {
-    const date = new Intl.DateTimeFormat('sv-SE', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(new Date(BUILD_DATE));
-    return `v${APP_VERSION} (${BUILD_HASH}) · ${date}`;
-  })();
+  protected readonly appVersion = `v${APP_VERSION} (${BUILD_HASH}) · ${formatDate(BUILD_DATE, 'yyyy-MM-dd HH:mm', 'en-US')}`;
 
   readonly #authService = inject(AuthService);
 
