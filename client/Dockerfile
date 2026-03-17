@@ -1,8 +1,11 @@
 # Stage 1: build
 FROM node:22-alpine AS builder
 WORKDIR /app
-COPY client/package*.json ./client/
-RUN cd client && npm ci --ignore-scripts
+COPY package*.json ./
+COPY client/package.json ./client/
+COPY server/package.json ./server/
+COPY mock-server/package.json ./mock-server/
+RUN npm ci --workspace=client --ignore-scripts
 COPY shared/ ./shared/
 COPY client/ ./client/
 ARG COMMIT_HASH=unknown
