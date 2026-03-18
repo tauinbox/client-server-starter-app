@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
+import type { StringValue } from 'ms';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { LocalStrategy } from './strategies/local.strategy';
@@ -64,13 +65,24 @@ function conditionalProvider(
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get('JWT_SECRET'),
-        signOptions: {
-          expiresIn: `${configService.get('JWT_EXPIRATION')}s`,
-          algorithm: 'HS256'
+      useFactory: (configService: ConfigService): JwtModuleOptions => {
+        const algorithm = configService.get<string>('JWT_ALGORITHM') ?? 'HS256';
+        const expiration =
+          `${configService.get('JWT_EXPIRATION')}s` as StringValue;
+        if (algorithm === 'RS256') {
+          return {
+            privateKey: Buffer.from(
+              configService.getOrThrow<string>('JWT_PRIVATE_KEY'),
+              'base64'
+            ).toString('utf-8'),
+            signOptions: { expiresIn: expiration, algorithm: 'RS256' }
+          };
         }
-      })
+        return {
+          secret: configService.get('JWT_SECRET'),
+          signOptions: { expiresIn: expiration, algorithm: 'HS256' }
+        };
+      }
     })
   ],
   controllers: [

@@ -57,7 +57,25 @@ export class CoreModule implements NestModule {
             DB_NAME: Joi.string().required(),
             DB_USER: Joi.string().required(),
             DB_PASSWORD: Joi.string().required(),
-            JWT_SECRET: Joi.string().min(16).required(),
+            JWT_ALGORITHM: Joi.string()
+              .valid('HS256', 'RS256')
+              .default('HS256'),
+            JWT_SECRET: Joi.string().min(16).when('JWT_ALGORITHM', {
+              is: 'RS256',
+              then: Joi.optional(),
+              otherwise: Joi.required()
+            }),
+            JWT_PRIVATE_KEY: Joi.string().when('JWT_ALGORITHM', {
+              is: 'RS256',
+              then: Joi.required(),
+              otherwise: Joi.optional()
+            }),
+            JWT_PUBLIC_KEY: Joi.string().when('JWT_ALGORITHM', {
+              is: 'RS256',
+              then: Joi.required(),
+              otherwise: Joi.optional()
+            }),
+            JWT_MIN_IAT: Joi.number().integer().min(0).optional(),
             JWT_EXPIRATION: Joi.number().required(),
             JWT_REFRESH_EXPIRATION: Joi.number().required(),
             AUDIT_LOG_RETENTION_DAYS: Joi.number().min(1).default(90),
