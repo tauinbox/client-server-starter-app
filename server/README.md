@@ -58,7 +58,7 @@ Copy `.env.example` to `.env` and configure:
 | `DB_SCHEMA` | `public` | Database schema |
 | `DB_LOGGING` | `["query","warn","error","log"]` | TypeORM logging levels |
 | `REQUEST_LOG_LEVEL` | `all` | Request logging verbosity: `all` (every request), `warn` (4xx+5xx only), `error` (5xx only) |
-| `JWT_ALGORITHM` | `HS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
+| `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
 | `JWT_SECRET` | - | Symmetric secret, min 16 chars (required when `JWT_ALGORITHM=HS256`) |
 | `JWT_PRIVATE_KEY` | - | Base64-encoded RSA private key PEM (required when `JWT_ALGORITHM=RS256`) |
 | `JWT_PUBLIC_KEY` | - | Base64-encoded RSA public key PEM (required when `JWT_ALGORITHM=RS256`) |

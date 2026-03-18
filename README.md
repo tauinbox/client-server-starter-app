@@ -153,7 +153,11 @@ Edit `.env` with your database credentials and settings:
 | `DB_NAME` | `my-db` | Database name |
 | `DB_USER` | `postgres` | Database user |
 | `DB_PASSWORD` | `password` | Database password |
-| `JWT_SECRET` | `my_jwt_secret_key` | Secret for signing JWTs |
+| `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
+| `JWT_SECRET` | - | HS256 secret (min 16 chars; required when `JWT_ALGORITHM=HS256`) |
+| `JWT_PRIVATE_KEY` | - | Base64-encoded RSA private key PEM (required when `JWT_ALGORITHM=RS256`) |
+| `JWT_PUBLIC_KEY` | - | Base64-encoded RSA public key PEM (required when `JWT_ALGORITHM=RS256`) |
+| `JWT_MIN_IAT` | - | Unix timestamp; tokens issued before this value are rejected (key rotation) |
 | `JWT_EXPIRATION` | `3600` | Access token lifetime (seconds) |
 | `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime (seconds) |
 | `GOOGLE_CLIENT_ID` | - | Google OAuth client ID |
