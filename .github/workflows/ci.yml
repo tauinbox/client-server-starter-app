@@ -40,7 +40,7 @@ jobs:
       DB_PASSWORD: postgres
       DB_NAME: testdb
       DB_SCHEMA: public
-      JWT_SECRET: ci-test-secret-not-for-production
+      JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
       JWT_EXPIRATION: 3600
       JWT_REFRESH_EXPIRATION: 604800
       CLIENT_URL: http://localhost:4200
