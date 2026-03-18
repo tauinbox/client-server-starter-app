@@ -113,47 +113,11 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: DEPLOY_SHA,OWNER,GRAFANA_ADMIN_PASSWORD,GRAFANA_ROOT_URL,JWT_PRIVATE_KEY,JWT_PUBLIC_KEY
+          envs: DEPLOY_SHA,OWNER,GRAFANA_ADMIN_PASSWORD,GRAFANA_ROOT_URL
           script: |
             set -euo pipefail
             cd /home/deploy/nexus
             git pull --ff-only
-
-            # Inject RS256 JWT config into server/.env
-            python3 - << 'PYEOF'
-import os, re
-
-env_file = 'server/.env'
-content = open(env_file).read()
-
-to_remove = {'JWT_SECRET'}
-to_set = {
-    'JWT_ALGORITHM': 'RS256',
-    'JWT_PRIVATE_KEY': os.environ['JWT_PRIVATE_KEY'],
-    'JWT_PUBLIC_KEY': os.environ['JWT_PUBLIC_KEY'],
-}
-
-lines = content.splitlines(keepends=True)
-result = []
-seen = set()
-
-for line in lines:
-    key = line.split('=', 1)[0].strip()
-    if key in to_remove:
-        continue
-    if key in to_set:
-        result.append(f'{key}={to_set[key]}\n')
-        seen.add(key)
-    else:
-        result.append(line)
-
-for key, val in to_set.items():
-    if key not in seen:
-        result.append(f'{key}={val}\n')
-
-open(env_file, 'w').writelines(result)
-print('JWT RS256 config updated in server/.env')
-PYEOF
 
             # Read the previously successful SHA (empty on first deploy)
             PREV_SHA=""
@@ -244,5 +208,3 @@ PYEOF
           OWNER: ${{ needs.build-push.outputs.owner }}
           GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
           GRAFANA_ROOT_URL: ${{ secrets.GRAFANA_ROOT_URL }}
-          JWT_PRIVATE_KEY: ${{ secrets.JWT_PRIVATE_KEY }}
-          JWT_PUBLIC_KEY: ${{ secrets.JWT_PUBLIC_KEY }}
