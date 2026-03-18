@@ -1,0 +1,46 @@
+name: VPS Security Check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Check and fix VPS file permissions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /home/deploy/nexus
+
+            echo "=== server/.env permissions ==="
+            stat -c "%a %U:%G %n" server/.env
+
+            echo ""
+            echo "=== deploy dir permissions ==="
+            stat -c "%a %U:%G %n" .
+
+            echo ""
+            echo "=== Other sensitive files ==="
+            find . -maxdepth 2 -name "*.env*" -o -name "*.pem" -o -name "*.key" 2>/dev/null \
+              | xargs -r stat -c "%a %U:%G %n" 2>/dev/null || true
+
+            echo ""
+            echo "=== Fixing permissions if needed ==="
+            if [ "$(stat -c '%a' server/.env)" != "600" ]; then
+              chmod 600 server/.env
+              echo "FIXED: server/.env → 600"
+            else
+              echo "OK: server/.env is 600"
+            fi
+
+            if [ "$(stat -c '%a' .)" != "700" ] && [ "$(stat -c '%a' .)" != "750" ]; then
+              echo "WARN: deploy dir permissions are $(stat -c '%a' .) — consider 750"
+            else
+              echo "OK: deploy dir permissions $(stat -c '%a' .)"
+            fi
