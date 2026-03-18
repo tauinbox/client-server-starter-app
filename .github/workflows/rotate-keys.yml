@@ -56,10 +56,12 @@ jobs:
             chmod 600 server/.env.new
             mv server/.env.new server/.env
 
-            echo "server/.env updated — restarting server container..."
+            echo "server/.env updated — recreating server container..."
 
-            # Restart only the server container (no image pull, no client restart)
-            docker compose restart server
+            # Recreate the server container to pick up updated env_file.
+            # "docker compose restart" reuses the existing container with
+            # its original environment — it does NOT re-read env_file.
+            docker compose up -d --force-recreate server
 
             # Health check via Docker healthcheck status (server uses expose, not ports)
             echo "Waiting for server to become healthy..."
@@ -78,7 +80,7 @@ jobs:
             # Health check failed — restore backup and restart
             echo "Health check failed — rolling back server/.env"
             mv server/.env.bak server/.env
-            docker compose restart server
+            docker compose up -d --force-recreate server
             echo "Rollback complete — investigate server logs"
             exit 1
         env:
