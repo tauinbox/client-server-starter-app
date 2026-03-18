@@ -39,7 +39,6 @@ export const AuthStore = signalStore(
     };
   }),
   withComputed((store) => ({
-    user: computed<User | null>(() => store.user()),
     isAuthenticated: computed(() => store.accessToken() !== null),
     /**
      * For displaying the current user's role label only.
