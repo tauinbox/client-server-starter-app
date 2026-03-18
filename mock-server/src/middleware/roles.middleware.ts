@@ -77,10 +77,18 @@ router.get('/:id', adminGuard, (req, res) => {
 
 // POST /api/v1/roles
 router.post('/', adminGuard, (req, res) => {
-  const { name, description } = req.body;
+  const { name, description, isSuper } = req.body;
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     res.status(400).json({ message: 'Role name is required', statusCode: 400 });
+    return;
+  }
+
+  if (isSuper !== undefined) {
+    res.status(400).json({
+      message: 'isSuper flag cannot be set via API',
+      statusCode: 400
+    });
     return;
   }
 

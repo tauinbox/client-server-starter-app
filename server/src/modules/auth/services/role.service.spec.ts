@@ -217,6 +217,21 @@ describe('RoleService', () => {
         BadRequestException
       );
     });
+
+    it('should throw BadRequestException if isSuper is provided', async () => {
+      await expect(
+        service.create({ name: 'superrole', isSuper: true })
+      ).rejects.toThrow(BadRequestException);
+      expect(mockRoleRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('should always create role with isSuper false regardless of input', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(null);
+      await service.create({ name: 'viewer' });
+      expect(mockRoleRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ isSuper: false })
+      );
+    });
   });
 
   describe('update', () => {
