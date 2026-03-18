@@ -39,14 +39,21 @@ export class RoleService {
     return role;
   }
 
-  async create(data: { name: string; description?: string }): Promise<Role> {
+  async create(data: {
+    name: string;
+    description?: string;
+    isSuper?: boolean;
+  }): Promise<Role> {
+    if (data.isSuper !== undefined) {
+      throw new BadRequestException('isSuper flag cannot be set via API');
+    }
     const existing = await this.roleRepository.findOne({
       where: { name: data.name }
     });
     if (existing) {
       throw new BadRequestException('Role with this name already exists');
     }
-    const role = this.roleRepository.create(data);
+    const role = this.roleRepository.create({ ...data, isSuper: false });
     return this.roleRepository.save(role);
   }
 

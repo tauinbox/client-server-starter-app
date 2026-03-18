@@ -12,6 +12,7 @@ import type { AuthenticatedRequest } from '../types';
 const router = Router();
 
 const ACTION_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
+const CASL_RESERVED_ACTION_NAMES = ['manage', 'all'];
 
 // GET /api/v1/rbac/metadata
 router.get('/metadata', authGuard, (_req, res) => {
@@ -117,6 +118,14 @@ router.post('/actions', adminGuard, (req, res) => {
   if (!ACTION_NAME_PATTERN.test(trimmedName)) {
     res.status(400).json({
       message: 'name must match pattern /^[a-z][a-z0-9_]*$/',
+      statusCode: 400
+    });
+    return;
+  }
+
+  if (CASL_RESERVED_ACTION_NAMES.includes(trimmedName)) {
+    res.status(400).json({
+      message: `Action name "${trimmedName}" is reserved and cannot be used`,
       statusCode: 400
     });
     return;

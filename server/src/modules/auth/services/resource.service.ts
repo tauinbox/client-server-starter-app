@@ -1,9 +1,15 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Resource } from '../entities/resource.entity';
+import { CASL_RESERVED_SUBJECT_NAMES } from '../casl/constants';
 
 const SUBJECT_MAP_CACHE_KEY = 'rbac:subject_map';
 const SUBJECT_MAP_CACHE_TTL = 300_000; // 5 minutes
@@ -73,6 +79,12 @@ export class ResourceService {
     displayName: string;
     isSystem?: boolean;
   }): Promise<Resource> {
+    if (CASL_RESERVED_SUBJECT_NAMES.includes(data.subject.toLowerCase())) {
+      throw new BadRequestException(
+        `Resource subject "${data.subject}" is reserved and cannot be used`
+      );
+    }
+
     const existing = await this.resourceRepository.findOne({
       where: { name: data.name }
     });
