@@ -61,12 +61,12 @@ jobs:
             # Restart only the server container (no image pull, no client restart)
             docker compose restart server
 
-            # Health check via HTTP endpoint
+            # Health check via Docker healthcheck status (server uses expose, not ports)
             echo "Waiting for server to become healthy..."
             TIMEOUT=60
             ELAPSED=0
             while [ $ELAPSED -lt $TIMEOUT ]; do
-              if wget -qO- http://localhost:3000/api/health/ready > /dev/null 2>&1; then
+              if docker compose exec server wget -qO- http://localhost:3000/api/health/ready > /dev/null 2>&1; then
                 echo "Server is healthy — key rotation complete"
                 rm -f server/.env.bak
                 exit 0
