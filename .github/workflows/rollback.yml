@@ -102,15 +102,16 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: VERSION
           script: |
             set -euo pipefail
             cd /home/deploy/nexus
 
-            VERSION="${{ needs.resolve.outputs.version }}"
             echo "Rolling back to sha-${VERSION}..."
 
-            # Restore docker-compose.yml from the target SHA so the health check URL
-            # and any other config matches the images being rolled back to
+            # Clean up docker-compose.yml if a previous rollback left it modified,
+            # then restore the version matching the rollback target
+            git checkout HEAD -- docker-compose.yml 2>/dev/null || true
             git fetch --quiet origin
             git checkout "$VERSION" -- docker-compose.yml
 
@@ -121,7 +122,7 @@ jobs:
             docker compose up -d --force-recreate --remove-orphans
 
             # Health check with timeout — require ALL services with healthcheck to be healthy
-            EXPECTED=$(docker compose ps --format '{{.Health}}' | grep -c . || true)
+            EXPECTED=$(docker compose config 2>/dev/null | grep -c 'healthcheck:' || true)
             if [ "$EXPECTED" -lt 1 ]; then EXPECTED=4; fi
             echo "Expecting $EXPECTED services with healthcheck"
             TIMEOUT=120
@@ -151,3 +152,5 @@ jobs:
 
             echo "Rollback health check failed — check container logs with: docker compose logs"
             exit 1
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
