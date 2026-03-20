@@ -135,6 +135,8 @@ jobs:
           script: |
             set -euo pipefail
             cd /home/deploy/nexus
+            # Clean up docker-compose.yml if a previous rollback left it modified
+            git checkout HEAD -- docker-compose.yml 2>/dev/null || true
             git pull --ff-only
 
             # Read the previously successful SHA (empty on first deploy)
@@ -150,7 +152,7 @@ jobs:
 
             # Health check with timeout — require ALL services with healthcheck to be healthy
             echo "Waiting for services to become healthy..."
-            EXPECTED=$(docker compose ps --format '{{.Health}}' | grep -c . || true)
+            EXPECTED=$(docker compose config 2>/dev/null | grep -c 'healthcheck:' || true)
             if [ "$EXPECTED" -lt 1 ]; then EXPECTED=4; fi
             echo "Expecting $EXPECTED services with healthcheck"
             TIMEOUT=120
