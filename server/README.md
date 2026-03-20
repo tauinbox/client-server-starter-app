@@ -349,7 +349,7 @@ This package's version is kept in sync with `client/` and `mock-server/` via `co
 
 | Technology | Version |
 |------------|---------|
-| NestJS | 11.1.13 |
+| NestJS | 11.1.17 |
 | TypeORM | 0.3.28 |
 | PostgreSQL | via `pg` 8.x |
 | Passport | 0.7.x |

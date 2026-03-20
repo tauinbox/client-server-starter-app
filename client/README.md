@@ -206,8 +206,8 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 
 | Technology | Version |
 |------------|---------|
-| Angular | 21.1.3 |
-| Angular Material | 21.1.3 |
+| Angular | 21.2.5 |
+| Angular Material | 21.2.3 |
 | TypeScript | 5.9.x |
 | @ngrx/signals | 21.0.x |
 | RxJS | 7.8.x |
