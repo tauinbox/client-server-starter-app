@@ -150,6 +150,7 @@ npm test
 - **API testing**: Uses in-memory Express mock-server with per-worker isolation (not route interception)
 - Worker-scoped fixture starts Express on dynamic port (`app.listen(0)`), test-scoped resets state
 - `page.route(/\/api\//)` intercepts API calls and rewrites URL to worker's mock-server port
+- **CI web server**: runs `ng build` before `playwright test`, then serves the pre-built output via `serve -s dist/client/browser` (eliminates 60-90 s Angular dev-server startup). Local dev still uses `ng serve`
 - Seed data: 5 well-known users + 65 faker-generated (70 total). Credentials: `admin@example.com / Password1` (admin), `user@example.com / Password1` (user)
 - Modular fixture architecture in `e2e/fixtures/`:
   - `base.fixture.ts` — `_mockServer` (MockServerApi) and `_workerMockServer` fixtures + re-exports all modules
@@ -206,8 +207,8 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 
 | Technology | Version |
 |------------|---------|
-| Angular | 21.1.3 |
-| Angular Material | 21.1.3 |
+| Angular | 21.2.5 |
+| Angular Material | 21.2.3 |
 | TypeScript | 5.9.x |
 | @ngrx/signals | 21.0.x |
 | RxJS | 7.8.x |

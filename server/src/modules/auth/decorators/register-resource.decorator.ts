@@ -4,6 +4,12 @@ export const RESOURCE_METADATA_KEY = 'resource_metadata';
 
 export interface ResourceMetadata {
   name: string;
+  /**
+   * CASL subject name for this resource.
+   * Must be PascalCase (e.g. 'User', 'AuditLog') — CASL is case-sensitive,
+   * so a mismatch with `@Authorize()` decorators silently denies access.
+   * `ResourceService.upsertResource()` auto-normalizes to PascalCase on sync.
+   */
   subject: string;
   displayName: string;
 }

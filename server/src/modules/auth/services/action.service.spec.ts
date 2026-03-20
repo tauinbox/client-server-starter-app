@@ -197,6 +197,34 @@ describe('ActionService', () => {
       );
     });
 
+    it('should throw BadRequestException when name is a CASL reserved word "manage"', async () => {
+      await expect(
+        service.create({
+          name: 'manage',
+          displayName: 'Manage',
+          description: ''
+        })
+      ).rejects.toThrow(BadRequestException);
+      expect(mockActionRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when name is a CASL reserved word "all"', async () => {
+      await expect(
+        service.create({ name: 'all', displayName: 'All', description: '' })
+      ).rejects.toThrow(BadRequestException);
+      expect(mockActionRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('should reject reserved names even with mixed case input', async () => {
+      await expect(
+        service.create({
+          name: 'MANAGE',
+          displayName: 'Manage',
+          description: ''
+        })
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('should auto-create permissions for all existing resources', async () => {
       mockActionRepo.findOne.mockResolvedValue(null);
       const resources = [

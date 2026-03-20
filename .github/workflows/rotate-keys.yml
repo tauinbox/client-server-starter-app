@@ -1,0 +1,91 @@
+name: Rotate JWT Keys
+
+on:
+  workflow_dispatch:
+    inputs:
+      invalidate_sessions:
+        description: 'Force all users to re-login (sets JWT_MIN_IAT to current time)'
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  rotate:
+    name: Rotate JWT keys on VPS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute JWT_MIN_IAT
+        id: min-iat
+        run: |
+          if [ "${{ inputs.invalidate_sessions }}" = "true" ]; then
+            echo "value=$(date +%s)" >> $GITHUB_OUTPUT
+          else
+            echo "value=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Rotate keys via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: JWT_PRIVATE_KEY,JWT_PUBLIC_KEY,JWT_MIN_IAT
+          script: |
+            set -euo pipefail
+            cd /home/deploy/nexus
+
+            echo "Updating JWT RS256 config in server/.env..."
+
+            # Backup current .env
+            cp server/.env server/.env.bak
+            chmod 600 server/.env.bak
+
+            # Build updated .env atomically:
+            # - strip old JWT vars
+            # - append new RS256 config
+            # - write to temp file first, then mv (atomic on same filesystem)
+            {
+              grep -v '^JWT_SECRET=\|^JWT_ALGORITHM=\|^JWT_PRIVATE_KEY=\|^JWT_PUBLIC_KEY=\|^JWT_MIN_IAT=' \
+                server/.env || true
+              printf 'JWT_ALGORITHM=RS256\n'
+              printf 'JWT_PRIVATE_KEY=%s\n' "$JWT_PRIVATE_KEY"
+              printf 'JWT_PUBLIC_KEY=%s\n'  "$JWT_PUBLIC_KEY"
+              [ -n "${JWT_MIN_IAT:-}" ] && printf 'JWT_MIN_IAT=%s\n' "$JWT_MIN_IAT" || true
+            } > server/.env.new
+
+            chmod 600 server/.env.new
+            mv server/.env.new server/.env
+
+            echo "server/.env updated — restarting server container..."
+
+            # Restart only the server container (no image pull, no client restart)
+            docker compose restart server
+
+            # Health check via HTTP endpoint
+            echo "Waiting for server to become healthy..."
+            TIMEOUT=60
+            ELAPSED=0
+            while [ $ELAPSED -lt $TIMEOUT ]; do
+              if docker compose exec server wget -qO- http://127.0.0.1:3000/api/health/ready > /dev/null 2>&1; then
+                echo "Server is healthy — key rotation complete"
+                rm -f server/.env.bak
+                exit 0
+              fi
+              sleep 5
+              ELAPSED=$((ELAPSED + 5))
+            done
+
+            # Health check failed — restore backup and restart
+            echo "Health check failed — rolling back server/.env"
+            mv server/.env.bak server/.env
+            docker compose restart server
+            echo "Rollback complete — investigate server logs"
+            exit 1
+        env:
+          JWT_PRIVATE_KEY: ${{ secrets.JWT_PRIVATE_KEY }}
+          JWT_PUBLIC_KEY: ${{ secrets.JWT_PUBLIC_KEY }}
+          JWT_MIN_IAT: ${{ steps.min-iat.outputs.value }}

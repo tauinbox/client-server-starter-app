@@ -6,9 +6,9 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| Frontend | Angular | 21.2.1 |
-| UI Library | Angular Material + CDK | 21.2.1 |
-| Backend | NestJS | 11.1.16 |
+| Frontend | Angular | 21.2.5 |
+| UI Library | Angular Material + CDK | 21.2.3 |
+| Backend | NestJS | 11.1.17 |
 | Database | PostgreSQL (TypeORM) | 0.3.28 |
 | Language | TypeScript | 5.9.x |
 | Auth | JWT + HttpOnly-cookie refresh tokens + OAuth (Passport) | - |
@@ -154,7 +154,11 @@ Edit `.env` with your database credentials and settings:
 | `DB_NAME` | `my-db` | Database name |
 | `DB_USER` | `postgres` | Database user |
 | `DB_PASSWORD` | `password` | Database password |
-| `JWT_SECRET` | `my_jwt_secret_key` | Secret for signing JWTs |
+| `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
+| `JWT_SECRET` | - | HS256 secret (min 16 chars; required when `JWT_ALGORITHM=HS256`) |
+| `JWT_PRIVATE_KEY` | - | Base64-encoded RSA private key PEM (required when `JWT_ALGORITHM=RS256`) |
+| `JWT_PUBLIC_KEY` | - | Base64-encoded RSA public key PEM (required when `JWT_ALGORITHM=RS256`) |
+| `JWT_MIN_IAT` | - | Unix timestamp; tokens issued before this value are rejected (key rotation) |
 | `JWT_EXPIRATION` | `3600` | Access token lifetime (seconds) |
 | `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime (seconds) |
 | `GOOGLE_CLIENT_ID` | - | Google OAuth client ID |
@@ -259,7 +263,13 @@ Set `GRAFANA_ADMIN_PASSWORD` as a shell environment variable before running `doc
 
 ### Deploy pipeline
 
-`.github/workflows/deploy.yml` — triggered manually (`workflow_dispatch`) or on push to `master`. Builds and pushes Docker images to a container registry.
+`.github/workflows/deploy.yml` — triggered manually (`workflow_dispatch`) or on push to `master`. Builds Docker images locally, scans with Trivy (HIGH/CRITICAL), pushes to GHCR only after both scans pass, and deploys to VPS with health checks and automatic rollback.
+
+`.github/workflows/rebuild.yml` — weekly scheduled rebuild (Sundays 03:00 UTC) to pick up OS security patches. Rebuilds images with `no-cache`, scans, and deploys. Snapshots current images as `:pre-rebuild` for safe rollback.
+
+`.github/workflows/edge-patch-cleanup.yml` — quarterly check that creates a PR to remove Dockerfile edge/main patches when fixes reach stable Alpine.
+
+All VPS-facing workflows share a `deploy-production` concurrency group to prevent race conditions.
 
 ---
 
@@ -430,14 +440,15 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 ## CI/CD
 
-GitHub Actions runs on every push and pull request to `master` with 4 parallel jobs:
+GitHub Actions runs on every push and pull request to `master` with 5 jobs:
 
-| Job | Steps | Artifacts |
-|-----|-------|-----------|
-| **Server** | lint, format:check, test:cov (60/60/50/60 thresholds), build | Coverage report |
-| **Mock Server** | lint, format:check | - |
-| **Client** | lint, unit test, build | - |
-| **Client E2E** (needs: mock-server) | Playwright with Chromium caching | HTML report, test results |
+| Job | Depends on | Steps | Artifacts |
+|-----|-----------|-------|-----------|
+| **Server – Checks** | — | lint, format:check, check:routes, check:enums | — |
+| **Server – Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
+| **Mock Server** | — | lint, format:check, tsc, test | — |
+| **Client** | — | lint, format:check, test:cov, build | Coverage report |
+| **Client E2E** | mock-server | ng build → serve (static), Playwright Chromium | HTML report, test results |
 
 Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file required — all tests run against mocks.
 
