@@ -451,16 +451,17 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 ## CI/CD
 
-GitHub Actions runs on every push and pull request to `master` with 4 parallel jobs:
+GitHub Actions runs on every push and pull request to `master` with 5 jobs:
 
-| Job | Steps | Artifacts |
-|-----|-------|-----------|
-| **Server** | lint, format:check, test:cov (60/60/50/60 thresholds), build | Coverage report |
-| **Mock Server** | lint, format:check | - |
-| **Client** | lint, unit test, build | - |
-| **Client E2E** (needs: mock-server) | Playwright with Chromium caching | HTML report, test results |
+| Job | Depends on | Steps | Artifacts |
+|-----|-----------|-------|-----------|
+| **Server – Checks** | — | lint, format:check, check:routes, check:enums | — |
+| **Server – Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
+| **Mock Server** | — | lint, format:check, tsc, test | — |
+| **Client** | — | lint, format:check, test:cov, build | Coverage report |
+| **Client E2E** | mock-server | ng build → serve (static), Playwright Chromium | HTML report, test results |
 
-Each job installs all workspaces via a single `npm ci` from the repository root (npm workspaces). Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file required — all tests run against mocks.
+All jobs restore `node_modules` from a shared cache (keyed on `package-lock.json`); `npm ci` runs only on cache miss. Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file required — all tests run against mocks.
 
 ## Security
 
