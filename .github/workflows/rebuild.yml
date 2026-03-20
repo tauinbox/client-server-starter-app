@@ -150,24 +150,28 @@ jobs:
             docker compose pull
             docker compose up -d --remove-orphans
 
+            # Require ALL services with healthcheck to be healthy
+            EXPECTED=$(docker compose ps --format '{{.Health}}' | grep -c . || true)
+            if [ "$EXPECTED" -lt 1 ]; then EXPECTED=4; fi
+            echo "Expecting $EXPECTED services with healthcheck"
             TIMEOUT=120
             ELAPSED=0
             HEALTHY=0
             while [ $ELAPSED -lt $TIMEOUT ]; do
-              if docker compose ps --format json | grep -q '"unhealthy"'; then
+              if docker compose ps --format '{{.Health}}' | grep -q 'unhealthy'; then
                 sleep 5
                 ELAPSED=$((ELAPSED + 5))
                 continue
               fi
-              HEALTHY=$(docker compose ps --format json | grep -c '"healthy"' || true)
-              if [ "$HEALTHY" -ge 1 ]; then
+              HEALTHY=$(docker compose ps --format '{{.Health}}' | grep -c 'healthy' || true)
+              if [ "$HEALTHY" -ge "$EXPECTED" ]; then
                 break
               fi
               sleep 5
               ELAPSED=$((ELAPSED + 5))
             done
 
-            if [ "$HEALTHY" -ge 1 ]; then
+            if [ "$HEALTHY" -ge "$EXPECTED" ]; then
               echo "Redeploy successful — sha-${DEPLOY_SHA}"
               cp -f .deployed-sha .prev-deployed-sha 2>/dev/null || true
               echo "$DEPLOY_SHA" > .deployed-sha
