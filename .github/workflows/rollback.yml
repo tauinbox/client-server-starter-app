@@ -8,6 +8,10 @@ on:
         required: false
         type: string
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   resolve:
     name: Resolve Target Version
