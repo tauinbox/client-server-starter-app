@@ -19,7 +19,7 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Check for edge patch markers
         id: check
@@ -71,7 +71,7 @@ jobs:
         if: steps.check.outputs.found == 'true'
         id: scan-server
         continue-on-error: true
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/nexus-server:patch-check
           format: table
@@ -93,7 +93,7 @@ jobs:
         if: steps.check.outputs.found == 'true'
         id: scan-client
         continue-on-error: true
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/nexus-client:patch-check
           format: table
