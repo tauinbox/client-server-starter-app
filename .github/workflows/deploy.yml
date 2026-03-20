@@ -82,7 +82,7 @@ jobs:
           cache-to: type=gha,scope=server,mode=max
 
       - name: Scan server image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/nexus-server:sha-${{ env.COMMIT_HASH }}
           format: table
@@ -102,7 +102,7 @@ jobs:
           cache-to: type=gha,scope=client,mode=max
 
       - name: Scan client image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/nexus-client:sha-${{ env.COMMIT_HASH }}
           format: table
