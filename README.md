@@ -263,7 +263,13 @@ Set `GRAFANA_ADMIN_PASSWORD` as a shell environment variable before running `doc
 
 ### Deploy pipeline
 
-`.github/workflows/deploy.yml` — triggered manually (`workflow_dispatch`) or on push to `master`. Builds and pushes Docker images to a container registry.
+`.github/workflows/deploy.yml` — triggered manually (`workflow_dispatch`) or on push to `master`. Builds Docker images locally, scans with Trivy (HIGH/CRITICAL), pushes to GHCR only after both scans pass, and deploys to VPS with health checks and automatic rollback.
+
+`.github/workflows/rebuild.yml` — weekly scheduled rebuild (Sundays 03:00 UTC) to pick up OS security patches. Rebuilds images with `no-cache`, scans, and deploys. Snapshots current images as `:pre-rebuild` for safe rollback.
+
+`.github/workflows/edge-patch-cleanup.yml` — quarterly check that creates a PR to remove Dockerfile edge/main patches when fixes reach stable Alpine.
+
+All VPS-facing workflows share a `deploy-production` concurrency group to prevent race conditions.
 
 ---
 
