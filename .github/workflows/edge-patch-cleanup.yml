@@ -102,6 +102,17 @@ jobs:
 
       - name: Create cleanup PR
         if: steps.check.outputs.found == 'true' && steps.scan-server.outcome == 'success' && steps.scan-client.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_BODY: |
+            ## Summary
+            Quarterly automated check confirmed that all packages previously pulled from
+            Alpine edge/main are now available in the stable repository. The explicit
+            edge/main upgrade blocks are no longer needed.
+
+            ## Test plan
+            - [ ] Images built and scanned without edge patches — Trivy passed
+            - [ ] Verify next deploy succeeds after merge
         run: |
           BRANCH="chore/remove-edge-patches"
           git config user.name "github-actions[bot]"
@@ -117,20 +128,8 @@ jobs:
           else
             gh pr create \
               --title "Remove edge/main patches (now in stable Alpine)" \
-              --body "$(cat <<'EOF'
-## Summary
-Quarterly automated check confirmed that all packages previously pulled from
-Alpine edge/main are now available in the stable repository. The explicit
-edge/main upgrade blocks are no longer needed.
-
-## Test plan
-- [ ] Images built and scanned without edge patches — Trivy passed
-- [ ] Verify next deploy succeeds after merge
-EOF
-          )"
+              --body "$PR_BODY"
           fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Report — patches still needed
         if: steps.check.outputs.found == 'true' && (steps.scan-server.outcome == 'failure' || steps.scan-client.outcome == 'failure')
