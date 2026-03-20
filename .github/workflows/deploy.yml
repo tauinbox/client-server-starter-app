@@ -204,20 +204,20 @@ jobs:
             ELAPSED=0
             ROLLBACK_HEALTHY=0
             while [ $ELAPSED -lt $TIMEOUT ]; do
-              if docker compose ps --format json | grep -q '"unhealthy"'; then
+              if docker compose ps --format '{{.Health}}' | grep -q 'unhealthy'; then
                 sleep 5
                 ELAPSED=$((ELAPSED + 5))
                 continue
               fi
-              ROLLBACK_HEALTHY=$(docker compose ps --format json | grep -c '"healthy"' || true)
-              if [ "$ROLLBACK_HEALTHY" -ge 1 ]; then
+              ROLLBACK_HEALTHY=$(docker compose ps --format '{{.Health}}' | grep -c 'healthy' || true)
+              if [ "$ROLLBACK_HEALTHY" -ge "$EXPECTED" ]; then
                 break
               fi
               sleep 5
               ELAPSED=$((ELAPSED + 5))
             done
 
-            if [ "$ROLLBACK_HEALTHY" -ge 1 ]; then
+            if [ "$ROLLBACK_HEALTHY" -ge "$EXPECTED" ]; then
               echo "Rolled back to sha-${PREV_SHA} successfully"
             else
               echo "Rollback health check also failed — manual intervention required"
