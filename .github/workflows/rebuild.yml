@@ -21,7 +21,7 @@ jobs:
       owner: ${{ steps.lowercase-owner.outputs.owner }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Get commit short SHA
         id: short-sha
