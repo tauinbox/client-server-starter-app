@@ -1,0 +1,131 @@
+name: Quarterly Edge Patch Cleanup
+
+on:
+  schedule:
+    - cron: '0 3 1 1,4,7,10 *'  # 03:00 UTC on 1st of Jan/Apr/Jul/Oct
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    name: Check & Clean Edge Patches
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check for edge patch markers
+        id: check
+        run: |
+          FILES=$(grep -rl 'EDGE_PATCHES_START' client/Dockerfile server/Dockerfile 2>/dev/null || true)
+          if [ -z "$FILES" ]; then
+            echo "No edge patch markers found — nothing to clean"
+            echo "found=false" >> $GITHUB_OUTPUT
+          else
+            echo "Edge patches found in: $FILES"
+            echo "found=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Remove edge patch blocks
+        if: steps.check.outputs.found == 'true'
+        run: |
+          for f in client/Dockerfile server/Dockerfile; do
+            if grep -q 'EDGE_PATCHES_START' "$f" 2>/dev/null; then
+              sed -i '/^# EDGE_PATCHES_START/,/^# EDGE_PATCHES_END/d' "$f"
+              echo "Cleaned: $f"
+            fi
+          done
+
+      - uses: docker/setup-buildx-action@v4
+        if: steps.check.outputs.found == 'true'
+
+      - uses: docker/login-action@v4
+        if: steps.check.outputs.found == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lowercase owner
+        if: steps.check.outputs.found == 'true'
+        run: echo "OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
+
+      - name: Build server image
+        if: steps.check.outputs.found == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: server/Dockerfile
+          load: true
+          tags: ghcr.io/${{ env.OWNER }}/nexus-server:patch-check
+          no-cache: true
+
+      - name: Scan server image
+        if: steps.check.outputs.found == 'true'
+        id: scan-server
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/${{ env.OWNER }}/nexus-server:patch-check
+          format: table
+          exit-code: 1
+          severity: HIGH,CRITICAL
+
+      - name: Build client image
+        if: steps.check.outputs.found == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: client/Dockerfile
+          load: true
+          tags: ghcr.io/${{ env.OWNER }}/nexus-client:patch-check
+          build-args: COMMIT_HASH=patch-check
+          no-cache: true
+
+      - name: Scan client image
+        if: steps.check.outputs.found == 'true'
+        id: scan-client
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/${{ env.OWNER }}/nexus-client:patch-check
+          format: table
+          exit-code: 1
+          severity: HIGH,CRITICAL
+
+      - name: Create cleanup PR
+        if: steps.check.outputs.found == 'true' && steps.scan-server.outcome == 'success' && steps.scan-client.outcome == 'success'
+        run: |
+          BRANCH="chore/remove-edge-patches"
+          git checkout -b "$BRANCH"
+          git add client/Dockerfile server/Dockerfile
+          git commit -m "chore(docker): remove edge/main patches — fixes now in stable Alpine"
+          git push --force origin "$BRANCH"
+
+          EXISTING=$(gh pr list --head "$BRANCH" --json number -q '.[0].number' 2>/dev/null || true)
+          if [ -n "$EXISTING" ]; then
+            echo "PR #$EXISTING updated with latest changes"
+          else
+            gh pr create \
+              --title "Remove edge/main patches (now in stable Alpine)" \
+              --body "$(cat <<'EOF'
+          ## Summary
+          Quarterly automated check confirmed that all packages previously pulled from
+          Alpine edge/main are now available in the stable repository. The explicit
+          edge/main upgrade blocks are no longer needed.
+
+          ## Test plan
+          - [ ] Images built and scanned without edge patches — Trivy passed
+          - [ ] Verify next deploy succeeds after merge
+          EOF
+          )"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Report — patches still needed
+        if: steps.check.outputs.found == 'true' && (steps.scan-server.outcome == 'failure' || steps.scan-client.outcome == 'failure')
+        run: echo "Edge patches still needed — CVE fixes not yet in stable Alpine. Will check again next quarter."
