@@ -27,9 +27,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: process.env['CI']
-        ? `npx serve -s dist/client/browser -l ${port}`
-        : `npx ng serve --host 127.0.0.1 --port ${port}`,
+      command: `npx ng serve --host 127.0.0.1 --port ${port}`,
       url: baseURL,
       reuseExistingServer: !process.env['CI']
     }

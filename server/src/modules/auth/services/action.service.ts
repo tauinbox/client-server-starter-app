@@ -11,7 +11,6 @@ import { Action } from '../entities/action.entity';
 import { Permission } from '../entities/permission.entity';
 import { Resource } from '../entities/resource.entity';
 import { RolePermission } from '../entities/role-permission.entity';
-import { CASL_RESERVED_ACTION_NAMES } from '../casl/constants';
 
 @Injectable()
 export class ActionService {
@@ -44,12 +43,6 @@ export class ActionService {
     description: string;
   }): Promise<Action> {
     const normalizedName = data.name.toLowerCase().trim();
-
-    if (CASL_RESERVED_ACTION_NAMES.includes(normalizedName)) {
-      throw new BadRequestException(
-        `Action name "${normalizedName}" is reserved and cannot be used`
-      );
-    }
 
     const existing = await this.actionRepository.findOne({
       where: { name: normalizedName }

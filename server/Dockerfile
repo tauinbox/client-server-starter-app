@@ -2,24 +2,18 @@
 FROM node:22-alpine AS deps
 RUN apk upgrade --no-cache && apk add --no-cache python3 make g++
 WORKDIR /app
-COPY package*.json ./
-COPY server/package.json ./server/
-COPY client/package.json ./client/
-COPY mock-server/package.json ./mock-server/
-RUN npm ci --workspace=server --omit=dev
+COPY server/package*.json ./server/
+RUN cd server && npm ci --omit=dev
 
 # Stage 2: build
 FROM node:22-alpine AS builder
 RUN apk upgrade --no-cache && apk add --no-cache python3 make g++
 WORKDIR /app
-COPY package*.json ./
-COPY server/package.json ./server/
-COPY client/package.json ./client/
-COPY mock-server/package.json ./mock-server/
-RUN npm ci --workspace=server
+COPY server/package*.json ./server/
+RUN cd server && npm ci
 COPY shared/ ./shared/
 COPY server/ ./server/
-RUN npm run -w server build
+RUN cd server && npm run build
 
 # Stage 3: runtime
 FROM node:22-alpine AS runner
@@ -33,7 +27,7 @@ COPY --from=builder /app/server/dist ./server/dist
 RUN mkdir -p server/dist/server/public/uploads
 COPY server/docker-entrypoint.sh ./server/docker-entrypoint.sh
 RUN chmod +x server/docker-entrypoint.sh
-RUN chown -R node:node /app
+RUN chown -R node:node /app/server
 USER node
 WORKDIR /app/server
 ENTRYPOINT ["./docker-entrypoint.sh"]

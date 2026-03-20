@@ -14,24 +14,11 @@
     "verify": "turbo run lint format:check build test"
   },
   "devDependencies": {
-    "turbo": "^2.5.4",
-    "@vitest/coverage-v8": "~4.0.18",
-    "class-transformer": "^0.5.1",
-    "class-validator": "^0.14.4",
-    "jiti": "^2.6.1",
-    "jsdom": "^28.1.0",
-    "vitest": "~4.0.18"
+    "turbo": "^2.5.4"
   },
   "optionalDependencies": {
-    "@esbuild/linux-x64": "0.27.3",
-    "@parcel/watcher-linux-x64-glibc": "2.5.6",
-    "@parcel/watcher-linux-x64-musl": "2.5.6",
-    "@rolldown/binding-linux-x64-gnu": "1.0.0-rc.4",
-    "@rolldown/binding-linux-x64-musl": "1.0.0-rc.4",
     "@rollup/rollup-linux-x64-gnu": "4.59.0",
-    "@rollup/rollup-linux-x64-musl": "4.59.0",
-    "@unrs/resolver-binding-linux-x64-gnu": "1.11.1",
-    "@unrs/resolver-binding-linux-x64-musl": "1.11.1"
+    "@rollup/rollup-linux-x64-musl": "4.59.0"
   },
   "packageManager": "npm@10.9.3",
   "engines": {

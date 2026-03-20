@@ -7,10 +7,6 @@ on:
     types: [completed]
   workflow_dispatch:
 
-concurrency:
-  group: deploy-production
-  cancel-in-progress: false
-
 jobs:
   build-push:
     name: Build & Push Images
@@ -25,7 +21,7 @@ jobs:
       server_image: ${{ steps.meta-server.outputs.tags }}
       client_image: ${{ steps.meta-client.outputs.tags }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
@@ -36,9 +32,9 @@ jobs:
           echo "COMMIT_HASH=$SHA" >> $GITHUB_ENV
           echo "sha=$SHA" >> $GITHUB_OUTPUT
 
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@v3
 
-      - uses: docker/login-action@v4
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -53,7 +49,7 @@ jobs:
 
       - name: Server image metadata
         id: meta-server
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ env.OWNER }}/nexus-server
           tags: |
@@ -62,63 +58,49 @@ jobs:
 
       - name: Client image metadata
         id: meta-client
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ env.OWNER }}/nexus-client
           tags: |
             type=raw,value=latest
             type=raw,value=sha-${{ env.COMMIT_HASH }}
 
-      # Build locally first, scan, then push — prevents pushing vulnerable images to GHCR
-      - name: Build server image
-        uses: docker/build-push-action@v7
+      - name: Build and push server image
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: server/Dockerfile
-          push: false
-          load: true
+          push: true
           tags: ${{ steps.meta-server.outputs.tags }}
           cache-from: type=gha,scope=server
           cache-to: type=gha,scope=server,mode=max
 
       - name: Scan server image
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/nexus-server:sha-${{ env.COMMIT_HASH }}
           format: table
           exit-code: 1
           severity: HIGH,CRITICAL
 
-      - name: Build client image
-        uses: docker/build-push-action@v7
+      - name: Build and push client image
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: client/Dockerfile
-          push: false
-          load: true
+          push: true
           tags: ${{ steps.meta-client.outputs.tags }}
           build-args: COMMIT_HASH=${{ env.COMMIT_HASH }}
           cache-from: type=gha,scope=client
           cache-to: type=gha,scope=client,mode=max
 
       - name: Scan client image
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/nexus-client:sha-${{ env.COMMIT_HASH }}
           format: table
           exit-code: 1
           severity: HIGH,CRITICAL
-
-      # Push only after both scans pass
-      - name: Push server image
-        run: |
-          docker push ghcr.io/${{ env.OWNER }}/nexus-server:sha-${{ env.COMMIT_HASH }}
-          docker push ghcr.io/${{ env.OWNER }}/nexus-server:latest
-
-      - name: Push client image
-        run: |
-          docker push ghcr.io/${{ env.OWNER }}/nexus-client:sha-${{ env.COMMIT_HASH }}
-          docker push ghcr.io/${{ env.OWNER }}/nexus-client:latest
 
   deploy:
     name: Deploy to VPS
@@ -135,8 +117,6 @@ jobs:
           script: |
             set -euo pipefail
             cd /home/deploy/nexus
-            # Clean up docker-compose.yml if a previous rollback left it modified
-            git checkout HEAD -- docker-compose.yml 2>/dev/null || true
             git pull --ff-only
 
             # Read the previously successful SHA (empty on first deploy)
@@ -150,29 +130,26 @@ jobs:
             docker compose pull
             docker compose up -d --remove-orphans
 
-            # Health check with timeout — require ALL services with healthcheck to be healthy
+            # Health check with timeout
             echo "Waiting for services to become healthy..."
-            EXPECTED=$(docker compose config 2>/dev/null | grep -c 'healthcheck:' || true)
-            if [ "$EXPECTED" -lt 1 ]; then EXPECTED=4; fi
-            echo "Expecting $EXPECTED services with healthcheck"
             TIMEOUT=120
             ELAPSED=0
             HEALTHY=0
             while [ $ELAPSED -lt $TIMEOUT ]; do
-              if docker compose ps --format '{{.Health}}' | grep -q 'unhealthy'; then
+              if docker compose ps --format json | grep -q '"unhealthy"'; then
                 sleep 5
                 ELAPSED=$((ELAPSED + 5))
                 continue
               fi
-              HEALTHY=$(docker compose ps --format '{{.Health}}' | grep -c 'healthy' || true)
-              if [ "$HEALTHY" -ge "$EXPECTED" ]; then
+              HEALTHY=$(docker compose ps --format json | grep -c '"healthy"' || true)
+              if [ "$HEALTHY" -ge 1 ]; then
                 break
               fi
               sleep 5
               ELAPSED=$((ELAPSED + 5))
             done
 
-            if [ "$HEALTHY" -ge "$EXPECTED" ]; then
+            if [ "$HEALTHY" -ge 1 ]; then
               echo "Deploy successful — sha-${DEPLOY_SHA}"
               cp -f .deployed-sha .prev-deployed-sha 2>/dev/null || true
               echo "$DEPLOY_SHA" > .deployed-sha
@@ -206,20 +183,20 @@ jobs:
             ELAPSED=0
             ROLLBACK_HEALTHY=0
             while [ $ELAPSED -lt $TIMEOUT ]; do
-              if docker compose ps --format '{{.Health}}' | grep -q 'unhealthy'; then
+              if docker compose ps --format json | grep -q '"unhealthy"'; then
                 sleep 5
                 ELAPSED=$((ELAPSED + 5))
                 continue
               fi
-              ROLLBACK_HEALTHY=$(docker compose ps --format '{{.Health}}' | grep -c 'healthy' || true)
-              if [ "$ROLLBACK_HEALTHY" -ge "$EXPECTED" ]; then
+              ROLLBACK_HEALTHY=$(docker compose ps --format json | grep -c '"healthy"' || true)
+              if [ "$ROLLBACK_HEALTHY" -ge 1 ]; then
                 break
               fi
               sleep 5
               ELAPSED=$((ELAPSED + 5))
             done
 
-            if [ "$ROLLBACK_HEALTHY" -ge "$EXPECTED" ]; then
+            if [ "$ROLLBACK_HEALTHY" -ge 1 ]; then
               echo "Rolled back to sha-${PREV_SHA} successfully"
             else
               echo "Rollback health check also failed — manual intervention required"

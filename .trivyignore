@@ -1,9 +1,0 @@
-# Trivy CVE ignore list
-# Add one CVE ID per line to suppress it in scheduled rebuild and deploy scans.
-# Always include a comment with: reason, date added, and review-by date.
-#
-# Format:
-#   CVE-YYYY-NNNNN  # reason — added YYYY-MM-DD, review by YYYY-MM-DD
-#
-# Example:
-#   CVE-2025-99999  # no fix available, not exploitable (no user input reaches libfoo) — added 2026-03-20, review by 2026-06-20

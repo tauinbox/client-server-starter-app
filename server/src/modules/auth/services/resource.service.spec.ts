@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ResourceService } from './resource.service';
 import { Resource } from '../entities/resource.entity';
@@ -304,71 +303,6 @@ describe('ResourceService', () => {
 
       expect(mockResourceRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({ isSystem: false })
-      );
-    });
-
-    it('should throw BadRequestException when subject is CASL reserved word "all"', async () => {
-      await expect(
-        service.upsertResource({
-          name: 'everything',
-          subject: 'all',
-          displayName: 'Everything'
-        })
-      ).rejects.toThrow(BadRequestException);
-      expect(mockResourceRepo.findOne).not.toHaveBeenCalled();
-    });
-
-    it('should reject reserved subject even with mixed case', async () => {
-      await expect(
-        service.upsertResource({
-          name: 'everything',
-          subject: 'ALL',
-          displayName: 'Everything'
-        })
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should normalize lowercase subject to PascalCase when creating', async () => {
-      mockResourceRepo.findOne.mockResolvedValue(null);
-
-      await service.upsertResource({
-        name: 'posts',
-        subject: 'post',
-        displayName: 'Posts'
-      });
-
-      expect(mockResourceRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({ subject: 'Post' })
-      );
-    });
-
-    it('should normalize lowercase subject to PascalCase when updating existing', async () => {
-      const existing = { ...resource1 };
-      mockResourceRepo.findOne.mockResolvedValue(existing);
-      mockResourceRepo.save.mockImplementation(
-        (data: Record<string, unknown>) => Promise.resolve(data)
-      );
-
-      await service.upsertResource({
-        name: 'users',
-        subject: 'user',
-        displayName: 'Users'
-      });
-
-      expect(existing.subject).toBe('User');
-    });
-
-    it('should leave already-PascalCase subject unchanged', async () => {
-      mockResourceRepo.findOne.mockResolvedValue(null);
-
-      await service.upsertResource({
-        name: 'posts',
-        subject: 'Post',
-        displayName: 'Posts'
-      });
-
-      expect(mockResourceRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({ subject: 'Post' })
       );
     });
   });

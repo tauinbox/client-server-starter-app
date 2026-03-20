@@ -39,7 +39,7 @@ services:
     volumes:
       - uploads:/app/server/dist/server/public/uploads
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health/ready || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health/ready || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -59,7 +59,7 @@ services:
     ports:
       - "4200:8080"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
