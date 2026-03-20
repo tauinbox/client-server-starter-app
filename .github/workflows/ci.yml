@@ -11,8 +11,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  server:
-    name: Server
+  server-checks:
+    name: Server – Checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+            mock-server/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run check:routes
+      - run: npm run check:enums
+
+  server-tests:
+    name: Server – Tests & Build
+    needs: [server-checks]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -58,10 +84,6 @@ jobs:
             mock-server/package-lock.json
 
       - run: npm ci
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run check:routes
-      - run: npm run check:enums
       - run: npm run test:cov
       - run: npm run build
 
@@ -171,6 +193,9 @@ jobs:
       - name: Install Playwright Chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install chromium
+
+      - name: Build client
+        run: npm run build
 
       - run: npm run test:e2e
 
