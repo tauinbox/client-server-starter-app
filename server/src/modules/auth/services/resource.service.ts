@@ -79,9 +79,13 @@ export class ResourceService {
     displayName: string;
     isSystem?: boolean;
   }): Promise<Resource> {
-    if (CASL_RESERVED_SUBJECT_NAMES.includes(data.subject.toLowerCase())) {
+    // Normalize to PascalCase: CASL subjects are case-sensitive, so 'user' ≠ 'User'
+    const normalizedSubject =
+      data.subject.charAt(0).toUpperCase() + data.subject.slice(1);
+
+    if (CASL_RESERVED_SUBJECT_NAMES.includes(normalizedSubject.toLowerCase())) {
       throw new BadRequestException(
-        `Resource subject "${data.subject}" is reserved and cannot be used`
+        `Resource subject "${normalizedSubject}" is reserved and cannot be used`
       );
     }
 
@@ -90,7 +94,7 @@ export class ResourceService {
     });
 
     if (existing) {
-      existing.subject = data.subject;
+      existing.subject = normalizedSubject;
       existing.displayName = data.displayName;
       existing.lastSyncedAt = new Date();
       return this.resourceRepository.save(existing);
@@ -98,6 +102,7 @@ export class ResourceService {
 
     const resource = this.resourceRepository.create({
       ...data,
+      subject: normalizedSubject,
       isSystem: data.isSystem ?? false,
       lastSyncedAt: new Date()
     });
