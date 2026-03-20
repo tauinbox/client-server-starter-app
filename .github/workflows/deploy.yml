@@ -25,7 +25,7 @@ jobs:
       server_image: ${{ steps.meta-server.outputs.tags }}
       client_image: ${{ steps.meta-client.outputs.tags }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
