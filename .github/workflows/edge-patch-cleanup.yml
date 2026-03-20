@@ -100,6 +100,8 @@ jobs:
         if: steps.check.outputs.found == 'true' && steps.scan-server.outcome == 'success' && steps.scan-client.outcome == 'success'
         run: |
           BRANCH="chore/remove-edge-patches"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
           git add client/Dockerfile server/Dockerfile
           git commit -m "chore(docker): remove edge/main patches — fixes now in stable Alpine"
@@ -112,15 +114,15 @@ jobs:
             gh pr create \
               --title "Remove edge/main patches (now in stable Alpine)" \
               --body "$(cat <<'EOF'
-          ## Summary
-          Quarterly automated check confirmed that all packages previously pulled from
-          Alpine edge/main are now available in the stable repository. The explicit
-          edge/main upgrade blocks are no longer needed.
+## Summary
+Quarterly automated check confirmed that all packages previously pulled from
+Alpine edge/main are now available in the stable repository. The explicit
+edge/main upgrade blocks are no longer needed.
 
-          ## Test plan
-          - [ ] Images built and scanned without edge patches — Trivy passed
-          - [ ] Verify next deploy succeeds after merge
-          EOF
+## Test plan
+- [ ] Images built and scanned without edge patches — Trivy passed
+- [ ] Verify next deploy succeeds after merge
+EOF
           )"
           fi
         env:
