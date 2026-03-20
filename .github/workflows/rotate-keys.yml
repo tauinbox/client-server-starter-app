@@ -62,8 +62,9 @@ jobs:
 
             echo "server/.env updated — restarting server container..."
 
-            # Restart only the server container (no image pull, no client restart)
-            docker compose restart server
+            # Recreate only the server container so Docker re-reads env_file: server/.env
+            # (docker compose restart keeps the old environment; up -d recreates with the new one)
+            docker compose up -d server
 
             # Health check via HTTP endpoint
             echo "Waiting for server to become healthy..."
@@ -79,10 +80,10 @@ jobs:
               ELAPSED=$((ELAPSED + 5))
             done
 
-            # Health check failed — restore backup and restart
+            # Health check failed — restore backup and recreate container
             echo "Health check failed — rolling back server/.env"
             mv server/.env.bak server/.env
-            docker compose restart server
+            docker compose up -d server
             echo "Rollback complete — investigate server logs"
             exit 1
         env:
