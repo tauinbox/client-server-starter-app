@@ -70,8 +70,6 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 
 ```
 fullstack-starter-app/
-├── package.json            # Root workspace (npm workspaces + Turborepo scripts)
-├── turbo.json              # Turborepo pipeline (parallel tasks, local caching)
 ├── .github/workflows/      # CI/CD pipeline (GitHub Actions)
 │   └── ci.yml              # Lint, test, build on push/PR to master
 ├── shared/                 # Shared types and constants (no build step)
@@ -132,7 +130,10 @@ All three workspaces import from `@app/shared/*` path alias (maps to `../shared/
 ```bash
 git clone <repository-url>
 cd fullstack-starter-app
-npm install        # installs all workspaces and activates git hooks (husky)
+
+cd client && npm install        # also activates git hooks (husky)
+cd ../server && npm install
+cd ../mock-server && npm install
 ```
 
 ### 2. Configure the server
@@ -316,18 +317,6 @@ API base URL: `/api/v1`
 
 ## Available Commands
 
-### Root (monorepo)
-
-```bash
-npm run build          # Build all workspaces in parallel (Turborepo)
-npm run lint           # Lint all workspaces in parallel
-npm run format:check   # Prettier check all workspaces in parallel
-npm run test           # Unit tests across all workspaces in parallel
-npm run verify         # Full pre-push check: lint + format:check + build + test
-```
-
-> `npm run verify` is the recommended pre-push command. E2E tests (`npm run test:e2e`) must still be run per-workspace.
-
 ### Mock Server (`cd mock-server`)
 
 ```bash
@@ -450,7 +439,7 @@ GitHub Actions runs on every push and pull request to `master` with 4 parallel j
 | **Client** | lint, unit test, build | - |
 | **Client E2E** (needs: mock-server) | Playwright with Chromium caching | HTML report, test results |
 
-Each job installs all workspaces via a single `npm ci` from the repository root (npm workspaces). Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file required — all tests run against mocks.
+Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file required — all tests run against mocks.
 
 ## Security
 
