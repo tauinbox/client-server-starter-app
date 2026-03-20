@@ -5,25 +5,6 @@ import { DataSource } from 'typeorm';
 import { JwtStrategy } from './jwt.strategy';
 import { CustomJwtPayload } from '../types/jwt-payload';
 
-function buildConfigService(overrides: Record<string, unknown> = {}): {
-  get: jest.Mock;
-  getOrThrow: jest.Mock;
-} {
-  const values: Record<string, unknown> = {
-    JWT_ALGORITHM: 'HS256',
-    JWT_SECRET: 'test-secret',
-    JWT_MIN_IAT: undefined,
-    ...overrides
-  };
-  return {
-    get: jest.fn().mockImplementation((key: string) => values[key]),
-    getOrThrow: jest.fn().mockImplementation((key: string) => {
-      if (values[key] === undefined) throw new Error(`Missing: ${key}`);
-      return values[key];
-    })
-  };
-}
-
 describe('JwtStrategy', () => {
   let strategy: JwtStrategy;
   let mockRepository: {
@@ -47,7 +28,9 @@ describe('JwtStrategy', () => {
         JwtStrategy,
         {
           provide: ConfigService,
-          useValue: buildConfigService()
+          useValue: {
+            getOrThrow: jest.fn().mockReturnValue('test-secret')
+          }
         },
         { provide: DataSource, useValue: mockDataSource }
       ]
@@ -145,67 +128,6 @@ describe('JwtStrategy', () => {
       const result = await strategy.validate(payloadWithoutRoles);
 
       expect(result.roles).toEqual([]);
-    });
-
-    describe('JWT_MIN_IAT rotation check (SRV-12)', () => {
-      let rotationStrategy: JwtStrategy;
-
-      beforeEach(async () => {
-        // minIat = iat + 10 → token is 10 seconds too old
-        const minIat = basePayload.iat! + 10;
-        const module: TestingModule = await Test.createTestingModule({
-          providers: [
-            JwtStrategy,
-            {
-              provide: ConfigService,
-              useValue: buildConfigService({ JWT_MIN_IAT: minIat })
-            },
-            { provide: DataSource, useValue: mockDataSource }
-          ]
-        }).compile();
-        rotationStrategy = module.get<JwtStrategy>(JwtStrategy);
-      });
-
-      it('should throw UnauthorizedException when token was issued before JWT_MIN_IAT', async () => {
-        await expect(rotationStrategy.validate(basePayload)).rejects.toThrow(
-          new UnauthorizedException(
-            'Token invalidated due to key rotation. Please log in again.'
-          )
-        );
-      });
-
-      it('should pass when token was issued at or after JWT_MIN_IAT', async () => {
-        mockRepository.findOne.mockResolvedValue({
-          id: 'user-1',
-          tokenRevokedAt: null
-        });
-        // minIat = iat - 10 → token is newer than the rotation boundary
-        const minIat = basePayload.iat! - 10;
-        const module: TestingModule = await Test.createTestingModule({
-          providers: [
-            JwtStrategy,
-            {
-              provide: ConfigService,
-              useValue: buildConfigService({ JWT_MIN_IAT: minIat })
-            },
-            { provide: DataSource, useValue: mockDataSource }
-          ]
-        }).compile();
-        const freshStrategy = module.get<JwtStrategy>(JwtStrategy);
-
-        const result = await freshStrategy.validate(basePayload);
-        expect(result.userId).toBe('user-1');
-      });
-
-      it('should skip rotation check when JWT_MIN_IAT is not set', async () => {
-        mockRepository.findOne.mockResolvedValue({
-          id: 'user-1',
-          tokenRevokedAt: null
-        });
-        // strategy from outer beforeEach has JWT_MIN_IAT=undefined
-        const result = await strategy.validate(basePayload);
-        expect(result.userId).toBe('user-1');
-      });
     });
   });
 });

@@ -58,11 +58,7 @@ Copy `.env.example` to `.env` and configure:
 | `DB_SCHEMA` | `public` | Database schema |
 | `DB_LOGGING` | `["query","warn","error","log"]` | TypeORM logging levels |
 | `REQUEST_LOG_LEVEL` | `all` | Request logging verbosity: `all` (every request), `warn` (4xx+5xx only), `error` (5xx only) |
-| `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
-| `JWT_SECRET` | - | Symmetric secret, min 16 chars (required when `JWT_ALGORITHM=HS256`) |
-| `JWT_PRIVATE_KEY` | - | Base64-encoded RSA private key PEM (required when `JWT_ALGORITHM=RS256`) |
-| `JWT_PUBLIC_KEY` | - | Base64-encoded RSA public key PEM (required when `JWT_ALGORITHM=RS256`) |
-| `JWT_MIN_IAT` | - | Unix timestamp; tokens issued before this value are rejected (used during key rotation) |
+| `JWT_SECRET` | `my_jwt_secret_key` | Secret for signing JWTs |
 | `JWT_EXPIRATION` | `3600` | Access token lifetime in seconds (1h) |
 | `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime in seconds (7d) |
 | `GOOGLE_CLIENT_ID` | - | Google OAuth client ID |
@@ -349,7 +345,7 @@ This package's version is kept in sync with `client/` and `mock-server/` via `co
 
 | Technology | Version |
 |------------|---------|
-| NestJS | 11.1.17 |
+| NestJS | 11.1.13 |
 | TypeORM | 0.3.28 |
 | PostgreSQL | via `pg` 8.x |
 | Passport | 0.7.x |

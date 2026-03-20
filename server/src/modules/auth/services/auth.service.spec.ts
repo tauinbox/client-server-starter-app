@@ -784,51 +784,6 @@ describe('AuthService', () => {
         'token-1'
       );
     });
-
-    it('should revoke token and throw when JWT_MIN_IAT is set and token was created before it', async () => {
-      const oldToken = {
-        ...mockTokenDoc,
-        createdAt: new Date('2024-01-01T00:00:00Z')
-      };
-      mockRefreshTokenService.findByToken.mockResolvedValue(oldToken);
-      mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'JWT_MIN_IAT') return 1800000000; // 2027, after oldToken.createdAt
-        const config: Record<string, string> = {
-          JWT_EXPIRATION: '3600',
-          JWT_REFRESH_EXPIRATION: '604800'
-        };
-        return config[key];
-      });
-
-      await expect(service.refreshTokens('old-session-token')).rejects.toThrow(
-        UnauthorizedException
-      );
-
-      expect(mockRefreshTokenService.revokeToken).toHaveBeenCalledWith(
-        'token-1'
-      );
-    });
-
-    it('should allow refresh when JWT_MIN_IAT is set and token was created after it', async () => {
-      const recentToken = {
-        ...mockTokenDoc,
-        createdAt: new Date('2030-01-01T00:00:00Z')
-      };
-      mockRefreshTokenService.findByToken.mockResolvedValue(recentToken);
-      mockUsersService.findOne.mockResolvedValue(mockUser);
-      mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'JWT_MIN_IAT') return 1800000000; // 2027, before recentToken.createdAt
-        const config: Record<string, string> = {
-          JWT_EXPIRATION: '3600',
-          JWT_REFRESH_EXPIRATION: '604800'
-        };
-        return config[key];
-      });
-
-      const result = await service.refreshTokens('valid-refresh-token');
-
-      expect(result.tokens.access_token).toBe('mock-access-token');
-    });
   });
 
   describe('loginWithOAuth', () => {

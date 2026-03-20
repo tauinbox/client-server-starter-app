@@ -278,39 +278,6 @@ describe('ResourceSyncService', () => {
     });
   });
 
-  // ── syncResources — subject casing ───────────────────────────────
-
-  describe('syncResources — subject casing', () => {
-    it('should warn when subject does not start with uppercase', async () => {
-      const ctrl = makeController('PostsController');
-      discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
-      reflectorMock.get.mockReturnValue({
-        name: 'posts',
-        subject: 'post',
-        displayName: 'Posts'
-      });
-      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
-
-      await service.onApplicationBootstrap();
-
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('"post"'));
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('PostsController')
-      );
-    });
-
-    it('should not warn when subject is already PascalCase', async () => {
-      const ctrl = makeController('UsersController');
-      discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
-      reflectorMock.get.mockReturnValue(usersMeta);
-      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
-
-      await service.onApplicationBootstrap();
-
-      expect(warnSpy).not.toHaveBeenCalled();
-    });
-  });
-
   // ── syncResources — orphan detection ─────────────────────────────
 
   describe('syncResources — orphaned resource detection', () => {

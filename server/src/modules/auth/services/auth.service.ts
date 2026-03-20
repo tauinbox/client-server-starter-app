@@ -581,23 +581,6 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const rawMinIat = this.configService.get<number>('JWT_MIN_IAT');
-    if (rawMinIat !== undefined) {
-      const minIat = Number(rawMinIat);
-      if (tokenDoc.createdAt.getTime() / 1000 < minIat) {
-        await this.refreshTokenService.revokeToken(tokenDoc.id);
-        this.auditService.logFireAndForget({
-          action: AuditAction.TOKEN_REFRESH_FAILURE,
-          actorId: tokenDoc.userId,
-          details: { reason: 'session_invalidated_by_rotation' }
-        });
-        this.metricsService.recordAuthEvent('token_refresh_failure');
-        throw new UnauthorizedException(
-          'Session invalidated due to key rotation. Please log in again.'
-        );
-      }
-    }
-
     const user = await this.usersService.findOne(tokenDoc.userId);
     if (!user) {
       this.auditService.logFireAndForget({
