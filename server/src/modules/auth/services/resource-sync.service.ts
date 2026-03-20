@@ -70,6 +70,14 @@ export class ResourceSyncService implements OnApplicationBootstrap {
       if (registeredNames.has(meta.name)) continue;
       registeredNames.add(meta.name);
 
+      // Warn early if subject is not PascalCase — upsertResource auto-normalizes,
+      // but this surfaces decorator misconfiguration to developers at startup
+      if (meta.subject.charAt(0) !== meta.subject.charAt(0).toUpperCase()) {
+        this.logger.warn(
+          `@RegisterResource subject "${meta.subject}" on controller "${metatype.name}" is not PascalCase — auto-normalizing. Fix the decorator to suppress this warning.`
+        );
+      }
+
       const resource = await this.resourceService.upsertResource({
         name: meta.name,
         subject: meta.subject,

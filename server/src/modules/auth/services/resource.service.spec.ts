@@ -327,6 +327,50 @@ describe('ResourceService', () => {
         })
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('should normalize lowercase subject to PascalCase when creating', async () => {
+      mockResourceRepo.findOne.mockResolvedValue(null);
+
+      await service.upsertResource({
+        name: 'posts',
+        subject: 'post',
+        displayName: 'Posts'
+      });
+
+      expect(mockResourceRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ subject: 'Post' })
+      );
+    });
+
+    it('should normalize lowercase subject to PascalCase when updating existing', async () => {
+      const existing = { ...resource1 };
+      mockResourceRepo.findOne.mockResolvedValue(existing);
+      mockResourceRepo.save.mockImplementation(
+        (data: Record<string, unknown>) => Promise.resolve(data)
+      );
+
+      await service.upsertResource({
+        name: 'users',
+        subject: 'user',
+        displayName: 'Users'
+      });
+
+      expect(existing.subject).toBe('User');
+    });
+
+    it('should leave already-PascalCase subject unchanged', async () => {
+      mockResourceRepo.findOne.mockResolvedValue(null);
+
+      await service.upsertResource({
+        name: 'posts',
+        subject: 'Post',
+        displayName: 'Posts'
+      });
+
+      expect(mockResourceRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ subject: 'Post' })
+      );
+    });
   });
 
   describe('invalidateSubjectMapCache', () => {
