@@ -12,12 +12,14 @@ RUN cd client && COMMIT_HASH=$COMMIT_HASH NODE_OPTIONS="--max-old-space-size=204
 # Stage 2: runtime
 FROM nginx:1.28-alpine AS runner
 RUN apk upgrade --no-cache && \
-    apk upgrade --no-cache \
-        --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
-        zlib libexpat && \
     mkdir -p /var/cache/nginx /tmp/nginx && \
     chown -R nginx:nginx /var/cache/nginx /tmp/nginx /usr/share/nginx/html && \
     sed -i 's|/run/nginx.pid|/tmp/nginx/nginx.pid|' /etc/nginx/nginx.conf
+# EDGE_PATCHES_START
+RUN apk upgrade --no-cache \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
+    zlib libexpat
+# EDGE_PATCHES_END
 COPY --from=builder /app/client/dist/client/browser /usr/share/nginx/html
 COPY client/nginx.conf /etc/nginx/conf.d/default.conf
 USER nginx

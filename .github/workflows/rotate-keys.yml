@@ -9,6 +9,10 @@ on:
         required: false
         default: false
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   rotate:
     name: Rotate JWT keys on VPS

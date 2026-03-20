@@ -1,10 +1,8 @@
-name: Deploy
+name: Scheduled Rebuild
 
 on:
-  workflow_run:
-    workflows: [CI]
-    branches: [master]
-    types: [completed]
+  schedule:
+    - cron: '0 3 * * 0'  # Every Sunday at 03:00 UTC
   workflow_dispatch:
 
 concurrency:
@@ -12,9 +10,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-push:
-    name: Build & Push Images
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+  rebuild-push:
+    name: Rebuild & Push Images
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -22,12 +19,9 @@ jobs:
     outputs:
       sha: ${{ steps.short-sha.outputs.sha }}
       owner: ${{ steps.lowercase-owner.outputs.owner }}
-      server_image: ${{ steps.meta-server.outputs.tags }}
-      client_image: ${{ steps.meta-client.outputs.tags }}
+
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/checkout@v6
 
       - name: Get commit short SHA
         id: short-sha
@@ -36,9 +30,9 @@ jobs:
           echo "COMMIT_HASH=$SHA" >> $GITHUB_ENV
           echo "sha=$SHA" >> $GITHUB_OUTPUT
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -51,9 +45,20 @@ jobs:
           echo "OWNER=$OWNER" >> $GITHUB_ENV
           echo "owner=$OWNER" >> $GITHUB_OUTPUT
 
+      # Save current :latest as :pre-rebuild so we can roll back if the new build breaks VPS
+      - name: Snapshot current images as pre-rebuild
+        run: |
+          for IMAGE in nexus-server nexus-client; do
+            REF="ghcr.io/${{ env.OWNER }}/${IMAGE}"
+            if docker pull "${REF}:latest"; then
+              docker tag "${REF}:latest" "${REF}:pre-rebuild"
+              docker push "${REF}:pre-rebuild"
+            fi
+          done
+
       - name: Server image metadata
         id: meta-server
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ env.OWNER }}/nexus-server
           tags: |
@@ -62,14 +67,14 @@ jobs:
 
       - name: Client image metadata
         id: meta-client
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ env.OWNER }}/nexus-client
           tags: |
             type=raw,value=latest
             type=raw,value=sha-${{ env.COMMIT_HASH }}
 
-      # Build locally first, scan, then push — prevents pushing vulnerable images to GHCR
+      # no-cache: true forces fresh apk upgrade; load: true builds locally for scan before push
       - name: Build server image
         uses: docker/build-push-action@v7
         with:
@@ -78,8 +83,7 @@ jobs:
           push: false
           load: true
           tags: ${{ steps.meta-server.outputs.tags }}
-          cache-from: type=gha,scope=server
-          cache-to: type=gha,scope=server,mode=max
+          no-cache: true
 
       - name: Scan server image
         uses: aquasecurity/trivy-action@master
@@ -98,8 +102,7 @@ jobs:
           load: true
           tags: ${{ steps.meta-client.outputs.tags }}
           build-args: COMMIT_HASH=${{ env.COMMIT_HASH }}
-          cache-from: type=gha,scope=client
-          cache-to: type=gha,scope=client,mode=max
+          no-cache: true
 
       - name: Scan client image
         uses: aquasecurity/trivy-action@master
@@ -109,7 +112,7 @@ jobs:
           exit-code: 1
           severity: HIGH,CRITICAL
 
-      # Push only after both scans pass
+      # Push only after both scans pass — keeps GHCR clean if either scan fails
       - name: Push server image
         run: |
           docker push ghcr.io/${{ env.OWNER }}/nexus-server:sha-${{ env.COMMIT_HASH }}
@@ -122,7 +125,7 @@ jobs:
 
   deploy:
     name: Deploy to VPS
-    needs: build-push
+    needs: rebuild-push
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH
@@ -137,19 +140,16 @@ jobs:
             cd /home/deploy/nexus
             git pull --ff-only
 
-            # Read the previously successful SHA (empty on first deploy)
             PREV_SHA=""
             if [ -f .deployed-sha ]; then
               PREV_SHA=$(cat .deployed-sha)
             fi
 
-            echo "Deploying sha-${DEPLOY_SHA} (previous: ${PREV_SHA:-none})"
+            echo "Redeploying sha-${DEPLOY_SHA} with fresh OS packages (previous: ${PREV_SHA:-none})"
 
             docker compose pull
             docker compose up -d --remove-orphans
 
-            # Health check with timeout
-            echo "Waiting for services to become healthy..."
             TIMEOUT=120
             ELAPSED=0
             HEALTHY=0
@@ -168,61 +168,54 @@ jobs:
             done
 
             if [ "$HEALTHY" -ge 1 ]; then
-              echo "Deploy successful — sha-${DEPLOY_SHA}"
+              echo "Redeploy successful — sha-${DEPLOY_SHA}"
               cp -f .deployed-sha .prev-deployed-sha 2>/dev/null || true
               echo "$DEPLOY_SHA" > .deployed-sha
               docker image prune -f
               exit 0
             fi
 
-            # Health check failed — attempt rollback
-            echo "Health check failed after ${TIMEOUT}s"
+            # Health check failed — roll back to pre-rebuild images
+            echo "Health check failed after ${TIMEOUT}s — rolling back to pre-rebuild images"
 
-            if [ -z "$PREV_SHA" ]; then
-              echo "No previous version on record — bringing services down"
+            docker pull "ghcr.io/${OWNER}/nexus-server:pre-rebuild" || true
+            docker pull "ghcr.io/${OWNER}/nexus-client:pre-rebuild" || true
+
+            if docker image inspect "ghcr.io/${OWNER}/nexus-server:pre-rebuild" > /dev/null 2>&1 && \
+               docker image inspect "ghcr.io/${OWNER}/nexus-client:pre-rebuild" > /dev/null 2>&1; then
+              docker tag "ghcr.io/${OWNER}/nexus-server:pre-rebuild" "ghcr.io/${OWNER}/nexus-server:latest"
+              docker tag "ghcr.io/${OWNER}/nexus-client:pre-rebuild" "ghcr.io/${OWNER}/nexus-client:latest"
               docker compose down
-              exit 1
-            fi
+              docker compose up -d
 
-            echo "Rolling back to sha-${PREV_SHA}"
-            docker pull "ghcr.io/${OWNER}/nexus-server:sha-${PREV_SHA}"
-            docker pull "ghcr.io/${OWNER}/nexus-client:sha-${PREV_SHA}"
-            docker tag "ghcr.io/${OWNER}/nexus-server:sha-${PREV_SHA}" "ghcr.io/${OWNER}/nexus-server:latest"
-            docker tag "ghcr.io/${OWNER}/nexus-client:sha-${PREV_SHA}" "ghcr.io/${OWNER}/nexus-client:latest"
-
-            # Restore docker-compose.yml to match the rollback target SHA
-            git fetch --quiet origin
-            git checkout "${PREV_SHA}" -- docker-compose.yml
-
-            docker compose down
-            docker compose up -d
-
-            # Verify rollback health
-            ELAPSED=0
-            ROLLBACK_HEALTHY=0
-            while [ $ELAPSED -lt $TIMEOUT ]; do
-              if docker compose ps --format json | grep -q '"unhealthy"'; then
+              ELAPSED=0
+              ROLLBACK_HEALTHY=0
+              while [ $ELAPSED -lt $TIMEOUT ]; do
+                if docker compose ps --format json | grep -q '"unhealthy"'; then
+                  sleep 5
+                  ELAPSED=$((ELAPSED + 5))
+                  continue
+                fi
+                ROLLBACK_HEALTHY=$(docker compose ps --format json | grep -c '"healthy"' || true)
+                if [ "$ROLLBACK_HEALTHY" -ge 1 ]; then
+                  break
+                fi
                 sleep 5
                 ELAPSED=$((ELAPSED + 5))
-                continue
-              fi
-              ROLLBACK_HEALTHY=$(docker compose ps --format json | grep -c '"healthy"' || true)
-              if [ "$ROLLBACK_HEALTHY" -ge 1 ]; then
-                break
-              fi
-              sleep 5
-              ELAPSED=$((ELAPSED + 5))
-            done
+              done
 
-            if [ "$ROLLBACK_HEALTHY" -ge 1 ]; then
-              echo "Rolled back to sha-${PREV_SHA} successfully"
+              if [ "$ROLLBACK_HEALTHY" -ge 1 ]; then
+                echo "Rolled back to pre-rebuild images successfully"
+              else
+                echo "Rollback health check also failed — manual intervention required"
+              fi
             else
-              echo "Rollback health check also failed — manual intervention required"
+              echo "Pre-rebuild images not available — manual intervention required"
             fi
 
             exit 1
         env:
-          DEPLOY_SHA: ${{ needs.build-push.outputs.sha }}
-          OWNER: ${{ needs.build-push.outputs.owner }}
+          DEPLOY_SHA: ${{ needs.rebuild-push.outputs.sha }}
+          OWNER: ${{ needs.rebuild-push.outputs.owner }}
           GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
           GRAFANA_ROOT_URL: ${{ secrets.GRAFANA_ROOT_URL }}
