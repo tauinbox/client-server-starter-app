@@ -11,6 +11,7 @@ import { CaslAbilityFactory } from './casl-ability.factory';
 import { ResourceService } from '../services/resource.service';
 import { ActionService } from '../services/action.service';
 import { ResourceSyncService } from '../services/resource-sync.service';
+import { ResourceRegistryService } from '../services/resource-registry.service';
 
 /**
  * Shared CASL module — provides PermissionService, CaslAbilityFactory,
@@ -35,13 +36,15 @@ import { ResourceSyncService } from '../services/resource-sync.service';
     CaslAbilityFactory,
     ResourceService,
     ActionService,
-    ResourceSyncService
+    ResourceSyncService,
+    ResourceRegistryService
   ],
   exports: [
     PermissionService,
     CaslAbilityFactory,
     ResourceService,
-    ActionService
+    ActionService,
+    ResourceRegistryService
   ]
 })
 export class CaslModule {}

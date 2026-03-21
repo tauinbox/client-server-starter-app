@@ -6,6 +6,7 @@ export type ResourceResponse = {
   description: string | null;
   isSystem: boolean;
   isOrphaned: boolean;
+  isRegistered: boolean;
   allowedActionNames: string[] | null;
   createdAt: string;
 };

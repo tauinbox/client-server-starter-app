@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ResourceService } from './resource.service';
+import { ResourceRegistryService } from './resource-registry.service';
 import { Resource } from '../entities/resource.entity';
 
 describe('ResourceService', () => {
@@ -17,6 +18,10 @@ describe('ResourceService', () => {
     get: jest.Mock;
     set: jest.Mock;
     del: jest.Mock;
+  };
+  let mockRegistry: {
+    isRegistered: jest.Mock;
+    register: jest.Mock;
   };
 
   const resource1: Resource = {
@@ -81,6 +86,11 @@ describe('ResourceService', () => {
       del: jest.fn().mockResolvedValue(undefined)
     };
 
+    mockRegistry = {
+      isRegistered: jest.fn().mockReturnValue(true),
+      register: jest.fn()
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourceService,
@@ -88,7 +98,8 @@ describe('ResourceService', () => {
           provide: getRepositoryToken(Resource),
           useValue: mockResourceRepo
         },
-        { provide: CACHE_MANAGER, useValue: mockCacheManager }
+        { provide: CACHE_MANAGER, useValue: mockCacheManager },
+        { provide: ResourceRegistryService, useValue: mockRegistry }
       ]
     }).compile();
 
@@ -107,6 +118,18 @@ describe('ResourceService', () => {
       expect(mockResourceRepo.find).toHaveBeenCalledWith({
         order: { name: 'ASC' }
       });
+    });
+
+    it('should populate isRegistered from registry on each resource', async () => {
+      mockResourceRepo.find.mockResolvedValue([resource1, resource2]);
+      mockRegistry.isRegistered.mockImplementation(
+        (name: string) => name === 'users'
+      );
+
+      const result = await service.findAll();
+
+      expect(result[0].isRegistered).toBe(true); // users
+      expect(result[1].isRegistered).toBe(false); // articles
     });
   });
 
@@ -413,6 +436,17 @@ describe('ResourceService', () => {
       expect(mockResourceRepo.save).toHaveBeenCalled();
     });
 
+    it('should set isRegistered to true on returned resource', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
+      mockResourceRepo.save.mockImplementation(
+        (data: Record<string, unknown>) => Promise.resolve(data)
+      );
+
+      const result = await service.restore('res-3');
+
+      expect(result.isRegistered).toBe(true);
+    });
+
     it('should invalidate subject map cache after restore', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
       mockResourceRepo.save.mockImplementation(
@@ -430,6 +464,16 @@ describe('ResourceService', () => {
       await expect(service.restore('bad-id')).rejects.toThrow(
         'Resource not found'
       );
+    });
+
+    it('should throw BadRequestException if controller is not registered', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
+      mockRegistry.isRegistered.mockReturnValue(false);
+
+      await expect(service.restore('res-3')).rejects.toThrow(
+        BadRequestException
+      );
+      expect(mockResourceRepo.save).not.toHaveBeenCalled();
     });
   });
 

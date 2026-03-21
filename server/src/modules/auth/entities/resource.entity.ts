@@ -38,6 +38,9 @@ export class Resource {
   @Column({ name: 'is_orphaned', default: false })
   isOrphaned: boolean;
 
+  /** Virtual field — populated by ResourceService.findAll(), not stored in DB */
+  isRegistered?: boolean;
+
   @Column({ name: 'last_synced_at', type: 'timestamp', nullable: true })
   lastSyncedAt: Date | null;
 

@@ -149,6 +149,7 @@ function generateResources(): MockResource[] {
       description: 'User management',
       isSystem: true,
       isOrphaned: false,
+      isRegistered: true,
       allowedActionNames: null,
       lastSyncedAt: now,
       createdAt: now
@@ -161,6 +162,7 @@ function generateResources(): MockResource[] {
       description: 'User profile',
       isSystem: true,
       isOrphaned: false,
+      isRegistered: true,
       allowedActionNames: ['read', 'update'],
       lastSyncedAt: now,
       createdAt: now
@@ -173,6 +175,7 @@ function generateResources(): MockResource[] {
       description: 'Role management',
       isSystem: true,
       isOrphaned: false,
+      isRegistered: true,
       allowedActionNames: [
         'create',
         'read',
@@ -192,6 +195,7 @@ function generateResources(): MockResource[] {
       description: 'Permission management',
       isSystem: true,
       isOrphaned: false,
+      isRegistered: true,
       allowedActionNames: null,
       lastSyncedAt: now,
       createdAt: now

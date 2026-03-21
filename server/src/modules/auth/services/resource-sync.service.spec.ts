@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { DiscoveryService, Reflector } from '@nestjs/core';
 import { ResourceSyncService } from './resource-sync.service';
 import { ResourceService } from './resource.service';
+import { ResourceRegistryService } from './resource-registry.service';
 import { Resource } from '../entities/resource.entity';
 import { Permission } from '../entities/permission.entity';
 import { Action } from '../entities/action.entity';
@@ -23,6 +24,7 @@ describe('ResourceSyncService', () => {
     upsertResource: jest.Mock;
     invalidateSubjectMapCache: jest.Mock;
   };
+  let resourceRegistryMock: { register: jest.Mock; isRegistered: jest.Mock };
   let resourceRepoMock: {
     find: jest.Mock;
     findOne: jest.Mock;
@@ -52,6 +54,11 @@ describe('ResourceSyncService', () => {
       invalidateSubjectMapCache: jest.fn().mockResolvedValue(undefined)
     };
 
+    resourceRegistryMock = {
+      register: jest.fn(),
+      isRegistered: jest.fn().mockReturnValue(false)
+    };
+
     resourceRepoMock = {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn().mockResolvedValue(null),
@@ -72,6 +79,10 @@ describe('ResourceSyncService', () => {
         { provide: DiscoveryService, useValue: discoveryServiceMock },
         { provide: Reflector, useValue: reflectorMock },
         { provide: ResourceService, useValue: resourceServiceMock },
+        {
+          provide: ResourceRegistryService,
+          useValue: resourceRegistryMock
+        },
         { provide: getRepositoryToken(Resource), useValue: resourceRepoMock },
         {
           provide: getRepositoryToken(Permission),
@@ -381,6 +392,30 @@ describe('ResourceSyncService', () => {
       await service.onApplicationBootstrap();
 
       expect(resourceServiceMock.invalidateSubjectMapCache).toHaveBeenCalled();
+    });
+  });
+
+  // ── syncResources — registry ─────────────────────────────────────
+
+  describe('syncResources — resource registry', () => {
+    it('should register discovered resource names in the registry', async () => {
+      const ctrl = makeController('UsersController');
+      discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
+      reflectorMock.get.mockReturnValue(usersMeta);
+
+      await service.onApplicationBootstrap();
+
+      expect(resourceRegistryMock.register).toHaveBeenCalledWith(
+        expect.arrayContaining(['users'])
+      );
+    });
+
+    it('should register empty array when no controllers are decorated', async () => {
+      discoveryServiceMock.getControllers.mockReturnValue([]);
+
+      await service.onApplicationBootstrap();
+
+      expect(resourceRegistryMock.register).toHaveBeenCalledWith([]);
     });
   });
 });
