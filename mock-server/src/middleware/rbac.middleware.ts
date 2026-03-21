@@ -43,6 +43,14 @@ router.post('/resources/:id/restore', adminGuard, (req, res) => {
     return;
   }
 
+  if (!resource.isRegistered) {
+    res.status(400).json({
+      message: `Cannot restore resource "${resource.name}": its @RegisterResource controller is not registered. Restore the controller code first.`,
+      statusCode: 400
+    });
+    return;
+  }
+
   resource.isOrphaned = false;
 
   const actor = (req as AuthenticatedRequest).user;

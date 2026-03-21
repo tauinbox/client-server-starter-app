@@ -10,6 +10,7 @@ import { Resource } from '../entities/resource.entity';
 import { Permission } from '../entities/permission.entity';
 import { Action } from '../entities/action.entity';
 import { ResourceService } from './resource.service';
+import { ResourceRegistryService } from './resource-registry.service';
 
 @Injectable()
 export class ResourceSyncService implements OnApplicationBootstrap {
@@ -19,6 +20,7 @@ export class ResourceSyncService implements OnApplicationBootstrap {
     private readonly discoveryService: DiscoveryService,
     private readonly reflector: Reflector,
     private readonly resourceService: ResourceService,
+    private readonly resourceRegistry: ResourceRegistryService,
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
     @InjectRepository(Permission)
@@ -133,6 +135,7 @@ export class ResourceSyncService implements OnApplicationBootstrap {
       }
     }
 
+    this.resourceRegistry.register([...registeredNames]);
     await this.resourceService.invalidateSubjectMapCache();
   }
 }

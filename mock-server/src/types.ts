@@ -38,6 +38,7 @@ export interface MockResource {
   description: string | null;
   isSystem: boolean;
   isOrphaned: boolean;
+  isRegistered: boolean;
   allowedActionNames: string[] | null;
   lastSyncedAt: string;
   createdAt: string;

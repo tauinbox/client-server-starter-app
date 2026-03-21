@@ -11,6 +11,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Resource } from '../entities/resource.entity';
 import { CASL_RESERVED_SUBJECT_NAMES } from '../casl/constants';
+import { ResourceRegistryService } from './resource-registry.service';
 
 const SUBJECT_MAP_CACHE_KEY = 'rbac:subject_map';
 const SUBJECT_MAP_CACHE_TTL = 300_000; // 5 minutes
@@ -23,11 +24,18 @@ export class ResourceService {
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
     @Inject(CACHE_MANAGER)
-    private readonly cacheManager: Cache
+    private readonly cacheManager: Cache,
+    private readonly registry: ResourceRegistryService
   ) {}
 
   async findAll(): Promise<Resource[]> {
-    return this.resourceRepository.find({ order: { name: 'ASC' } });
+    const resources = await this.resourceRepository.find({
+      order: { name: 'ASC' }
+    });
+    return resources.map((r) => {
+      r.isRegistered = this.registry.isRegistered(r.name);
+      return r;
+    });
   }
 
   async findOne(id: string): Promise<Resource | null> {
@@ -81,9 +89,15 @@ export class ResourceService {
     if (!resource) {
       throw new NotFoundException('Resource not found');
     }
+    if (!this.registry.isRegistered(resource.name)) {
+      throw new BadRequestException(
+        `Cannot restore resource "${resource.name}": its @RegisterResource controller is not registered. Restore the controller code first.`
+      );
+    }
     resource.isOrphaned = false;
     const saved = await this.resourceRepository.save(resource);
     await this.invalidateSubjectMapCache();
+    saved.isRegistered = true;
     return saved;
   }
 

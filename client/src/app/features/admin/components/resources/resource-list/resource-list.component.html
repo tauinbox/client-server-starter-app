@@ -50,7 +50,11 @@
               <mat-chip
                 color="warn"
                 highlighted
-                matTooltip="Controller removed — permissions disabled"
+                [matTooltip]="
+                  resource.isRegistered
+                    ? 'Controller removed — click Restore to re-enable permissions'
+                    : 'Controller not found in code — restore the @RegisterResource controller first'
+                "
               >
                 Orphaned
               </mat-chip>
@@ -65,7 +69,7 @@
           <th mat-header-cell *matHeaderCellDef>Actions</th>
           <td mat-cell *matCellDef="let resource">
             @if (canUpdate()) {
-              @if (resource.isOrphaned) {
+              @if (resource.isOrphaned && resource.isRegistered) {
                 <button
                   mat-icon-button
                   color="warn"
@@ -75,7 +79,7 @@
                 >
                   <mat-icon>restore</mat-icon>
                 </button>
-              } @else {
+              } @else if (!resource.isOrphaned) {
                 <button
                   mat-icon-button
                   color="accent"

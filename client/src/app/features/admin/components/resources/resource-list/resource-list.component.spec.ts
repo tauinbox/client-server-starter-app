@@ -23,6 +23,7 @@ const mockResource: ResourceResponse = {
   description: 'User management',
   isSystem: true,
   isOrphaned: false,
+  isRegistered: true,
   allowedActionNames: null,
   createdAt: '2024-01-01T00:00:00.000Z'
 };
