@@ -18,6 +18,7 @@ const mockResource: ResourceResponse = {
   displayName: 'Users',
   description: 'User management',
   isSystem: true,
+  isOrphaned: false,
   allowedActionNames: null,
   createdAt: '2024-01-01T00:00:00.000Z'
 };
@@ -29,6 +30,7 @@ const mockResource2: ResourceResponse = {
   displayName: 'Roles',
   description: null,
   isSystem: true,
+  isOrphaned: false,
   allowedActionNames: null,
   createdAt: '2024-01-01T00:00:00.000Z'
 };
@@ -56,6 +58,7 @@ describe('ResourcesStore', () => {
     getResources: ReturnType<typeof vi.fn>;
     getActions: ReturnType<typeof vi.fn>;
     updateResource: ReturnType<typeof vi.fn>;
+    restoreResource: ReturnType<typeof vi.fn>;
     createAction: ReturnType<typeof vi.fn>;
     updateAction: ReturnType<typeof vi.fn>;
     deleteAction: ReturnType<typeof vi.fn>;
@@ -68,6 +71,7 @@ describe('ResourcesStore', () => {
       getResources: vi.fn().mockReturnValue(of([mockResource])),
       getActions: vi.fn().mockReturnValue(of([mockAction])),
       updateResource: vi.fn(),
+      restoreResource: vi.fn(),
       createAction: vi.fn(),
       updateAction: vi.fn(),
       deleteAction: vi.fn()
@@ -103,6 +107,7 @@ describe('ResourcesStore', () => {
           .mockReturnValue(of([mockResource, mockResource2])),
         getActions: vi.fn().mockReturnValue(of([mockAction, mockAction2])),
         updateResource: vi.fn(),
+        restoreResource: vi.fn(),
         createAction: vi.fn(),
         updateAction: vi.fn(),
         deleteAction: vi.fn()
@@ -138,6 +143,7 @@ describe('ResourcesStore', () => {
           .mockReturnValue(throwError(() => new Error('Network error'))),
         getActions: vi.fn().mockReturnValue(of([])),
         updateResource: vi.fn(),
+        restoreResource: vi.fn(),
         createAction: vi.fn(),
         updateAction: vi.fn(),
         deleteAction: vi.fn()
@@ -251,6 +257,7 @@ describe('ResourcesStore', () => {
         getResources: vi.fn().mockReturnValue(of([mockResource])),
         getActions: vi.fn().mockReturnValue(of([mockAction, mockAction2])),
         updateResource: vi.fn(),
+        restoreResource: vi.fn(),
         createAction: vi.fn(),
         updateAction: vi.fn(),
         deleteAction: vi.fn().mockReturnValue(of(undefined))

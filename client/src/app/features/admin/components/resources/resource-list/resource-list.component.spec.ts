@@ -22,6 +22,7 @@ const mockResource: ResourceResponse = {
   displayName: 'Users',
   description: 'User management',
   isSystem: true,
+  isOrphaned: false,
   allowedActionNames: null,
   createdAt: '2024-01-01T00:00:00.000Z'
 };
@@ -44,6 +45,7 @@ describe('ResourceListComponent', () => {
     actions: ReturnType<typeof signal<ActionResponse[]>>;
     load: ReturnType<typeof vi.fn>;
     updateResource: ReturnType<typeof vi.fn>;
+    restoreResource: ReturnType<typeof vi.fn>;
   };
   let authStoreMock: { hasPermissions: ReturnType<typeof vi.fn> };
   let dialogMock: { open: ReturnType<typeof vi.fn> };
@@ -71,7 +73,8 @@ describe('ResourceListComponent', () => {
       resources: signal([mockResource]),
       actions: signal([mockAction]),
       load: vi.fn(),
-      updateResource: vi.fn().mockReturnValue(of({} as ResourceResponse))
+      updateResource: vi.fn().mockReturnValue(of({} as ResourceResponse)),
+      restoreResource: vi.fn().mockReturnValue(of({} as ResourceResponse))
     };
 
     authStoreMock = { hasPermissions: vi.fn().mockReturnValue(false) };

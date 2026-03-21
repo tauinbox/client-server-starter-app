@@ -78,6 +78,16 @@ export class ResourceSyncService implements OnApplicationBootstrap {
         );
       }
 
+      // Check orphaned status before upserting so we can warn if needed
+      const existing = await this.resourceRepository.findOne({
+        where: { name: meta.name }
+      });
+      if (existing?.isOrphaned) {
+        this.logger.warn(
+          `Resource "${meta.name}" was previously orphaned and its controller is back. Permissions remain disabled until an admin explicitly restores it via POST /api/v1/rbac/resources/${existing.id}/restore`
+        );
+      }
+
       const resource = await this.resourceService.upsertResource({
         name: meta.name,
         subject: meta.subject,
@@ -105,13 +115,21 @@ export class ResourceSyncService implements OnApplicationBootstrap {
       this.logger.log(`Synced resource: ${meta.name} → ${meta.subject}`);
     }
 
-    // Log orphaned resources
+    // Mark unregistered resources as orphaned
     const allResources = await this.resourceRepository.find();
     for (const resource of allResources) {
       if (!registeredNames.has(resource.name)) {
-        this.logger.warn(
-          `Orphaned resource detected: "${resource.name}" — not registered by any controller`
-        );
+        if (!resource.isOrphaned) {
+          resource.isOrphaned = true;
+          await this.resourceRepository.save(resource);
+          this.logger.warn(
+            `Resource "${resource.name}" marked as orphaned — no controller registered it. Permissions for this resource are now disabled.`
+          );
+        } else {
+          this.logger.warn(
+            `Resource "${resource.name}" is still orphaned — permissions remain disabled`
+          );
+        }
       }
     }
 

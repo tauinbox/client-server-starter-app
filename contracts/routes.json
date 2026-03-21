@@ -1,5 +1,5 @@
 {
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "API route manifest — update whenever server endpoints change.",
   "routes": [
     {
@@ -220,6 +220,11 @@
     {
       "method": "GET",
       "path": "/api/v1/rbac/resources",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/rbac/resources/1/restore",
       "expectedStatus": 401
     },
     {

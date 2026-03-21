@@ -82,6 +82,7 @@ export function toResourceResponse(resource: {
   displayName: string;
   description: string | null;
   isSystem: boolean;
+  isOrphaned: boolean;
   allowedActionNames: string[] | null;
   createdAt: string;
 }): ResourceResponse {
@@ -92,6 +93,7 @@ export function toResourceResponse(resource: {
     displayName: resource.displayName,
     description: resource.description,
     isSystem: resource.isSystem,
+    isOrphaned: resource.isOrphaned,
     allowedActionNames: resource.allowedActionNames,
     createdAt: resource.createdAt
   };

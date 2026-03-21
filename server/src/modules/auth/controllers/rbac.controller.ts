@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Inject,
   Param,
   Patch,
@@ -92,6 +93,33 @@ export class RbacController {
   @ApiForbiddenResponse({ description: 'Forbidden' })
   findAllResources() {
     return this.resourceService.findAll();
+  }
+
+  @Post('resources/:id/restore')
+  @HttpCode(200)
+  @Authorize(['update', 'Permission'])
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Restore an orphaned resource (re-enable its permissions)'
+  })
+  @ApiParam({ name: 'id', description: 'The resource ID' })
+  @ApiOkResponse({ description: 'Resource restored' })
+  @ApiNotFoundResponse({ description: 'Resource not found' })
+  async restoreResource(
+    @Param('id') id: string,
+    @Request() req: JwtAuthRequest
+  ) {
+    const result = await this.resourceService.restore(id);
+    await this.cacheManager.del(METADATA_CACHE_KEY);
+    await this.auditService.log({
+      action: AuditAction.RESOURCE_RESTORE,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      targetId: id,
+      targetType: 'Resource',
+      context: extractAuditContext(req)
+    });
+    return result;
   }
 
   @Patch('resources/:id')

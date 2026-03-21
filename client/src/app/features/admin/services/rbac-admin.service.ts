@@ -45,6 +45,13 @@ export class RbacAdminService {
     );
   }
 
+  restoreResource(id: string): Observable<ResourceResponse> {
+    return this.#http.post<ResourceResponse>(
+      `${RBAC_API_V1}/resources/${id}/restore`,
+      {}
+    );
+  }
+
   getActions(): Observable<ActionResponse[]> {
     return this.#http.get<ActionResponse[]>(`${RBAC_API_V1}/actions`);
   }

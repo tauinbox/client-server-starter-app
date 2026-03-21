@@ -35,6 +35,9 @@ export class Resource {
   })
   allowedActionNames: string[] | null;
 
+  @Column({ name: 'is_orphaned', default: false })
+  isOrphaned: boolean;
+
   @Column({ name: 'last_synced_at', type: 'timestamp', nullable: true })
   lastSyncedAt: Date | null;
 

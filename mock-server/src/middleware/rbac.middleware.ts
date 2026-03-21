@@ -32,6 +32,31 @@ router.get('/resources', adminGuard, (_req, res) => {
   res.json(resources);
 });
 
+// POST /api/v1/rbac/resources/:id/restore
+router.post('/resources/:id/restore', adminGuard, (req, res) => {
+  const id = req.params['id'] as string;
+  const state = getState();
+  const resource = state.resources.get(id);
+
+  if (!resource) {
+    res.status(404).json({ message: 'Resource not found', statusCode: 404 });
+    return;
+  }
+
+  resource.isOrphaned = false;
+
+  const actor = (req as AuthenticatedRequest).user;
+  logAudit('RESOURCE_RESTORE', {
+    actorId: actor.id,
+    actorEmail: actor.email,
+    targetId: id,
+    targetType: 'Resource',
+    ip: req.ip
+  });
+
+  res.json(toResourceResponse(resource));
+});
+
 // PATCH /api/v1/rbac/resources/:id
 router.patch('/resources/:id', adminGuard, (req, res) => {
   const id = req.params['id'] as string;
