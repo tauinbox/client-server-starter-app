@@ -188,7 +188,7 @@ Ten tables managed via TypeORM migrations:
 | `oauth_accounts` | UUID PK, provider + provider_id (unique), FK to users (CASCADE) |
 | `refresh_tokens` | UUID PK, token (SHA-256 hashed), FK to users (CASCADE), expires_at, revoked |
 | `roles` | UUID PK, name (unique), description, isSystem flag, isSuper flag |
-| `resources` | UUID PK, name (unique), displayName, description, isSystem flag, sortOrder |
+| `resources` | UUID PK, name (unique), displayName, description, isSystem flag, `is_orphaned` boolean (marked true when controller removed; excluded from CASL subject map until restored), `allowed_action_names text[]` |
 | `actions` | UUID PK, name (unique), displayName, description, isSystem flag, sortOrder |
 | `permissions` | UUID PK, resource_id + action_id (unique constraint, FKs to resources and actions) |
 | `role_permissions` | FK to roles + permissions, optional jsonb `conditions` |
@@ -274,6 +274,7 @@ Base URL: `/api/v1`
 | GET | `/metadata` | Bearer | Get RBAC metadata (resources + actions); Redis-cached 60s |
 | GET | `/resources` | `permissions:read` | List all resources |
 | PATCH | `/resources/:id` | `permissions:update` | Update resource display info |
+| POST | `/resources/:id/restore` | `permissions:update` | Restore orphaned resource (clears `is_orphaned`, invalidates subject-map cache) |
 | GET | `/actions` | `permissions:read` | List all actions |
 | POST | `/actions` | `permissions:create` | Create new action |
 | PATCH | `/actions/:id` | `permissions:update` | Update action |

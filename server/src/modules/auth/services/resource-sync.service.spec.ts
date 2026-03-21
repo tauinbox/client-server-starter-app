@@ -23,7 +23,11 @@ describe('ResourceSyncService', () => {
     upsertResource: jest.Mock;
     invalidateSubjectMapCache: jest.Mock;
   };
-  let resourceRepoMock: { find: jest.Mock };
+  let resourceRepoMock: {
+    find: jest.Mock;
+    findOne: jest.Mock;
+    save: jest.Mock;
+  };
   let permissionRepoMock: {
     findOne: jest.Mock;
     create: jest.Mock;
@@ -48,7 +52,11 @@ describe('ResourceSyncService', () => {
       invalidateSubjectMapCache: jest.fn().mockResolvedValue(undefined)
     };
 
-    resourceRepoMock = { find: jest.fn().mockResolvedValue([]) };
+    resourceRepoMock = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
+      save: jest.fn().mockResolvedValue(undefined)
+    };
 
     permissionRepoMock = {
       findOne: jest.fn().mockResolvedValue(null),
@@ -314,23 +322,40 @@ describe('ResourceSyncService', () => {
   // ── syncResources — orphan detection ─────────────────────────────
 
   describe('syncResources — orphaned resource detection', () => {
-    it('should warn about resources in DB that have no registered controller', async () => {
+    it('should mark resource as orphaned and warn when not registered', async () => {
+      discoveryServiceMock.getControllers.mockReturnValue([]);
+      const legacy = { id: 'old-res', name: 'legacy', isOrphaned: false };
+      resourceRepoMock.find.mockResolvedValue([legacy]);
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
+
+      await service.onApplicationBootstrap();
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('"legacy"'));
+      expect(resourceRepoMock.save).toHaveBeenCalledWith(
+        expect.objectContaining({ isOrphaned: true })
+      );
+    });
+
+    it('should warn (without save) when resource was already orphaned', async () => {
       discoveryServiceMock.getControllers.mockReturnValue([]);
       resourceRepoMock.find.mockResolvedValue([
-        { id: 'old-res', name: 'legacy' }
+        { id: 'old-res', name: 'legacy', isOrphaned: true }
       ]);
       const warnSpy = jest.spyOn(Logger.prototype, 'warn');
 
       await service.onApplicationBootstrap();
 
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('"legacy"'));
+      expect(resourceRepoMock.save).not.toHaveBeenCalled();
     });
 
     it('should not warn for resources that are registered', async () => {
       const ctrl = makeController('UsersController');
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
       reflectorMock.get.mockReturnValue(usersMeta);
-      resourceRepoMock.find.mockResolvedValue([{ id: 'res-1', name: 'users' }]);
+      resourceRepoMock.find.mockResolvedValue([
+        { id: 'res-1', name: 'users', isOrphaned: false }
+      ]);
       const warnSpy = jest.spyOn(Logger.prototype, 'warn');
 
       await service.onApplicationBootstrap();

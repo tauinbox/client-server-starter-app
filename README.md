@@ -320,6 +320,7 @@ API base URL: `/api/v1`
 | GET | `/rbac/metadata` | Bearer | Get RBAC metadata (resources + actions); Redis-cached 60s |
 | GET | `/rbac/resources` | `permissions:read` | List all resources |
 | PATCH | `/rbac/resources/:id` | `permissions:update` | Update resource display info |
+| POST | `/rbac/resources/:id/restore` | `permissions:update` | Restore an orphaned resource (re-enables its permissions) |
 | GET | `/rbac/actions` | `permissions:read` | List all actions |
 | POST | `/rbac/actions` | `permissions:create` | Create a new action |
 | PATCH | `/rbac/actions/:id` | `permissions:update` | Update action |
@@ -394,7 +395,7 @@ Nine tables managed via TypeORM migrations:
 - **oauth_accounts** — Linked to users (CASCADE delete), provider + provider_id (unique), timestamps
 - **refresh_tokens** — Linked to users (CASCADE delete), token string (SHA-256 hashed), expiry, revoked flag
 - **roles** — UUID PK, name (unique), description, isSystem flag, isSuper flag; ManyToMany with users
-- **resources** — UUID PK, name (unique), displayName, description, isSystem flag, `allowed_action_names text[]` (null = use all default actions)
+- **resources** — UUID PK, name (unique), displayName, description, isSystem flag, `is_orphaned` boolean (true when controller was removed; excluded from CASL ability until restored), `allowed_action_names text[]` (null = use all default actions)
 - **actions** — UUID PK, name (unique), displayName, description, isSystem flag, sortOrder
 - **permissions** — UUID PK, resource_id + action_id (unique constraint, FKs to resources and actions)
 - **role_permissions** — FK to roles + permissions, optional jsonb `conditions` column
@@ -444,7 +445,7 @@ GitHub Actions runs on every push and pull request to `master` with 5 jobs:
 
 | Job | Depends on | Steps | Artifacts |
 |-----|-----------|-------|-----------|
-| **Server – Checks** | — | lint, format:check, check:routes, check:enums | — |
+| **Server – Checks** | — | lint, format:check, check:routes, check:enums, check:permissions | — |
 | **Server – Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
 | **Mock Server** | — | lint, format:check, tsc, test | — |
 | **Client** | — | lint, format:check, test:cov, build | Coverage report |

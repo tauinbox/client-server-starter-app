@@ -61,6 +61,19 @@ export const ResourcesStore = signalStore(
         )
       ),
 
+      restoreResource(id: string): Observable<ResourceResponse> {
+        return rbacService.restoreResource(id).pipe(
+          tap((updated) => {
+            patchState(store, {
+              resources: store
+                .resources()
+                .map((r) => (r.id === id ? updated : r))
+            });
+            void authService.fetchRbacMetadata();
+          })
+        );
+      },
+
       updateResource(
         id: string,
         dto: UpdateResource

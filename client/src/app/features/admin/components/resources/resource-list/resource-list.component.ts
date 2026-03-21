@@ -84,7 +84,7 @@ export class ResourceListComponent implements OnInit {
     'name',
     'subject',
     'description',
-    'system',
+    'status',
     'actions'
   ];
 
@@ -94,6 +94,28 @@ export class ResourceListComponent implements OnInit {
 
   ngOnInit(): void {
     this.#resourcesStore.load();
+  }
+
+  restoreResource(resource: ResourceResponse): void {
+    this.#resourcesStore
+      .restoreResource(resource.id)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.#snackBar.open(
+            `Resource "${resource.displayName}" restored — permissions re-enabled`,
+            'Close',
+            { duration: 5000 }
+          );
+        },
+        error: (err: { error?: { message?: string } }) => {
+          this.#snackBar.open(
+            err.error?.message ?? 'Failed to restore resource.',
+            'Close',
+            { duration: 5000 }
+          );
+        }
+      });
   }
 
   openEditResource(resource: ResourceResponse): void {

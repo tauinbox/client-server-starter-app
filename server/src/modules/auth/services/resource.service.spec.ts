@@ -26,6 +26,7 @@ describe('ResourceService', () => {
     displayName: 'Users',
     description: 'User management',
     isSystem: true,
+    isOrphaned: false,
     allowedActionNames: null,
     lastSyncedAt: new Date(),
     permissions: [],
@@ -39,6 +40,21 @@ describe('ResourceService', () => {
     displayName: 'Articles',
     description: null,
     isSystem: false,
+    isOrphaned: false,
+    allowedActionNames: null,
+    lastSyncedAt: null,
+    permissions: [],
+    createdAt: new Date()
+  };
+
+  const orphanedResource: Resource = {
+    id: 'res-3',
+    name: 'legacy',
+    subject: 'Legacy',
+    displayName: 'Legacy',
+    description: null,
+    isSystem: false,
+    isOrphaned: true,
     allowedActionNames: null,
     lastSyncedAt: null,
     permissions: [],
@@ -186,6 +202,16 @@ describe('ResourceService', () => {
         { users: 'User', articles: 'Article' },
         300_000
       );
+    });
+
+    it('should exclude orphaned resources from subject map', async () => {
+      mockCacheManager.get.mockResolvedValue(undefined);
+      mockResourceRepo.find.mockResolvedValue([resource1, orphanedResource]);
+
+      const result = await service.getSubjectMap();
+
+      expect(result).toEqual({ users: 'User' });
+      expect(result).not.toHaveProperty('legacy');
     });
 
     it('should return null from cache as a miss', async () => {
@@ -369,6 +395,40 @@ describe('ResourceService', () => {
 
       expect(mockResourceRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({ subject: 'Post' })
+      );
+    });
+  });
+
+  describe('restore', () => {
+    it('should set isOrphaned to false and save', async () => {
+      const orphaned = { ...orphanedResource };
+      mockResourceRepo.findOne.mockResolvedValue(orphaned);
+      mockResourceRepo.save.mockImplementation(
+        (data: Record<string, unknown>) => Promise.resolve(data)
+      );
+
+      const result = await service.restore('res-3');
+
+      expect(result).toMatchObject({ isOrphaned: false });
+      expect(mockResourceRepo.save).toHaveBeenCalled();
+    });
+
+    it('should invalidate subject map cache after restore', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
+      mockResourceRepo.save.mockImplementation(
+        (data: Record<string, unknown>) => Promise.resolve(data)
+      );
+
+      await service.restore('res-3');
+
+      expect(mockCacheManager.del).toHaveBeenCalledWith('rbac:subject_map');
+    });
+
+    it('should throw NotFoundException if resource not found', async () => {
+      mockResourceRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.restore('bad-id')).rejects.toThrow(
+        'Resource not found'
       );
     });
   });

@@ -2,7 +2,8 @@ import {
   BadRequestException,
   Inject,
   Injectable,
-  Logger
+  Logger,
+  NotFoundException
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -62,7 +63,9 @@ export class ResourceService {
     const resources = await this.resourceRepository.find();
     const map: Record<string, string> = {};
     for (const r of resources) {
-      map[r.name] = r.subject;
+      if (!r.isOrphaned) {
+        map[r.name] = r.subject;
+      }
     }
 
     await this.cacheManager.set(
@@ -71,6 +74,17 @@ export class ResourceService {
       SUBJECT_MAP_CACHE_TTL
     );
     return map;
+  }
+
+  async restore(id: string): Promise<Resource> {
+    const resource = await this.resourceRepository.findOne({ where: { id } });
+    if (!resource) {
+      throw new NotFoundException('Resource not found');
+    }
+    resource.isOrphaned = false;
+    const saved = await this.resourceRepository.save(resource);
+    await this.invalidateSubjectMapCache();
+    return saved;
   }
 
   async upsertResource(data: {
