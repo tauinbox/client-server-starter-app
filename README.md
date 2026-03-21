@@ -320,7 +320,7 @@ API base URL: `/api/v1`
 | GET | `/rbac/metadata` | Bearer | Get RBAC metadata (resources + actions); Redis-cached 60s |
 | GET | `/rbac/resources` | `permissions:read` | List all resources |
 | PATCH | `/rbac/resources/:id` | `permissions:update` | Update resource display info |
-| POST | `/rbac/resources/:id/restore` | `permissions:update` | Restore an orphaned resource (re-enables its permissions) |
+| POST | `/rbac/resources/:id/restore` | `permissions:update` | Restore an orphaned resource; 400 if controller not registered |
 | GET | `/rbac/actions` | `permissions:read` | List all actions |
 | POST | `/rbac/actions` | `permissions:create` | Create a new action |
 | PATCH | `/rbac/actions/:id` | `permissions:update` | Update action |
