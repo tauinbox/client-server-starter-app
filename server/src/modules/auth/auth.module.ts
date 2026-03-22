@@ -1,4 +1,4 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import type { StringValue } from 'ms';
 import { PassportModule } from '@nestjs/passport';
@@ -49,7 +49,7 @@ function conditionalProvider(
 
 @Module({
   imports: [
-    forwardRef(() => UsersModule),
+    UsersModule,
     CaslModule,
     PassportModule,
     TypeOrmModule.forFeature([
