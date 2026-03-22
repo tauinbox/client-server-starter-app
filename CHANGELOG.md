@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.13](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.12...v0.1.13) (2026-03-22)
+
+
+### Features
+
+* **auth:** add RS256 support and JWT key rotation mechanism ([f02e42e](https://github.com/tauinbox/client-server-starter-app/commit/f02e42ea445d022f2f9d7116fdf6fa0396c7096f))
+* **auth:** add RS256 support and JWT key rotation mechanism ([f7b016f](https://github.com/tauinbox/client-server-starter-app/commit/f7b016f98b8d8968515b97ba7d0f1ee227749c55))
+* **ci:** add scheduled rebuild, scan-before-push, and deployment concurrency ([1c85580](https://github.com/tauinbox/client-server-starter-app/commit/1c855801e47aaf60feb6790291ba14bff432dfa6))
+* **ci:** add scheduled rebuild, scan-before-push, and deployment concurrency ([e184d5c](https://github.com/tauinbox/client-server-starter-app/commit/e184d5c40df78d6488d7b50c1cb21ac11bc3696e))
+* **ci:** move JWT secret to GitHub Secrets, inject RS256 keys on deploy ([e62db27](https://github.com/tauinbox/client-server-starter-app/commit/e62db27392a2b8e271fbdd32d612d48ca3243c37))
+* **ci:** move JWT secret to GitHub Secrets, inject RS256 keys on deploy ([4894ebd](https://github.com/tauinbox/client-server-starter-app/commit/4894ebd692045a44323a274ac989e0a87755702b))
+* **client:** refresh RBAC metadata on 403 and retry request ([eefaead](https://github.com/tauinbox/client-server-starter-app/commit/eefaeadc4857095fb88b05fdc72a4d576f6ad751))
+* **rbac:** enforce PascalCase normalization for resource subjects ([742e7ae](https://github.com/tauinbox/client-server-starter-app/commit/742e7aea01052c808c06a8c176c360ec0eced225))
+* **rbac:** enforce PascalCase normalization for resource subjects ([3d0a136](https://github.com/tauinbox/client-server-starter-app/commit/3d0a1360a657627999431fd73099fa89d71876c5))
+* **rbac:** gate restore on controller registration status ([5f54eba](https://github.com/tauinbox/client-server-starter-app/commit/5f54ebaecd99971ba0220b3b598c7e4e6ce63895))
+* **rbac:** harden role and permission creation validation ([a3f2d12](https://github.com/tauinbox/client-server-starter-app/commit/a3f2d12bc45833eb91265a9de1580ba28758c586))
+* **rbac:** harden role and permission creation validation ([809a290](https://github.com/tauinbox/client-server-starter-app/commit/809a290fc2ff31faa4af0f35c8d7de37709a9fed))
+* **rbac:** orphaned resource lifecycle management and static permissions check ([886ad91](https://github.com/tauinbox/client-server-starter-app/commit/886ad91e817c2ce928530d05287c01e7036ff0d0))
+
+
+### Bug Fixes
+
+* **auth:** apply JWT_MIN_IAT check to refresh token validation ([b0fbb4a](https://github.com/tauinbox/client-server-starter-app/commit/b0fbb4a74d83948d674330947c9eadb11822505d))
+* **auth:** apply JWT_MIN_IAT check to refresh token validation ([46e3226](https://github.com/tauinbox/client-server-starter-app/commit/46e32263cabe5d349811d85aae48d37f953ca955))
+* **auth:** remove redundant user computed that overrides state signal in AuthStore ([2e80582](https://github.com/tauinbox/client-server-starter-app/commit/2e805826b084293d843db59d7a875a573ce53281))
+* **auth:** remove redundant user computed that overrides state signal in AuthStore ([3af580a](https://github.com/tauinbox/client-server-starter-app/commit/3af580a05714222e2e99cdc16fb7168928575b6d))
+* **ci:** add git identity and fix PR body formatting in edge-patch-cleanup ([8c21dd2](https://github.com/tauinbox/client-server-starter-app/commit/8c21dd24798c6f6f42834bca8bf043c9805e2b37))
+* **ci:** add git identity and fix PR body formatting in edge-patch-cleanup ([87567a6](https://github.com/tauinbox/client-server-starter-app/commit/87567a6329506ba43fc60442c14aa6f889046d6d))
+* **ci:** align rollback health checks with hardened format ([68f5c50](https://github.com/tauinbox/client-server-starter-app/commit/68f5c50f7ef39cc259192fedb0d52a883e9684bf))
+* **ci:** align rollback health checks with hardened format ([ae8c8f1](https://github.com/tauinbox/client-server-starter-app/commit/ae8c8f1a7d117b915c9eb974efb239dc4b6a5adc))
+* **ci:** fix YAML parse error in edge-patch-cleanup heredoc ([31b638b](https://github.com/tauinbox/client-server-starter-app/commit/31b638b1eee57fc48ea98ffa281e39963c1aa694))
+* **ci:** harden health checks and minor infra improvements ([25549d3](https://github.com/tauinbox/client-server-starter-app/commit/25549d3d79c4ea6dc7981da9cbbe87a6581b5418))
+* **ci:** harden health checks and minor infra improvements ([6e38664](https://github.com/tauinbox/client-server-starter-app/commit/6e38664565c124876c6a4e7dac3d359443001f46))
+* **ci:** pin actions/checkout and trivy-action versions in edge-patch-cleanup ([5cb8bfc](https://github.com/tauinbox/client-server-starter-app/commit/5cb8bfccc1555c9cdd9f23f726ccfdecbbfc30e5))
+* **ci:** pin trivy-action to v0.35.0 to avoid Node.js 20 deprecation warning ([9b01679](https://github.com/tauinbox/client-server-starter-app/commit/9b01679eef31dd06deabdf4148a646d8c6ccb047))
+* **ci:** replace heredoc with env var in edge-patch-cleanup to fix YAML parse error ([303acb7](https://github.com/tauinbox/client-server-starter-app/commit/303acb73efba782a17b65a6fd31af22fd890ede5))
+* **ci:** replace non-existent actions/checkout@v6 with [@v4](https://github.com/v4) in scheduled workflows ([5cf5700](https://github.com/tauinbox/client-server-starter-app/commit/5cf5700688c3e91e252c82c8267229b889014b40))
+* **ci:** upgrade GitHub Actions to Node.js 24 compatible versions ([f1a1a09](https://github.com/tauinbox/client-server-starter-app/commit/f1a1a099a5e088b3144b1607a373f9532926925e))
+* **ci:** use compose config for health count, clean dirty tree, fix Playwright cache ([26e037b](https://github.com/tauinbox/client-server-starter-app/commit/26e037beb48bed54a3de361ae03f96d0fe662504))
+* **ci:** use compose config for health count, clean dirty tree, fix Playwright cache ([c432ca2](https://github.com/tauinbox/client-server-starter-app/commit/c432ca2f480c4487245aa28573b603a8ff56a804))
+* **ci:** use docker compose exec for health check in rotate-keys workflow ([7187cca](https://github.com/tauinbox/client-server-starter-app/commit/7187cca95459b1570db54d2d3b80fd2c75456535))
+* **ci:** use docker compose up -d instead of restart for JWT key rotation ([1e4671e](https://github.com/tauinbox/client-server-starter-app/commit/1e4671e6bddc53b13c88c2aa455b1e01afe708f4))
+* **ci:** use force-recreate instead of restart in rotate-keys workflow ([c69886e](https://github.com/tauinbox/client-server-starter-app/commit/c69886eb89e018af12e636a313cce3e5ec12f3c6))
+* **client:** refresh user permissions (not resource catalog) on 403 ([05f31e1](https://github.com/tauinbox/client-server-starter-app/commit/05f31e18238cccb4fe5f5e8a8252a2ef97990b27))
+* **client:** suppress vite dynamic import warning for locale lazy loading ([0c6cce8](https://github.com/tauinbox/client-server-starter-app/commit/0c6cce8efa3eedaaa3b3ba9139685b6a01a43256))
+* **deps:** add class-transformer and class-validator to root devDependencies ([d439047](https://github.com/tauinbox/client-server-starter-app/commit/d439047d9512c6ac71454b8d114dabc27aa55bb2))
+* **docker:** upgrade libexpat from edge/main to patch CVE-2026-32767 ([8ccf0b9](https://github.com/tauinbox/client-server-starter-app/commit/8ccf0b9155ee2e700da4d5b22620a77ecb16189f))
+* **docker:** upgrade libexpat from edge/main to patch CVE-2026-32767 ([fda7854](https://github.com/tauinbox/client-server-starter-app/commit/fda7854cbc7ff52fc5a525daa3c14c41de9ff752))
+* **infra:** use 127.0.0.1 in healthchecks, add IPv6 listen to nginx ([112b49a](https://github.com/tauinbox/client-server-starter-app/commit/112b49a09011f8e24612f4294ea083ee3036729b))
+* **infra:** use 127.0.0.1 in healthchecks, add IPv6 listen to nginx ([309837b](https://github.com/tauinbox/client-server-starter-app/commit/309837b499bc26b5add4f90f87878c953990e63b))
+* remove Turborepo and restore pre-[#101](https://github.com/tauinbox/client-server-starter-app/issues/101) state ([99323bf](https://github.com/tauinbox/client-server-starter-app/commit/99323bfaaa6c0f8cbce1eff80909ae7ba21b3989))
+* remove Turborepo and restore pre-[#101](https://github.com/tauinbox/client-server-starter-app/issues/101) state ([6021e85](https://github.com/tauinbox/client-server-starter-app/commit/6021e85a5c154ad93c80aa74a441726d380b06a9)), closes [#109](https://github.com/tauinbox/client-server-starter-app/issues/109)
+* **security:** mass assignment protection and admin password session invalidation ([#115](https://github.com/tauinbox/client-server-starter-app/issues/115)) ([120f88c](https://github.com/tauinbox/client-server-starter-app/commit/120f88c2dab91b5d05382d060b76795a83787594))
+
 ## [0.1.11](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.10...v0.1.11) (2026-03-13)
 
 
