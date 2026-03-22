@@ -5,22 +5,23 @@ import type {
   HttpInterceptorFn,
   HttpRequest
 } from '@angular/common/http';
-import { HttpContext } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { switchMap, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import type { UserPermissionsResponse } from '@app/shared/types';
 import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
 import { RBAC_RETRY_CONTEXT } from '@core/context-tokens/rbac-retry';
-import { RbacMetadataService } from '@features/auth/services/rbac-metadata.service';
-import { RbacMetadataStore } from '@features/auth/store/rbac-metadata.store';
+import { AuthStore } from '@features/auth/store/auth.store';
+import { AuthApiEnum } from '@features/auth/constants/auth-api.const';
 
 export const errorInterceptor: HttpInterceptorFn = (
   request: HttpRequest<unknown>,
   next: HttpHandlerFn
 ) => {
   const snackBar = inject(MatSnackBar);
-  const rbacMetadataService = inject(RbacMetadataService);
-  const rbacMetadataStore = inject(RbacMetadataStore);
+  const http = inject(HttpClient);
+  const authStore = inject(AuthStore);
 
   return next(request).pipe(
     catchError((error: HttpErrorResponse) => {
@@ -29,29 +30,35 @@ export const errorInterceptor: HttpInterceptorFn = (
       );
       const isRetry = request.context.get(RBAC_RETRY_CONTEXT);
 
-      // On first 403: refresh RBAC metadata and retry once
+      // On first 403: refresh user permissions so AuthStore.ability updates
+      // reactively (RequirePermissionsDirective re-evaluates via effect()),
+      // then retry the request once.
       if (error.status === 403 && !isRetry) {
-        const metadataCtx = new HttpContext()
+        const permissionsCtx = new HttpContext()
           .set(RBAC_RETRY_CONTEXT, true)
           .set(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN, true);
 
-        return rbacMetadataService.getMetadata({ context: metadataCtx }).pipe(
-          switchMap(({ resources, actions }) => {
-            rbacMetadataStore.setMetadata(resources, actions);
-            const retried = request.clone({
-              context: request.context.set(RBAC_RETRY_CONTEXT, true)
-            });
-            return next(retried);
-          }),
-          catchError(() => {
-            if (!silentMode) {
-              snackBar.open(getErrorMessageText(error), 'Close', {
-                duration: 5000
-              });
-            }
-            return throwError(() => error);
+        return http
+          .get<UserPermissionsResponse>(AuthApiEnum.Permissions, {
+            context: permissionsCtx
           })
-        );
+          .pipe(
+            switchMap((response) => {
+              authStore.setRules(response.rules);
+              const retried = request.clone({
+                context: request.context.set(RBAC_RETRY_CONTEXT, true)
+              });
+              return next(retried);
+            }),
+            catchError(() => {
+              if (!silentMode) {
+                snackBar.open(getErrorMessageText(error), 'Close', {
+                  duration: 5000
+                });
+              }
+              return throwError(() => error);
+            })
+          );
       }
 
       // 401 is handled by jwt interceptor (token refresh / logout)
