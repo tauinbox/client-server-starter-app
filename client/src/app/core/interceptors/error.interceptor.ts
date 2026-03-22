@@ -32,7 +32,8 @@ export const errorInterceptor: HttpInterceptorFn = (
 
       // On first 403: refresh user permissions so AuthStore.ability updates
       // reactively (RequirePermissionsDirective re-evaluates via effect()),
-      // then retry the request once.
+      // then retry the request once. If the retry also 403s the permission is
+      // genuinely revoked — show a snackbar and propagate the retry error.
       if (error.status === 403 && !isRetry) {
         const permissionsCtx = new HttpContext()
           .set(RBAC_RETRY_CONTEXT, true)
@@ -43,20 +44,31 @@ export const errorInterceptor: HttpInterceptorFn = (
             context: permissionsCtx
           })
           .pipe(
-            switchMap((response) => {
-              authStore.setRules(response.rules);
-              const retried = request.clone({
-                context: request.context.set(RBAC_RETRY_CONTEXT, true)
-              });
-              return next(retried);
-            }),
             catchError(() => {
+              // Permissions fetch itself failed — show snackbar for original 403
               if (!silentMode) {
                 snackBar.open(getErrorMessageText(error), 'Close', {
                   duration: 5000
                 });
               }
               return throwError(() => error);
+            }),
+            switchMap((response) => {
+              authStore.setRules(response.rules);
+              const retried = request.clone({
+                context: request.context.set(RBAC_RETRY_CONTEXT, true)
+              });
+              return next(retried).pipe(
+                catchError((retryError: HttpErrorResponse) => {
+                  // Retry failed — permission is genuinely revoked
+                  if (!silentMode) {
+                    snackBar.open(getErrorMessageText(retryError), 'Close', {
+                      duration: 5000
+                    });
+                  }
+                  return throwError(() => retryError);
+                })
+              );
             })
           );
       }

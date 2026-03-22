@@ -136,7 +136,6 @@ describe('errorInterceptor', () => {
     it('should refresh permissions and retry on 403', () => {
       http.get('/api/test').subscribe({ next: vi.fn(), error: vi.fn() });
 
-      // First attempt → 403
       httpMock
         .expectOne('/api/test')
         .flush(
@@ -144,10 +143,8 @@ describe('errorInterceptor', () => {
           { status: 403, statusText: 'Forbidden' }
         );
 
-      // Permissions refresh
       httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: mockRules });
 
-      // Retry succeeds
       httpMock
         .expectOne('/api/test')
         .flush({ data: 'ok' }, { status: 200, statusText: 'OK' });
@@ -178,32 +175,63 @@ describe('errorInterceptor', () => {
       expect(result).toEqual({ data: 'ok' });
     });
 
-    it('should show snackbar when 403 retry also fails', () => {
+    it('should show snackbar with retry error message when retry fails', () => {
       http.get('/api/test').subscribe({ error: vi.fn() });
 
       httpMock
         .expectOne('/api/test')
         .flush(
-          { message: 'Forbidden' },
+          { message: 'Original Forbidden' },
           { status: 403, statusText: 'Forbidden' }
         );
 
       httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: mockRules });
 
-      // Retry → 403 again (RBAC_RETRY_CONTEXT is set, so no second refresh)
+      // Retry → 403 with a more specific message
       httpMock
         .expectOne('/api/test')
         .flush(
-          { message: 'Forbidden' },
+          { message: 'Still Forbidden' },
           { status: 403, statusText: 'Forbidden' }
         );
 
-      expect(snackBarMock.open).toHaveBeenCalledWith('Forbidden', 'Close', {
-        duration: 5000
-      });
+      // Snackbar shows retry error (not original), so caller knows the current state
+      expect(snackBarMock.open).toHaveBeenCalledWith(
+        'Still Forbidden',
+        'Close',
+        { duration: 5000 }
+      );
+      expect(snackBarMock.open).toHaveBeenCalledTimes(1);
     });
 
-    it('should show snackbar when permissions fetch fails', () => {
+    it('should rethrow retry error (not original) when retry fails', () => {
+      let caughtError: HttpErrorResponse | null = null;
+      http.get('/api/test').subscribe({ error: (err) => (caughtError = err) });
+
+      httpMock
+        .expectOne('/api/test')
+        .flush(
+          { message: 'Original' },
+          { status: 403, statusText: 'Forbidden' }
+        );
+
+      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: mockRules });
+
+      httpMock
+        .expectOne('/api/test')
+        .flush(
+          { message: 'Retry error' },
+          { status: 403, statusText: 'Forbidden' }
+        );
+
+      expect(caughtError!.status).toBe(403);
+      // Retry error propagates, not original
+      expect((caughtError!.error as { message: string }).message).toBe(
+        'Retry error'
+      );
+    });
+
+    it('should show snackbar with original error when permissions fetch fails', () => {
       http.get('/api/test').subscribe({ error: vi.fn() });
 
       httpMock
@@ -216,14 +244,35 @@ describe('errorInterceptor', () => {
       httpMock
         .expectOne(AuthApiEnum.Permissions)
         .flush(
-          { message: 'Error' },
+          { message: 'Server Error' },
           { status: 500, statusText: 'Internal Server Error' }
         );
+
+      // No retry expected — permissions fetch failed
+      httpMock.expectNone('/api/test');
 
       expect(authStoreMock.setRules).not.toHaveBeenCalled();
       expect(snackBarMock.open).toHaveBeenCalledWith('Forbidden', 'Close', {
         duration: 5000
       });
+    });
+
+    it('should rethrow original error when permissions fetch fails', () => {
+      let caughtError: HttpErrorResponse | null = null;
+      http.get('/api/test').subscribe({ error: (err) => (caughtError = err) });
+
+      httpMock
+        .expectOne('/api/test')
+        .flush(
+          { message: 'Forbidden' },
+          { status: 403, statusText: 'Forbidden' }
+        );
+
+      httpMock
+        .expectOne(AuthApiEnum.Permissions)
+        .flush({ message: 'Error' }, { status: 500, statusText: 'Error' });
+
+      expect(caughtError!.status).toBe(403);
     });
 
     it('should not retry when request is already marked as retry', () => {
@@ -238,7 +287,6 @@ describe('errorInterceptor', () => {
           { status: 403, statusText: 'Forbidden' }
         );
 
-      // No permissions fetch or retry expected
       httpMock.expectNone(AuthApiEnum.Permissions);
 
       expect(snackBarMock.open).toHaveBeenCalledWith('Forbidden', 'Close', {
@@ -268,13 +316,13 @@ describe('errorInterceptor', () => {
       expect(snackBarMock.open).not.toHaveBeenCalled();
     });
 
-    it('should rethrow original 403 error after failed permissions fetch', () => {
-      let caughtError: HttpErrorResponse | null = null;
-      http.get('/api/test').subscribe({
-        error: (err) => {
-          caughtError = err;
-        }
-      });
+    it('should not show snackbar for silent 403 when retry fails', () => {
+      const context = new HttpContext().set(
+        DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN,
+        true
+      );
+
+      http.get('/api/test', { context }).subscribe({ error: vi.fn() });
 
       httpMock
         .expectOne('/api/test')
@@ -283,12 +331,16 @@ describe('errorInterceptor', () => {
           { status: 403, statusText: 'Forbidden' }
         );
 
-      httpMock
-        .expectOne(AuthApiEnum.Permissions)
-        .flush({ message: 'Error' }, { status: 500, statusText: 'Error' });
+      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: mockRules });
 
-      expect(caughtError).toBeTruthy();
-      expect(caughtError!.status).toBe(403);
+      httpMock
+        .expectOne('/api/test')
+        .flush(
+          { message: 'Forbidden' },
+          { status: 403, statusText: 'Forbidden' }
+        );
+
+      expect(snackBarMock.open).not.toHaveBeenCalled();
     });
   });
 });
