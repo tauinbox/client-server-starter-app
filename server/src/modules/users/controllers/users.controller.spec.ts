@@ -11,6 +11,7 @@ import { UserDeletedEvent } from '../events/user-deleted.event';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { SearchUsersQueryDto } from '../dtos/search-users-query.dto';
+import { AuthService } from '../../auth/services/auth.service';
 
 const allowAllGuard = { canActivate: () => true };
 
@@ -41,6 +42,7 @@ describe('UsersController', () => {
   };
   let eventEmitterMock: { emit: jest.Mock };
   let auditServiceMock: { log: jest.Mock };
+  let authServiceMock: { logout: jest.Mock };
 
   beforeEach(async () => {
     usersServiceMock = {
@@ -56,12 +58,15 @@ describe('UsersController', () => {
 
     auditServiceMock = { log: jest.fn().mockResolvedValue(undefined) };
 
+    authServiceMock = { logout: jest.fn().mockResolvedValue(undefined) };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
       providers: [
         { provide: UsersService, useValue: usersServiceMock },
         { provide: EventEmitter2, useValue: eventEmitterMock },
-        { provide: AuditService, useValue: auditServiceMock }
+        { provide: AuditService, useValue: auditServiceMock },
+        { provide: AuthService, useValue: authServiceMock }
       ]
     })
       .overrideGuard(JwtAuthGuard)
@@ -238,6 +243,29 @@ describe('UsersController', () => {
       expect(auditServiceMock.log).not.toHaveBeenCalledWith(
         expect.objectContaining({ action: AuditAction.PASSWORD_CHANGE })
       );
+    });
+
+    it('should NOT call authService.logout when dto does not contain password', async () => {
+      const dto: UpdateUserDto = { firstName: 'Updated' };
+      usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req);
+
+      expect(authServiceMock.logout).not.toHaveBeenCalled();
+    });
+
+    it('should call authService.logout with target user id when dto contains password', async () => {
+      const dto: UpdateUserDto = { firstName: 'Updated', password: 'NewPass1' };
+      usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+      const req = mockJwtRequest(
+        'actor-3',
+        'admin@example.com'
+      ) as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req);
+
+      expect(authServiceMock.logout).toHaveBeenCalledWith('user-5');
     });
 
     it('should log USER_UPDATE and PASSWORD_CHANGE when dto contains password', async () => {

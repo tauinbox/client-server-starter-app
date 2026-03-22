@@ -308,6 +308,14 @@ router.patch('/:id', adminGuard, (req, res) => {
       return;
     }
     user.password = password;
+    // Invalidate target user's sessions so attacker cannot keep access after admin password reset
+    user.tokenRevokedAt = new Date().toISOString();
+    const sessionState = getState();
+    for (const [token, uid] of sessionState.refreshTokens.entries()) {
+      if (uid === user.id) {
+        sessionState.refreshTokens.delete(token);
+      }
+    }
   }
   if (isActive !== undefined) user.isActive = isActive;
   if (unlockAccount) {

@@ -3,8 +3,10 @@ import {
   ClassSerializerInterceptor,
   Controller,
   Delete,
+  forwardRef,
   Get,
   HttpStatus,
+  Inject,
   Param,
   Patch,
   Post,
@@ -38,6 +40,7 @@ import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { JwtAuthRequest } from '../../auth/types/auth.request';
+import { AuthService } from '../../auth/services/auth.service';
 
 @ApiTags('Users API')
 @Controller({
@@ -50,7 +53,9 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly eventEmitter: EventEmitter2,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    @Inject(forwardRef(() => AuthService))
+    private readonly authService: AuthService
   ) {}
 
   @Post()
@@ -159,6 +164,7 @@ export class UsersController {
     });
 
     if (updateUserDto.password) {
+      await this.authService.logout(id);
       await this.auditService.log({
         action: AuditAction.PASSWORD_CHANGE,
         actorId: req.user.userId,
