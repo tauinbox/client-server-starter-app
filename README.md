@@ -27,6 +27,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - Session restored on page reload via cookie-refresh in `provideAppInitializer` before route guards run
 - Automatic token refresh 60 seconds before expiry
 - 401 handling with request retry in JWT interceptor
+- **Reactive permission refresh on 403** — `errorInterceptor` detects mid-session 403s, silently re-fetches `/api/v1/auth/permissions`, updates `AuthStore.ability`, and retries the request; `RequirePermissionsDirective` reacts via Angular `effect()` without a page reload
 - **Role-Based Access Control (RBAC)** — dynamic resources and actions with `@RegisterResource` auto-discovery; `isSuper` flag on roles replaces hardcoded admin bypass; `@Authorize(['action', 'Subject'])` typed tuples on server; `permissionGuard(action, subject)` + `*appRequirePermissions="{ action, subject }"` directive on client; `/api/v1/rbac/` endpoints for managing resources and actions
 - `GET /api/v1/auth/permissions` returns CASL packed rules; client hydrates into `AppAbility` at bootstrap before route activation
 - OAuth account management (link/unlink providers in profile)
