@@ -3,6 +3,7 @@ import { UserDeletedListener } from './user-deleted.listener';
 import { RefreshTokenService } from '../services/refresh-token.service';
 import { DataSource } from 'typeorm';
 import { UserDeletedEvent } from '../../users/events/user-deleted.event';
+import { UserPasswordChangedByAdminEvent } from '../../users/events/user-password-changed-by-admin.event';
 
 describe('UserDeletedListener', () => {
   let listener: UserDeletedListener;
@@ -34,7 +35,19 @@ describe('UserDeletedListener', () => {
     const userId = 'user-123';
     const event = new UserDeletedEvent(userId);
 
-    await listener.handle(event);
+    await listener.handleUserDeleted(event);
+
+    expect(refreshTokenService.deleteByUserId).toHaveBeenCalledWith(userId);
+    expect(repositoryMock.update).toHaveBeenCalledWith(userId, {
+      tokenRevokedAt: expect.any(Date) as Date
+    });
+  });
+
+  it('should delete refresh tokens and revoke the user session on UserPasswordChangedByAdminEvent', async () => {
+    const userId = 'user-456';
+    const event = new UserPasswordChangedByAdminEvent(userId);
+
+    await listener.handlePasswordChangedByAdmin(event);
 
     expect(refreshTokenService.deleteByUserId).toHaveBeenCalledWith(userId);
     expect(repositoryMock.update).toHaveBeenCalledWith(userId, {

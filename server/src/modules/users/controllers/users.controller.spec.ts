@@ -11,6 +11,7 @@ import { UserDeletedEvent } from '../events/user-deleted.event';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { SearchUsersQueryDto } from '../dtos/search-users-query.dto';
+import { UserPasswordChangedByAdminEvent } from '../events/user-password-changed-by-admin.event';
 
 const allowAllGuard = { canActivate: () => true };
 
@@ -237,6 +238,35 @@ describe('UsersController', () => {
 
       expect(auditServiceMock.log).not.toHaveBeenCalledWith(
         expect.objectContaining({ action: AuditAction.PASSWORD_CHANGE })
+      );
+    });
+
+    it('should NOT emit UserPasswordChangedByAdminEvent when dto does not contain password', async () => {
+      const dto: UpdateUserDto = { firstName: 'Updated' };
+      usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req);
+
+      expect(eventEmitterMock.emit).not.toHaveBeenCalledWith(
+        UserPasswordChangedByAdminEvent.name,
+        expect.any(UserPasswordChangedByAdminEvent)
+      );
+    });
+
+    it('should emit UserPasswordChangedByAdminEvent with target user id when dto contains password', async () => {
+      const dto: UpdateUserDto = { firstName: 'Updated', password: 'NewPass1' };
+      usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+      const req = mockJwtRequest(
+        'actor-3',
+        'admin@example.com'
+      ) as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req);
+
+      expect(eventEmitterMock.emit).toHaveBeenCalledWith(
+        UserPasswordChangedByAdminEvent.name,
+        expect.objectContaining({ userId: 'user-5' })
       );
     });
 

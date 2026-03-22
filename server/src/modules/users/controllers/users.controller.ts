@@ -38,6 +38,7 @@ import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { JwtAuthRequest } from '../../auth/types/auth.request';
+import { UserPasswordChangedByAdminEvent } from '../events/user-password-changed-by-admin.event';
 
 @ApiTags('Users API')
 @Controller({
@@ -159,6 +160,10 @@ export class UsersController {
     });
 
     if (updateUserDto.password) {
+      this.eventEmitter.emit(
+        UserPasswordChangedByAdminEvent.name,
+        new UserPasswordChangedByAdminEvent(id)
+      );
       await this.auditService.log({
         action: AuditAction.PASSWORD_CHANGE,
         actorId: req.user.userId,

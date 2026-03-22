@@ -24,10 +24,13 @@ async function bootstrap() {
    */
 
   app.useGlobalPipes(
-    new ValidationPipe(
-      // This allows to automatically transform the incoming request payloads into DTO instances before validating them
-      { transform: true }
-    )
+    new ValidationPipe({
+      // Automatically transform incoming request payloads into DTO instances before validating them
+      transform: true,
+      // Strip properties not declared in DTOs and reject requests that contain unknown properties
+      whitelist: true,
+      forbidNonWhitelisted: true
+    })
   );
   app.use(helmet());
   app.enableCors(corsOptions());
