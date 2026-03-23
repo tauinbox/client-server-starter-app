@@ -86,7 +86,7 @@ Copy `.env.example` to `.env` and configure:
 | `DB_POOL_MAX` | `10` | Maximum PostgreSQL connection pool size |
 | `DB_POOL_IDLE_TIMEOUT` | `30000` | Milliseconds before an idle connection is closed |
 | `DB_POOL_CONNECTION_TIMEOUT` | `5000` | Milliseconds to wait for a connection before erroring |
-| `CORS_ORIGINS` | - | Allowed origins separated by `#` |
+| `CORS_ORIGINS` | - | Comma-separated allowed origins (e.g. `https://app.example.com,https://admin.example.com`); `*` is rejected in production |
 
 ## Architecture
 
