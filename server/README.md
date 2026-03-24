@@ -352,15 +352,15 @@ This package's version is kept in sync with `client/` and `mock-server/` via `co
 |------------|---------|
 | NestJS | 11.1.17 |
 | TypeORM | 0.3.28 |
-| PostgreSQL | via `pg` 8.x |
-| Passport | 0.7.x |
-| bcrypt | 6.x |
-| class-validator | 0.14.x |
-| @nestjs/swagger | 11.x |
-| @nestjs/schedule | 6.x |
-| cache-manager-redis-yet | 5.x |
-| ioredis | 5.x |
-| TypeScript | 5.9.x |
-| Jest | 30.x |
-| ESLint | 9.x |
-| Prettier | 3.x |
+| PostgreSQL | via `pg` 8.20.0 |
+| Passport | 0.7.0 |
+| bcrypt | 6.0.0 |
+| class-validator | 0.14.4 |
+| @nestjs/swagger | 11.2.6 |
+| @nestjs/schedule | 6.1.1 |
+| cache-manager-redis-yet | 5.1.5 |
+| ioredis | 5.10.1 |
+| TypeScript | 5.9.3 |
+| Jest | 30.2.0 |
+| ESLint | 9.39.4 |
+| Prettier | 3.8.1 |

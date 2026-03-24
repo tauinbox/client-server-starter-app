@@ -10,7 +10,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 | UI Library | Angular Material + CDK | 21.2.3 |
 | Backend | NestJS | 11.1.17 |
 | Database | PostgreSQL (TypeORM) | 0.3.28 |
-| Language | TypeScript | 5.9.x |
+| Language | TypeScript | 5.9.3 |
 | Auth | JWT + HttpOnly-cookie refresh tokens + OAuth (Passport) | - |
 | Client Tests | Vitest (unit), Playwright (e2e) | 4.0.18 / 1.58.2 |
 | Server Tests | Jest (unit + e2e) | 30.2.0 |
@@ -62,7 +62,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - **Standardized dialog system** — `DialogSize` enum (`Confirm` / `Form` / `Wide`) with `dialogSizeConfig()` helper; all dialogs use Material Design 3 responsive `{ width: '90vw', maxWidth }` pattern; global `_dialogs.scss` handles title padding, Angular Material bug #26352 fix (floating label clipping), and `::before` spacer reset
 
 ### Versioning
-- All three workspaces share a single version (`0.1.0`)
+- All three workspaces share a single version (see `package.json`)
 - `client/scripts/version.mjs` auto-generates `src/environments/version.ts` before every build/start/test
 - `npm run release` (from `client/`) bumps all `package.json` files, generates `CHANGELOG.md`, and creates a git tag
 - Conventional Commits enforced via commitlint + husky `commit-msg` hook

@@ -209,13 +209,13 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 |------------|---------|
 | Angular | 21.2.5 |
 | Angular Material | 21.2.3 |
-| TypeScript | 5.9.x |
-| @ngrx/signals | 21.0.x |
-| RxJS | 7.8.x |
+| TypeScript | 5.9.3 |
+| @ngrx/signals | 21.0.1 |
+| RxJS | 7.8.2 |
 | Vitest | 4.0.18 |
 | Playwright | 1.58.2 |
-| ESLint | 9.x |
-| Prettier | 3.x |
-| Stylelint | 17.x |
-| commitlint | 20.x |
-| commit-and-tag-version | 12.x |
+| ESLint | 9.39.2 |
+| Prettier | 3.8.1 |
+| Stylelint | 17.1.1 |
+| commitlint | 20.4.1 |
+| commit-and-tag-version | 12.6.1 |
