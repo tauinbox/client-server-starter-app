@@ -19,7 +19,7 @@ describe('RoleService', () => {
     create: jest.Mock;
     save: jest.Mock;
     remove: jest.Mock;
-    manager: { createQueryBuilder: jest.Mock };
+    manager: { createQueryBuilder: jest.Mock; update: jest.Mock };
     createQueryBuilder: jest.Mock;
   };
   let mockPermissionRepo: { find: jest.Mock };
@@ -109,7 +109,8 @@ describe('RoleService', () => {
           .fn()
           .mockImplementation((...args: unknown[]) =>
             args.length > 0 ? mockUserQueryBuilder : mockRelationQueryBuilder
-          )
+          ),
+        update: jest.fn().mockResolvedValue(undefined)
       },
       createQueryBuilder: jest.fn().mockReturnValue(mockRoleRepoQB)
     };
@@ -358,9 +359,29 @@ describe('RoleService', () => {
 
   describe('removeRoleFromUser', () => {
     it('should remove role and invalidate cache', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+
       await service.removeRoleFromUser('user-1', 'role-2');
 
       expect(mockRelationQueryBuilder.remove).toHaveBeenCalledWith('role-2');
+      expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
+        'user-1'
+      );
+      expect(mockRoleRepo.manager.update).not.toHaveBeenCalled();
+    });
+
+    it('should revoke tokens when removing a super role', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(systemRole);
+
+      await service.removeRoleFromUser('user-1', 'role-1');
+
+      expect(mockRelationQueryBuilder.remove).toHaveBeenCalledWith('role-1');
+      expect(mockRoleRepo.manager.update).toHaveBeenCalledWith(
+        expect.anything(),
+        'user-1',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        expect.objectContaining({ tokenRevokedAt: expect.any(Date) })
+      );
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
         'user-1'
       );

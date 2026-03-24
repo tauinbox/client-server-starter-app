@@ -124,6 +124,10 @@ export class UsersService {
       changes.lockedUntil = null;
     }
 
+    if (rest.isActive === false) {
+      changes.tokenRevokedAt = new Date();
+    }
+
     this.userRepository.merge(user, changes);
 
     return this.userRepository.save(user);

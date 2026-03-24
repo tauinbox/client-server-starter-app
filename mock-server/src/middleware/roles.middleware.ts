@@ -410,6 +410,10 @@ router.delete('/assign/:userId/:roleId', adminGuard, (req, res) => {
 
   user.roles = user.roles.filter((r) => r !== role.name);
 
+  if (role.isSuper) {
+    user.tokenRevokedAt = new Date().toISOString();
+  }
+
   const actor = (req as AuthenticatedRequest).user;
   logAudit('ROLE_UNASSIGN', {
     actorId: actor.id,
