@@ -187,7 +187,7 @@ router.get('/', adminGuard, (req, res) => {
   if (!includeDeleted) {
     allUsers = allUsers.filter((u) => !u.deletedAt);
   }
-  const users = allUsers.map(toUserResponse);
+  const users = allUsers.map(toAdminUserResponse);
   const params = parsePaginationParams(req.query as Record<string, unknown>);
   const result = paginateAndSort(users, params);
   res.json(result);
@@ -220,7 +220,7 @@ router.get('/search', adminGuard, (req, res) => {
     users = users.filter((u) => u.isActive === activeBool);
   }
 
-  const userResponses = users.map(toUserResponse);
+  const userResponses = users.map(toAdminUserResponse);
   const params = parsePaginationParams(req.query as Record<string, unknown>);
   const result = paginateAndSort(userResponses, params);
   res.json(result);
