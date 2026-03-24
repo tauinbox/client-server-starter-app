@@ -27,7 +27,7 @@ import {
   findUserByIdWithDeleted,
   getState,
   logAudit,
-  toUserResponse
+  toAdminUserResponse
 } from '../state';
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest, MockUser } from '../types';
@@ -177,7 +177,7 @@ router.post('/', adminGuard, (req, res) => {
     ip: req.ip
   });
 
-  res.status(201).json(toUserResponse(user));
+  res.status(201).json(toAdminUserResponse(user));
 });
 
 // GET /api/v1/users
@@ -187,7 +187,7 @@ router.get('/', adminGuard, (req, res) => {
   if (!includeDeleted) {
     allUsers = allUsers.filter((u) => !u.deletedAt);
   }
-  const users = allUsers.map(toUserResponse);
+  const users = allUsers.map(toAdminUserResponse);
   const params = parsePaginationParams(req.query as Record<string, unknown>);
   const result = paginateAndSort(users, params);
   res.json(result);
@@ -220,7 +220,7 @@ router.get('/search', adminGuard, (req, res) => {
     users = users.filter((u) => u.isActive === activeBool);
   }
 
-  const userResponses = users.map(toUserResponse);
+  const userResponses = users.map(toAdminUserResponse);
   const params = parsePaginationParams(req.query as Record<string, unknown>);
   const result = paginateAndSort(userResponses, params);
   res.json(result);
@@ -235,7 +235,7 @@ router.get('/:id', authGuard, (req, res) => {
     return;
   }
 
-  res.json(toUserResponse(user));
+  res.json(toAdminUserResponse(user));
 });
 
 // PATCH /api/v1/users/:id
@@ -317,7 +317,12 @@ router.patch('/:id', adminGuard, (req, res) => {
       }
     }
   }
-  if (isActive !== undefined) user.isActive = isActive;
+  if (isActive !== undefined) {
+    if (isActive === false && user.isActive !== false) {
+      user.tokenRevokedAt = new Date().toISOString();
+    }
+    user.isActive = isActive;
+  }
   if (unlockAccount) {
     user.failedLoginAttempts = 0;
     user.lockedUntil = null;
@@ -348,7 +353,7 @@ router.patch('/:id', adminGuard, (req, res) => {
     });
   }
 
-  res.json(toUserResponse(user));
+  res.json(toAdminUserResponse(user));
 });
 
 // DELETE /api/v1/users/:id
@@ -408,7 +413,7 @@ router.post('/:id/restore', adminGuard, (req, res) => {
     ip: req.ip
   });
 
-  res.json(toUserResponse(targetUser));
+  res.json(toAdminUserResponse(targetUser));
 });
 
 export default router;

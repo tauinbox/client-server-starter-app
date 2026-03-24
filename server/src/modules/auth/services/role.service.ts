@@ -100,11 +100,17 @@ export class RoleService {
   }
 
   async removeRoleFromUser(userId: string, roleId: string): Promise<void> {
+    const role = await this.findOne(roleId);
     await this.roleRepository.manager
       .createQueryBuilder()
       .relation(User, 'roles')
       .of(userId)
       .remove(roleId);
+    if (role.isSuper) {
+      await this.roleRepository.manager.update(User, userId, {
+        tokenRevokedAt: new Date()
+      });
+    }
     await this.permissionService.invalidateUserCache(userId);
   }
 

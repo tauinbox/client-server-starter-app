@@ -8,11 +8,17 @@ export type UserResponse = {
   isActive: boolean;
   roles: RoleResponse[];
   isEmailVerified: boolean;
-  failedLoginAttempts: number;
-  lockedUntil: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+};
+
+/**
+ * Extended response used only by admin endpoints (UsersController).
+ * Includes lockout state needed for the admin user-management UI.
+ */
+export type AdminUserResponse = UserResponse & {
+  lockedUntil?: string | null;
 };
 
 export type OAuthAccountResponse = {

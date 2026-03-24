@@ -24,14 +24,20 @@
 import type { User } from './user.entity';
 import type { UserResponse, _AssertNever } from '@app/shared/types';
 
-/** Fields decorated with @Exclude() — stripped by ClassSerializerInterceptor. */
+/**
+ * Fields excluded from the base UserResponse wire format.
+ * Includes both @Exclude()-decorated fields and admin-only fields
+ * (failedLoginAttempts, lockedUntil) that are exposed only via AdminUserResponseDto.
+ */
 type _ExcludedFields =
   | 'password'
   | 'emailVerificationToken'
   | 'emailVerificationExpiresAt'
   | 'passwordResetToken'
   | 'passwordResetExpiresAt'
-  | 'tokenRevokedAt';
+  | 'tokenRevokedAt'
+  | 'failedLoginAttempts'
+  | 'lockedUntil';
 
 /**
  * TypeORM relations whose runtime value differs from the shared response type.

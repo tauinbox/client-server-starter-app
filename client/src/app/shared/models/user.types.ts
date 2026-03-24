@@ -1,4 +1,4 @@
-import type { UserResponse, SortOrder } from '@app/shared/types';
+import type { AdminUserResponse, SortOrder } from '@app/shared/types';
 import type { UserSortColumn } from '@app/shared/constants';
 
 export type {
@@ -8,8 +8,9 @@ export type {
 } from '@app/shared/types';
 export type { UserSortColumn } from '@app/shared/constants';
 
-// Re-export UserResponse as User for backward compatibility across client code
-export type User = UserResponse;
+// Admin pages need lockedUntil for the account-lock UI, so User maps to AdminUserResponse.
+// Auth profile responses omit lockedUntil at runtime but the type is a safe superset.
+export type User = AdminUserResponse;
 
 export type UserSearch = Pick<
   Partial<User>,
