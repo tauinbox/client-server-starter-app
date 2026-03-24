@@ -15,6 +15,14 @@ import { SearchUsersQueryDto } from '../dtos/search-users-query.dto';
 import { PaginatedResponseDto } from '../../../common/dtos';
 import { escapeLikePattern } from '../../../common/utils/escape-like';
 
+const USER_SORT_COLUMN_MAP: Record<string, string> = {
+  email: 'user.email',
+  firstName: 'user.firstName',
+  lastName: 'user.lastName',
+  isActive: 'user.isActive',
+  createdAt: 'user.createdAt'
+};
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -81,7 +89,10 @@ export class UsersService {
       });
     }
 
-    qb.orderBy(`user.${sortBy}`, sortOrder.toUpperCase() as 'ASC' | 'DESC');
+    qb.orderBy(
+      USER_SORT_COLUMN_MAP[sortBy] ?? 'user.createdAt',
+      sortOrder.toUpperCase() as 'ASC' | 'DESC'
+    );
     qb.skip((page - 1) * limit);
     qb.take(limit);
 
@@ -145,10 +156,11 @@ export class UsersService {
         failedLoginAttempts: () => '"failed_login_attempts" + 1',
         lockedUntil: () =>
           `CASE WHEN "failed_login_attempts" + 1 >= ${maxAttempts} ` +
-          `THEN NOW() + INTERVAL '${lockDurationMs} milliseconds' ` +
+          `THEN NOW() + :lockInterval::interval ` +
           `ELSE "locked_until" END`
       })
       .where('id = :userId', { userId })
+      .setParameters({ lockInterval: `${lockDurationMs} milliseconds` })
       .returning(['failedLoginAttempts', 'lockedUntil'])
       .execute();
 
