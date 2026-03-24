@@ -6,6 +6,7 @@ import {
 import type { MongoQuery } from '@casl/ability';
 import { packRules } from '@casl/ability/extra';
 import type {
+  AdminUserResponse,
   MockAuditLog,
   MockPermission,
   MockUser,
@@ -136,7 +137,29 @@ export function toPermissionResponse(
 }
 
 export function toUserResponse(user: MockUser): UserResponse {
-  const { password: _, tokenRevokedAt: __, roles: roleNames, ...rest } = user;
+  const {
+    password: _,
+    tokenRevokedAt: __,
+    failedLoginAttempts: ___,
+    lockedUntil: ____,
+    roles: roleNames,
+    ...rest
+  } = user;
+  const roles = roleNames.flatMap((name) => {
+    const role = Array.from(state.roles.values()).find((r) => r.name === name);
+    return role ? [role] : [];
+  });
+  return { ...rest, roles };
+}
+
+export function toAdminUserResponse(user: MockUser): AdminUserResponse {
+  const {
+    password: _,
+    tokenRevokedAt: __,
+    failedLoginAttempts: ___,
+    roles: roleNames,
+    ...rest
+  } = user;
   const roles = roleNames.flatMap((name) => {
     const role = Array.from(state.roles.values()).find((r) => r.name === name);
     return role ? [role] : [];

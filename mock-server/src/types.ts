@@ -1,6 +1,7 @@
 import type { Request } from 'express';
 
 export type {
+  AdminUserResponse,
   UserResponse,
   OAuthAccountResponse,
   TokensResponse,

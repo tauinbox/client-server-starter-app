@@ -49,8 +49,6 @@ function mockLocalAuthRequest(
     isActive: true,
     roles: ['admin'],
     isEmailVerified: true,
-    failedLoginAttempts: 0,
-    lockedUntil: null,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     deletedAt: null

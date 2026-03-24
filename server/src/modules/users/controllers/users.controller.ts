@@ -29,7 +29,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
-import { UserResponseDto } from '../dtos/user-response.dto';
+import { AdminUserResponseDto } from '../dtos/admin-user-response.dto';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
 import { RegisterResource } from '../../auth/decorators/register-resource.decorator';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -61,7 +61,7 @@ export class UsersController {
   @ApiBody({ type: CreateUserDto })
   @ApiCreatedResponse({
     description: 'The user has been successfully created.',
-    type: UserResponseDto
+    type: AdminUserResponseDto
   })
   @ApiResponse({
     status: HttpStatus.CONFLICT,
@@ -118,7 +118,7 @@ export class UsersController {
   @ApiParam({ name: 'id', description: 'The user ID' })
   @ApiOkResponse({
     description: 'The user has been found',
-    type: UserResponseDto
+    type: AdminUserResponseDto
   })
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -135,7 +135,7 @@ export class UsersController {
   @ApiBody({ type: UpdateUserDto })
   @ApiOkResponse({
     description: 'The user has been successfully updated',
-    type: UserResponseDto
+    type: AdminUserResponseDto
   })
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -210,7 +210,7 @@ export class UsersController {
   @ApiParam({ name: 'id', description: 'The user ID' })
   @ApiOkResponse({
     description: 'The user has been successfully restored',
-    type: UserResponseDto
+    type: AdminUserResponseDto
   })
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })

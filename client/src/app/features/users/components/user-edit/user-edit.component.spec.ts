@@ -37,7 +37,6 @@ const mockUser: User = {
   roles: [mockUserRole],
   isActive: true,
   isEmailVerified: true,
-  failedLoginAttempts: 0,
   lockedUntil: null,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
@@ -398,7 +397,7 @@ describe('UserEditComponent', () => {
     });
 
     it('should update user signal and show success snackbar', () => {
-      const unlockedUser = { ...mockUser, failedLoginAttempts: 0 };
+      const unlockedUser = { ...mockUser, lockedUntil: null };
       usersStoreMock.updateUser.mockReturnValue(of(unlockedUser));
 
       component.unlockAccount();

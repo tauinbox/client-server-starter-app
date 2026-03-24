@@ -23,12 +23,6 @@ export class UserResponseDto {
   @ApiProperty({ example: true })
   isEmailVerified: boolean;
 
-  @ApiProperty({ example: 0 })
-  failedLoginAttempts: number;
-
-  @ApiProperty({ example: null, nullable: true })
-  lockedUntil: Date | null;
-
   @ApiProperty({ example: '2023-01-01T00:00:00Z' })
   createdAt: Date;
 

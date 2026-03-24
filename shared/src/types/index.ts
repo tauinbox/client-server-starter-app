@@ -2,6 +2,7 @@ export type { WireType, _AssertNever } from './type-utils';
 
 export type {
   UserResponse,
+  AdminUserResponse,
   OAuthAccountResponse
 } from './user.types';
 

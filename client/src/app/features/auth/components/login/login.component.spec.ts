@@ -36,8 +36,6 @@ const mockAuthResponse: AuthResponse = {
     isActive: true,
     roles: [mockUserRole],
     isEmailVerified: true,
-    failedLoginAttempts: 0,
-    lockedUntil: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     deletedAt: null
