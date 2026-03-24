@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Put,
@@ -78,7 +79,7 @@ export class RolesController {
   @ApiParam({ name: 'id', description: 'The role ID' })
   @ApiOkResponse({ description: 'The role' })
   @ApiNotFoundResponse({ description: 'Role not found' })
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.roleService.findOne(id);
   }
 
@@ -89,7 +90,7 @@ export class RolesController {
   @ApiParam({ name: 'id', description: 'The role ID' })
   @ApiOkResponse({ description: 'List of role permissions' })
   @ApiNotFoundResponse({ description: 'Role not found' })
-  getPermissionsForRole(@Param('id') id: string) {
+  getPermissionsForRole(@Param('id', ParseUUIDPipe) id: string) {
     return this.roleService.getPermissionsForRole(id);
   }
 
@@ -125,7 +126,7 @@ export class RolesController {
   @ApiOkResponse({ description: 'Role updated' })
   @ApiNotFoundResponse({ description: 'Role not found' })
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateRoleDto: UpdateRoleDto,
     @Request() req: JwtAuthRequest
   ) {
@@ -149,7 +150,10 @@ export class RolesController {
   @ApiParam({ name: 'id', description: 'The role ID' })
   @ApiOkResponse({ description: 'Role deleted' })
   @ApiNotFoundResponse({ description: 'Role not found' })
-  async remove(@Param('id') id: string, @Request() req: JwtAuthRequest) {
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: JwtAuthRequest
+  ) {
     const result = await this.roleService.delete(id);
     await this.auditService.log({
       action: AuditAction.ROLE_DELETE,
@@ -173,7 +177,7 @@ export class RolesController {
   @ApiOkResponse({ description: 'Permissions updated' })
   @ApiNotFoundResponse({ description: 'Role not found' })
   async setPermissions(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SetPermissionsDto,
     @Request() req: JwtAuthRequest
   ) {
@@ -198,7 +202,7 @@ export class RolesController {
   @ApiBody({ type: AssignPermissionsDto })
   @ApiOkResponse({ description: 'Permissions assigned' })
   async assignPermissions(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AssignPermissionsDto,
     @Request() req: JwtAuthRequest
   ) {
@@ -227,8 +231,8 @@ export class RolesController {
   @ApiParam({ name: 'permissionId', description: 'The permission ID' })
   @ApiOkResponse({ description: 'Permission removed' })
   async removePermission(
-    @Param('id') id: string,
-    @Param('permissionId') permissionId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('permissionId', ParseUUIDPipe) permissionId: string,
     @Request() req: JwtAuthRequest
   ) {
     const result = await this.roleService.removePermissionFromRole(
@@ -255,7 +259,7 @@ export class RolesController {
   @ApiBody({ type: AssignRoleDto })
   @ApiOkResponse({ description: 'Role assigned' })
   async assignRole(
-    @Param('userId') userId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
     @Body() dto: AssignRoleDto,
     @Request() req: JwtAuthRequest
   ) {
@@ -280,8 +284,8 @@ export class RolesController {
   @ApiParam({ name: 'roleId', description: 'The role ID' })
   @ApiOkResponse({ description: 'Role removed' })
   async removeRole(
-    @Param('userId') userId: string,
-    @Param('roleId') roleId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param('roleId', ParseUUIDPipe) roleId: string,
     @Request() req: JwtAuthRequest
   ) {
     const result = await this.roleService.removeRoleFromUser(userId, roleId);

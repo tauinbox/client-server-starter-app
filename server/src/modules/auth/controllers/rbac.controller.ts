@@ -6,6 +6,7 @@ import {
   HttpCode,
   Inject,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Request,
@@ -106,7 +107,7 @@ export class RbacController {
   @ApiOkResponse({ description: 'Resource restored' })
   @ApiNotFoundResponse({ description: 'Resource not found' })
   async restoreResource(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Request() req: JwtAuthRequest
   ) {
     const result = await this.resourceService.restore(id);
@@ -131,7 +132,7 @@ export class RbacController {
   @ApiOkResponse({ description: 'Resource updated' })
   @ApiNotFoundResponse({ description: 'Resource not found' })
   async updateResource(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateResourceDto,
     @Request() req: JwtAuthRequest
   ) {
@@ -193,7 +194,7 @@ export class RbacController {
   @ApiOkResponse({ description: 'Action updated' })
   @ApiNotFoundResponse({ description: 'Action not found' })
   async updateAction(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateActionDto,
     @Request() req: JwtAuthRequest
   ) {
@@ -218,7 +219,10 @@ export class RbacController {
   @ApiParam({ name: 'id', description: 'The action ID' })
   @ApiOkResponse({ description: 'Action deleted' })
   @ApiNotFoundResponse({ description: 'Action not found' })
-  async deleteAction(@Param('id') id: string, @Request() req: JwtAuthRequest) {
+  async deleteAction(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: JwtAuthRequest
+  ) {
     await this.actionService.delete(id);
     await this.cacheManager.del(METADATA_CACHE_KEY);
     await this.auditService.log({

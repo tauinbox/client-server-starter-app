@@ -6,6 +6,7 @@ import {
   Get,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -123,7 +124,7 @@ export class UsersController {
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.findOne(id);
   }
 
@@ -141,7 +142,7 @@ export class UsersController {
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
     @Request() req: JwtAuthRequest
   ) {
@@ -187,7 +188,10 @@ export class UsersController {
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  async remove(@Param('id') id: string, @Request() req: JwtAuthRequest) {
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: JwtAuthRequest
+  ) {
     const user = await this.usersService.findOne(id);
     await this.usersService.remove(id);
     this.eventEmitter.emit(UserDeletedEvent.name, new UserDeletedEvent(id));
@@ -215,7 +219,10 @@ export class UsersController {
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  async restore(@Param('id') id: string, @Request() req: JwtAuthRequest) {
+  async restore(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: JwtAuthRequest
+  ) {
     const restoredUser = await this.usersService.restore(id);
     await this.auditService.log({
       action: AuditAction.USER_RESTORE,

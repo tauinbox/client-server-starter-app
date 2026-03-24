@@ -453,6 +453,7 @@ describe('UsersService', () => {
       update: jest.Mock;
       set: jest.Mock;
       where: jest.Mock;
+      setParameters: jest.Mock;
       returning: jest.Mock;
       execute: jest.Mock;
     };
@@ -462,6 +463,7 @@ describe('UsersService', () => {
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
+        setParameters: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({
           raw: [{ failed_login_attempts: 1, locked_until: null }]
@@ -480,6 +482,9 @@ describe('UsersService', () => {
       expect(mockRepository.createQueryBuilder).toHaveBeenCalled();
       expect(mockUpdateQb.where).toHaveBeenCalledWith('id = :userId', {
         userId: 'user-1'
+      });
+      expect(mockUpdateQb.setParameters).toHaveBeenCalledWith({
+        lockInterval: '900000 milliseconds'
       });
       expect(result).toEqual({
         failedLoginAttempts: 1,
