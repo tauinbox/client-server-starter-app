@@ -1,4 +1,5 @@
-import { inject, Injectable } from '@angular/core';
+import { DestroyRef, inject, Injectable } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import { finalize, firstValueFrom, from, switchMap, tap } from 'rxjs';
@@ -20,6 +21,7 @@ import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-to
 import { TokenService } from './token.service';
 import { RbacMetadataService } from './rbac-metadata.service';
 import { RbacMetadataStore } from '../store/rbac-metadata.store';
+import { NotificationsService } from '@core/services/notifications.service';
 
 const silentContext = () =>
   new HttpContext().set(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN, true);
@@ -32,8 +34,18 @@ export class AuthService {
   readonly #tokenService = inject(TokenService);
   readonly #rbacMetadataService = inject(RbacMetadataService);
   readonly #rbacMetadataStore = inject(RbacMetadataStore);
+  readonly #notificationsService = inject(NotificationsService);
+  readonly #destroyRef = inject(DestroyRef);
 
   readonly isAuthenticated = this.#authStore.isAuthenticated;
+
+  constructor() {
+    this.#notificationsService.permissionsUpdated$
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe(() => {
+        void this.fetchPermissions();
+      });
+  }
 
   login(credentials: LoginCredentials): Observable<AuthResponse> {
     return this.#http
@@ -46,6 +58,9 @@ export class AuthService {
           this.scheduleTokenRefresh();
           void this.fetchRbacMetadata();
           return from(this.fetchPermissions()).pipe(
+            tap(() => {
+              this.#notificationsService.connect();
+            }),
             switchMap(() => [response])
           );
         })
@@ -74,6 +89,7 @@ export class AuthService {
         .post(AuthApiEnum.Logout, {}, { context: silentContext() })
         .pipe(
           finalize(() => {
+            this.#notificationsService.disconnect();
             this.#authStore.clearSession();
             completeLogout();
           })

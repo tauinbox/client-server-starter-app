@@ -132,6 +132,10 @@ src/
 │   ├── decorators/         # @RequirePermissions([Actions,Subjects]), @Authorize([action,subject]) composite, @RegisterResource
 │   └── casl/               # app-ability.ts (AppAbility, Actions, Subjects, PermissionCheck types)
 │                           # CaslAbilityFactory (builds AppAbility, used by AuthController /permissions)
+├── notifications/
+│   ├── notifications.service.ts    # Manages Map<userId, Map<connectionId, Subject>> — push(userId), pushToAll()
+│   ├── notifications.listener.ts   # @OnEvent() handlers: UserDeleted/PasswordChanged/Created/Updated/Restored/RoleChanged → push
+│   └── notifications.controller.ts # GET /stream — @Sse() returns Observable<MessageEvent>; sets X-Accel-Buffering: no
 └── users/
     ├── controllers/        # UsersController (CRUD + search, all endpoints use @Authorize([action, 'User']))
     ├── services/           # UsersService
@@ -170,7 +174,7 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 - **Token cleanup** — daily cron removes expired tokens, weekly cron removes revoked+expired
 - **Account lockout** — 5 failed login attempts → 15 min lock (HTTP 423), admin unlock via user update
 - **Email verification** — required before login, 24-hour token expiry, resend capability, OAuth users auto-verified
-- **Password reset** — forgot-password/reset-password flow, 1-hour token expiry, invalidates all sessions
+- **Password reset** — forgot-password/reset-password flow, 30-minute token expiry, invalidates all sessions
 
 ### Email (MailModule)
 
@@ -280,6 +284,12 @@ Base URL: `/api/v1`
 | POST | `/actions` | `permissions:create` | Create new action |
 | PATCH | `/actions/:id` | `permissions:update` | Update action |
 | DELETE | `/actions/:id` | `permissions:delete` | Delete custom action |
+
+### Notifications (`/api/v1/notifications`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/stream` | Bearer | SSE stream — pushes `session_invalidated`, `permissions_updated`, and `user_crud_events` events |
 
 ### Users (`/api/v1/users`)
 

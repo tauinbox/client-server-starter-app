@@ -31,6 +31,7 @@ import {
 } from '../state';
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest, MockUser } from '../types';
+import { pushToAll, pushToUser } from '../sse-hub';
 
 interface PaginationParams {
   page: number;
@@ -177,6 +178,7 @@ router.post('/', adminGuard, (req, res) => {
     ip: req.ip
   });
 
+  pushToAll({ type: 'user_crud_events', action: 'created', userId: user.id });
   res.status(201).json(toAdminUserResponse(user));
 });
 
@@ -351,8 +353,10 @@ router.patch('/:id', adminGuard, (req, res) => {
       details: { source: 'admin' },
       ip: req.ip
     });
+    pushToUser(id, { type: 'session_invalidated', userId: id });
   }
 
+  pushToAll({ type: 'user_crud_events', action: 'updated', userId: id });
   res.json(toAdminUserResponse(user));
 });
 
@@ -387,6 +391,8 @@ router.delete('/:id', adminGuard, (req, res) => {
     ip: req.ip
   });
 
+  pushToUser(id, { type: 'session_invalidated', userId: id });
+  pushToAll({ type: 'user_crud_events', action: 'deleted', userId: id });
   res.json({});
 });
 
@@ -413,6 +419,7 @@ router.post('/:id/restore', adminGuard, (req, res) => {
     ip: req.ip
   });
 
+  pushToAll({ type: 'user_crud_events', action: 'restored', userId: id });
   res.json(toAdminUserResponse(targetUser));
 });
 

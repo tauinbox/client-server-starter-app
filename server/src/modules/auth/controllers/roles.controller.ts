@@ -38,6 +38,8 @@ import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { JwtAuthRequest } from '../types/auth.request';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { UserRoleChangedEvent } from '../events/user-role-changed.event';
 
 @ApiTags('Roles API')
 @Controller({
@@ -49,7 +51,8 @@ import { JwtAuthRequest } from '../types/auth.request';
 export class RolesController {
   constructor(
     private readonly roleService: RoleService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly eventEmitter: EventEmitter2
   ) {}
 
   @Get()
@@ -273,6 +276,10 @@ export class RolesController {
       details: { roleId: dto.roleId },
       context: extractAuditContext(req)
     });
+    this.eventEmitter.emit(
+      UserRoleChangedEvent.name,
+      new UserRoleChangedEvent(userId)
+    );
     return result;
   }
 
@@ -298,6 +305,10 @@ export class RolesController {
       details: { roleId },
       context: extractAuditContext(req)
     });
+    this.eventEmitter.emit(
+      UserRoleChangedEvent.name,
+      new UserRoleChangedEvent(userId)
+    );
     return result;
   }
 }

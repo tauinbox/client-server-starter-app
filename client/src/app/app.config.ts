@@ -18,6 +18,7 @@ import { errorInterceptor } from '@core/interceptors/error.interceptor';
 import { AuthService } from '@features/auth/services/auth.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { registerOAuthIcons } from '@features/auth/utils/register-oauth-icons';
+import { NotificationsService } from '@core/services/notifications.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -32,12 +33,14 @@ export const appConfig: ApplicationConfig = {
     provideAppInitializer(async () => {
       const authService = inject(AuthService);
       const authStore = inject(AuthStore);
+      const notificationsService = inject(NotificationsService);
       if (authService.isAuthenticated()) {
         authService.scheduleTokenRefresh();
         await Promise.all([
           authService.fetchPermissions(),
           authService.fetchRbacMetadata()
         ]);
+        notificationsService.connect();
       } else if (authStore.hasPersistedUser()) {
         // Page reload: access token gone from memory, try to restore via refresh cookie
         try {
@@ -46,6 +49,7 @@ export const appConfig: ApplicationConfig = {
             authService.fetchPermissions(),
             authService.fetchRbacMetadata()
           ]);
+          notificationsService.connect();
         } catch {
           authStore.clearSession();
         }

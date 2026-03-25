@@ -40,6 +40,9 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { JwtAuthRequest } from '../../auth/types/auth.request';
 import { UserPasswordChangedByAdminEvent } from '../events/user-password-changed-by-admin.event';
+import { UserCreatedEvent } from '../events/user-created.event';
+import { UserUpdatedEvent } from '../events/user-updated.event';
+import { UserRestoredEvent } from '../events/user-restored.event';
 
 @ApiTags('Users API')
 @Controller({
@@ -83,6 +86,10 @@ export class UsersController {
       targetType: 'User',
       context: extractAuditContext(req)
     });
+    this.eventEmitter.emit(
+      UserCreatedEvent.name,
+      new UserCreatedEvent(createdUser.id)
+    );
     return createdUser;
   }
 
@@ -176,6 +183,7 @@ export class UsersController {
       });
     }
 
+    this.eventEmitter.emit(UserUpdatedEvent.name, new UserUpdatedEvent(id));
     return updatedUser;
   }
 
@@ -233,6 +241,7 @@ export class UsersController {
       details: { targetEmail: restoredUser.email },
       context: extractAuditContext(req)
     });
+    this.eventEmitter.emit(UserRestoredEvent.name, new UserRestoredEvent(id));
     return restoredUser;
   }
 }
