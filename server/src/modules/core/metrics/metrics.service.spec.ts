@@ -5,7 +5,7 @@ import { MetricsService } from './metrics.service';
 
 const mockCounter = { inc: jest.fn() };
 const mockHistogram = { observe: jest.fn() };
-const mockGauge = { inc: jest.fn(), dec: jest.fn() };
+const mockGauge = { set: jest.fn() };
 
 describe('MetricsService', () => {
   let service: MetricsService;
@@ -67,19 +67,11 @@ describe('MetricsService', () => {
     });
   });
 
-  describe('incSseConnections', () => {
-    it('increments the SSE connections gauge', () => {
-      service.incSseConnections();
+  describe('setSseConnections', () => {
+    it('sets the SSE connections gauge to the provided count', () => {
+      service.setSseConnections(3);
 
-      expect(mockGauge.inc).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('decSseConnections', () => {
-    it('decrements the SSE connections gauge', () => {
-      service.decSseConnections();
-
-      expect(mockGauge.dec).toHaveBeenCalledTimes(1);
+      expect(mockGauge.set).toHaveBeenCalledWith(3);
     });
   });
 });

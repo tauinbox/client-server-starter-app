@@ -19,7 +19,7 @@ export class NotificationsService {
     }
     const subject = new Subject<MessageEvent>();
     this.#connections.get(userId)!.set(connectionId, subject);
-    this.metricsService.incSseConnections();
+    this.metricsService.setSseConnections(this.#countConnections());
     return subject;
   }
 
@@ -30,11 +30,19 @@ export class NotificationsService {
     if (subject) {
       subject.complete();
       userConnections.delete(connectionId);
-      this.metricsService.decSseConnections();
     }
     if (userConnections.size === 0) {
       this.#connections.delete(userId);
     }
+    this.metricsService.setSseConnections(this.#countConnections());
+  }
+
+  #countConnections(): number {
+    let count = 0;
+    for (const userConns of this.#connections.values()) {
+      count += userConns.size;
+    }
+    return count;
   }
 
   push(userId: string, event: NotificationEvent): void {
