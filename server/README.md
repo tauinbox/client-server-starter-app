@@ -57,7 +57,8 @@ Copy `.env.example` to `.env` and configure:
 | `DB_USER` | `postgres` | Database user |
 | `DB_PASSWORD` | `password` | Database password |
 | `DB_SCHEMA` | `public` | Database schema |
-| `DB_LOGGING` | `["query","warn","error","log"]` | TypeORM logging levels |
+| `DB_LOGGING` | `["warn","error","slow"]` | TypeORM logging levels. `"slow"` logs queries exceeding `DB_SLOW_QUERY_THRESHOLD` |
+| `DB_SLOW_QUERY_THRESHOLD` | `200` | Slow query threshold in milliseconds |
 | `REQUEST_LOG_LEVEL` | `all` | Request logging verbosity: `all` (every request), `warn` (4xx+5xx only), `error` (5xx only) |
 | `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
 | `JWT_SECRET` | - | Symmetric secret, min 16 chars (required when `JWT_ALGORITHM=HS256`) |

@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import {
   PrometheusModule,
   makeCounterProvider,
+  makeGaugeProvider,
   makeHistogramProvider
 } from '@willsoto/nestjs-prometheus';
 import { MetricsService } from './metrics.service';
@@ -31,6 +32,10 @@ import { MetricsService } from './metrics.service';
       name: 'auth_events_total',
       help: 'Total number of authentication events',
       labelNames: ['event']
+    }),
+    makeGaugeProvider({
+      name: 'sse_connections_active',
+      help: 'Number of currently active SSE connections'
     })
   ],
   exports: [MetricsService]

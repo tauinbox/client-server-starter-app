@@ -1,10 +1,11 @@
 import { Test } from '@nestjs/testing';
 import { getToken } from '@willsoto/nestjs-prometheus';
-import type { Counter, Histogram } from 'prom-client';
+import type { Counter, Gauge, Histogram } from 'prom-client';
 import { MetricsService } from './metrics.service';
 
 const mockCounter = { inc: jest.fn() };
 const mockHistogram = { observe: jest.fn() };
+const mockGauge = { inc: jest.fn(), dec: jest.fn() };
 
 describe('MetricsService', () => {
   let service: MetricsService;
@@ -26,6 +27,10 @@ describe('MetricsService', () => {
         {
           provide: getToken('auth_events_total'),
           useValue: mockCounter as unknown as Counter<string>
+        },
+        {
+          provide: getToken('sse_connections_active'),
+          useValue: mockGauge as unknown as Gauge<string>
         }
       ]
     }).compile();
@@ -59,6 +64,22 @@ describe('MetricsService', () => {
       service.recordAuthEvent('login_success');
 
       expect(mockCounter.inc).toHaveBeenCalledWith({ event: 'login_success' });
+    });
+  });
+
+  describe('incSseConnections', () => {
+    it('increments the SSE connections gauge', () => {
+      service.incSseConnections();
+
+      expect(mockGauge.inc).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('decSseConnections', () => {
+    it('decrements the SSE connections gauge', () => {
+      service.decSseConnections();
+
+      expect(mockGauge.dec).toHaveBeenCalledTimes(1);
     });
   });
 });
