@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectMetric } from '@willsoto/nestjs-prometheus';
-import type { Counter, Histogram } from 'prom-client';
+import type { Counter, Gauge, Histogram } from 'prom-client';
 
 export type AuthEvent =
   | 'login_success'
@@ -18,7 +18,9 @@ export class MetricsService {
     @InjectMetric('http_request_duration_seconds')
     private readonly httpDurationHistogram: Histogram<string>,
     @InjectMetric('auth_events_total')
-    private readonly authEventsCounter: Counter<string>
+    private readonly authEventsCounter: Counter<string>,
+    @InjectMetric('sse_connections_active')
+    private readonly sseConnectionsGauge: Gauge<string>
   ) {}
 
   recordHttpRequest(
@@ -34,5 +36,13 @@ export class MetricsService {
 
   recordAuthEvent(event: AuthEvent): void {
     this.authEventsCounter.inc({ event });
+  }
+
+  incSseConnections(): void {
+    this.sseConnectionsGauge.inc();
+  }
+
+  decSseConnections(): void {
+    this.sseConnectionsGauge.dec();
   }
 }

@@ -2,10 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { Subject } from 'rxjs';
 import type { MessageEvent } from '@nestjs/common';
 import type { NotificationEvent } from '@app/shared/types';
+import { MetricsService } from '../core/metrics/metrics.service';
 
 @Injectable()
 export class NotificationsService {
   readonly #connections = new Map<string, Map<string, Subject<MessageEvent>>>();
+
+  constructor(private readonly metricsService: MetricsService) {}
 
   getOrCreateStream(
     userId: string,
@@ -16,6 +19,7 @@ export class NotificationsService {
     }
     const subject = new Subject<MessageEvent>();
     this.#connections.get(userId)!.set(connectionId, subject);
+    this.metricsService.incSseConnections();
     return subject;
   }
 
@@ -26,6 +30,7 @@ export class NotificationsService {
     if (subject) {
       subject.complete();
       userConnections.delete(connectionId);
+      this.metricsService.decSseConnections();
     }
     if (userConnections.size === 0) {
       this.#connections.delete(userId);

@@ -31,6 +31,9 @@ export const postgresConfig: () => PostgresConnectionOptions = () => ({
   logger:
     (process.env['DB_LOGGER'] as PostgresConnectionOptions['logger']) ||
     localConfig.logger,
+  maxQueryExecutionTime: process.env['DB_SLOW_QUERY_THRESHOLD']
+    ? Number(process.env['DB_SLOW_QUERY_THRESHOLD'])
+    : undefined,
   migrationsRun: false, // automatically run migrations on startup
   synchronize: false, // always false — run 'npm run build && npm run migrations:run' manually
   entities: [__dirname + '/modules/**/*.entity{.ts,.js}'],

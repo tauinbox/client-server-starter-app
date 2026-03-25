@@ -1,12 +1,23 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { MetricsService } from '../core/metrics/metrics.service';
 import { NotificationsService } from './notifications.service';
+
+const mockMetrics = {
+  incSseConnections: jest.fn(),
+  decSseConnections: jest.fn()
+};
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [NotificationsService]
+      providers: [
+        NotificationsService,
+        { provide: MetricsService, useValue: mockMetrics }
+      ]
     }).compile();
 
     service = module.get<NotificationsService>(NotificationsService);
@@ -15,6 +26,11 @@ describe('NotificationsService', () => {
   it('should create a stream for a new userId/connectionId', () => {
     const subject = service.getOrCreateStream('user-1', 'conn-1');
     expect(subject).toBeDefined();
+  });
+
+  it('should increment SSE connections gauge on getOrCreateStream', () => {
+    service.getOrCreateStream('user-1', 'conn-1');
+    expect(mockMetrics.incSseConnections).toHaveBeenCalledTimes(1);
   });
 
   it('should emit events pushed to a specific user', (done) => {
@@ -88,5 +104,20 @@ describe('NotificationsService', () => {
     expect(() =>
       service.push('user-6', { type: 'session_invalidated', userId: 'user-6' })
     ).not.toThrow();
+  });
+
+  it('should decrement SSE connections gauge on closeStream', () => {
+    service.getOrCreateStream('user-7', 'conn-1');
+    jest.clearAllMocks();
+
+    service.closeStream('user-7', 'conn-1');
+
+    expect(mockMetrics.decSseConnections).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not decrement gauge when closing a non-existent connection', () => {
+    service.closeStream('unknown-user', 'conn-1');
+
+    expect(mockMetrics.decSseConnections).not.toHaveBeenCalled();
   });
 });
