@@ -10,13 +10,16 @@ import { PermissionService } from '../services/permission.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import type { PermissionCheck } from '../casl/app-ability';
 import { JwtAuthRequest } from '../types/auth.request';
+import { AuditService } from '../../audit/audit.service';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly permissionService: PermissionService,
-    private readonly caslAbilityFactory: CaslAbilityFactory
+    private readonly caslAbilityFactory: CaslAbilityFactory,
+    private readonly auditService: AuditService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -28,7 +31,8 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
-    const { user } = context.switchToHttp().getRequest<JwtAuthRequest>();
+    const req = context.switchToHttp().getRequest<JwtAuthRequest>();
+    const { user } = req;
 
     const [roles, userPermissions] = await Promise.all([
       this.permissionService.getRolesForUser(user.userId),
@@ -46,6 +50,16 @@ export class PermissionsGuard implements CanActivate {
     );
 
     if (!hasAll) {
+      this.auditService.logFireAndForget({
+        action: AuditAction.PERMISSION_CHECK_FAILURE,
+        actorId: user.userId,
+        details: {
+          required: requiredPermissions.map(
+            ([a, s]) => `${String(a)}:${String(s)}`
+          )
+        },
+        context: { ip: req.ip }
+      });
       throw new ForbiddenException('Insufficient permissions');
     }
 

@@ -44,7 +44,35 @@ async function bootstrap() {
       forbidNonWhitelisted: true
     })
   );
-  app.use(helmet());
+
+  const env = process.env['ENVIRONMENT'];
+  const swaggerEnabled =
+    env === 'local' ||
+    env === 'development' ||
+    process.env['SWAGGER_ENABLED'] === 'true';
+
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          // Swagger UI embeds inline scripts — allow only when Swagger is on
+          scriptSrc: swaggerEnabled
+            ? ["'self'", "'unsafe-inline'"]
+            : ["'self'"],
+          // Angular Material uses inline styles
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:'],
+          fontSrc: ["'self'"],
+          connectSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'none'"],
+          baseUri: ["'self'"],
+          formAction: ["'self'"]
+        }
+      }
+    })
+  );
   app.enableCors(corsOptions());
   app.useStaticAssets(join(__dirname, '..', 'public'));
   app.setGlobalPrefix('api', {
@@ -55,12 +83,6 @@ async function bootstrap() {
   app.use(cookieParser()); // this wil allow to get parsed cookie from req.cookies instead of req.get('Cookie')
   app.useBodyParser('json', { limit: '100kb' });
   app.useBodyParser('urlencoded', { extended: true, limit: '100kb' });
-
-  const env = process.env['ENVIRONMENT'];
-  const swaggerEnabled =
-    env === 'local' ||
-    env === 'development' ||
-    process.env['SWAGGER_ENABLED'] === 'true';
   if (swaggerEnabled) {
     const config = new DocumentBuilder()
       .setTitle('Swagger')

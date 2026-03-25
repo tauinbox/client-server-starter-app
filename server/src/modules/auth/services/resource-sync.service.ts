@@ -60,7 +60,8 @@ export class ResourceSyncService implements OnApplicationBootstrap {
         if (
           !name.includes('Health') &&
           !name.includes('Auth') &&
-          !name.includes('OAuth')
+          !name.includes('OAuth') &&
+          !name.includes('Prometheus')
         ) {
           this.logger.debug(
             `Controller ${name} has no @RegisterResource decorator`
