@@ -50,6 +50,7 @@ Copy `.env.example` to `.env` and configure:
 |----------|---------|-------------|
 | `APPLICATION_PORT` | `3000` | HTTP listen port |
 | `ENVIRONMENT` | `local` | Environment name (`local` enables auto-sync & permissive CORS) |
+| `SWAGGER_ENABLED` | - | Set to `true` to enable Swagger UI in staging/production (always on in `local`/`development`) |
 | `DB_HOST` | `localhost` | PostgreSQL host |
 | `DB_PORT` | `5432` | PostgreSQL port |
 | `DB_NAME` | `my-db` | Database name |
@@ -104,7 +105,7 @@ src/
 │   ├── cache/              # @nestjs/cache-manager
 │   ├── database/           # TypeORM + PostgreSQL config
 │   ├── filters/            # GlobalExceptionFilter (standardized error responses, DB error mapping)
-│   ├── health/             # HealthModule (GET /api/health, TypeORM DB ping)
+│   ├── health/             # HealthModule (GET /api/health/live, /api/health/ready — DB ping + Redis warning in production + optional SMTP)
 │   ├── metrics/            # MetricsModule (@Global) — Prometheus metrics via @willsoto/nestjs-prometheus
 │   │                       #   GET /metrics (excluded from /api prefix); http_requests_total,
 │   │                       #   http_request_duration_seconds, auth_events_total; HttpMetricsInterceptor
@@ -221,7 +222,7 @@ Use `docker-compose.yml` at the repo root to run the full stack (db + server + c
 
 ## API
 
-Swagger docs: http://localhost:3000/swagger
+Swagger docs: http://localhost:3000/swagger (enabled in `local` and `development` by default; set `SWAGGER_ENABLED=true` to enable in any environment)
 
 Base URL: `/api/v1`
 

@@ -11,7 +11,9 @@ import {
   ApiServiceUnavailableResponse,
   ApiTags
 } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { SmtpHealthIndicator } from './smtp.health';
+import { RedisHealthIndicator } from './redis.health';
 import { MailService } from '../../mail/mail.service';
 
 @ApiTags('Health')
@@ -21,7 +23,9 @@ export class HealthController {
     private readonly health: HealthCheckService,
     private readonly db: TypeOrmHealthIndicator,
     private readonly smtp: SmtpHealthIndicator,
-    private readonly mailService: MailService
+    private readonly redis: RedisHealthIndicator,
+    private readonly mailService: MailService,
+    private readonly config: ConfigService
   ) {}
 
   @Get('live')
@@ -40,6 +44,9 @@ export class HealthController {
     const checks: HealthIndicatorFunction[] = [
       () => this.db.pingCheck('database')
     ];
+    if (this.config.get('ENVIRONMENT') === 'production') {
+      checks.push(() => this.redis.isHealthy('redis'));
+    }
     if (this.mailService.isSmtpConfigured()) {
       checks.push(() => this.smtp.isHealthy('smtp'));
     }
