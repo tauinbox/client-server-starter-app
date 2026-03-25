@@ -130,7 +130,7 @@
       },
       "targets": [
         {
-          "expr": "sse_connections_active or vector(0)",
+          "expr": "sse_connections_active",
           "legendFormat": "SSE",
           "refId": "A"
         }
@@ -426,7 +426,7 @@
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
         {
-          "expr": "sse_connections_active or vector(0)",
+          "expr": "sse_connections_active",
           "legendFormat": "Active connections",
           "refId": "A"
         }
