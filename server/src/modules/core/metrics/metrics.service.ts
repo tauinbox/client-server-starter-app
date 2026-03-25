@@ -38,11 +38,7 @@ export class MetricsService {
     this.authEventsCounter.inc({ event });
   }
 
-  incSseConnections(): void {
-    this.sseConnectionsGauge.inc();
-  }
-
-  decSseConnections(): void {
-    this.sseConnectionsGauge.dec();
+  setSseConnections(count: number): void {
+    this.sseConnectionsGauge.set(count);
   }
 }
