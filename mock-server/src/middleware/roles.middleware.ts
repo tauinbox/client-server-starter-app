@@ -8,6 +8,7 @@ import {
 } from '../state';
 import { adminGuard } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';
+import { pushToUser } from '../sse-hub';
 
 const router = Router();
 
@@ -387,6 +388,7 @@ router.post('/assign/:userId', adminGuard, (req, res) => {
     ip: req.ip
   });
 
+  pushToUser(userId, { type: 'permissions_updated', userId });
   res.send();
 });
 
@@ -424,6 +426,7 @@ router.delete('/assign/:userId/:roleId', adminGuard, (req, res) => {
     ip: req.ip
   });
 
+  pushToUser(userId, { type: 'permissions_updated', userId });
   res.send();
 });
 

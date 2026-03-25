@@ -31,7 +31,7 @@ All components are standalone (no NgModules) with `OnPush` change detection and 
 
 ```
 src/app/
-├── core/                   # Header, sidenav, theme toggle, storage/session-storage services, error interceptor, 404 page
+├── core/                   # Header, sidenav, theme toggle, storage/session-storage services, error interceptor, 404 page, NotificationsService (SSE)
 ├── features/
 │   ├── auth/               # Login, register, profile, OAuth callback, verify-email, forgot-password, reset-password, forbidden
 │   │   ├── casl/           # app-ability.ts — AppAbility, Actions, Subjects, PermissionCheck types
@@ -96,6 +96,7 @@ NgRx Signal Store (`@ngrx/signals`):
 - **UsersStore** (route-level at `/users`) — entity-based store with `withEntities<User>()`. Unified state: `filters: UserSearch` (empty = all users, filled = search via `GET /users/search`), single `load()`/`loadMore()` pair with **infinite scroll** (page size 20; `upsertEntities` appends; `hasMore` computed signal drives sentinel visibility; `isLoadingMore` shows spinner). `setFilters()` and `setSorting()` update state; component calls `load()` after each change
 - **RbacMetadataStore** (`providedIn: 'root'`) — NgRx Signal Store with stale-while-revalidate localStorage caching for resources/actions metadata. Loaded at bootstrap via `AuthService.fetchRbacMetadata()` (only when authenticated). Computed: `subjectMap` (resource name to CASL subject)
 - **ThemeService** — `theme` signal (`'light'` | `'dark'`), system preference detection, persists to localStorage
+- **NotificationsService** (`providedIn: 'root'`) — SSE client using `HttpClient` with `observe: 'events'` so the JWT interceptor attaches `Authorization: Bearer` automatically. Parses `HttpDownloadProgressEvent.partialText` with offset tracking. Exposes: `sessionInvalidated$` (calls `tokenService.forceLogout()`), `permissionsUpdated$` (triggers `authService.fetchPermissions()`), `userCrudEvents$` (drives user list refresh). `connect()` called after login and session restore; `disconnect()` called on logout. Reconnects with 5-attempt exponential backoff; stops reconnecting when not authenticated
 
 ### HTTP Interceptors
 
@@ -158,7 +159,7 @@ npm test
   - `mock-data.ts` — `MockUser` type, `defaultUser`, factory re-exports (`createMockUser`, `createOAuthAccount`)
   - `helpers.ts` — `loginViaUi()`, `expectAuthRedirect()`, `expectForbiddenRedirect()`
 - Test structure: organized by module in `e2e/auth/` and `e2e/users/`
-- Coverage: 113 tests (55 auth + 58 users) — unit test suite: 351 tests passing covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search, admin roles/resources management. User list and search tests updated to work with server-side paginated responses from mock-server
+- Coverage: 113 tests (55 auth + 58 users) — unit test suite: 368 tests passing covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search, admin roles/resources management. User list and search tests updated to work with server-side paginated responses from mock-server
 - Workers: 4 (fully parallel, per-worker mock-server instances on dynamic ports)
 
 ```bash

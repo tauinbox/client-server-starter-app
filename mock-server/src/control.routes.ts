@@ -14,6 +14,8 @@ import type {
   OAuthAccount,
   State
 } from './types';
+import type { NotificationEvent } from '@app/shared/types';
+import { pushToAll, pushToUser } from './sse-hub';
 
 const router = Router();
 
@@ -136,6 +138,24 @@ router.post('/role-permissions', (req, res) => {
   state.rolePermissions = rolePermissions;
 
   res.json({ message: `Set ${rolePermissions.length} role-permission(s)` });
+});
+
+// POST /__control/notify — push a test notification event (E2E helper)
+router.post('/notify', (req, res) => {
+  const event = req.body as NotificationEvent;
+  if (!event || !event.type) {
+    res.status(400).json({ message: 'Body must be a valid NotificationEvent' });
+    return;
+  }
+  if (
+    event.type === 'session_invalidated' ||
+    event.type === 'permissions_updated'
+  ) {
+    pushToUser(event.userId, event);
+  } else {
+    pushToAll(event);
+  }
+  res.json({ ok: true });
 });
 
 export default router;

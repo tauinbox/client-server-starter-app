@@ -32,3 +32,5 @@ export type {
   ActionResponse,
   RbacMetadataResponse
 } from './rbac.types';
+
+export type { NotificationEvent } from './notification.types';

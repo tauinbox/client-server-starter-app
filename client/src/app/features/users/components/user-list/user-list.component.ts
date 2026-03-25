@@ -28,6 +28,7 @@ import type { Sort } from '@angular/material/sort';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { filter, merge } from 'rxjs';
+import { NotificationsService } from '@core/services/notifications.service';
 import type { User, UserSearch, UserSortColumn } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
@@ -76,6 +77,7 @@ export class UserListComponent implements OnInit, AfterViewInit {
   readonly #dialog = inject(MatDialog);
   readonly #destroyRef = inject(DestroyRef);
   readonly #injector = inject(Injector);
+  readonly #notificationsService = inject(NotificationsService);
 
   readonly filterForm: FormGroup<UserFilterFormType> =
     this.#fb.group<UserFilterFormType>({
@@ -102,6 +104,11 @@ export class UserListComponent implements OnInit, AfterViewInit {
 
   ngOnInit(): void {
     this.#usersStore.load();
+    this.#notificationsService.userCrudEvents$
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe(() => {
+        this.#usersStore.load();
+      });
   }
 
   ngAfterViewInit(): void {

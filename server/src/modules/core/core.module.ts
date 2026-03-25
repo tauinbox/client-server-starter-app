@@ -28,6 +28,7 @@ import { RequestLoggingMiddleware } from './middleware/request-logging.middlewar
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MetricsModule } from './metrics/metrics.module';
 import { HttpMetricsInterceptor } from './interceptors/http-metrics.interceptor';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({})
 export class CoreModule implements NestModule {
@@ -162,7 +163,8 @@ export class CoreModule implements NestModule {
         AuditModule,
         AuthModule,
         UsersModule,
-        HealthModule
+        HealthModule,
+        NotificationsModule
       ],
       providers: [
         {

@@ -5,6 +5,7 @@ import oauthRouter from './oauth.middleware';
 import rolesRouter from './roles.middleware';
 import rbacRouter from './rbac.middleware';
 import healthRouter from '../routes/health';
+import notificationsRouter from './notifications.middleware';
 
 export function registerRoutes(app: Express): void {
   app.use('/api/health', healthRouter);
@@ -13,4 +14,5 @@ export function registerRoutes(app: Express): void {
   app.use('/api/v1/users', usersRouter);
   app.use('/api/v1/roles', rolesRouter);
   app.use('/api/v1/rbac', rbacRouter);
+  app.use('/api/v1/notifications', notificationsRouter);
 }

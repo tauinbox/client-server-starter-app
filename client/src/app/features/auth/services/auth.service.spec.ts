@@ -5,12 +5,13 @@ import {
   HttpTestingController,
   provideHttpClientTesting
 } from '@angular/common/http/testing';
-import { firstValueFrom, of } from 'rxjs';
+import { firstValueFrom, of, EMPTY } from 'rxjs';
 import { AuthService } from './auth.service';
 import { AuthStore } from '../store/auth.store';
 import { TokenService } from './token.service';
 import { RbacMetadataService } from './rbac-metadata.service';
 import { RbacMetadataStore } from '../store/rbac-metadata.store';
+import { NotificationsService } from '@core/services/notifications.service';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import type { AuthResponse } from '../models/auth.types';
 import type { RoleResponse } from '@app/shared/types';
@@ -117,7 +118,15 @@ describe('AuthService', () => {
         { provide: AuthStore, useValue: authStoreMock },
         { provide: TokenService, useValue: tokenServiceMock },
         { provide: RbacMetadataService, useValue: rbacMetadataServiceMock },
-        { provide: RbacMetadataStore, useValue: rbacMetadataStoreMock }
+        { provide: RbacMetadataStore, useValue: rbacMetadataStoreMock },
+        {
+          provide: NotificationsService,
+          useValue: {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            permissionsUpdated$: EMPTY
+          }
+        }
       ]
     });
 

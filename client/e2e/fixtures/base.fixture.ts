@@ -55,6 +55,21 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       return route.continue({ url });
     });
 
+    // Immediately fulfill SSE stream with an empty body so it completes cleanly.
+    // A persistent SSE connection blocks waitForLoadState('networkidle') in loginViaUi()
+    // because Playwright counts streaming XHR as active until the connection closes.
+    // Registered after the general route so it takes priority (Playwright: last = first matched).
+    await page.route(/\/api\/.*\/notifications\/stream/, (route) =>
+      route.fulfill({
+        status: 200,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache'
+        },
+        body: ''
+      })
+    );
+
     const api: MockServerApi = {
       url: baseUrl,
       reset() {

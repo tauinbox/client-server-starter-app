@@ -251,6 +251,11 @@
       "method": "DELETE",
       "path": "/api/v1/rbac/actions/1",
       "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/notifications/stream",
+      "expectedStatus": 401
     }
   ]
 }

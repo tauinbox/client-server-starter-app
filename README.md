@@ -28,6 +28,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - Automatic token refresh 60 seconds before expiry
 - 401 handling with request retry in JWT interceptor
 - **Reactive permission refresh on 403** — `errorInterceptor` detects mid-session 403s, silently re-fetches `/api/v1/auth/permissions`, updates `AuthStore.ability`, and retries the request; `RequirePermissionsDirective` reacts via Angular `effect()` without a page reload
+- **Real-time notifications via SSE** — `GET /api/v1/notifications/stream` (JWT-protected) pushes three event types: `session_invalidated` (force-logout on admin password change or user delete), `permissions_updated` (silent permissions re-fetch on role change), `user_crud_events` (admin user list auto-refresh on create/update/delete/restore). Client uses `HttpClient` with `observe: 'events'` so the existing JWT interceptor attaches the Bearer token; `NotificationsService` connects on login and disconnects on logout with exponential-backoff reconnect
 - **Role-Based Access Control (RBAC)** — dynamic resources and actions with `@RegisterResource` auto-discovery; `isSuper` flag on roles replaces hardcoded admin bypass; `@Authorize(['action', 'Subject'])` typed tuples on server; `permissionGuard(action, subject)` + `*appRequirePermissions="{ action, subject }"` directive on client; `/api/v1/rbac/` endpoints for managing resources and actions
 - `GET /api/v1/auth/permissions` returns CASL packed rules; client hydrates into `AppAbility` at bootstrap before route activation
 - OAuth account management (link/unlink providers in profile)
@@ -93,9 +94,10 @@ fullstack-starter-app/
 ├── server/                 # NestJS 11 API
 │   ├── src/modules/
 │   │   ├── core/           # Config, caching, database, scheduling
-│   │   ├── auth/           # JWT + refresh token auth, lockout, verification, reset, permissions endpoint
+│   │   │   ├── auth/           # JWT + refresh token auth, lockout, verification, reset, permissions endpoint
 │   │   ├── mail/           # Email delivery (nodemailer, console/SMTP transports)
 │   │   ├── users/          # User CRUD
+│   │   ├── notifications/  # SSE push: NotificationsService, NotificationsListener, NotificationsController
 │   │   └── roles/          # RBAC: Role/Permission/RolePermission entities, RolesController, PermissionsGuard
 │   ├── src/common/
 │   │   ├── dtos/           # PaginationQueryDto, PaginatedResponseDto<T>
@@ -111,9 +113,10 @@ fullstack-starter-app/
         ├── seed.ts         # Faker-based seed data (70 users)
         ├── factories.ts    # createMockUser, createOAuthAccount
         ├── jwt.utils.ts    # JWT generation/validation
-        ├── middleware/      # Route handlers (auth, users, OAuth) + guards
+        ├── middleware/      # Route handlers (auth, users, OAuth, notifications) + guards
+        ├── sse-hub.ts      # SSE connection registry and push helpers
         ├── helpers/        # Auth helper utilities
-        └── control.routes.ts  # Test control API (reset, seed)
+        └── control.routes.ts  # Test control API (reset, seed, notify)
 ```
 
 All three workspaces import from `@app/shared/*` path alias (maps to `../shared/src/*` in each workspace's `tsconfig.json`).
@@ -319,6 +322,7 @@ API base URL: `/api/v1`
 | DELETE | `/roles/:id/permissions/:permId` | `roles:update` | Remove permission from role |
 | POST | `/roles/assign/:userId` | `roles:assign` | Assign role to user |
 | DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove role from user |
+| GET | `/notifications/stream` | Bearer | SSE stream — pushes `session_invalidated`, `permissions_updated`, `user_crud_events` |
 | GET | `/rbac/metadata` | Bearer | Get RBAC metadata (resources + actions); Redis-cached 60s |
 | GET | `/rbac/resources` | `permissions:read` | List all resources |
 | PATCH | `/rbac/resources/:id` | `permissions:update` | Update resource display info |
@@ -435,9 +439,9 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 440 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 460 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | Configured |
-| Client unit tests | Vitest | `*.spec.ts` alongside source | 351 tests passing |
+| Client unit tests | Vitest | `*.spec.ts` alongside source | 368 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 101 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
 
@@ -460,7 +464,7 @@ Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file
 - Passwords hashed with **bcrypt** (cost factor = 12)
 - **Account lockout** after 5 failed login attempts (15-minute cooldown)
 - **Email verification** required before first login
-- **Password reset tokens** are single-use with 1-hour expiry; reset revokes all sessions
+- **Password reset tokens** are single-use with 30-minute expiry; reset revokes all sessions
 - **Admin password change** immediately revokes all sessions for the target user
 - **HttpOnly refresh token cookie** (`SameSite=Strict`, `path=/api/v1/auth`, 7d expiry) — JavaScript cannot read or steal the token (XSS-proof); rotated on every use
 - JWT access tokens (1h) stored in Angular signals only — never written to `localStorage`; user info persisted to `localStorage` (`auth_user` key) only to detect prior sessions on page reload

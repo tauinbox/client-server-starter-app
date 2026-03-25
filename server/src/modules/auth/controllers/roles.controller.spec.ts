@@ -6,6 +6,7 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { JwtAuthRequest } from '../types/auth.request';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { PermissionsGuard } from '../guards/permissions.guard';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 const allowAllGuard = { canActivate: () => true };
 
@@ -68,7 +69,8 @@ describe('RolesController', () => {
       controllers: [RolesController],
       providers: [
         { provide: RoleService, useValue: roleServiceMock },
-        { provide: AuditService, useValue: auditServiceMock }
+        { provide: AuditService, useValue: auditServiceMock },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } }
       ]
     })
       .overrideGuard(JwtAuthGuard)
