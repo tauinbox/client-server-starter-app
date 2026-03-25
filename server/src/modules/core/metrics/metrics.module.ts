@@ -2,10 +2,17 @@ import { Global, Module } from '@nestjs/common';
 import {
   PrometheusModule,
   makeCounterProvider,
-  makeGaugeProvider,
-  makeHistogramProvider
+  makeHistogramProvider,
+  getToken
 } from '@willsoto/nestjs-prometheus';
+import { Gauge } from 'prom-client';
 import { MetricsService } from './metrics.service';
+
+export interface SseConnectionsRef {
+  getCount: () => number;
+}
+
+export const SSE_CONNECTIONS_REF = Symbol('SSE_CONNECTIONS_REF');
 
 @Global()
 @Module({
@@ -33,11 +40,24 @@ import { MetricsService } from './metrics.service';
       help: 'Total number of authentication events',
       labelNames: ['event']
     }),
-    makeGaugeProvider({
-      name: 'sse_connections_active',
-      help: 'Number of currently active SSE connections'
-    })
+    {
+      provide: SSE_CONNECTIONS_REF,
+      useFactory: (): SseConnectionsRef => ({ getCount: () => 0 })
+    },
+    {
+      provide: getToken('sse_connections_active'),
+      useFactory: (ref: SseConnectionsRef): Gauge<string> => {
+        return new Gauge<string>({
+          name: 'sse_connections_active',
+          help: 'Number of currently active SSE connections',
+          collect() {
+            this.set(ref.getCount());
+          }
+        });
+      },
+      inject: [SSE_CONNECTIONS_REF]
+    }
   ],
-  exports: [MetricsService]
+  exports: [MetricsService, SSE_CONNECTIONS_REF]
 })
 export class MetricsModule {}

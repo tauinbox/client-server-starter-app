@@ -1,21 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { MetricsService } from '../core/metrics/metrics.service';
+import {
+  SSE_CONNECTIONS_REF,
+  type SseConnectionsRef
+} from '../core/metrics/metrics.module';
 import { NotificationsService } from './notifications.service';
 
-const mockMetrics = {
-  setSseConnections: jest.fn()
-};
+const mockSseRef: SseConnectionsRef = { getCount: () => 0 };
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
 
   beforeEach(async () => {
-    jest.clearAllMocks();
+    mockSseRef.getCount = () => 0;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationsService,
-        { provide: MetricsService, useValue: mockMetrics }
+        { provide: SSE_CONNECTIONS_REF, useValue: mockSseRef }
       ]
     }).compile();
 
@@ -27,9 +28,9 @@ describe('NotificationsService', () => {
     expect(subject).toBeDefined();
   });
 
-  it('should update SSE connections gauge on getOrCreateStream', () => {
+  it('should wire getCount to return live connection count', () => {
     service.getOrCreateStream('user-1', 'conn-1');
-    expect(mockMetrics.setSseConnections).toHaveBeenCalledWith(1);
+    expect(mockSseRef.getCount()).toBe(1);
   });
 
   it('should emit events pushed to a specific user', (done) => {
@@ -105,30 +106,23 @@ describe('NotificationsService', () => {
     ).not.toThrow();
   });
 
-  it('should update SSE connections gauge on closeStream', () => {
-    service.getOrCreateStream('user-7', 'conn-1');
-    jest.clearAllMocks();
-
-    service.closeStream('user-7', 'conn-1');
-
-    expect(mockMetrics.setSseConnections).toHaveBeenCalledWith(0);
-  });
-
   it('should reflect actual connection count across multiple open/close cycles', () => {
     service.getOrCreateStream('user-8', 'conn-1');
     service.getOrCreateStream('user-8', 'conn-2');
-    expect(mockMetrics.setSseConnections).toHaveBeenLastCalledWith(2);
+    expect(mockSseRef.getCount()).toBe(2);
 
     service.closeStream('user-8', 'conn-1');
-    expect(mockMetrics.setSseConnections).toHaveBeenLastCalledWith(1);
+    expect(mockSseRef.getCount()).toBe(1);
 
     service.closeStream('user-8', 'conn-2');
-    expect(mockMetrics.setSseConnections).toHaveBeenLastCalledWith(0);
+    expect(mockSseRef.getCount()).toBe(0);
   });
 
-  it('should not update gauge when closing a non-existent connection', () => {
-    service.closeStream('unknown-user', 'conn-1');
+  it('should not change count when closing a non-existent connection', () => {
+    service.getOrCreateStream('user-9', 'conn-1');
+    expect(mockSseRef.getCount()).toBe(1);
 
-    expect(mockMetrics.setSseConnections).not.toHaveBeenCalled();
+    service.closeStream('unknown-user', 'conn-1');
+    expect(mockSseRef.getCount()).toBe(1);
   });
 });
