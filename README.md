@@ -174,6 +174,7 @@ Edit `.env` with your database credentials and settings:
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
 | `REDIS_URL` | - | Redis connection URL (optional; enables distributed rate limiting and shared permission cache for multi-instance deployments) |
+| `SWAGGER_ENABLED` | - | Set to `true` to enable Swagger UI in staging/production (always on in `local`/`development`) |
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to retain audit log entries |
 | `DB_POOL_MAX` | `10` | Maximum PostgreSQL connection pool size |
 | `DB_POOL_IDLE_TIMEOUT` | `30000` | Milliseconds before an idle connection is closed |
@@ -243,7 +244,7 @@ Services:
 - **redis** — redis:7-alpine, used for distributed rate limiting and shared permission cache
 - **db** — postgres:16-alpine, persistent named volume
 - **server** — NestJS API on port 3000; entrypoint runs migrations, optional admin seed, then starts the server; exposes `GET /metrics` for Prometheus scraping
-- **client** — Angular SPA served by nginx on port 4200 (maps to container port 80); built with `--base-href /nexus/` (overridable via `docker build --build-arg BASE_HREF=/`)
+- **client** — Angular SPA served by nginx on port 8080; host binding `127.0.0.1:4200:8080` (localhost-only; Caddy accesses internally via `client:8080`); built with `--base-href /nexus/` (overridable via `docker build --build-arg BASE_HREF=/`)
 - **prometheus** — prom/prometheus:v2.54.1, internal network only (no ports exposed); scrapes `/metrics` every 15s, 30d retention; config at `monitoring/prometheus.yml`
 - **grafana** — grafana/grafana:11.3.1, accessible at port 3001; provisioned datasource (Prometheus) and NestJS dashboard (HTTP traffic, auth events, Node.js runtime)
 
@@ -276,7 +277,7 @@ All VPS-facing workflows share a `deploy-production` concurrency group to preven
 
 ## API Documentation
 
-Swagger docs are available at http://localhost:3000/swagger when the server is running.
+Swagger docs are available at http://localhost:3000/swagger when the server is running in `local` or `development` environments. Can be enabled in any environment via `SWAGGER_ENABLED=true`.
 
 API base URL: `/api/v1`
 
