@@ -4,6 +4,7 @@ import { PermissionsGuard } from './permissions.guard';
 import { createMongoAbility } from '@casl/ability';
 import type { RawRuleOf } from '@casl/ability';
 import type { AppAbility } from '../casl/app-ability';
+import type { AuditService } from '../../audit/audit.service';
 
 describe('PermissionsGuard', () => {
   let guard: PermissionsGuard;
@@ -13,6 +14,7 @@ describe('PermissionsGuard', () => {
     getRolesForUser: jest.Mock;
   };
   let caslAbilityFactory: { createForUser: jest.Mock };
+  let auditService: Pick<AuditService, 'logFireAndForget'>;
 
   function createMockContext(user: Record<string, unknown>): ExecutionContext {
     return {
@@ -20,7 +22,7 @@ describe('PermissionsGuard', () => {
       getClass: jest.fn(),
       switchToHttp: () => ({
         // @ts-expect-error testing mock
-        getRequest: () => ({ user })
+        getRequest: () => ({ user, ip: '127.0.0.1' })
       })
     };
   }
@@ -57,12 +59,14 @@ describe('PermissionsGuard', () => {
     caslAbilityFactory = {
       createForUser: jest.fn()
     };
+    auditService = { logFireAndForget: jest.fn() };
 
     guard = new PermissionsGuard(
       reflector,
       // @ts-expect-error testing mock
       permissionService,
-      caslAbilityFactory
+      caslAbilityFactory,
+      auditService as AuditService
     );
   });
 
@@ -153,6 +157,9 @@ describe('PermissionsGuard', () => {
 
     await expect(guard.canActivate(context)).rejects.toThrow(
       ForbiddenException
+    );
+    expect(auditService.logFireAndForget).toHaveBeenCalledWith(
+      expect.objectContaining({ actorId: 'user-1' })
     );
   });
 
