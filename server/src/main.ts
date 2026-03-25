@@ -17,6 +17,18 @@ async function bootstrap() {
   );
   app.useLogger(app.get(Logger));
 
+  if (
+    process.env['ENVIRONMENT'] === 'production' &&
+    !process.env['REDIS_URL']
+  ) {
+    app
+      .get(Logger)
+      .warn(
+        'REDIS_URL is not set — rate limiting and cache invalidation are per-instance only',
+        'Bootstrap'
+      );
+  }
+
   /*
    Example: getting instances to pass as dependencies into class constructors (when needed)
    const reflector = app.get(Reflector);
@@ -44,7 +56,8 @@ async function bootstrap() {
   app.useBodyParser('json', { limit: '100kb' });
   app.useBodyParser('urlencoded', { extended: true, limit: '100kb' });
 
-  if (process.env['ENVIRONMENT'] !== 'production') {
+  const env = process.env['ENVIRONMENT'];
+  if (env === 'local' || env === 'development') {
     const config = new DocumentBuilder()
       .setTitle('Swagger')
       .setDescription('Starter Project API')
