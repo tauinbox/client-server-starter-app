@@ -21,7 +21,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - Email/password registration and login
 - **Account lockout** — 5 consecutive failed login attempts lock the account for 15 minutes (HTTP 423 with countdown); admin can unlock early via user-edit page
 - **Email verification** — new registrations require email verification before login (HTTP 403); resend-verification endpoint; OAuth users auto-verified
-- **Password reset** — forgot-password sends a reset link (1-hour token expiry); reset invalidates all active sessions
+- **Password reset** — forgot-password sends a reset link (30-minute token expiry); reset invalidates all active sessions
 - **OAuth2 login via Google, Facebook, VK** — auto-links by email, creates OAuth-only users
 - JWT access tokens (1h, stored in-memory only) + opaque refresh tokens (7d, stored as HttpOnly `SameSite=Strict` cookie — never readable by JavaScript)
 - Session restored on page reload via cookie-refresh in `provideAppInitializer` before route guards run
