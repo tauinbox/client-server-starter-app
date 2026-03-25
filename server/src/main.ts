@@ -57,7 +57,11 @@ async function bootstrap() {
   app.useBodyParser('urlencoded', { extended: true, limit: '100kb' });
 
   const env = process.env['ENVIRONMENT'];
-  if (env === 'local' || env === 'development') {
+  const swaggerEnabled =
+    env === 'local' ||
+    env === 'development' ||
+    process.env['SWAGGER_ENABLED'] === 'true';
+  if (swaggerEnabled) {
     const config = new DocumentBuilder()
       .setTitle('Swagger')
       .setDescription('Starter Project API')
