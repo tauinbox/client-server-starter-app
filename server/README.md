@@ -136,7 +136,7 @@ src/
 ├── notifications/
 │   ├── notifications.service.ts    # Manages Map<userId, Map<connectionId, Subject>> — push(userId), pushToAll()
 │   ├── notifications.listener.ts   # @OnEvent() handlers: UserDeleted/PasswordChanged/Created/Updated/Restored/RoleChanged → push
-│   └── notifications.controller.ts # GET /stream — @Sse() returns Observable<MessageEvent>; sets X-Accel-Buffering: no
+│   └── notifications.controller.ts # GET /stream — @Sse() returns Observable<MessageEvent> merged with 30s heartbeat
 └── users/
     ├── controllers/        # UsersController (CRUD + search, all endpoints use @Authorize([action, 'User']))
     ├── services/           # UsersService
