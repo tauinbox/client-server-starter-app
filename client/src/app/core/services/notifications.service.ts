@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpContext, HttpEventType } from '@angular/common/http';
 import type { HttpDownloadProgressEvent } from '@angular/common/http';
-import { filter, retry, Subject, tap } from 'rxjs';
+import { filter, retry, Subject, tap, timer } from 'rxjs';
 import type { Subscription } from 'rxjs';
 import type { NotificationEvent } from '@app/shared/types';
 import { AuthStore } from '@features/auth/store/auth.store';
@@ -9,8 +9,10 @@ import { TokenService } from '@features/auth/services/token.service';
 import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
 
 const NOTIFICATIONS_STREAM_URL = '/api/v1/notifications/stream';
-const RETRY_COUNT = 5;
-const RETRY_DELAY_MS = 3000;
+const MAX_RETRIES = 10;
+const INITIAL_RETRY_DELAY_MS = 3000;
+const MAX_RETRY_DELAY_MS = 60_000;
+const RECONNECT_DELAY_MS = 5000;
 
 const silentContext = () =>
   new HttpContext().set(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN, true);
@@ -45,6 +47,14 @@ export class NotificationsService {
     )
   );
 
+  constructor() {
+    // Subscribe once — service is a root singleton, no need to unsubscribe
+    this.sessionInvalidated$.subscribe(() => {
+      this.disconnect();
+      this.#tokenService.forceLogout();
+    });
+  }
+
   connect(): void {
     if (this.#subscription) return;
 
@@ -64,8 +74,14 @@ export class NotificationsService {
           }
         }),
         retry({
-          count: RETRY_COUNT,
-          delay: RETRY_DELAY_MS,
+          count: MAX_RETRIES,
+          delay: (_error, retryCount) =>
+            timer(
+              Math.min(
+                INITIAL_RETRY_DELAY_MS * 2 ** (retryCount - 1),
+                MAX_RETRY_DELAY_MS
+              )
+            ),
           resetOnSuccess: true
         })
       )
@@ -87,21 +103,24 @@ export class NotificationsService {
         },
         error: () => {
           this.#subscription = null;
+          this.#scheduleReconnect();
         },
         complete: () => {
           this.#subscription = null;
+          this.#scheduleReconnect();
         }
       });
-
-    this.sessionInvalidated$.subscribe(() => {
-      this.disconnect();
-      this.#tokenService.forceLogout();
-    });
   }
 
   disconnect(): void {
     this.#subscription?.unsubscribe();
     this.#subscription = null;
+  }
+
+  #scheduleReconnect(): void {
+    if (this.#authStore.isAuthenticated()) {
+      setTimeout(() => this.connect(), RECONNECT_DELAY_MS);
+    }
   }
 
   #parseAndEmit(chunk: string): void {

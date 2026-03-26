@@ -13,8 +13,10 @@ import {
   ApiTags,
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
-import { Observable } from 'rxjs';
+import { interval, map, merge, Observable } from 'rxjs';
 import { randomUUID } from 'crypto';
+
+const HEARTBEAT_INTERVAL_MS = 30_000;
 import type { Response } from 'express';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -49,6 +51,12 @@ export class NotificationsController {
     res.on('close', () => {
       this.notificationsService.closeStream(req.user.userId, connectionId);
     });
-    return subject.asObservable();
+
+    // Keep-alive heartbeat to prevent nginx/proxy idle timeout
+    const heartbeat$ = interval(HEARTBEAT_INTERVAL_MS).pipe(
+      map((): MessageEvent => ({ data: '' }))
+    );
+
+    return merge(subject.asObservable(), heartbeat$);
   }
 }
