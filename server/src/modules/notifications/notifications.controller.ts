@@ -38,7 +38,9 @@ export class NotificationsController {
     @Req() req: JwtAuthRequest,
     @Res({ passthrough: true }) res: Response
   ): Observable<MessageEvent> {
-    res.setHeader('X-Accel-Buffering', 'no');
+    // NestJS's SseStream.pipe() sends headers (including X-Accel-Buffering: no)
+    // before calling the controller via lazy Observable subscription, so
+    // res.setHeader() must not be called here — it would throw ERR_HTTP_HEADERS_SENT.
     const connectionId = randomUUID();
     const subject = this.notificationsService.getOrCreateStream(
       req.user.userId,
