@@ -5,7 +5,7 @@ import {
   makeHistogramProvider,
   getToken
 } from '@willsoto/nestjs-prometheus';
-import { Gauge } from 'prom-client';
+import { Gauge, register } from 'prom-client';
 import { MetricsService } from './metrics.service';
 
 export interface SseConnectionsRef {
@@ -47,6 +47,12 @@ export const SSE_CONNECTIONS_REF = Symbol('SSE_CONNECTIONS_REF');
     {
       provide: getToken('sse_connections_active'),
       useFactory: (ref: SseConnectionsRef): Gauge<string> => {
+        // Re-use the existing metric if already registered (e.g. multiple module
+        // initializations in the same process during E2E tests or hot-reload).
+        const existing = register.getSingleMetric('sse_connections_active');
+        if (existing) {
+          return existing as Gauge<string>;
+        }
         return new Gauge<string>({
           name: 'sse_connections_active',
           help: 'Number of currently active SSE connections',
