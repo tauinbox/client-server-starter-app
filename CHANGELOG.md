@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.14](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.13...v0.1.14) (2026-03-26)
+
+
+### Features
+
+* **notifications:** add real-time SSE notifications ([#121](https://github.com/tauinbox/client-server-starter-app/issues/121)) ([6572a2b](https://github.com/tauinbox/client-server-starter-app/commit/6572a2b0ffa4df7a91e46c6954d77b3656d6e74d))
+* **observability:** add Grafana dashboard, SSE metrics, slow query logging ([6790638](https://github.com/tauinbox/client-server-starter-app/commit/679063871cf41f5c597d4671cd0181600bcf201f))
+
+
+### Bug Fixes
+
+* **grafana:** remove or vector(0) from SSE panel to eliminate duplicate legend entries ([81908fc](https://github.com/tauinbox/client-server-starter-app/commit/81908fce70f2b514d3dc6a379d8b83db033ca20b))
+* **metrics:** reuse existing prom-client gauge on repeated module init ([52826d4](https://github.com/tauinbox/client-server-starter-app/commit/52826d462c0786eb569a9e6b8bbc249ac3581e52))
+* **metrics:** use collect callback for SSE connections gauge ([ca5611e](https://github.com/tauinbox/client-server-starter-app/commit/ca5611ed3822b116972c73c3b36616396e13df97))
+* **security:** add CSP headers, shorten reset TTL, audit permission failures ([#120](https://github.com/tauinbox/client-server-starter-app/issues/120)) ([054a9bf](https://github.com/tauinbox/client-server-starter-app/commit/054a9bf556a11808f820631c0f37f4bda7541e48))
+* **security:** add SWAGGER_ENABLED env var to allow opt-in on staging/production ([5eab2e0](https://github.com/tauinbox/client-server-starter-app/commit/5eab2e05364717b777734588a7461cdba4de9244))
+* **security:** harden QueryBuilder, UUID pipe, lockout interval ([2ea32f2](https://github.com/tauinbox/client-server-starter-app/commit/2ea32f246c0290946646c060431ad789f824fcd6))
+* **security:** reject CORS wildcard in production and add credentials support ([71b2efa](https://github.com/tauinbox/client-server-starter-app/commit/71b2efa61b04861b4dd7f75047b8540a868872db))
+* **security:** remove internal lockout fields from API responses and revoke tokens on permission changes ([#117](https://github.com/tauinbox/client-server-starter-app/issues/117)) ([5520ca1](https://github.com/tauinbox/client-server-starter-app/commit/5520ca1dfb928b0655e7862c72e22d5fc2d3fcb9))
+* **security:** restrict Swagger to local/dev, add Redis warning, bind client port ([b833418](https://github.com/tauinbox/client-server-starter-app/commit/b833418898eef8a14c20cfde4d334d7a179aa018))
+* **sse:** add server heartbeat, fix client subscription leak, improve reconnect ([fbf09b0](https://github.com/tauinbox/client-server-starter-app/commit/fbf09b02119a697811f0b5ccfffca5c93581ccdb))
+* **sse:** remove redundant res.setHeader causing ERR_HTTP_HEADERS_SENT ([eb20d8b](https://github.com/tauinbox/client-server-starter-app/commit/eb20d8b86d0b451ab3821c21ad8ae073a724c059))
+* **sse:** use res.on(close) and gauge.set(count) for accurate connection tracking ([6cc15c1](https://github.com/tauinbox/client-server-starter-app/commit/6cc15c14aa4fd2e5649f585a431739f94dfe9bff))
+
 ## [0.1.13](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.12...v0.1.13) (2026-03-22)
 
 
