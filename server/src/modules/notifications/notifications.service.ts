@@ -1,14 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Subject } from 'rxjs';
 import type { MessageEvent } from '@nestjs/common';
 import type { NotificationEvent } from '@app/shared/types';
-import { MetricsService } from '../core/metrics/metrics.service';
+import {
+  SSE_CONNECTIONS_REF,
+  type SseConnectionsRef
+} from '../core/metrics/metrics.module';
 
 @Injectable()
 export class NotificationsService {
   readonly #connections = new Map<string, Map<string, Subject<MessageEvent>>>();
 
-  constructor(private readonly metricsService: MetricsService) {}
+  constructor(
+    @Inject(SSE_CONNECTIONS_REF) private readonly sseRef: SseConnectionsRef
+  ) {
+    this.sseRef.getCount = () => this.#countConnections();
+  }
 
   getOrCreateStream(
     userId: string,
@@ -19,7 +26,6 @@ export class NotificationsService {
     }
     const subject = new Subject<MessageEvent>();
     this.#connections.get(userId)!.set(connectionId, subject);
-    this.metricsService.setSseConnections(this.#countConnections());
     return subject;
   }
 
@@ -34,7 +40,6 @@ export class NotificationsService {
     if (userConnections.size === 0) {
       this.#connections.delete(userId);
     }
-    this.metricsService.setSseConnections(this.#countConnections());
   }
 
   #countConnections(): number {
