@@ -146,4 +146,65 @@ describe('NotificationsService', () => {
 
     expect(received).toHaveLength(0);
   });
+
+  it('should skip heartbeat frames (empty data)', () => {
+    const received: NotificationEvent[] = [];
+    service.userCrudEvents$.subscribe((e) => received.push(e));
+
+    service.connect();
+    const req = httpController.expectOne('/api/v1/notifications/stream');
+
+    req.event(makeProgressEvent('data: \n\n', 8));
+
+    expect(received).toHaveLength(0);
+  });
+
+  it('should schedule reconnect when server closes the connection', () => {
+    vi.useFakeTimers();
+
+    service.connect();
+    const req = httpController.expectOne('/api/v1/notifications/stream');
+
+    // Server closes the connection (complete)
+    req.flush('');
+
+    // Advance past RECONNECT_DELAY_MS (5000)
+    vi.advanceTimersByTime(5000);
+
+    // A new connection should have been attempted
+    httpController.expectOne('/api/v1/notifications/stream').flush('');
+
+    vi.useRealTimers();
+  });
+
+  it('should not reconnect after explicit disconnect()', () => {
+    vi.useFakeTimers();
+
+    service.connect();
+    const req = httpController.expectOne('/api/v1/notifications/stream');
+    service.disconnect();
+    expect(req.cancelled).toBe(true);
+
+    vi.advanceTimersByTime(10_000);
+
+    httpController.expectNone('/api/v1/notifications/stream');
+
+    vi.useRealTimers();
+  });
+
+  it('should not reconnect if user is not authenticated', () => {
+    vi.useFakeTimers();
+
+    service.connect();
+    const req = httpController.expectOne('/api/v1/notifications/stream');
+
+    isAuthenticatedSignal.set(false);
+    req.flush('');
+
+    vi.advanceTimersByTime(10_000);
+
+    httpController.expectNone('/api/v1/notifications/stream');
+
+    vi.useRealTimers();
+  });
 });
