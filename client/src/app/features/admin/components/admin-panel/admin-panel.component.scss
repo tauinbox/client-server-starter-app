@@ -6,3 +6,7 @@
   height: 100%;
   padding: vars.$spacing-md;
 }
+
+a[mat-tab-link] {
+  text-decoration: none;
+}
