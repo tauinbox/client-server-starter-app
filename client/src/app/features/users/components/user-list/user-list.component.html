@@ -73,8 +73,18 @@
       <mat-divider class="my-4"></mat-divider>
 
       @if (loading()) {
-        <div class="loading-container">
-          <mat-spinner></mat-spinner>
+        <div class="skeleton-table" aria-busy="true" aria-label="Loading users">
+          @for (i of [1, 2, 3, 4, 5]; track i) {
+            <div class="skeleton-row">
+              <div class="skeleton-cell sk-narrow"></div>
+              <div class="skeleton-cell sk-wide"></div>
+              <div class="skeleton-cell sk-medium"></div>
+              <div class="skeleton-cell sk-chip"></div>
+              <div class="skeleton-cell sk-chip"></div>
+              <div class="skeleton-cell sk-medium"></div>
+              <div class="skeleton-cell sk-actions"></div>
+            </div>
+          }
         </div>
       } @else if (totalUsers() === 0) {
         <div class="empty-state">
