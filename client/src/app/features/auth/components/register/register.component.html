@@ -72,6 +72,42 @@
           </mat-error>
         </mat-form-field>
 
+        @if (passwordStrength() > 0) {
+          <div
+            class="password-strength"
+            [attr.data-strength]="passwordStrength()"
+            role="progressbar"
+            [attr.aria-valuenow]="passwordStrength()"
+            aria-valuemin="0"
+            aria-valuemax="4"
+          >
+            <div class="strength-bars">
+              @for (i of [1, 2, 3, 4]; track i) {
+                <div
+                  class="strength-bar"
+                  [class.filled]="passwordStrength() >= i"
+                ></div>
+              }
+            </div>
+            <span class="strength-label">
+              @switch (passwordStrength()) {
+                @case (1) {
+                  {{ t('auth.register.passwordStrengthWeak') }}
+                }
+                @case (2) {
+                  {{ t('auth.register.passwordStrengthFair') }}
+                }
+                @case (3) {
+                  {{ t('auth.register.passwordStrengthGood') }}
+                }
+                @default {
+                  {{ t('auth.register.passwordStrengthStrong') }}
+                }
+              }
+            </span>
+          </div>
+        }
+
         @if (error()) {
           <div class="error-message" role="alert">
             {{ error() }}

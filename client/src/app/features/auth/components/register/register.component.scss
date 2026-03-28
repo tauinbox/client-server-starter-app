@@ -1,8 +1,73 @@
 @use 'abstracts/variables' as vars;
+@use 'abstracts/functions' as func;
 @use 'abstracts/mixins' as mix;
 
 :host {
   .register-container {
     @include mix.centered-container(vars.$card-width-sm);
+  }
+
+  .form-actions {
+    @include mix.form-actions;
+  }
+
+  .error-message {
+    @include mix.error-message;
+  }
+
+  button[type='submit'] {
+    width: 100%;
+
+    @include mix.button-with-spinner;
+  }
+
+  .password-strength {
+    display: flex;
+    gap: vars.$spacing-xs;
+    align-items: center;
+    margin-top: calc(-1 * vars.$spacing-sm);
+    margin-bottom: vars.$spacing-sm;
+
+    .strength-bars {
+      display: flex;
+      flex: 1;
+      gap: vars.$spacing-xxs;
+
+      .strength-bar {
+        flex: 1;
+        height: func.rem(4);
+        background-color: var(--mat-sys-outline-variant);
+        border-radius: func.rem(2);
+        transition: background-color vars.$transition-fast ease;
+      }
+    }
+
+    .strength-label {
+      min-width: func.rem(44);
+      font-size: vars.$font-size-sm;
+      color: var(--mat-sys-on-surface-variant);
+      white-space: nowrap;
+      transition: color vars.$transition-fast ease;
+    }
+
+    &[data-strength='1'] {
+      .strength-bar.filled { background-color: var(--color-error); }
+      .strength-label { color: var(--color-error); }
+    }
+
+    &[data-strength='2'] {
+      .strength-bar.filled { background-color: var(--color-warning); }
+      .strength-label { color: var(--color-warning); }
+    }
+
+    &[data-strength='3'] {
+      .strength-bar.filled { background-color: var(--color-info); }
+      .strength-label { color: var(--color-info); }
+    }
+
+    &[data-strength='4'] {
+      .strength-bar.filled { background-color: var(--color-success); }
+      .strength-label { color: var(--color-success); }
+    }
   }
 }
