@@ -1,3 +1,5 @@
+@use 'abstracts/variables' as vars;
+@use 'abstracts/functions' as func;
 @use 'abstracts/mixins' as mix;
 
 :host {
@@ -10,11 +12,11 @@
 .loading-container {
   display: flex;
   justify-content: center;
-  padding: 32px;
+  padding: vars.$spacing-xl;
 }
 
 .section-card {
-  margin-bottom: 24px;
+  margin-bottom: vars.$spacing-lg;
 }
 
 mat-card-header {
@@ -31,8 +33,8 @@ mat-card-header {
 }
 
 code {
-  padding: 2px 6px;
+  padding: func.rem(2) func.rem(6);
   font-family: monospace;
   background: rgb(0 0 0 / 4%);
-  border-radius: 4px;
+  border-radius: vars.$border-radius-sm;
 }
