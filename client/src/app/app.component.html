@@ -1,7 +1,7 @@
 <app-header />
 <mat-sidenav-container class="sidenav-container">
   @if (authStore.isAuthenticated()) {
-    <mat-sidenav opened mode="side">
+    <mat-sidenav opened mode="side" [style.width]="sidenavState.width()">
       <app-sidenav />
     </mat-sidenav>
   }

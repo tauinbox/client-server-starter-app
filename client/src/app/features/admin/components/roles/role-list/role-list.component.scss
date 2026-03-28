@@ -1,3 +1,4 @@
+@use 'abstracts/variables' as vars;
 @use 'abstracts/mixins' as mix;
 
 :host {
@@ -10,6 +11,7 @@
 mat-card-header {
   display: flex;
   align-items: center;
+  padding-bottom: vars.$spacing-sm;
 
   .spacer {
     flex: 1;
@@ -19,7 +21,7 @@ mat-card-header {
 .loading-container {
   display: flex;
   justify-content: center;
-  padding: 32px;
+  padding: vars.$spacing-xl;
 }
 
 .roles-table {

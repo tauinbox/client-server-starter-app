@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  computed,
   inject,
   signal
 } from '@angular/core';
@@ -28,7 +29,7 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
@@ -95,6 +96,22 @@ export class RegisterComponent {
         nonNullable: true
       })
     });
+
+  readonly #passwordValue = toSignal(
+    this.registerForm.controls.password.valueChanges,
+    { initialValue: '' }
+  );
+
+  protected readonly passwordStrength = computed(() => {
+    const pwd = this.#passwordValue();
+    if (!pwd || pwd.length === 0) return 0;
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[a-z]/.test(pwd)) score++;
+    if (/[0-9!@#$%^&*]/.test(pwd)) score++;
+    return Math.max(score, 1);
+  });
 
   onSubmit(): void {
     if (this.registerForm.invalid) return;

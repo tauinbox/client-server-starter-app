@@ -1,6 +1,6 @@
 # Client
 
-Angular 21 SPA with standalone components, Angular Material UI, JWT authentication, and light/dark theming.
+Angular 21 SPA with standalone components, Angular Material M3 UI, JWT authentication, and light/dark theming.
 
 ## Getting Started
 

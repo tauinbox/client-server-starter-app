@@ -1,5 +1,17 @@
 @use 'abstracts/functions' as func;
 
+.flag-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: func.rem(24);
+  height: func.rem(24);
+
+  // clip-path cuts geometry directly — more reliable than overflow+border-radius
+  // for SVG content which may form its own stacking/paint context
+  clip-path: circle(50% at 50% 50%);
+}
+
 .active-language {
   font-weight: 500;
   background-color: var(--mat-menu-item-hover-state-layer-color);

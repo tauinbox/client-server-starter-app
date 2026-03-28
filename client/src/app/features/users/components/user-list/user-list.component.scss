@@ -1,3 +1,4 @@
+@use 'abstracts/variables' as vars;
 @use 'abstracts/functions' as func;
 @use 'abstracts/mixins' as mix;
 
@@ -12,17 +13,13 @@
   .filter-fields {
     display: grid;
     grid-template-columns: minmax(func.rem(250), 1fr) minmax(func.rem(250), 1fr);
-    gap: func.rem(16);
+    gap: vars.$spacing-md;
   }
 
   .filter-actions {
     display: flex;
-    gap: func.rem(10);
+    gap: vars.$spacing-xs;
     justify-content: flex-end;
-  }
-
-  .loading-container {
-    @include mix.loading-container;
   }
 
   .empty-state {
@@ -36,6 +33,58 @@
   .load-more-container {
     display: flex;
     justify-content: center;
-    padding: func.rem(16) 0;
+    padding: vars.$spacing-md 0;
+  }
+
+  .skeleton-table {
+    border-top: 1px solid var(--mat-sys-outline-variant);
+  }
+
+  .skeleton-row {
+    display: flex;
+    gap: vars.$spacing-md;
+    align-items: center;
+    padding: vars.$spacing-sm vars.$spacing-md;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+  }
+
+  .skeleton-cell {
+    height: func.rem(16);
+    background: linear-gradient(
+      90deg,
+      var(--mat-sys-surface-variant) 25%,
+      color-mix(in srgb, var(--mat-sys-surface-variant) 50%, var(--mat-sys-surface)) 50%,
+      var(--mat-sys-surface-variant) 75%
+    );
+    background-size: 200% 100%;
+    border-radius: vars.$border-radius-sm;
+    animation: sk-shimmer vars.$transition-slow infinite linear;
+
+    &.sk-narrow {
+      flex-shrink: 0;
+      width: func.rem(32);
+    }
+
+    &.sk-wide { flex: 2; }
+    &.sk-medium { flex: 1; }
+
+    &.sk-chip {
+      flex-shrink: 0;
+      width: func.rem(64);
+      height: func.rem(22);
+      border-radius: func.rem(11);
+    }
+
+    &.sk-actions {
+      flex-shrink: 0;
+      width: func.rem(80);
+    }
+  }
+
+  // ── Skeleton loader ─────────────────────────────────────────────────────────
+
+  @keyframes sk-shimmer {
+    from { background-position: -200% 0; }
+    to { background-position: 200% 0; }
   }
 }

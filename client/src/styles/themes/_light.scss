@@ -1,53 +1,46 @@
 @use '@angular/material' as mat;
-@use 'abstracts/functions' as func;
-@include mat.elevation-classes;
-@include mat.app-background;
 
-// Define light theme palettes
-$light-primary: mat.m2-define-palette(mat.$m2-teal-palette, 600);
-$light-accent: mat.m2-define-palette(mat.$m2-deep-orange-palette, A400);
-$light-warn: mat.m2-define-palette(mat.$m2-red-palette);
-
-// Define state palettes
-$light-success: mat.m2-define-palette(mat.$m2-green-palette, 500);
-$light-info: mat.m2-define-palette(mat.$m2-blue-palette, 500);
-$light-warning: mat.m2-define-palette(mat.$m2-orange-palette, 500);
-$light-theme: mat.m2-define-light-theme(
-  (
-    color: (
-      primary: $light-primary,
-      accent: $light-accent,
-      warn: $light-warn
-    ),
-    typography: mat.m2-define-typography-config(),
-    density: 0
-  )
-);
+// ── Material 3 light theme ──────────────────────────────────────────────────
+// Primary:  Azure  — professional blue-teal, replaces M2 teal-600
+// Tertiary: Violet — replaces M2 deep-orange accent
+// Typography and density are defined once here (dark theme only overrides color).
 
 :root {
-  // Common theme settings
+  // ── Semantic color aliases ────────────────────────────────────────────────
+  // Mapped from M3 system tokens so existing component SCSS keeps working.
   --color-scheme: light;
+  --color-primary: var(--mat-sys-primary);
+  --color-accent: var(--mat-sys-tertiary);
+  --color-warn: var(--mat-sys-error);
+  --color-error: var(--mat-sys-error);
 
-  // Theme-specific colors
-  --color-primary: #{mat.m2-get-color-from-palette($light-primary)};
-  --color-accent: #{mat.m2-get-color-from-palette($light-accent)};
-  --color-warn: #{mat.m2-get-color-from-palette($light-warn)};
+  // State colors (not part of M3 system — defined manually)
+  --color-success: #2e7d32;
+  --color-info: #0277bd;
+  --color-warning: #e65100;
 
-  // State colors
-  --color-success: #{mat.m2-get-color-from-palette($light-success)};
-  --color-info: #{mat.m2-get-color-from-palette($light-info)};
-  --color-warning: #{mat.m2-get-color-from-palette($light-warning)};
-  --color-error: #{mat.m2-get-color-from-palette($light-warn)};
+  // Surface / background
+  --color-background: var(--mat-sys-background);
 
-  // UI colors
-  --color-background: #fafafa;
-  --color-surface: #fff;
-  --color-text-primary: rgb(0 0 0 / 87%);
-  --color-text-secondary: rgb(0 0 0 / 60%);
-  --color-text-tertiary: rgb(0 0 0 / 38%);
-  --color-border: rgb(0 0 0 / 12%);
-  --color-divider: rgb(0 0 0 / 12%);
-  --color-disabled: rgb(0 0 0 / 38%);
+  // Sidenav uses a slightly elevated surface so it stands out from page content
+  --mat-sidenav-container-background-color: var(--mat-sys-surface-container);
 
-  @include mat.all-component-themes($light-theme);
+  // Text
+  --color-text-primary: var(--mat-sys-on-surface);
+  --color-text-secondary: var(--mat-sys-on-surface-variant);
+  --color-text-tertiary: color-mix(in srgb, var(--mat-sys-on-surface) 38%, transparent);
+
+  // Borders & dividers
+  --color-border: var(--mat-sys-outline-variant);
+  --color-divider: var(--mat-sys-outline-variant);
+
+  @include mat.theme((
+    color: (
+      primary: mat.$azure-palette,
+      tertiary: mat.$violet-palette,
+      theme-type: light,
+    ),
+    typography: Roboto,
+    density: 0,
+  ));
 }

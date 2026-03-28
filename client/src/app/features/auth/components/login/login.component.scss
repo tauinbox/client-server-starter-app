@@ -1,9 +1,14 @@
 @use 'abstracts/variables' as vars;
+@use 'abstracts/functions' as func;
 @use 'abstracts/mixins' as mix;
 
 :host {
   .login-container {
     @include mix.centered-container(vars.$card-width-sm);
+  }
+
+  mat-card-header {
+    padding-bottom: vars.$spacing-md;
   }
 
   .form-actions {
@@ -16,13 +21,13 @@
 
   .info-message {
     display: flex;
-    gap: 8px;
+    gap: vars.$spacing-xs;
     align-items: center;
-    padding: 12px 16px;
-    margin-bottom: 16px;
+    padding: vars.$spacing-sm vars.$spacing-md;
+    margin-bottom: vars.$spacing-md;
     color: var(--mat-sys-on-primary-container);
     background-color: var(--mat-sys-primary-container);
-    border-radius: 8px;
+    border-radius: vars.$border-radius-md;
 
     mat-icon {
       flex-shrink: 0;
@@ -30,46 +35,52 @@
   }
 
   .lockout-countdown {
-    margin-top: 4px;
+    margin-top: vars.$spacing-xxs;
     font-weight: 500;
   }
 
   .verification-actions {
-    margin-bottom: 16px;
+    margin-bottom: vars.$spacing-md;
     text-align: center;
 
     .verification-sent {
-      font-size: 14px;
+      font-size: vars.$font-size-sm;
       color: var(--mat-sys-primary);
     }
   }
 
   .forgot-password-link {
-    margin-top: 8px;
+    margin-top: vars.$spacing-xs;
     text-align: center;
 
     a {
-      font-size: 14px;
+      font-size: vars.$font-size-sm;
       color: var(--mat-sys-primary);
     }
   }
 
+  mat-card-actions p {
+    font-size: vars.$font-size-sm;
+  }
+
   button[type='submit'] {
+    width: 100%;
+
     @include mix.button-with-spinner;
   }
 
   .oauth-divider {
     display: flex;
-    gap: 16px;
+    gap: vars.$spacing-md;
     align-items: center;
-    margin: 24px 0 16px;
+    margin: vars.$spacing-lg 0 vars.$spacing-md;
 
     mat-divider {
       flex: 1;
     }
 
     .oauth-divider-text {
-      font-size: 14px;
+      font-size: vars.$font-size-sm;
       color: var(--mat-sys-on-surface-variant);
       white-space: nowrap;
     }
@@ -78,14 +89,35 @@
   .oauth-buttons {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: vars.$spacing-xs;
 
     .oauth-button {
+      width: 100%;
+    }
+
+    // Inner flex wrapper — keeps icon + label centered as a unit inside
+    // the MDC button label span (applying flex on the button host itself
+    // conflicts with Material's internal layout and skews the icon).
+    .oauth-btn-content {
       display: flex;
-      gap: 8px;
+      gap: vars.$spacing-xs;
       align-items: center;
       justify-content: center;
-      width: 100%;
+
+      // SVG icons have width/height="100%" — pin mat-icon to 20px so the SVG
+      // cannot expand and push the icon off the text baseline.
+      // display:flex + align-items:center centers the inner SVG within the
+      // mat-icon box (Material's box model can be taller than font-size).
+      mat-icon {
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        width: func.rem(20);
+        height: func.rem(20);
+        font-size: func.rem(20);
+        line-height: 1;
+      }
     }
   }
 }
