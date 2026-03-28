@@ -41,6 +41,12 @@
     }
   }
 
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: vars.$spacing-xs;
+  }
+
   .detail-item {
     @include mix.detail-item;
   }
