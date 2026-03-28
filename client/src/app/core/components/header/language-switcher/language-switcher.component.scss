@@ -1,6 +1,11 @@
 @use 'abstracts/functions' as func;
 
 .flag-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: func.rem(24);
+  height: func.rem(24);
   overflow: hidden;
   border-radius: 50%;
 }
