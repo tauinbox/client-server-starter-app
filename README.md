@@ -52,12 +52,12 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - **Sticky header** — toolbar remains fixed at the top while scrolling through long lists
 
 ### UI/UX
-- Angular Material component library
+- Angular Material M3 component library — `mat.theme()` API with Azure/Violet palette, M3 design tokens (`--mat-sys-*`), pill-shaped navigation active indicators
 - Light/dark theme with system preference detection
 - **Runtime multilingual support (EN / RU)** — `@jsverse/transloco` with lazy-loaded per-feature scopes; language switcher in toolbar (flag icons); persisted to `localStorage`; server error keys translated client-side via shared `ErrorKeys` const
 - Responsive SCSS architecture
 - Snackbar error notifications
-- Form validation with error messages
+- Form validation with error messages; password strength indicator on registration (4-bar visual meter)
 - 404 and 403 pages
 - Version display in toolbar (version + git hash via `MatTooltip`)
 - **Collapsible side navigation** — persistent left panel (narrow 64px / wide 220px) with per-user localStorage persistence
