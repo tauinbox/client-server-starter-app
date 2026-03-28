@@ -7,6 +7,7 @@ import { signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import type { Sort } from '@angular/material/sort';
+import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { UserListComponent } from './user-list.component';
 import { UsersStore } from '../../store/users.store';
@@ -87,7 +88,7 @@ describe('UserListComponent', () => {
     dialogMock = { open: vi.fn() };
 
     await TestBed.configureTestingModule({
-      imports: [UserListComponent],
+      imports: [UserListComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
         provideNoopAnimations(),

@@ -11,6 +11,7 @@ import {
   provideHttpClientTesting
 } from '@angular/common/http/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { TranslocoTestingModuleWithLangs } from '../../../test-utils/transloco-testing';
 import { errorInterceptor } from './error.interceptor';
 import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
 import { RBAC_RETRY_CONTEXT } from '@core/context-tokens/rbac-retry';
@@ -30,6 +31,7 @@ describe('errorInterceptor', () => {
     authStoreMock = { setRules: vi.fn() };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModuleWithLangs],
       providers: [
         provideHttpClient(withInterceptors([errorInterceptor])),
         provideHttpClientTesting(),

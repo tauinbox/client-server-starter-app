@@ -1,4 +1,4 @@
-<div class="admin-panel-container">
+<div class="admin-panel-container" *transloco="let t; scope: 'admin'">
   <nav mat-tab-nav-bar [tabPanel]="tabPanel">
     <ng-container
       *appRequirePermissions="{ action: 'search', subject: 'User' }"
@@ -10,7 +10,7 @@
         #usersActive="routerLinkActive"
         [active]="usersActive.isActive"
       >
-        Manage Users
+        {{ t('admin.panel.manageUsers') }}
       </a>
     </ng-container>
     <ng-container *appRequirePermissions="{ action: 'read', subject: 'Role' }">
@@ -21,7 +21,7 @@
         #rolesActive="routerLinkActive"
         [active]="rolesActive.isActive"
       >
-        Manage Roles
+        {{ t('admin.panel.manageRoles') }}
       </a>
     </ng-container>
     <ng-container
@@ -34,7 +34,7 @@
         #resourcesActive="routerLinkActive"
         [active]="resourcesActive.isActive"
       >
-        Manage Resources
+        {{ t('admin.panel.manageResources') }}
       </a>
     </ng-container>
     <ng-container
@@ -47,7 +47,7 @@
         #actionsActive="routerLinkActive"
         [active]="actionsActive.isActive"
       >
-        Manage Actions
+        {{ t('admin.panel.manageActions') }}
       </a>
     </ng-container>
   </nav>

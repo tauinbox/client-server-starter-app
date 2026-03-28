@@ -4,6 +4,7 @@ import {
   PASSWORD_ERROR,
   PASSWORD_REGEX
 } from '@app/shared/constants/password.constants';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 import {
   isValidEmail,
   validateMaxLength,
@@ -144,7 +145,8 @@ router.post('/', adminGuard, (req, res) => {
   if (findUserByEmail(email)) {
     res.status(409).json({
       message: 'User with this email already exists',
-      statusCode: 409
+      statusCode: 409,
+      errorKey: ErrorKeys.USERS.EMAIL_EXISTS
     });
     return;
   }
@@ -233,7 +235,11 @@ router.get('/:id', authGuard, (req, res) => {
   const id = req.params['id'] as string;
   const user = findUserById(id);
   if (!user) {
-    res.status(404).json({ message: 'User not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'User not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.USERS.NOT_FOUND
+    });
     return;
   }
 
@@ -245,7 +251,11 @@ router.patch('/:id', adminGuard, (req, res) => {
   const id = req.params['id'] as string;
   const user = findUserById(id);
   if (!user) {
-    res.status(404).json({ message: 'User not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'User not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.USERS.NOT_FOUND
+    });
     return;
   }
 
@@ -366,7 +376,11 @@ router.delete('/:id', adminGuard, (req, res) => {
   const state = getState();
   const targetUser = findUserById(id);
   if (!targetUser) {
-    res.status(404).json({ message: 'User not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'User not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.USERS.NOT_FOUND
+    });
     return;
   }
 
@@ -401,7 +415,11 @@ router.post('/:id/restore', adminGuard, (req, res) => {
   const id = req.params['id'] as string;
   const targetUser = findUserByIdWithDeleted(id);
   if (!targetUser) {
-    res.status(404).json({ message: 'User not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'User not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.USERS.NOT_FOUND
+    });
     return;
   }
 

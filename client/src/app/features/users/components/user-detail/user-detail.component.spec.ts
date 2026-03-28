@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal } from '@angular/core';
 import type { WritableSignal } from '@angular/core';
+import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { UserDetailComponent } from './user-detail.component';
 import { UsersStore } from '../../store/users.store';
@@ -64,7 +65,7 @@ describe('UserDetailComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [UserDetailComponent],
+      imports: [UserDetailComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
         provideNoopAnimations(),

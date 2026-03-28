@@ -1,13 +1,14 @@
 import type { ApplicationConfig } from '@angular/core';
 import {
   inject,
-  LOCALE_ID,
+  isDevMode,
   provideAppInitializer,
   provideZoneChangeDetection
 } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { routes } from './app.routes';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideTransloco } from '@jsverse/transloco';
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { MAT_SNACK_BAR_DEFAULT_OPTIONS } from '@angular/material/snack-bar';
 import { MatIconRegistry } from '@angular/material/icon';
@@ -19,6 +20,8 @@ import { AuthService } from '@features/auth/services/auth.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { registerOAuthIcons } from '@features/auth/utils/register-oauth-icons';
 import { NotificationsService } from '@core/services/notifications.service';
+import { TranslocoHttpLoader } from '@core/transloco-loader';
+import { LanguageService } from '@core/services/language.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -28,7 +31,17 @@ export const appConfig: ApplicationConfig = {
     // JWT handles 401s (refresh + retry), error interceptor handles everything else
     provideHttpClient(withInterceptors([errorInterceptor, jwtInterceptor])),
     provideAppInitializer(() => {
-      registerOAuthIcons(inject(MatIconRegistry), inject(DomSanitizer));
+      const iconRegistry = inject(MatIconRegistry);
+      const sanitizer = inject(DomSanitizer);
+      registerOAuthIcons(iconRegistry, sanitizer);
+      for (const lang of ['en', 'ru']) {
+        iconRegistry.addSvgIcon(
+          `flag-${lang}`,
+          sanitizer.bypassSecurityTrustResourceUrl(
+            `assets/icons/flags/${lang}.svg`
+          )
+        );
+      }
     }),
     provideAppInitializer(async () => {
       const authService = inject(AuthService);
@@ -55,7 +68,18 @@ export const appConfig: ApplicationConfig = {
         }
       }
     }),
-    { provide: LOCALE_ID, useValue: navigator.language },
+    provideTransloco({
+      config: {
+        availableLangs: ['en', 'ru'],
+        defaultLang: 'en',
+        reRenderOnLangChange: true,
+        prodMode: !isDevMode()
+      },
+      loader: TranslocoHttpLoader
+    }),
+    provideAppInitializer(() => {
+      inject(LanguageService);
+    }),
     {
       provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
       useValue: { appearance: 'outline' }

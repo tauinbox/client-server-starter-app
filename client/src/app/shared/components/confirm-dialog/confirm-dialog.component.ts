@@ -9,6 +9,7 @@ import {
 } from '@angular/material/dialog';
 import { MatIcon } from '@angular/material/icon';
 import { MatButton } from '@angular/material/button';
+import { TranslocoDirective } from '@jsverse/transloco';
 
 export type ConfirmDialogData = {
   title: string;
@@ -26,7 +27,8 @@ export type ConfirmDialogData = {
     MatIcon,
     MatDialogActions,
     MatButton,
-    MatDialogClose
+    MatDialogClose,
+    TranslocoDirective
   ],
   templateUrl: './confirm-dialog.component.html',
   styleUrl: './confirm-dialog.component.scss',

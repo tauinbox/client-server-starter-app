@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 import {
   findUserById,
   getState,
@@ -39,7 +40,11 @@ router.get('/:id/permissions', adminGuard, (req, res) => {
   const role = state.roles.get(id);
 
   if (!role) {
-    res.status(404).json({ message: 'Role not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'Role not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.ROLES.NOT_FOUND
+    });
     return;
   }
 
@@ -69,7 +74,11 @@ router.get('/:id', adminGuard, (req, res) => {
   const role = getState().roles.get(id);
 
   if (!role) {
-    res.status(404).json({ message: 'Role not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'Role not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.ROLES.NOT_FOUND
+    });
     return;
   }
 
@@ -88,7 +97,8 @@ router.post('/', adminGuard, (req, res) => {
   if (isSuper !== undefined) {
     res.status(400).json({
       message: 'isSuper flag cannot be set via API',
-      statusCode: 400
+      statusCode: 400,
+      errorKey: ErrorKeys.ROLES.SUPER_FLAG_FORBIDDEN
     });
     return;
   }
@@ -98,7 +108,8 @@ router.post('/', adminGuard, (req, res) => {
     if (existing.name === name) {
       res.status(400).json({
         message: 'Role with this name already exists',
-        statusCode: 400
+        statusCode: 400,
+        errorKey: ErrorKeys.ROLES.NAME_EXISTS
       });
       return;
     }
@@ -137,14 +148,19 @@ router.patch('/:id', adminGuard, (req, res) => {
   const role = state.roles.get(id);
 
   if (!role) {
-    res.status(404).json({ message: 'Role not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'Role not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.ROLES.NOT_FOUND
+    });
     return;
   }
 
   if (role.isSystem) {
     res.status(400).json({
       message: 'Cannot modify system roles',
-      statusCode: 400
+      statusCode: 400,
+      errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
     });
     return;
   }
@@ -154,7 +170,8 @@ router.patch('/:id', adminGuard, (req, res) => {
   if (isSuper !== undefined) {
     res.status(400).json({
       message: 'isSuper flag cannot be changed via API',
-      statusCode: 400
+      statusCode: 400,
+      errorKey: ErrorKeys.ROLES.SUPER_FLAG_FORBIDDEN
     });
     return;
   }
@@ -164,7 +181,8 @@ router.patch('/:id', adminGuard, (req, res) => {
       if (existing.name === name) {
         res.status(400).json({
           message: 'Role with this name already exists',
-          statusCode: 400
+          statusCode: 400,
+          errorKey: ErrorKeys.ROLES.NAME_EXISTS
         });
         return;
       }
@@ -198,14 +216,19 @@ router.delete('/:id', adminGuard, (req, res) => {
   const role = state.roles.get(id);
 
   if (!role) {
-    res.status(404).json({ message: 'Role not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'Role not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.ROLES.NOT_FOUND
+    });
     return;
   }
 
   if (role.isSystem) {
     res.status(400).json({
       message: 'Cannot delete system roles',
-      statusCode: 400
+      statusCode: 400,
+      errorKey: ErrorKeys.ROLES.CANNOT_DELETE_SYSTEM
     });
     return;
   }
@@ -241,7 +264,11 @@ router.put('/:id/permissions', adminGuard, (req, res) => {
   const role = state.roles.get(id);
 
   if (!role) {
-    res.status(404).json({ message: 'Role not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'Role not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.ROLES.NOT_FOUND
+    });
     return;
   }
 
@@ -290,7 +317,11 @@ router.post('/:id/permissions', adminGuard, (req, res) => {
   const role = state.roles.get(id);
 
   if (!role) {
-    res.status(404).json({ message: 'Role not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'Role not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.ROLES.NOT_FOUND
+    });
     return;
   }
 
@@ -364,13 +395,21 @@ router.post('/assign/:userId', adminGuard, (req, res) => {
   const state = getState();
   const user = findUserById(userId);
   if (!user) {
-    res.status(404).json({ message: 'User not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'User not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.USERS.NOT_FOUND
+    });
     return;
   }
 
   const role = state.roles.get(roleId);
   if (!role) {
-    res.status(404).json({ message: 'Role not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'Role not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.ROLES.NOT_FOUND
+    });
     return;
   }
 
@@ -400,13 +439,21 @@ router.delete('/assign/:userId/:roleId', adminGuard, (req, res) => {
   const state = getState();
   const user = findUserById(userId);
   if (!user) {
-    res.status(404).json({ message: 'User not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'User not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.USERS.NOT_FOUND
+    });
     return;
   }
 
   const role = state.roles.get(roleId);
   if (!role) {
-    res.status(404).json({ message: 'Role not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'Role not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.ROLES.NOT_FOUND
+    });
     return;
   }
 

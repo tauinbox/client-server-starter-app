@@ -1,11 +1,11 @@
-<mat-card class="section-card">
+<mat-card class="section-card" *transloco="let t; scope: 'admin'">
   <mat-card-header>
-    <mat-card-title>Actions</mat-card-title>
+    <mat-card-title>{{ t('admin.actions.title') }}</mat-card-title>
     <div class="spacer"></div>
     @if (canCreate()) {
       <button mat-raised-button color="primary" (click)="openAddAction()">
         <mat-icon>add</mat-icon>
-        Add Action
+        {{ t('admin.actions.addAction') }}
       </button>
     }
   </mat-card-header>
@@ -19,13 +19,17 @@
       <table mat-table [dataSource]="actions()" class="actions-table">
         <!-- Display Name Column -->
         <ng-container matColumnDef="displayName">
-          <th mat-header-cell *matHeaderCellDef>Display Name</th>
+          <th mat-header-cell *matHeaderCellDef>
+            {{ t('admin.actions.tableHeaderDisplayName') }}
+          </th>
           <td mat-cell *matCellDef="let action">{{ action.displayName }}</td>
         </ng-container>
 
         <!-- Name Column -->
         <ng-container matColumnDef="name">
-          <th mat-header-cell *matHeaderCellDef>Name</th>
+          <th mat-header-cell *matHeaderCellDef>
+            {{ t('admin.actions.tableHeaderName') }}
+          </th>
           <td mat-cell *matCellDef="let action">
             <code>{{ action.name }}</code>
           </td>
@@ -33,7 +37,9 @@
 
         <!-- Description Column -->
         <ng-container matColumnDef="description">
-          <th mat-header-cell *matHeaderCellDef>Description</th>
+          <th mat-header-cell *matHeaderCellDef>
+            {{ t('admin.actions.tableHeaderDescription') }}
+          </th>
           <td mat-cell *matCellDef="let action">
             {{ action.description || '—' }}
           </td>
@@ -41,17 +47,23 @@
 
         <!-- Default Column -->
         <ng-container matColumnDef="default">
-          <th mat-header-cell *matHeaderCellDef>Default</th>
+          <th mat-header-cell *matHeaderCellDef>
+            {{ t('admin.actions.tableHeaderDefault') }}
+          </th>
           <td mat-cell *matCellDef="let action">
             @if (action.isDefault) {
-              <mat-chip color="primary" highlighted>Default</mat-chip>
+              <mat-chip color="primary" highlighted>{{
+                t('admin.actions.typeDefault')
+              }}</mat-chip>
             }
           </td>
         </ng-container>
 
         <!-- Created At Column -->
         <ng-container matColumnDef="createdAt">
-          <th mat-header-cell *matHeaderCellDef>Created</th>
+          <th mat-header-cell *matHeaderCellDef>
+            {{ t('admin.actions.tableHeaderCreated') }}
+          </th>
           <td mat-cell *matCellDef="let action">
             {{ action.createdAt | date: 'medium' }}
           </td>
@@ -59,15 +71,19 @@
 
         <!-- Actions Column -->
         <ng-container matColumnDef="actions">
-          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <th mat-header-cell *matHeaderCellDef>
+            {{ t('admin.actions.tableHeaderActions') }}
+          </th>
           <td mat-cell *matCellDef="let action">
             @if (canUpdate()) {
               <button
                 mat-icon-button
                 color="accent"
                 (click)="openEditAction(action)"
-                matTooltip="Edit Action"
-                [attr.aria-label]="'Edit action ' + action.displayName"
+                [matTooltip]="t('admin.actions.editAction')"
+                [attr.aria-label]="
+                  t('admin.actions.editAction') + ' ' + action.displayName
+                "
               >
                 <mat-icon>edit</mat-icon>
               </button>
@@ -77,8 +93,10 @@
                 mat-icon-button
                 color="warn"
                 (click)="confirmDeleteAction(action)"
-                matTooltip="Delete Action"
-                [attr.aria-label]="'Delete action ' + action.displayName"
+                [matTooltip]="t('admin.actions.deleteAction')"
+                [attr.aria-label]="
+                  t('admin.actions.deleteAction') + ' ' + action.displayName
+                "
               >
                 <mat-icon>delete</mat-icon>
               </button>

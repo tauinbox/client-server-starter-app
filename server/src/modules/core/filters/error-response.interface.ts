@@ -5,4 +5,5 @@ export interface ErrorResponse {
   timestamp: string;
   path: string;
   errors?: string[];
+  errorKey?: string;
 }

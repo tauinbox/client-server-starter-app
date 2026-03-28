@@ -1,79 +1,91 @@
-<h2 mat-dialog-title>Edit Resource</h2>
+<ng-container *transloco="let t; scope: 'admin'">
+  <h2 mat-dialog-title>{{ t('admin.resourceForm.editTitle') }}</h2>
 
-<mat-dialog-content>
-  <form [formGroup]="form" (ngSubmit)="submit()">
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>Display Name</mat-label>
-      <input
-        matInput
-        formControlName="displayName"
-        placeholder="Display name"
-      />
-      <mat-hint>Internal name: {{ data.resource.name }}</mat-hint>
-      <mat-error>
-        @if (form.get('displayName')?.errors?.['required']) {
-          Display name is required
-        } @else if (form.get('displayName')?.errors?.['maxlength']) {
-          Display name must be at most 100 characters
-        }
-      </mat-error>
-    </mat-form-field>
+  <mat-dialog-content>
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ t('admin.resourceForm.displayNameLabel') }}</mat-label>
+        <input
+          matInput
+          formControlName="displayName"
+          [placeholder]="t('admin.resourceForm.displayNamePlaceholder')"
+        />
+        <mat-hint>{{
+          t('admin.resourceForm.internalNameHint', {
+            name: data.resource.name
+          })
+        }}</mat-hint>
+        <mat-error>
+          @if (form.get('displayName')?.errors?.['required']) {
+            {{ t('admin.resourceForm.displayNameRequired') }}
+          } @else if (form.get('displayName')?.errors?.['maxlength']) {
+            {{ t('admin.resourceForm.displayNameMaxLength') }}
+          }
+        </mat-error>
+      </mat-form-field>
 
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>Description</mat-label>
-      <textarea
-        matInput
-        formControlName="description"
-        placeholder="Optional description"
-        rows="3"
-      ></textarea>
-    </mat-form-field>
-  </form>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ t('admin.resourceForm.descriptionLabel') }}</mat-label>
+        <textarea
+          matInput
+          formControlName="description"
+          [placeholder]="t('admin.resourceForm.descriptionPlaceholder')"
+          rows="3"
+        ></textarea>
+      </mat-form-field>
+    </form>
 
-  <mat-divider />
+    <mat-divider />
 
-  <div class="allowed-actions">
-    <div class="allowed-actions__header">
-      <span class="allowed-actions__title">Allowed Actions</span>
-      <mat-slide-toggle
-        [checked]="isCustomMode()"
-        (change)="toggleCustomMode($event.checked)"
-      >
-        Custom
-      </mat-slide-toggle>
-    </div>
-
-    @if (isCustomMode()) {
-      <div class="allowed-actions__checkboxes">
-        @for (action of data.actions; track action.id) {
-          <mat-checkbox
-            [checked]="isActionSelected(action.name)"
-            (change)="toggleAction(action.name)"
-          >
-            {{ action.displayName }}
-            @if (!action.isDefault) {
-              <span class="action-badge">custom</span>
-            }
-          </mat-checkbox>
-        }
+    <div class="allowed-actions">
+      <div class="allowed-actions__header">
+        <span class="allowed-actions__title">{{
+          t('admin.resourceForm.allowedActions')
+        }}</span>
+        <mat-slide-toggle
+          [checked]="isCustomMode()"
+          (change)="toggleCustomMode($event.checked)"
+        >
+          {{ t('admin.resourceForm.customToggle') }}
+        </mat-slide-toggle>
       </div>
-    } @else {
-      <p class="allowed-actions__hint">
-        All default actions are shown: create, read, update, delete, search.
-      </p>
-    }
-  </div>
-</mat-dialog-content>
 
-<mat-dialog-actions align="end">
-  <button mat-button type="button" (click)="cancel()">Cancel</button>
-  <button
-    mat-raised-button
-    color="primary"
-    type="button"
-    [disabled]="form.invalid || !isDirty"
-    (click)="submit()"
-  >
-    Save Changes
-  </button>
-</mat-dialog-actions>
+      @if (isCustomMode()) {
+        <div class="allowed-actions__checkboxes">
+          @for (action of data.actions; track action.id) {
+            <mat-checkbox
+              [checked]="isActionSelected(action.name)"
+              (change)="toggleAction(action.name)"
+            >
+              {{ action.displayName }}
+              @if (!action.isDefault) {
+                <span class="action-badge">{{
+                  t('admin.resourceForm.customBadge')
+                }}</span>
+              }
+            </mat-checkbox>
+          }
+        </div>
+      } @else {
+        <p class="allowed-actions__hint">
+          {{ t('admin.resourceForm.defaultActionsHint') }}
+        </p>
+      }
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ t('common.cancel') }}
+    </button>
+    <button
+      mat-raised-button
+      color="primary"
+      type="button"
+      [disabled]="form.invalid || !isDirty"
+      (click)="submit()"
+    >
+      {{ t('common.saveChanges') }}
+    </button>
+  </mat-dialog-actions>
+</ng-container>

@@ -1,5 +1,6 @@
 import { computed, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { TranslocoService } from '@jsverse/transloco';
 import type { Observable } from 'rxjs';
 import { pipe, switchMap, tap } from 'rxjs';
 import { tapResponse } from '@ngrx/operators';
@@ -68,6 +69,7 @@ export const UsersStore = signalStore(
   withMethods((store) => {
     const userService = inject(UserService);
     const snackBar = inject(MatSnackBar);
+    const translocoService = inject(TranslocoService);
 
     function buildRequest(page: number): Observable<PaginatedResponse<User>> {
       const params: UserListParams = {
@@ -105,13 +107,16 @@ export const UsersStore = signalStore(
                   });
                 },
                 error: () => {
+                  const msg = translocoService.translate(
+                    'users.store.errorLoadFailed'
+                  );
                   patchState(store, {
                     loading: false,
-                    error: 'Failed to load users. Please try again.'
+                    error: msg
                   });
                   snackBar.open(
-                    'Failed to load users. Please try again.',
-                    'Close',
+                    msg,
+                    translocoService.translate('common.close'),
                     { duration: 5000 }
                   );
                 }
@@ -141,14 +146,17 @@ export const UsersStore = signalStore(
                   });
                 },
                 error: () => {
+                  const msg = translocoService.translate(
+                    'users.store.errorLoadMoreFailed'
+                  );
                   patchState(store, {
                     isLoadingMore: false,
                     currentPage: store.currentPage() - 1,
-                    error: 'Failed to load more users. Please try again.'
+                    error: msg
                   });
                   snackBar.open(
-                    'Failed to load more users. Please try again.',
-                    'Close',
+                    msg,
+                    translocoService.translate('common.close'),
                     { duration: 5000 }
                   );
                 }
@@ -171,14 +179,16 @@ export const UsersStore = signalStore(
                   patchState(store, { detailLoading: false });
                 },
                 error: () => {
+                  const msg = translocoService.translate(
+                    'users.store.errorLoadDetailsFailed'
+                  );
                   patchState(store, {
                     detailLoading: false,
-                    detailError:
-                      'Failed to load user details. Please try again.'
+                    detailError: msg
                   });
                   snackBar.open(
-                    'Failed to load user details. Please try again.',
-                    'Close',
+                    msg,
+                    translocoService.translate('common.close'),
                     { duration: 5000 }
                   );
                 }

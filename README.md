@@ -54,6 +54,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 ### UI/UX
 - Angular Material component library
 - Light/dark theme with system preference detection
+- **Runtime multilingual support (EN / RU)** — `@jsverse/transloco` with lazy-loaded per-feature scopes; language switcher in toolbar (flag icons); persisted to `localStorage`; server error keys translated client-side via shared `ErrorKeys` const
 - Responsive SCSS architecture
 - Snackbar error notifications
 - Form validation with error messages
@@ -439,10 +440,10 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 460 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 463 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | Configured |
-| Client unit tests | Vitest | `*.spec.ts` alongside source | 368 tests passing |
-| Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 101 tests passing |
+| Client unit tests | Vitest | `*.spec.ts` alongside source | 374 tests passing |
+| Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 104 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
 
 ## CI/CD
@@ -456,6 +457,7 @@ GitHub Actions runs on every push and pull request to `master` with 5 jobs:
 | **Mock Server** | — | lint, format:check, tsc, test | — |
 | **Client** | — | lint, format:check, test:cov, build | Coverage report |
 | **Client E2E** | mock-server | ng build → serve (static), Playwright Chromium | HTML report, test results |
+| **Server – Checks** | — | check:i18n (validates all ErrorKeys exist in all i18n JSON files) | — |
 
 Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file required — all tests run against mocks.
 

@@ -7,6 +7,7 @@ import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { VerifyEmailComponent } from './verify-email.component';
 import { AuthService } from '../../services/auth.service';
@@ -18,7 +19,7 @@ describe('VerifyEmailComponent', () => {
 
   function createComponent(token: string | undefined): void {
     TestBed.configureTestingModule({
-      imports: [VerifyEmailComponent],
+      imports: [VerifyEmailComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
         provideHttpClient(),

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { getState, logAudit } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';
@@ -25,7 +26,8 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
   if (!validProviders.includes(provider)) {
     res.status(400).json({
       message: `Invalid OAuth provider: ${provider}`,
-      statusCode: 400
+      statusCode: 400,
+      errorKey: ErrorKeys.AUTH.INVALID_OAUTH_PROVIDER
     });
     return;
   }
@@ -38,7 +40,8 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
     res.status(400).json({
       message:
         'Cannot unlink the last OAuth provider without a password set. Please set a password first.',
-      statusCode: 400
+      statusCode: 400,
+      errorKey: ErrorKeys.AUTH.UNLINK_LAST_PROVIDER
     });
     return;
   }

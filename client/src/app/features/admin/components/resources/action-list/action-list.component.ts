@@ -21,6 +21,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { MatChip } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import {
   MatCell,
   MatCellDef,
@@ -67,7 +68,8 @@ import { ActionFormDialogComponent } from '../action-form-dialog/action-form-dia
     MatHeaderCellDef,
     MatHeaderRowDef,
     MatRowDef,
-    MatCell
+    MatCell,
+    TranslocoDirective
   ],
   templateUrl: './action-list.component.html',
   styleUrl: './action-list.component.scss',
@@ -78,6 +80,7 @@ export class ActionListComponent implements OnInit {
   readonly #dialog = inject(MatDialog);
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #translocoService = inject(TranslocoService);
   protected readonly authStore = inject(AuthStore);
 
   readonly loading = this.#resourcesStore.loading;
@@ -122,14 +125,21 @@ export class ActionListComponent implements OnInit {
             .pipe(takeUntilDestroyed(this.#destroyRef))
             .subscribe({
               next: () => {
-                this.#snackBar.open('Action created successfully', 'Close', {
-                  duration: 5000
-                });
+                this.#snackBar.open(
+                  this.#translocoService.translate(
+                    'admin.actions.successCreated'
+                  ),
+                  this.#translocoService.translate('common.close'),
+                  { duration: 5000 }
+                );
               },
               error: (err: { error?: { message?: string } }) => {
                 this.#snackBar.open(
-                  err.error?.message ?? 'Failed to create action.',
-                  'Close',
+                  err.error?.message ??
+                    this.#translocoService.translate(
+                      'admin.actions.errorCreateFailed'
+                    ),
+                  this.#translocoService.translate('common.close'),
                   { duration: 5000 }
                 );
               }
@@ -154,14 +164,21 @@ export class ActionListComponent implements OnInit {
             .pipe(takeUntilDestroyed(this.#destroyRef))
             .subscribe({
               next: () => {
-                this.#snackBar.open('Action updated successfully', 'Close', {
-                  duration: 5000
-                });
+                this.#snackBar.open(
+                  this.#translocoService.translate(
+                    'admin.actions.successUpdated'
+                  ),
+                  this.#translocoService.translate('common.close'),
+                  { duration: 5000 }
+                );
               },
               error: (err: { error?: { message?: string } }) => {
                 this.#snackBar.open(
-                  err.error?.message ?? 'Failed to update action.',
-                  'Close',
+                  err.error?.message ??
+                    this.#translocoService.translate(
+                      'admin.actions.errorUpdateFailed'
+                    ),
+                  this.#translocoService.translate('common.close'),
                   { duration: 5000 }
                 );
               }
@@ -175,10 +192,15 @@ export class ActionListComponent implements OnInit {
       .open(ConfirmDialogComponent, {
         ...dialogSizeConfig(DialogSize.Confirm),
         data: {
-          title: 'Delete Action',
-          message: `Are you sure you want to delete the action "${action.displayName}"?`,
-          confirmButton: 'Delete',
-          cancelButton: 'Cancel',
+          title: this.#translocoService.translate(
+            'admin.actions.confirmDeleteTitle'
+          ),
+          message: this.#translocoService.translate(
+            'admin.actions.confirmDeleteMessage',
+            { name: action.displayName }
+          ),
+          confirmButton: this.#translocoService.translate('common.delete'),
+          cancelButton: this.#translocoService.translate('common.cancel'),
           icon: 'warning'
         }
       })
@@ -191,14 +213,21 @@ export class ActionListComponent implements OnInit {
             .pipe(takeUntilDestroyed(this.#destroyRef))
             .subscribe({
               next: () => {
-                this.#snackBar.open('Action deleted successfully', 'Close', {
-                  duration: 5000
-                });
+                this.#snackBar.open(
+                  this.#translocoService.translate(
+                    'admin.actions.successDeleted'
+                  ),
+                  this.#translocoService.translate('common.close'),
+                  { duration: 5000 }
+                );
               },
               error: (err: { error?: { message?: string } }) => {
                 this.#snackBar.open(
-                  err.error?.message ?? 'Failed to delete action.',
-                  'Close',
+                  err.error?.message ??
+                    this.#translocoService.translate(
+                      'admin.actions.errorDeleteFailed'
+                    ),
+                  this.#translocoService.translate('common.close'),
                   { duration: 5000 }
                 );
               }

@@ -41,6 +41,7 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Generate migration | `npm run migrations:gen -- ./src/migrations/<kebab-name>` (build first) |
 | Revert migration | `npm run migrations:revert` (build first) |
 | Run seeders | `npm run seed:run` (build first) |
+| Validate i18n keys | `npm run check:i18n` — verifies all `ErrorKeys` values exist in every client i18n JSON |
 
 ## Environment Configuration
 

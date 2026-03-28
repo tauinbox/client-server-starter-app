@@ -22,6 +22,7 @@ import { MatInput } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDividerModule } from '@angular/material/divider';
+import { TranslocoDirective } from '@jsverse/transloco';
 import type {
   ActionResponse,
   ResourceResponse
@@ -56,7 +57,8 @@ type ResourceFormType = {
     MatInput,
     MatSlideToggleModule,
     MatCheckboxModule,
-    MatDividerModule
+    MatDividerModule,
+    TranslocoDirective
   ],
   templateUrl: './resource-form-dialog.component.html',
   styleUrl: './resource-form-dialog.component.scss',

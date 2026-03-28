@@ -6,14 +6,15 @@ import { AuthStore } from '../../store/auth.store';
 import { AuthService } from '../../services/auth.service';
 import { SessionStorageService } from '@core/services/session-storage.service';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
+import { TranslocoDirective } from '@jsverse/transloco';
 
 @Component({
   selector: 'app-oauth-callback',
-  imports: [MatProgressSpinner],
+  imports: [MatProgressSpinner, TranslocoDirective],
   template: `
-    <div class="oauth-callback-container">
+    <div class="oauth-callback-container" *transloco="let t; scope: 'auth'">
       <mat-spinner></mat-spinner>
-      <p>Completing sign in...</p>
+      <p>{{ t('auth.oauthCallback.completingSignIn') }}</p>
     </div>
   `,
   styles: `

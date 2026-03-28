@@ -1,4 +1,4 @@
-<div class="profile-page">
+<div class="profile-page" *transloco="let t; scope: 'auth'">
   @if (loading()) {
     <div class="loading-container">
       <mat-spinner></mat-spinner>
@@ -15,14 +15,22 @@
               <p class="profile-email">{{ u.email }}</p>
               <div class="profile-badges">
                 @if (u.isActive) {
-                  <mat-chip color="primary" highlighted>Active</mat-chip>
+                  <mat-chip color="primary" highlighted>{{
+                    t('auth.profile.statusActive')
+                  }}</mat-chip>
                 } @else {
-                  <mat-chip>Inactive</mat-chip>
+                  <mat-chip>{{ t('auth.profile.statusInactive') }}</mat-chip>
                 }
-                <mat-chip>{{ isAdmin() ? 'Administrator' : 'User' }}</mat-chip>
-                <span class="profile-since"
-                  >Member since {{ u.createdAt | date: 'mediumDate' }}</span
-                >
+                <mat-chip>{{
+                  isAdmin()
+                    ? t('auth.profile.roleAdmin')
+                    : t('auth.profile.roleUser')
+                }}</mat-chip>
+                <span class="profile-since">{{
+                  t('auth.profile.memberSince', {
+                    date: (u.createdAt | date: 'mediumDate')
+                  })
+                }}</span>
               </div>
             </div>
           </div>
@@ -32,20 +40,20 @@
       <div class="profile-grid">
         <mat-card>
           <mat-card-header>
-            <mat-card-title>Update Profile</mat-card-title>
+            <mat-card-title>{{ t('auth.profile.updateCard') }}</mat-card-title>
           </mat-card-header>
 
           <mat-card-content>
             <form [formGroup]="profileForm" (ngSubmit)="onSubmit()">
               <div class="form-name-row">
                 <mat-form-field appearance="outline">
-                  <mat-label>First Name</mat-label>
+                  <mat-label>{{ t('auth.profile.firstName') }}</mat-label>
                   <input
                     matInput
                     autocomplete="on"
                     type="text"
                     formControlName="firstName"
-                    placeholder="First Name"
+                    [placeholder]="t('auth.profile.firstName')"
                     required
                   />
                   <mat-icon matPrefix>person</mat-icon>
@@ -53,18 +61,20 @@
                     profileForm.get('firstName')?.invalid &&
                     profileForm.get('firstName')?.touched
                   ) {
-                    <mat-error>First name is required</mat-error>
+                    <mat-error>{{
+                      t('auth.profile.firstNameRequired')
+                    }}</mat-error>
                   }
                 </mat-form-field>
 
                 <mat-form-field appearance="outline">
-                  <mat-label>Last Name</mat-label>
+                  <mat-label>{{ t('auth.profile.lastName') }}</mat-label>
                   <input
                     matInput
                     autocomplete="on"
                     type="text"
                     formControlName="lastName"
-                    placeholder="Last Name"
+                    [placeholder]="t('auth.profile.lastName')"
                     required
                   />
                   <mat-icon matPrefix>person</mat-icon>
@@ -72,19 +82,21 @@
                     profileForm.get('lastName')?.invalid &&
                     profileForm.get('lastName')?.touched
                   ) {
-                    <mat-error>Last name is required</mat-error>
+                    <mat-error>{{
+                      t('auth.profile.lastNameRequired')
+                    }}</mat-error>
                   }
                 </mat-form-field>
               </div>
 
               <mat-form-field class="full-width" appearance="outline">
-                <mat-label>New Password (Optional)</mat-label>
+                <mat-label>{{ t('auth.profile.newPassword') }}</mat-label>
                 <input
                   matInput
                   autocomplete="off"
                   [type]="pwdToggle.show() ? 'text' : 'password'"
                   formControlName="password"
-                  placeholder="Leave blank to keep current password"
+                  [placeholder]="t('auth.profile.passwordPlaceholder')"
                 />
                 <mat-icon matPrefix>lock</mat-icon>
                 <app-password-toggle matSuffix #pwdToggle />
@@ -92,24 +104,28 @@
                   profileForm.get('password')?.invalid &&
                   profileForm.get('password')?.touched
                 ) {
-                  <mat-error>Password must be at least 8 characters</mat-error>
+                  <mat-error>{{
+                    t('auth.profile.passwordMinLength')
+                  }}</mat-error>
                 }
               </mat-form-field>
 
               @if (profileForm.get('password')?.value) {
                 <mat-form-field class="full-width" appearance="outline">
-                  <mat-label>Confirm New Password</mat-label>
+                  <mat-label>{{ t('auth.profile.confirmPassword') }}</mat-label>
                   <input
                     matInput
                     autocomplete="off"
                     [type]="confirmPwdToggle.show() ? 'text' : 'password'"
                     formControlName="confirmPassword"
                     [errorStateMatcher]="confirmPasswordErrorMatcher"
-                    placeholder="Confirm new password"
+                    [placeholder]="t('auth.profile.confirmPasswordPlaceholder')"
                   />
                   <mat-icon matPrefix>lock</mat-icon>
                   <app-password-toggle matSuffix #confirmPwdToggle />
-                  <mat-error>Passwords do not match</mat-error>
+                  <mat-error>{{
+                    t('auth.profile.passwordsMismatch')
+                  }}</mat-error>
                 </mat-form-field>
               }
 
@@ -128,9 +144,9 @@
                 >
                   @if (saving()) {
                     <mat-spinner diameter="24"></mat-spinner>
-                    <span class="ml-2">Saving...</span>
+                    <span class="ml-2">{{ t('auth.profile.saving') }}</span>
                   } @else {
-                    Update Profile
+                    {{ t('auth.profile.updateButton') }}
                   }
                 </button>
               </div>
@@ -140,7 +156,9 @@
 
         <mat-card>
           <mat-card-header>
-            <mat-card-title>Connected Accounts</mat-card-title>
+            <mat-card-title>{{
+              t('auth.profile.connectedAccounts')
+            }}</mat-card-title>
           </mat-card-header>
 
           <mat-card-content>
@@ -149,7 +167,7 @@
                 <div class="oauth-provider-row">
                   <div class="oauth-provider-info">
                     <mat-icon [svgIcon]="provider"></mat-icon>
-                    <span>{{ providerLabels[provider] }}</span>
+                    <span>{{ t('auth.providers.' + provider) }}</span>
                   </div>
                   @if (isProviderLinked(provider)) {
                     <button
@@ -158,7 +176,7 @@
                       [disabled]="oauthLoading()"
                       (click)="disconnectProvider(provider)"
                     >
-                      Disconnect
+                      {{ t('auth.profile.disconnect') }}
                     </button>
                   } @else {
                     <button
@@ -166,7 +184,7 @@
                       [disabled]="oauthLoading()"
                       (click)="connectProvider(provider)"
                     >
-                      Connect
+                      {{ t('auth.profile.connect') }}
                     </button>
                   }
                 </div>

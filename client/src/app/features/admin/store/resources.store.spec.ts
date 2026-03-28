@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 
 import { ResourcesStore } from './resources.store';
 import { RbacAdminService } from '../services/rbac-admin.service';
@@ -86,6 +87,7 @@ describe('ResourcesStore', () => {
     snackBarMock = { open: vi.fn() };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModuleWithLangs],
       providers: [
         ResourcesStore,
         { provide: RbacAdminService, useValue: rbacServiceMock },
@@ -120,6 +122,7 @@ describe('ResourcesStore', () => {
       snackBarMock = { open: vi.fn() };
 
       TestBed.configureTestingModule({
+        imports: [TranslocoTestingModuleWithLangs],
         providers: [
           ResourcesStore,
           { provide: RbacAdminService, useValue: rbacServiceMock },
@@ -156,6 +159,7 @@ describe('ResourcesStore', () => {
       snackBarMock = { open: vi.fn() };
 
       TestBed.configureTestingModule({
+        imports: [TranslocoTestingModuleWithLangs],
         providers: [
           ResourcesStore,
           { provide: RbacAdminService, useValue: rbacServiceMock },
@@ -270,6 +274,7 @@ describe('ResourcesStore', () => {
       snackBarMock = { open: vi.fn() };
 
       TestBed.configureTestingModule({
+        imports: [TranslocoTestingModuleWithLangs],
         providers: [
           ResourcesStore,
           { provide: RbacAdminService, useValue: rbacServiceMock },

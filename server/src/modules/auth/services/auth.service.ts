@@ -1,11 +1,4 @@
-import {
-  ConflictException,
-  HttpException,
-  HttpStatus,
-  Injectable,
-  Logger,
-  UnauthorizedException
-} from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -30,7 +23,7 @@ import { AuditService, AuditContext } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { hashToken } from '../../../common/utils/hash-token';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
-import { SYSTEM_ROLES } from '@app/shared/constants';
+import { SYSTEM_ROLES, ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
   MAX_FAILED_ATTEMPTS,
@@ -86,6 +79,7 @@ export class AuthService {
         {
           message:
             'Account is temporarily locked due to too many failed login attempts',
+          errorKey: ErrorKeys.AUTH.ACCOUNT_LOCKED,
           lockedUntil: user.lockedUntil.toISOString(),
           retryAfter
         },
@@ -123,6 +117,7 @@ export class AuthService {
             {
               message:
                 'Account is temporarily locked due to too many failed login attempts',
+              errorKey: ErrorKeys.AUTH.ACCOUNT_LOCKED,
               lockedUntil: lockedUntil.toISOString(),
               retryAfter
             },
@@ -136,7 +131,13 @@ export class AuthService {
         details: { reason: 'invalid_credentials' }
       });
       this.metricsService.recordAuthEvent('login_failure');
-      throw new UnauthorizedException('Invalid credentials');
+      throw new HttpException(
+        {
+          message: 'Invalid credentials',
+          errorKey: ErrorKeys.AUTH.INVALID_CREDENTIALS
+        },
+        HttpStatus.UNAUTHORIZED
+      );
     }
 
     // Check email verification
@@ -144,6 +145,7 @@ export class AuthService {
       throw new HttpException(
         {
           message: 'Please verify your email address before logging in',
+          errorKey: ErrorKeys.AUTH.EMAIL_NOT_VERIFIED,
           errorCode: 'EMAIL_NOT_VERIFIED'
         },
         HttpStatus.FORBIDDEN
@@ -201,7 +203,13 @@ export class AuthService {
       // Returning OAuth user
       user = await this.usersService.findOne(existingOAuth.userId);
       if (!user.isActive) {
-        throw new UnauthorizedException('User account is deactivated');
+        throw new HttpException(
+          {
+            message: 'User account is deactivated',
+            errorKey: ErrorKeys.AUTH.USER_DEACTIVATED
+          },
+          HttpStatus.UNAUTHORIZED
+        );
       }
       // Auto-verify email for OAuth users
       if (!user.isEmailVerified) {
@@ -215,7 +223,13 @@ export class AuthService {
       if (existingUser) {
         // Link OAuth to existing user
         if (!existingUser.isActive) {
-          throw new UnauthorizedException('User account is deactivated');
+          throw new HttpException(
+            {
+              message: 'User account is deactivated',
+              errorKey: ErrorKeys.AUTH.USER_DEACTIVATED
+            },
+            HttpStatus.UNAUTHORIZED
+          );
         }
         user = existingUser;
         // Auto-verify email for OAuth users
@@ -309,8 +323,12 @@ export class AuthService {
             providerId
           );
         if (existing && existing.userId !== userId) {
-          throw new ConflictException(
-            'This OAuth account is already linked to another user'
+          throw new HttpException(
+            {
+              message: 'This OAuth account is already linked to another user',
+              errorKey: ErrorKeys.AUTH.OAUTH_ALREADY_LINKED
+            },
+            HttpStatus.CONFLICT
           );
         }
         // Already linked to this user — safe to ignore
@@ -328,7 +346,13 @@ export class AuthService {
   ): Promise<void> {
     const user = await this.usersService.findOne(userId);
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('User account not found or deactivated');
+      throw new HttpException(
+        {
+          message: 'User account not found or deactivated',
+          errorKey: ErrorKeys.AUTH.USER_NOT_FOUND_OR_DEACTIVATED
+        },
+        HttpStatus.UNAUTHORIZED
+      );
     }
     await this.safeCreateOAuthAccount(userId, provider, providerId);
 
@@ -363,7 +387,13 @@ export class AuthService {
         where: { email: registerDto.email }
       });
       if (existing) {
-        throw new ConflictException('User with this email already exists');
+        throw new HttpException(
+          {
+            message: 'User with this email already exists',
+            errorKey: ErrorKeys.USERS.EMAIL_EXISTS
+          },
+          HttpStatus.CONFLICT
+        );
       }
 
       const newUser = await manager.save(User, {
@@ -415,7 +445,10 @@ export class AuthService {
 
     if (!user) {
       throw new HttpException(
-        { message: 'Invalid or expired verification token' },
+        {
+          message: 'Invalid or expired verification token',
+          errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN
+        },
         HttpStatus.BAD_REQUEST
       );
     }
@@ -426,7 +459,8 @@ export class AuthService {
     ) {
       throw new HttpException(
         {
-          message: 'Verification token has expired. Please request a new one.'
+          message: 'Verification token has expired. Please request a new one.',
+          errorKey: ErrorKeys.AUTH.VERIFICATION_TOKEN_EXPIRED
         },
         HttpStatus.BAD_REQUEST
       );
@@ -524,7 +558,10 @@ export class AuthService {
 
     if (!user) {
       throw new HttpException(
-        { message: 'Invalid or expired password reset token' },
+        {
+          message: 'Invalid or expired password reset token',
+          errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN
+        },
         HttpStatus.BAD_REQUEST
       );
     }
@@ -535,7 +572,9 @@ export class AuthService {
     ) {
       throw new HttpException(
         {
-          message: 'Password reset token has expired. Please request a new one.'
+          message:
+            'Password reset token has expired. Please request a new one.',
+          errorKey: ErrorKeys.AUTH.RESET_TOKEN_EXPIRED
         },
         HttpStatus.BAD_REQUEST
       );
@@ -578,7 +617,13 @@ export class AuthService {
         details: { reason: 'invalid_or_expired_token' }
       });
       this.metricsService.recordAuthEvent('token_refresh_failure');
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new HttpException(
+        {
+          message: 'Invalid refresh token',
+          errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+        },
+        HttpStatus.UNAUTHORIZED
+      );
     }
 
     const rawMinIat = this.configService.get<number>('JWT_MIN_IAT');
@@ -592,8 +637,13 @@ export class AuthService {
           details: { reason: 'session_invalidated_by_rotation' }
         });
         this.metricsService.recordAuthEvent('token_refresh_failure');
-        throw new UnauthorizedException(
-          'Session invalidated due to key rotation. Please log in again.'
+        throw new HttpException(
+          {
+            message:
+              'Session invalidated due to key rotation. Please log in again.',
+            errorKey: ErrorKeys.AUTH.SESSION_INVALIDATED
+          },
+          HttpStatus.UNAUTHORIZED
         );
       }
     }
@@ -605,7 +655,10 @@ export class AuthService {
         actorId: tokenDoc.userId,
         details: { reason: 'user_not_found' }
       });
-      throw new UnauthorizedException('User not found');
+      throw new HttpException(
+        { message: 'User not found', errorKey: ErrorKeys.AUTH.USER_NOT_FOUND },
+        HttpStatus.UNAUTHORIZED
+      );
     }
 
     if (!user.isActive) {
@@ -616,7 +669,13 @@ export class AuthService {
         actorEmail: user.email,
         details: { reason: 'user_deactivated' }
       });
-      throw new UnauthorizedException('User account is deactivated');
+      throw new HttpException(
+        {
+          message: 'User account is deactivated',
+          errorKey: ErrorKeys.AUTH.USER_DEACTIVATED
+        },
+        HttpStatus.UNAUTHORIZED
+      );
     }
 
     const roles = await this.permissionService.getRoleNamesForUser(user.id);

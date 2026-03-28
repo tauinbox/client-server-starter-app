@@ -10,6 +10,7 @@ import {
   PASSWORD_REGEX,
   PASSWORD_ERROR
 } from '@app/shared/constants/password.constants';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 import {
   isValidEmail,
   validateMaxLength,
@@ -92,7 +93,8 @@ router.post('/register', (req, res) => {
   if (findUserByEmail(email)) {
     res.status(409).json({
       message: 'User with this email already exists',
-      statusCode: 409
+      statusCode: 409,
+      errorKey: ErrorKeys.USERS.EMAIL_EXISTS
     });
     return;
   }
@@ -185,7 +187,8 @@ router.post('/login', (req, res) => {
         message:
           'Account is temporarily locked due to too many failed login attempts',
         lockedUntil: user.lockedUntil,
-        retryAfter
+        retryAfter,
+        errorKey: ErrorKeys.AUTH.ACCOUNT_LOCKED
       });
       return;
     }
@@ -216,7 +219,8 @@ router.post('/login', (req, res) => {
           message:
             'Account is temporarily locked due to too many failed login attempts',
           lockedUntil: user.lockedUntil,
-          retryAfter
+          retryAfter,
+          errorKey: ErrorKeys.AUTH.ACCOUNT_LOCKED
         });
         return;
       }
@@ -226,7 +230,11 @@ router.post('/login', (req, res) => {
       details: { reason: 'invalid_credentials' },
       ip: req.ip
     });
-    res.status(401).json({ message: 'Invalid credentials', statusCode: 401 });
+    res.status(401).json({
+      message: 'Invalid credentials',
+      statusCode: 401,
+      errorKey: ErrorKeys.AUTH.INVALID_CREDENTIALS
+    });
     return;
   }
 
@@ -234,7 +242,8 @@ router.post('/login', (req, res) => {
   if (!user.isEmailVerified) {
     res.status(403).json({
       message: 'Please verify your email address before logging in',
-      errorCode: 'EMAIL_NOT_VERIFIED'
+      errorCode: 'EMAIL_NOT_VERIFIED',
+      errorKey: ErrorKeys.AUTH.EMAIL_NOT_VERIFIED
     });
     return;
   }
@@ -277,13 +286,19 @@ router.post('/verify-email', (req, res) => {
   const userId = state.emailVerificationTokens.get(token);
 
   if (!userId) {
-    res.status(400).json({ message: 'Invalid or expired verification token' });
+    res.status(400).json({
+      message: 'Invalid or expired verification token',
+      errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN
+    });
     return;
   }
 
   const user = findUserById(userId);
   if (!user) {
-    res.status(400).json({ message: 'Invalid or expired verification token' });
+    res.status(400).json({
+      message: 'Invalid or expired verification token',
+      errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN
+    });
     return;
   }
 
@@ -419,17 +434,19 @@ router.post('/reset-password', (req, res) => {
   const userId = state.passwordResetTokens.get(token);
 
   if (!userId) {
-    res
-      .status(400)
-      .json({ message: 'Invalid or expired password reset token' });
+    res.status(400).json({
+      message: 'Invalid or expired password reset token',
+      errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN
+    });
     return;
   }
 
   const user = findUserById(userId);
   if (!user) {
-    res
-      .status(400)
-      .json({ message: 'Invalid or expired password reset token' });
+    res.status(400).json({
+      message: 'Invalid or expired password reset token',
+      errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN
+    });
     return;
   }
 
@@ -466,9 +483,11 @@ router.post('/refresh-token', (req, res) => {
   ];
 
   if (!cookieToken) {
-    res
-      .status(401)
-      .json({ message: 'Refresh token is required', statusCode: 401 });
+    res.status(401).json({
+      message: 'Refresh token is required',
+      statusCode: 401,
+      errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+    });
     return;
   }
 
@@ -479,7 +498,11 @@ router.post('/refresh-token', (req, res) => {
       details: { reason: 'invalid_or_expired_token' },
       ip: req.ip
     });
-    res.status(401).json({ message: 'Invalid refresh token', statusCode: 401 });
+    res.status(401).json({
+      message: 'Invalid refresh token',
+      statusCode: 401,
+      errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+    });
     return;
   }
 
@@ -493,7 +516,11 @@ router.post('/refresh-token', (req, res) => {
       ip: req.ip
     });
     state.refreshTokens.delete(cookieToken);
-    res.status(401).json({ message: 'Invalid refresh token', statusCode: 401 });
+    res.status(401).json({
+      message: 'Invalid refresh token',
+      statusCode: 401,
+      errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+    });
     return;
   }
 

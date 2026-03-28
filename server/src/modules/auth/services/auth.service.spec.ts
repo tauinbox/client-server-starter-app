@@ -1,12 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import {
-  ConflictException,
-  HttpException,
-  HttpStatus,
-  UnauthorizedException
-} from '@nestjs/common';
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
@@ -280,42 +275,42 @@ describe('AuthService', () => {
       );
     });
 
-    it('should throw UnauthorizedException when password does not match', async () => {
+    it('should throw HttpException when password does not match', async () => {
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
       await expect(
         service.validateUser('test@example.com', 'wrong-password')
-      ).rejects.toThrow(UnauthorizedException);
+      ).rejects.toThrow(HttpException);
     });
 
-    it('should throw UnauthorizedException when user does not exist', async () => {
+    it('should throw HttpException when user does not exist', async () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
       await expect(
         service.validateUser('nonexistent@example.com', 'password')
-      ).rejects.toThrow(UnauthorizedException);
+      ).rejects.toThrow(HttpException);
     });
 
-    it('should throw UnauthorizedException when user is inactive', async () => {
+    it('should throw HttpException when user is inactive', async () => {
       const inactiveUser = { ...mockUser, isActive: false };
       mockUsersService.findByEmail.mockResolvedValue(inactiveUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
       await expect(
         service.validateUser('test@example.com', 'password')
-      ).rejects.toThrow(UnauthorizedException);
+      ).rejects.toThrow(HttpException);
     });
 
-    it('should throw UnauthorizedException when user has no password (OAuth-only)', async () => {
+    it('should throw HttpException when user has no password (OAuth-only)', async () => {
       const oauthUser = { ...mockUser, password: null };
       mockUsersService.findByEmail.mockResolvedValue(oauthUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
       await expect(
         service.validateUser('test@example.com', 'password')
-      ).rejects.toThrow(UnauthorizedException);
+      ).rejects.toThrow(HttpException);
     });
 
     it('should use dummy hash for timing attack protection when user not found', async () => {
@@ -326,7 +321,7 @@ describe('AuthService', () => {
 
       await expect(
         service.validateUser('nonexistent@example.com', 'password')
-      ).rejects.toThrow(UnauthorizedException);
+      ).rejects.toThrow(HttpException);
 
       // bcrypt.compare should still be called (with dummy hash) for constant-time behavior
       expect(compareSpy).toHaveBeenCalled();
@@ -493,11 +488,11 @@ describe('AuthService', () => {
       expect(result.message).toContain('Registration successful');
     });
 
-    it('should throw ConflictException when email already exists', async () => {
+    it('should throw HttpException when email already exists', async () => {
       mockManager.findOne.mockResolvedValue(mockUser); // conflict
 
       await expect(service.register(registerDto)).rejects.toThrow(
-        ConflictException
+        HttpException
       );
       expect(mockManager.save).not.toHaveBeenCalled();
     });
@@ -734,41 +729,41 @@ describe('AuthService', () => {
       );
     });
 
-    it('should throw UnauthorizedException when token not found', async () => {
+    it('should throw HttpException when token not found', async () => {
       mockRefreshTokenService.findByToken.mockResolvedValue(null);
 
       await expect(service.refreshTokens('invalid-token')).rejects.toThrow(
-        UnauthorizedException
+        HttpException
       );
     });
 
-    it('should throw UnauthorizedException when token is revoked', async () => {
+    it('should throw HttpException when token is revoked', async () => {
       const revokedToken = { ...mockTokenDoc, revoked: true };
       mockRefreshTokenService.findByToken.mockResolvedValue(revokedToken);
 
       await expect(service.refreshTokens('revoked-token')).rejects.toThrow(
-        UnauthorizedException
+        HttpException
       );
     });
 
-    it('should throw UnauthorizedException when token is expired', async () => {
+    it('should throw HttpException when token is expired', async () => {
       const expiredToken = { ...mockTokenDoc, isExpired: () => true };
       mockRefreshTokenService.findByToken.mockResolvedValue(expiredToken);
 
       await expect(service.refreshTokens('expired-token')).rejects.toThrow(
-        UnauthorizedException
+        HttpException
       );
     });
 
-    it('should throw UnauthorizedException when user not found', async () => {
+    it('should throw HttpException when user not found', async () => {
       mockRefreshTokenService.findByToken.mockResolvedValue(mockTokenDoc);
       mockUsersService.findOne.mockRejectedValue(
-        new UnauthorizedException('User not found')
+        new HttpException('User not found', 404)
       );
 
       await expect(
         service.refreshTokens('valid-refresh-token')
-      ).rejects.toThrow(UnauthorizedException);
+      ).rejects.toThrow(HttpException);
     });
 
     it('should revoke token and throw when user is deactivated', async () => {
@@ -778,7 +773,7 @@ describe('AuthService', () => {
 
       await expect(
         service.refreshTokens('valid-refresh-token')
-      ).rejects.toThrow(UnauthorizedException);
+      ).rejects.toThrow(HttpException);
 
       expect(mockRefreshTokenService.revokeToken).toHaveBeenCalledWith(
         'token-1'
@@ -801,7 +796,7 @@ describe('AuthService', () => {
       });
 
       await expect(service.refreshTokens('old-session-token')).rejects.toThrow(
-        UnauthorizedException
+        HttpException
       );
 
       expect(mockRefreshTokenService.revokeToken).toHaveBeenCalledWith(
@@ -912,7 +907,7 @@ describe('AuthService', () => {
       });
 
       await expect(service.loginWithOAuth(oauthProfile)).rejects.toThrow(
-        UnauthorizedException
+        HttpException
       );
     });
 
@@ -946,7 +941,7 @@ describe('AuthService', () => {
       });
 
       await expect(service.loginWithOAuth(oauthProfile)).rejects.toThrow(
-        UnauthorizedException
+        HttpException
       );
     });
 
@@ -1010,10 +1005,10 @@ describe('AuthService', () => {
 
       await expect(
         service.linkOAuthToUser('user-1', 'google', 'google-123')
-      ).rejects.toThrow(UnauthorizedException);
+      ).rejects.toThrow(HttpException);
     });
 
-    it('should throw ConflictException when OAuth account linked to another user', async () => {
+    it('should throw HttpException when OAuth account linked to another user', async () => {
       mockUsersService.findOne.mockResolvedValue(mockUser);
       mockOAuthAccountService.createOAuthAccount.mockRejectedValue({
         code: '23505'
@@ -1026,7 +1021,7 @@ describe('AuthService', () => {
 
       await expect(
         service.linkOAuthToUser('user-1', 'google', 'google-123')
-      ).rejects.toThrow(ConflictException);
+      ).rejects.toThrow(HttpException);
     });
 
     it('should silently succeed when OAuth account already linked to same user', async () => {

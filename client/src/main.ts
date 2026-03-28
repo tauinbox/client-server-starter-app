@@ -3,9 +3,12 @@ import { bootstrapApplication } from '@angular/platform-browser';
 import { appConfig } from './app/app.config';
 import { AppComponent } from './app/app.component';
 
+const LANGUAGE_KEY = 'preferred-language';
+
 async function initLocale(): Promise<void> {
-  const lang = navigator.language.split('-')[0].toLowerCase();
-  if (lang === 'en') return; // en-US is built in, no registration needed
+  const saved = localStorage.getItem(LANGUAGE_KEY);
+  const lang = saved || navigator.language.split('-')[0].toLowerCase();
+  if (lang === 'en') return;
   try {
     const localeModule = await import(
       /* @vite-ignore */ `@angular/common/locales/${lang}`

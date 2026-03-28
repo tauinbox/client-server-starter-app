@@ -7,11 +7,13 @@ import { ActivatedRoute } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { LoginComponent } from './login.component';
 import { AuthService } from '../../services/auth.service';
 import type { AuthResponse } from '../../models/auth.types';
 import type { RoleResponse } from '@app/shared/types';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
@@ -56,7 +58,7 @@ describe('LoginComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [LoginComponent],
+      imports: [LoginComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
         provideHttpClient(),
@@ -169,7 +171,7 @@ describe('LoginComponent', () => {
     it('should navigate to custom returnUrl when present', () => {
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
-        imports: [LoginComponent],
+        imports: [LoginComponent, TranslocoTestingModuleWithLangs],
         providers: [
           provideRouter([]),
           provideHttpClient(),
@@ -202,9 +204,31 @@ describe('LoginComponent', () => {
       expect(newRouter.navigateByUrl).toHaveBeenCalledWith('/dashboard');
     });
 
-    it('should set error on login failure', () => {
+    it('should show fallback translation on login failure without errorKey', () => {
       const httpError = new HttpErrorResponse({
         error: { message: 'Invalid credentials' },
+        status: 401
+      });
+      authServiceMock.login.mockReturnValue(throwError(() => httpError));
+
+      component.loginForm.setValue({
+        email: 'test@example.com',
+        password: 'wrongpassword'
+      });
+      component.onSubmit();
+
+      expect(component['error']()).toBe(
+        'Login failed. Please check your credentials.'
+      );
+      expect(component['loading']()).toBe(false);
+    });
+
+    it('should translate error from errorKey on login failure', () => {
+      const httpError = new HttpErrorResponse({
+        error: {
+          message: 'Invalid credentials',
+          errorKey: ErrorKeys.AUTH.INVALID_CREDENTIALS
+        },
         status: 401
       });
       authServiceMock.login.mockReturnValue(throwError(() => httpError));

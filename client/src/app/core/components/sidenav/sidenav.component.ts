@@ -3,6 +3,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 import { MatRippleModule } from '@angular/material/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { TranslocoDirective } from '@jsverse/transloco';
 import { SidenavStateService } from '@core/services/sidenav-state.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
@@ -14,7 +15,8 @@ import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
     RouterLinkActive,
     MatRippleModule,
     MatIconModule,
-    MatTooltipModule
+    MatTooltipModule,
+    TranslocoDirective
   ],
   templateUrl: './sidenav.component.html',
   styleUrl: './sidenav.component.scss',

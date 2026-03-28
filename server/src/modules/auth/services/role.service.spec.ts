@@ -1,10 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import {
-  BadRequestException,
-  InternalServerErrorException,
-  NotFoundException
-} from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
 import { RoleService } from './role.service';
 import { Role } from '../entities/role.entity';
 import { Permission } from '../entities/permission.entity';
@@ -194,11 +190,9 @@ describe('RoleService', () => {
       expect(result.name).toBe('admin');
     });
 
-    it('should throw NotFoundException if not found', async () => {
+    it('should throw HttpException if not found', async () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
-      await expect(service.findOne('bad-id')).rejects.toThrow(
-        NotFoundException
-      );
+      await expect(service.findOne('bad-id')).rejects.toThrow(HttpException);
     });
   });
 
@@ -215,14 +209,14 @@ describe('RoleService', () => {
     it('should throw if name already exists', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       await expect(service.create({ name: 'editor' })).rejects.toThrow(
-        BadRequestException
+        HttpException
       );
     });
 
-    it('should throw BadRequestException if isSuper is provided', async () => {
+    it('should throw HttpException if isSuper is provided', async () => {
       await expect(
         service.create({ name: 'superrole', isSuper: true })
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(HttpException);
       expect(mockRoleRepo.findOne).not.toHaveBeenCalled();
     });
 
@@ -240,7 +234,7 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
       await expect(
         service.update('role-1', { name: 'superadmin' })
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(HttpException);
     });
 
     it('should update a custom role', async () => {
@@ -261,9 +255,7 @@ describe('RoleService', () => {
   describe('delete', () => {
     it('should throw if role is system', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
-      await expect(service.delete('role-1')).rejects.toThrow(
-        BadRequestException
-      );
+      await expect(service.delete('role-1')).rejects.toThrow(HttpException);
     });
 
     it('should delete a custom role and invalidate cache for its members', async () => {
@@ -398,14 +390,14 @@ describe('RoleService', () => {
   });
 
   describe('update — additional branches', () => {
-    it('should throw BadRequestException if isSuper is in update payload', async () => {
+    it('should throw HttpException if isSuper is in update payload', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       await expect(service.update('role-2', { isSuper: true })).rejects.toThrow(
-        BadRequestException
+        HttpException
       );
     });
 
-    it('should throw BadRequestException when updating name to an existing name', async () => {
+    it('should throw HttpException when updating name to an existing name', async () => {
       const conflictRole: Role = {
         ...customRole,
         id: 'role-99',
@@ -416,7 +408,7 @@ describe('RoleService', () => {
         .mockResolvedValueOnce(conflictRole); // findOne({ name }) conflict check
       await expect(
         service.update('role-2', { name: 'viewer' })
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(HttpException);
     });
 
     it('should allow renaming to the same name (no conflict)', async () => {
@@ -465,10 +457,10 @@ describe('RoleService', () => {
       expect(result).toEqual(perms);
     });
 
-    it('should throw NotFoundException when role does not exist', async () => {
+    it('should throw HttpException when role does not exist', async () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
       await expect(service.getPermissionsForRole('bad-id')).rejects.toThrow(
-        NotFoundException
+        HttpException
       );
     });
   });
@@ -517,10 +509,10 @@ describe('RoleService', () => {
       });
     });
 
-    it('should throw InternalServerErrorException when role not found', async () => {
+    it('should throw HttpException when role not found', async () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
       await expect(service.findRoleByName('nonexistent')).rejects.toThrow(
-        InternalServerErrorException
+        HttpException
       );
     });
   });

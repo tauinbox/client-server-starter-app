@@ -19,6 +19,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 @Component({
   selector: 'app-verify-email',
@@ -30,7 +31,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
     MatIcon,
     MatButton,
     MatProgressSpinner,
-    RouterLink
+    RouterLink,
+    TranslocoDirective
   ],
   templateUrl: './verify-email.component.html',
   styleUrl: './verify-email.component.scss',
@@ -40,6 +42,7 @@ export class VerifyEmailComponent implements OnInit {
   readonly #authService = inject(AuthService);
   readonly #route = inject(ActivatedRoute);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #transloco = inject(TranslocoService);
 
   protected readonly loading = signal(true);
   protected readonly success = signal(false);
@@ -50,7 +53,9 @@ export class VerifyEmailComponent implements OnInit {
 
     if (!token) {
       this.loading.set(false);
-      this.error.set('No verification token provided.');
+      this.error.set(
+        this.#transloco.translate('auth.verifyEmail.errorNoToken')
+      );
       return;
     }
 
@@ -66,7 +71,7 @@ export class VerifyEmailComponent implements OnInit {
           this.loading.set(false);
           this.error.set(
             err.error?.message ||
-              'Email verification failed. The token may be invalid or expired.'
+              this.#transloco.translate('auth.verifyEmail.errorFailed')
           );
         }
       });

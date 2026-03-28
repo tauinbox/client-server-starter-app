@@ -10,6 +10,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal } from '@angular/core';
 import type { WritableSignal } from '@angular/core';
+import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { UserEditComponent } from './user-edit.component';
 import { UserService } from '../../services/user.service';
@@ -96,7 +97,7 @@ describe('UserEditComponent', () => {
     dialogMock = { open: vi.fn() };
 
     await TestBed.configureTestingModule({
-      imports: [UserEditComponent],
+      imports: [UserEditComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
         provideHttpClient(),

@@ -35,16 +35,16 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
 import type { LockoutErrorData } from '../../models/auth.types';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 type LoginFormType = {
   email: FormControl<string>;
   password: FormControl<string>;
 };
 
-const OAUTH_ERROR_MESSAGES: Record<string, string> = {
-  auth_failed: 'OAuth authentication failed. Please try again.',
-  no_email:
-    'No email was provided by the OAuth provider. Please use a different sign-in method.'
+const OAUTH_ERROR_KEYS: Record<string, string> = {
+  auth_failed: 'auth.login.errorOauthFailed',
+  no_email: 'auth.login.errorNoEmail'
 };
 
 @Component({
@@ -66,7 +66,8 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
     MatDivider,
     RouterLink,
     PasswordToggleComponent,
-    MatSuffix
+    MatSuffix,
+    TranslocoDirective
   ],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
@@ -80,6 +81,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   readonly #destroyRef = inject(DestroyRef);
   readonly #sessionStorage = inject(SessionStorageService);
   readonly #window = inject(DOCUMENT).defaultView;
+  readonly #translocoService = inject(TranslocoService);
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -111,9 +113,11 @@ export class LoginComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     const oauthError = this.#route.snapshot.queryParams['oauth_error'];
     if (oauthError) {
+      const key = OAUTH_ERROR_KEYS[oauthError];
       this.error.set(
-        OAUTH_ERROR_MESSAGES[oauthError] ||
-          'Authentication failed. Please try again.'
+        key
+          ? this.#translocoService.translate(key)
+          : this.#translocoService.translate('auth.login.errorAuthFailed')
       );
     }
 
@@ -184,21 +188,31 @@ export class LoginComponent implements OnInit, OnDestroy {
   }
 
   #handleLoginError(err: HttpErrorResponse): void {
+    const errorKey = err.error?.errorKey as string | undefined;
+
     if (err.status === 423) {
       const data = err.error as LockoutErrorData;
       this.#startLockoutCountdown(data.retryAfter);
-      this.error.set(data.message);
+      this.error.set(
+        errorKey ? this.#translocoService.translate(errorKey) : data.message
+      );
       return;
     }
 
     if (err.status === 403 && err.error?.errorCode === 'EMAIL_NOT_VERIFIED') {
       this.emailNotVerified.set(true);
-      this.error.set(err.error.message);
+      this.error.set(
+        errorKey
+          ? this.#translocoService.translate(errorKey)
+          : err.error.message
+      );
       return;
     }
 
     this.error.set(
-      err.error?.message || 'Login failed. Please check your credentials.'
+      errorKey
+        ? this.#translocoService.translate(errorKey)
+        : this.#translocoService.translate('auth.login.errorCredentialsInvalid')
     );
   }
 

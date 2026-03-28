@@ -24,6 +24,7 @@ import { RouterLink } from '@angular/router';
 import { MatChip } from '@angular/material/chips';
 import { MatIcon } from '@angular/material/icon';
 import { DatePipe } from '@angular/common';
+import { TranslocoDirective } from '@jsverse/transloco';
 import type { User, UserSortColumn } from '../../models/user.types';
 
 export const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
@@ -53,7 +54,8 @@ export const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
     MatRow,
     MatHeaderRowDef,
     MatRowDef,
-    DatePipe
+    DatePipe,
+    TranslocoDirective
   ],
   templateUrl: './user-table.component.html',
   styleUrl: './user-table.component.scss',

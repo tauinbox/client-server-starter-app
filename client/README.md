@@ -96,11 +96,12 @@ NgRx Signal Store (`@ngrx/signals`):
 - **UsersStore** (route-level at `/users`) — entity-based store with `withEntities<User>()`. Unified state: `filters: UserSearch` (empty = all users, filled = search via `GET /users/search`), single `load()`/`loadMore()` pair with **infinite scroll** (page size 20; `upsertEntities` appends; `hasMore` computed signal drives sentinel visibility; `isLoadingMore` shows spinner). `setFilters()` and `setSorting()` update state; component calls `load()` after each change
 - **RbacMetadataStore** (`providedIn: 'root'`) — NgRx Signal Store with stale-while-revalidate localStorage caching for resources/actions metadata. Loaded at bootstrap via `AuthService.fetchRbacMetadata()` (only when authenticated). Computed: `subjectMap` (resource name to CASL subject)
 - **ThemeService** — `theme` signal (`'light'` | `'dark'`), system preference detection, persists to localStorage
+- **LanguageService** — `lang` signal (`'en'` | `'ru'`), reads `localStorage` → `navigator.language` → `'en'` fallback; on `setLanguage()` updates Transloco active lang, registers Angular locale data, sets `document.documentElement.lang`; `LOCALE_ID` provided via factory from this service
 - **NotificationsService** (`providedIn: 'root'`) — SSE client using `HttpClient` with `observe: 'events'` so the JWT interceptor attaches `Authorization: Bearer` automatically. Parses `HttpDownloadProgressEvent.partialText` with offset tracking. Exposes: `sessionInvalidated$` (calls `tokenService.forceLogout()`), `permissionsUpdated$` (triggers `authService.fetchPermissions()`), `userCrudEvents$` (drives user list refresh). `connect()` called after login and session restore; `disconnect()` called on logout. Exponential backoff retry (3 s → 60 s cap, up to 10 retries, `resetOnSuccess`); auto-reconnects after retry exhaustion or server-initiated close if still authenticated. Server sends 30 s heartbeat (empty `data:` frames) to prevent proxy idle timeout
 
 ### HTTP Interceptors
 
-1. **errorInterceptor** — catches errors, shows `MatSnackBar` notifications, skips 401s. On first 403: silently re-fetches `GET /auth/permissions`, calls `AuthStore.setRules()` (which triggers `RequirePermissionsDirective` via `effect()`), then retries the original request once. `RBAC_RETRY_CONTEXT` token prevents retry loops. Permissions-fetch failure and retry failure are handled separately with distinct snackbar messages.
+1. **errorInterceptor** — catches errors, shows `MatSnackBar` notifications, skips 401s. If `errorKey` is present in the error response, translates it via `TranslocoService` (falls back to `message` if key not found). On first 403: silently re-fetches `GET /auth/permissions`, calls `AuthStore.setRules()` (which triggers `RequirePermissionsDirective` via `effect()`), then retries the original request once. `RBAC_RETRY_CONTEXT` token prevents retry loops. Permissions-fetch failure and retry failure are handled separately with distinct snackbar messages.
 2. **jwtInterceptor** — attaches `Authorization: Bearer` header, handles 401 with token refresh + request retry, uses `shareReplay(1)` to prevent concurrent refreshes
 
 ### Path Aliases
@@ -159,7 +160,7 @@ npm test
   - `mock-data.ts` — `MockUser` type, `defaultUser`, factory re-exports (`createMockUser`, `createOAuthAccount`)
   - `helpers.ts` — `loginViaUi()`, `expectAuthRedirect()`, `expectForbiddenRedirect()`
 - Test structure: organized by module in `e2e/auth/` and `e2e/users/`
-- Coverage: 113 tests (55 auth + 58 users) — unit test suite: 368 tests passing covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search, admin roles/resources management. User list and search tests updated to work with server-side paginated responses from mock-server
+- Coverage: 104 tests — unit test suite: 374 tests passing covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search, admin roles/resources management. User list and search tests updated to work with server-side paginated responses from mock-server. Error translation tests verify `errorKey` → Transloco pipeline for login, register, and global interceptor snackbar.
 - Workers: 4 (fully parallel, per-worker mock-server instances on dynamic ports)
 
 ```bash
@@ -212,6 +213,7 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 | Angular Material | 21.2.3 |
 | TypeScript | 5.9.3 |
 | @ngrx/signals | 21.0.1 |
+| @jsverse/transloco | 7.5.0 |
 | RxJS | 7.8.2 |
 | Vitest | 4.0.18 |
 | Playwright | 1.58.2 |

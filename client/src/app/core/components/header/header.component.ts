@@ -13,6 +13,8 @@ import { AuthStore } from '@features/auth/store/auth.store';
 import { AuthService } from '@features/auth/services/auth.service';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { ThemeToggleComponent } from './theme-toggle/theme-toggle.component';
+import { LanguageSwitcherComponent } from './language-switcher/language-switcher.component';
+import { TranslocoDirective } from '@jsverse/transloco';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { formatDate } from '@angular/common';
 import { APP_VERSION, BUILD_HASH, BUILD_DATE } from '@environments/version';
@@ -28,7 +30,9 @@ import { environment } from '@environments/environment';
     MatTooltipModule,
     RouterLink,
     RouterLinkActive,
-    ThemeToggleComponent
+    ThemeToggleComponent,
+    LanguageSwitcherComponent,
+    TranslocoDirective
   ],
   templateUrl: './header.component.html',
   styleUrl: './header.component.scss',

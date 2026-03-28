@@ -1,0 +1,11 @@
+@use 'abstracts/functions' as func;
+
+.active-language {
+  font-weight: 500;
+  background-color: var(--mat-menu-item-hover-state-layer-color);
+}
+
+.language-flag-icon {
+  width: func.rem(24);
+  height: func.rem(16);
+}

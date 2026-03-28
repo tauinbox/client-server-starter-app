@@ -2,6 +2,7 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 
 import { ConfirmDialogComponent } from './confirm-dialog.component';
 import type { ConfirmDialogData } from './confirm-dialog.component';
@@ -23,7 +24,7 @@ describe('ConfirmDialogComponent', () => {
     dialogRefMock = { close: vi.fn() };
 
     await TestBed.configureTestingModule({
-      imports: [ConfirmDialogComponent],
+      imports: [ConfirmDialogComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideNoopAnimations(),
         { provide: MatDialogRef, useValue: dialogRefMock },
@@ -54,7 +55,7 @@ describe('ConfirmDialogComponent', () => {
     it('should work without optional icon field', async () => {
       await TestBed.resetTestingModule();
       await TestBed.configureTestingModule({
-        imports: [ConfirmDialogComponent],
+        imports: [ConfirmDialogComponent, TranslocoTestingModuleWithLangs],
         providers: [
           provideNoopAnimations(),
           { provide: MatDialogRef, useValue: { close: vi.fn() } },

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 import {
   getState,
   logAudit,
@@ -39,14 +40,19 @@ router.post('/resources/:id/restore', adminGuard, (req, res) => {
   const resource = state.resources.get(id);
 
   if (!resource) {
-    res.status(404).json({ message: 'Resource not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'Resource not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.RESOURCES.NOT_FOUND
+    });
     return;
   }
 
   if (!resource.isRegistered) {
     res.status(400).json({
       message: `Cannot restore resource "${resource.name}": its @RegisterResource controller is not registered. Restore the controller code first.`,
-      statusCode: 400
+      statusCode: 400,
+      errorKey: ErrorKeys.RESOURCES.CANNOT_RESTORE
     });
     return;
   }
@@ -72,7 +78,11 @@ router.patch('/resources/:id', adminGuard, (req, res) => {
   const resource = state.resources.get(id);
 
   if (!resource) {
-    res.status(404).json({ message: 'Resource not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'Resource not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.RESOURCES.NOT_FOUND
+    });
     return;
   }
 
@@ -159,7 +169,8 @@ router.post('/actions', adminGuard, (req, res) => {
   if (CASL_RESERVED_ACTION_NAMES.includes(trimmedName)) {
     res.status(400).json({
       message: `Action name "${trimmedName}" is reserved and cannot be used`,
-      statusCode: 400
+      statusCode: 400,
+      errorKey: ErrorKeys.ACTIONS.NAME_RESERVED
     });
     return;
   }
@@ -200,7 +211,8 @@ router.post('/actions', adminGuard, (req, res) => {
     if (existing.name === trimmedName) {
       res.status(400).json({
         message: 'Action with this name already exists',
-        statusCode: 400
+        statusCode: 400,
+        errorKey: ErrorKeys.ACTIONS.NAME_EXISTS
       });
       return;
     }
@@ -250,7 +262,11 @@ router.patch('/actions/:id', adminGuard, (req, res) => {
   const action = state.actions.get(id);
 
   if (!action) {
-    res.status(404).json({ message: 'Action not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'Action not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
+    });
     return;
   }
 
@@ -305,14 +321,19 @@ router.delete('/actions/:id', adminGuard, (req, res) => {
   const action = state.actions.get(id);
 
   if (!action) {
-    res.status(404).json({ message: 'Action not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'Action not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
+    });
     return;
   }
 
   if (action.isDefault) {
     res.status(403).json({
       message: 'Cannot delete default actions',
-      statusCode: 403
+      statusCode: 403,
+      errorKey: ErrorKeys.ACTIONS.CANNOT_DELETE_DEFAULT
     });
     return;
   }
@@ -334,7 +355,8 @@ router.delete('/actions/:id', adminGuard, (req, res) => {
     res.status(409).json({
       message:
         'Cannot delete action: it is referenced by role permissions. Remove the role-permission assignments first.',
-      statusCode: 409
+      statusCode: 409,
+      errorKey: ErrorKeys.ACTIONS.ASSIGNED_TO_ROLES
     });
     return;
   }

@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { of } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 
 import { ResourceListComponent } from './resource-list.component';
 import { ResourcesStore } from '../../../store/resources.store';
@@ -54,7 +55,7 @@ describe('ResourceListComponent', () => {
 
   async function setupComponent(): Promise<void> {
     await TestBed.configureTestingModule({
-      imports: [ResourceListComponent],
+      imports: [ResourceListComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideNoopAnimations(),
         { provide: ResourcesStore, useValue: resourcesStoreMock },
@@ -126,7 +127,7 @@ describe('ResourceListComponent', () => {
       fixture.detectChanges();
 
       const editBtns = fixture.nativeElement.querySelectorAll(
-        'button[aria-label^="Edit resource"]'
+        'button[aria-label^="Edit Resource"]'
       );
       expect(editBtns.length).toBe(0);
     });
@@ -137,7 +138,7 @@ describe('ResourceListComponent', () => {
       fixture.detectChanges();
 
       const editBtns = fixture.nativeElement.querySelectorAll(
-        'button[aria-label^="Edit resource"]'
+        'button[aria-label^="Edit Resource"]'
       );
       expect(editBtns.length).toBeGreaterThan(0);
     });

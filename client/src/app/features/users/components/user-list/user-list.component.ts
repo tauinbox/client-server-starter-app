@@ -1,11 +1,13 @@
-import type { AfterViewInit, ElementRef, OnInit } from '@angular/core';
+import type { ElementRef, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
   computed,
   DestroyRef,
+  effect,
   inject,
   Injector,
+  untracked,
   viewChild
 } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
@@ -28,6 +30,7 @@ import type { Sort } from '@angular/material/sort';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { filter, merge } from 'rxjs';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { NotificationsService } from '@core/services/notifications.service';
 import type { User, UserSearch, UserSortColumn } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
@@ -63,13 +66,14 @@ type UserFilterFormType = {
     MatDivider,
     MatInput,
     MatProgressSpinner,
-    UserTableComponent
+    UserTableComponent,
+    TranslocoDirective
   ],
   templateUrl: './user-list.component.html',
   styleUrl: './user-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class UserListComponent implements OnInit, AfterViewInit {
+export class UserListComponent implements OnInit {
   readonly #fb = inject(FormBuilder);
   readonly #usersStore = inject(UsersStore);
   readonly #authStore = inject(AuthStore);
@@ -78,6 +82,7 @@ export class UserListComponent implements OnInit, AfterViewInit {
   readonly #destroyRef = inject(DestroyRef);
   readonly #injector = inject(Injector);
   readonly #notificationsService = inject(NotificationsService);
+  readonly #translocoService = inject(TranslocoService);
 
   readonly filterForm: FormGroup<UserFilterFormType> =
     this.#fb.group<UserFilterFormType>({
@@ -100,7 +105,52 @@ export class UserListComponent implements OnInit, AfterViewInit {
   readonly hasMore = this.#usersStore.hasMore;
   readonly isLoadingMore = this.#usersStore.isLoadingMore;
 
-  readonly scrollSentinel = viewChild.required<ElementRef>('scrollSentinel');
+  readonly scrollSentinel = viewChild<ElementRef>('scrollSentinel');
+
+  constructor() {
+    // Set up IntersectionObserver reactively: the sentinel lives inside a
+    // *transloco structural directive, so it only appears in the DOM after
+    // translations load. The effect re-runs when the signal becomes non-null.
+    let observerAttached = false;
+    effect(() => {
+      const sentinelEl = this.scrollSentinel()?.nativeElement as
+        | HTMLElement
+        | undefined;
+      if (!sentinelEl || observerAttached) return;
+      observerAttached = true;
+
+      untracked(() => {
+        const loadMoreIfVisible = () => {
+          if (this.hasMore() && !this.isLoadingMore() && !this.loading()) {
+            const rect = sentinelEl.getBoundingClientRect();
+            if (rect.top <= window.innerHeight) {
+              this.#usersStore.loadMore();
+            }
+          }
+        };
+
+        const observer = new IntersectionObserver(
+          (entries) => {
+            if (entries[0].isIntersecting) loadMoreIfVisible();
+          },
+          { threshold: 0 }
+        );
+
+        observer.observe(sentinelEl);
+        this.#destroyRef.onDestroy(() => observer.disconnect());
+
+        merge(
+          toObservable(this.loading, { injector: this.#injector }),
+          toObservable(this.isLoadingMore, { injector: this.#injector })
+        )
+          .pipe(
+            filter((isLoading) => !isLoading),
+            takeUntilDestroyed(this.#destroyRef)
+          )
+          .subscribe(() => loadMoreIfVisible());
+      });
+    });
+  }
 
   ngOnInit(): void {
     this.#usersStore.load();
@@ -109,39 +159,6 @@ export class UserListComponent implements OnInit, AfterViewInit {
       .subscribe(() => {
         this.#usersStore.load();
       });
-  }
-
-  ngAfterViewInit(): void {
-    const sentinel = this.scrollSentinel().nativeElement;
-
-    const loadMoreIfVisible = () => {
-      if (this.hasMore() && !this.isLoadingMore() && !this.loading()) {
-        const rect = (sentinel as HTMLElement).getBoundingClientRect();
-        if (rect.top <= window.innerHeight) {
-          this.#usersStore.loadMore();
-        }
-      }
-    };
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) loadMoreIfVisible();
-      },
-      { threshold: 0 }
-    );
-
-    observer.observe(sentinel);
-    this.#destroyRef.onDestroy(() => observer.disconnect());
-
-    merge(
-      toObservable(this.loading, { injector: this.#injector }),
-      toObservable(this.isLoadingMore, { injector: this.#injector })
-    )
-      .pipe(
-        filter((isLoading) => !isLoading),
-        takeUntilDestroyed(this.#destroyRef)
-      )
-      .subscribe(() => loadMoreIfVisible());
   }
 
   sortData(sort: Sort): void {
@@ -176,10 +193,15 @@ export class UserListComponent implements OnInit, AfterViewInit {
     const dialogRef = this.#dialog.open(ConfirmDialogComponent, {
       ...dialogSizeConfig(DialogSize.Confirm),
       data: {
-        title: 'Confirm Delete',
-        message: `Are you sure you want to delete user ${user.firstName} ${user.lastName}?`,
-        confirmButton: 'Delete',
-        cancelButton: 'Cancel'
+        title: this.#translocoService.translate(
+          'users.list.confirmDeleteTitle'
+        ),
+        message: this.#translocoService.translate(
+          'users.list.confirmDeleteMessage',
+          { firstName: user.firstName, lastName: user.lastName }
+        ),
+        confirmButton: this.#translocoService.translate('common.delete'),
+        cancelButton: this.#translocoService.translate('common.cancel')
       }
     });
 
@@ -199,14 +221,16 @@ export class UserListComponent implements OnInit, AfterViewInit {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
-          this.#snackBar.open('User deleted successfully', 'Close', {
-            duration: 5000
-          });
+          this.#snackBar.open(
+            this.#translocoService.translate('users.list.successDeleted'),
+            this.#translocoService.translate('common.close'),
+            { duration: 5000 }
+          );
         },
         error: () => {
           this.#snackBar.open(
-            'Failed to delete user. Please try again.',
-            'Close',
+            this.#translocoService.translate('users.list.errorDeleteFailed'),
+            this.#translocoService.translate('common.close'),
             { duration: 5000 }
           );
         }

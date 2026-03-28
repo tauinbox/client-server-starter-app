@@ -1,11 +1,11 @@
-<mat-card>
+<mat-card *transloco="let t; scope: 'admin'">
   <mat-card-header>
-    <mat-card-title>Roles management</mat-card-title>
+    <mat-card-title>{{ t('admin.roles.title') }}</mat-card-title>
     <div class="spacer"></div>
     @if (canCreate()) {
       <button mat-raised-button color="primary" (click)="openCreateDialog()">
         <mat-icon>add</mat-icon>
-        New Role
+        {{ t('admin.roles.newRole') }}
       </button>
     }
   </mat-card-header>
@@ -19,7 +19,9 @@
       <table mat-table [dataSource]="roles()" class="roles-table">
         <!-- Name Column -->
         <ng-container matColumnDef="name">
-          <th mat-header-cell *matHeaderCellDef>Name</th>
+          <th mat-header-cell *matHeaderCellDef>
+            {{ t('admin.roles.tableHeaderName') }}
+          </th>
           <td mat-cell *matCellDef="let role">
             <span class="role-name">{{ role.name }}</span>
           </td>
@@ -27,7 +29,9 @@
 
         <!-- Description Column -->
         <ng-container matColumnDef="description">
-          <th mat-header-cell *matHeaderCellDef>Description</th>
+          <th mat-header-cell *matHeaderCellDef>
+            {{ t('admin.roles.tableHeaderDescription') }}
+          </th>
           <td mat-cell *matCellDef="let role">
             {{ role.description ?? '—' }}
           </td>
@@ -35,19 +39,25 @@
 
         <!-- Type Column -->
         <ng-container matColumnDef="type">
-          <th mat-header-cell *matHeaderCellDef>Type</th>
+          <th mat-header-cell *matHeaderCellDef>
+            {{ t('admin.roles.tableHeaderType') }}
+          </th>
           <td mat-cell *matCellDef="let role">
             @if (role.isSystem) {
-              <mat-chip color="primary" highlighted>System</mat-chip>
+              <mat-chip color="primary" highlighted>{{
+                t('admin.roles.typeSystem')
+              }}</mat-chip>
             } @else {
-              <mat-chip>Custom</mat-chip>
+              <mat-chip>{{ t('admin.roles.typeCustom') }}</mat-chip>
             }
           </td>
         </ng-container>
 
         <!-- Created At Column -->
         <ng-container matColumnDef="createdAt">
-          <th mat-header-cell *matHeaderCellDef>Created</th>
+          <th mat-header-cell *matHeaderCellDef>
+            {{ t('admin.roles.tableHeaderCreated') }}
+          </th>
           <td mat-cell *matCellDef="let role">
             {{ role.createdAt | date: 'medium' }}
           </td>
@@ -55,15 +65,19 @@
 
         <!-- Actions Column -->
         <ng-container matColumnDef="actions">
-          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <th mat-header-cell *matHeaderCellDef>
+            {{ t('admin.roles.tableHeaderActions') }}
+          </th>
           <td mat-cell *matCellDef="let role">
             @if (!role.isSuper) {
               <button
                 mat-icon-button
                 color="primary"
                 (click)="openPermissionsDialog(role)"
-                matTooltip="Manage Permissions"
-                [attr.aria-label]="'Manage permissions for ' + role.name"
+                [matTooltip]="t('admin.roles.managePermissions')"
+                [attr.aria-label]="
+                  t('admin.roles.managePermissions') + ' ' + role.name
+                "
               >
                 <mat-icon>security</mat-icon>
               </button>
@@ -73,8 +87,8 @@
                 mat-icon-button
                 color="accent"
                 (click)="openEditDialog(role)"
-                matTooltip="Edit Role"
-                [attr.aria-label]="'Edit role ' + role.name"
+                [matTooltip]="t('admin.roles.editRole')"
+                [attr.aria-label]="t('admin.roles.editRole') + ' ' + role.name"
               >
                 <mat-icon>edit</mat-icon>
               </button>
@@ -84,8 +98,10 @@
                 mat-icon-button
                 color="warn"
                 (click)="confirmDelete(role)"
-                matTooltip="Delete Role"
-                [attr.aria-label]="'Delete role ' + role.name"
+                [matTooltip]="t('admin.roles.deleteRole')"
+                [attr.aria-label]="
+                  t('admin.roles.deleteRole') + ' ' + role.name
+                "
               >
                 <mat-icon>delete</mat-icon>
               </button>

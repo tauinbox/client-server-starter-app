@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { of } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import type { RoleResponse } from '@app/shared/types/role.types';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { RolesStore } from '../../../store/roles.store';
@@ -65,7 +66,7 @@ describe('RoleListComponent — openPermissionsDialog', () => {
 
   async function setupComponent(): Promise<RoleListComponent> {
     await TestBed.configureTestingModule({
-      imports: [RoleListComponent],
+      imports: [RoleListComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideNoopAnimations(),
         { provide: RolesStore, useValue: rolesStoreMock },

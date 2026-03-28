@@ -1,0 +1,100 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "save": "Save",
+    "delete": "Delete",
+    "search": "Search",
+    "clear": "Clear",
+    "loading": "Loading...",
+    "active": "Active",
+    "inactive": "Inactive",
+    "name": "Name",
+    "description": "Description",
+    "created": "Created",
+    "actions": "Actions",
+    "saveChanges": "Save Changes"
+  },
+  "header": {
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout"
+  },
+  "sidenav": {
+    "adminPanel": "Admin Panel",
+    "profile": "Profile",
+    "collapse": "Collapse",
+    "expand": "Expand"
+  },
+  "theme": {
+    "switchToLight": "Switch to light theme",
+    "switchToDark": "Switch to dark theme"
+  },
+  "language": {
+    "switchLanguage": "Switch language",
+    "en": "English",
+    "ru": "Русский"
+  },
+  "pageNotFound": {
+    "code": "404",
+    "title": "Page Not Found",
+    "message": "The page you are looking for does not exist or has been moved.",
+    "goHome": "Go Home"
+  },
+  "errors": {
+    "auth": {
+      "invalidCredentials": "Invalid credentials",
+      "accountLocked": "Account is temporarily locked due to too many failed login attempts",
+      "emailNotVerified": "Please verify your email address before logging in",
+      "userDeactivated": "User account is deactivated",
+      "userNotFound": "User not found",
+      "oauthAlreadyLinked": "This OAuth account is already linked to another user",
+      "userNotFoundOrDeactivated": "User account not found or deactivated",
+      "invalidVerificationToken": "Invalid or expired verification token",
+      "verificationTokenExpired": "Verification token has expired. Please request a new one.",
+      "invalidResetToken": "Invalid or expired password reset token",
+      "resetTokenExpired": "Password reset token has expired. Please request a new one.",
+      "invalidRefreshToken": "Invalid refresh token",
+      "sessionInvalidated": "Session invalidated due to key rotation. Please log in again.",
+      "tokenRevoked": "Token has been revoked",
+      "tokenInvalidatedRotation": "Token invalidated due to key rotation. Please log in again.",
+      "invalidOauthProvider": "Invalid OAuth provider",
+      "missingOauthData": "Missing OAuth data",
+      "invalidOauthData": "Invalid or expired OAuth data",
+      "unlinkLastProvider": "Cannot unlink the last OAuth provider without a password set. Please set a password first."
+    },
+    "users": {
+      "notFound": "User not found",
+      "emailExists": "User with this email already exists"
+    },
+    "roles": {
+      "notFound": "Role not found",
+      "nameExists": "Role with this name already exists",
+      "cannotModifySystem": "Cannot modify system roles",
+      "cannotDeleteSystem": "Cannot delete system roles",
+      "superFlagForbidden": "isSuper flag cannot be set via API"
+    },
+    "actions": {
+      "nameReserved": "Action name is reserved and cannot be used",
+      "nameExists": "Action with this name already exists",
+      "cannotDeleteDefault": "Cannot delete default actions",
+      "assignedToRoles": "Cannot delete action that is assigned to roles. Remove it from all roles first."
+    },
+    "resources": {
+      "notFound": "Resource not found",
+      "cannotRestore": "Cannot restore resource: its controller is not registered. Restore the controller code first.",
+      "subjectReserved": "Resource subject is reserved and cannot be used"
+    },
+    "db": {
+      "uniqueViolation": "A record with this value already exists",
+      "foreignKeyViolation": "Cannot complete operation due to related data",
+      "notNullViolation": "A required field is missing",
+      "invalidInput": "Invalid input format"
+    },
+    "general": {
+      "resourceNotFound": "The requested resource was not found",
+      "internalServerError": "Internal server error"
+    }
+  }
+}
