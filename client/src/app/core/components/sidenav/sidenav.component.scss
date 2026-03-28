@@ -4,9 +4,9 @@
 $nav-width-narrow: func.rem(64); // 64px
 $nav-width-wide: func.rem(220); // 220px
 
-// footer height = padding-top(0.5rem) + nav-link(3rem) = 3.5rem
-// toggle btn center on divider: bottom = 3.5rem - btn-half(0.75rem) = 2.75rem
-$footer-height: func.rem(56);
+// footer height = padding-top(8px) + nav-link(56px) = 64px
+// toggle btn center on border-top divider: bottom = 4rem - btn-half(0.75rem) = 3.25rem
+$footer-height: func.rem(64);
 $toggle-btn-size: func.rem(24);
 
 // M3 navigation rail uses 56px indicator pill height, full width in narrow mode

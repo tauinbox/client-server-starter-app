@@ -58,6 +58,10 @@
     }
   }
 
+  mat-card-actions p {
+    font-size: vars.$font-size-sm;
+  }
+
   button[type='submit'] {
     width: 100%;
 
@@ -88,6 +92,16 @@
 
     .oauth-button {
       width: 100%;
+    }
+
+    // Inner flex wrapper — keeps icon + label centered as a unit inside
+    // the MDC button label span (applying flex on the button host itself
+    // conflicts with Material's internal layout and skews the icon).
+    .oauth-btn-content {
+      display: flex;
+      gap: vars.$spacing-xs;
+      align-items: center;
+      justify-content: center;
     }
   }
 }

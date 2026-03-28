@@ -126,8 +126,10 @@
           class="oauth-button"
           (click)="onOAuthLogin('google')"
         >
-          <mat-icon svgIcon="google"></mat-icon>
-          <span>{{ t('auth.providers.google') }}</span>
+          <span class="oauth-btn-content">
+            <mat-icon svgIcon="google"></mat-icon>
+            <span>{{ t('auth.providers.google') }}</span>
+          </span>
         </button>
         <button
           mat-stroked-button
@@ -135,8 +137,10 @@
           class="oauth-button"
           (click)="onOAuthLogin('facebook')"
         >
-          <mat-icon svgIcon="facebook"></mat-icon>
-          <span>{{ t('auth.providers.facebook') }}</span>
+          <span class="oauth-btn-content">
+            <mat-icon svgIcon="facebook"></mat-icon>
+            <span>{{ t('auth.providers.facebook') }}</span>
+          </span>
         </button>
         <button
           mat-stroked-button
@@ -144,8 +148,10 @@
           class="oauth-button"
           (click)="onOAuthLogin('vk')"
         >
-          <mat-icon svgIcon="vk"></mat-icon>
-          <span>{{ t('auth.providers.vk') }}</span>
+          <span class="oauth-btn-content">
+            <mat-icon svgIcon="vk"></mat-icon>
+            <span>{{ t('auth.providers.vk') }}</span>
+          </span>
         </button>
       </div>
     </mat-card-content>
