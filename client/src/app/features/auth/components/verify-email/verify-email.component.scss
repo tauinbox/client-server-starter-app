@@ -1,4 +1,5 @@
 @use 'abstracts/variables' as vars;
+@use 'abstracts/functions' as func;
 @use 'abstracts/mixins' as mix;
 
 :host {
@@ -9,15 +10,15 @@
   .status-container {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: vars.$spacing-md;
     align-items: center;
-    padding: 24px 0;
+    padding: vars.$spacing-lg 0;
     text-align: center;
 
     mat-icon {
-      width: 48px;
-      height: 48px;
-      font-size: 48px;
+      width: func.rem(48);
+      height: func.rem(48);
+      font-size: func.rem(48);
     }
 
     &.success mat-icon {

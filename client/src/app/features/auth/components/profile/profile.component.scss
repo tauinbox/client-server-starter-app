@@ -30,8 +30,8 @@
   height: func.rem(72);
   font-size: func.rem(26);
   font-weight: vars.$font-weight-medium;
-  color: #fff;
-  letter-spacing: 1px;
+  color: var(--mat-sys-on-primary);
+  letter-spacing: func.rem(1);
   user-select: none;
   background: var(--color-primary);
   border-radius: vars.$border-radius-circle;
