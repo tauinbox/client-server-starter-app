@@ -94,9 +94,7 @@ test.describe('User Detail page', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1');
 
-    await expect(
-      page.locator('.chips').getByText('Administrator')
-    ).toBeVisible();
+    await expect(page.locator('.chips').getByText('Admin')).toBeVisible();
   });
 
   test('should display User chip for non-admin user', async ({

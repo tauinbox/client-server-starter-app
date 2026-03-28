@@ -1,11 +1,13 @@
-import type { AfterViewInit, ElementRef, OnInit } from '@angular/core';
+import type { ElementRef, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
   computed,
   DestroyRef,
+  effect,
   inject,
   Injector,
+  untracked,
   viewChild
 } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
@@ -71,7 +73,7 @@ type UserFilterFormType = {
   styleUrl: './user-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class UserListComponent implements OnInit, AfterViewInit {
+export class UserListComponent implements OnInit {
   readonly #fb = inject(FormBuilder);
   readonly #usersStore = inject(UsersStore);
   readonly #authStore = inject(AuthStore);
@@ -103,7 +105,52 @@ export class UserListComponent implements OnInit, AfterViewInit {
   readonly hasMore = this.#usersStore.hasMore;
   readonly isLoadingMore = this.#usersStore.isLoadingMore;
 
-  readonly scrollSentinel = viewChild.required<ElementRef>('scrollSentinel');
+  readonly scrollSentinel = viewChild<ElementRef>('scrollSentinel');
+
+  constructor() {
+    // Set up IntersectionObserver reactively: the sentinel lives inside a
+    // *transloco structural directive, so it only appears in the DOM after
+    // translations load. The effect re-runs when the signal becomes non-null.
+    let observerAttached = false;
+    effect(() => {
+      const sentinelEl = this.scrollSentinel()?.nativeElement as
+        | HTMLElement
+        | undefined;
+      if (!sentinelEl || observerAttached) return;
+      observerAttached = true;
+
+      untracked(() => {
+        const loadMoreIfVisible = () => {
+          if (this.hasMore() && !this.isLoadingMore() && !this.loading()) {
+            const rect = sentinelEl.getBoundingClientRect();
+            if (rect.top <= window.innerHeight) {
+              this.#usersStore.loadMore();
+            }
+          }
+        };
+
+        const observer = new IntersectionObserver(
+          (entries) => {
+            if (entries[0].isIntersecting) loadMoreIfVisible();
+          },
+          { threshold: 0 }
+        );
+
+        observer.observe(sentinelEl);
+        this.#destroyRef.onDestroy(() => observer.disconnect());
+
+        merge(
+          toObservable(this.loading, { injector: this.#injector }),
+          toObservable(this.isLoadingMore, { injector: this.#injector })
+        )
+          .pipe(
+            filter((isLoading) => !isLoading),
+            takeUntilDestroyed(this.#destroyRef)
+          )
+          .subscribe(() => loadMoreIfVisible());
+      });
+    });
+  }
 
   ngOnInit(): void {
     this.#usersStore.load();
@@ -112,39 +159,6 @@ export class UserListComponent implements OnInit, AfterViewInit {
       .subscribe(() => {
         this.#usersStore.load();
       });
-  }
-
-  ngAfterViewInit(): void {
-    const sentinel = this.scrollSentinel().nativeElement;
-
-    const loadMoreIfVisible = () => {
-      if (this.hasMore() && !this.isLoadingMore() && !this.loading()) {
-        const rect = (sentinel as HTMLElement).getBoundingClientRect();
-        if (rect.top <= window.innerHeight) {
-          this.#usersStore.loadMore();
-        }
-      }
-    };
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) loadMoreIfVisible();
-      },
-      { threshold: 0 }
-    );
-
-    observer.observe(sentinel);
-    this.#destroyRef.onDestroy(() => observer.disconnect());
-
-    merge(
-      toObservable(this.loading, { injector: this.#injector }),
-      toObservable(this.isLoadingMore, { injector: this.#injector })
-    )
-      .pipe(
-        filter((isLoading) => !isLoading),
-        takeUntilDestroyed(this.#destroyRef)
-      )
-      .subscribe(() => loadMoreIfVisible());
   }
 
   sortData(sort: Sort): void {

@@ -1,4 +1,4 @@
-import { expect, test } from '../fixtures/base.fixture';
+import { expect, loginViaUi, test } from '../fixtures/base.fixture';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 
 // These tests verify that when the server returns an `errorKey` in the error
@@ -142,31 +142,38 @@ test.describe('Error translation: global error interceptor → snackbar', () => 
     page,
     _mockServer
   }) => {
-    // A 422 response is not explicitly handled by the login component (none of
-    // the 401/403/423 branches match), so it falls through to the global error
-    // interceptor which opens a snackbar. Using a distinguishable raw `message`
-    // lets us assert the translated errorKey path was taken.
-    await page.route('**/api/v1/auth/login', (route) =>
-      route.fulfill({
-        status: 422,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          message: RAW_MSG,
-          errorKey: ErrorKeys.AUTH.INVALID_CREDENTIALS,
-          statusCode: 422
-        })
-      })
-    );
+    // Login via UI so we can reach the profile page.
+    // auth.service login/register/forgotPassword etc. all use silentContext()
+    // which suppresses the snackbar — so we use the profile-update endpoint
+    // (PATCH /auth/profile) which is NOT silenced and goes through the global
+    // error interceptor.
+    await loginViaUi(page, _mockServer.url);
 
-    await page.goto('/login');
-    const main = page.getByRole('main');
-    await page.getByLabel('Email').fill('test@example.com');
-    await page.getByLabel('Password', { exact: true }).fill('Password1');
-    await main.getByRole('button', { name: 'Login' }).click();
+    // Intercept only PATCH /auth/profile; let other profile requests through.
+    await page.route('**/api/v1/auth/profile', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            message: RAW_MSG,
+            errorKey: ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR,
+            statusCode: 500
+          })
+        });
+      } else {
+        await route.fallback();
+      }
+    });
+
+    // Make the form dirty and submit.
+    await page.getByLabel('First Name').fill('Updated');
+    await page.getByRole('button', { name: 'Update Profile' }).click();
 
     const snackbar = page.locator('mat-snack-bar-container');
     await expect(snackbar).toBeVisible({ timeout: 5000 });
-    await expect(snackbar).toContainText('Invalid credentials');
-    await expect(page.getByText(RAW_MSG)).not.toBeVisible();
+    await expect(snackbar).toContainText('Internal server error');
+    // The snackbar must show the translated key, not the raw server message.
+    await expect(snackbar).not.toContainText(RAW_MSG);
   });
 });
