@@ -10,7 +10,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { ErrorKeys } from '../../shared/src/constants/error-keys';
+import { ErrorKeys } from '@app/shared/constants';
 
 // ─── config ──────────────────────────────────────────────────────────────────
 
@@ -25,7 +25,9 @@ function extractLeafValues(obj: unknown, prefix = ''): string[] {
     values.push(obj);
   } else if (typeof obj === 'object' && obj !== null) {
     for (const [key, value] of Object.entries(obj)) {
-      values.push(...extractLeafValues(value, prefix ? `${prefix}.${key}` : key));
+      values.push(
+        ...extractLeafValues(value, prefix ? `${prefix}.${key}` : key)
+      );
     }
   }
   return values;
@@ -52,7 +54,7 @@ const i18nFiles = fs
   .filter((f) => f.endsWith('.json'))
   .map((f) => ({
     name: f,
-    path: path.join(I18N_DIR, f),
+    path: path.join(I18N_DIR, f)
   }));
 
 if (i18nFiles.length === 0) {
@@ -63,7 +65,10 @@ if (i18nFiles.length === 0) {
 let hasErrors = false;
 
 for (const file of i18nFiles) {
-  const content = JSON.parse(fs.readFileSync(file.path, 'utf-8')) as Record<string, unknown>;
+  const content = JSON.parse(fs.readFileSync(file.path, 'utf-8')) as Record<
+    string,
+    unknown
+  >;
   const missing: string[] = [];
 
   for (const key of errorKeyValues) {
@@ -80,14 +85,14 @@ for (const file of i18nFiles) {
       console.error(`   - ${key}`);
     }
   } else {
-    console.log(`✅ ${file.name}: all ${errorKeyValues.length} error keys present`);
+    console.log(
+      `✅ ${file.name}: all ${errorKeyValues.length} error keys present`
+    );
   }
 }
 
 if (hasErrors) {
-  console.error(
-    `\n💡 Add missing keys to the i18n JSON files in ${I18N_DIR}`
-  );
+  console.error(`\n💡 Add missing keys to the i18n JSON files in ${I18N_DIR}`);
   process.exit(1);
 } else {
   console.log(
