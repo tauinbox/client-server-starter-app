@@ -1,8 +1,8 @@
 import {
-  BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
-  InternalServerErrorException,
-  NotFoundException
+  InternalServerErrorException
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -12,6 +12,7 @@ import { RolePermission } from '../entities/role-permission.entity';
 import { User } from '../../users/entities/user.entity';
 import { PermissionService } from './permission.service';
 import { PermissionCondition } from '@app/shared/types';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 
 @Injectable()
 export class RoleService {
@@ -34,7 +35,10 @@ export class RoleService {
   async findOne(id: string): Promise<Role> {
     const role = await this.roleRepository.findOne({ where: { id } });
     if (!role) {
-      throw new NotFoundException('Role not found');
+      throw new HttpException(
+        { message: 'Role not found', errorKey: ErrorKeys.ROLES.NOT_FOUND },
+        HttpStatus.NOT_FOUND
+      );
     }
     return role;
   }
@@ -45,13 +49,25 @@ export class RoleService {
     isSuper?: boolean;
   }): Promise<Role> {
     if (data.isSuper !== undefined) {
-      throw new BadRequestException('isSuper flag cannot be set via API');
+      throw new HttpException(
+        {
+          message: 'isSuper flag cannot be set via API',
+          errorKey: ErrorKeys.ROLES.SUPER_FLAG_FORBIDDEN
+        },
+        HttpStatus.BAD_REQUEST
+      );
     }
     const existing = await this.roleRepository.findOne({
       where: { name: data.name }
     });
     if (existing) {
-      throw new BadRequestException('Role with this name already exists');
+      throw new HttpException(
+        {
+          message: 'Role with this name already exists',
+          errorKey: ErrorKeys.ROLES.NAME_EXISTS
+        },
+        HttpStatus.BAD_REQUEST
+      );
     }
     const role = this.roleRepository.create({ ...data, isSuper: false });
     return this.roleRepository.save(role);
@@ -63,17 +79,35 @@ export class RoleService {
   ): Promise<Role> {
     const role = await this.findOne(id);
     if (role.isSystem) {
-      throw new BadRequestException('Cannot modify system roles');
+      throw new HttpException(
+        {
+          message: 'Cannot modify system roles',
+          errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
+        },
+        HttpStatus.BAD_REQUEST
+      );
     }
     if (data.isSuper !== undefined) {
-      throw new BadRequestException('isSuper flag cannot be changed via API');
+      throw new HttpException(
+        {
+          message: 'isSuper flag cannot be changed via API',
+          errorKey: ErrorKeys.ROLES.SUPER_FLAG_FORBIDDEN
+        },
+        HttpStatus.BAD_REQUEST
+      );
     }
     if (data.name) {
       const existing = await this.roleRepository.findOne({
         where: { name: data.name }
       });
       if (existing && existing.id !== id) {
-        throw new BadRequestException('Role with this name already exists');
+        throw new HttpException(
+          {
+            message: 'Role with this name already exists',
+            errorKey: ErrorKeys.ROLES.NAME_EXISTS
+          },
+          HttpStatus.BAD_REQUEST
+        );
       }
     }
     Object.assign(role, data);
@@ -83,7 +117,13 @@ export class RoleService {
   async delete(id: string): Promise<void> {
     const role = await this.findOne(id);
     if (role.isSystem) {
-      throw new BadRequestException('Cannot delete system roles');
+      throw new HttpException(
+        {
+          message: 'Cannot delete system roles',
+          errorKey: ErrorKeys.ROLES.CANNOT_DELETE_SYSTEM
+        },
+        HttpStatus.BAD_REQUEST
+      );
     }
     await this.invalidateUsersWithRole(id);
     await this.roleRepository.remove(role);

@@ -5,6 +5,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { ForgotPasswordComponent } from './forgot-password.component';
 import { AuthService } from '../../services/auth.service';
@@ -20,7 +21,7 @@ describe('ForgotPasswordComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [ForgotPasswordComponent],
+      imports: [ForgotPasswordComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
         provideHttpClient(),

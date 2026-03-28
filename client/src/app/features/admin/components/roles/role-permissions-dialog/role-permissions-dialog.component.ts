@@ -24,6 +24,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatIconModule } from '@angular/material/icon';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type {
   PermissionCondition,
   PermissionResponse,
@@ -54,7 +55,8 @@ export type PermissionGroup = {
     MatInputModule,
     MatChipsModule,
     MatTooltipModule,
-    MatIconModule
+    MatIconModule,
+    TranslocoDirective
   ],
   templateUrl: './role-permissions-dialog.component.html',
   styleUrl: './role-permissions-dialog.component.scss',
@@ -65,6 +67,7 @@ export class RolePermissionsDialogComponent implements OnInit {
   readonly #dialogRef = inject(MatDialogRef<RolePermissionsDialogComponent>);
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #translocoService = inject(TranslocoService);
 
   protected readonly data = inject<RolePermissionsDialogData>(MAT_DIALOG_DATA);
   protected readonly role = this.data.role;
@@ -146,7 +149,11 @@ export class RolePermissionsDialogComponent implements OnInit {
           this.loading.set(false);
         },
         error: () => {
-          this.error.set('Failed to load permissions. Please try again.');
+          this.error.set(
+            this.#translocoService.translate(
+              'admin.rolePermissions.errorLoadFailed'
+            )
+          );
           this.loading.set(false);
         }
       });
@@ -298,7 +305,13 @@ export class RolePermissionsDialogComponent implements OnInit {
       this.#patchCondition(permissionId, { fieldMatch: parsed });
       this.#clearJsonError(permissionId, 'fieldMatch');
     } catch {
-      this.#setJsonError(permissionId, 'fieldMatch', 'Invalid JSON object');
+      this.#setJsonError(
+        permissionId,
+        'fieldMatch',
+        this.#translocoService.translate(
+          'admin.rolePermissions.invalidJsonObject'
+        )
+      );
     }
   }
 
@@ -349,7 +362,13 @@ export class RolePermissionsDialogComponent implements OnInit {
       this.#patchCondition(permissionId, { userAttr: parsed });
       this.#clearJsonError(permissionId, 'userAttr');
     } catch {
-      this.#setJsonError(permissionId, 'userAttr', 'Invalid JSON object');
+      this.#setJsonError(
+        permissionId,
+        'userAttr',
+        this.#translocoService.translate(
+          'admin.rolePermissions.invalidJsonObject'
+        )
+      );
     }
   }
 
@@ -392,7 +411,11 @@ export class RolePermissionsDialogComponent implements OnInit {
       this.#patchCondition(permissionId, { custom: text });
       this.#clearJsonError(permissionId, 'custom');
     } catch {
-      this.#setJsonError(permissionId, 'custom', 'Invalid JSON');
+      this.#setJsonError(
+        permissionId,
+        'custom',
+        this.#translocoService.translate('admin.rolePermissions.invalidJson')
+      );
       // Store the text even if invalid so the user can keep editing
       this.#patchCondition(permissionId, { custom: text });
     }
@@ -421,8 +444,11 @@ export class RolePermissionsDialogComponent implements OnInit {
         error: (err) => {
           this.saving.set(false);
           this.#snackBar.open(
-            (err.error?.message as string) || 'Failed to save permissions.',
-            'Close',
+            (err.error?.message as string) ||
+              this.#translocoService.translate(
+                'admin.rolePermissions.errorSaveFailed'
+              ),
+            this.#translocoService.translate('common.close'),
             { duration: 5000 }
           );
         }

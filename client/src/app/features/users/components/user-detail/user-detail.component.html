@@ -1,8 +1,8 @@
-<div class="user-detail-container">
+<div class="user-detail-container" *transloco="let t; scope: 'users'">
   @let u = user();
   <mat-card>
     <mat-card-header>
-      <mat-card-title>User Details</mat-card-title>
+      <mat-card-title>{{ t('users.detail.title') }}</mat-card-title>
       <div class="spacer"></div>
       <ng-container
         *appRequirePermissions="{ action: 'search', subject: 'User' }"
@@ -11,7 +11,7 @@
           mat-icon-button
           color="primary"
           routerLink="/admin/users"
-          aria-label="Back to users list"
+          [attr.aria-label]="t('users.detail.backAriaLabel')"
         >
           <mat-icon>arrow_back</mat-icon>
         </button>
@@ -34,27 +34,37 @@
               <p class="email">{{ u.email }}</p>
               <div class="chips">
                 @if (u.isActive) {
-                  <mat-chip color="accent" highlighted>Active</mat-chip>
+                  <mat-chip color="accent" highlighted>{{
+                    t('common.active')
+                  }}</mat-chip>
                 } @else {
-                  <mat-chip color="warn" highlighted>Inactive</mat-chip>
+                  <mat-chip color="warn" highlighted>{{
+                    t('common.inactive')
+                  }}</mat-chip>
                 }
 
                 @if (isAdmin()) {
-                  <mat-chip color="primary" highlighted>Administrator</mat-chip>
+                  <mat-chip color="primary" highlighted>{{
+                    t('users.table.roleAdmin')
+                  }}</mat-chip>
                 } @else {
-                  <mat-chip>User</mat-chip>
+                  <mat-chip>{{ t('users.table.roleUser') }}</mat-chip>
                 }
 
                 @if (u.isEmailVerified) {
-                  <mat-chip color="accent" highlighted>Email Verified</mat-chip>
+                  <mat-chip color="accent" highlighted>{{
+                    t('users.detail.emailVerified')
+                  }}</mat-chip>
                 } @else {
-                  <mat-chip color="warn" highlighted
-                    >Email Not Verified</mat-chip
-                  >
+                  <mat-chip color="warn" highlighted>{{
+                    t('users.detail.emailNotVerified')
+                  }}</mat-chip>
                 }
 
                 @if (u.lockedUntil) {
-                  <mat-chip color="warn" highlighted>Account Locked</mat-chip>
+                  <mat-chip color="warn" highlighted>{{
+                    t('users.detail.accountLocked')
+                  }}</mat-chip>
                 }
               </div>
             </div>
@@ -63,22 +73,24 @@
           <mat-divider class="my-4"></mat-divider>
 
           <div class="detail-section">
-            <h3>User Information</h3>
+            <h3>{{ t('users.detail.userInfoSection') }}</h3>
 
             <div class="detail-item">
-              <div class="detail-label">User ID</div>
+              <div class="detail-label">{{ t('users.detail.userId') }}</div>
               <div class="detail-value">{{ u.id }}</div>
             </div>
 
             <div class="detail-item">
-              <div class="detail-label">Created On</div>
+              <div class="detail-label">{{ t('users.detail.createdOn') }}</div>
               <div class="detail-value">
                 {{ u.createdAt | date: 'medium' }}
               </div>
             </div>
 
             <div class="detail-item">
-              <div class="detail-label">Last Updated</div>
+              <div class="detail-label">
+                {{ t('users.detail.lastUpdated') }}
+              </div>
               <div class="detail-value">
                 {{ user()!.updatedAt | date: 'medium' }}
               </div>
@@ -94,17 +106,17 @@
               [routerLink]="['/admin/users', u.id, 'edit']"
             >
               <mat-icon>edit</mat-icon>
-              Edit User
+              {{ t('users.detail.editButton') }}
             </button>
           </div>
         }
       } @else {
         <div class="error-container">
           <mat-icon class="error-icon">error_outline</mat-icon>
-          <h3>User Not Found</h3>
-          <p>The requested user could not be found.</p>
+          <h3>{{ t('users.detail.notFoundTitle') }}</h3>
+          <p>{{ t('users.detail.notFoundMessage') }}</p>
           <button mat-raised-button color="primary" routerLink="/admin/users">
-            Back to Users
+            {{ t('users.detail.backToUsers') }}
           </button>
         </div>
       }

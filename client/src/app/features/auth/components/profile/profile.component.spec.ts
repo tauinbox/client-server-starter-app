@@ -8,6 +8,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute } from '@angular/router';
+import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { ProfileComponent } from './profile.component';
 import { AuthService } from '../../services/auth.service';
@@ -69,7 +70,7 @@ describe('ProfileComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [ProfileComponent],
+      imports: [ProfileComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
         provideHttpClient(),

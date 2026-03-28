@@ -35,6 +35,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 type ResetPasswordFormType = {
   password: FormControl<string>;
@@ -66,7 +67,8 @@ function passwordsMatchValidator(
     MatProgressSpinner,
     RouterLink,
     PasswordToggleComponent,
-    MatSuffix
+    MatSuffix,
+    TranslocoDirective
   ],
   templateUrl: './reset-password.component.html',
   styleUrl: './reset-password.component.scss',
@@ -78,6 +80,7 @@ export class ResetPasswordComponent implements OnInit {
   readonly #router = inject(Router);
   readonly #route = inject(ActivatedRoute);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #translocoService = inject(TranslocoService);
 
   protected readonly confirmPasswordErrorMatcher: ErrorStateMatcher = {
     isErrorState: () =>
@@ -110,7 +113,9 @@ export class ResetPasswordComponent implements OnInit {
 
     if (!this.#token) {
       this.invalidToken.set(true);
-      this.error.set('No reset token provided.');
+      this.error.set(
+        this.#translocoService.translate('auth.resetPassword.errorNoToken')
+      );
     }
   }
 
@@ -132,7 +137,7 @@ export class ResetPasswordComponent implements OnInit {
           this.loading.set(false);
           this.error.set(
             err.error?.message ||
-              'Password reset failed. The token may be invalid or expired.'
+              this.#translocoService.translate('auth.resetPassword.errorFailed')
           );
         }
       });

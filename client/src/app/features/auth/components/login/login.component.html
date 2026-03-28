@@ -1,54 +1,51 @@
-<div class="login-container">
+<div class="login-container" *transloco="let t; scope: 'auth'">
   <mat-card>
     <mat-card-header>
-      <mat-card-title>Login</mat-card-title>
+      <mat-card-title>{{ t('auth.login.title') }}</mat-card-title>
     </mat-card-header>
 
     <mat-card-content>
       @if (pendingVerification()) {
         <div class="info-message">
           <mat-icon>mark_email_read</mat-icon>
-          <span
-            >Registration successful! Please check your email to verify your
-            account before logging in.</span
-          >
+          <span>{{ t('auth.login.registrationPendingVerification') }}</span>
         </div>
       }
 
       <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
         <mat-form-field class="full-width">
-          <mat-label>Email</mat-label>
+          <mat-label>{{ t('auth.login.email') }}</mat-label>
           <input
             matInput
             autocomplete="on"
             type="email"
             formControlName="email"
-            placeholder="Email"
+            [placeholder]="t('auth.login.email')"
             required
           />
           <mat-icon matPrefix>email</mat-icon>
           <mat-error>
             @if (loginForm.get('email')?.errors?.['required']) {
-              Email is required
+              {{ t('auth.login.emailRequired') }}
             } @else if (loginForm.get('email')?.errors?.['email']) {
-              Please enter a valid email address
+              {{ t('auth.login.emailInvalid') }}
             }
           </mat-error>
         </mat-form-field>
 
         <mat-form-field class="full-width">
-          <mat-label>Password</mat-label>
+          <mat-label>{{ t('auth.login.password') }}</mat-label>
           <input
             matInput
             autocomplete="off"
             [type]="pwdToggle.show() ? 'text' : 'password'"
             formControlName="password"
-            placeholder="Password"
+            [placeholder]="t('auth.login.password')"
             required
           />
           <mat-icon matPrefix>lock</mat-icon>
           <app-password-toggle matSuffix #pwdToggle />
-          <mat-error>Password is required</mat-error>
+          <mat-error>{{ t('auth.login.passwordRequired') }}</mat-error>
         </mat-form-field>
 
         @if (error()) {
@@ -56,7 +53,11 @@
             {{ error() }}
             @if (lockoutSeconds() > 0) {
               <div class="lockout-countdown">
-                Try again in {{ lockoutSeconds() }} seconds
+                {{
+                  t('auth.login.lockoutCountdown', {
+                    seconds: lockoutSeconds()
+                  })
+                }}
               </div>
             }
           </div>
@@ -65,9 +66,9 @@
         @if (emailNotVerified()) {
           <div class="verification-actions">
             @if (verificationResent()) {
-              <span class="verification-sent"
-                >Verification email sent! Check your inbox.</span
-              >
+              <span class="verification-sent">{{
+                t('auth.login.verificationSent')
+              }}</span>
             } @else {
               <button
                 mat-button
@@ -78,9 +79,9 @@
               >
                 @if (resendingVerification()) {
                   <mat-spinner diameter="16"></mat-spinner>
-                  Sending...
+                  {{ t('auth.login.sending') }}
                 } @else {
-                  Resend verification email
+                  {{ t('auth.login.resendVerificationEmail') }}
                 }
               </button>
             }
@@ -96,21 +97,25 @@
           >
             @if (loading()) {
               <mat-spinner diameter="24"></mat-spinner>
-              <span class="ml-2">Logging in...</span>
+              <span class="ml-2">{{ t('auth.login.loggingIn') }}</span>
             } @else {
-              Login
+              {{ t('auth.login.title') }}
             }
           </button>
         </div>
 
         <div class="forgot-password-link">
-          <a routerLink="/forgot-password">Forgot password?</a>
+          <a routerLink="/forgot-password">{{
+            t('auth.login.forgotPassword')
+          }}</a>
         </div>
       </form>
 
       <div class="oauth-divider">
         <mat-divider></mat-divider>
-        <span class="oauth-divider-text">or sign in with</span>
+        <span class="oauth-divider-text">{{
+          t('auth.login.oauthDivider')
+        }}</span>
         <mat-divider></mat-divider>
       </div>
 
@@ -122,7 +127,7 @@
           (click)="onOAuthLogin('google')"
         >
           <mat-icon svgIcon="google"></mat-icon>
-          <span>Google</span>
+          <span>{{ t('auth.providers.google') }}</span>
         </button>
         <button
           mat-stroked-button
@@ -131,7 +136,7 @@
           (click)="onOAuthLogin('facebook')"
         >
           <mat-icon svgIcon="facebook"></mat-icon>
-          <span>Facebook</span>
+          <span>{{ t('auth.providers.facebook') }}</span>
         </button>
         <button
           mat-stroked-button
@@ -140,15 +145,15 @@
           (click)="onOAuthLogin('vk')"
         >
           <mat-icon svgIcon="vk"></mat-icon>
-          <span>VK</span>
+          <span>{{ t('auth.providers.vk') }}</span>
         </button>
       </div>
     </mat-card-content>
 
     <mat-card-actions>
       <p class="text-center full-width">
-        Don't have an account?
-        <a routerLink="/register">Register</a>
+        {{ t('auth.login.noAccount') }}
+        <a routerLink="/register">{{ t('auth.login.register') }}</a>
       </p>
     </mat-card-actions>
   </mat-card>

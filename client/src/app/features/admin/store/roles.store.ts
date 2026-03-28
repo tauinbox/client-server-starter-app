@@ -11,6 +11,7 @@ import {
 } from '@ngrx/signals/entities';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { TranslocoService } from '@jsverse/transloco';
 import type { RoleResponse } from '@app/shared/types/role.types';
 import type { CreateRole, UpdateRole } from '../services/role.service';
 import { RoleService } from '../services/role.service';
@@ -29,6 +30,7 @@ export const RolesStore = signalStore(
   withMethods((store) => {
     const roleService = inject(RoleService);
     const snackBar = inject(MatSnackBar);
+    const translocoService = inject(TranslocoService);
 
     return {
       load: rxMethod<void>(
@@ -42,13 +44,16 @@ export const RolesStore = signalStore(
                   patchState(store, { loading: false });
                 },
                 error: () => {
+                  const errorMsg = translocoService.translate(
+                    'admin.store.errorLoadRolesFailed'
+                  );
                   patchState(store, {
                     loading: false,
-                    error: 'Failed to load roles. Please try again.'
+                    error: errorMsg
                   });
                   snackBar.open(
-                    'Failed to load roles. Please try again.',
-                    'Close',
+                    errorMsg,
+                    translocoService.translate('common.close'),
                     { duration: 5000 }
                   );
                 }

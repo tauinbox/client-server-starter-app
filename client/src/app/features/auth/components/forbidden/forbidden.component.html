@@ -1,8 +1,8 @@
-<div class="container">
-  <h1>403</h1>
-  <h2>Access Forbidden</h2>
-  <p>You don't have permission to access this resource.</p>
+<div class="container" *transloco="let t; scope: 'auth'">
+  <h1>{{ t('auth.forbidden.code') }}</h1>
+  <h2>{{ t('auth.forbidden.title') }}</h2>
+  <p>{{ t('auth.forbidden.message') }}</p>
   <button mat-raised-button color="primary" routerLink="/">
-    <mat-icon>home</mat-icon> Go Home
+    <mat-icon>home</mat-icon> {{ t('auth.forbidden.goHome') }}
   </button>
 </div>

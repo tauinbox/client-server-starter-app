@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
+import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { OAuthCallbackComponent } from './oauth-callback.component';
 import { AuthStore } from '../../store/auth.store';
@@ -73,7 +74,7 @@ describe('OAuthCallbackComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [OAuthCallbackComponent],
+      imports: [OAuthCallbackComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
         provideNoopAnimations(),

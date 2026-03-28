@@ -3,12 +3,13 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { MatIconButton } from '@angular/material/button';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatIcon } from '@angular/material/icon';
+import { TranslocoDirective } from '@jsverse/transloco';
 import type { ThemeMode } from '@core/services/theme.service';
 import { ThemeService } from '@core/services/theme.service';
 
 @Component({
   selector: 'app-theme-toggle',
-  imports: [MatIconButton, MatTooltip, MatIcon],
+  imports: [MatIconButton, MatTooltip, MatIcon, TranslocoDirective],
   templateUrl: './theme-toggle.component.html',
   styleUrl: './theme-toggle.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

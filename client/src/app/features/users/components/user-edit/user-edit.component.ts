@@ -43,6 +43,7 @@ import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confir
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import { catchError, forkJoin, merge, of, tap } from 'rxjs';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { UsersStore } from '../../store/users.store';
@@ -78,7 +79,8 @@ type UserFormType = {
     MatSuffix,
     MatPrefix,
     MatSelect,
-    MatOption
+    MatOption,
+    TranslocoDirective
   ],
   templateUrl: './user-edit.component.html',
   styleUrl: './user-edit.component.scss',
@@ -94,6 +96,7 @@ export class UserEditComponent implements OnInit {
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #translocoService = inject(TranslocoService);
 
   readonly id = input.required<string>();
   readonly user = signal<User | null>(null);
@@ -197,9 +200,13 @@ export class UserEditComponent implements OnInit {
           this.loading.set(false);
           const errorMessage =
             err.error?.message ||
-            'Failed to load user details. Please try again.';
+            this.#translocoService.translate('users.edit.errorLoadFailed');
           this.error.set(errorMessage);
-          this.#snackBar.open(errorMessage, 'Close', { duration: 5000 });
+          this.#snackBar.open(
+            errorMessage,
+            this.#translocoService.translate('common.close'),
+            { duration: 5000 }
+          );
         }
       });
   }
@@ -259,9 +266,11 @@ export class UserEditComponent implements OnInit {
           this.userForm.patchValue({ password: '' });
           this.userForm.markAsPristine();
 
-          this.#snackBar.open('User updated successfully', 'Close', {
-            duration: 5000
-          });
+          this.#snackBar.open(
+            this.#translocoService.translate('users.edit.successUpdated'),
+            this.#translocoService.translate('common.close'),
+            { duration: 5000 }
+          );
           void this.#router.navigate([
             `/${AppRouteSegmentEnum.Admin}`,
             AppRouteSegmentEnum.Users,
@@ -293,7 +302,8 @@ export class UserEditComponent implements OnInit {
   #handleUpdateError(err: HttpErrorResponse): void {
     this.saving.set(false);
     this.error.set(
-      err.error?.message || 'Failed to update user. Please try again.'
+      err.error?.message ||
+        this.#translocoService.translate('users.edit.errorUpdateFailed')
     );
   }
 
@@ -306,15 +316,18 @@ export class UserEditComponent implements OnInit {
         next: (user) => {
           this.saving.set(false);
           this.user.set(user);
-          this.#snackBar.open('Account unlocked successfully', 'Close', {
-            duration: 5000
-          });
+          this.#snackBar.open(
+            this.#translocoService.translate('users.edit.successUnlocked'),
+            this.#translocoService.translate('common.close'),
+            { duration: 5000 }
+          );
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
           this.#snackBar.open(
-            err.error?.message || 'Failed to unlock account',
-            'Close',
+            err.error?.message ||
+              this.#translocoService.translate('users.edit.errorUnlockFailed'),
+            this.#translocoService.translate('common.close'),
             { duration: 5000 }
           );
         }
@@ -328,10 +341,18 @@ export class UserEditComponent implements OnInit {
       .open(ConfirmDialogComponent, {
         ...dialogSizeConfig(DialogSize.Confirm),
         data: {
-          title: 'Confirm Delete',
-          message: `Are you sure you want to delete user ${this.user()!.firstName} ${this.user()!.lastName}?`,
-          confirmButton: 'Delete',
-          cancelButton: 'Cancel',
+          title: this.#translocoService.translate(
+            'users.edit.confirmDeleteTitle'
+          ),
+          message: this.#translocoService.translate(
+            'users.edit.confirmDeleteMessage',
+            {
+              firstName: this.user()!.firstName,
+              lastName: this.user()!.lastName
+            }
+          ),
+          confirmButton: this.#translocoService.translate('common.delete'),
+          cancelButton: this.#translocoService.translate('common.cancel'),
           icon: 'warning'
         }
       })
@@ -350,9 +371,11 @@ export class UserEditComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
-          this.#snackBar.open('User deleted successfully', 'Close', {
-            duration: 5000
-          });
+          this.#snackBar.open(
+            this.#translocoService.translate('users.edit.successDeleted'),
+            this.#translocoService.translate('common.close'),
+            { duration: 5000 }
+          );
           void this.#router.navigate([
             `/${AppRouteSegmentEnum.Admin}`,
             AppRouteSegmentEnum.Users
@@ -360,8 +383,9 @@ export class UserEditComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.#snackBar.open(
-            err.error?.message || 'Failed to delete user. Please try again.',
-            'Close',
+            err.error?.message ||
+              this.#translocoService.translate('users.edit.errorDeleteFailed'),
+            this.#translocoService.translate('common.close'),
             { duration: 5000 }
           );
         }

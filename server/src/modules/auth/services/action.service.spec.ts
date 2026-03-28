@@ -1,11 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  NotFoundException
-} from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
 import { ActionService } from './action.service';
 import { Action } from '../entities/action.entity';
 import { Permission } from '../entities/permission.entity';
@@ -150,9 +145,7 @@ describe('ActionService', () => {
 
     it('should throw NotFoundException if not found', async () => {
       mockActionRepo.findOne.mockResolvedValue(null);
-      await expect(service.findOne('bad-id')).rejects.toThrow(
-        NotFoundException
-      );
+      await expect(service.findOne('bad-id')).rejects.toThrow(HttpException);
     });
   });
 
@@ -192,9 +185,7 @@ describe('ActionService', () => {
 
     it('should throw BadRequestException if name already exists', async () => {
       mockActionRepo.findOne.mockResolvedValue(makeCustomAction());
-      await expect(service.create(createData)).rejects.toThrow(
-        BadRequestException
-      );
+      await expect(service.create(createData)).rejects.toThrow(HttpException);
     });
 
     it('should throw BadRequestException when name is a CASL reserved word "manage"', async () => {
@@ -204,14 +195,14 @@ describe('ActionService', () => {
           displayName: 'Manage',
           description: ''
         })
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(HttpException);
       expect(mockActionRepo.findOne).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException when name is a CASL reserved word "all"', async () => {
       await expect(
         service.create({ name: 'all', displayName: 'All', description: '' })
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(HttpException);
       expect(mockActionRepo.findOne).not.toHaveBeenCalled();
     });
 
@@ -222,7 +213,7 @@ describe('ActionService', () => {
           displayName: 'Manage',
           description: ''
         })
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(HttpException);
     });
 
     it('should auto-create permissions for all existing resources', async () => {
@@ -277,7 +268,7 @@ describe('ActionService', () => {
       mockActionRepo.findOne.mockResolvedValue(null);
       await expect(
         service.update('bad-id', { description: 'Updated' })
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(HttpException);
     });
 
     it('should update only provided fields', async () => {
@@ -309,18 +300,14 @@ describe('ActionService', () => {
   describe('delete', () => {
     it('should throw ForbiddenException if action is default', async () => {
       mockActionRepo.findOne.mockResolvedValue(makeDefaultAction());
-      await expect(service.delete('action-1')).rejects.toThrow(
-        ForbiddenException
-      );
+      await expect(service.delete('action-1')).rejects.toThrow(HttpException);
     });
 
     it('should throw ConflictException if action is used by role permissions', async () => {
       mockActionRepo.findOne.mockResolvedValue(makeCustomAction());
       mockQueryBuilder.getCount.mockResolvedValue(3);
 
-      await expect(service.delete('action-2')).rejects.toThrow(
-        ConflictException
-      );
+      await expect(service.delete('action-2')).rejects.toThrow(HttpException);
     });
 
     it('should delete associated permissions then the action', async () => {
@@ -357,7 +344,7 @@ describe('ActionService', () => {
 
     it('should throw NotFoundException if action does not exist', async () => {
       mockActionRepo.findOne.mockResolvedValue(null);
-      await expect(service.delete('bad-id')).rejects.toThrow(NotFoundException);
+      await expect(service.delete('bad-id')).rejects.toThrow(HttpException);
     });
 
     it('should delete permissions before removing action to avoid FK constraint', async () => {

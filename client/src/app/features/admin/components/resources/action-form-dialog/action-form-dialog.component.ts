@@ -14,6 +14,7 @@ import {
   MatLabel
 } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
+import { TranslocoDirective } from '@jsverse/transloco';
 import type { ActionResponse } from '@app/shared/types/rbac.types';
 
 export type ActionFormDialogData = {
@@ -44,7 +45,8 @@ const ACTION_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
     MatLabel,
     MatError,
     MatHint,
-    MatInput
+    MatInput,
+    TranslocoDirective
   ],
   templateUrl: './action-form-dialog.component.html',
   styleUrl: './action-form-dialog.component.scss',

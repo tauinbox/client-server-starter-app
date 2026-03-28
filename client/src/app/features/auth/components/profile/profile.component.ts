@@ -45,6 +45,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { AuthStore } from '@features/auth/store/auth.store';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 type ProfileFormType = {
   firstName: FormControl<string>;
@@ -67,10 +68,10 @@ type OAuthAccountInfo = {
   createdAt: string;
 };
 
-const PROVIDER_LABELS: Record<string, string> = {
-  google: 'Google',
-  facebook: 'Facebook',
-  vk: 'VK'
+const PROVIDER_KEYS: Record<string, string> = {
+  google: 'auth.providers.google',
+  facebook: 'auth.providers.facebook',
+  vk: 'auth.providers.vk'
 };
 
 @Component({
@@ -91,7 +92,8 @@ const PROVIDER_LABELS: Record<string, string> = {
     MatButton,
     DatePipe,
     PasswordToggleComponent,
-    MatSuffix
+    MatSuffix,
+    TranslocoDirective
   ],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
@@ -107,6 +109,7 @@ export class ProfileComponent implements OnInit {
   readonly #route = inject(ActivatedRoute);
   readonly #router = inject(Router);
   readonly #authStore = inject(AuthStore);
+  readonly #transloco = inject(TranslocoService);
 
   protected readonly confirmPasswordErrorMatcher: ErrorStateMatcher = {
     isErrorState: () =>
@@ -127,7 +130,6 @@ export class ProfileComponent implements OnInit {
   protected readonly oauthAccounts = signal<OAuthAccountInfo[]>([]);
   protected readonly oauthLoading = signal(false);
   protected readonly allProviders = Object.keys(OAUTH_URLS);
-  protected readonly providerLabels = PROVIDER_LABELS;
 
   protected readonly profileForm: FormGroup<ProfileFormType> =
     this.#fb.group<ProfileFormType>(
@@ -162,8 +164,13 @@ export class ProfileComponent implements OnInit {
     const error = this.#route.snapshot.queryParamMap.get('oauth_error');
 
     if (provider) {
+      const providerLabel = this.#transloco.translate(
+        PROVIDER_KEYS[provider] || 'auth.providers.' + provider
+      );
       this.#snackBar.open(
-        `${PROVIDER_LABELS[provider] || provider} account connected successfully`,
+        this.#transloco.translate('auth.profile.oauthConnected', {
+          provider: providerLabel
+        }),
         'Close',
         { duration: 5000 }
       );
@@ -173,7 +180,7 @@ export class ProfileComponent implements OnInit {
       });
     } else if (error) {
       this.#snackBar.open(
-        'Failed to link OAuth account. Please try again.',
+        this.#transloco.translate('auth.profile.errorLinkFailed'),
         'Close',
         { duration: 5000 }
       );
@@ -206,7 +213,8 @@ export class ProfileComponent implements OnInit {
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           const errorMessage =
-            err.error?.message || 'Failed to load profile. Please try again.';
+            err.error?.message ||
+            this.#transloco.translate('auth.profile.errorLoadFailed');
           this.error.set(errorMessage);
         }
       });
@@ -242,7 +250,8 @@ export class ProfileComponent implements OnInit {
         error: (err: HttpErrorResponse) => {
           this.oauthLoading.set(false);
           this.#snackBar.open(
-            err.error?.message || 'Failed to initiate link',
+            err.error?.message ||
+              this.#transloco.translate('auth.profile.errorInitiateLinkFailed'),
             'Close',
             { duration: 5000 }
           );
@@ -261,8 +270,13 @@ export class ProfileComponent implements OnInit {
           this.oauthAccounts.update((accounts) =>
             accounts.filter((a) => a.provider !== provider)
           );
+          const providerLabel = this.#transloco.translate(
+            PROVIDER_KEYS[provider] || 'auth.providers.' + provider
+          );
           this.#snackBar.open(
-            `${PROVIDER_LABELS[provider] || provider} account disconnected`,
+            this.#transloco.translate('auth.profile.oauthDisconnected', {
+              provider: providerLabel
+            }),
             'Close',
             { duration: 5000 }
           );
@@ -270,7 +284,8 @@ export class ProfileComponent implements OnInit {
         error: (err: HttpErrorResponse) => {
           this.oauthLoading.set(false);
           this.#snackBar.open(
-            err.error?.message || 'Failed to disconnect account',
+            err.error?.message ||
+              this.#transloco.translate('auth.profile.errorDisconnectFailed'),
             'Close',
             { duration: 5000 }
           );
@@ -306,14 +321,17 @@ export class ProfileComponent implements OnInit {
           this.profileForm.patchValue({ password: '', confirmPassword: '' });
           this.profileForm.markAsPristine();
 
-          this.#snackBar.open('Profile updated successfully', 'Close', {
-            duration: 5000
-          });
+          this.#snackBar.open(
+            this.#transloco.translate('auth.profile.successUpdated'),
+            'Close',
+            { duration: 5000 }
+          );
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
           const errorMessage =
-            err.error?.message || 'Failed to update profile. Please try again.';
+            err.error?.message ||
+            this.#transloco.translate('auth.profile.errorUpdateFailed');
           this.error.set(errorMessage);
         }
       });

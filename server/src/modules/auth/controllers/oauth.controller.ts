@@ -1,8 +1,9 @@
 import {
-  BadRequestException,
   Controller,
   Delete,
   Get,
+  HttpException,
+  HttpStatus,
   Logger,
   Param,
   Post,
@@ -33,6 +34,7 @@ import { UsersService } from '../../users/services/users.service';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 
 @ApiTags('OAuth API')
 @Controller({
@@ -190,7 +192,13 @@ export class OAuthController {
     @Request() req: JwtAuthRequest
   ) {
     if (!Object.values(OAuthProvider).includes(provider as OAuthProvider)) {
-      throw new BadRequestException(`Invalid OAuth provider: ${provider}`);
+      throw new HttpException(
+        {
+          message: `Invalid OAuth provider: ${provider}`,
+          errorKey: ErrorKeys.AUTH.INVALID_OAUTH_PROVIDER
+        },
+        HttpStatus.BAD_REQUEST
+      );
     }
 
     const userId = req.user.userId;
@@ -203,8 +211,13 @@ export class OAuthController {
     ).length;
 
     if (!hasPassword && otherOAuthCount === 0) {
-      throw new BadRequestException(
-        'Cannot unlink the last OAuth provider without a password set. Please set a password first.'
+      throw new HttpException(
+        {
+          message:
+            'Cannot unlink the last OAuth provider without a password set. Please set a password first.',
+          errorKey: ErrorKeys.AUTH.UNLINK_LAST_PROVIDER
+        },
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -241,7 +254,13 @@ export class OAuthController {
     });
 
     if (!cookie) {
-      throw new BadRequestException('Missing OAuth data');
+      throw new HttpException(
+        {
+          message: 'Missing OAuth data',
+          errorKey: ErrorKeys.AUTH.MISSING_OAUTH_DATA
+        },
+        HttpStatus.BAD_REQUEST
+      );
     }
 
     try {
@@ -267,7 +286,13 @@ export class OAuthController {
       });
       return { tokens: publicTokens, user: payload.data.user };
     } catch {
-      throw new BadRequestException('Invalid or expired OAuth data');
+      throw new HttpException(
+        {
+          message: 'Invalid or expired OAuth data',
+          errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA
+        },
+        HttpStatus.BAD_REQUEST
+      );
     }
   }
 

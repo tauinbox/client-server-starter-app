@@ -1,7 +1,8 @@
-<mat-toolbar color="primary">
+<mat-toolbar color="primary" *transloco="let t">
   <span [matTooltip]="appVersion">{{ appName }}</span>
   <span class="spacer"></span>
 
+  <app-language-switcher></app-language-switcher>
   <app-theme-toggle></app-theme-toggle>
 
   @if (authStore.isAuthenticated()) {
@@ -12,7 +13,7 @@
     <mat-menu #menu="matMenu">
       <button mat-menu-item (click)="logout()">
         <mat-icon>logout</mat-icon>
-        <span>Logout</span>
+        <span>{{ t('header.logout') }}</span>
       </button>
     </mat-menu>
   } @else {
@@ -21,14 +22,14 @@
       [routerLink]="'/' + routes.Login"
       routerLinkActive="active"
     >
-      Login
+      {{ t('header.login') }}
     </button>
     <button
       mat-button
       [routerLink]="'/' + routes.Register"
       routerLinkActive="active"
     >
-      Register
+      {{ t('header.register') }}
     </button>
   }
 </mat-toolbar>

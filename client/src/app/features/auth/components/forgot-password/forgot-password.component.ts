@@ -24,6 +24,7 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 type ForgotPasswordFormType = {
   email: FormControl<string>;
@@ -45,7 +46,8 @@ type ForgotPasswordFormType = {
     MatIcon,
     MatButton,
     MatProgressSpinner,
-    RouterLink
+    RouterLink,
+    TranslocoDirective
   ],
   templateUrl: './forgot-password.component.html',
   styleUrl: './forgot-password.component.scss',
@@ -55,6 +57,7 @@ export class ForgotPasswordComponent {
   readonly #fb = inject(FormBuilder);
   readonly #authService = inject(AuthService);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #translocoService = inject(TranslocoService);
 
   @ViewChild('successHeading') successHeading?: ElementRef<HTMLElement>;
 
@@ -86,7 +89,9 @@ export class ForgotPasswordComponent {
         },
         error: () => {
           this.loading.set(false);
-          this.error.set('Something went wrong. Please try again later.');
+          this.error.set(
+            this.#translocoService.translate('auth.forgotPassword.errorFailed')
+          );
         }
       });
   }

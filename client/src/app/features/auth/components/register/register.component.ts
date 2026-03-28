@@ -30,6 +30,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 type RegisterFormType = {
   email: FormControl<string>;
@@ -56,7 +57,8 @@ type RegisterFormType = {
     MatCardActions,
     RouterLink,
     PasswordToggleComponent,
-    MatSuffix
+    MatSuffix,
+    TranslocoDirective
   ],
   templateUrl: './register.component.html',
   styleUrl: './register.component.scss',
@@ -67,6 +69,7 @@ export class RegisterComponent {
   readonly #authService = inject(AuthService);
   readonly #router = inject(Router);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #translocoService = inject(TranslocoService);
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -112,10 +115,15 @@ export class RegisterComponent {
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           if (err.status === 409) {
-            this.error.set('User with this email already exists.');
-          } else {
             this.error.set(
-              err.error?.message || 'Registration failed. Please try again.'
+              this.#translocoService.translate('auth.register.errorEmailExists')
+            );
+          } else {
+            const errorKey = err.error?.errorKey as string | undefined;
+            this.error.set(
+              errorKey
+                ? this.#translocoService.translate(errorKey)
+                : this.#translocoService.translate('auth.register.errorFailed')
             );
           }
         }

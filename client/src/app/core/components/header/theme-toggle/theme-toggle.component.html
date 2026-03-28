@@ -1,12 +1,15 @@
-@let isDarkTheme = theme() === 'dark';
-@let tooltip = isDarkTheme ? 'Switch to light theme' : 'Switch to dark theme';
-@let icon = isDarkTheme ? 'light_mode' : 'dark_mode';
+<ng-container *transloco="let t">
+  @let isDarkTheme = theme() === 'dark';
+  @let tooltip =
+    isDarkTheme ? t('theme.switchToLight') : t('theme.switchToDark');
+  @let icon = isDarkTheme ? 'light_mode' : 'dark_mode';
 
-<button
-  mat-icon-button
-  (click)="toggleTheme()"
-  [matTooltip]="tooltip"
-  aria-label="Toggle theme"
->
-  <mat-icon [fontIcon]="icon"></mat-icon>
-</button>
+  <button
+    mat-icon-button
+    (click)="toggleTheme()"
+    [matTooltip]="tooltip"
+    aria-label="Toggle theme"
+  >
+    <mat-icon [fontIcon]="icon"></mat-icon>
+  </button>
+</ng-container>

@@ -26,7 +26,8 @@
     "migrations:revert": "npx typeorm-ts-node-esm migration:revert -d dist/server/src/postgres-data-source.js",
     "check:routes": "ts-node scripts/check-routes.ts",
     "check:enums": "ts-node scripts/check-enums.ts",
-    "check:permissions": "ts-node scripts/check-permissions.ts"
+    "check:permissions": "ts-node scripts/check-permissions.ts",
+    "check:i18n": "ts-node scripts/check-i18n-keys.ts"
   },
   "dependencies": {
     "@casl/ability": "^6.8.0",

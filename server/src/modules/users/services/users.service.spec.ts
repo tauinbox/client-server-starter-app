@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
 import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
@@ -121,11 +121,11 @@ describe('UsersService', () => {
       expect(result).toEqual(mockUser);
     });
 
-    it('should throw ConflictException when email already exists', async () => {
+    it('should throw HttpException when email already exists', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
 
       await expect(service.create(createUserDto)).rejects.toThrow(
-        ConflictException
+        HttpException
       );
       await expect(service.create(createUserDto)).rejects.toThrow(
         'User with this email already exists'
@@ -146,11 +146,11 @@ describe('UsersService', () => {
       expect(result).toEqual(mockUser);
     });
 
-    it('should throw NotFoundException when user not found', async () => {
+    it('should throw HttpException when user not found', async () => {
       mockRepository.findOne.mockResolvedValue(null);
 
       await expect(service.findOne('nonexistent')).rejects.toThrow(
-        NotFoundException
+        HttpException
       );
       await expect(service.findOne('nonexistent')).rejects.toThrow(
         'User with ID nonexistent not found'
@@ -354,12 +354,12 @@ describe('UsersService', () => {
       });
     });
 
-    it('should throw NotFoundException when user not found', async () => {
+    it('should throw HttpException when user not found', async () => {
       mockRepository.findOne.mockResolvedValue(null);
 
       await expect(
         service.update('nonexistent', { firstName: 'Updated' })
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(HttpException);
     });
 
     it('should unlock account when unlockAccount is true', async () => {
@@ -396,11 +396,11 @@ describe('UsersService', () => {
       expect(mockRepository.softRemove).toHaveBeenCalledWith(mockUser);
     });
 
-    it('should throw NotFoundException when user not found', async () => {
+    it('should throw HttpException when user not found', async () => {
       mockRepository.findOne.mockResolvedValue(null);
 
       await expect(service.remove('nonexistent')).rejects.toThrow(
-        NotFoundException
+        HttpException
       );
     });
   });
@@ -439,11 +439,11 @@ describe('UsersService', () => {
       expect(result).toEqual(mockUser);
     });
 
-    it('should throw NotFoundException when user does not exist', async () => {
+    it('should throw HttpException when user does not exist', async () => {
       mockRepository.findOne.mockResolvedValue(null);
 
       await expect(service.restore('nonexistent')).rejects.toThrow(
-        NotFoundException
+        HttpException
       );
     });
   });

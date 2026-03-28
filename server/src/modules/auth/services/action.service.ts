@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException
-} from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Action } from '../entities/action.entity';
@@ -12,6 +6,7 @@ import { Permission } from '../entities/permission.entity';
 import { Resource } from '../entities/resource.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { CASL_RESERVED_ACTION_NAMES } from '../casl/constants';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 
 @Injectable()
 export class ActionService {
@@ -33,7 +28,10 @@ export class ActionService {
   async findOne(id: string): Promise<Action> {
     const action = await this.actionRepository.findOne({ where: { id } });
     if (!action) {
-      throw new NotFoundException('Action not found');
+      throw new HttpException(
+        { message: 'Action not found' },
+        HttpStatus.NOT_FOUND
+      );
     }
     return action;
   }
@@ -46,8 +44,12 @@ export class ActionService {
     const normalizedName = data.name.toLowerCase().trim();
 
     if (CASL_RESERVED_ACTION_NAMES.includes(normalizedName)) {
-      throw new BadRequestException(
-        `Action name "${normalizedName}" is reserved and cannot be used`
+      throw new HttpException(
+        {
+          message: `Action name "${normalizedName}" is reserved and cannot be used`,
+          errorKey: ErrorKeys.ACTIONS.NAME_RESERVED
+        },
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -55,7 +57,13 @@ export class ActionService {
       where: { name: normalizedName }
     });
     if (existing) {
-      throw new BadRequestException('Action with this name already exists');
+      throw new HttpException(
+        {
+          message: 'Action with this name already exists',
+          errorKey: ErrorKeys.ACTIONS.NAME_EXISTS
+        },
+        HttpStatus.BAD_REQUEST
+      );
     }
 
     const action = this.actionRepository.create({
@@ -93,7 +101,13 @@ export class ActionService {
     const action = await this.findOne(id);
 
     if (action.isDefault) {
-      throw new ForbiddenException('Cannot delete default actions');
+      throw new HttpException(
+        {
+          message: 'Cannot delete default actions',
+          errorKey: ErrorKeys.ACTIONS.CANNOT_DELETE_DEFAULT
+        },
+        HttpStatus.FORBIDDEN
+      );
     }
 
     // Check if any role_permissions reference permissions with this action
@@ -104,8 +118,13 @@ export class ActionService {
       .getCount();
 
     if (usedCount > 0) {
-      throw new ConflictException(
-        'Cannot delete action that is assigned to roles. Remove it from all roles first.'
+      throw new HttpException(
+        {
+          message:
+            'Cannot delete action that is assigned to roles. Remove it from all roles first.',
+          errorKey: ErrorKeys.ACTIONS.ASSIGNED_TO_ROLES
+        },
+        HttpStatus.CONFLICT
       );
     }
 

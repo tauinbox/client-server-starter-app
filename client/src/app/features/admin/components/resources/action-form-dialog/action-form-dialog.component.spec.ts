@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 
 import { ActionFormDialogComponent } from './action-form-dialog.component';
 import type { ActionFormDialogData } from './action-form-dialog.component';
@@ -26,7 +27,7 @@ describe('ActionFormDialogComponent', () => {
     dialogRefMock = { close: vi.fn() };
 
     TestBed.configureTestingModule({
-      imports: [ActionFormDialogComponent],
+      imports: [ActionFormDialogComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideNoopAnimations(),
         { provide: MatDialogRef, useValue: dialogRefMock },

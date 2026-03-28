@@ -33,6 +33,7 @@ import {
   MatRowDef,
   MatTable
 } from '@angular/material/table';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { RoleResponse } from '@app/shared/types/role.types';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AuthService } from '@features/auth/services/auth.service';
@@ -70,7 +71,8 @@ import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-
     MatHeaderCellDef,
     MatHeaderRowDef,
     MatRowDef,
-    MatCell
+    MatCell,
+    TranslocoDirective
   ],
   templateUrl: './role-list.component.html',
   styleUrl: './role-list.component.scss',
@@ -82,6 +84,7 @@ export class RoleListComponent implements OnInit {
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
   readonly #authService = inject(AuthService);
+  readonly #translocoService = inject(TranslocoService);
   protected readonly authStore = inject(AuthStore);
 
   readonly loading = this.#rolesStore.loading;
@@ -125,14 +128,21 @@ export class RoleListComponent implements OnInit {
             .pipe(takeUntilDestroyed(this.#destroyRef))
             .subscribe({
               next: () => {
-                this.#snackBar.open('Role created successfully', 'Close', {
-                  duration: 5000
-                });
+                this.#snackBar.open(
+                  this.#translocoService.translate(
+                    'admin.roles.successCreated'
+                  ),
+                  this.#translocoService.translate('common.close'),
+                  { duration: 5000 }
+                );
               },
               error: (err) => {
                 this.#snackBar.open(
-                  (err.error?.message as string) || 'Failed to create role.',
-                  'Close',
+                  (err.error?.message as string) ||
+                    this.#translocoService.translate(
+                      'admin.roles.errorCreateFailed'
+                    ),
+                  this.#translocoService.translate('common.close'),
                   { duration: 5000 }
                 );
               }
@@ -157,14 +167,21 @@ export class RoleListComponent implements OnInit {
             .pipe(takeUntilDestroyed(this.#destroyRef))
             .subscribe({
               next: () => {
-                this.#snackBar.open('Role updated successfully', 'Close', {
-                  duration: 5000
-                });
+                this.#snackBar.open(
+                  this.#translocoService.translate(
+                    'admin.roles.successUpdated'
+                  ),
+                  this.#translocoService.translate('common.close'),
+                  { duration: 5000 }
+                );
               },
               error: (err) => {
                 this.#snackBar.open(
-                  (err.error?.message as string) || 'Failed to update role.',
-                  'Close',
+                  (err.error?.message as string) ||
+                    this.#translocoService.translate(
+                      'admin.roles.errorUpdateFailed'
+                    ),
+                  this.#translocoService.translate('common.close'),
                   { duration: 5000 }
                 );
               }
@@ -187,9 +204,11 @@ export class RoleListComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((changed: boolean | undefined) => {
         if (changed) {
-          this.#snackBar.open('Permissions updated successfully', 'Close', {
-            duration: 5000
-          });
+          this.#snackBar.open(
+            this.#translocoService.translate('admin.roles.permissionsUpdated'),
+            this.#translocoService.translate('common.close'),
+            { duration: 5000 }
+          );
           void this.#authService.fetchPermissions();
         }
       });
@@ -200,10 +219,15 @@ export class RoleListComponent implements OnInit {
       .open(ConfirmDialogComponent, {
         ...dialogSizeConfig(DialogSize.Confirm),
         data: {
-          title: 'Delete Role',
-          message: `Are you sure you want to delete the role "${role.name}"?`,
-          confirmButton: 'Delete',
-          cancelButton: 'Cancel'
+          title: this.#translocoService.translate(
+            'admin.roles.confirmDeleteTitle'
+          ),
+          message: this.#translocoService.translate(
+            'admin.roles.confirmDeleteMessage',
+            { name: role.name }
+          ),
+          confirmButton: this.#translocoService.translate('common.delete'),
+          cancelButton: this.#translocoService.translate('common.cancel')
         }
       })
       .afterClosed()
@@ -215,14 +239,21 @@ export class RoleListComponent implements OnInit {
             .pipe(takeUntilDestroyed(this.#destroyRef))
             .subscribe({
               next: () => {
-                this.#snackBar.open('Role deleted successfully', 'Close', {
-                  duration: 5000
-                });
+                this.#snackBar.open(
+                  this.#translocoService.translate(
+                    'admin.roles.successDeleted'
+                  ),
+                  this.#translocoService.translate('common.close'),
+                  { duration: 5000 }
+                );
               },
               error: (err) => {
                 this.#snackBar.open(
-                  (err.error?.message as string) || 'Failed to delete role.',
-                  'Close',
+                  (err.error?.message as string) ||
+                    this.#translocoService.translate(
+                      'admin.roles.errorDeleteFailed'
+                    ),
+                  this.#translocoService.translate('common.close'),
                   { duration: 5000 }
                 );
               }

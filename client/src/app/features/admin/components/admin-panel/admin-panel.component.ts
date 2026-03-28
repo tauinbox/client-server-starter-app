@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatTabLink, MatTabNav, MatTabNavPanel } from '@angular/material/tabs';
+import { TranslocoDirective } from '@jsverse/transloco';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { RequirePermissionsDirective } from '@features/auth/directives/require-permissions.directive';
 
@@ -13,7 +14,8 @@ import { RequirePermissionsDirective } from '@features/auth/directives/require-p
     MatTabNav,
     MatTabLink,
     MatTabNavPanel,
-    RequirePermissionsDirective
+    RequirePermissionsDirective,
+    TranslocoDirective
   ],
   templateUrl: './admin-panel.component.html',
   styleUrl: './admin-panel.component.scss',

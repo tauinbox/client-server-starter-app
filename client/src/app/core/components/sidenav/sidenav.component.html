@@ -1,57 +1,61 @@
-<div class="nav-container" [class.wide]="sidenavState.isWide()">
-  <nav class="nav-items">
-    @if (sidenavState.canAccessAdmin()) {
+<ng-container *transloco="let t">
+  <div class="nav-container" [class.wide]="sidenavState.isWide()">
+    <nav class="nav-items">
+      @if (sidenavState.canAccessAdmin()) {
+        <a
+          class="nav-link"
+          matRipple
+          #adminRla="routerLinkActive"
+          routerLinkActive
+          [class.active]="adminRla.isActive"
+          [routerLink]="'/' + routes.Admin"
+          [matTooltip]="sidenavState.isWide() ? '' : t('sidenav.adminPanel')"
+          matTooltipPosition="after"
+          [matTooltipShowDelay]="300"
+        >
+          <mat-icon>admin_panel_settings</mat-icon>
+          @if (sidenavState.isWide()) {
+            <span>{{ t('sidenav.adminPanel') }}</span>
+          }
+        </a>
+      }
+    </nav>
+
+    <div class="nav-footer">
       <a
         class="nav-link"
         matRipple
-        #adminRla="routerLinkActive"
+        #profileRla="routerLinkActive"
         routerLinkActive
-        [class.active]="adminRla.isActive"
-        [routerLink]="'/' + routes.Admin"
-        [matTooltip]="sidenavState.isWide() ? '' : 'Admin Panel'"
+        [class.active]="profileRla.isActive"
+        [routerLink]="'/' + routes.Profile"
+        [matTooltip]="sidenavState.isWide() ? '' : t('sidenav.profile')"
         matTooltipPosition="after"
         [matTooltipShowDelay]="300"
       >
-        <mat-icon>admin_panel_settings</mat-icon>
+        <mat-icon>account_circle</mat-icon>
         @if (sidenavState.isWide()) {
-          <span>Admin Panel</span>
+          <span
+            >{{ authStore.user()?.firstName }}
+            {{ authStore.user()?.lastName }}</span
+          >
         }
       </a>
-    }
-  </nav>
-
-  <div class="nav-footer">
-    <a
-      class="nav-link"
-      matRipple
-      #profileRla="routerLinkActive"
-      routerLinkActive
-      [class.active]="profileRla.isActive"
-      [routerLink]="'/' + routes.Profile"
-      [matTooltip]="sidenavState.isWide() ? '' : 'Profile'"
-      matTooltipPosition="after"
-      [matTooltipShowDelay]="300"
-    >
-      <mat-icon>account_circle</mat-icon>
-      @if (sidenavState.isWide()) {
-        <span
-          >{{ authStore.user()?.firstName }}
-          {{ authStore.user()?.lastName }}</span
-        >
-      }
-    </a>
+    </div>
   </div>
-</div>
 
-<button
-  class="toggle-btn"
-  [class.wide]="sidenavState.isWide()"
-  matRipple
-  (click)="sidenavState.toggleWide()"
-  [matTooltip]="sidenavState.isWide() ? 'Collapse' : 'Expand'"
-  matTooltipPosition="after"
->
-  <mat-icon>{{
-    sidenavState.isWide() ? 'chevron_left' : 'chevron_right'
-  }}</mat-icon>
-</button>
+  <button
+    class="toggle-btn"
+    [class.wide]="sidenavState.isWide()"
+    matRipple
+    (click)="sidenavState.toggleWide()"
+    [matTooltip]="
+      sidenavState.isWide() ? t('sidenav.collapse') : t('sidenav.expand')
+    "
+    matTooltipPosition="after"
+  >
+    <mat-icon>{{
+      sidenavState.isWide() ? 'chevron_left' : 'chevron_right'
+    }}</mat-icon>
+  </button>
+</ng-container>

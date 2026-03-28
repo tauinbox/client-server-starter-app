@@ -6,6 +6,8 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 
 import { RegisterComponent } from './register.component';
 import { AuthService } from '../../services/auth.service';
@@ -25,7 +27,7 @@ describe('RegisterComponent', () => {
     authServiceMock = { register: vi.fn() };
 
     await TestBed.configureTestingModule({
-      imports: [RegisterComponent],
+      imports: [RegisterComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
         provideHttpClient(),
@@ -150,7 +152,7 @@ describe('RegisterComponent', () => {
       expect(component['loading']()).toBe(false);
     });
 
-    it('should show server error message on other errors', () => {
+    it('should show fallback translation on non-409 error without errorKey', () => {
       const httpError = new HttpErrorResponse({
         error: { message: 'Validation failed' },
         status: 400
@@ -160,7 +162,25 @@ describe('RegisterComponent', () => {
       component.registerForm.setValue(validForm);
       component.onSubmit();
 
-      expect(component['error']()).toBe('Validation failed');
+      expect(component['error']()).toBe(
+        'Registration failed. Please try again.'
+      );
+    });
+
+    it('should translate error from errorKey on non-409 error', () => {
+      const httpError = new HttpErrorResponse({
+        error: {
+          message: 'Validation failed',
+          errorKey: ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR
+        },
+        status: 500
+      });
+      authServiceMock.register.mockReturnValue(throwError(() => httpError));
+
+      component.registerForm.setValue(validForm);
+      component.onSubmit();
+
+      expect(component['error']()).toBe('Internal server error');
     });
 
     it('should show fallback error message when no server message', () => {

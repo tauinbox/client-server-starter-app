@@ -1,9 +1,9 @@
 import {
-  BadRequestException,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
-  Logger,
-  NotFoundException
+  Logger
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -11,6 +11,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Resource } from '../entities/resource.entity';
 import { CASL_RESERVED_SUBJECT_NAMES } from '../casl/constants';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { ResourceRegistryService } from './resource-registry.service';
 
 const SUBJECT_MAP_CACHE_KEY = 'rbac:subject_map';
@@ -52,7 +53,13 @@ export class ResourceService {
   ): Promise<Resource> {
     const resource = await this.resourceRepository.findOne({ where: { id } });
     if (!resource) {
-      throw new Error('Resource not found');
+      throw new HttpException(
+        {
+          message: 'Resource not found',
+          errorKey: ErrorKeys.RESOURCES.NOT_FOUND
+        },
+        HttpStatus.NOT_FOUND
+      );
     }
     Object.assign(resource, data);
     const saved = await this.resourceRepository.save(resource);
@@ -87,11 +94,21 @@ export class ResourceService {
   async restore(id: string): Promise<Resource> {
     const resource = await this.resourceRepository.findOne({ where: { id } });
     if (!resource) {
-      throw new NotFoundException('Resource not found');
+      throw new HttpException(
+        {
+          message: 'Resource not found',
+          errorKey: ErrorKeys.RESOURCES.NOT_FOUND
+        },
+        HttpStatus.NOT_FOUND
+      );
     }
     if (!this.registry.isRegistered(resource.name)) {
-      throw new BadRequestException(
-        `Cannot restore resource "${resource.name}": its @RegisterResource controller is not registered. Restore the controller code first.`
+      throw new HttpException(
+        {
+          message: `Cannot restore resource "${resource.name}": its @RegisterResource controller is not registered. Restore the controller code first.`,
+          errorKey: ErrorKeys.RESOURCES.CANNOT_RESTORE
+        },
+        HttpStatus.BAD_REQUEST
       );
     }
     resource.isOrphaned = false;
@@ -112,8 +129,12 @@ export class ResourceService {
       data.subject.charAt(0).toUpperCase() + data.subject.slice(1);
 
     if (CASL_RESERVED_SUBJECT_NAMES.includes(normalizedSubject.toLowerCase())) {
-      throw new BadRequestException(
-        `Resource subject "${normalizedSubject}" is reserved and cannot be used`
+      throw new HttpException(
+        {
+          message: `Resource subject "${normalizedSubject}" is reserved and cannot be used`,
+          errorKey: ErrorKeys.RESOURCES.SUBJECT_RESERVED
+        },
+        HttpStatus.BAD_REQUEST
       );
     }
 

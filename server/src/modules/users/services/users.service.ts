@@ -1,13 +1,10 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException
-} from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import * as bcrypt from 'bcrypt';
 import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
@@ -38,7 +35,13 @@ export class UsersService {
       where: { email }
     });
     if (existingUser) {
-      throw new ConflictException('User with this email already exists');
+      throw new HttpException(
+        {
+          message: 'User with this email already exists',
+          errorKey: ErrorKeys.USERS.EMAIL_EXISTS
+        },
+        HttpStatus.CONFLICT
+      );
     }
 
     const hashedPassword = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
@@ -107,7 +110,13 @@ export class UsersService {
       relations: ['roles']
     });
     if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+      throw new HttpException(
+        {
+          message: `User with ID ${id} not found`,
+          errorKey: ErrorKeys.USERS.NOT_FOUND
+        },
+        HttpStatus.NOT_FOUND
+      );
     }
 
     return user;
@@ -253,7 +262,13 @@ export class UsersService {
       withDeleted: true
     });
     if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+      throw new HttpException(
+        {
+          message: `User with ID ${id} not found`,
+          errorKey: ErrorKeys.USERS.NOT_FOUND
+        },
+        HttpStatus.NOT_FOUND
+      );
     }
     await withTransaction(this.dataSource, async (manager) => {
       await manager.restore(User, id);

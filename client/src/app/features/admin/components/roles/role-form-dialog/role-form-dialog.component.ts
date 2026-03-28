@@ -9,6 +9,7 @@ import {
 } from '@angular/material/dialog';
 import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
+import { TranslocoDirective } from '@jsverse/transloco';
 import type { RoleResponse } from '@app/shared/types/role.types';
 
 export type RoleFormDialogData = {
@@ -34,7 +35,8 @@ type RoleFormType = {
     MatFormField,
     MatLabel,
     MatError,
-    MatInput
+    MatInput,
+    TranslocoDirective
   ],
   templateUrl: './role-form-dialog.component.html',
   styleUrl: './role-form-dialog.component.scss',

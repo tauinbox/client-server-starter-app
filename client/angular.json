@@ -36,7 +36,22 @@
             "inlineStyleLanguage": "scss",
             "assets": [
               "src/favicon.ico",
-              "src/assets"
+              "src/assets",
+              {
+                "glob": "**/*.json",
+                "input": "src/app/features/auth/i18n",
+                "output": "app/features/auth/i18n"
+              },
+              {
+                "glob": "**/*.json",
+                "input": "src/app/features/users/i18n",
+                "output": "app/features/users/i18n"
+              },
+              {
+                "glob": "**/*.json",
+                "input": "src/app/features/admin/i18n",
+                "output": "app/features/admin/i18n"
+              }
             ],
             "styles": [
               "src/styles.scss"
@@ -114,7 +129,9 @@
           "options": {
             "tsConfig": "tsconfig.spec.json",
             "buildTarget": "client:build:development",
-            "setupFiles": ["src/test-setup.ts"]
+            "setupFiles": [
+              "src/test-setup.ts"
+            ]
           }
         },
         "lint": {

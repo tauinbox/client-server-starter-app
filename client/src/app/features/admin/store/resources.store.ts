@@ -5,6 +5,7 @@ import { tapResponse } from '@ngrx/operators';
 import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { TranslocoService } from '@jsverse/transloco';
 import type {
   ActionResponse,
   ResourceResponse
@@ -33,6 +34,7 @@ export const ResourcesStore = signalStore(
     const rbacService = inject(RbacAdminService);
     const authService = inject(AuthService);
     const snackBar = inject(MatSnackBar);
+    const translocoService = inject(TranslocoService);
 
     return {
       load: rxMethod<void>(
@@ -50,8 +52,10 @@ export const ResourcesStore = signalStore(
                 error: () => {
                   patchState(store, { loading: false });
                   snackBar.open(
-                    'Failed to load resources. Please try again.',
-                    'Close',
+                    translocoService.translate(
+                      'admin.store.errorLoadResourcesFailed'
+                    ),
+                    translocoService.translate('common.close'),
                     { duration: 5000 }
                   );
                 }

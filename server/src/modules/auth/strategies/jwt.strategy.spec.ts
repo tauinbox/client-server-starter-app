@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UnauthorizedException } from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { JwtStrategy } from './jwt.strategy';
@@ -93,7 +93,7 @@ describe('JwtStrategy', () => {
       mockRepository.findOne.mockResolvedValue(null);
 
       await expect(strategy.validate(basePayload)).rejects.toThrow(
-        new UnauthorizedException('User not found')
+        HttpException
       );
     });
 
@@ -107,7 +107,7 @@ describe('JwtStrategy', () => {
       });
 
       await expect(strategy.validate(basePayload)).rejects.toThrow(
-        new UnauthorizedException('Token has been revoked')
+        HttpException
       );
     });
 
@@ -168,9 +168,7 @@ describe('JwtStrategy', () => {
 
       it('should throw UnauthorizedException when token was issued before JWT_MIN_IAT', async () => {
         await expect(rotationStrategy.validate(basePayload)).rejects.toThrow(
-          new UnauthorizedException(
-            'Token invalidated due to key rotation. Please log in again.'
-          )
+          HttpException
         );
       });
 

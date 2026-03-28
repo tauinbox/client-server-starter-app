@@ -28,6 +28,7 @@ import type { Sort } from '@angular/material/sort';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { filter, merge } from 'rxjs';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { NotificationsService } from '@core/services/notifications.service';
 import type { User, UserSearch, UserSortColumn } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
@@ -63,7 +64,8 @@ type UserFilterFormType = {
     MatDivider,
     MatInput,
     MatProgressSpinner,
-    UserTableComponent
+    UserTableComponent,
+    TranslocoDirective
   ],
   templateUrl: './user-list.component.html',
   styleUrl: './user-list.component.scss',
@@ -78,6 +80,7 @@ export class UserListComponent implements OnInit, AfterViewInit {
   readonly #destroyRef = inject(DestroyRef);
   readonly #injector = inject(Injector);
   readonly #notificationsService = inject(NotificationsService);
+  readonly #translocoService = inject(TranslocoService);
 
   readonly filterForm: FormGroup<UserFilterFormType> =
     this.#fb.group<UserFilterFormType>({
@@ -176,10 +179,15 @@ export class UserListComponent implements OnInit, AfterViewInit {
     const dialogRef = this.#dialog.open(ConfirmDialogComponent, {
       ...dialogSizeConfig(DialogSize.Confirm),
       data: {
-        title: 'Confirm Delete',
-        message: `Are you sure you want to delete user ${user.firstName} ${user.lastName}?`,
-        confirmButton: 'Delete',
-        cancelButton: 'Cancel'
+        title: this.#translocoService.translate(
+          'users.list.confirmDeleteTitle'
+        ),
+        message: this.#translocoService.translate(
+          'users.list.confirmDeleteMessage',
+          { firstName: user.firstName, lastName: user.lastName }
+        ),
+        confirmButton: this.#translocoService.translate('common.delete'),
+        cancelButton: this.#translocoService.translate('common.cancel')
       }
     });
 
@@ -199,14 +207,16 @@ export class UserListComponent implements OnInit, AfterViewInit {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
-          this.#snackBar.open('User deleted successfully', 'Close', {
-            duration: 5000
-          });
+          this.#snackBar.open(
+            this.#translocoService.translate('users.list.successDeleted'),
+            this.#translocoService.translate('common.close'),
+            { duration: 5000 }
+          );
         },
         error: () => {
           this.#snackBar.open(
-            'Failed to delete user. Please try again.',
-            'Close',
+            this.#translocoService.translate('users.list.errorDeleteFailed'),
+            this.#translocoService.translate('common.close'),
             { duration: 5000 }
           );
         }

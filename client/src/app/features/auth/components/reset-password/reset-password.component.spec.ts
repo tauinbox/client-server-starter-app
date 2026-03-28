@@ -7,6 +7,7 @@ import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { ResetPasswordComponent } from './reset-password.component';
 import { AuthService } from '../../services/auth.service';
@@ -19,7 +20,7 @@ describe('ResetPasswordComponent', () => {
 
   function createComponent(token: string | undefined): void {
     TestBed.configureTestingModule({
-      imports: [ResetPasswordComponent],
+      imports: [ResetPasswordComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
         provideHttpClient(),

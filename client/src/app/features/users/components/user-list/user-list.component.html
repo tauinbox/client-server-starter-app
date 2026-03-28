@@ -1,48 +1,48 @@
-<div class="user-list-container">
+<div class="user-list-container" *transloco="let t; scope: 'users'">
   <mat-card>
     <mat-card-header>
-      <mat-card-title>User Management</mat-card-title>
+      <mat-card-title>{{ t('users.list.title') }}</mat-card-title>
     </mat-card-header>
 
     <mat-card-content>
       <form [formGroup]="filterForm" (ngSubmit)="onSubmit()">
         <div class="filter-fields">
           <mat-form-field appearance="outline">
-            <mat-label>Email</mat-label>
+            <mat-label>{{ t('users.list.filterEmail') }}</mat-label>
             <input
               matInput
               formControlName="email"
-              placeholder="Filter by email"
+              [placeholder]="t('users.list.filterEmailPlaceholder')"
             />
             <mat-icon matPrefix>email</mat-icon>
           </mat-form-field>
 
           <mat-form-field appearance="outline">
-            <mat-label>First Name</mat-label>
+            <mat-label>{{ t('users.list.filterFirstName') }}</mat-label>
             <input
               matInput
               formControlName="firstName"
-              placeholder="Filter by first name"
+              [placeholder]="t('users.list.filterFirstNamePlaceholder')"
             />
             <mat-icon matPrefix>person</mat-icon>
           </mat-form-field>
 
           <mat-form-field appearance="outline">
-            <mat-label>Last Name</mat-label>
+            <mat-label>{{ t('users.list.filterLastName') }}</mat-label>
             <input
               matInput
               formControlName="lastName"
-              placeholder="Filter by last name"
+              [placeholder]="t('users.list.filterLastNamePlaceholder')"
             />
             <mat-icon matPrefix>person</mat-icon>
           </mat-form-field>
 
           <mat-form-field appearance="outline">
-            <mat-label>Status</mat-label>
+            <mat-label>{{ t('users.list.filterStatus') }}</mat-label>
             <mat-select formControlName="isActive">
-              <mat-option value="">All</mat-option>
-              <mat-option value="true">Active</mat-option>
-              <mat-option value="false">Inactive</mat-option>
+              <mat-option value="">{{ t('users.list.statusAll') }}</mat-option>
+              <mat-option value="true">{{ t('common.active') }}</mat-option>
+              <mat-option value="false">{{ t('common.inactive') }}</mat-option>
             </mat-select>
           </mat-form-field>
         </div>
@@ -56,7 +56,7 @@
             [disabled]="isLoading"
           >
             <mat-icon>search</mat-icon>
-            Search
+            {{ t('common.search') }}
           </button>
 
           <button
@@ -65,7 +65,7 @@
             (click)="resetForm()"
             [disabled]="isLoading"
           >
-            Clear
+            {{ t('common.clear') }}
           </button>
         </div>
       </form>
@@ -79,8 +79,8 @@
       } @else if (totalUsers() === 0) {
         <div class="empty-state">
           <mat-icon class="empty-icon">people_outline</mat-icon>
-          <h3>No Users Found</h3>
-          <p>No users match the current filters.</p>
+          <h3>{{ t('users.list.noUsers') }}</h3>
+          <p>{{ t('users.list.noUsersMessage') }}</p>
         </div>
       } @else {
         <app-user-table

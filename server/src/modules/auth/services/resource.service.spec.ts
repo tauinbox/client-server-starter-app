@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException } from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ResourceService } from './resource.service';
 import { ResourceRegistryService } from './resource-registry.service';
@@ -356,14 +356,14 @@ describe('ResourceService', () => {
       );
     });
 
-    it('should throw BadRequestException when subject is CASL reserved word "all"', async () => {
+    it('should throw HttpException when subject is CASL reserved word "all"', async () => {
       await expect(
         service.upsertResource({
           name: 'everything',
           subject: 'all',
           displayName: 'Everything'
         })
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(HttpException);
       expect(mockResourceRepo.findOne).not.toHaveBeenCalled();
     });
 
@@ -374,7 +374,7 @@ describe('ResourceService', () => {
           subject: 'ALL',
           displayName: 'Everything'
         })
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(HttpException);
     });
 
     it('should normalize lowercase subject to PascalCase when creating', async () => {
@@ -466,13 +466,11 @@ describe('ResourceService', () => {
       );
     });
 
-    it('should throw BadRequestException if controller is not registered', async () => {
+    it('should throw HttpException if controller is not registered', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
       mockRegistry.isRegistered.mockReturnValue(false);
 
-      await expect(service.restore('res-3')).rejects.toThrow(
-        BadRequestException
-      );
+      await expect(service.restore('res-3')).rejects.toThrow(HttpException);
       expect(mockResourceRepo.save).not.toHaveBeenCalled();
     });
   });

@@ -1,57 +1,67 @@
-<h2 mat-dialog-title>{{ isEdit ? 'Edit Role' : 'Create Role' }}</h2>
+<ng-container *transloco="let t; scope: 'admin'">
+  <h2 mat-dialog-title>
+    {{
+      isEdit ? t('admin.roleForm.editTitle') : t('admin.roleForm.createTitle')
+    }}
+  </h2>
 
-<mat-dialog-content>
-  @if (isSystemRole) {
-    <p class="system-role-warning">System roles cannot be modified.</p>
-  }
+  <mat-dialog-content>
+    @if (isSystemRole) {
+      <p class="system-role-warning">{{ t('admin.roleForm.systemWarning') }}</p>
+    }
 
-  <form [formGroup]="form" (ngSubmit)="submit()">
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>Name</mat-label>
-      <input
-        matInput
-        formControlName="name"
-        placeholder="Role name"
-        [readonly]="isSystemRole"
-      />
-      <mat-error>
-        @if (form.get('name')?.errors?.['required']) {
-          Name is required
-        } @else if (form.get('name')?.errors?.['maxlength']) {
-          Name must be at most 50 characters
-        }
-      </mat-error>
-    </mat-form-field>
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ t('admin.roleForm.nameLabel') }}</mat-label>
+        <input
+          matInput
+          formControlName="name"
+          [placeholder]="t('admin.roleForm.namePlaceholder')"
+          [readonly]="isSystemRole"
+        />
+        <mat-error>
+          @if (form.get('name')?.errors?.['required']) {
+            {{ t('admin.roleForm.nameRequired') }}
+          } @else if (form.get('name')?.errors?.['maxlength']) {
+            {{ t('admin.roleForm.nameMaxLength') }}
+          }
+        </mat-error>
+      </mat-form-field>
 
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>Description</mat-label>
-      <textarea
-        matInput
-        formControlName="description"
-        placeholder="Optional description"
-        rows="3"
-        [readonly]="isSystemRole"
-      ></textarea>
-      <mat-error>
-        @if (form.get('description')?.errors?.['maxlength']) {
-          Description must be at most 255 characters
-        }
-      </mat-error>
-    </mat-form-field>
-  </form>
-</mat-dialog-content>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ t('admin.roleForm.descriptionLabel') }}</mat-label>
+        <textarea
+          matInput
+          formControlName="description"
+          [placeholder]="t('admin.roleForm.descriptionPlaceholder')"
+          rows="3"
+          [readonly]="isSystemRole"
+        ></textarea>
+        <mat-error>
+          @if (form.get('description')?.errors?.['maxlength']) {
+            {{ t('admin.roleForm.descriptionMaxLength') }}
+          }
+        </mat-error>
+      </mat-form-field>
+    </form>
+  </mat-dialog-content>
 
-<mat-dialog-actions align="end">
-  <button mat-button type="button" (click)="cancel()">Cancel</button>
-  @if (!isSystemRole) {
-    <button
-      mat-raised-button
-      color="primary"
-      type="button"
-      [disabled]="form.invalid || !form.dirty"
-      (click)="submit()"
-    >
-      {{ isEdit ? 'Save Changes' : 'Create' }}
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ t('common.cancel') }}
     </button>
-  }
-</mat-dialog-actions>
+    @if (!isSystemRole) {
+      <button
+        mat-raised-button
+        color="primary"
+        type="button"
+        [disabled]="form.invalid || !form.dirty"
+        (click)="submit()"
+      >
+        {{
+          isEdit ? t('common.saveChanges') : t('admin.roleForm.createButton')
+        }}
+      </button>
+    }
+  </mat-dialog-actions>
+</ng-container>

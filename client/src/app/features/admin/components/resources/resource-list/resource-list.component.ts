@@ -20,6 +20,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { MatChip } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import {
   MatCell,
   MatCellDef,
@@ -63,7 +64,8 @@ import { ResourceFormDialogComponent } from '../resource-form-dialog/resource-fo
     MatHeaderCellDef,
     MatHeaderRowDef,
     MatRowDef,
-    MatCell
+    MatCell,
+    TranslocoDirective
   ],
   templateUrl: './resource-list.component.html',
   styleUrl: './resource-list.component.scss',
@@ -74,6 +76,7 @@ export class ResourceListComponent implements OnInit {
   readonly #dialog = inject(MatDialog);
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #translocoService = inject(TranslocoService);
   protected readonly authStore = inject(AuthStore);
 
   readonly loading = this.#resourcesStore.loading;
@@ -103,15 +106,21 @@ export class ResourceListComponent implements OnInit {
       .subscribe({
         next: () => {
           this.#snackBar.open(
-            `Resource "${resource.displayName}" restored — permissions re-enabled`,
-            'Close',
+            this.#translocoService.translate(
+              'admin.resources.successRestored',
+              { name: resource.displayName }
+            ),
+            this.#translocoService.translate('common.close'),
             { duration: 5000 }
           );
         },
         error: (err: { error?: { message?: string } }) => {
           this.#snackBar.open(
-            err.error?.message ?? 'Failed to restore resource.',
-            'Close',
+            err.error?.message ??
+              this.#translocoService.translate(
+                'admin.resources.errorRestoreFailed'
+              ),
+            this.#translocoService.translate('common.close'),
             { duration: 5000 }
           );
         }
@@ -137,14 +146,21 @@ export class ResourceListComponent implements OnInit {
             .pipe(takeUntilDestroyed(this.#destroyRef))
             .subscribe({
               next: () => {
-                this.#snackBar.open('Resource updated successfully', 'Close', {
-                  duration: 5000
-                });
+                this.#snackBar.open(
+                  this.#translocoService.translate(
+                    'admin.resources.successUpdated'
+                  ),
+                  this.#translocoService.translate('common.close'),
+                  { duration: 5000 }
+                );
               },
               error: (err: { error?: { message?: string } }) => {
                 this.#snackBar.open(
-                  err.error?.message ?? 'Failed to update resource.',
-                  'Close',
+                  err.error?.message ??
+                    this.#translocoService.translate(
+                      'admin.resources.errorUpdateFailed'
+                    ),
+                  this.#translocoService.translate('common.close'),
                   { duration: 5000 }
                 );
               }

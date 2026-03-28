@@ -4,6 +4,7 @@ import { of } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import type { RoleResponse } from '@app/shared/types/role.types';
 import type { RolePermissionItem } from '../../../services/role.service';
 import { RoleService } from '../../../services/role.service';
@@ -96,7 +97,7 @@ function setup(
       : { role: mockRole };
 
   TestBed.configureTestingModule({
-    imports: [RolePermissionsDialogComponent],
+    imports: [RolePermissionsDialogComponent, TranslocoTestingModuleWithLangs],
     providers: [
       provideNoopAnimations(),
       { provide: MAT_DIALOG_DATA, useValue: dialogData },
