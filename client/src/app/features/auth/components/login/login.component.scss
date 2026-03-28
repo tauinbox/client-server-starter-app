@@ -102,6 +102,16 @@
       gap: vars.$spacing-xs;
       align-items: center;
       justify-content: center;
+
+      // SVG icons have width/height="100%" — pin mat-icon to 20px so the SVG
+      // cannot expand and push the icon off the text baseline.
+      mat-icon {
+        flex-shrink: 0;
+        width: func.rem(20);
+        height: func.rem(20);
+        font-size: func.rem(20);
+        line-height: 1;
+      }
     }
   }
 }
