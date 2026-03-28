@@ -8,7 +8,7 @@
 
   // Separate header from page content
   border-bottom: 1px solid var(--mat-sys-outline-variant);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--mat-sys-shadow) 8%, transparent);
+  box-shadow: 0 func.rem(1) func.rem(3) color-mix(in srgb, var(--mat-sys-shadow) 8%, transparent);
 }
 
 .active {
