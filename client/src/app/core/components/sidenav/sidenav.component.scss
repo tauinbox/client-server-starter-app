@@ -80,7 +80,7 @@ $indicator-radius: func.rem(28); // full pill
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: vars.$spacing-xs;
+  padding: vars.$spacing-xs vars.$spacing-xxs;
   border-top: 1px solid var(--mat-sys-outline-variant);
 
   .nav-link {
