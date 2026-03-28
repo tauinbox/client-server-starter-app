@@ -23,6 +23,9 @@
   --color-background: var(--mat-sys-background);
   --color-surface: var(--mat-sys-surface);
 
+  // Sidenav uses a slightly elevated surface so it stands out from page content
+  --mat-sidenav-container-background-color: var(--mat-sys-surface-container);
+
   // Text
   --color-text-primary: var(--mat-sys-on-surface);
   --color-text-secondary: var(--mat-sys-on-surface-variant);

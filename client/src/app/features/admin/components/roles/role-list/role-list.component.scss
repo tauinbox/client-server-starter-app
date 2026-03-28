@@ -11,6 +11,7 @@
 mat-card-header {
   display: flex;
   align-items: center;
+  padding-bottom: vars.$spacing-sm;
 
   .spacer {
     flex: 1;

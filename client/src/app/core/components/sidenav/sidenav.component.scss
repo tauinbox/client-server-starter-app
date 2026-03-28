@@ -105,7 +105,7 @@ $indicator-radius: func.rem(28); // full pill
   overflow: hidden; // for matRipple
   color: var(--mat-sidenav-container-text-color, var(--mat-sys-on-surface));
   cursor: pointer;
-  background-color: var(--mat-sidenav-container-background-color, var(--mat-sys-surface));
+  background-color: var(--mat-sidenav-container-background-color, var(--mat-sys-surface-container));
   border: 1px solid var(--mat-sys-outline-variant);
   border-radius: 50%;
   transition: left vars.$transition-medium ease;

@@ -5,10 +5,22 @@
   top: 0;
   z-index: 100;
   display: block;
+}
 
-  // Separate header from page content
-  border-bottom: 1px solid var(--mat-sys-outline-variant);
-  box-shadow: 0 func.rem(1) func.rem(3) color-mix(in srgb, var(--mat-sys-shadow) 8%, transparent);
+// In M3 the color="primary" attribute on mat-toolbar is deprecated and ignored.
+// Set the primary background and text color via the CSS custom properties the
+// toolbar component actually reads (confirmed from toolbar.mjs source).
+// Material also auto-cascades --mat-toolbar-container-text-color into
+// mat-button label and outlined-button label colors for mat-unthemed buttons.
+mat-toolbar {
+  --mat-toolbar-container-background-color: var(--mat-sys-primary);
+  --mat-toolbar-container-text-color: var(--mat-sys-on-primary);
+
+  // Icon buttons (language switcher, theme toggle) don't receive the automatic
+  // toolbar text-color override — set explicitly.
+  --mdc-icon-button-icon-color: var(--mat-sys-on-primary);
+  --mat-icon-button-icon-color: var(--mat-sys-on-primary);
+  --mat-icon-button-state-layer-color: var(--mat-sys-on-primary);
 }
 
 .active {

@@ -23,6 +23,11 @@ mat-sidenav .mat-drawer-inner-container {
   overflow: visible;
 }
 
+// Separate sidenav from page content with a hairline border.
+mat-sidenav.mat-drawer {
+  border-right: 1px solid var(--mat-sys-outline-variant);
+}
+
 // mat-sidenav-content receives margin-left via Angular style binding (not Material's
 // autosize) to avoid ~10s delay caused by ResizeObserver + OnPush change detection.
 // Transition here keeps the content shift in sync with the sidenav width animation.

@@ -6,6 +6,10 @@
     @include mix.centered-container(vars.$card-width-sm);
   }
 
+  mat-card-header {
+    padding-bottom: vars.$spacing-md;
+  }
+
   .form-actions {
     @include mix.form-actions;
   }
@@ -83,10 +87,6 @@
     gap: vars.$spacing-xs;
 
     .oauth-button {
-      display: flex;
-      gap: vars.$spacing-xs;
-      align-items: center;
-      justify-content: center;
       width: 100%;
     }
   }
