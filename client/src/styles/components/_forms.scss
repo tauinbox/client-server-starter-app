@@ -1,13 +1,6 @@
 @use '../abstracts/variables' as vars;
 @use '../abstracts/mixins' as mix;
 
-// Material does not set a distinct placeholder color, so native ::placeholder
-// inherits the full input text color. Override to use the muted system token.
-::placeholder {
-  color: var(--mat-sys-on-surface-variant);
-  opacity: 1; // Firefox reduces opacity by default; normalise across browsers
-}
-
 .app-form {
   &__container {
     @include mix.centered-container(vars.$card-width-md);
