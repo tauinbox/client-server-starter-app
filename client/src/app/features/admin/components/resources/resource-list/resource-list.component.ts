@@ -4,7 +4,8 @@ import {
   Component,
   computed,
   DestroyRef,
-  inject
+  inject,
+  ViewContainerRef
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
@@ -74,6 +75,7 @@ export class ResourceListComponent implements OnInit {
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
   readonly #translocoService = inject(TranslocoService);
+  readonly #viewContainerRef = inject(ViewContainerRef);
   protected readonly authStore = inject(AuthStore);
 
   readonly loading = this.#resourcesStore.loading;
@@ -131,6 +133,7 @@ export class ResourceListComponent implements OnInit {
     };
     this.#dialog.open(ResourceFormDialogComponent, {
       ...dialogSizeConfig(DialogSize.Form),
+      viewContainerRef: this.#viewContainerRef,
       data
     });
   }

@@ -24,10 +24,10 @@ export const errorInterceptor: HttpInterceptorFn = (
   const http = inject(HttpClient);
   const authStore = inject(AuthStore);
   const transloco = inject(TranslocoService);
-  const closeLabel = transloco.translate('common.close');
 
   return next(request).pipe(
     catchError((error: HttpErrorResponse) => {
+      const closeLabel = transloco.translate('common.close');
       const silentMode = request.context.get(
         DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN
       );

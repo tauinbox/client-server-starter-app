@@ -4,7 +4,8 @@ import {
   Component,
   computed,
   DestroyRef,
-  inject
+  inject,
+  ViewContainerRef
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
@@ -78,6 +79,7 @@ export class ActionListComponent implements OnInit {
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
   readonly #translocoService = inject(TranslocoService);
+  readonly #viewContainerRef = inject(ViewContainerRef);
   protected readonly authStore = inject(AuthStore);
 
   readonly loading = this.#resourcesStore.loading;
@@ -110,6 +112,7 @@ export class ActionListComponent implements OnInit {
     const data: ActionFormDialogData = {};
     this.#dialog.open(ActionFormDialogComponent, {
       ...dialogSizeConfig(DialogSize.Form),
+      viewContainerRef: this.#viewContainerRef,
       data
     });
   }
@@ -118,6 +121,7 @@ export class ActionListComponent implements OnInit {
     const data: ActionFormDialogData = { action };
     this.#dialog.open(ActionFormDialogComponent, {
       ...dialogSizeConfig(DialogSize.Form),
+      viewContainerRef: this.#viewContainerRef,
       data
     });
   }
