@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  inject,
+  signal
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import type { FormControl, FormGroup } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -14,17 +21,18 @@ import {
   MatLabel
 } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
-import { TranslocoDirective } from '@jsverse/transloco';
+import { MatProgressSpinner } from '@angular/material/progress-spinner';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { ActionResponse } from '@app/shared/types/rbac.types';
+import type {
+  CreateAction,
+  UpdateAction
+} from '../../../services/rbac-admin.service';
+import { ResourcesStore } from '../../../store/resources.store';
 
 export type ActionFormDialogData = {
   action?: ActionResponse;
-};
-
-export type ActionFormDialogResult = {
-  name: string;
-  displayName: string;
-  description: string;
 };
 
 type ActionFormType = {
@@ -46,6 +54,7 @@ const ACTION_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
     MatError,
     MatHint,
     MatInput,
+    MatProgressSpinner,
     TranslocoDirective
   ],
   templateUrl: './action-form-dialog.component.html',
@@ -55,6 +64,10 @@ const ACTION_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
 export class ActionFormDialogComponent {
   readonly #fb = inject(FormBuilder);
   readonly #dialogRef = inject(MatDialogRef<ActionFormDialogComponent>);
+  readonly #resourcesStore = inject(ResourcesStore);
+  readonly #snackBar = inject(MatSnackBar);
+  readonly #translocoService = inject(TranslocoService);
+  readonly #destroyRef = inject(DestroyRef);
   protected readonly data = inject<ActionFormDialogData>(MAT_DIALOG_DATA);
 
   protected readonly isEdit = !!this.data.action;
@@ -79,6 +92,9 @@ export class ActionFormDialogComponent {
       })
     });
 
+  protected readonly isLoading = signal(false);
+  protected readonly errorMessage = signal<string | null>(null);
+
   constructor() {
     if (this.isEdit) {
       this.form.get('name')?.disable();
@@ -86,15 +102,70 @@ export class ActionFormDialogComponent {
   }
 
   submit(): void {
-    if (this.form.invalid) return;
+    if (this.form.invalid || this.isLoading()) return;
+    if (this.isEdit && !this.form.dirty) return;
 
     const { name, displayName, description } = this.form.getRawValue();
-    const result: ActionFormDialogResult = {
-      name: name.trim(),
-      displayName: displayName.trim(),
-      description: description.trim()
-    };
-    this.#dialogRef.close(result);
+
+    this.isLoading.set(true);
+    this.errorMessage.set(null);
+
+    if (this.isEdit && this.data.action) {
+      const dto: UpdateAction = {
+        displayName: displayName.trim(),
+        description: description.trim()
+      };
+      this.#resourcesStore
+        .updateAction(this.data.action.id, dto)
+        .pipe(takeUntilDestroyed(this.#destroyRef))
+        .subscribe({
+          next: () => {
+            this.#snackBar.open(
+              this.#translocoService.translate('admin.actions.successUpdated'),
+              this.#translocoService.translate('common.close'),
+              { duration: 5000 }
+            );
+            this.#dialogRef.close(true);
+          },
+          error: (err: { error?: { message?: string } }) => {
+            this.isLoading.set(false);
+            this.errorMessage.set(
+              err.error?.message ??
+                this.#translocoService.translate(
+                  'admin.actions.errorUpdateFailed'
+                )
+            );
+          }
+        });
+    } else {
+      const dto: CreateAction = {
+        name: name.trim(),
+        displayName: displayName.trim(),
+        description: description.trim() || undefined
+      };
+      this.#resourcesStore
+        .createAction(dto)
+        .pipe(takeUntilDestroyed(this.#destroyRef))
+        .subscribe({
+          next: () => {
+            this.#snackBar.open(
+              this.#translocoService.translate('admin.actions.successCreated'),
+              this.#translocoService.translate('common.close'),
+              { duration: 5000 }
+            );
+            this.#dialogRef.close(true);
+          },
+          error: (err: { error?: { message?: string } }) => {
+            this.isLoading.set(false);
+            this.errorMessage.set(
+              err.error?.message ??
+                this.#translocoService.translate(
+                  'admin.actions.errorCreateFailed'
+                )
+            );
+          }
+        });
+    }
   }
 
   cancel(): void {

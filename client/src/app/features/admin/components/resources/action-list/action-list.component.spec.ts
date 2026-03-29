@@ -190,11 +190,6 @@ describe('ActionListComponent', () => {
 
   describe('dialog interactions', () => {
     it('opens ActionFormDialog (create mode) on add action click', async () => {
-      const dialogRefMock = {
-        afterClosed: vi.fn().mockReturnValue(of(undefined))
-      };
-      dialogMock.open.mockReturnValue(dialogRefMock);
-
       await setupComponent();
       fixture.detectChanges();
 
@@ -206,33 +201,7 @@ describe('ActionListComponent', () => {
       );
     });
 
-    it('calls store.createAction when ActionFormDialog (add) returns a result', async () => {
-      const dialogResult = {
-        name: 'publish',
-        displayName: 'Publish',
-        description: ''
-      };
-      const dialogRefMock = {
-        afterClosed: vi.fn().mockReturnValue(of(dialogResult))
-      };
-      dialogMock.open.mockReturnValue(dialogRefMock);
-
-      await setupComponent();
-      fixture.detectChanges();
-
-      component.openAddAction();
-
-      expect(resourcesStoreMock.createAction).toHaveBeenCalledWith(
-        dialogResult
-      );
-    });
-
     it('opens ActionFormDialog (edit mode) on edit action click', async () => {
-      const dialogRefMock = {
-        afterClosed: vi.fn().mockReturnValue(of(undefined))
-      };
-      dialogMock.open.mockReturnValue(dialogRefMock);
-
       await setupComponent();
       fixture.detectChanges();
 
@@ -241,28 +210,6 @@ describe('ActionListComponent', () => {
       expect(dialogMock.open).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ data: { action: mockAction } })
-      );
-    });
-
-    it('calls store.updateAction when ActionFormDialog (edit) returns a result', async () => {
-      const dialogResult = {
-        name: 'read',
-        displayName: 'Read All',
-        description: ''
-      };
-      const dialogRefMock = {
-        afterClosed: vi.fn().mockReturnValue(of(dialogResult))
-      };
-      dialogMock.open.mockReturnValue(dialogRefMock);
-
-      await setupComponent();
-      fixture.detectChanges();
-
-      component.openEditAction(mockAction);
-
-      expect(resourcesStoreMock.updateAction).toHaveBeenCalledWith(
-        'act-1',
-        dialogResult
       );
     });
 

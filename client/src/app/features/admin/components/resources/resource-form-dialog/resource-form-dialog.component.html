@@ -72,19 +72,31 @@
         </p>
       }
     </div>
+
+    @if (errorMessage()) {
+      <p class="form-error" role="alert">{{ errorMessage() }}</p>
+    }
   </mat-dialog-content>
 
   <mat-dialog-actions align="end">
-    <button mat-button type="button" (click)="cancel()">
+    <button
+      mat-button
+      type="button"
+      [disabled]="isLoading()"
+      (click)="cancel()"
+    >
       {{ t('common.cancel') }}
     </button>
     <button
       mat-raised-button
       color="primary"
       type="button"
-      [disabled]="form.invalid || !isDirty"
+      [disabled]="form.invalid || !isDirty || isLoading()"
       (click)="submit()"
     >
+      @if (isLoading()) {
+        <mat-spinner diameter="18" />
+      }
       {{ t('common.saveChanges') }}
     </button>
   </mat-dialog-actions>

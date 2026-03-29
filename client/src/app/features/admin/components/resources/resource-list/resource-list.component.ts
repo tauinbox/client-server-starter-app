@@ -37,10 +37,7 @@ import type { ResourceResponse } from '@app/shared/types/rbac.types';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { ResourcesStore } from '../../../store/resources.store';
-import type {
-  ResourceFormDialogData,
-  ResourceFormDialogResult
-} from '../resource-form-dialog/resource-form-dialog.component';
+import type { ResourceFormDialogData } from '../resource-form-dialog/resource-form-dialog.component';
 import { ResourceFormDialogComponent } from '../resource-form-dialog/resource-form-dialog.component';
 
 @Component({
@@ -132,40 +129,9 @@ export class ResourceListComponent implements OnInit {
       resource,
       actions: this.#resourcesStore.actions()
     };
-    this.#dialog
-      .open(ResourceFormDialogComponent, {
-        ...dialogSizeConfig(DialogSize.Form),
-        data
-      })
-      .afterClosed()
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe((result: ResourceFormDialogResult | undefined) => {
-        if (result) {
-          this.#resourcesStore
-            .updateResource(resource.id, result)
-            .pipe(takeUntilDestroyed(this.#destroyRef))
-            .subscribe({
-              next: () => {
-                this.#snackBar.open(
-                  this.#translocoService.translate(
-                    'admin.resources.successUpdated'
-                  ),
-                  this.#translocoService.translate('common.close'),
-                  { duration: 5000 }
-                );
-              },
-              error: (err: { error?: { message?: string } }) => {
-                this.#snackBar.open(
-                  err.error?.message ??
-                    this.#translocoService.translate(
-                      'admin.resources.errorUpdateFailed'
-                    ),
-                  this.#translocoService.translate('common.close'),
-                  { duration: 5000 }
-                );
-              }
-            });
-        }
-      });
+    this.#dialog.open(ResourceFormDialogComponent, {
+      ...dialogSizeConfig(DialogSize.Form),
+      data
+    });
   }
 }

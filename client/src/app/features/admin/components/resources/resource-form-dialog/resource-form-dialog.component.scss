@@ -6,6 +6,7 @@ form {
 }
 
 .full-width {
+  display: block;
   width: 100%;
   margin-bottom: vars.$spacing-xs;
 }
@@ -42,4 +43,11 @@ form {
   margin-left: vars.$spacing-xxs;
   font-size: func.rem(11);
   color: var(--mat-sys-on-surface-variant);
+}
+
+.form-error {
+  margin-top: vars.$spacing-sm;
+  margin-bottom: 0;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-error);
 }
