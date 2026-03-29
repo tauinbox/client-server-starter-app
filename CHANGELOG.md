@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.15](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.14...v0.1.15) (2026-03-29)
+
+
+### Features
+
+* add i18n support ([2a9eaab](https://github.com/tauinbox/client-server-starter-app/commit/2a9eaab0c800246a38ba36a31e540c2a04b1d1ab))
+* **admin:** loading state and inline errors for resource/action form dialogs ([#129](https://github.com/tauinbox/client-server-starter-app/issues/129)) ([bdffa0c](https://github.com/tauinbox/client-server-starter-app/commit/bdffa0cf351f05ab488c2efc94679026fe33d0cc))
+* linter fix ([f187d42](https://github.com/tauinbox/client-server-starter-app/commit/f187d4229d9ce659818e9d85339d84de070cc2c4))
+* **ui:** migrate Angular Material M2 to M3 with UI polish ([#128](https://github.com/tauinbox/client-server-starter-app/issues/128)) ([35cba98](https://github.com/tauinbox/client-server-starter-app/commit/35cba982b689e201d4b3148bd502b04cb3131e9d))
+
+
+### Bug Fixes
+
+* **tests:** fix E2E test regressions introduced by i18n changes ([09d5785](https://github.com/tauinbox/client-server-starter-app/commit/09d5785e0ce70cad93eb8507ada5047677a5717e))
+
 ## [0.1.14](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.13...v0.1.14) (2026-03-26)
 
 

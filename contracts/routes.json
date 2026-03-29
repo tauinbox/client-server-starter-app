@@ -1,5 +1,5 @@
 {
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "API route manifest — update whenever server endpoints change.",
   "routes": [
     {
