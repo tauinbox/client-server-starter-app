@@ -190,6 +190,11 @@ mat-divider {
 }
 
 .condition-toggle {
+  // Suppress Material's built-in state layer — it doesn't reach the edges when
+  // the button is inside a border-radius + overflow:hidden container.
+  // The hover background is applied directly on the button instead.
+  --mat-button-text-hover-state-layer-opacity: 0;
+
   display: flex;
   flex-wrap: wrap;
   gap: vars.$spacing-xs;
@@ -199,6 +204,10 @@ mat-divider {
   height: auto;
   padding: vars.$spacing-xs vars.$spacing-sm;
   text-align: left;
+
+  &:hover:not([disabled]) {
+    background-color: color-mix(in srgb, var(--mat-sys-on-surface) 8%, transparent);
+  }
 
   mat-icon {
     flex-shrink: 0;
