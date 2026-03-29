@@ -1,14 +1,15 @@
 <mat-card class="section-card" *transloco="let t; scope: 'admin'">
   <mat-card-header>
     <mat-card-title>{{ t('admin.actions.title') }}</mat-card-title>
-    <div class="spacer"></div>
-    @if (canCreate()) {
+  </mat-card-header>
+  @if (canCreate()) {
+    <div class="header-action">
       <button mat-raised-button color="primary" (click)="openAddAction()">
         <mat-icon>add</mat-icon>
         {{ t('admin.actions.addAction') }}
       </button>
-    }
-  </mat-card-header>
+    </div>
+  }
 
   <mat-card-content>
     @if (loading() && actions().length === 0) {

@@ -16,17 +16,14 @@
 }
 
 .section-card {
+  position: relative;
   margin-bottom: vars.$spacing-lg;
 }
 
-mat-card-header {
-  display: flex;
-  align-items: center;
-  padding-bottom: vars.$spacing-sm;
-
-  .spacer {
-    flex: 1;
-  }
+.header-action {
+  position: absolute;
+  top: vars.$spacing-md;
+  right: vars.$spacing-md;
 }
 
 .actions-table {
