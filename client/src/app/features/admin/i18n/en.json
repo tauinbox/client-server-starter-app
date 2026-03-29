@@ -1,9 +1,9 @@
 {
   "panel": {
-    "manageUsers": "Manage Users",
-    "manageRoles": "Manage Roles",
-    "manageResources": "Manage Resources",
-    "manageActions": "Manage Actions"
+    "manageUsers": "Users",
+    "manageRoles": "Roles",
+    "manageResources": "Resources",
+    "manageActions": "Actions"
   },
   "roles": {
     "title": "Roles management",

@@ -147,11 +147,6 @@ describe('ResourceListComponent', () => {
   describe('dialog interactions', () => {
     it('opens ResourceFormDialog on edit resource click', async () => {
       authStoreMock.hasPermissions.mockReturnValue(true);
-      const dialogRefMock = {
-        afterClosed: vi.fn().mockReturnValue(of(undefined))
-      };
-      dialogMock.open.mockReturnValue(dialogRefMock);
-
       await setupComponent();
       fixture.detectChanges();
 
@@ -162,25 +157,6 @@ describe('ResourceListComponent', () => {
         expect.objectContaining({
           data: { resource: mockResource, actions: [mockAction] }
         })
-      );
-    });
-
-    it('calls store.updateResource when ResourceFormDialog returns a result', async () => {
-      authStoreMock.hasPermissions.mockReturnValue(true);
-      const dialogResult = { displayName: 'New Name', description: null };
-      const dialogRefMock = {
-        afterClosed: vi.fn().mockReturnValue(of(dialogResult))
-      };
-      dialogMock.open.mockReturnValue(dialogRefMock);
-
-      await setupComponent();
-      fixture.detectChanges();
-
-      component.openEditResource(mockResource);
-
-      expect(resourcesStoreMock.updateResource).toHaveBeenCalledWith(
-        'res-1',
-        dialogResult
       );
     });
   });

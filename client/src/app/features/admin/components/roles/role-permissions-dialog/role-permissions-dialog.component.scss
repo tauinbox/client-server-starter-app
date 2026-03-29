@@ -190,6 +190,12 @@ mat-divider {
 }
 
 .condition-toggle {
+  // mat-button's state layer uses --mat-sys-corner-full (pill shape) by default,
+  // which leaves visible gaps at the edges when the button fills a container with
+  // a different border-radius. Set it to 0 so the state layer is rectangular and
+  // the parent .condition-row (overflow:hidden + border-radius-md) handles rounding.
+  --mat-button-text-container-shape: 0;
+
   display: flex;
   flex-wrap: wrap;
   gap: vars.$spacing-xs;
@@ -220,6 +226,7 @@ mat-divider {
   }
 
   .no-condition {
+    margin-left: vars.$spacing-sm;
     font-size: func.rem(12);
     font-style: italic;
     color: var(--mat-sys-on-surface-variant);
@@ -256,6 +263,7 @@ mat-divider {
   }
 
   .checkbox-hint {
+    margin-left: vars.$spacing-xs;
     font-size: func.rem(12);
     font-weight: vars.$font-weight-regular;
     color: var(--mat-sys-on-surface-variant);

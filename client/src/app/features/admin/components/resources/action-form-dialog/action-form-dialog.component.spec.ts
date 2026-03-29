@@ -1,13 +1,20 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { signal } from '@angular/core';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { of } from 'rxjs';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 
 import { ActionFormDialogComponent } from './action-form-dialog.component';
 import type { ActionFormDialogData } from './action-form-dialog.component';
-import type { ActionResponse } from '@app/shared/types/rbac.types';
+import { ResourcesStore } from '../../../store/resources.store';
+import type {
+  ActionResponse,
+  ResourceResponse
+} from '@app/shared/types/rbac.types';
 
 const mockAction: ActionResponse = {
   id: 'act-1',
@@ -22,6 +29,15 @@ describe('ActionFormDialogComponent', () => {
   let component: ActionFormDialogComponent;
   let fixture: ComponentFixture<ActionFormDialogComponent>;
   let dialogRefMock: { close: ReturnType<typeof vi.fn> };
+  let resourcesStoreMock: {
+    resources: ReturnType<typeof signal<ResourceResponse[]>>;
+    actions: ReturnType<typeof signal<ActionResponse[]>>;
+    loading: ReturnType<typeof signal<boolean>>;
+    load: ReturnType<typeof vi.fn>;
+    createAction: ReturnType<typeof vi.fn>;
+    updateAction: ReturnType<typeof vi.fn>;
+  };
+  let snackBarMock: { open: ReturnType<typeof vi.fn> };
 
   function createComponent(data: ActionFormDialogData): void {
     dialogRefMock = { close: vi.fn() };
@@ -31,7 +47,9 @@ describe('ActionFormDialogComponent', () => {
       providers: [
         provideNoopAnimations(),
         { provide: MatDialogRef, useValue: dialogRefMock },
-        { provide: MAT_DIALOG_DATA, useValue: data }
+        { provide: MAT_DIALOG_DATA, useValue: data },
+        { provide: ResourcesStore, useValue: resourcesStoreMock },
+        { provide: MatSnackBar, useValue: snackBarMock }
       ]
     });
 
@@ -42,6 +60,15 @@ describe('ActionFormDialogComponent', () => {
 
   beforeEach(() => {
     TestBed.resetTestingModule();
+    resourcesStoreMock = {
+      resources: signal([]),
+      actions: signal([mockAction]),
+      loading: signal(false),
+      load: vi.fn(),
+      createAction: vi.fn().mockReturnValue(of(mockAction)),
+      updateAction: vi.fn().mockReturnValue(of(mockAction))
+    };
+    snackBarMock = { open: vi.fn() };
   });
 
   it('shows "Add Action" title in create mode', () => {
@@ -144,7 +171,7 @@ describe('ActionFormDialogComponent', () => {
     expect(saveBtn?.disabled).toBe(true);
   });
 
-  it('calls dialogRef.close with correct result on submit in create mode', () => {
+  it('calls store.createAction with trimmed values and closes dialog on submit in create mode', () => {
     createComponent({});
     component['form'].get('name')?.setValue('publish');
     component['form'].get('displayName')?.setValue('  Publish  ');
@@ -153,14 +180,15 @@ describe('ActionFormDialogComponent', () => {
 
     component.submit();
 
-    expect(dialogRefMock.close).toHaveBeenCalledWith({
+    expect(resourcesStoreMock.createAction).toHaveBeenCalledWith({
       name: 'publish',
       displayName: 'Publish',
       description: 'Publish desc'
     });
+    expect(dialogRefMock.close).toHaveBeenCalledWith(true);
   });
 
-  it('calls dialogRef.close with correct result on submit in edit mode', () => {
+  it('calls store.updateAction with trimmed values and closes dialog on submit in edit mode', () => {
     createComponent({ action: mockAction });
     component['form'].get('displayName')?.setValue('  Updated Read  ');
     component['form'].get('description')?.setValue('Updated desc');
@@ -168,11 +196,11 @@ describe('ActionFormDialogComponent', () => {
 
     component.submit();
 
-    expect(dialogRefMock.close).toHaveBeenCalledWith({
-      name: 'read',
+    expect(resourcesStoreMock.updateAction).toHaveBeenCalledWith('act-1', {
       displayName: 'Updated Read',
       description: 'Updated desc'
     });
+    expect(dialogRefMock.close).toHaveBeenCalledWith(true);
   });
 
   it('calls dialogRef.close with no argument on cancel', () => {
@@ -181,12 +209,13 @@ describe('ActionFormDialogComponent', () => {
     expect(dialogRefMock.close).toHaveBeenCalledWith();
   });
 
-  it('does not close when form is invalid on submit', () => {
+  it('does not call store when form is invalid on submit', () => {
     createComponent({});
     component['form'].markAsDirty();
 
     component.submit();
 
+    expect(resourcesStoreMock.createAction).not.toHaveBeenCalled();
     expect(dialogRefMock.close).not.toHaveBeenCalled();
   });
 });

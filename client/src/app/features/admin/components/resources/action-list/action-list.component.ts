@@ -4,7 +4,8 @@ import {
   Component,
   computed,
   DestroyRef,
-  inject
+  inject,
+  ViewContainerRef
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
@@ -39,10 +40,7 @@ import { AuthStore } from '@features/auth/store/auth.store';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { ResourcesStore } from '../../../store/resources.store';
-import type {
-  ActionFormDialogData,
-  ActionFormDialogResult
-} from '../action-form-dialog/action-form-dialog.component';
+import type { ActionFormDialogData } from '../action-form-dialog/action-form-dialog.component';
 import { ActionFormDialogComponent } from '../action-form-dialog/action-form-dialog.component';
 
 @Component({
@@ -81,6 +79,7 @@ export class ActionListComponent implements OnInit {
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
   readonly #translocoService = inject(TranslocoService);
+  readonly #viewContainerRef = inject(ViewContainerRef);
   protected readonly authStore = inject(AuthStore);
 
   readonly loading = this.#resourcesStore.loading;
@@ -111,80 +110,20 @@ export class ActionListComponent implements OnInit {
 
   openAddAction(): void {
     const data: ActionFormDialogData = {};
-    this.#dialog
-      .open(ActionFormDialogComponent, {
-        ...dialogSizeConfig(DialogSize.Form),
-        data
-      })
-      .afterClosed()
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe((result: ActionFormDialogResult | undefined) => {
-        if (result) {
-          this.#resourcesStore
-            .createAction(result)
-            .pipe(takeUntilDestroyed(this.#destroyRef))
-            .subscribe({
-              next: () => {
-                this.#snackBar.open(
-                  this.#translocoService.translate(
-                    'admin.actions.successCreated'
-                  ),
-                  this.#translocoService.translate('common.close'),
-                  { duration: 5000 }
-                );
-              },
-              error: (err: { error?: { message?: string } }) => {
-                this.#snackBar.open(
-                  err.error?.message ??
-                    this.#translocoService.translate(
-                      'admin.actions.errorCreateFailed'
-                    ),
-                  this.#translocoService.translate('common.close'),
-                  { duration: 5000 }
-                );
-              }
-            });
-        }
-      });
+    this.#dialog.open(ActionFormDialogComponent, {
+      ...dialogSizeConfig(DialogSize.Form),
+      viewContainerRef: this.#viewContainerRef,
+      data
+    });
   }
 
   openEditAction(action: ActionResponse): void {
     const data: ActionFormDialogData = { action };
-    this.#dialog
-      .open(ActionFormDialogComponent, {
-        ...dialogSizeConfig(DialogSize.Form),
-        data
-      })
-      .afterClosed()
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe((result: ActionFormDialogResult | undefined) => {
-        if (result) {
-          this.#resourcesStore
-            .updateAction(action.id, result)
-            .pipe(takeUntilDestroyed(this.#destroyRef))
-            .subscribe({
-              next: () => {
-                this.#snackBar.open(
-                  this.#translocoService.translate(
-                    'admin.actions.successUpdated'
-                  ),
-                  this.#translocoService.translate('common.close'),
-                  { duration: 5000 }
-                );
-              },
-              error: (err: { error?: { message?: string } }) => {
-                this.#snackBar.open(
-                  err.error?.message ??
-                    this.#translocoService.translate(
-                      'admin.actions.errorUpdateFailed'
-                    ),
-                  this.#translocoService.translate('common.close'),
-                  { duration: 5000 }
-                );
-              }
-            });
-        }
-      });
+    this.#dialog.open(ActionFormDialogComponent, {
+      ...dialogSizeConfig(DialogSize.Form),
+      viewContainerRef: this.#viewContainerRef,
+      data
+    });
   }
 
   confirmDeleteAction(action: ActionResponse): void {

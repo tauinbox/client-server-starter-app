@@ -1,5 +1,20 @@
 @use '../abstracts/variables' as vars;
+@use '../abstracts/functions' as func;
 @use '../abstracts/mixins' as mix;
+
+// M3 card-header has padding: 16px 16px 0 (no bottom) and card-content has
+// padding: 0 16px (no top), so the title sits flush against content.
+// Use margin-bottom (not padding-bottom) so Material's padding shorthand
+// injected later cannot override it.
+// min-height: rem(56) = 16px top padding + 40px (Material raised button height).
+// This ensures the header block is the same size whether or not action buttons
+// are present, so the visual gap between the title and card content never
+// changes when switching between tabs.
+.mat-mdc-card-header {
+  align-items: center;
+  min-height: func.rem(56);
+  margin-bottom: vars.$spacing-sm;
+}
 
 .app-card {
   &__container {

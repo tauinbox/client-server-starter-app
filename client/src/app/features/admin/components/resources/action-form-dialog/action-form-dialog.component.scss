@@ -1,10 +1,19 @@
 @use 'abstracts/variables' as vars;
+@use 'abstracts/functions' as func;
 
 form {
   margin-top: vars.$spacing-md;
 }
 
 .full-width {
+  display: block;
   width: 100%;
   margin-bottom: vars.$spacing-xs;
+}
+
+.form-error {
+  margin-top: vars.$spacing-sm;
+  margin-bottom: 0;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-error);
 }
