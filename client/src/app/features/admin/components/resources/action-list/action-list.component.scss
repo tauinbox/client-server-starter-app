@@ -16,14 +16,16 @@
 }
 
 .section-card {
-  position: relative;
   margin-bottom: vars.$spacing-lg;
 }
 
-.header-action {
-  position: absolute;
-  top: vars.$spacing-md;
-  right: vars.$spacing-md;
+mat-card-header {
+  display: flex;
+  align-items: center;
+
+  .spacer {
+    flex: 1;
+  }
 }
 
 .actions-table {

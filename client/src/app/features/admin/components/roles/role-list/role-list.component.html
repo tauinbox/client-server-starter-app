@@ -1,15 +1,14 @@
 <mat-card *transloco="let t; scope: 'admin'">
   <mat-card-header>
     <mat-card-title>{{ t('admin.roles.title') }}</mat-card-title>
-  </mat-card-header>
-  @if (canCreate()) {
-    <div class="header-action">
+    <div class="spacer"></div>
+    @if (canCreate()) {
       <button mat-raised-button color="primary" (click)="openCreateDialog()">
         <mat-icon>add</mat-icon>
         {{ t('admin.roles.newRole') }}
       </button>
-    </div>
-  }
+    }
+  </mat-card-header>
 
   <mat-card-content>
     @if (loading() && roles().length === 0) {

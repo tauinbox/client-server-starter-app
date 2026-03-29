@@ -8,14 +8,13 @@
   @include mix.card-container;
 }
 
-:host mat-card {
-  position: relative;
-}
+mat-card-header {
+  display: flex;
+  align-items: center;
 
-.header-action {
-  position: absolute;
-  top: vars.$spacing-md;
-  right: vars.$spacing-md;
+  .spacer {
+    flex: 1;
+  }
 }
 
 .loading-container {
