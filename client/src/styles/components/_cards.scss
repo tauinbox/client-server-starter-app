@@ -1,6 +1,18 @@
 @use '../abstracts/variables' as vars;
 @use '../abstracts/mixins' as mix;
 
+// M3 card-header has padding: 16px 16px 0 (no bottom) and card-content has
+// padding: 0 16px (no top), so the title sits flush against content.
+// Use margin-bottom (not padding-bottom) so Material's padding shorthand
+// injected later cannot override it.
+// align-items: flex-start anchors the title to the top of the header flex row
+// so that action buttons (taller than the title) don't push the title down and
+// inflate the apparent gap — spacing stays identical across all tabs.
+.mat-mdc-card-header {
+  align-items: flex-start;
+  margin-bottom: vars.$spacing-sm;
+}
+
 .app-card {
   &__container {
     @include mix.card-container;
