@@ -107,8 +107,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     }),
     password: this.#fb.control('', {
       validators: [Validators.required],
-      nonNullable: true,
-      updateOn: 'blur'
+      nonNullable: true
     })
   });
 
