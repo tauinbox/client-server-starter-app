@@ -18,7 +18,7 @@ RUN apk upgrade --no-cache && \
 # EDGE_PATCHES_START
 RUN apk upgrade --no-cache \
     --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
-    zlib libexpat
+    zlib libexpat libpng
 # EDGE_PATCHES_END
 COPY --from=builder /app/client/dist/client/browser /usr/share/nginx/html
 COPY client/nginx.conf /etc/nginx/conf.d/default.conf
