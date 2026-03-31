@@ -1,4 +1,7 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { BreakpointObserver } from '@angular/cdk/layout';
+import { map } from 'rxjs';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { LocalStorageService } from './local-storage.service';
 
@@ -6,15 +9,30 @@ const WIDE_KEY = (userId: string) => `sidenav_wide_${userId}`;
 
 const NAV_WIDTH_NARROW = '4rem';
 const NAV_WIDTH_WIDE = '13.75rem';
+const MOBILE_BREAKPOINT = '(max-width: 599px)';
 
 @Injectable({ providedIn: 'root' })
 export class SidenavStateService {
   readonly #storage = inject(LocalStorageService);
   readonly #authStore = inject(AuthStore);
+  readonly #breakpointObserver = inject(BreakpointObserver);
 
   readonly #isWide = signal(false);
+  readonly #mobileOpen = signal(false);
 
   readonly isWide = this.#isWide.asReadonly();
+
+  readonly isMobile = toSignal(
+    this.#breakpointObserver
+      .observe(MOBILE_BREAKPOINT)
+      .pipe(map((r) => r.matches)),
+    { initialValue: false }
+  );
+
+  readonly sidenavOpened = computed(() => {
+    if (this.isMobile()) return this.#mobileOpen();
+    return true;
+  });
 
   readonly width = computed(() =>
     this.#isWide() ? NAV_WIDTH_WIDE : NAV_WIDTH_NARROW
@@ -47,5 +65,13 @@ export class SidenavStateService {
     if (userId) {
       this.#storage.setItem(WIDE_KEY(userId), next);
     }
+  }
+
+  toggleMobileOpen(): void {
+    this.#mobileOpen.update((v) => !v);
+  }
+
+  closeMobile(): void {
+    this.#mobileOpen.set(false);
   }
 }

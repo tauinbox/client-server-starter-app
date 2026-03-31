@@ -28,8 +28,21 @@ mat-card-header {
   }
 }
 
+.table-wrapper {
+  overflow-x: auto;
+}
+
 .resources-table {
   width: 100%;
+
+  @media (max-width: vars.$breakpoint-xs) {
+    /* stylelint-disable selector-class-pattern */
+    .mat-column-description,
+    .mat-column-subject {
+      display: none;
+    }
+    /* stylelint-enable selector-class-pattern */
+  }
 }
 
 code {

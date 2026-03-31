@@ -136,11 +136,13 @@ export class ProfileComponent implements OnInit {
       {
         firstName: this.#fb.control('', {
           validators: [Validators.required],
-          nonNullable: true
+          nonNullable: true,
+          updateOn: 'blur'
         }),
         lastName: this.#fb.control('', {
           validators: [Validators.required],
-          nonNullable: true
+          nonNullable: true,
+          updateOn: 'blur'
         }),
         password: this.#fb.control('', {
           validators: [Validators.minLength(8)],

@@ -102,11 +102,13 @@ export class LoginComponent implements OnInit, OnDestroy {
   readonly loginForm = this.#fb.group<LoginFormType>({
     email: this.#fb.control('', {
       validators: [Validators.required, Validators.email],
-      nonNullable: true
+      nonNullable: true,
+      updateOn: 'blur'
     }),
     password: this.#fb.control('', {
       validators: [Validators.required],
-      nonNullable: true
+      nonNullable: true,
+      updateOn: 'blur'
     })
   });
 

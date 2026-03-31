@@ -25,7 +25,8 @@
     "adminPanel": "Admin Panel",
     "profile": "Profile",
     "collapse": "Collapse",
-    "expand": "Expand"
+    "expand": "Expand",
+    "openNavigation": "Open navigation"
   },
   "theme": {
     "switchToLight": "Switch to light theme",

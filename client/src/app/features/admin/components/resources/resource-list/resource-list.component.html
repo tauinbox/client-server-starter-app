@@ -9,116 +9,118 @@
         <mat-spinner></mat-spinner>
       </div>
     } @else {
-      <table mat-table [dataSource]="resources()" class="resources-table">
-        <!-- Display Name Column -->
-        <ng-container matColumnDef="displayName">
-          <th mat-header-cell *matHeaderCellDef>
-            {{ t('admin.resources.tableHeaderDisplayName') }}
-          </th>
-          <td mat-cell *matCellDef="let resource">
-            {{ resource.displayName }}
-          </td>
-        </ng-container>
+      <div class="table-wrapper">
+        <table mat-table [dataSource]="resources()" class="resources-table">
+          <!-- Display Name Column -->
+          <ng-container matColumnDef="displayName">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ t('admin.resources.tableHeaderDisplayName') }}
+            </th>
+            <td mat-cell *matCellDef="let resource">
+              {{ resource.displayName }}
+            </td>
+          </ng-container>
 
-        <!-- Name Column -->
-        <ng-container matColumnDef="name">
-          <th mat-header-cell *matHeaderCellDef>
-            {{ t('admin.resources.tableHeaderName') }}
-          </th>
-          <td mat-cell *matCellDef="let resource">
-            <code>{{ resource.name }}</code>
-          </td>
-        </ng-container>
+          <!-- Name Column -->
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ t('admin.resources.tableHeaderName') }}
+            </th>
+            <td mat-cell *matCellDef="let resource">
+              <code>{{ resource.name }}</code>
+            </td>
+          </ng-container>
 
-        <!-- Subject Column -->
-        <ng-container matColumnDef="subject">
-          <th mat-header-cell *matHeaderCellDef>
-            {{ t('admin.resources.tableHeaderSubject') }}
-          </th>
-          <td mat-cell *matCellDef="let resource">
-            <code>{{ resource.subject }}</code>
-          </td>
-        </ng-container>
+          <!-- Subject Column -->
+          <ng-container matColumnDef="subject">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ t('admin.resources.tableHeaderSubject') }}
+            </th>
+            <td mat-cell *matCellDef="let resource">
+              <code>{{ resource.subject }}</code>
+            </td>
+          </ng-container>
 
-        <!-- Description Column -->
-        <ng-container matColumnDef="description">
-          <th mat-header-cell *matHeaderCellDef>
-            {{ t('admin.resources.tableHeaderDescription') }}
-          </th>
-          <td mat-cell *matCellDef="let resource">
-            {{ resource.description ?? '—' }}
-          </td>
-        </ng-container>
+          <!-- Description Column -->
+          <ng-container matColumnDef="description">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ t('admin.resources.tableHeaderDescription') }}
+            </th>
+            <td mat-cell *matCellDef="let resource">
+              {{ resource.description ?? '—' }}
+            </td>
+          </ng-container>
 
-        <!-- Status Column -->
-        <ng-container matColumnDef="status">
-          <th mat-header-cell *matHeaderCellDef>
-            {{ t('admin.resources.tableHeaderStatus') }}
-          </th>
-          <td mat-cell *matCellDef="let resource">
-            @if (resource.isOrphaned) {
-              <mat-chip
-                color="warn"
-                highlighted
-                [matTooltip]="
-                  resource.isRegistered
-                    ? t('admin.resources.orphanedRegisteredTooltip')
-                    : t('admin.resources.orphanedUnregisteredTooltip')
-                "
-              >
-                {{ t('admin.resources.statusOrphaned') }}
-              </mat-chip>
-            } @else if (resource.isSystem) {
-              <mat-chip color="primary" highlighted>{{
-                t('admin.roles.typeSystem')
-              }}</mat-chip>
-            }
-          </td>
-        </ng-container>
-
-        <!-- Actions Column -->
-        <ng-container matColumnDef="actions">
-          <th mat-header-cell *matHeaderCellDef>
-            {{ t('admin.resources.tableHeaderActions') }}
-          </th>
-          <td mat-cell *matCellDef="let resource">
-            @if (canUpdate()) {
-              @if (resource.isOrphaned && resource.isRegistered) {
-                <button
-                  mat-icon-button
+          <!-- Status Column -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ t('admin.resources.tableHeaderStatus') }}
+            </th>
+            <td mat-cell *matCellDef="let resource">
+              @if (resource.isOrphaned) {
+                <mat-chip
                   color="warn"
-                  (click)="restoreResource(resource)"
-                  [matTooltip]="t('admin.resources.restoreTooltip')"
-                  [attr.aria-label]="
-                    t('admin.resources.restoreTooltip') +
-                    ' ' +
-                    resource.displayName
+                  highlighted
+                  [matTooltip]="
+                    resource.isRegistered
+                      ? t('admin.resources.orphanedRegisteredTooltip')
+                      : t('admin.resources.orphanedUnregisteredTooltip')
                   "
                 >
-                  <mat-icon>restore</mat-icon>
-                </button>
-              } @else if (!resource.isOrphaned) {
-                <button
-                  mat-icon-button
-                  color="accent"
-                  (click)="openEditResource(resource)"
-                  [matTooltip]="t('admin.resources.editResource')"
-                  [attr.aria-label]="
-                    t('admin.resources.editResource') +
-                    ' ' +
-                    resource.displayName
-                  "
-                >
-                  <mat-icon>edit</mat-icon>
-                </button>
+                  {{ t('admin.resources.statusOrphaned') }}
+                </mat-chip>
+              } @else if (resource.isSystem) {
+                <mat-chip color="primary" highlighted>{{
+                  t('admin.roles.typeSystem')
+                }}</mat-chip>
               }
-            }
-          </td>
-        </ng-container>
+            </td>
+          </ng-container>
 
-        <tr mat-header-row *matHeaderRowDef="resourceColumns"></tr>
-        <tr mat-row *matRowDef="let _; columns: resourceColumns"></tr>
-      </table>
+          <!-- Actions Column -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ t('admin.resources.tableHeaderActions') }}
+            </th>
+            <td mat-cell *matCellDef="let resource">
+              @if (canUpdate()) {
+                @if (resource.isOrphaned && resource.isRegistered) {
+                  <button
+                    mat-icon-button
+                    color="warn"
+                    (click)="restoreResource(resource)"
+                    [matTooltip]="t('admin.resources.restoreTooltip')"
+                    [attr.aria-label]="
+                      t('admin.resources.restoreTooltip') +
+                      ' ' +
+                      resource.displayName
+                    "
+                  >
+                    <mat-icon>restore</mat-icon>
+                  </button>
+                } @else if (!resource.isOrphaned) {
+                  <button
+                    mat-icon-button
+                    color="accent"
+                    (click)="openEditResource(resource)"
+                    [matTooltip]="t('admin.resources.editResource')"
+                    [attr.aria-label]="
+                      t('admin.resources.editResource') +
+                      ' ' +
+                      resource.displayName
+                    "
+                  >
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                }
+              }
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="resourceColumns"></tr>
+          <tr mat-row *matRowDef="let _; columns: resourceColumns"></tr>
+        </table>
+      </div>
     }
   </mat-card-content>
 </mat-card>

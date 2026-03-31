@@ -53,11 +53,13 @@ export class RoleFormDialogComponent {
     this.#fb.group<RoleFormType>({
       name: this.#fb.control(this.data.role?.name ?? '', {
         validators: [Validators.required, Validators.maxLength(50)],
-        nonNullable: true
+        nonNullable: true,
+        updateOn: 'blur'
       }),
       description: this.#fb.control(this.data.role?.description ?? '', {
         validators: [Validators.maxLength(255)],
-        nonNullable: true
+        nonNullable: true,
+        updateOn: 'blur'
       })
     });
 

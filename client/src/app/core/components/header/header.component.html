@@ -1,4 +1,13 @@
 <mat-toolbar color="primary" *transloco="let t">
+  @if (authStore.isAuthenticated() && sidenavState.isMobile()) {
+    <button
+      mat-icon-button
+      (click)="sidenavState.toggleMobileOpen()"
+      [attr.aria-label]="t('sidenav.openNavigation')"
+    >
+      <mat-icon>menu</mat-icon>
+    </button>
+  }
   <span [matTooltip]="appVersion">{{ appName }}</span>
   <span class="spacer"></span>
 
