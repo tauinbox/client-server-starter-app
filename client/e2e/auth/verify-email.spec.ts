@@ -61,7 +61,9 @@ test.describe('Email verification', () => {
 
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('unverified@example.com');
+    await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await page.getByLabel('Password', { exact: true }).blur();
     await main.getByRole('button', { name: 'Login' }).click();
 
     // Should show email not verified error
@@ -98,7 +100,9 @@ test.describe('Email verification', () => {
 
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('resend@example.com');
+    await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await page.getByLabel('Password', { exact: true }).blur();
     await main.getByRole('button', { name: 'Login' }).click();
 
     // Wait for verification actions to appear
@@ -173,7 +177,9 @@ test.describe('Email verification', () => {
 
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('verifythenlogin@example.com');
+    await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await page.getByLabel('Password', { exact: true }).blur();
     await main.getByRole('button', { name: 'Login' }).click();
 
     await expect(page).toHaveURL(/.*\/profile$/);

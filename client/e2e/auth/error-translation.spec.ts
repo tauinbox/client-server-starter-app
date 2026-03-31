@@ -28,7 +28,9 @@ test.describe('Error translation: login component errors', () => {
     await page.goto('/login');
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('test@example.com');
+    await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await page.getByLabel('Password', { exact: true }).blur();
     await main.getByRole('button', { name: 'Login' }).click();
 
     await expect(page.locator('.error-message')).toContainText(
@@ -58,7 +60,9 @@ test.describe('Error translation: login component errors', () => {
     await page.goto('/login');
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('test@example.com');
+    await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await page.getByLabel('Password', { exact: true }).blur();
     await main.getByRole('button', { name: 'Login' }).click();
 
     await expect(page.locator('.error-message')).toContainText(
@@ -95,7 +99,9 @@ test.describe('Error translation: login component errors', () => {
     await page.goto('/login');
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('test@example.com');
+    await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await page.getByLabel('Password', { exact: true }).blur();
     await main.getByRole('button', { name: 'Login' }).click();
 
     await expect(page.locator('.error-message')).toContainText(
@@ -125,8 +131,11 @@ test.describe('Error translation: register component errors', () => {
     await page.goto('/register');
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('test@example.com');
+    await page.getByLabel('Email').blur();
     await page.getByLabel('First Name').fill('John');
+    await page.getByLabel('First Name').blur();
     await page.getByLabel('Last Name').fill('Doe');
+    await page.getByLabel('Last Name').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
     await main.getByRole('button', { name: 'Register' }).click();
 
@@ -168,6 +177,7 @@ test.describe('Error translation: global error interceptor → snackbar', () => 
 
     // Make the form dirty and submit.
     await page.getByLabel('First Name').fill('Updated');
+    await page.getByLabel('First Name').blur();
     await page.getByRole('button', { name: 'Update Profile' }).click();
 
     const snackbar = page.locator('mat-snack-bar-container');

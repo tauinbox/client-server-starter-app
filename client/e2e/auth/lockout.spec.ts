@@ -12,7 +12,9 @@ test.describe('Account lockout', () => {
     // Enter 5 wrong passwords
     for (let i = 0; i < 5; i++) {
       await page.getByLabel('Email').fill('user@example.com');
+      await page.getByLabel('Email').blur();
       await page.getByLabel('Password', { exact: true }).fill('WrongPassword');
+      await page.getByLabel('Password', { exact: true }).blur();
       await main.getByRole('button', { name: 'Login' }).click();
 
       if (i < 4) {
@@ -58,7 +60,9 @@ test.describe('Account lockout', () => {
 
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('locked@example.com');
+    await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await page.getByLabel('Password', { exact: true }).blur();
     await main.getByRole('button', { name: 'Login' }).click();
 
     await expect(page.getByText(/temporarily locked/i)).toBeVisible();

@@ -99,6 +99,7 @@ test.describe('Profile page', () => {
     await loginViaUi(page, _mockServer.url);
 
     await page.getByLabel('First Name').fill('Jane');
+    await page.getByLabel('First Name').blur();
 
     await expect(
       page.getByRole('button', { name: 'Update Profile' })
@@ -178,7 +179,9 @@ test.describe('Profile page', () => {
     await loginViaUi(page, _mockServer.url);
 
     await page.getByLabel('First Name').fill('Jane');
+    await page.getByLabel('First Name').blur();
     await page.getByLabel('Last Name').fill('Smith');
+    await page.getByLabel('Last Name').blur();
     await page.getByRole('button', { name: 'Update Profile' }).click();
 
     await expect(page.getByText('Profile updated successfully')).toBeVisible();
@@ -191,7 +194,9 @@ test.describe('Profile page', () => {
     await loginViaUi(page, _mockServer.url);
 
     await page.getByLabel('First Name').fill('Jane');
+    await page.getByLabel('First Name').blur();
     await page.getByLabel('Last Name').fill('Smith');
+    await page.getByLabel('Last Name').blur();
     await page.getByRole('button', { name: 'Update Profile' }).click();
 
     await expect(
@@ -206,6 +211,7 @@ test.describe('Profile page', () => {
     await loginViaUi(page, _mockServer.url);
 
     await page.getByLabel('First Name').fill('Jane');
+    await page.getByLabel('First Name').blur();
     await page.getByRole('button', { name: 'Update Profile' }).click();
 
     await expect(page.getByText('Profile updated successfully')).toBeVisible();
@@ -232,6 +238,7 @@ test.describe('Profile page', () => {
     });
 
     await page.getByLabel('First Name').fill('Jane');
+    await page.getByLabel('First Name').blur();
     await page.getByRole('button', { name: 'Update Profile' }).click();
 
     await expect(page.locator('.error-message')).toBeVisible();
