@@ -81,15 +81,18 @@ export class RegisterComponent {
     this.#fb.group<RegisterFormType>({
       email: this.#fb.control('', {
         validators: [Validators.required, Validators.email],
-        nonNullable: true
+        nonNullable: true,
+        updateOn: 'blur'
       }),
       firstName: this.#fb.control('', {
         validators: [Validators.required],
-        nonNullable: true
+        nonNullable: true,
+        updateOn: 'blur'
       }),
       lastName: this.#fb.control('', {
         validators: [Validators.required],
-        nonNullable: true
+        nonNullable: true,
+        updateOn: 'blur'
       }),
       password: this.#fb.control('', {
         validators: [Validators.required, Validators.minLength(8)],

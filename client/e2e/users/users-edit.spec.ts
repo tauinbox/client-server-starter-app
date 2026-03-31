@@ -106,6 +106,7 @@ test.describe('User Edit page', () => {
     await page.goto('/users/1/edit');
 
     await page.getByLabel('First Name').fill('Updated');
+    await page.getByLabel('First Name').blur();
     await page.getByRole('button', { name: 'Save Changes' }).click();
 
     await expect(page.getByText('User updated successfully')).toBeVisible();
@@ -134,6 +135,7 @@ test.describe('User Edit page', () => {
     await page.goto('/users/1/edit');
 
     await page.getByLabel('First Name').fill('Updated');
+    await page.getByLabel('First Name').blur();
     await page.getByRole('button', { name: 'Save Changes' }).click();
 
     await expect(page.locator('.error-message')).toBeVisible();

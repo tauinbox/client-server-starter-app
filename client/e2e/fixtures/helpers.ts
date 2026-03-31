@@ -38,7 +38,9 @@ export async function loginViaUi(
 
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Email').blur();
   await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByLabel('Password', { exact: true }).blur();
   await page.getByRole('main').getByRole('button', { name: 'Login' }).click();
   await page.waitForURL(/.*\/profile$/);
   // Wait for the permissions fetch to complete so CASL ability is set

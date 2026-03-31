@@ -23,6 +23,19 @@ mat-card-header {
   padding: vars.$spacing-xl;
 }
 
+.table-wrapper {
+  overflow-x: auto;
+}
+
 .roles-table {
   width: 100%;
+
+  @media (max-width: vars.$breakpoint-xs) {
+    /* stylelint-disable selector-class-pattern */
+    .mat-column-description,
+    .mat-column-createdAt {
+      display: none;
+    }
+    /* stylelint-enable selector-class-pattern */
+  }
 }

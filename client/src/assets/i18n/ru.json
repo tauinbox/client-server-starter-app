@@ -25,7 +25,8 @@
     "adminPanel": "Панель администратора",
     "profile": "Профиль",
     "collapse": "Свернуть",
-    "expand": "Развернуть"
+    "expand": "Развернуть",
+    "openNavigation": "Открыть навигацию"
   },
   "theme": {
     "switchToLight": "Переключить на светлую тему",

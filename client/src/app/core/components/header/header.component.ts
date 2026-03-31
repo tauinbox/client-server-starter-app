@@ -19,6 +19,7 @@ import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { formatDate } from '@angular/common';
 import { APP_VERSION, BUILD_HASH, BUILD_DATE } from '@environments/version';
 import { environment } from '@environments/environment';
+import { SidenavStateService } from '@core/services/sidenav-state.service';
 
 @Component({
   selector: 'app-header',
@@ -40,6 +41,7 @@ import { environment } from '@environments/environment';
 })
 export class HeaderComponent {
   protected readonly authStore = inject(AuthStore);
+  protected readonly sidenavState = inject(SidenavStateService);
   protected readonly routes = AppRouteSegmentEnum;
   readonly #locale = inject(LOCALE_ID);
   protected readonly appName = environment.appName;

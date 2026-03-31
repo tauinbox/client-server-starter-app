@@ -60,7 +60,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - Form validation with error messages; password strength indicator on registration (4-bar visual meter)
 - 404 and 403 pages
 - Version display in toolbar (version + git hash via `MatTooltip`)
-- **Collapsible side navigation** — persistent left panel (narrow 64px / wide 220px) with per-user localStorage persistence
+- **Collapsible side navigation** — persistent left panel (narrow 64px / wide 220px) with per-user localStorage persistence; auto-collapses to overlay mode on mobile (≤599px) via `BreakpointObserver`; hamburger button in toolbar opens the drawer
 - **Standardized dialog system** — `DialogSize` enum (`Confirm` / `Form` / `Wide`) with `dialogSizeConfig()` helper; all dialogs use Material Design 3 responsive `{ width: '90vw', maxWidth }` pattern; global `_dialogs.scss` handles title padding, Angular Material bug #26352 fix (floating label clipping), and `::before` spacer reset
 
 ### Versioning

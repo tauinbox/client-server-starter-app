@@ -1,13 +1,20 @@
 <app-header />
 <mat-sidenav-container class="sidenav-container">
   @if (authStore.isAuthenticated()) {
-    <mat-sidenav opened mode="side" [style.width]="sidenavState.width()">
+    <mat-sidenav
+      [mode]="sidenavState.isMobile() ? 'over' : 'side'"
+      [opened]="sidenavState.sidenavOpened()"
+      (closed)="sidenavState.closeMobile()"
+      [style.width]="sidenavState.width()"
+    >
       <app-sidenav />
     </mat-sidenav>
   }
   <mat-sidenav-content
     [style.margin-left]="
-      authStore.isAuthenticated() ? sidenavState.width() : null
+      authStore.isAuthenticated() && !sidenavState.isMobile()
+        ? sidenavState.width()
+        : null
     "
   >
     <main class="container mx-auto p-4">
