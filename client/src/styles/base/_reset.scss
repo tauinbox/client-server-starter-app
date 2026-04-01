@@ -1,4 +1,5 @@
 @use '../abstracts/functions' as func;
+@use '../abstracts/variables' as vars;
 
 *,
 *::before,
@@ -82,6 +83,25 @@ fieldset {
 // Make sure textarea only resizes vertically by default
 textarea {
   resize: vertical;
+}
+
+// Skip link — visually hidden until focused by keyboard
+.skip-link {
+  position: absolute;
+  top: func.rem(-40);
+  left: func.rem(8);
+  z-index: 9999;
+  padding: func.rem(8) func.rem(16);
+  font-size: vars.$font-size-base;
+  color: #fff;
+  text-decoration: none;
+  background: var(--color-primary);
+  border-radius: vars.$border-radius-sm;
+  transition: top vars.$transition-fast ease;
+
+  &:focus {
+    top: func.rem(8);
+  }
 }
 
 // Remove Chrome's autofill background color

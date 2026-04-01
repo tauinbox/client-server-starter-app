@@ -3,7 +3,7 @@
     mat-icon-button
     [matMenuTriggerFor]="langMenu"
     [matTooltip]="t('language.switchLanguage')"
-    aria-label="Switch language"
+    [attr.aria-label]="t('language.switchLanguage')"
   >
     <mat-icon class="flag-btn-icon" [svgIcon]="currentFlag"></mat-icon>
   </button>

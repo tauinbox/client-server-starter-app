@@ -8,8 +8,8 @@
     mat-icon-button
     (click)="toggleTheme()"
     [matTooltip]="tooltip"
-    aria-label="Toggle theme"
+    [attr.aria-label]="tooltip"
   >
-    <mat-icon [fontIcon]="icon"></mat-icon>
+    <mat-icon [fontIcon]="icon" aria-hidden="true"></mat-icon>
   </button>
 </ng-container>

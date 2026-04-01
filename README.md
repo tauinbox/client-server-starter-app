@@ -53,7 +53,8 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 
 ### UI/UX
 - Angular Material M3 component library — `mat.theme()` API with Azure/Violet palette, M3 design tokens (`--mat-sys-*`), pill-shaped navigation active indicators
-- Light/dark theme with system preference detection
+- Light/dark theme with system preference detection; dark mode contrast ratios verified (7.9–14.4:1)
+- **WCAG 2.1 AA** — skip link, `aria-label` / `aria-current` / `aria-expanded` on sidenav, `aria-hidden` on decorative icons, transloco-bound `aria-label` on toolbar controls
 - **Runtime multilingual support (EN / RU)** — `@jsverse/transloco` with lazy-loaded per-feature scopes; language switcher in toolbar (flag icons); persisted to `localStorage`; server error keys translated client-side via shared `ErrorKeys` const
 - Responsive SCSS architecture
 - Snackbar error notifications

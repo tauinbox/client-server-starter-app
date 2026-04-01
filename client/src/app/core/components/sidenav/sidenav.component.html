@@ -9,11 +9,13 @@
           routerLinkActive
           [class.active]="adminRla.isActive"
           [routerLink]="'/' + routes.Admin"
+          [attr.aria-label]="t('sidenav.adminPanel')"
+          [attr.aria-current]="adminRla.isActive ? 'page' : null"
           [matTooltip]="sidenavState.isWide() ? '' : t('sidenav.adminPanel')"
           matTooltipPosition="after"
           [matTooltipShowDelay]="300"
         >
-          <mat-icon>admin_panel_settings</mat-icon>
+          <mat-icon aria-hidden="true">admin_panel_settings</mat-icon>
           @if (sidenavState.isWide()) {
             <span>{{ t('sidenav.adminPanel') }}</span>
           }
@@ -29,11 +31,13 @@
         routerLinkActive
         [class.active]="profileRla.isActive"
         [routerLink]="'/' + routes.Profile"
+        [attr.aria-label]="t('sidenav.profile')"
+        [attr.aria-current]="profileRla.isActive ? 'page' : null"
         [matTooltip]="sidenavState.isWide() ? '' : t('sidenav.profile')"
         matTooltipPosition="after"
         [matTooltipShowDelay]="300"
       >
-        <mat-icon>account_circle</mat-icon>
+        <mat-icon aria-hidden="true">account_circle</mat-icon>
         @if (sidenavState.isWide()) {
           <span
             >{{ authStore.user()?.firstName }}
@@ -49,12 +53,16 @@
     [class.wide]="sidenavState.isWide()"
     matRipple
     (click)="sidenavState.toggleWide()"
+    [attr.aria-label]="
+      sidenavState.isWide() ? t('sidenav.collapse') : t('sidenav.expand')
+    "
+    [attr.aria-expanded]="sidenavState.isWide()"
     [matTooltip]="
       sidenavState.isWide() ? t('sidenav.collapse') : t('sidenav.expand')
     "
     matTooltipPosition="after"
   >
-    <mat-icon>{{
+    <mat-icon aria-hidden="true">{{
       sidenavState.isWide() ? 'chevron_left' : 'chevron_right'
     }}</mat-icon>
   </button>
