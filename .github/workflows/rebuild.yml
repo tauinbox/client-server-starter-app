@@ -14,8 +14,9 @@ jobs:
     name: Rebuild & Push Images
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
+      pull-requests: write
     outputs:
       sha: ${{ steps.short-sha.outputs.sha }}
       owner: ${{ steps.lowercase-owner.outputs.owner }}
@@ -86,6 +87,8 @@ jobs:
           no-cache: true
 
       - name: Scan server image
+        id: scan-server
+        continue-on-error: true
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/nexus-server:sha-${{ env.COMMIT_HASH }}
@@ -105,6 +108,8 @@ jobs:
           no-cache: true
 
       - name: Scan client image
+        id: scan-client
+        continue-on-error: true
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/nexus-client:sha-${{ env.COMMIT_HASH }}
@@ -112,13 +117,140 @@ jobs:
           exit-code: 1
           severity: HIGH,CRITICAL
 
-      # Push only after both scans pass — keeps GHCR clean if either scan fails
+      # If any scan found HIGH/CRITICAL CVEs: identify vulnerable Alpine packages,
+      # add edge/main patches to the affected Dockerfiles, rebuild, re-scan to verify,
+      # then open a PR. The step exits 1 so the deploy job is skipped until the PR is merged.
+      - name: Auto-patch CVEs and open PR
+        if: steps.scan-server.outcome == 'failure' || steps.scan-client.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          IMAGE_SERVER="ghcr.io/${{ env.OWNER }}/nexus-server:sha-${{ env.COMMIT_HASH }}"
+          IMAGE_CLIENT="ghcr.io/${{ env.OWNER }}/nexus-client:sha-${{ env.COMMIT_HASH }}"
+          SERVER_PKGS=""
+          CLIENT_PKGS=""
+
+          # Extract vulnerable Alpine OS package names from Trivy JSON output.
+          # Node npm CVEs (type=node-pkg) are skipped — those require dependency updates.
+          if [[ "${{ steps.scan-server.outcome }}" == "failure" ]]; then
+            SERVER_PKGS=$(trivy image \
+              --skip-db-update \
+              --format json \
+              --severity HIGH,CRITICAL \
+              --quiet \
+              "$IMAGE_SERVER" | \
+              jq -r '
+                .Results[]?
+                | select(.Type == "alpine")
+                | .Vulnerabilities[]?
+                | select(.Severity == "HIGH" or .Severity == "CRITICAL")
+                | .PkgName
+              ' | sort -u | xargs)
+            echo "Server Alpine packages to patch: ${SERVER_PKGS:-none}"
+          fi
+
+          if [[ "${{ steps.scan-client.outcome }}" == "failure" ]]; then
+            CLIENT_PKGS=$(trivy image \
+              --skip-db-update \
+              --format json \
+              --severity HIGH,CRITICAL \
+              --quiet \
+              "$IMAGE_CLIENT" | \
+              jq -r '
+                .Results[]?
+                | select(.Type == "alpine")
+                | .Vulnerabilities[]?
+                | select(.Severity == "HIGH" or .Severity == "CRITICAL")
+                | .PkgName
+              ' | sort -u | xargs)
+            echo "Client Alpine packages to patch: ${CLIENT_PKGS:-none}"
+          fi
+
+          if [[ -z "$SERVER_PKGS" && -z "$CLIENT_PKGS" ]]; then
+            echo "No Alpine OS packages to patch — CVEs are in npm dependencies and require manual dependency updates"
+            exit 1
+          fi
+
+          # Patch Dockerfiles and rebuild affected images
+          if [[ -n "$SERVER_PKGS" ]]; then
+            python3 scripts/patch-dockerfile.py server/Dockerfile $SERVER_PKGS
+            docker build --no-cache -f server/Dockerfile \
+              -t "$IMAGE_SERVER" .
+          fi
+
+          if [[ -n "$CLIENT_PKGS" ]]; then
+            python3 scripts/patch-dockerfile.py client/Dockerfile $CLIENT_PKGS
+            docker build --no-cache -f client/Dockerfile \
+              --build-arg COMMIT_HASH="${{ env.COMMIT_HASH }}" \
+              -t "$IMAGE_CLIENT" .
+          fi
+
+          # Re-scan patched images to verify the fixes work
+          VERIFY_OK=true
+          if [[ -n "$SERVER_PKGS" ]]; then
+            echo "Re-scanning server image..."
+            if ! trivy image --skip-db-update --severity HIGH,CRITICAL --exit-code 1 --quiet "$IMAGE_SERVER"; then
+              echo "Server image still has HIGH/CRITICAL CVEs after patching"
+              VERIFY_OK=false
+            fi
+          fi
+          if [[ -n "$CLIENT_PKGS" ]]; then
+            echo "Re-scanning client image..."
+            if ! trivy image --skip-db-update --severity HIGH,CRITICAL --exit-code 1 --quiet "$IMAGE_CLIENT"; then
+              echo "Client image still has HIGH/CRITICAL CVEs after patching"
+              VERIFY_OK=false
+            fi
+          fi
+
+          if [[ "$VERIFY_OK" == "false" ]]; then
+            echo "Edge patches did not resolve all CVEs — manual intervention required"
+            exit 1
+          fi
+
+          # Open a PR with the Dockerfile changes
+          BRANCH="fix/auto-edge-patch-$(date +%Y-%m-%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add server/Dockerfile client/Dockerfile
+          git commit -m "fix(docker): add edge channel patches for newly detected CVEs"
+          git push --force origin "$BRANCH"
+
+          PR_BODY="## Summary
+          Scheduled rebuild detected new HIGH/CRITICAL CVEs in Alpine OS packages.
+          Edge channel patches have been added and verified to resolve all findings.
+
+          **Server patches:** ${SERVER_PKGS:-none}
+          **Client patches:** ${CLIENT_PKGS:-none}
+
+          ## Test plan
+          - [ ] Trivy scan passes on CI after merge
+          - [ ] Next scheduled rebuild deploys cleanly"
+
+          EXISTING=$(gh pr list --head "$BRANCH" --json number -q '.[0].number' 2>/dev/null || true)
+          if [[ -n "$EXISTING" ]]; then
+            gh pr edit "$EXISTING" --body "$PR_BODY"
+            echo "Updated existing PR #$EXISTING"
+          else
+            gh pr create \
+              --title "fix(docker): edge channel patches for new CVEs ($(date +%Y-%m-%d))" \
+              --body "$PR_BODY"
+          fi
+
+          echo "PR opened — deploy is blocked until the patch PR is reviewed and merged"
+          exit 1  # Prevent deploy with unpatched images
+
+      # Push only after both scans pass cleanly (no CVEs, no auto-patch ran)
       - name: Push server image
+        if: steps.scan-server.outcome == 'success' && steps.scan-client.outcome == 'success'
         run: |
           docker push ghcr.io/${{ env.OWNER }}/nexus-server:sha-${{ env.COMMIT_HASH }}
           docker push ghcr.io/${{ env.OWNER }}/nexus-server:latest
 
       - name: Push client image
+        if: steps.scan-server.outcome == 'success' && steps.scan-client.outcome == 'success'
         run: |
           docker push ghcr.io/${{ env.OWNER }}/nexus-client:sha-${{ env.COMMIT_HASH }}
           docker push ghcr.io/${{ env.OWNER }}/nexus-client:latest
