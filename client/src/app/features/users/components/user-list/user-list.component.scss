@@ -14,6 +14,10 @@
     display: grid;
     grid-template-columns: minmax(func.rem(250), 1fr) minmax(func.rem(250), 1fr);
     gap: vars.$spacing-md;
+
+    @media (max-width: vars.$breakpoint-xs) {
+      grid-template-columns: 1fr;
+    }
   }
 
   .filter-actions {

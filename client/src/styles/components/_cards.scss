@@ -16,6 +16,17 @@
   margin-bottom: vars.$spacing-sm;
 }
 
+// On narrow viewports the default 16px side padding on card-content leaves too
+// little space for table columns. Halve it at the xs breakpoint so tables fit
+// without horizontal overflow. Uses parent selector to win over Material's
+// same-specificity rule when component styles are injected after the global bundle.
+@media (max-width: vars.$breakpoint-xs) {
+  .mat-mdc-card .mat-mdc-card-content {
+    padding-right: vars.$spacing-xs;
+    padding-left: vars.$spacing-xs;
+  }
+}
+
 .app-card {
   &__container {
     @include mix.card-container;

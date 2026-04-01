@@ -30,6 +30,11 @@ mat-card-header {
 
 .table-wrapper {
   overflow-x: auto;
+
+  @media (max-width: vars.$breakpoint-xs) {
+    margin-right: -(vars.$spacing-xs);
+    margin-left: -(vars.$spacing-xs);
+  }
 }
 
 .resources-table {
@@ -38,7 +43,8 @@ mat-card-header {
   @media (max-width: vars.$breakpoint-xs) {
     /* stylelint-disable selector-class-pattern */
     .mat-column-description,
-    .mat-column-subject {
+    .mat-column-subject,
+    .mat-column-status {
       display: none;
     }
     /* stylelint-enable selector-class-pattern */
