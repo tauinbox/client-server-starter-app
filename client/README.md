@@ -133,6 +133,8 @@ src/styles/
 
 All size values use `func.rem(N)` (pixels → rem conversion) — never hardcoded `px`/`rem` literals. Global dialog styles live in `_dialogs.scss` (title padding, `::before` reset, bug #26352 fix). Dialog sizes are managed via `DialogSize` enum + `dialogSizeConfig()` in `shared/utils/dialog.utils.ts`.
 
+**Accessibility (WCAG 2.1 AA):** skip link in `index.html` targets `id="main-content"` on `<main>`; sidenav nav links have `aria-label` + `aria-current`; sidenav toggle has `aria-label` + `aria-expanded`; decorative `mat-icon` elements carry `aria-hidden="true"`; toolbar control `aria-label`s are bound to transloco strings.
+
 ## Testing
 
 ### Unit Tests (Vitest)
