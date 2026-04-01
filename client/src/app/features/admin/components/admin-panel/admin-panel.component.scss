@@ -5,6 +5,10 @@
   flex-direction: column;
   height: 100%;
   padding: vars.$spacing-md;
+
+  @media (max-width: vars.$breakpoint-xs) {
+    padding: vars.$spacing-xs;
+  }
 }
 
 a[mat-tab-link] {
