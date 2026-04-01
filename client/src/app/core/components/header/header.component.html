@@ -17,11 +17,11 @@
   @if (authStore.isAuthenticated()) {
     <button mat-button [matMenuTriggerFor]="menu">
       {{ authStore.user()?.firstName }} {{ authStore.user()?.lastName }}
-      <mat-icon>expand_more</mat-icon>
+      <mat-icon aria-hidden="true">expand_more</mat-icon>
     </button>
     <mat-menu #menu="matMenu">
       <button mat-menu-item (click)="logout()">
-        <mat-icon>logout</mat-icon>
+        <mat-icon aria-hidden="true">logout</mat-icon>
         <span>{{ t('header.logout') }}</span>
       </button>
     </mat-menu>
