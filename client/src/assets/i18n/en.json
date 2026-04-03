@@ -43,6 +43,14 @@
     "message": "The page you are looking for does not exist or has been moved.",
     "goHome": "Go Home"
   },
+  "shortcuts": {
+    "dialogTitle": "Keyboard Shortcuts",
+    "noShortcuts": "No shortcuts available.",
+    "groupGlobal": "Global",
+    "groupForms": "Forms",
+    "labelSave": "Save changes",
+    "labelHelp": "Open keyboard shortcuts help"
+  },
   "errors": {
     "auth": {
       "invalidCredentials": "Invalid credentials",

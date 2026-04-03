@@ -6,6 +6,7 @@ import {
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule } from '@angular/material/dialog';
+import { TranslocoDirective } from '@jsverse/transloco';
 import type { ShortcutDef } from '@core/services/keyboard-shortcuts.service';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 
@@ -15,8 +16,8 @@ type ShortcutGroup = {
 };
 
 const GROUP_ORDER: Record<string, number> = {
-  Global: 0,
-  Forms: 1
+  'shortcuts.groupGlobal': 0,
+  'shortcuts.groupForms': 1
 };
 
 function groupShortcuts(shortcuts: ShortcutDef[]): ShortcutGroup[] {
@@ -40,7 +41,7 @@ function groupShortcuts(shortcuts: ShortcutDef[]): ShortcutGroup[] {
 @Component({
   selector: 'app-keyboard-shortcuts-help',
   standalone: true,
-  imports: [MatDialogModule, MatButtonModule],
+  imports: [MatDialogModule, MatButtonModule, TranslocoDirective],
   templateUrl: './keyboard-shortcuts-help.component.html',
   styleUrl: './keyboard-shortcuts-help.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

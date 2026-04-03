@@ -31,14 +31,14 @@ export class AppComponent implements OnInit, OnDestroy {
     const openHelp = () => this.#openHelp();
     this.#cleanupQuestion = this.#shortcuts.register(
       '?',
-      'Open keyboard shortcuts help',
-      'Global',
+      'shortcuts.labelHelp',
+      'shortcuts.groupGlobal',
       openHelp
     );
     this.#cleanupCtrlSlash = this.#shortcuts.register(
       'ctrl+/',
-      'Open keyboard shortcuts help',
-      'Global',
+      'shortcuts.labelHelp',
+      'shortcuts.groupGlobal',
       openHelp
     );
   }

@@ -108,14 +108,14 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
     const save = () => this.submit();
     this.#cleanupCtrlS = this.#shortcuts.register(
       'ctrl+s',
-      'Save changes',
-      'Forms',
+      'shortcuts.labelSave',
+      'shortcuts.groupForms',
       save
     );
     this.#cleanupMetaS = this.#shortcuts.register(
       'meta+s',
-      'Save changes',
-      'Forms',
+      'shortcuts.labelSave',
+      'shortcuts.groupForms',
       save
     );
   }
