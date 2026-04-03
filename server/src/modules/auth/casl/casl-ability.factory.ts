@@ -93,9 +93,15 @@ export class CaslAbilityFactory {
               string,
               unknown
             >;
-            // Merge via entries to avoid prototype pollution from __proto__ /
-            // constructor keys that Object.assign would forward to the setter
             for (const [k, v] of Object.entries(parsed)) {
+              // Skip keys that could pollute the query object's prototype
+              if (
+                k === '__proto__' ||
+                k === 'constructor' ||
+                k === 'prototype'
+              ) {
+                continue;
+              }
               query[k] = v;
             }
           } catch {

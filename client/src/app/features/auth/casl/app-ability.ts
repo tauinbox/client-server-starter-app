@@ -1,14 +1,21 @@
 import type { MongoAbility } from '@casl/ability';
-import type { KnownSubjects } from '@app/shared/generated/casl-subjects';
+import type {
+  KnownActions,
+  KnownSubjects
+} from '@app/shared/generated/casl-subjects';
 
-/** Known actions: 'create' | 'read' | 'update' | 'delete' | 'search' | 'assign' */
+/**
+ * CASL action type — string for MongoAbility compatibility (custom actions
+ * created via admin UI are stored in DB as arbitrary strings).
+ * Use KnownActions in PermissionCheck for compile-time safety at call sites.
+ */
 export type Actions = string;
 
 /**
  * Valid CASL subject names — auto-generated from @RegisterResource decorators.
  * Re-run `npm run generate:subjects` (from server/) when adding a new resource.
  *
- * Record<PropertyKey, unknown> is included so that subject()-tagged plain objects
+ * Record<string, unknown> is included so that subject()-tagged plain objects
  * (instance-level checks) are accepted by ability.can() — standard CASL pattern
  * for plain object subjects that don't have TypeORM entity class constructors.
  */
@@ -30,7 +37,7 @@ export type AppAbility = MongoAbility<[Actions, Subjects]>;
  * Plain object subjects (ForcedSubject) are an implementation detail of hasPermissions().
  */
 export type PermissionCheck = {
-  action: Actions;
+  action: KnownActions;
   subject: KnownSubjects | 'all';
   instance?: Record<string, unknown>;
 };
