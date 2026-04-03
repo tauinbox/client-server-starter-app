@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from './permissions.guard';
 import { createMongoAbility } from '@casl/ability';
 import type { RawRuleOf } from '@casl/ability';
-import type { AppAbility } from '../casl/app-ability';
+import type { AppAbility, Subjects } from '../casl/app-ability';
 import type { AuditService } from '../../audit/audit.service';
 
 describe('PermissionsGuard', () => {
@@ -38,7 +38,7 @@ describe('PermissionsGuard', () => {
       const [resource, action] = p.split(':');
       return {
         action: action,
-        subject: subjectMap[resource] ?? resource
+        subject: (subjectMap[resource] ?? resource) as Extract<Subjects, string>
       };
     });
     return createMongoAbility<AppAbility>(rules);

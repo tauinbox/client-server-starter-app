@@ -8,7 +8,7 @@ import {
   withState
 } from '@ngrx/signals';
 import type { RawRuleOf } from '@casl/ability';
-import { createMongoAbility } from '@casl/ability';
+import { createMongoAbility, subject } from '@casl/ability';
 import type { PackRule } from '@casl/ability/extra';
 import { unpackRules } from '@casl/ability/extra';
 import type { User } from '@shared/models/user.types';
@@ -122,9 +122,14 @@ export const AuthStore = signalStore(
       check: PermissionCheck | PermissionCheck[]
     ): boolean {
       const checks = Array.isArray(check) ? check : [check];
-      return checks.every(
-        ({ action, subject }) => store.ability()?.can(action, subject) ?? false
-      );
+      return checks.every(({ action, subject: subjectName, instance }) => {
+        const ability = store.ability();
+        if (!ability) return false;
+        if (instance !== undefined) {
+          return ability.can(action, subject(subjectName, instance));
+        }
+        return ability.can(action, subjectName);
+      });
     }
 
     return {

@@ -5,11 +5,11 @@ import { AuthStore } from '../store/auth.store';
 import { AuthService } from '../services/auth.service';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { ensureAuthenticated } from '../utils/ensure-authenticated';
-import type { Actions, Subjects } from '../casl/app-ability';
+import type { Actions, PermissionCheck } from '../casl/app-ability';
 
 export function permissionGuard(
   action: Actions,
-  subject: Subjects
+  subject: PermissionCheck['subject']
 ): CanActivateFn {
   return (route, state) => {
     const authStore = inject(AuthStore);

@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { MongoQuery } from '@casl/ability';
 import { ResolvedPermission } from '@app/shared/types';
-import { AbilityBuilder, AppAbility, createMongoAbility } from './app-ability';
+import {
+  AbilityBuilder,
+  AppAbility,
+  createMongoAbility,
+  Subjects
+} from './app-ability';
 import { ResourceService } from '../services/resource.service';
 
 export interface RoleInfo {
@@ -28,14 +32,18 @@ export class CaslAbilityFactory {
       const subjectMap = await this.resourceService.getSubjectMap();
 
       for (const p of permissions) {
-        const subject = subjectMap[p.resource];
-        if (!subject) {
+        const rawSubject = subjectMap[p.resource];
+        if (!rawSubject) {
           this.logger.warn(
             `Unknown resource "${p.resource}" in permissions for user ${userId} — skipping`
           );
           continue;
         }
 
+        // Values in subjectMap come from @RegisterResource and are valid string subjects.
+        // Cast to Extract<Subjects, string> because AbilityBuilder.can() takes constructors
+        // or string literals — never entity instances (those are for ability.can() checks).
+        const subject = rawSubject as Extract<Subjects, string>;
         const action = p.action;
 
         if (!p.conditions) {
@@ -98,8 +106,7 @@ export class CaslAbilityFactory {
         }
 
         if (Object.keys(query).length > 0) {
-          // CASL infers MongoQuery<never> for string subjects — cast is required
-          can(action, subject, query as MongoQuery<never>);
+          can(action, subject, query);
         } else {
           can(action, subject);
         }
