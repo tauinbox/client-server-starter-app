@@ -1,3 +1,4 @@
+import type { OnDestroy, OnInit } from '@angular/core';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import type { FormControl, FormGroup } from '@angular/forms';
@@ -11,6 +12,7 @@ import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { TranslocoDirective } from '@jsverse/transloco';
 import type { RoleResponse } from '@app/shared/types/role.types';
+import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 
 export type RoleFormDialogData = {
   role?: RoleResponse;
@@ -42,10 +44,14 @@ type RoleFormType = {
   styleUrl: './role-form-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class RoleFormDialogComponent {
+export class RoleFormDialogComponent implements OnInit, OnDestroy {
   readonly #fb = inject(FormBuilder);
   readonly #dialogRef = inject(MatDialogRef<RoleFormDialogComponent>);
+  readonly #shortcuts = inject(KeyboardShortcutsService);
   protected readonly data = inject<RoleFormDialogData>(MAT_DIALOG_DATA);
+
+  #cleanupCtrlS: (() => void) | null = null;
+  #cleanupMetaS: (() => void) | null = null;
 
   protected readonly isEdit = !!this.data.role;
 
@@ -64,6 +70,27 @@ export class RoleFormDialogComponent {
     });
 
   protected readonly isSystemRole = this.data.role?.isSystem ?? false;
+
+  ngOnInit(): void {
+    const save = () => this.submit();
+    this.#cleanupCtrlS = this.#shortcuts.register(
+      'ctrl+s',
+      'Save changes',
+      'Forms',
+      save
+    );
+    this.#cleanupMetaS = this.#shortcuts.register(
+      'meta+s',
+      'Save changes',
+      'Forms',
+      save
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.#cleanupCtrlS?.();
+    this.#cleanupMetaS?.();
+  }
 
   submit(): void {
     if (this.form.invalid) return;

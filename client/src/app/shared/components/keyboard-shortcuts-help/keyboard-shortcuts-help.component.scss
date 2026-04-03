@@ -1,0 +1,40 @@
+@use 'abstracts/functions' as func;
+@use 'abstracts/variables' as vars;
+
+.group-heading {
+  margin: func.rem(16) 0 func.rem(8);
+  font-size: vars.$font-size-sm;
+  font-weight: vars.$font-weight-medium;
+  opacity: 0.7;
+
+  &:first-child {
+    margin-top: 0;
+  }
+}
+
+.shortcuts-table {
+  width: 100%;
+  margin-bottom: func.rem(8);
+  border-collapse: collapse;
+
+  td {
+    padding: func.rem(4) func.rem(8) func.rem(4) 0;
+    vertical-align: middle;
+  }
+}
+
+.key-badge {
+  display: inline-block;
+  padding: func.rem(2) func.rem(6);
+  font-family: monospace;
+  font-size: vars.$font-size-sm;
+  white-space: nowrap;
+  border: 1px solid currentcolor;
+  border-radius: func.rem(4);
+  opacity: 0.85;
+}
+
+.empty-state {
+  padding: func.rem(8) 0;
+  opacity: 0.6;
+}

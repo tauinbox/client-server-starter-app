@@ -1,3 +1,4 @@
+import type { OnDestroy, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -33,6 +34,7 @@ import type {
 } from '@app/shared/types/rbac.types';
 import type { UpdateResource } from '../../../services/rbac-admin.service';
 import { ResourcesStore } from '../../../store/resources.store';
+import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 
 export type ResourceFormDialogData = {
   resource: ResourceResponse;
@@ -65,14 +67,18 @@ type ResourceFormType = {
   styleUrl: './resource-form-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ResourceFormDialogComponent {
+export class ResourceFormDialogComponent implements OnInit, OnDestroy {
   readonly #fb = inject(FormBuilder);
   readonly #dialogRef = inject(MatDialogRef<ResourceFormDialogComponent>);
   readonly #resourcesStore = inject(ResourcesStore);
   readonly #snackBar = inject(MatSnackBar);
   readonly #translocoService = inject(TranslocoService);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #shortcuts = inject(KeyboardShortcutsService);
   protected readonly data = inject<ResourceFormDialogData>(MAT_DIALOG_DATA);
+
+  #cleanupCtrlS: (() => void) | null = null;
+  #cleanupMetaS: (() => void) | null = null;
 
   protected readonly form: FormGroup<ResourceFormType> =
     this.#fb.group<ResourceFormType>({
@@ -97,6 +103,27 @@ export class ResourceFormDialogComponent {
   );
   protected readonly isLoading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
+
+  ngOnInit(): void {
+    const save = () => this.submit();
+    this.#cleanupCtrlS = this.#shortcuts.register(
+      'ctrl+s',
+      'Save changes',
+      'Forms',
+      save
+    );
+    this.#cleanupMetaS = this.#shortcuts.register(
+      'meta+s',
+      'Save changes',
+      'Forms',
+      save
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.#cleanupCtrlS?.();
+    this.#cleanupMetaS?.();
+  }
 
   get isDirty(): boolean {
     if (this.form.dirty) return true;

@@ -1,3 +1,4 @@
+import type { OnDestroy, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -30,6 +31,7 @@ import type {
   UpdateAction
 } from '../../../services/rbac-admin.service';
 import { ResourcesStore } from '../../../store/resources.store';
+import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 
 export type ActionFormDialogData = {
   action?: ActionResponse;
@@ -61,14 +63,18 @@ const ACTION_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
   styleUrl: './action-form-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ActionFormDialogComponent {
+export class ActionFormDialogComponent implements OnInit, OnDestroy {
   readonly #fb = inject(FormBuilder);
   readonly #dialogRef = inject(MatDialogRef<ActionFormDialogComponent>);
   readonly #resourcesStore = inject(ResourcesStore);
   readonly #snackBar = inject(MatSnackBar);
   readonly #translocoService = inject(TranslocoService);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #shortcuts = inject(KeyboardShortcutsService);
   protected readonly data = inject<ActionFormDialogData>(MAT_DIALOG_DATA);
+
+  #cleanupCtrlS: (() => void) | null = null;
+  #cleanupMetaS: (() => void) | null = null;
 
   protected readonly isEdit = !!this.data.action;
 
@@ -99,6 +105,27 @@ export class ActionFormDialogComponent {
     if (this.isEdit) {
       this.form.get('name')?.disable();
     }
+  }
+
+  ngOnInit(): void {
+    const save = () => this.submit();
+    this.#cleanupCtrlS = this.#shortcuts.register(
+      'ctrl+s',
+      'Save changes',
+      'Forms',
+      save
+    );
+    this.#cleanupMetaS = this.#shortcuts.register(
+      'meta+s',
+      'Save changes',
+      'Forms',
+      save
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.#cleanupCtrlS?.();
+    this.#cleanupMetaS?.();
   }
 
   submit(): void {

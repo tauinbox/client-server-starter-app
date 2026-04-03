@@ -1,4 +1,4 @@
-import type { OnInit } from '@angular/core';
+import type { OnDestroy, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -48,6 +48,7 @@ import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { UsersStore } from '../../store/users.store';
 import type { RoleResponse } from '@app/shared/types/role.types';
+import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 
 type UserFormType = {
   email: FormControl<string>;
@@ -86,7 +87,7 @@ type UserFormType = {
   styleUrl: './user-edit.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class UserEditComponent implements OnInit {
+export class UserEditComponent implements OnInit, OnDestroy {
   readonly #fb = inject(FormBuilder);
   readonly #userService = inject(UserService);
   readonly #roleService = inject(RoleService);
@@ -97,6 +98,7 @@ export class UserEditComponent implements OnInit {
   readonly #dialog = inject(MatDialog);
   readonly #destroyRef = inject(DestroyRef);
   readonly #translocoService = inject(TranslocoService);
+  readonly #shortcuts = inject(KeyboardShortcutsService);
 
   readonly id = input.required<string>();
   readonly user = signal<User | null>(null);
@@ -106,6 +108,9 @@ export class UserEditComponent implements OnInit {
   readonly availableRoles = signal<RoleResponse[]>([]);
   readonly selectedRoleIds = signal<string[]>([]);
   readonly #initialRoleIds = signal<string[]>([]);
+
+  #cleanupCtrlS: (() => void) | null = null;
+  #cleanupMetaS: (() => void) | null = null;
 
   protected readonly userForm: FormGroup<UserFormType> =
     this.#fb.group<UserFormType>({
@@ -166,8 +171,26 @@ export class UserEditComponent implements OnInit {
       this.id() !== this.#authStore.user()?.id
   );
 
-  ngOnInit() {
+  ngOnInit(): void {
     this.loadUser();
+    const save = () => this.onSubmit();
+    this.#cleanupCtrlS = this.#shortcuts.register(
+      'ctrl+s',
+      'Save changes',
+      'Forms',
+      save
+    );
+    this.#cleanupMetaS = this.#shortcuts.register(
+      'meta+s',
+      'Save changes',
+      'Forms',
+      save
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.#cleanupCtrlS?.();
+    this.#cleanupMetaS?.();
   }
 
   loadUser(): void {
