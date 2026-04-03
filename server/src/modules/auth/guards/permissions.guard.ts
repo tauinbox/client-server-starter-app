@@ -45,6 +45,9 @@ export class PermissionsGuard implements CanActivate {
       userPermissions
     );
 
+    // Attach for downstream instance-level checks via @CurrentAbility()
+    req.ability = ability;
+
     const hasAll = requiredPermissions.every(([action, subject]) =>
       ability.can(action, subject)
     );
@@ -55,7 +58,7 @@ export class PermissionsGuard implements CanActivate {
         actorId: user.userId,
         details: {
           required: requiredPermissions.map(
-            ([a, s]) => `${String(a)}:${String(s)}`
+            ([a, s]) => `${String(a)}:${typeof s === 'string' ? s : '[object]'}`
           )
         },
         context: { ip: req.ip }

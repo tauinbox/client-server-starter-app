@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from './permissions.guard';
 import { createMongoAbility } from '@casl/ability';
 import type { RawRuleOf } from '@casl/ability';
-import type { AppAbility } from '../casl/app-ability';
+import type { AppAbility, Subjects } from '../casl/app-ability';
 import type { AuditService } from '../../audit/audit.service';
 
 describe('PermissionsGuard', () => {
@@ -16,15 +16,20 @@ describe('PermissionsGuard', () => {
   let caslAbilityFactory: { createForUser: jest.Mock };
   let auditService: Pick<AuditService, 'logFireAndForget'>;
 
-  function createMockContext(user: Record<string, unknown>): ExecutionContext {
-    return {
+  function createMockContext(user: Record<string, unknown>): {
+    context: ExecutionContext;
+    req: Record<string, unknown>;
+  } {
+    const req = { user, ip: '127.0.0.1' };
+    const context: ExecutionContext = {
       getHandler: jest.fn(),
       getClass: jest.fn(),
       switchToHttp: () => ({
         // @ts-expect-error testing mock
-        getRequest: () => ({ user, ip: '127.0.0.1' })
+        getRequest: () => req
       })
     };
+    return { context, req };
   }
 
   function buildAbilityWith(...permissionStrings: string[]): AppAbility {
@@ -38,7 +43,7 @@ describe('PermissionsGuard', () => {
       const [resource, action] = p.split(':');
       return {
         action: action,
-        subject: subjectMap[resource] ?? resource
+        subject: (subjectMap[resource] ?? resource) as Extract<Subjects, string>
       };
     });
     return createMongoAbility<AppAbility>(rules);
@@ -76,7 +81,7 @@ describe('PermissionsGuard', () => {
 
   it('should pass when no permissions are required', async () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(undefined);
-    const context = createMockContext({
+    const { context } = createMockContext({
       userId: 'user-1',
       roles: ['user']
     });
@@ -94,7 +99,7 @@ describe('PermissionsGuard', () => {
     ]);
     permissionService.getPermissionsForUser.mockResolvedValue([]);
     caslAbilityFactory.createForUser.mockResolvedValue(buildManageAllAbility());
-    const context = createMockContext({
+    const { context } = createMockContext({
       userId: 'user-1'
     });
 
@@ -125,12 +130,30 @@ describe('PermissionsGuard', () => {
     caslAbilityFactory.createForUser.mockResolvedValue(
       buildAbilityWith('users:read')
     );
-    const context = createMockContext({
+    const { context } = createMockContext({
       userId: 'user-1'
     });
 
     const result = await guard.canActivate(context);
     expect(result).toBe(true);
+  });
+
+  it('should attach ability to request for downstream @CurrentAbility() usage', async () => {
+    jest
+      .spyOn(reflector, 'getAllAndOverride')
+      .mockReturnValue([['read', 'User']]);
+    permissionService.getRolesForUser.mockResolvedValue([
+      { name: 'user', isSuper: false }
+    ]);
+    permissionService.getPermissionsForUser.mockResolvedValue([]);
+    const ability = buildAbilityWith('users:read');
+    caslAbilityFactory.createForUser.mockResolvedValue(ability);
+    const { context, req } = createMockContext({
+      userId: 'user-1'
+    });
+
+    await guard.canActivate(context);
+    expect(req).toHaveProperty('ability', ability);
   });
 
   it('should throw ForbiddenException when user lacks permissions', async () => {
@@ -151,7 +174,7 @@ describe('PermissionsGuard', () => {
     caslAbilityFactory.createForUser.mockResolvedValue(
       buildAbilityWith('users:read')
     );
-    const context = createMockContext({
+    const { context } = createMockContext({
       userId: 'user-1'
     });
 
@@ -182,7 +205,7 @@ describe('PermissionsGuard', () => {
     caslAbilityFactory.createForUser.mockResolvedValue(
       buildAbilityWith('users:read')
     );
-    const context = createMockContext({
+    const { context } = createMockContext({
       userId: 'user-1'
     });
 

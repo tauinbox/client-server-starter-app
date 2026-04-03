@@ -42,6 +42,7 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Revert migration | `npm run migrations:revert` (build first) |
 | Run seeders | `npm run seed:run` (build first) |
 | Validate i18n keys | `npm run check:i18n` — verifies all `ErrorKeys` values exist in every client i18n JSON |
+| Generate CASL subjects | `npm run generate:subjects` — scans `@RegisterResource` decorators and writes `shared/src/generated/casl-subjects.ts`; run when adding a new resource |
 
 ## Environment Configuration
 

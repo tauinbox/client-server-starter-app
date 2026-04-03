@@ -27,7 +27,8 @@
     "check:routes": "ts-node scripts/check-routes.ts",
     "check:enums": "ts-node scripts/check-enums.ts",
     "check:permissions": "ts-node scripts/check-permissions.ts",
-    "check:i18n": "ts-node scripts/check-i18n-keys.ts"
+    "check:i18n": "ts-node scripts/check-i18n-keys.ts",
+    "generate:subjects": "ts-node scripts/generate-subjects.ts"
   },
   "dependencies": {
     "@casl/ability": "^6.8.0",

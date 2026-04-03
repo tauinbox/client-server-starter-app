@@ -34,7 +34,7 @@ src/app/
 ├── core/                   # Header, sidenav, theme toggle, storage/session-storage services, error interceptor, 404 page, NotificationsService (SSE)
 ├── features/
 │   ├── auth/               # Login, register, profile, OAuth callback, verify-email, forgot-password, reset-password, forbidden
-│   │   ├── casl/           # app-ability.ts — AppAbility, Actions, Subjects, PermissionCheck types
+│   │   ├── casl/           # app-ability.ts — AppAbility, Actions, Subjects (auto-generated KnownSubjects + AnyObject), PermissionCheck (action, subject, instance?)
 │   │   ├── directives/     # RequirePermissionsDirective (*appRequirePermissions="{ action, subject } | [...]")
 │   │   ├── guards/         # authGuard, guestGuard, permissionGuard(action, subject)
 │   │   ├── interceptors/   # jwtInterceptor

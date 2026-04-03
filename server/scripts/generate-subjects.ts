@@ -1,0 +1,202 @@
+/**
+ * Generates shared/src/generated/casl-subjects.ts from controller decorators.
+ *
+ * Scans all controller files in src/modules/ (excluding 'feature') and extracts:
+ *   - `KnownSubjects` — from @RegisterResource({ subject: '...' }) decorators
+ *   - `KnownActions`  — from @Authorize(['action', 'Subject']) decorators + CASL reserved 'manage'
+ *
+ * Run whenever a new resource or action is introduced:
+ *   npm run generate:subjects   (from server/)
+ *
+ * The generated file is committed to the repository.
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+import * as ts from 'typescript';
+
+// ─── config ──────────────────────────────────────────────────────────────────
+
+const CONTROLLERS_ROOT = path.resolve(__dirname, '../src/modules');
+const OUTPUT_FILE = path.resolve(
+  __dirname,
+  '../../shared/src/generated/casl-subjects.ts'
+);
+
+/** Controller subdirectories to skip entirely. */
+const EXCLUDE_DIRS = new Set(['feature']);
+
+/** CASL reserved action that is not used in @Authorize but required in the type. */
+const CASL_RESERVED_ACTIONS = ['manage'];
+
+// ─── AST helpers ─────────────────────────────────────────────────────────────
+
+function decoratorName(d: ts.Decorator): string | undefined {
+  const expr = d.expression;
+  if (ts.isCallExpression(expr) && ts.isIdentifier(expr.expression)) {
+    return expr.expression.text;
+  }
+  return ts.isIdentifier(expr) ? expr.text : undefined;
+}
+
+function decoratorArgs(
+  d: ts.Decorator
+): ts.NodeArray<ts.Expression> | undefined {
+  return ts.isCallExpression(d.expression) ? d.expression.arguments : undefined;
+}
+
+function stringLiteral(node: ts.Expression): string | undefined {
+  return ts.isStringLiteral(node) ? node.text : undefined;
+}
+
+function parseRegisterResource(d: ts.Decorator): string | undefined {
+  const args = decoratorArgs(d);
+  if (!args?.length) return undefined;
+
+  const arg = args[0];
+  if (!ts.isObjectLiteralExpression(arg)) return undefined;
+
+  for (const prop of arg.properties) {
+    if (!ts.isPropertyAssignment(prop) || !ts.isIdentifier(prop.name)) continue;
+    if (prop.name.text === 'subject') return stringLiteral(prop.initializer);
+  }
+
+  return undefined;
+}
+
+/**
+ * Extract action strings from @Authorize(['action', 'Subject'], ...)
+ */
+function parseAuthorizeActions(d: ts.Decorator): string[] {
+  const args = decoratorArgs(d);
+  if (!args?.length) return [];
+
+  const actions: string[] = [];
+  for (const arg of args) {
+    if (!ts.isArrayLiteralExpression(arg)) continue;
+    if (arg.elements.length < 2) continue;
+    const action = stringLiteral(arg.elements[0]);
+    if (action) actions.push(action);
+  }
+  return actions;
+}
+
+// ─── file scanning ────────────────────────────────────────────────────────────
+
+function findControllers(dir: string): string[] {
+  const results: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (!EXCLUDE_DIRS.has(entry.name)) {
+        results.push(...findControllers(path.join(dir, entry.name)));
+      }
+    } else if (entry.name.endsWith('.controller.ts')) {
+      results.push(path.join(dir, entry.name));
+    }
+  }
+  return results;
+}
+
+function extractFromFile(filePath: string): {
+  subjects: string[];
+  actions: string[];
+} {
+  const source = fs.readFileSync(filePath, 'utf-8');
+  const sf = ts.createSourceFile(
+    filePath,
+    source,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true
+  );
+
+  const subjects: string[] = [];
+  const actions: string[] = [];
+
+  ts.forEachChild(sf, (node) => {
+    if (!ts.isClassDeclaration(node)) return;
+
+    // Class-level: @RegisterResource
+    const classDecorators = ts.getDecorators(node);
+    if (classDecorators) {
+      for (const d of classDecorators) {
+        if (decoratorName(d) === 'RegisterResource') {
+          const subject = parseRegisterResource(d);
+          if (subject) subjects.push(subject);
+        }
+      }
+    }
+
+    // Method-level: @Authorize
+    for (const member of node.members) {
+      if (!ts.isMethodDeclaration(member)) continue;
+      const methodDecorators = ts.getDecorators(member);
+      if (!methodDecorators) continue;
+
+      for (const d of methodDecorators) {
+        if (decoratorName(d) === 'Authorize') {
+          actions.push(...parseAuthorizeActions(d));
+        }
+      }
+    }
+  });
+
+  return { subjects, actions };
+}
+
+// ─── codegen ─────────────────────────────────────────────────────────────────
+
+function buildUnion(items: string[]): string {
+  return [...new Set(items)].sort().map((s) => `  | '${s}'`).join('\n');
+}
+
+function buildFileContent(subjects: string[], actions: string[]): string {
+  return [
+    '// AUTO-GENERATED by server/scripts/generate-subjects.ts — do not edit manually.',
+    '// Re-run: npm run generate:subjects (from server/) when adding a new @RegisterResource or @Authorize action.',
+    '',
+    '// prettier-ignore',
+    `export type KnownSubjects =\n${buildUnion(subjects)};`,
+    '',
+    '// prettier-ignore',
+    `export type KnownActions =\n${buildUnion(actions)};`,
+    '',
+  ].join('\n');
+}
+
+// ─── main ─────────────────────────────────────────────────────────────────────
+
+function main(): void {
+  const controllerFiles = findControllers(CONTROLLERS_ROOT);
+  const allSubjects: string[] = [];
+  const allActions: string[] = [...CASL_RESERVED_ACTIONS];
+
+  for (const file of controllerFiles) {
+    const { subjects, actions } = extractFromFile(file);
+    allSubjects.push(...subjects);
+    allActions.push(...actions);
+  }
+
+  if (allSubjects.length === 0) {
+    console.error('✗ generate:subjects: no @RegisterResource decorators found');
+    process.exit(1);
+  }
+
+  const content = buildFileContent(allSubjects, allActions);
+
+  const outDir = path.dirname(OUTPUT_FILE);
+  if (!fs.existsSync(outDir)) {
+    fs.mkdirSync(outDir, { recursive: true });
+  }
+
+  fs.writeFileSync(OUTPUT_FILE, content, 'utf-8');
+
+  const sortedSubjects = [...new Set(allSubjects)].sort();
+  const sortedActions = [...new Set(allActions)].sort();
+  console.log(
+    `✓ generate:subjects: wrote ${sortedSubjects.length} subjects + ${sortedActions.length} actions to ${path.relative(process.cwd(), OUTPUT_FILE)}`
+  );
+  console.log(`  Subjects: ${sortedSubjects.join(', ')}`);
+  console.log(`  Actions:  ${sortedActions.join(', ')}`);
+}
+
+main();
