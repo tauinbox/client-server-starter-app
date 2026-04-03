@@ -60,8 +60,9 @@ src/app/
 │       └── store/          # RolesStore (route-level), ResourcesStore (route-level: resources, actions, loading)
 └── shared/
     ├── components/
-    │   ├── confirm-dialog/ # Confirmation dialog
-    │   └── password-toggle/# PasswordToggleComponent (reusable password visibility toggle)
+    │   ├── confirm-dialog/            # Confirmation dialog
+    │   ├── keyboard-shortcuts-help/   # KeyboardShortcutsHelpComponent — Material dialog listing active shortcuts grouped by category
+    │   └── password-toggle/           # PasswordToggleComponent (reusable password visibility toggle)
     ├── models/             # user.types
     └── utils/              # css.utils, dialog.utils (DialogSize enum + dialogSizeConfig())
 ```

@@ -1,3 +1,4 @@
+import type { OnDestroy, OnInit } from '@angular/core';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import {
   MAT_DIALOG_DATA,
@@ -10,6 +11,7 @@ import {
 import { MatIcon } from '@angular/material/icon';
 import { MatButton } from '@angular/material/button';
 import { TranslocoDirective } from '@jsverse/transloco';
+import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 
 export type ConfirmDialogData = {
   title: string;
@@ -34,7 +36,20 @@ export type ConfirmDialogData = {
   styleUrl: './confirm-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ConfirmDialogComponent {
+export class ConfirmDialogComponent implements OnInit, OnDestroy {
   readonly dialogRef = inject(MatDialogRef<ConfirmDialogComponent>);
   readonly data: ConfirmDialogData = inject(MAT_DIALOG_DATA);
+  readonly #shortcuts = inject(KeyboardShortcutsService);
+
+  #cleanupSave: (() => void) | null = null;
+
+  ngOnInit(): void {
+    // Block save shortcut while confirmation dialog is open so that
+    // a form underneath does not accidentally submit via Ctrl+S / Cmd+S.
+    this.#cleanupSave = this.#shortcuts.registerSave('', '', () => undefined);
+  }
+
+  ngOnDestroy(): void {
+    this.#cleanupSave?.();
+  }
 }

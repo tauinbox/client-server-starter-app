@@ -1,0 +1,27 @@
+<ng-container *transloco="let t">
+  <h2 mat-dialog-title>{{ t('shortcuts.dialogTitle') }}</h2>
+
+  <mat-dialog-content>
+    @if (groupedShortcuts().length === 0) {
+      <p class="empty-state">{{ t('shortcuts.noShortcuts') }}</p>
+    } @else {
+      @for (group of groupedShortcuts(); track group.group) {
+        <h3 class="group-heading">{{ t(group.group) }}</h3>
+        <table class="shortcuts-table">
+          @for (shortcut of group.shortcuts; track shortcut.key) {
+            <tr>
+              <td>
+                <kbd class="key-badge">{{ formatKey(shortcut.key) }}</kbd>
+              </td>
+              <td>{{ t(shortcut.label) }}</td>
+            </tr>
+          }
+        </table>
+      }
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button mat-dialog-close>{{ t('common.close') }}</button>
+  </mat-dialog-actions>
+</ng-container>

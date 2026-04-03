@@ -56,6 +56,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - Light/dark theme with system preference detection; dark mode contrast ratios verified (7.9–14.4:1)
 - **WCAG 2.1 AA** — skip link, `aria-label` / `aria-current` / `aria-expanded` on sidenav, `aria-hidden` on decorative icons, transloco-bound `aria-label` on toolbar controls
 - **Runtime multilingual support (EN / RU)** — `@jsverse/transloco` with lazy-loaded per-feature scopes; language switcher in toolbar (flag icons); persisted to `localStorage`; server error keys translated client-side via shared `ErrorKeys` const
+- **Keyboard shortcuts** — `Ctrl+S` / `Cmd+S` saves the active form; `?` or `Ctrl+/` opens a contextual shortcuts reference dialog; stack-based registration so dialog overlays handle shortcut scoping automatically
 - Responsive SCSS architecture
 - Snackbar error notifications
 - Form validation with error messages; password strength indicator on registration (4-bar visual meter)
