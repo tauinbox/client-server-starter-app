@@ -37,7 +37,11 @@ export class KeyboardShortcutsService {
     const result: ShortcutDef[] = [];
     for (const stack of this.#stacks.values()) {
       if (stack.length > 0) {
-        result.push(stack[stack.length - 1].def);
+        const top = stack[stack.length - 1].def;
+        // Entries with an empty label are blocking no-ops — exclude from help.
+        if (top.label) {
+          result.push(top);
+        }
       }
     }
     return result;
