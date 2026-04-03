@@ -40,14 +40,14 @@ function groupShortcuts(shortcuts: ShortcutDef[]): ShortcutGroup[] {
 
 const MAC_SYMBOLS: Record<string, string> = {
   ctrl: 'Ctrl',
-  meta: '⌘',
+  cmd: '⌘',
   shift: '⇧',
   alt: '⌥'
 };
 
 const WIN_LABELS: Record<string, string> = {
   ctrl: 'Ctrl',
-  meta: 'Meta',
+  cmd: 'Cmd',
   shift: 'Shift',
   alt: 'Alt'
 };

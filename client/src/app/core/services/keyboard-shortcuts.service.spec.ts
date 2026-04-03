@@ -162,9 +162,9 @@ describe('KeyboardShortcutsService', () => {
     expect(preventDefaultSpy).not.toHaveBeenCalled();
   });
 
-  it('normalises meta+s correctly', () => {
+  it('normalises cmd+s correctly', () => {
     const handler = vi.fn();
-    const cleanup = service.register('meta+s', 'Save', 'Forms', handler);
+    const cleanup = service.register('cmd+s', 'Save', 'Forms', handler);
 
     fireKey(doc, { key: 's', metaKey: true });
 

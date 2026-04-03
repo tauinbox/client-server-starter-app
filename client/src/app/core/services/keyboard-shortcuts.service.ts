@@ -20,7 +20,7 @@ type StackEntry = {
 };
 
 const INPUT_LIKE_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
-const SAVE_KEYS = new Set(['ctrl+s', 'meta+s']);
+const SAVE_KEYS = new Set(['ctrl+s', 'cmd+s']);
 
 @Injectable({
   providedIn: 'root'
@@ -94,7 +94,7 @@ export class KeyboardShortcutsService {
    */
   registerSave(label: string, group: string, handler: () => void): () => void {
     return this.register(
-      this.isMac ? 'meta+s' : 'ctrl+s',
+      this.isMac ? 'cmd+s' : 'ctrl+s',
       label,
       group,
       handler
@@ -119,7 +119,7 @@ export class KeyboardShortcutsService {
   #normalise(event: KeyboardEvent): string {
     const parts: string[] = [];
     if (event.ctrlKey) parts.push('ctrl');
-    if (event.metaKey) parts.push('meta');
+    if (event.metaKey) parts.push('cmd');
     if (event.shiftKey && event.key !== '?') parts.push('shift');
     if (event.altKey) parts.push('alt');
     parts.push(event.key.toLowerCase());
