@@ -109,8 +109,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
   readonly selectedRoleIds = signal<string[]>([]);
   readonly #initialRoleIds = signal<string[]>([]);
 
-  #cleanupCtrlS: (() => void) | null = null;
-  #cleanupMetaS: (() => void) | null = null;
+  #cleanupSave: (() => void) | null = null;
 
   protected readonly userForm: FormGroup<UserFormType> =
     this.#fb.group<UserFormType>({
@@ -173,24 +172,15 @@ export class UserEditComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadUser();
-    const save = () => this.onSubmit();
-    this.#cleanupCtrlS = this.#shortcuts.register(
-      'ctrl+s',
+    this.#cleanupSave = this.#shortcuts.registerSave(
       'shortcuts.labelSave',
       'shortcuts.groupForms',
-      save
-    );
-    this.#cleanupMetaS = this.#shortcuts.register(
-      'meta+s',
-      'shortcuts.labelSave',
-      'shortcuts.groupForms',
-      save
+      () => this.onSubmit()
     );
   }
 
   ngOnDestroy(): void {
-    this.#cleanupCtrlS?.();
-    this.#cleanupMetaS?.();
+    this.#cleanupSave?.();
   }
 
   loadUser(): void {

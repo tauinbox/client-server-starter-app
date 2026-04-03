@@ -29,6 +29,10 @@ export class KeyboardShortcutsService {
   readonly #document = inject(DOCUMENT);
   readonly #destroyRef = inject(DestroyRef);
 
+  readonly isMac: boolean = /Mac|iPhone|iPad|iPod/.test(
+    this.#document.defaultView?.navigator.platform ?? ''
+  );
+
   readonly #stacks = new Map<string, StackEntry[]>();
   readonly #revision = signal(0);
 
@@ -82,6 +86,19 @@ export class KeyboardShortcutsService {
       }
       this.#revision.update((v) => v + 1);
     };
+  }
+
+  /**
+   * Registers a "save" shortcut using the platform-appropriate modifier:
+   * Cmd+S on Mac, Ctrl+S on Windows/Linux.
+   */
+  registerSave(label: string, group: string, handler: () => void): () => void {
+    return this.register(
+      this.isMac ? 'meta+s' : 'ctrl+s',
+      label,
+      group,
+      handler
+    );
   }
 
   #onKeydown(event: KeyboardEvent): void {

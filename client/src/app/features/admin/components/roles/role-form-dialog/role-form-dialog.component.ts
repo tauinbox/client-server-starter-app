@@ -50,8 +50,7 @@ export class RoleFormDialogComponent implements OnInit, OnDestroy {
   readonly #shortcuts = inject(KeyboardShortcutsService);
   protected readonly data = inject<RoleFormDialogData>(MAT_DIALOG_DATA);
 
-  #cleanupCtrlS: (() => void) | null = null;
-  #cleanupMetaS: (() => void) | null = null;
+  #cleanupSave: (() => void) | null = null;
 
   protected readonly isEdit = !!this.data.role;
 
@@ -72,24 +71,15 @@ export class RoleFormDialogComponent implements OnInit, OnDestroy {
   protected readonly isSystemRole = this.data.role?.isSystem ?? false;
 
   ngOnInit(): void {
-    const save = () => this.submit();
-    this.#cleanupCtrlS = this.#shortcuts.register(
-      'ctrl+s',
+    this.#cleanupSave = this.#shortcuts.registerSave(
       'shortcuts.labelSave',
       'shortcuts.groupForms',
-      save
-    );
-    this.#cleanupMetaS = this.#shortcuts.register(
-      'meta+s',
-      'shortcuts.labelSave',
-      'shortcuts.groupForms',
-      save
+      () => this.submit()
     );
   }
 
   ngOnDestroy(): void {
-    this.#cleanupCtrlS?.();
-    this.#cleanupMetaS?.();
+    this.#cleanupSave?.();
   }
 
   submit(): void {

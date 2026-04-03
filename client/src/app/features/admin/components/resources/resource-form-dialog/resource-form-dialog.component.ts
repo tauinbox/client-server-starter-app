@@ -77,8 +77,7 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
   readonly #shortcuts = inject(KeyboardShortcutsService);
   protected readonly data = inject<ResourceFormDialogData>(MAT_DIALOG_DATA);
 
-  #cleanupCtrlS: (() => void) | null = null;
-  #cleanupMetaS: (() => void) | null = null;
+  #cleanupSave: (() => void) | null = null;
 
   protected readonly form: FormGroup<ResourceFormType> =
     this.#fb.group<ResourceFormType>({
@@ -105,24 +104,15 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
   protected readonly errorMessage = signal<string | null>(null);
 
   ngOnInit(): void {
-    const save = () => this.submit();
-    this.#cleanupCtrlS = this.#shortcuts.register(
-      'ctrl+s',
+    this.#cleanupSave = this.#shortcuts.registerSave(
       'shortcuts.labelSave',
       'shortcuts.groupForms',
-      save
-    );
-    this.#cleanupMetaS = this.#shortcuts.register(
-      'meta+s',
-      'shortcuts.labelSave',
-      'shortcuts.groupForms',
-      save
+      () => this.submit()
     );
   }
 
   ngOnDestroy(): void {
-    this.#cleanupCtrlS?.();
-    this.#cleanupMetaS?.();
+    this.#cleanupSave?.();
   }
 
   get isDirty(): boolean {

@@ -41,19 +41,15 @@ export class ConfirmDialogComponent implements OnInit, OnDestroy {
   readonly data: ConfirmDialogData = inject(MAT_DIALOG_DATA);
   readonly #shortcuts = inject(KeyboardShortcutsService);
 
-  #cleanupCtrlS: (() => void) | null = null;
-  #cleanupMetaS: (() => void) | null = null;
+  #cleanupSave: (() => void) | null = null;
 
   ngOnInit(): void {
-    // Block save shortcuts while confirmation dialog is open so that
-    // a form underneath does not accidentally submit via Ctrl+S.
-    const noop = () => undefined;
-    this.#cleanupCtrlS = this.#shortcuts.register('ctrl+s', '', '', noop);
-    this.#cleanupMetaS = this.#shortcuts.register('meta+s', '', '', noop);
+    // Block save shortcut while confirmation dialog is open so that
+    // a form underneath does not accidentally submit via Ctrl+S / Cmd+S.
+    this.#cleanupSave = this.#shortcuts.registerSave('', '', () => undefined);
   }
 
   ngOnDestroy(): void {
-    this.#cleanupCtrlS?.();
-    this.#cleanupMetaS?.();
+    this.#cleanupSave?.();
   }
 }

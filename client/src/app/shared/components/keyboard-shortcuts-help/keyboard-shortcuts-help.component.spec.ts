@@ -81,7 +81,7 @@ describe('KeyboardShortcutsHelpComponent', () => {
       }
     ]);
     const badge = fixture.nativeElement.querySelector('.key-badge');
-    expect(badge?.textContent?.trim()).toBe('ctrl+s');
+    expect(badge?.textContent?.trim()).toBe('Ctrl+S');
   });
 
   it('renders translated label', async () => {

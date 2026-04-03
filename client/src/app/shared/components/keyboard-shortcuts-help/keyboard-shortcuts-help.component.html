@@ -11,7 +11,7 @@
           @for (shortcut of group.shortcuts; track shortcut.key) {
             <tr>
               <td>
-                <kbd class="key-badge">{{ shortcut.key }}</kbd>
+                <kbd class="key-badge">{{ formatKey(shortcut.key) }}</kbd>
               </td>
               <td>{{ t(shortcut.label) }}</td>
             </tr>

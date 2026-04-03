@@ -38,6 +38,20 @@ function groupShortcuts(shortcuts: ShortcutDef[]): ShortcutGroup[] {
     });
 }
 
+const MAC_SYMBOLS: Record<string, string> = {
+  ctrl: 'Ctrl',
+  meta: '⌘',
+  shift: '⇧',
+  alt: '⌥'
+};
+
+const WIN_LABELS: Record<string, string> = {
+  ctrl: 'Ctrl',
+  meta: 'Meta',
+  shift: 'Shift',
+  alt: 'Alt'
+};
+
 @Component({
   selector: 'app-keyboard-shortcuts-help',
   standalone: true,
@@ -49,7 +63,23 @@ function groupShortcuts(shortcuts: ShortcutDef[]): ShortcutGroup[] {
 export class KeyboardShortcutsHelpComponent {
   readonly #shortcutsService = inject(KeyboardShortcutsService);
 
+  protected readonly isMac = this.#shortcutsService.isMac;
+
   protected readonly groupedShortcuts = computed(() =>
     groupShortcuts(this.#shortcutsService.shortcuts())
   );
+
+  protected formatKey(key: string): string {
+    const parts = key.split('+');
+    const labels = this.isMac ? MAC_SYMBOLS : WIN_LABELS;
+    const mapped = parts.map((part) => {
+      if (part in labels) return labels[part];
+      return /^[a-z]$/.test(part) ? part.toUpperCase() : part;
+    });
+    // Mac: symbol modifiers join without separator (⌘S, ⌘/)
+    // Windows: join with + (Ctrl+S, Ctrl+/)
+    const hasMacSymbol =
+      this.isMac && mapped.some((p) => ['⌘', '⇧', '⌥'].includes(p));
+    return hasMacSymbol ? mapped.join('') : mapped.join('+');
+  }
 }
