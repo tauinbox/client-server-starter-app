@@ -12,8 +12,12 @@ import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { SearchUsersQueryDto } from '../dtos/search-users-query.dto';
 import { UserPasswordChangedByAdminEvent } from '../events/user-password-changed-by-admin.event';
+import type { AppAbility } from '../../auth/casl/app-ability';
 
 const allowAllGuard = { canActivate: () => true };
+
+// @ts-expect-error partial mock — only `can` is needed for controller delegation tests
+const mockAbility: AppAbility = { can: jest.fn().mockReturnValue(true) };
 
 function mockJwtRequest(
   userId = 'user-1',
@@ -183,15 +187,19 @@ describe('UsersController', () => {
   // ── update ────────────────────────────────────────────────────────
 
   describe('update', () => {
-    it('should call usersService.update with id and dto, and return the updated user', async () => {
+    it('should call usersService.update with id, dto and ability, and return the updated user', async () => {
       const dto: UpdateUserDto = { firstName: 'Updated', isActive: false };
       const updatedUser = { id: 'user-5', firstName: 'Updated' };
       usersServiceMock.update.mockResolvedValue(updatedUser);
       const req = mockJwtRequest() as JwtAuthRequest;
 
-      const result = await controller.update('user-5', dto, req);
+      const result = await controller.update('user-5', dto, req, mockAbility);
 
-      expect(usersServiceMock.update).toHaveBeenCalledWith('user-5', dto);
+      expect(usersServiceMock.update).toHaveBeenCalledWith(
+        'user-5',
+        dto,
+        mockAbility
+      );
       expect(result).toBe(updatedUser);
     });
 
@@ -207,7 +215,7 @@ describe('UsersController', () => {
         'admin@example.com'
       ) as JwtAuthRequest;
 
-      await controller.update('user-5', dto, req);
+      await controller.update('user-5', dto, req, mockAbility);
 
       expect(auditServiceMock.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -234,7 +242,7 @@ describe('UsersController', () => {
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
       const req = mockJwtRequest() as JwtAuthRequest;
 
-      await controller.update('user-5', dto, req);
+      await controller.update('user-5', dto, req, mockAbility);
 
       expect(auditServiceMock.log).not.toHaveBeenCalledWith(
         expect.objectContaining({ action: AuditAction.PASSWORD_CHANGE })
@@ -246,7 +254,7 @@ describe('UsersController', () => {
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
       const req = mockJwtRequest() as JwtAuthRequest;
 
-      await controller.update('user-5', dto, req);
+      await controller.update('user-5', dto, req, mockAbility);
 
       expect(eventEmitterMock.emit).not.toHaveBeenCalledWith(
         UserPasswordChangedByAdminEvent.name,
@@ -262,7 +270,7 @@ describe('UsersController', () => {
         'admin@example.com'
       ) as JwtAuthRequest;
 
-      await controller.update('user-5', dto, req);
+      await controller.update('user-5', dto, req, mockAbility);
 
       expect(eventEmitterMock.emit).toHaveBeenCalledWith(
         UserPasswordChangedByAdminEvent.name,
@@ -278,7 +286,7 @@ describe('UsersController', () => {
         'admin@example.com'
       ) as JwtAuthRequest;
 
-      await controller.update('user-5', dto, req);
+      await controller.update('user-5', dto, req, mockAbility);
 
       expect(auditServiceMock.log).toHaveBeenCalledTimes(2);
       expect(auditServiceMock.log).toHaveBeenCalledWith(
@@ -301,7 +309,7 @@ describe('UsersController', () => {
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
       const req = mockJwtRequest() as JwtAuthRequest;
 
-      await controller.update('user-5', dto, req);
+      await controller.update('user-5', dto, req, mockAbility);
 
       expect(auditServiceMock.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -329,16 +337,19 @@ describe('UsersController', () => {
   // ── remove ────────────────────────────────────────────────────────
 
   describe('remove', () => {
-    it('should call usersService.findOne and usersService.remove with the id', async () => {
+    it('should call usersService.findOne and usersService.remove with the id and ability', async () => {
       const user = { id: 'user-7', email: 'del@example.com' };
       usersServiceMock.findOne.mockResolvedValue(user);
       usersServiceMock.remove.mockResolvedValue(undefined);
       const req = mockJwtRequest() as JwtAuthRequest;
 
-      await controller.remove('user-7', req);
+      await controller.remove('user-7', req, mockAbility);
 
       expect(usersServiceMock.findOne).toHaveBeenCalledWith('user-7');
-      expect(usersServiceMock.remove).toHaveBeenCalledWith('user-7');
+      expect(usersServiceMock.remove).toHaveBeenCalledWith(
+        'user-7',
+        mockAbility
+      );
     });
 
     it('should emit UserDeletedEvent with the correct user id', async () => {
@@ -347,7 +358,7 @@ describe('UsersController', () => {
       usersServiceMock.remove.mockResolvedValue(undefined);
       const req = mockJwtRequest() as JwtAuthRequest;
 
-      await controller.remove('user-7', req);
+      await controller.remove('user-7', req, mockAbility);
 
       expect(eventEmitterMock.emit).toHaveBeenCalledWith(
         UserDeletedEvent.name,
@@ -368,7 +379,7 @@ describe('UsersController', () => {
         'admin@example.com'
       ) as JwtAuthRequest;
 
-      await controller.remove('user-7', req);
+      await controller.remove('user-7', req, mockAbility);
 
       expect(auditServiceMock.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -390,7 +401,7 @@ describe('UsersController', () => {
       usersServiceMock.remove.mockResolvedValue(undefined);
       const req = mockJwtRequest() as JwtAuthRequest;
 
-      const result = await controller.remove('user-7', req);
+      const result = await controller.remove('user-7', req, mockAbility);
 
       expect(result).toEqual({});
     });
@@ -399,14 +410,17 @@ describe('UsersController', () => {
   // ── restore ───────────────────────────────────────────────────────
 
   describe('restore', () => {
-    it('should call usersService.restore with the id and return the restored user', async () => {
+    it('should call usersService.restore with the id and ability, and return the restored user', async () => {
       const restoredUser = { id: 'user-8', email: 'restored@example.com' };
       usersServiceMock.restore.mockResolvedValue(restoredUser);
       const req = mockJwtRequest() as JwtAuthRequest;
 
-      const result = await controller.restore('user-8', req);
+      const result = await controller.restore('user-8', req, mockAbility);
 
-      expect(usersServiceMock.restore).toHaveBeenCalledWith('user-8');
+      expect(usersServiceMock.restore).toHaveBeenCalledWith(
+        'user-8',
+        mockAbility
+      );
       expect(result).toBe(restoredUser);
     });
 
@@ -418,7 +432,7 @@ describe('UsersController', () => {
         'admin@example.com'
       ) as JwtAuthRequest;
 
-      await controller.restore('user-8', req);
+      await controller.restore('user-8', req, mockAbility);
 
       expect(auditServiceMock.log).toHaveBeenCalledWith(
         expect.objectContaining({

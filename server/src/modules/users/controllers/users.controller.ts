@@ -32,7 +32,9 @@ import {
 } from '@nestjs/swagger';
 import { AdminUserResponseDto } from '../dtos/admin-user-response.dto';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
+import { CurrentAbility } from '../../auth/decorators/current-ability.decorator';
 import { RegisterResource } from '../../auth/decorators/register-resource.decorator';
+import type { AppAbility } from '../../auth/casl/app-ability';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserDeletedEvent } from '../events/user-deleted.event';
 import { AuditService } from '../../audit/audit.service';
@@ -151,9 +153,14 @@ export class UsersController {
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
-    @Request() req: JwtAuthRequest
+    @Request() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
-    const updatedUser = await this.usersService.update(id, updateUserDto);
+    const updatedUser = await this.usersService.update(
+      id,
+      updateUserDto,
+      ability
+    );
     const changedFields = Object.keys(updateUserDto).filter(
       (k) => k !== 'password'
     );
@@ -198,10 +205,11 @@ export class UsersController {
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
-    @Request() req: JwtAuthRequest
+    @Request() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
     const user = await this.usersService.findOne(id);
-    await this.usersService.remove(id);
+    await this.usersService.remove(id, ability);
     this.eventEmitter.emit(UserDeletedEvent.name, new UserDeletedEvent(id));
     await this.auditService.log({
       action: AuditAction.USER_DELETE,
@@ -229,9 +237,10 @@ export class UsersController {
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   async restore(
     @Param('id', ParseUUIDPipe) id: string,
-    @Request() req: JwtAuthRequest
+    @Request() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
-    const restoredUser = await this.usersService.restore(id);
+    const restoredUser = await this.usersService.restore(id, ability);
     await this.auditService.log({
       action: AuditAction.USER_RESTORE,
       actorId: req.user.userId,

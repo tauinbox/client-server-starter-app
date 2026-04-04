@@ -33,7 +33,9 @@ import {
   SetPermissionsDto
 } from '../dtos/assign-permissions.dto';
 import { Authorize } from '../decorators/authorize.decorator';
+import { CurrentAbility } from '../decorators/current-ability.decorator';
 import { RegisterResource } from '../decorators/register-resource.decorator';
+import type { AppAbility } from '../casl/app-ability';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
@@ -264,9 +266,14 @@ export class RolesController {
   async assignRole(
     @Param('userId', ParseUUIDPipe) userId: string,
     @Body() dto: AssignRoleDto,
-    @Request() req: JwtAuthRequest
+    @Request() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
-    const result = await this.roleService.assignRoleToUser(userId, dto.roleId);
+    const result = await this.roleService.assignRoleToUser(
+      userId,
+      dto.roleId,
+      ability
+    );
     await this.auditService.log({
       action: AuditAction.ROLE_ASSIGN,
       actorId: req.user.userId,
@@ -293,9 +300,14 @@ export class RolesController {
   async removeRole(
     @Param('userId', ParseUUIDPipe) userId: string,
     @Param('roleId', ParseUUIDPipe) roleId: string,
-    @Request() req: JwtAuthRequest
+    @Request() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
-    const result = await this.roleService.removeRoleFromUser(userId, roleId);
+    const result = await this.roleService.removeRoleFromUser(
+      userId,
+      roleId,
+      ability
+    );
     await this.auditService.log({
       action: AuditAction.ROLE_UNASSIGN,
       actorId: req.user.userId,

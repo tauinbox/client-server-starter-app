@@ -7,8 +7,12 @@ import { JwtAuthRequest } from '../types/auth.request';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { PermissionsGuard } from '../guards/permissions.guard';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import type { AppAbility } from '../casl/app-ability';
 
 const allowAllGuard = { canActivate: () => true };
+
+// @ts-expect-error partial mock — only `can` is needed for controller delegation tests
+const mockAbility: AppAbility = { can: jest.fn().mockReturnValue(true) };
 
 function mockJwtRequest(
   userId = 'user-1',
@@ -380,15 +384,16 @@ describe('RolesController', () => {
   // ── assignRole ────────────────────────────────────────────────────
 
   describe('assignRole', () => {
-    it('should call roleService.assignRoleToUser with userId and dto.roleId', async () => {
+    it('should call roleService.assignRoleToUser with userId, roleId and ability', async () => {
       const dto = { roleId: 'role-1' };
       const req = mockJwtRequest() as JwtAuthRequest;
 
-      await controller.assignRole('user-99', dto, req);
+      await controller.assignRole('user-99', dto, req, mockAbility);
 
       expect(roleServiceMock.assignRoleToUser).toHaveBeenCalledWith(
         'user-99',
-        'role-1'
+        'role-1',
+        mockAbility
       );
     });
 
@@ -399,7 +404,7 @@ describe('RolesController', () => {
         'admin@example.com'
       ) as JwtAuthRequest;
 
-      await controller.assignRole('user-99', dto, req);
+      await controller.assignRole('user-99', dto, req, mockAbility);
 
       expect(auditServiceMock.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -417,14 +422,15 @@ describe('RolesController', () => {
   // ── removeRole ────────────────────────────────────────────────────
 
   describe('removeRole', () => {
-    it('should call roleService.removeRoleFromUser with userId and roleId', async () => {
+    it('should call roleService.removeRoleFromUser with userId, roleId and ability', async () => {
       const req = mockJwtRequest() as JwtAuthRequest;
 
-      await controller.removeRole('user-99', 'role-1', req);
+      await controller.removeRole('user-99', 'role-1', req, mockAbility);
 
       expect(roleServiceMock.removeRoleFromUser).toHaveBeenCalledWith(
         'user-99',
-        'role-1'
+        'role-1',
+        mockAbility
       );
     });
 
@@ -434,7 +440,7 @@ describe('RolesController', () => {
         'admin@example.com'
       ) as JwtAuthRequest;
 
-      await controller.removeRole('user-99', 'role-1', req);
+      await controller.removeRole('user-99', 'role-1', req, mockAbility);
 
       expect(auditServiceMock.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -451,7 +457,12 @@ describe('RolesController', () => {
     it('should return undefined (void response)', async () => {
       const req = mockJwtRequest() as JwtAuthRequest;
 
-      const result = await controller.removeRole('user-99', 'role-1', req);
+      const result = await controller.removeRole(
+        'user-99',
+        'role-1',
+        req,
+        mockAbility
+      );
 
       expect(result).toBeUndefined();
     });
