@@ -25,6 +25,7 @@ import { MatChip } from '@angular/material/chips';
 import { MatIcon } from '@angular/material/icon';
 import { DatePipe } from '@angular/common';
 import { TranslocoDirective } from '@jsverse/transloco';
+import { RequirePermissionsDirective } from '../../../auth/directives/require-permissions.directive';
 import type { User, UserSortColumn } from '../../models/user.types';
 
 export const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
@@ -55,7 +56,8 @@ export const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
     MatHeaderRowDef,
     MatRowDef,
     DatePipe,
-    TranslocoDirective
+    TranslocoDirective,
+    RequirePermissionsDirective
   ],
   templateUrl: './user-table.component.html',
   styleUrl: './user-table.component.scss',
@@ -63,8 +65,6 @@ export const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
 })
 export class UserTableComponent {
   readonly users = input.required<User[]>();
-  readonly canUpdate = input(false);
-  readonly canDelete = input(false);
 
   readonly sortChange = output<Sort>();
   readonly deleteUser = output<User>();

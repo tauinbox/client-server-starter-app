@@ -98,7 +98,13 @@
           </div>
         </div>
 
-        @if (canEdit()) {
+        <ng-container
+          *appRequirePermissions="{
+            action: 'update',
+            subject: 'User',
+            instance: u
+          }"
+        >
           <div class="actions-container">
             <button
               mat-raised-button
@@ -109,7 +115,7 @@
               {{ t('users.detail.editButton') }}
             </button>
           </div>
-        }
+        </ng-container>
       } @else {
         <div class="error-container">
           <mat-icon class="error-icon">error_outline</mat-icon>

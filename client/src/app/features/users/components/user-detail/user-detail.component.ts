@@ -22,7 +22,6 @@ import { MatDivider } from '@angular/material/divider';
 import { TranslocoDirective } from '@jsverse/transloco';
 import { UsersStore } from '../../store/users.store';
 import { RequirePermissionsDirective } from '../../../auth/directives/require-permissions.directive';
-import { AuthStore } from '../../../auth/store/auth.store';
 
 @Component({
   selector: 'app-user-detail',
@@ -48,7 +47,6 @@ import { AuthStore } from '../../../auth/store/auth.store';
 })
 export class UserDetailComponent implements OnInit {
   readonly #usersStore = inject(UsersStore);
-  readonly #authStore = inject(AuthStore);
 
   readonly id = input.required<string>();
   readonly user = computed(
@@ -58,9 +56,6 @@ export class UserDetailComponent implements OnInit {
     () => this.user()?.roles.some((r) => r.name === 'admin') ?? false
   );
   readonly loading = this.#usersStore.detailLoading;
-  readonly canEdit = computed(() =>
-    this.#authStore.hasPermissions({ action: 'update', subject: 'User' })
-  );
 
   ngOnInit(): void {
     this.#usersStore.loadOne(this.id());

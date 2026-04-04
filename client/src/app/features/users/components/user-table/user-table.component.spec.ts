@@ -6,6 +6,7 @@ import type { ComponentRef } from '@angular/core';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { COLUMN_TO_SORT_MAP, UserTableComponent } from './user-table.component';
+import { AuthStore } from '../../../auth/store/auth.store';
 import type { User } from '../../models/user.types';
 import type { RoleResponse } from '@app/shared/types';
 
@@ -33,15 +34,34 @@ const mockUser: User = {
   deletedAt: null
 };
 
+const otherUser: User = {
+  ...mockUser,
+  id: 'other-user-id',
+  email: 'other@example.com',
+  firstName: 'Other',
+  lastName: 'Person'
+};
+
 describe('UserTableComponent', () => {
   let component: UserTableComponent;
   let componentRef: ComponentRef<UserTableComponent>;
   let fixture: ComponentFixture<UserTableComponent>;
+  let authStoreMock: {
+    hasPermissions: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
+    authStoreMock = {
+      hasPermissions: vi.fn().mockReturnValue(false)
+    };
+
     await TestBed.configureTestingModule({
       imports: [UserTableComponent, TranslocoTestingModuleWithLangs],
-      providers: [provideRouter([]), provideNoopAnimations()]
+      providers: [
+        provideRouter([]),
+        provideNoopAnimations(),
+        { provide: AuthStore, useValue: authStoreMock }
+      ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(UserTableComponent);
@@ -117,6 +137,67 @@ describe('UserTableComponent', () => {
 
     it('should have deleteUser output', () => {
       expect(component.deleteUser).toBeDefined();
+    });
+  });
+
+  describe('instance-level permission checks', () => {
+    it('should show edit button when hasPermissions returns true for the user instance', () => {
+      authStoreMock.hasPermissions.mockReturnValue(true);
+      componentRef.setInput('users', [mockUser]);
+      fixture.detectChanges();
+
+      const editButton = fixture.nativeElement.querySelector(
+        'button[color="accent"]'
+      );
+      expect(editButton).toBeTruthy();
+    });
+
+    it('should hide edit and delete buttons when hasPermissions returns false', () => {
+      authStoreMock.hasPermissions.mockReturnValue(false);
+      componentRef.setInput('users', [mockUser]);
+      fixture.detectChanges();
+
+      const editButton = fixture.nativeElement.querySelector(
+        'button[color="accent"]'
+      );
+      const deleteButton = fixture.nativeElement.querySelector(
+        'button[color="warn"]'
+      );
+      expect(editButton).toBeNull();
+      expect(deleteButton).toBeNull();
+    });
+
+    it('should show delete button when hasPermissions returns true for the user instance', () => {
+      authStoreMock.hasPermissions.mockReturnValue(true);
+      componentRef.setInput('users', [mockUser]);
+      fixture.detectChanges();
+
+      const deleteButton = fixture.nativeElement.querySelector(
+        'button[color="warn"]'
+      );
+      expect(deleteButton).toBeTruthy();
+    });
+
+    it('should call hasPermissions with instance data for each row', () => {
+      authStoreMock.hasPermissions.mockReturnValue(true);
+      componentRef.setInput('users', [mockUser, otherUser]);
+      fixture.detectChanges();
+
+      // update + delete for each of 2 rows = at least 4 calls
+      expect(authStoreMock.hasPermissions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'update',
+          subject: 'User',
+          instance: expect.objectContaining({ id: 'test-user-id' })
+        })
+      );
+      expect(authStoreMock.hasPermissions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'delete',
+          subject: 'User',
+          instance: expect.objectContaining({ id: 'other-user-id' })
+        })
+      );
     });
   });
 });

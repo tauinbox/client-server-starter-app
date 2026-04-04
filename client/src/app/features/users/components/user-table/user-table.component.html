@@ -98,7 +98,13 @@
         >
           <mat-icon>visibility</mat-icon>
         </button>
-        @if (canUpdate()) {
+        <ng-container
+          *appRequirePermissions="{
+            action: 'update',
+            subject: 'User',
+            instance: user
+          }"
+        >
           <button
             mat-icon-button
             color="accent"
@@ -113,8 +119,14 @@
           >
             <mat-icon>edit</mat-icon>
           </button>
-        }
-        @if (canDelete()) {
+        </ng-container>
+        <ng-container
+          *appRequirePermissions="{
+            action: 'delete',
+            subject: 'User',
+            instance: user
+          }"
+        >
           <button
             mat-icon-button
             color="warn"
@@ -129,7 +141,7 @@
           >
             <mat-icon>delete</mat-icon>
           </button>
-        }
+        </ng-container>
       </td>
     </ng-container>
 
