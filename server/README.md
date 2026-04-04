@@ -171,6 +171,7 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 - **PermissionsGuard** — resolves user permissions (cached 5 min), checks required permissions from typed `@RequirePermissions([Actions, Subjects])`; roles with `isSuper` flag bypass all checks
 - **@Authorize([action, subject]) decorator** — composite: `JwtAuthGuard` + `PermissionsGuard` + typed `@RequirePermissions()`. Replaces `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` pattern
 - **CaslAbilityFactory** — builds `AppAbility` from user roles + permissions; used by `AuthController` to return CASL packed rules via `packRules()` from `GET /permissions`
+- **Instance-level enforcement** — `UsersService.update/remove/restore` and `RoleService.assignRoleToUser/removeRoleFromUser` accept an optional `AppAbility` (injected via `@CurrentAbility()` in controllers) and check `ability.can(action, entity)` after loading the record; super-role assignment/removal is blocked for non-super actors
 - **JWT payload** — includes `roles: string[]`; `isAdmin` column removed from database (migration `drop-is-admin`)
 - **Refresh tokens** — opaque 80-char hex tokens stored in DB (SHA-256 hashed), delivered to the client as an `HttpOnly SameSite=Strict` cookie (`path=/api/v1/auth`), rotated on every use; never appear in response body
 - **OAuth accounts** — auto-link by email, manage linked providers, safety check on unlink
