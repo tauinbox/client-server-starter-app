@@ -137,4 +137,42 @@ describe('UserDetailComponent', () => {
       expect(component.loading()).toBe(false);
     });
   });
+
+  describe('edit button visibility', () => {
+    it('should show edit button when hasPermissions returns true for the user instance', () => {
+      authStoreMock.hasPermissions.mockReturnValue(true);
+      entityMapSignal.set({ 'user-1': mockUser });
+      fixture.detectChanges();
+
+      const editButton = fixture.nativeElement.querySelector(
+        'button[color="primary"][mat-raised-button]'
+      );
+      expect(editButton).toBeTruthy();
+    });
+
+    it('should hide edit button when hasPermissions returns false', () => {
+      authStoreMock.hasPermissions.mockReturnValue(false);
+      entityMapSignal.set({ 'user-1': mockUser });
+      fixture.detectChanges();
+
+      const editButton = fixture.nativeElement.querySelector(
+        'button[color="primary"][mat-raised-button]'
+      );
+      expect(editButton).toBeNull();
+    });
+
+    it('should pass instance with user data to hasPermissions', () => {
+      authStoreMock.hasPermissions.mockReturnValue(true);
+      entityMapSignal.set({ 'user-1': mockUser });
+      fixture.detectChanges();
+
+      expect(authStoreMock.hasPermissions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'update',
+          subject: 'User',
+          instance: expect.objectContaining({ id: 'user-1' })
+        })
+      );
+    });
+  });
 });

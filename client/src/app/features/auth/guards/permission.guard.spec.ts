@@ -4,7 +4,7 @@ import type {
   ActivatedRouteSnapshot,
   RouterStateSnapshot
 } from '@angular/router';
-import { permissionGuard } from './permission.guard';
+import { instancePermissionGuard, permissionGuard } from './permission.guard';
 import { AuthStore } from '../store/auth.store';
 import { AuthService } from '../services/auth.service';
 import type { Observable } from 'rxjs';
@@ -120,5 +120,125 @@ describe('permissionGuard', () => {
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(false);
     expect(router.navigate).toHaveBeenCalledWith(['/forbidden']);
+  });
+});
+
+describe('instancePermissionGuard', () => {
+  let authStoreMock: {
+    isAuthenticated: ReturnType<typeof vi.fn>;
+    isAccessTokenExpired: ReturnType<typeof vi.fn>;
+    hasPermissions: ReturnType<typeof vi.fn>;
+    clearSession: ReturnType<typeof vi.fn>;
+  };
+  let authServiceMock: {
+    refreshTokens: ReturnType<typeof vi.fn>;
+  };
+
+  const mockRoute = {
+    params: { id: 'user-1' }
+  } as unknown as ActivatedRouteSnapshot;
+  const mockState = { url: '/admin/users/user-1/edit' } as RouterStateSnapshot;
+
+  beforeEach(() => {
+    authStoreMock = {
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      isAccessTokenExpired: vi.fn().mockReturnValue(false),
+      hasPermissions: vi.fn().mockReturnValue(false),
+      clearSession: vi.fn()
+    };
+
+    authServiceMock = {
+      refreshTokens: vi.fn().mockReturnValue(of(null))
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: AuthStore, useValue: authStoreMock },
+        { provide: AuthService, useValue: authServiceMock }
+      ]
+    });
+  });
+
+  it('should return true when user has instance-level permission', () => {
+    authStoreMock.hasPermissions.mockReturnValue(true);
+
+    const result = TestBed.runInInjectionContext(() =>
+      instancePermissionGuard('update', 'User', (route) => ({
+        id: route.params['id']
+      }))(mockRoute, mockState)
+    );
+
+    expect(result).toBe(true);
+  });
+
+  it('should pass instance data from route params to hasPermissions', () => {
+    authStoreMock.hasPermissions.mockReturnValue(true);
+
+    TestBed.runInInjectionContext(() =>
+      instancePermissionGuard('update', 'User', (route) => ({
+        id: route.params['id']
+      }))(mockRoute, mockState)
+    );
+
+    expect(authStoreMock.hasPermissions).toHaveBeenCalledWith({
+      action: 'update',
+      subject: 'User',
+      instance: { id: 'user-1' }
+    });
+  });
+
+  it('should navigate to forbidden when instance-level permission is denied', () => {
+    authStoreMock.hasPermissions.mockReturnValue(false);
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate');
+
+    const result = TestBed.runInInjectionContext(() =>
+      instancePermissionGuard('update', 'User', (route) => ({
+        id: route.params['id']
+      }))(mockRoute, mockState)
+    );
+
+    expect(result).toBe(false);
+    expect(router.navigate).toHaveBeenCalledWith(['/forbidden']);
+  });
+
+  it('should attempt refresh when not authenticated', async () => {
+    authStoreMock.isAuthenticated.mockReturnValue(false);
+    authStoreMock.isAccessTokenExpired.mockReturnValue(true);
+    authServiceMock.refreshTokens.mockReturnValue(of(null));
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate');
+
+    const result = TestBed.runInInjectionContext(() =>
+      instancePermissionGuard('update', 'User', (route) => ({
+        id: route.params['id']
+      }))(mockRoute, mockState)
+    );
+
+    const value = await firstValueFrom(result as Observable<boolean>);
+    expect(value).toBe(false);
+    expect(authStoreMock.clearSession).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
+      queryParams: { returnUrl: '/admin/users/user-1/edit' }
+    });
+  });
+
+  it('should return true after successful refresh when instance permission granted', async () => {
+    authStoreMock.isAuthenticated.mockReturnValue(false);
+    authStoreMock.isAccessTokenExpired.mockReturnValue(true);
+    authServiceMock.refreshTokens.mockReturnValue(
+      of({ access_token: 'new', expires_in: 3600 })
+    );
+    authStoreMock.hasPermissions.mockReturnValue(true);
+
+    const result = TestBed.runInInjectionContext(() =>
+      instancePermissionGuard('update', 'User', (route) => ({
+        id: route.params['id']
+      }))(mockRoute, mockState)
+    );
+
+    const value = await firstValueFrom(result as Observable<boolean>);
+    expect(value).toBe(true);
   });
 });

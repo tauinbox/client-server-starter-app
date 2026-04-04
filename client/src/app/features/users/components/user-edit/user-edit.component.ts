@@ -156,19 +156,31 @@ export class UserEditComponent implements OnInit, OnDestroy {
     );
   });
 
-  protected readonly canManageUser = computed(() =>
-    this.#authStore.hasPermissions({ action: 'update', subject: 'User' })
-  );
+  protected readonly canManageUser = computed(() => {
+    const u = this.user();
+    if (!u) return false;
+    return this.#authStore.hasPermissions({
+      action: 'update',
+      subject: 'User',
+      instance: { id: u.id }
+    });
+  });
 
   protected readonly canAssignRoles = computed(() =>
     this.#authStore.hasPermissions({ action: 'assign', subject: 'Role' })
   );
 
-  protected readonly canDelete = computed(
-    () =>
-      this.#authStore.hasPermissions({ action: 'delete', subject: 'User' }) &&
-      this.id() !== this.#authStore.user()?.id
-  );
+  protected readonly canDelete = computed(() => {
+    const u = this.user();
+    if (!u) return false;
+    return (
+      this.#authStore.hasPermissions({
+        action: 'delete',
+        subject: 'User',
+        instance: { id: u.id }
+      }) && this.id() !== this.#authStore.user()?.id
+    );
+  });
 
   ngOnInit(): void {
     this.loadUser();
@@ -308,7 +320,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
       updateData.password = formValues.password;
     }
 
-    if (this.#authStore.hasPermissions({ action: 'update', subject: 'User' })) {
+    if (this.canManageUser()) {
       updateData.isActive = formValues.isActive;
     }
 

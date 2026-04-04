@@ -251,7 +251,39 @@ describe('UserEditComponent', () => {
     });
   });
 
-  describe('canDelete', () => {
+  describe('canManageUser (instance-level)', () => {
+    it('should return false when user is not loaded', () => {
+      // Do NOT call fixture.detectChanges() — user stays null
+      expect(component['canManageUser']()).toBe(false);
+    });
+
+    it('should return true when hasPermissions returns true for instance', () => {
+      fixture.detectChanges();
+      permittedSignal.set(true);
+      expect(component['canManageUser']()).toBe(true);
+    });
+
+    it('should return false when hasPermissions returns false for instance', () => {
+      fixture.detectChanges();
+      permittedSignal.set(false);
+      expect(component['canManageUser']()).toBe(false);
+    });
+
+    it('should pass instance with user id to hasPermissions', () => {
+      fixture.detectChanges();
+      component['canManageUser']();
+
+      expect(authStoreMock.hasPermissions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'update',
+          subject: 'User',
+          instance: expect.objectContaining({ id: 'user-1' })
+        })
+      );
+    });
+  });
+
+  describe('canDelete (instance-level)', () => {
     beforeEach(() => {
       fixture.detectChanges();
     });
@@ -272,6 +304,27 @@ describe('UserEditComponent', () => {
       permittedSignal.set(false);
       currentUserSignal.set({ id: 'admin-id' });
       expect(component['canDelete']()).toBe(false);
+    });
+
+    it('should return false when user is not loaded', () => {
+      component['user'].set(null);
+      permittedSignal.set(true);
+      currentUserSignal.set({ id: 'admin-id' });
+      expect(component['canDelete']()).toBe(false);
+    });
+
+    it('should pass instance with user id to hasPermissions', () => {
+      permittedSignal.set(true);
+      currentUserSignal.set({ id: 'admin-id' });
+      component['canDelete']();
+
+      expect(authStoreMock.hasPermissions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'delete',
+          subject: 'User',
+          instance: expect.objectContaining({ id: 'user-1' })
+        })
+      );
     });
   });
 

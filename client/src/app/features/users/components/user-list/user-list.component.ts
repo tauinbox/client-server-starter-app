@@ -2,7 +2,6 @@ import type { ElementRef, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
-  computed,
   DestroyRef,
   effect,
   inject,
@@ -40,7 +39,6 @@ import {
   COLUMN_TO_SORT_MAP,
   UserTableComponent
 } from '../user-table/user-table.component';
-import { AuthStore } from '../../../auth/store/auth.store';
 
 type UserFilterFormType = {
   email: FormControl<string>;
@@ -76,7 +74,6 @@ type UserFilterFormType = {
 export class UserListComponent implements OnInit {
   readonly #fb = inject(FormBuilder);
   readonly #usersStore = inject(UsersStore);
-  readonly #authStore = inject(AuthStore);
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
   readonly #destroyRef = inject(DestroyRef);
@@ -91,13 +88,6 @@ export class UserListComponent implements OnInit {
       lastName: this.#fb.control('', { nonNullable: true }),
       isActive: this.#fb.control('', { nonNullable: true })
     });
-
-  readonly canUpdate = computed(() =>
-    this.#authStore.hasPermissions({ action: 'update', subject: 'User' })
-  );
-  readonly canDelete = computed(() =>
-    this.#authStore.hasPermissions({ action: 'delete', subject: 'User' })
-  );
 
   readonly loading = this.#usersStore.loading;
   readonly totalUsers = this.#usersStore.totalUsers;
