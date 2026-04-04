@@ -41,6 +41,199 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - **CASL condition editors** — all four condition types supported in the permissions dialog: `ownership` checkbox, `fieldMatch` / `userAttr` JSON editors, and a `custom` raw MongoQuery textarea with blur-time JSON validation
 - **Prototype-pollution-safe `custom` conditions** — `CaslAbilityFactory` uses `Object.entries()` loop instead of `Object.assign` when merging user-supplied JSON into the CASL query object
 
+### CASL Permission Conditions
+
+The project uses [CASL](https://casl.js.org) (`@casl/ability` v6) with `MongoAbility` — a variant that evaluates conditions using **MongoDB query syntax** (operators like `$in`, `$lt`, `$or`, etc.). This is a pure in-memory evaluation engine (via `@ucast/mongo2js`, bundled inside CASL v6) — **no actual MongoDB database is involved**.
+
+#### How Conditions Work
+
+Each permission assigned to a role can optionally have a `conditions` object (stored as JSONB in `role_permissions.conditions`). When the server builds the CASL ability for a user, conditions are translated into MongoDB-style queries that CASL evaluates at runtime against entity instances.
+
+```
+Without conditions:     can('update', 'User')                         → allows updating ANY user
+With conditions:        can('update', 'User', { id: currentUserId })  → allows updating ONLY own record
+```
+
+The client receives packed CASL rules via `GET /api/v1/auth/permissions`, unpacks them into `AppAbility`, and evaluates the same conditions locally — so UI elements (Edit/Delete buttons) hide/show consistently with what the server enforces.
+
+#### Condition Types
+
+Type definition (`shared/src/types/role.types.ts`):
+
+```typescript
+type PermissionCondition = {
+  ownership?: { userField: string };
+  fieldMatch?: Record<string, unknown[]>;
+  userAttr?: Record<string, unknown>;
+  custom?: string;  // JSON-stringified MongoDB query
+};
+```
+
+All four types can be combined on a single permission — they are merged into one query with implicit AND logic.
+
+---
+
+**Type 1: `ownership`** — restrict access to records owned by the current user
+
+Sets `query[userField] = userId` where `userId` is the authenticated user's ID.
+
+| Admin UI | JSON stored |  Generated CASL rule |
+|----------|-------------|---------------------|
+| Checkbox + field name input (default: `"id"`) | `{ "ownership": { "userField": "id" } }` | `can('update', 'User', { id: '<userId>' })` |
+
+Examples:
+
+| Scenario | userField | Effect |
+|----------|-----------|--------|
+| User can edit own profile | `"id"` | `User.id` must match current user's ID |
+| Author can edit own posts | `"authorId"` | `Post.authorId` must match |
+| Manager sees own team | `"managerId"` | `Team.managerId` must match |
+
+---
+
+**Type 2: `fieldMatch`** — restrict access based on specific field values (allowlist)
+
+Each field is translated to a `$in` operator: `query[field] = { $in: values }`.
+
+| Admin UI | JSON stored | Generated CASL rule |
+|----------|-------------|---------------------|
+| JSON textarea | `{ "fieldMatch": { "status": ["active", "pending"] } }` | `can('read', 'Order', { status: { $in: ['active', 'pending'] } })` |
+
+Examples:
+
+| Scenario | Configuration | Effect |
+|----------|--------------|--------|
+| Support sees only active users | `{ "isActive": [true] }` | Can only read users where `isActive === true` |
+| Editor manages draft/review posts | `{ "status": ["draft", "review"] }` | Cannot touch published posts |
+| Regional manager | `{ "region": ["EU", "NA"] }` | Access limited to EU and NA records |
+
+---
+
+**Type 3: `userAttr`** — map a record field to a user attribute
+
+Resolves the attribute name from a user context object: `query[field] = userContext[attrName]`.
+
+| Admin UI | JSON stored | Generated CASL rule |
+|----------|-------------|---------------------|
+| JSON textarea | `{ "userAttr": { "createdBy": "id" } }` | `can('update', 'User', { createdBy: '<userId>' })` |
+
+Currently available user context attributes: `{ id: userId }`. To add more (e.g., `departmentId`, `tenantId`), extend the `userContext` object in `CaslAbilityFactory.createForUser()`.
+
+Difference from `ownership`: `ownership` always maps to `userId`. `userAttr` maps to any user attribute — once more attributes are added to userContext, this becomes the most flexible built-in type.
+
+---
+
+**Type 4: `custom`** — raw MongoDB query for complex conditions
+
+The value is a **JSON string** (stringified MongoDB query). It is parsed and merged key-by-key into the condition query.
+
+| Admin UI | JSON stored | Generated CASL rule |
+|----------|-------------|---------------------|
+| JSON textarea with validation | `{ "custom": "{\"price\":{\"$lt\":100}}" }` | `can('update', 'Product', { price: { $lt: 100 } })` |
+
+**Supported MongoDB operators** (evaluated by `@ucast/mongo2js` inside CASL):
+
+| Operator | Meaning | Example |
+|----------|---------|---------|
+| `$eq` | Equals | `{ "status": { "$eq": "active" } }` or `{ "status": "active" }` |
+| `$ne` | Not equals | `{ "status": { "$ne": "archived" } }` |
+| `$lt` | Less than | `{ "price": { "$lt": 100 } }` |
+| `$lte` | Less than or equal | `{ "price": { "$lte": 100 } }` |
+| `$gt` | Greater than | `{ "quantity": { "$gt": 0 } }` |
+| `$gte` | Greater than or equal | `{ "rating": { "$gte": 4 } }` |
+| `$in` | In array | `{ "status": { "$in": ["active", "pending"] } }` |
+| `$nin` | Not in array | `{ "role": { "$nin": ["admin", "super"] } }` |
+| `$all` | Array contains all | `{ "tags": { "$all": ["urgent", "billing"] } }` |
+| `$exists` | Field exists/absent | `{ "deletedAt": { "$exists": false } }` |
+| `$regex` | Regex match | `{ "email": { "$regex": "@company\\.com$" } }` |
+
+**Logical operators** (combine multiple conditions):
+
+| Operator | Meaning | Example |
+|----------|---------|---------|
+| `$and` | All must match | `{ "$and": [{ "price": { "$lt": 100 } }, { "status": "active" }] }` |
+| `$or` | Any must match | `{ "$or": [{ "status": "draft" }, { "status": "review" }] }` |
+| `$nor` | None must match | `{ "$nor": [{ "status": "archived" }, { "status": "deleted" }] }` |
+| `$not` | Negation | `{ "price": { "$not": { "$gt": 1000 } } }` |
+
+Security: prototype pollution keys (`__proto__`, `constructor`, `prototype`) are silently skipped during parsing.
+
+#### Combining Multiple Condition Types
+
+Multiple types on the same permission are merged into one query (AND):
+
+```json
+{
+  "ownership": { "userField": "id" },
+  "fieldMatch": { "isActive": [true] },
+  "custom": "{\"email\":{\"$regex\":\"@company\\\\.com$\"}}"
+}
+```
+
+Produces:
+```
+can('update', 'User', {
+  id: '<userId>',                      // from ownership
+  isActive: { $in: [true] },           // from fieldMatch
+  email: { $regex: '@company\\.com$' } // from custom
+})
+```
+
+Meaning: user can update only their own record, only if it's active, and only if the email matches the company domain.
+
+**Conflict resolution:** if the same field key appears in multiple condition types, later types overwrite earlier ones. Processing order: ownership → fieldMatch → userAttr → custom.
+
+#### Practical Examples
+
+| # | Scenario | Resource | Action | Condition | Result |
+|---|----------|----------|--------|-----------|--------|
+| 1 | User edits own profile | User | update | `{ "ownership": { "userField": "id" } }` | Edit button on own record only (default seed config) |
+| 2 | Moderator deletes inactive users | User | delete | `{ "fieldMatch": { "isActive": [false] } }` | Delete button on inactive records only |
+| 3 | Editor updates cheap products | Product | update | `{ "custom": "{\"price\":{\"$lt\":100}}" }` | Edit allowed only when `price < 100` |
+| 4 | Support sees active EU/NA users | User | read | `{ "fieldMatch": { "isActive": [true] }, "custom": "{\"$or\":[{\"region\":\"EU\"},{\"region\":\"NA\"}]}" }` | Filtered to active users in EU or NA |
+| 5 | Manager manages users they created | User | update | `{ "userAttr": { "createdBy": "id" } }` | Only records where `createdBy === managerId` |
+
+#### Instance-Level Checks
+
+**Server-side:** controllers inject `@CurrentAbility()` and pass it to the service, which loads the entity and calls `ability.can(action, entity)`. Returns 403 if denied.
+
+**Client-side** — three mechanisms:
+
+1. **`*appRequirePermissions` directive** (templates) — evaluates per-row:
+   ```html
+   <ng-container *appRequirePermissions="{ action: 'update', subject: 'User', instance: user }">
+     <button>Edit</button>
+   </ng-container>
+   ```
+
+2. **`instancePermissionGuard`** (routes) — checks before route activation:
+   ```typescript
+   canActivate: [instancePermissionGuard('update', 'User', (route) => ({ id: route.params['id'] }))]
+   ```
+
+3. **Computed properties** (components with complex logic):
+   ```typescript
+   canManageUser = computed(() => {
+     const u = this.user();
+     if (!u) return false;
+     return this.authStore.hasPermissions({
+       action: 'update', subject: 'User', instance: { id: u.id }
+     });
+   });
+   ```
+
+#### Super Roles
+
+Roles with `isSuper: true` receive `can('manage', 'all')` — a CASL wildcard that bypasses all condition checks. All buttons visible, all routes accessible, all API calls allowed.
+
+#### Multiple Roles and Condition Precedence
+
+When a user has multiple roles, permissions are deduplicated by `resource:action` key — later roles override earlier ones. Conditions are **not merged** across roles.
+
+Example: if Role A grants `update:User` with `{ ownership: { userField: "id" } }` and Role B grants `update:User` with no conditions — the user gets **unrestricted** `update:User` (Role B overrides Role A).
+
+To apply multiple restrictions simultaneously, use `$and` in a single `custom` condition on one role, rather than splitting across roles.
+
 ### User Management (Admin)
 - **Unified Manage Users page** — inline filter form (email, first/last name, status) on the same page as the user list; empty filters load all users, filled filters trigger a search via `GET /users/search`
 - **Infinite scroll** with column sorting — loads 20 users at a time; `IntersectionObserver` sentinel triggers additional pages automatically as the user scrolls
