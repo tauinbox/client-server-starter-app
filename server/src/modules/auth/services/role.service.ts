@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -13,6 +14,7 @@ import { User } from '../../users/entities/user.entity';
 import { PermissionService } from './permission.service';
 import { PermissionCondition } from '@app/shared/types';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
+import type { AppAbility } from '../casl/app-ability';
 
 @Injectable()
 export class RoleService {
@@ -129,8 +131,25 @@ export class RoleService {
     await this.roleRepository.remove(role);
   }
 
-  async assignRoleToUser(userId: string, roleId: string): Promise<void> {
-    await this.findOne(roleId);
+  async assignRoleToUser(
+    userId: string,
+    roleId: string,
+    ability?: AppAbility
+  ): Promise<void> {
+    const role = await this.findOne(roleId);
+
+    if (ability) {
+      if (role.isSuper) {
+        throw new ForbiddenException('Cannot assign super roles');
+      }
+      const targetUser = await this.roleRepository.manager.findOne(User, {
+        where: { id: userId }
+      });
+      if (targetUser && !ability.can('update', targetUser)) {
+        throw new ForbiddenException('Insufficient permissions');
+      }
+    }
+
     await this.roleRepository.manager
       .createQueryBuilder()
       .relation(User, 'roles')
@@ -139,8 +158,25 @@ export class RoleService {
     await this.permissionService.invalidateUserCache(userId);
   }
 
-  async removeRoleFromUser(userId: string, roleId: string): Promise<void> {
+  async removeRoleFromUser(
+    userId: string,
+    roleId: string,
+    ability?: AppAbility
+  ): Promise<void> {
     const role = await this.findOne(roleId);
+
+    if (ability) {
+      if (role.isSuper) {
+        throw new ForbiddenException('Cannot remove super roles');
+      }
+      const targetUser = await this.roleRepository.manager.findOne(User, {
+        where: { id: userId }
+      });
+      if (targetUser && !ability.can('update', targetUser)) {
+        throw new ForbiddenException('Insufficient permissions');
+      }
+    }
+
     await this.roleRepository.manager
       .createQueryBuilder()
       .relation(User, 'roles')

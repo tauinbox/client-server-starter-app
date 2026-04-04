@@ -1,11 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { HttpException } from '@nestjs/common';
+import { ForbiddenException, HttpException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
 import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
 import { UsersService } from './users.service';
 import { User } from '../entities/user.entity';
+import type { AppAbility } from '../../auth/casl/app-ability';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -380,6 +381,50 @@ describe('UsersService', () => {
         })
       );
     });
+
+    it('should throw ForbiddenException when ability denies update', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      const canSpy = jest.fn().mockReturnValue(false);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: canSpy };
+
+      await expect(
+        service.update('user-1', { firstName: 'Updated' }, ability)
+      ).rejects.toThrow(ForbiddenException);
+      expect(canSpy).toHaveBeenCalledWith('update', mockUser);
+    });
+
+    it('should proceed when ability allows update', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      mockRepository.save.mockResolvedValue({
+        ...mockUser,
+        firstName: 'Updated'
+      });
+      const canSpy = jest.fn().mockReturnValue(true);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: canSpy };
+
+      const result = await service.update(
+        'user-1',
+        { firstName: 'Updated' },
+        ability
+      );
+
+      expect(canSpy).toHaveBeenCalledWith('update', mockUser);
+      expect(result.firstName).toBe('Updated');
+    });
+
+    it('should skip ability check when ability is not provided', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      mockRepository.save.mockResolvedValue({
+        ...mockUser,
+        firstName: 'Updated'
+      });
+
+      const result = await service.update('user-1', { firstName: 'Updated' });
+
+      expect(result.firstName).toBe('Updated');
+    });
   });
 
   describe('remove', () => {
@@ -402,6 +447,31 @@ describe('UsersService', () => {
       await expect(service.remove('nonexistent')).rejects.toThrow(
         HttpException
       );
+    });
+
+    it('should throw ForbiddenException when ability denies delete', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      const canSpy = jest.fn().mockReturnValue(false);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: canSpy };
+
+      await expect(service.remove('user-1', ability)).rejects.toThrow(
+        ForbiddenException
+      );
+      expect(canSpy).toHaveBeenCalledWith('delete', mockUser);
+    });
+
+    it('should proceed when ability allows delete', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      mockRepository.softRemove.mockResolvedValue(undefined);
+      const canSpy = jest.fn().mockReturnValue(true);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: canSpy };
+
+      await service.remove('user-1', ability);
+
+      expect(canSpy).toHaveBeenCalledWith('delete', mockUser);
+      expect(mockRepository.softRemove).toHaveBeenCalledWith(mockUser);
     });
   });
 
@@ -445,6 +515,39 @@ describe('UsersService', () => {
       await expect(service.restore('nonexistent')).rejects.toThrow(
         HttpException
       );
+    });
+
+    it('should throw ForbiddenException when ability denies restore', async () => {
+      mockRepository.findOne.mockResolvedValue(deletedUser);
+      const canSpy = jest.fn().mockReturnValue(false);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: canSpy };
+
+      await expect(service.restore('user-1', ability)).rejects.toThrow(
+        ForbiddenException
+      );
+      expect(canSpy).toHaveBeenCalledWith('delete', deletedUser);
+    });
+
+    it('should proceed when ability allows restore', async () => {
+      const mockManager = {
+        restore: jest.fn().mockResolvedValue(undefined),
+        update: jest.fn().mockResolvedValue(undefined)
+      };
+      mockDataSource.transaction.mockImplementation(
+        (cb: (manager: typeof mockManager) => Promise<void>) => cb(mockManager)
+      );
+      mockRepository.findOne
+        .mockResolvedValueOnce(deletedUser)
+        .mockResolvedValueOnce(mockUser);
+      const canSpy = jest.fn().mockReturnValue(true);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: canSpy };
+
+      const result = await service.restore('user-1', ability);
+
+      expect(canSpy).toHaveBeenCalledWith('delete', deletedUser);
+      expect(result).toEqual(mockUser);
     });
   });
 

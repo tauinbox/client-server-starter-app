@@ -1,11 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { HttpException } from '@nestjs/common';
+import { ForbiddenException, HttpException } from '@nestjs/common';
 import { RoleService } from './role.service';
 import { Role } from '../entities/role.entity';
 import { Permission } from '../entities/permission.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { PermissionService } from './permission.service';
+import type { AppAbility } from '../casl/app-ability';
+import { User } from '../../users/entities/user.entity';
 
 describe('RoleService', () => {
   let service: RoleService;
@@ -15,7 +17,11 @@ describe('RoleService', () => {
     create: jest.Mock;
     save: jest.Mock;
     remove: jest.Mock;
-    manager: { createQueryBuilder: jest.Mock; update: jest.Mock };
+    manager: {
+      createQueryBuilder: jest.Mock;
+      update: jest.Mock;
+      findOne: jest.Mock;
+    };
     createQueryBuilder: jest.Mock;
   };
   let mockPermissionRepo: { find: jest.Mock };
@@ -106,7 +112,8 @@ describe('RoleService', () => {
           .mockImplementation((...args: unknown[]) =>
             args.length > 0 ? mockUserQueryBuilder : mockRelationQueryBuilder
           ),
-        update: jest.fn().mockResolvedValue(undefined)
+        update: jest.fn().mockResolvedValue(undefined),
+        findOne: jest.fn().mockResolvedValue(null)
       },
       createQueryBuilder: jest.fn().mockReturnValue(mockRoleRepoQB)
     };
@@ -347,6 +354,44 @@ describe('RoleService', () => {
         'user-1'
       );
     });
+
+    it('should throw ForbiddenException when assigning a super role with ability', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(systemRole);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: jest.fn().mockReturnValue(true) };
+
+      await expect(
+        service.assignRoleToUser('user-1', 'role-1', ability)
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw ForbiddenException when ability denies update on target user', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      const targetUser = { id: 'user-99' } as User;
+      mockRoleRepo.manager.findOne.mockResolvedValue(targetUser);
+      const canSpy = jest.fn().mockReturnValue(false);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: canSpy };
+
+      await expect(
+        service.assignRoleToUser('user-99', 'role-2', ability)
+      ).rejects.toThrow(ForbiddenException);
+      expect(canSpy).toHaveBeenCalledWith('update', targetUser);
+    });
+
+    it('should proceed when ability allows update on target user', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      const targetUser = { id: 'user-1' } as User;
+      mockRoleRepo.manager.findOne.mockResolvedValue(targetUser);
+      const canSpy = jest.fn().mockReturnValue(true);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: canSpy };
+
+      await service.assignRoleToUser('user-1', 'role-2', ability);
+
+      expect(canSpy).toHaveBeenCalledWith('update', targetUser);
+      expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
+    });
   });
 
   describe('removeRoleFromUser', () => {
@@ -362,7 +407,45 @@ describe('RoleService', () => {
       expect(mockRoleRepo.manager.update).not.toHaveBeenCalled();
     });
 
-    it('should revoke tokens when removing a super role', async () => {
+    it('should throw ForbiddenException when removing a super role with ability', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(systemRole);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: jest.fn().mockReturnValue(true) };
+
+      await expect(
+        service.removeRoleFromUser('user-1', 'role-1', ability)
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw ForbiddenException when ability denies update on target user', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      const targetUser = { id: 'user-99' } as User;
+      mockRoleRepo.manager.findOne.mockResolvedValue(targetUser);
+      const canSpy = jest.fn().mockReturnValue(false);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: canSpy };
+
+      await expect(
+        service.removeRoleFromUser('user-99', 'role-2', ability)
+      ).rejects.toThrow(ForbiddenException);
+      expect(canSpy).toHaveBeenCalledWith('update', targetUser);
+    });
+
+    it('should proceed when ability allows update on target user', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      const targetUser = { id: 'user-1' } as User;
+      mockRoleRepo.manager.findOne.mockResolvedValue(targetUser);
+      const canSpy = jest.fn().mockReturnValue(true);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: canSpy };
+
+      await service.removeRoleFromUser('user-1', 'role-2', ability);
+
+      expect(canSpy).toHaveBeenCalledWith('update', targetUser);
+      expect(mockRelationQueryBuilder.remove).toHaveBeenCalledWith('role-2');
+    });
+
+    it('should revoke tokens when removing a super role (no ability)', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
 
       await service.removeRoleFromUser('user-1', 'role-1');

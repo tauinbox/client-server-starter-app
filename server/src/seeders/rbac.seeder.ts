@@ -140,8 +140,9 @@ export default class RbacSeeder extends Seeder {
     );
     await rolePermissionRepo.save(adminRolePermissions);
 
-    // User gets profile:read and profile:update only
+    // User gets profile:read, profile:update, and update:User (own record only)
     const profileResource = savedResources.find((r) => r.name === 'profile');
+    const usersResource = savedResources.find((r) => r.name === 'users');
     const readAction = savedActions.find((a) => a.name === 'read');
     const updateAction = savedActions.find((a) => a.name === 'update');
     const profilePermissions = savedPermissions.filter(
@@ -155,6 +156,22 @@ export default class RbacSeeder extends Seeder {
         permissionId: perm.id
       })
     );
+
+    // update:User with ownership condition so regular users can only update their own record
+    const updateUserPermission = savedPermissions.find(
+      (p) =>
+        p.resourceId === usersResource?.id && p.actionId === updateAction?.id
+    );
+    if (updateUserPermission) {
+      userRolePermissions.push(
+        rolePermissionRepo.create({
+          roleId: userRole.id,
+          permissionId: updateUserPermission.id,
+          conditions: { ownership: { userField: 'id' } }
+        })
+      );
+    }
+
     await rolePermissionRepo.save(userRolePermissions);
   }
 }

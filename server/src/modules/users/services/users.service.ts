@@ -1,10 +1,16 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import * as bcrypt from 'bcrypt';
 import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
+import type { AppAbility } from '../../auth/casl/app-ability';
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
@@ -129,8 +135,16 @@ export class UsersService {
     });
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+  async update(
+    id: string,
+    updateUserDto: UpdateUserDto,
+    ability?: AppAbility
+  ): Promise<User> {
     const user = await this.findOne(id);
+
+    if (ability && !ability.can('update', user)) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
 
     const { unlockAccount, ...rest } = updateUserDto;
     const changes: Partial<User> = { ...rest };
@@ -250,12 +264,17 @@ export class UsersService {
     });
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, ability?: AppAbility): Promise<void> {
     const user = await this.findOne(id);
+
+    if (ability && !ability.can('delete', user)) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+
     await this.userRepository.softRemove(user);
   }
 
-  async restore(id: string): Promise<User> {
+  async restore(id: string, ability?: AppAbility): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id },
       relations: ['roles'],
@@ -270,6 +289,11 @@ export class UsersService {
         HttpStatus.NOT_FOUND
       );
     }
+
+    if (ability && !ability.can('delete', user)) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+
     await withTransaction(this.dataSource, async (manager) => {
       await manager.restore(User, id);
       await manager.update(User, id, { isActive: true });

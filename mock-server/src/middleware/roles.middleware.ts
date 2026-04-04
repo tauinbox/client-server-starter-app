@@ -413,6 +413,22 @@ router.post('/assign/:userId', adminGuard, (req, res) => {
     return;
   }
 
+  // Prevent assigning super roles via API (only super users bypass, and they
+  // already pass adminGuard — but a future non-super admin role would need this)
+  if (role.isSuper) {
+    const actor = (req as AuthenticatedRequest).user;
+    const actorRoles = Array.from(state.roles.values()).filter((r) =>
+      actor.roles.includes(r.name)
+    );
+    if (!actorRoles.some((r) => r.isSuper)) {
+      res.status(403).json({
+        message: 'Cannot assign super roles',
+        statusCode: 403
+      });
+      return;
+    }
+  }
+
   if (!user.roles.includes(role.name)) {
     user.roles.push(role.name);
   }
@@ -455,6 +471,21 @@ router.delete('/assign/:userId/:roleId', adminGuard, (req, res) => {
       errorKey: ErrorKeys.ROLES.NOT_FOUND
     });
     return;
+  }
+
+  // Prevent removing super roles via API unless actor is also super
+  if (role.isSuper) {
+    const actor = (req as AuthenticatedRequest).user;
+    const actorRoles = Array.from(state.roles.values()).filter((r) =>
+      actor.roles.includes(r.name)
+    );
+    if (!actorRoles.some((r) => r.isSuper)) {
+      res.status(403).json({
+        message: 'Cannot remove super roles',
+        statusCode: 403
+      });
+      return;
+    }
   }
 
   user.roles = user.roles.filter((r) => r !== role.name);
