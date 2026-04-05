@@ -1,0 +1,177 @@
+@use 'abstracts/variables' as vars;
+@use 'abstracts/functions' as func;
+
+:host {
+  display: block;
+}
+
+// ── Toolbar ─────────────────────────────────────────────────────────────────
+
+.builder-toolbar {
+  display: flex;
+  align-items: center;
+  margin-bottom: vars.$spacing-sm;
+}
+
+.logic-toggle,
+.builder-toolbar mat-button-toggle-group {
+  --mat-button-toggle-height: #{func.rem(28)};
+
+  font-size: func.rem(12);
+}
+
+// ── Visual builder ──────────────────────────────────────────────────────────
+
+.builder-visual {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-xs;
+}
+
+// ── Group block ─────────────────────────────────────────────────────────────
+
+.group-block {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-xs;
+
+  &.nested {
+    padding: vars.$spacing-xs vars.$spacing-sm;
+    background: color-mix(
+      in srgb,
+      var(--mat-sys-surface-container-low) 50%,
+      transparent
+    );
+    border: 1px dashed var(--mat-sys-outline-variant);
+    border-radius: vars.$border-radius-sm;
+  }
+}
+
+.group-header {
+  display: flex;
+  gap: vars.$spacing-xs;
+  align-items: center;
+
+  button {
+    --mdc-icon-button-state-layer-size: #{func.rem(28)};
+    --mdc-icon-button-icon-size: #{func.rem(18)};
+
+    width: func.rem(28);
+    height: func.rem(28);
+    padding: 0;
+  }
+}
+
+.empty-hint {
+  padding: vars.$spacing-xs;
+  font-size: func.rem(12);
+  font-style: italic;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// ── Rule row ────────────────────────────────────────────────────────────────
+
+.rule-row {
+  display: flex;
+  gap: vars.$spacing-xs;
+  align-items: flex-start;
+}
+
+.field-input {
+  flex: 2;
+}
+
+.operator-select {
+  flex: 1.5;
+  min-width: func.rem(100);
+}
+
+.value-input {
+  flex: 2;
+}
+
+.field-input,
+.operator-select,
+.value-input {
+  // Compact form fields
+  --mat-form-field-container-height: #{func.rem(36)};
+  --mat-form-field-container-vertical-padding: #{func.rem(6)};
+
+  font-size: func.rem(13);
+}
+
+.remove-btn {
+  --mdc-icon-button-state-layer-size: #{func.rem(28)};
+  --mdc-icon-button-icon-size: #{func.rem(18)};
+
+  flex-shrink: 0;
+  width: func.rem(28);
+  height: func.rem(28);
+  padding: 0;
+  margin-top: func.rem(4);
+}
+
+// ── Nested group wrapper ────────────────────────────────────────────────────
+
+.nested-group-wrapper {
+  position: relative;
+}
+
+.remove-group-btn {
+  --mdc-icon-button-state-layer-size: #{func.rem(22)};
+  --mdc-icon-button-icon-size: #{func.rem(14)};
+
+  position: absolute;
+  top: func.rem(-2);
+  right: func.rem(-2);
+  z-index: 1;
+  width: func.rem(22);
+  height: func.rem(22);
+  padding: 0;
+}
+
+// ── JSON preview ────────────────────────────────────────────────────────────
+
+.json-preview {
+  margin-top: vars.$spacing-xs;
+
+  details {
+    font-size: func.rem(12);
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  summary {
+    cursor: pointer;
+    user-select: none;
+  }
+}
+
+.preview-code {
+  padding: vars.$spacing-xs vars.$spacing-sm;
+  margin: vars.$spacing-xxs 0 0;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: func.rem(12);
+  line-height: 1.4;
+  word-break: break-all;
+  white-space: pre-wrap;
+  background: var(--mat-sys-surface-container-low);
+  border-radius: vars.$border-radius-sm;
+}
+
+// ── Raw mode ────────────────────────────────────────────────────────────────
+
+.builder-raw {
+  display: flex;
+  flex-direction: column;
+}
+
+.raw-field {
+  width: 100%;
+}
+
+.json-textarea {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: func.rem(13);
+  line-height: 1.4;
+  resize: vertical;
+}

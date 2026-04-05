@@ -1,0 +1,185 @@
+<ng-container *transloco="let t; scope: 'admin'">
+  <!-- Mode toggle -->
+  <div class="builder-toolbar">
+    <mat-button-toggle-group
+      [value]="mode()"
+      (change)="setMode($event.value)"
+      [disabled]="readonly()"
+    >
+      <mat-button-toggle value="visual">
+        <mat-icon>build</mat-icon>
+        {{ t('admin.conditionBuilder.modeVisual') }}
+      </mat-button-toggle>
+      <mat-button-toggle value="raw">
+        <mat-icon>code</mat-icon>
+        {{ t('admin.conditionBuilder.modeRaw') }}
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
+  @if (mode() === 'visual') {
+    <!-- Visual builder -->
+    <div class="builder-visual">
+      <ng-container
+        *ngTemplateOutlet="
+          groupTpl;
+          context: { $implicit: rootGroup(), depth: 0 }
+        "
+      ></ng-container>
+
+      @if (rootGroup().children.length > 0) {
+        <div class="json-preview">
+          <details>
+            <summary>{{ t('admin.conditionBuilder.preview') }}</summary>
+            <pre class="preview-code">{{ previewJson() }}</pre>
+          </details>
+        </div>
+      }
+    </div>
+  } @else {
+    <!-- Raw JSON editor -->
+    <div class="builder-raw">
+      <mat-form-field appearance="outline" class="raw-field">
+        <mat-label>{{ t('admin.conditionBuilder.rawLabel') }}</mat-label>
+        <textarea
+          matInput
+          [value]="rawText()"
+          [readonly]="readonly()"
+          (input)="onRawInput($event)"
+          (blur)="applyRaw()"
+          rows="6"
+          spellcheck="false"
+          class="json-textarea"
+        ></textarea>
+        @if (parseError()) {
+          <mat-error>{{ t('admin.conditionBuilder.parseError') }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+  }
+
+  <!-- Recursive group template -->
+  <ng-template #groupTpl let-group let-depth="depth">
+    <div class="group-block" [class.nested]="depth > 0">
+      <div class="group-header">
+        <mat-button-toggle-group
+          [value]="group.logic"
+          (change)="setGroupLogic(group, $event.value)"
+          [disabled]="readonly()"
+          class="logic-toggle"
+        >
+          <mat-button-toggle value="$and">AND</mat-button-toggle>
+          <mat-button-toggle value="$or">OR</mat-button-toggle>
+        </mat-button-toggle-group>
+
+        @if (!readonly()) {
+          <button
+            mat-icon-button
+            type="button"
+            (click)="addRule(group)"
+            [matTooltip]="t('admin.conditionBuilder.addRule')"
+          >
+            <mat-icon>add</mat-icon>
+          </button>
+          <button
+            mat-icon-button
+            type="button"
+            (click)="addGroup(group)"
+            [matTooltip]="t('admin.conditionBuilder.addGroup')"
+          >
+            <mat-icon>playlist_add</mat-icon>
+          </button>
+        }
+      </div>
+
+      @if (group.children.length === 0) {
+        <div class="empty-hint">
+          {{ t('admin.conditionBuilder.emptyGroup') }}
+        </div>
+      }
+
+      @for (
+        child of group.children;
+        track child.type === 'rule' ? child.rule.id : child.group.id;
+        let i = $index
+      ) {
+        @if (child.type === 'rule') {
+          <div class="rule-row">
+            <mat-form-field appearance="outline" class="field-input">
+              <mat-label>{{
+                t('admin.conditionBuilder.fieldLabel')
+              }}</mat-label>
+              <input
+                matInput
+                [value]="child.rule.field"
+                [readonly]="readonly()"
+                (input)="setField(child, $any($event.target).value)"
+                placeholder="status"
+              />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="operator-select">
+              <mat-label>{{
+                t('admin.conditionBuilder.operatorLabel')
+              }}</mat-label>
+              <mat-select
+                [value]="child.rule.operator"
+                [disabled]="readonly()"
+                (selectionChange)="setOperator(child, $event.value)"
+              >
+                @for (op of operators; track op) {
+                  <mat-option [value]="op">{{ op }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="value-input">
+              <mat-label>{{
+                t('admin.conditionBuilder.valueLabel')
+              }}</mat-label>
+              <input
+                matInput
+                [value]="child.rule.value"
+                [readonly]="readonly()"
+                (input)="setValue(child, $any($event.target).value)"
+                [placeholder]="getValuePlaceholder(child.rule.operator)"
+              />
+            </mat-form-field>
+
+            @if (!readonly()) {
+              <button
+                mat-icon-button
+                type="button"
+                class="remove-btn"
+                (click)="removeChild(group, i)"
+                [matTooltip]="t('admin.conditionBuilder.removeRule')"
+              >
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="nested-group-wrapper">
+            @if (!readonly()) {
+              <button
+                mat-icon-button
+                type="button"
+                class="remove-group-btn"
+                (click)="removeChild(group, i)"
+                [matTooltip]="t('admin.conditionBuilder.removeGroup')"
+              >
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+            <ng-container
+              *ngTemplateOutlet="
+                groupTpl;
+                context: { $implicit: child.group, depth: depth + 1 }
+              "
+            ></ng-container>
+          </div>
+        }
+      }
+    </div>
+  </ng-template>
+</ng-container>
