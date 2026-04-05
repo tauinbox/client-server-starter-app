@@ -14,6 +14,8 @@ export type {
 export type {
   PaginationMeta,
   PaginatedResponse,
+  CursorPaginationMeta,
+  CursorPaginatedResponse,
   SortOrder
 } from './pagination.types';
 

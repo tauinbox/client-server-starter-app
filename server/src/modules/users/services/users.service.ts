@@ -15,8 +15,13 @@ import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { SearchUsersQueryDto } from '../dtos/search-users-query.dto';
-import { PaginatedResponseDto } from '../../../common/dtos';
+import {
+  PaginatedResponseDto,
+  CursorPaginatedResponseDto
+} from '../../../common/dtos';
 import { escapeLikePattern } from '../../../common/utils/escape-like';
+import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
+import type { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto';
 
 const USER_SORT_COLUMN_MAP: Record<string, string> = {
   email: 'user.email',
@@ -74,6 +79,57 @@ export class UsersService {
       qb.withDeleted();
     }
 
+    this.applyUserFilters(qb, filters);
+
+    qb.orderBy(
+      USER_SORT_COLUMN_MAP[sortBy] ?? 'user.createdAt',
+      sortOrder.toUpperCase() as 'ASC' | 'DESC'
+    );
+    qb.skip((page - 1) * limit);
+    qb.take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    return new PaginatedResponseDto(data, total, page, limit);
+  }
+
+  async findCursorPaginated(
+    query: SearchUsersCursorQueryDto
+  ): Promise<CursorPaginatedResponseDto<User>> {
+    const { cursor, limit, sortBy, sortOrder, includeDeleted, ...filters } =
+      query;
+
+    const qb = this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.roles', 'role');
+
+    if (includeDeleted) {
+      qb.withDeleted();
+    }
+
+    this.applyUserFilters(qb, filters);
+
+    const { data, nextCursor } = await applyKeysetPagination(qb, {
+      cursor,
+      limit,
+      sortBy,
+      sortOrder,
+      sortColumnMap: USER_SORT_COLUMN_MAP,
+      idColumn: 'user.id'
+    });
+
+    return new CursorPaginatedResponseDto(data, nextCursor, limit);
+  }
+
+  private applyUserFilters(
+    qb: ReturnType<typeof this.userRepository.createQueryBuilder>,
+    filters: {
+      email?: string;
+      firstName?: string;
+      lastName?: string;
+      isActive?: boolean;
+    }
+  ): void {
     if (filters.email) {
       qb.andWhere('user.email ILIKE :email', {
         email: `%${escapeLikePattern(filters.email)}%`
@@ -97,17 +153,6 @@ export class UsersService {
         isActive: filters.isActive
       });
     }
-
-    qb.orderBy(
-      USER_SORT_COLUMN_MAP[sortBy] ?? 'user.createdAt',
-      sortOrder.toUpperCase() as 'ASC' | 'DESC'
-    );
-    qb.skip((page - 1) * limit);
-    qb.take(limit);
-
-    const [data, total] = await qb.getManyAndCount();
-
-    return new PaginatedResponseDto(data, total, page, limit);
   }
 
   async findOne(id: string): Promise<User> {

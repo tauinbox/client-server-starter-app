@@ -242,6 +242,7 @@ To apply multiple restrictions simultaneously, use `$and` in a single `custom` c
 - `includeDeleted=true` query param shows soft-deleted users in list and search
 - Role assignment in user edit form — multi-select field (visible to users with `assign:Role` permission); diffs initial vs selected roles and issues `POST /roles/assign/:userId` / `DELETE /roles/assign/:userId/:roleId` calls on save
 - Pagination response envelope: `{ data: User[], meta: { page, limit, total, totalPages } }`
+- **Cursor-based (keyset) pagination** — alternative to offset-based, available via `/cursor` and `/search/cursor` endpoints with response `{ data: User[], meta: { nextCursor, hasMore, limit } }`
 - **Sticky header** — toolbar remains fixed at the top while scrolling through long lists
 
 ### UI/UX
@@ -296,8 +297,8 @@ fullstack-starter-app/
 │   │   ├── notifications/  # SSE push: NotificationsService, NotificationsListener, NotificationsController
 │   │   └── roles/          # RBAC: Role/Permission/RolePermission entities, RolesController, PermissionsGuard
 │   ├── src/common/
-│   │   ├── dtos/           # PaginationQueryDto, PaginatedResponseDto<T>
-│   │   ├── utils/          # escapeLikePattern, hashToken, withTransaction, extractAuditContext
+│   │   ├── dtos/           # PaginationQueryDto, PaginatedResponseDto<T>, CursorPaginationQueryDto, CursorPaginatedResponseDto<T>
+│   │   ├── utils/          # escapeLikePattern, hashToken, withTransaction, extractAuditContext, cursor encode/decode, applyKeysetPagination
 │   │   └── upload/         # createDiskStorageOptions() — reusable multer disk storage factory
 │   ├── src/migrations/     # TypeORM migrations
 │   └── src/seeders/        # Database seeders
@@ -501,6 +502,8 @@ API base URL: `/api/v1`
 | GET | `/auth/permissions` | Bearer | Get current user's resolved permissions |
 | GET | `/users` | `users:search` | List all users (paginated; `includeDeleted=true` to include soft-deleted) |
 | GET | `/users/search` | `users:search` | Search users (paginated + filters: email, firstName, lastName, isActive; `includeDeleted=true`) |
+| GET | `/users/cursor` | `users:search` | List users with cursor-based (keyset) pagination |
+| GET | `/users/search/cursor` | `users:search` | Search users with cursor-based pagination + filters |
 | GET | `/users/:id` | `users:read` | Get user by ID |
 | POST | `/users` | `users:create` | Create user |
 | PATCH | `/users/:id` | `users:update` | Update user |
@@ -585,7 +588,7 @@ npm run release            # Bump versions, generate CHANGELOG.md, create git ta
 - **Passport strategies**: `LocalStrategy` (email/password), `JwtStrategy` (Bearer token; extracts roles, computes isAdmin), `GoogleStrategy`, `FacebookStrategy`, `VkStrategy` (OAuth, conditionally registered)
 - **RBAC**: `RolesModule` provides `PermissionsGuard`, `PolicyEvaluatorService`, `PermissionService`, `CaslAbilityFactory`. `@Authorize(['action', 'Subject'])` typed tuples replace `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` on all protected endpoints
 - **Request pipeline**: Global middleware -> Module middleware -> Guards -> Interceptors -> Pipes -> Controller
-- **Pagination**: Common `PaginationQueryDto` and `PaginatedResponseDto<T>` for consistent server-side pagination across endpoints
+- **Pagination**: Offset-based (`PaginationQueryDto` / `PaginatedResponseDto<T>`) and cursor-based (`CursorPaginationQueryDto` / `CursorPaginatedResponseDto<T>`) — both available, reusable across endpoints
 - **Cron jobs**: Daily expired token cleanup, weekly revoked token cleanup
 - **Swagger** auto-generated API documentation
 
