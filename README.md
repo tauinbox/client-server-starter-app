@@ -38,7 +38,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 ### Admin Panel
 - **Role management** — tabbed `/admin` shell (`AdminPanelComponent`) with "Users", "Roles", and "Resources" tabs. Role list with create/edit/delete dialogs; `RolePermissionsDialogComponent` assigns permissions to roles with optional CASL conditions (ownership, fieldMatch, userAttr, custom)
 - **Resource/Action management** — "Manage Resources" tab at `/admin/resources` (requires `read:Permission`). Resources table allows editing display name, description, and allowed actions per resource (`allowedActionNames`); Actions table supports create, edit, and delete of non-default actions. Each mutation refreshes `RbacMetadataStore` automatically
-- **CASL condition editors** — all four condition types supported in the permissions dialog: `ownership` checkbox, `fieldMatch` / `userAttr` JSON editors, and a `custom` raw MongoQuery textarea with blur-time JSON validation
+- **CASL condition editors** — all four condition types supported in the permissions dialog: `ownership` checkbox, `fieldMatch` / `userAttr` JSON editors, and a `custom` visual condition builder with field/operator/value form, nested `$or`/`$and` groups, JSON preview, and raw JSON fallback toggle
 - **Prototype-pollution-safe `custom` conditions** — `CaslAbilityFactory` uses `Object.entries()` loop instead of `Object.assign` when merging user-supplied JSON into the CASL query object
 
 ### CASL Permission Conditions
