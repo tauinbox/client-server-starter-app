@@ -41,6 +41,21 @@
     "descriptionMaxLength": "Description must be at most 255 characters",
     "createButton": "Create"
   },
+  "conditionBuilder": {
+    "modeVisual": "Visual",
+    "modeRaw": "Raw JSON",
+    "addRule": "Add rule",
+    "addGroup": "Add group",
+    "removeRule": "Remove rule",
+    "removeGroup": "Remove group",
+    "fieldLabel": "Field",
+    "operatorLabel": "Operator",
+    "valueLabel": "Value",
+    "emptyGroup": "No rules yet — click + to add one",
+    "preview": "JSON preview",
+    "rawLabel": "Raw JSON MongoQuery",
+    "parseError": "Cannot parse into visual builder — fix JSON or stay in raw mode"
+  },
   "rolePermissions": {
     "title": "Permissions: {{ name }}",
     "systemReadonly": "System role permissions are read-only.",

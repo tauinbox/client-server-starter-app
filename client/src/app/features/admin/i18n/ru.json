@@ -41,6 +41,21 @@
     "descriptionMaxLength": "Описание должно быть не более 255 символов",
     "createButton": "Создать"
   },
+  "conditionBuilder": {
+    "modeVisual": "Визуальный",
+    "modeRaw": "JSON",
+    "addRule": "Добавить правило",
+    "addGroup": "Добавить группу",
+    "removeRule": "Удалить правило",
+    "removeGroup": "Удалить группу",
+    "fieldLabel": "Поле",
+    "operatorLabel": "Оператор",
+    "valueLabel": "Значение",
+    "emptyGroup": "Нет правил — нажмите +, чтобы добавить",
+    "preview": "Предпросмотр JSON",
+    "rawLabel": "Сырой JSON MongoQuery",
+    "parseError": "Невозможно разобрать в визуальный режим — исправьте JSON или останьтесь в режиме JSON"
+  },
   "rolePermissions": {
     "title": "Разрешения: {{ name }}",
     "systemReadonly": "Разрешения системной роли доступны только для чтения.",

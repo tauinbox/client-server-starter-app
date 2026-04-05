@@ -32,6 +32,7 @@ import type {
 } from '@app/shared/types/role.types';
 import type { RolePermissionItem } from '../../../services/role.service';
 import { RoleService } from '../../../services/role.service';
+import { ConditionBuilderComponent } from './condition-builder/condition-builder.component';
 
 export type RolePermissionsDialogData = {
   role: RoleResponse;
@@ -56,7 +57,8 @@ export type PermissionGroup = {
     MatChipsModule,
     MatTooltipModule,
     MatIconModule,
-    TranslocoDirective
+    TranslocoDirective,
+    ConditionBuilderComponent
   ],
   templateUrl: './role-permissions-dialog.component.html',
   styleUrl: './role-permissions-dialog.component.scss',
@@ -397,9 +399,7 @@ export class RolePermissionsDialogComponent implements OnInit {
     }
   }
 
-  applyCustom(permissionId: string, event: Event): void {
-    const text = (event.target as HTMLTextAreaElement).value;
-
+  onCustomChange(permissionId: string, text: string): void {
     if (!text.trim()) {
       this.#removeConditionKey(permissionId, 'custom');
       this.#clearJsonError(permissionId, 'custom');
@@ -416,7 +416,6 @@ export class RolePermissionsDialogComponent implements OnInit {
         'custom',
         this.#translocoService.translate('admin.rolePermissions.invalidJson')
       );
-      // Store the text even if invalid so the user can keep editing
       this.#patchCondition(permissionId, { custom: text });
     }
   }

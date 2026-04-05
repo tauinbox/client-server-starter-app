@@ -277,32 +277,16 @@
                       </mat-checkbox>
 
                       @if (hasCustom(permission.id)) {
-                        <mat-form-field
-                          appearance="outline"
-                          class="condition-input condition-input--tall"
-                        >
-                          <mat-label>{{
-                            t('admin.rolePermissions.customJsonLabel')
-                          }}</mat-label>
-                          <textarea
-                            matInput
-                            [value]="getCustomText(permission.id)"
-                            [readonly]="role.isSystem"
-                            (blur)="applyCustom(permission.id, $event)"
-                            rows="4"
-                            spellcheck="false"
-                            class="json-textarea"
-                          ></textarea>
-                          @if (getCustomError(permission.id)) {
-                            <mat-error>{{
-                              getCustomError(permission.id)
-                            }}</mat-error>
-                          } @else {
-                            <mat-hint>{{
-                              t('admin.rolePermissions.customJsonExample')
-                            }}</mat-hint>
-                          }
-                        </mat-form-field>
+                        <app-condition-builder
+                          [value]="getCustomText(permission.id)"
+                          [readonly]="role.isSystem || isReadonly()"
+                          (valueChange)="onCustomChange(permission.id, $event)"
+                        ></app-condition-builder>
+                        @if (getCustomError(permission.id)) {
+                          <mat-error class="custom-error">{{
+                            getCustomError(permission.id)
+                          }}</mat-error>
+                        }
                       }
                     </div>
                   </div>

@@ -284,3 +284,9 @@ mat-divider {
   font-size: func.rem(13);
   line-height: 1.4;
 }
+
+.custom-error {
+  display: block;
+  margin-top: vars.$spacing-xxs;
+  font-size: func.rem(12);
+}
