@@ -216,19 +216,14 @@ jobs:
           git commit -m "fix(docker): add edge channel patches for newly detected CVEs"
           git push --force origin "$BRANCH"
 
-          PR_BODY=$(cat <<EOF
-## Summary
-Scheduled rebuild detected new HIGH/CRITICAL CVEs in Alpine OS packages.
-Edge channel patches have been added and verified to resolve all findings.
-
-**Server patches:** ${SERVER_PKGS:-none}
-**Client patches:** ${CLIENT_PKGS:-none}
-
-## Test plan
-- [ ] Trivy scan passes on CI after merge
-- [ ] Next scheduled rebuild deploys cleanly
-EOF
-          )
+          PR_BODY="## Summary"$'\n'
+          PR_BODY+="Scheduled rebuild detected new HIGH/CRITICAL CVEs in Alpine OS packages."$'\n'
+          PR_BODY+="Edge channel patches have been added and verified to resolve all findings."$'\n\n'
+          PR_BODY+="**Server patches:** ${SERVER_PKGS:-none}"$'\n'
+          PR_BODY+="**Client patches:** ${CLIENT_PKGS:-none}"$'\n\n'
+          PR_BODY+="## Test plan"$'\n'
+          PR_BODY+="- [ ] Trivy scan passes on CI after merge"$'\n'
+          PR_BODY+="- [ ] Next scheduled rebuild deploys cleanly"
 
           EXISTING=$(gh pr list --head "$BRANCH" --json number -q '.[0].number' 2>/dev/null || true)
           if [[ -n "$EXISTING" ]]; then
