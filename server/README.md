@@ -99,8 +99,8 @@ Copy `.env.example` to `.env` and configure:
 ```
 src/
 ├── common/
-│   ├── dtos/               # PaginationQueryDto, PaginatedResponseDto<T> (barrel export)
-│   ├── utils/              # Shared utilities (escapeLikePattern, hashToken, withTransaction, extractAuditContext)
+│   ├── dtos/               # PaginationQueryDto, PaginatedResponseDto<T>, CursorPaginationQueryDto, CursorPaginatedResponseDto<T>
+│   ├── utils/              # Shared utilities (escapeLikePattern, hashToken, withTransaction, extractAuditContext, cursor encode/decode, applyKeysetPagination)
 │   └── upload/             # createDiskStorageOptions() — reusable multer disk storage factory (destination, allowedExtensions, maxFileSizeBytes)
 └── modules/
 ├── core/                   # Dynamic root module
@@ -302,6 +302,8 @@ Base URL: `/api/v1`
 | POST | `/` | `users:create` | Create user |
 | GET | `/` | `users:search` | List all users (paginated; `includeDeleted=true` to include soft-deleted) |
 | GET | `/search` | `users:search` | Search users (paginated + filters: email, firstName, lastName, isActive; `includeDeleted=true`) |
+| GET | `/cursor` | `users:search` | List users with cursor-based (keyset) pagination |
+| GET | `/search/cursor` | `users:search` | Search users with cursor-based pagination + filters |
 | GET | `/:id` | `users:read` | Get user by ID |
 | PATCH | `/:id` | `users:update` | Update user |
 | DELETE | `/:id` | `users:delete` | Soft-delete user (sets `deleted_at`, revokes all active sessions) |
@@ -313,7 +315,7 @@ Base URL: `/api/v1`
 - `sortBy` (default createdAt)
 - `sortOrder` (default desc for list, asc for search)
 
-**Response format for paginated endpoints:**
+**Response format for offset-paginated endpoints:**
 ```json
 {
   "data": [UserResponseDto, ...],
@@ -322,6 +324,24 @@ Base URL: `/api/v1`
     "limit": 10,
     "total": 70,
     "totalPages": 7
+  }
+}
+```
+
+**Cursor-based pagination query params** (`/cursor`, `/search/cursor`):
+- `cursor` (opaque token from previous response; omit for first page)
+- `limit` (default 20, max 100)
+- `sortBy` (default createdAt)
+- `sortOrder` (default desc)
+
+**Response format for cursor-paginated endpoints:**
+```json
+{
+  "data": [UserResponseDto, ...],
+  "meta": {
+    "nextCursor": "eyJzb3J0VmFsdW...",
+    "hasMore": true,
+    "limit": 20
   }
 }
 ```
@@ -352,7 +372,7 @@ npm run test:e2e
 
 Server imports common types and constants from the root `shared/` directory via `@app/shared/*` path alias (maps to `../shared/src/*` in `tsconfig.json`). This includes:
 
-- **Types**: `UserResponse`, `OAuthAccountResponse`, `TokensResponse`, `AuthResponse`, `PaginationMeta`, `PaginatedResponse<T>`, `SortOrder`; `RoleResponse`, `PermissionResponse`, `RolePermissionResponse`, `RoleWithPermissionsResponse`, `PermissionCondition`, `ResolvedPermission`, `UserPermissionsResponse`; `ResourceResponse`, `ActionResponse`, `RbacMetadataResponse`
+- **Types**: `UserResponse`, `OAuthAccountResponse`, `TokensResponse`, `AuthResponse`, `PaginationMeta`, `PaginatedResponse<T>`, `CursorPaginationMeta`, `CursorPaginatedResponse<T>`, `SortOrder`; `RoleResponse`, `PermissionResponse`, `RolePermissionResponse`, `RoleWithPermissionsResponse`, `PermissionCondition`, `ResolvedPermission`, `UserPermissionsResponse`; `ResourceResponse`, `ActionResponse`, `RbacMetadataResponse`
 - **Constants**: `PASSWORD_REGEX`, `PASSWORD_ERROR`, `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, `MAX_CONCURRENT_SESSIONS`, pagination defaults, user sort columns; `SYSTEM_ROLES`, `SystemRole` (note: `PERMISSIONS` + `Permission` removed — typed `[Actions, Subjects]` tuples used instead)
 
 NestJS build compiles shared files into `dist/shared/` alongside `dist/server/`. Migration and seed scripts use paths like `dist/server/src/...` to reflect the nested output structure.
