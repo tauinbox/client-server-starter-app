@@ -7,7 +7,8 @@ export {
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
   DEFAULT_SORT_ORDER,
-  DEFAULT_SORT_BY
+  DEFAULT_SORT_BY,
+  DEFAULT_CURSOR_PAGE_SIZE
 } from './pagination.constants';
 
 export {

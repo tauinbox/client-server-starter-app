@@ -11,6 +11,7 @@ import { UserDeletedEvent } from '../events/user-deleted.event';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { SearchUsersQueryDto } from '../dtos/search-users-query.dto';
+import { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto';
 import { UserPasswordChangedByAdminEvent } from '../events/user-password-changed-by-admin.event';
 import type { AppAbility } from '../../auth/casl/app-ability';
 
@@ -39,6 +40,7 @@ describe('UsersController', () => {
   let usersServiceMock: {
     create: jest.Mock;
     findPaginated: jest.Mock;
+    findCursorPaginated: jest.Mock;
     findOne: jest.Mock;
     update: jest.Mock;
     remove: jest.Mock;
@@ -51,6 +53,7 @@ describe('UsersController', () => {
     usersServiceMock = {
       create: jest.fn(),
       findPaginated: jest.fn(),
+      findCursorPaginated: jest.fn(),
       findOne: jest.fn(),
       update: jest.fn(),
       remove: jest.fn(),
@@ -167,6 +170,43 @@ describe('UsersController', () => {
 
       expect(usersServiceMock.findPaginated).toHaveBeenCalledWith(query);
       expect(result).toBe(paginatedResult);
+    });
+  });
+
+  // ── findAllCursor ──────────────────────────���──────────────────────
+
+  describe('findAllCursor', () => {
+    it('should call usersService.findCursorPaginated with the query', () => {
+      const query = new SearchUsersCursorQueryDto();
+      const cursorResult = {
+        data: [],
+        meta: { nextCursor: null, hasMore: false, limit: 20 }
+      };
+      usersServiceMock.findCursorPaginated.mockReturnValue(cursorResult);
+
+      const result = controller.findAllCursor(query);
+
+      expect(usersServiceMock.findCursorPaginated).toHaveBeenCalledWith(query);
+      expect(result).toBe(cursorResult);
+    });
+  });
+
+  // ── searchUsersCursor ────────────────────────────────────────────
+
+  describe('searchUsersCursor', () => {
+    it('should call usersService.findCursorPaginated with the query', () => {
+      const query = new SearchUsersCursorQueryDto();
+      query.email = 'partial@example.com';
+      const cursorResult = {
+        data: [{ id: 'u1' }],
+        meta: { nextCursor: 'abc', hasMore: true, limit: 20 }
+      };
+      usersServiceMock.findCursorPaginated.mockReturnValue(cursorResult);
+
+      const result = controller.searchUsersCursor(query);
+
+      expect(usersServiceMock.findCursorPaginated).toHaveBeenCalledWith(query);
+      expect(result).toBe(cursorResult);
     });
   });
 

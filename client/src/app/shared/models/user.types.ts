@@ -4,6 +4,8 @@ import type { UserSortColumn } from '@app/shared/constants';
 export type {
   PaginationMeta,
   PaginatedResponse,
+  CursorPaginationMeta,
+  CursorPaginatedResponse,
   SortOrder
 } from '@app/shared/types';
 export type { UserSortColumn } from '@app/shared/constants';
@@ -31,6 +33,13 @@ export type UpdateUser = Pick<
 
 export type UserListParams = {
   page: number;
+  limit: number;
+  sortBy: UserSortColumn;
+  sortOrder: SortOrder;
+};
+
+export type UserCursorListParams = {
+  cursor?: string;
   limit: number;
   sortBy: UserSortColumn;
   sortOrder: SortOrder;

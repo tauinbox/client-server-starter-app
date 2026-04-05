@@ -17,6 +17,7 @@ import { UsersService } from '../services/users.service';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { SearchUsersQueryDto } from '../dtos/search-users-query.dto';
+import { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -119,6 +120,36 @@ export class UsersController {
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   searchUsers(@Query() query: SearchUsersQueryDto) {
     return this.usersService.findPaginated(query);
+  }
+
+  @Get('cursor')
+  @Authorize(['search', 'User'])
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get cursor-paginated list of users (admin only)'
+  })
+  @ApiOkResponse({
+    description: 'Cursor-paginated list of users'
+  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
+  findAllCursor(@Query() query: SearchUsersCursorQueryDto) {
+    return this.usersService.findCursorPaginated(query);
+  }
+
+  @Get('search/cursor')
+  @Authorize(['search', 'User'])
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Search users with cursor pagination (admin only)'
+  })
+  @ApiOkResponse({
+    description: 'Cursor-paginated list of filtered users'
+  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
+  searchUsersCursor(@Query() query: SearchUsersCursorQueryDto) {
+    return this.usersService.findCursorPaginated(query);
   }
 
   @Get(':id')

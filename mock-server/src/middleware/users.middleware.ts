@@ -17,11 +17,13 @@ import {
 import {
   DEFAULT_PAGE,
   DEFAULT_PAGE_SIZE,
+  DEFAULT_CURSOR_PAGE_SIZE,
   DEFAULT_SORT_BY,
   DEFAULT_SORT_ORDER,
   MAX_PAGE_SIZE
 } from '@app/shared/constants/pagination.constants';
 import type { SortOrder } from '@app/shared/types/pagination.types';
+import { decodeCursor, encodeCursor } from '../utils/cursor';
 import {
   findUserByEmail,
   findUserById,
@@ -103,6 +105,108 @@ function paginateAndSort<T extends Record<string, unknown>>(
   const data = sorted.slice(start, start + limit);
 
   return { data, meta: { page, limit, total, totalPages } };
+}
+
+interface CursorPaginationParams {
+  cursor?: string;
+  limit: number;
+  sortBy: UserSortColumn;
+  sortOrder: SortOrder;
+}
+
+function parseCursorPaginationParams(
+  query: Record<string, unknown>
+): CursorPaginationParams {
+  const cursor = query['cursor'] ? String(query['cursor']) : undefined;
+
+  let limit = Number(query['limit']) || DEFAULT_CURSOR_PAGE_SIZE;
+  if (limit < 1) limit = 1;
+  if (limit > MAX_PAGE_SIZE) limit = MAX_PAGE_SIZE;
+
+  const sortByRaw = String(query['sortBy'] || DEFAULT_SORT_BY);
+  const sortBy = (ALLOWED_USER_SORT_COLUMNS as readonly string[]).includes(
+    sortByRaw
+  )
+    ? (sortByRaw as UserSortColumn)
+    : (DEFAULT_SORT_BY as UserSortColumn);
+
+  const sortOrderRaw = String(
+    query['sortOrder'] || DEFAULT_SORT_ORDER
+  ).toLowerCase();
+  const sortOrder: SortOrder = sortOrderRaw === 'asc' ? 'asc' : 'desc';
+
+  return { cursor, limit, sortBy, sortOrder };
+}
+
+function cursorPaginateAndSort<T extends Record<string, unknown>>(
+  items: T[],
+  params: CursorPaginationParams
+): {
+  data: T[];
+  meta: { nextCursor: string | null; hasMore: boolean; limit: number };
+} {
+  const { cursor, limit, sortBy, sortOrder } = params;
+
+  const sorted = [...items].sort((a, b) => {
+    const aVal: unknown = a[sortBy];
+    const bVal: unknown = b[sortBy];
+
+    if (aVal == null && bVal == null) return 0;
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
+
+    const cmp = compareValues(aVal, bVal);
+    const result = sortOrder === 'asc' ? cmp : -cmp;
+    if (result !== 0) return result;
+
+    const aId = String(a['id'] ?? '');
+    const bId = String(b['id'] ?? '');
+    const idCmp = aId.localeCompare(bId);
+    return sortOrder === 'asc' ? idCmp : -idCmp;
+  });
+
+  let startIndex = 0;
+
+  if (cursor) {
+    const decoded = decodeCursor(cursor);
+    if (decoded) {
+      const cursorSortValue = decoded.sortValue;
+      const cursorId = decoded.id;
+
+      startIndex = sorted.findIndex((item) => {
+        const itemSortVal = item[sortBy];
+        const itemId = String(item['id'] ?? '');
+
+        if (sortOrder === 'desc') {
+          const cmp = compareValues(itemSortVal, cursorSortValue);
+          if (cmp < 0) return true;
+          if (cmp === 0 && itemId.localeCompare(cursorId) < 0) return true;
+          return false;
+        } else {
+          const cmp = compareValues(itemSortVal, cursorSortValue);
+          if (cmp > 0) return true;
+          if (cmp === 0 && itemId.localeCompare(cursorId) > 0) return true;
+          return false;
+        }
+      });
+      if (startIndex === -1) startIndex = sorted.length;
+    }
+  }
+
+  const slice = sorted.slice(startIndex, startIndex + limit + 1);
+  const hasMore = slice.length > limit;
+  const data = hasMore ? slice.slice(0, limit) : slice;
+
+  const lastItem = data[data.length - 1];
+  const nextCursor =
+    hasMore && lastItem
+      ? encodeCursor({
+          sortValue: (lastItem[sortBy] as string | number | boolean) ?? null,
+          id: String(lastItem['id'] ?? '')
+        })
+      : null;
+
+  return { data, meta: { nextCursor, hasMore, limit } };
 }
 
 const router = Router();
@@ -227,6 +331,56 @@ router.get('/search', adminGuard, (req, res) => {
   const userResponses = users.map(toAdminUserResponse);
   const params = parsePaginationParams(req.query as Record<string, unknown>);
   const result = paginateAndSort(userResponses, params);
+  res.json(result);
+});
+
+// GET /api/v1/users/cursor
+router.get('/cursor', adminGuard, (req, res) => {
+  const includeDeleted = String(req.query['includeDeleted']) === 'true';
+  let allUsers = Array.from(getState().users.values());
+  if (!includeDeleted) {
+    allUsers = allUsers.filter((u) => !u.deletedAt);
+  }
+  const users = allUsers.map(toAdminUserResponse);
+  const params = parseCursorPaginationParams(
+    req.query as Record<string, unknown>
+  );
+  const result = cursorPaginateAndSort(users, params);
+  res.json(result);
+});
+
+// GET /api/v1/users/search/cursor
+router.get('/search/cursor', adminGuard, (req, res) => {
+  const { email, firstName, lastName, isActive } = req.query;
+  const includeDeleted = String(req.query['includeDeleted']) === 'true';
+  let users = Array.from(getState().users.values());
+
+  if (!includeDeleted) {
+    users = users.filter((u) => !u.deletedAt);
+  }
+
+  if (email) {
+    const emailStr = String(email).toLowerCase();
+    users = users.filter((u) => u.email.toLowerCase().includes(emailStr));
+  }
+  if (firstName) {
+    const fnStr = String(firstName).toLowerCase();
+    users = users.filter((u) => u.firstName.toLowerCase().includes(fnStr));
+  }
+  if (lastName) {
+    const lnStr = String(lastName).toLowerCase();
+    users = users.filter((u) => u.lastName.toLowerCase().includes(lnStr));
+  }
+  if (isActive !== undefined) {
+    const activeBool = String(isActive) === 'true';
+    users = users.filter((u) => u.isActive === activeBool);
+  }
+
+  const userResponses = users.map(toAdminUserResponse);
+  const params = parseCursorPaginationParams(
+    req.query as Record<string, unknown>
+  );
+  const result = cursorPaginateAndSort(userResponses, params);
   res.json(result);
 });
 

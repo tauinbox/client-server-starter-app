@@ -1,0 +1,48 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsIn, IsOptional } from 'class-validator';
+import { ALLOWED_USER_SORT_COLUMNS } from '@app/shared/constants/user.constants';
+import { CursorPaginationQueryDto } from '../../../common/dtos';
+
+export class SearchUsersCursorQueryDto extends CursorPaginationQueryDto {
+  @ApiPropertyOptional({
+    default: 'createdAt',
+    enum: ALLOWED_USER_SORT_COLUMNS
+  })
+  @IsOptional()
+  @IsIn(ALLOWED_USER_SORT_COLUMNS)
+  override sortBy: string = 'createdAt';
+
+  @ApiPropertyOptional({ description: 'Filter by email (partial match)' })
+  @IsOptional()
+  email?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by first name (partial match)' })
+  @IsOptional()
+  firstName?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by last name (partial match)' })
+  @IsOptional()
+  lastName?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by active status' })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return undefined;
+  })
+  isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Include soft-deleted users (admin only)'
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return undefined;
+  })
+  includeDeleted?: boolean;
+}

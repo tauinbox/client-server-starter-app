@@ -28,6 +28,7 @@ describe('UsersService', () => {
     withDeleted: jest.Mock;
     andWhere: jest.Mock;
     orderBy: jest.Mock;
+    addOrderBy: jest.Mock;
     skip: jest.Mock;
     take: jest.Mock;
     getMany: jest.Mock;
@@ -52,6 +53,7 @@ describe('UsersService', () => {
       withDeleted: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
       skip: jest.fn().mockReturnThis(),
       take: jest.fn().mockReturnThis(),
       getMany: jest.fn().mockResolvedValue([]),
@@ -322,6 +324,81 @@ describe('UsersService', () => {
       });
 
       expect(mockQueryBuilder.withDeleted).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findCursorPaginated', () => {
+    it('should return cursor-paginated results with default params', async () => {
+      mockQueryBuilder.getMany.mockResolvedValue([mockUser]);
+
+      const result = await service.findCursorPaginated({
+        limit: 20,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      });
+
+      expect(mockRepository.createQueryBuilder).toHaveBeenCalledWith('user');
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+        'user.createdAt',
+        'DESC'
+      );
+      expect(mockQueryBuilder.addOrderBy).toHaveBeenCalledWith(
+        'user.id',
+        'DESC'
+      );
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(21);
+      expect(result.data).toEqual([mockUser]);
+      expect(result.meta.hasMore).toBe(false);
+      expect(result.meta.nextCursor).toBeNull();
+      expect(result.meta.limit).toBe(20);
+    });
+
+    it('should return nextCursor when there are more results', async () => {
+      const users = Array.from({ length: 3 }, (_, i) => ({
+        ...mockUser,
+        id: `user-${i}`,
+        createdAt: new Date(`2025-01-0${i + 1}`)
+      }));
+      mockQueryBuilder.getMany.mockResolvedValue(users);
+
+      const result = await service.findCursorPaginated({
+        limit: 2,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      });
+
+      expect(result.data).toHaveLength(2);
+      expect(result.meta.hasMore).toBe(true);
+      expect(result.meta.nextCursor).not.toBeNull();
+    });
+
+    it('should apply filters', async () => {
+      mockQueryBuilder.getMany.mockResolvedValue([]);
+
+      await service.findCursorPaginated({
+        limit: 20,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        email: 'test'
+      });
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'user.email ILIKE :email',
+        { email: '%test%' }
+      );
+    });
+
+    it('should call withDeleted when includeDeleted is true', async () => {
+      mockQueryBuilder.getMany.mockResolvedValue([]);
+
+      await service.findCursorPaginated({
+        limit: 20,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        includeDeleted: true
+      });
+
+      expect(mockQueryBuilder.withDeleted).toHaveBeenCalled();
     });
   });
 

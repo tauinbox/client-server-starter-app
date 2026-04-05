@@ -5,7 +5,10 @@ export type {
   UpdateUser,
   PaginationMeta,
   PaginatedResponse,
+  CursorPaginationMeta,
+  CursorPaginatedResponse,
   SortOrder,
   UserSortColumn,
-  UserListParams
+  UserListParams,
+  UserCursorListParams
 } from '@shared/models/user.types';
