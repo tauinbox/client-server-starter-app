@@ -136,7 +136,6 @@ jobs:
           # Node npm CVEs (type=node-pkg) are skipped — those require dependency updates.
           if [[ "${{ steps.scan-server.outcome }}" == "failure" ]]; then
             SERVER_PKGS=$(trivy image \
-              --skip-db-update \
               --format json \
               --severity HIGH,CRITICAL \
               --quiet \
@@ -153,7 +152,6 @@ jobs:
 
           if [[ "${{ steps.scan-client.outcome }}" == "failure" ]]; then
             CLIENT_PKGS=$(trivy image \
-              --skip-db-update \
               --format json \
               --severity HIGH,CRITICAL \
               --quiet \
@@ -191,14 +189,14 @@ jobs:
           VERIFY_OK=true
           if [[ -n "$SERVER_PKGS" ]]; then
             echo "Re-scanning server image..."
-            if ! trivy image --skip-db-update --severity HIGH,CRITICAL --exit-code 1 --quiet "$IMAGE_SERVER"; then
+            if ! trivy image --severity HIGH,CRITICAL --exit-code 1 --quiet "$IMAGE_SERVER"; then
               echo "Server image still has HIGH/CRITICAL CVEs after patching"
               VERIFY_OK=false
             fi
           fi
           if [[ -n "$CLIENT_PKGS" ]]; then
             echo "Re-scanning client image..."
-            if ! trivy image --skip-db-update --severity HIGH,CRITICAL --exit-code 1 --quiet "$IMAGE_CLIENT"; then
+            if ! trivy image --severity HIGH,CRITICAL --exit-code 1 --quiet "$IMAGE_CLIENT"; then
               echo "Client image still has HIGH/CRITICAL CVEs after patching"
               VERIFY_OK=false
             fi
@@ -218,16 +216,19 @@ jobs:
           git commit -m "fix(docker): add edge channel patches for newly detected CVEs"
           git push --force origin "$BRANCH"
 
-          PR_BODY="## Summary
-          Scheduled rebuild detected new HIGH/CRITICAL CVEs in Alpine OS packages.
-          Edge channel patches have been added and verified to resolve all findings.
+          PR_BODY=$(cat <<EOF
+## Summary
+Scheduled rebuild detected new HIGH/CRITICAL CVEs in Alpine OS packages.
+Edge channel patches have been added and verified to resolve all findings.
 
-          **Server patches:** ${SERVER_PKGS:-none}
-          **Client patches:** ${CLIENT_PKGS:-none}
+**Server patches:** ${SERVER_PKGS:-none}
+**Client patches:** ${CLIENT_PKGS:-none}
 
-          ## Test plan
-          - [ ] Trivy scan passes on CI after merge
-          - [ ] Next scheduled rebuild deploys cleanly"
+## Test plan
+- [ ] Trivy scan passes on CI after merge
+- [ ] Next scheduled rebuild deploys cleanly
+EOF
+          )
 
           EXISTING=$(gh pr list --head "$BRANCH" --json number -q '.[0].number' 2>/dev/null || true)
           if [[ -n "$EXISTING" ]]; then
