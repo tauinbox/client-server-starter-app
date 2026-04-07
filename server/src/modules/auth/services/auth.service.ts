@@ -1,5 +1,4 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -8,16 +7,12 @@ import { UsersService } from '../../users/services/users.service';
 import { RegisterDto } from '../dtos/register.dto';
 import { User } from '../../users/entities/user.entity';
 import { RefreshToken } from '../entities/refresh-token.entity';
-import { OAuthAccount } from '../entities/oauth-account.entity';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
-import { CustomJwtPayload } from '../types/jwt-payload';
 import { LocalAuthRequest } from '../types/auth.request';
-import { TokensResponseDto } from '../dtos/auth-response.dto';
 import { RefreshTokenService } from './refresh-token.service';
-import { OAuthAccountService } from './oauth-account.service';
 import { PermissionService } from './permission.service';
 import { RoleService } from './role.service';
-import { OAuthUserProfile } from '../types/oauth-profile';
+import { TokenGeneratorService } from './token-generator.service';
 import { MailService } from '../../mail/mail.service';
 import { AuditService, AuditContext } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -42,12 +37,11 @@ export class AuthService {
   constructor(
     private dataSource: DataSource,
     private usersService: UsersService,
-    private jwtService: JwtService,
     private configService: ConfigService,
     private refreshTokenService: RefreshTokenService,
-    private oauthAccountService: OAuthAccountService,
     private permissionService: PermissionService,
     private roleService: RoleService,
+    private tokenGenerator: TokenGeneratorService,
     private mailService: MailService,
     private auditService: AuditService,
     private metricsService: MetricsService
@@ -167,7 +161,11 @@ export class AuthService {
 
   async login(user: LocalAuthRequest['user']) {
     const roles = await this.permissionService.getRoleNamesForUser(user.id);
-    const tokens = this.generateTokens(user.id, user.email, roles);
+    const tokens = this.tokenGenerator.generateTokens(
+      user.id,
+      user.email,
+      roles
+    );
 
     const expiresIn = parseInt(
       this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION'),
@@ -187,184 +185,6 @@ export class AuthService {
       tokens,
       user: { ...user, roles }
     };
-  }
-
-  async loginWithOAuth(profile: OAuthUserProfile) {
-    // 1. Check if OAuth account already linked
-    const existingOAuth =
-      await this.oauthAccountService.findByProviderAndProviderId(
-        profile.provider,
-        profile.providerId
-      );
-
-    let user: User;
-
-    if (existingOAuth) {
-      // Returning OAuth user
-      user = await this.usersService.findOne(existingOAuth.userId);
-      if (!user.isActive) {
-        throw new HttpException(
-          {
-            message: 'User account is deactivated',
-            errorKey: ErrorKeys.AUTH.USER_DEACTIVATED
-          },
-          HttpStatus.UNAUTHORIZED
-        );
-      }
-      // Auto-verify email for OAuth users
-      if (!user.isEmailVerified) {
-        await this.usersService.markEmailVerified(user.id);
-        user.isEmailVerified = true;
-      }
-    } else {
-      // 2. Check if user exists by email
-      const existingUser = await this.usersService.findByEmail(profile.email);
-
-      if (existingUser) {
-        // Link OAuth to existing user
-        if (!existingUser.isActive) {
-          throw new HttpException(
-            {
-              message: 'User account is deactivated',
-              errorKey: ErrorKeys.AUTH.USER_DEACTIVATED
-            },
-            HttpStatus.UNAUTHORIZED
-          );
-        }
-        user = existingUser;
-        // Auto-verify email for OAuth users
-        if (!user.isEmailVerified) {
-          await this.usersService.markEmailVerified(user.id);
-          user.isEmailVerified = true;
-        }
-        await this.safeCreateOAuthAccount(
-          user.id,
-          profile.provider,
-          profile.providerId
-        );
-      } else {
-        // 3. Create new user + OAuth account atomically (isEmailVerified: true).
-        // Without a transaction, a failure after user creation would leave an
-        // orphaned user with no OAuth account — they would be unable to log in.
-        user = await withTransaction(this.dataSource, async (manager) => {
-          const newUser = await manager.save(User, {
-            email: profile.email,
-            firstName: profile.firstName,
-            lastName: profile.lastName,
-            password: null,
-            isEmailVerified: true
-          });
-          await manager.save(OAuthAccount, {
-            userId: newUser.id,
-            provider: profile.provider,
-            providerId: profile.providerId
-          });
-
-          // Assign default 'user' role
-          const userRole = await this.roleService.findRoleByName(
-            SYSTEM_ROLES.USER
-          );
-          await manager
-            .createQueryBuilder()
-            .relation(User, 'roles')
-            .of(newUser.id)
-            .add(userRole.id);
-
-          return newUser;
-        });
-      }
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...userWithoutPassword } = user;
-
-    const roles = await this.permissionService.getRoleNamesForUser(user.id);
-    const tokens = this.generateTokens(user.id, user.email, roles);
-
-    const expiresIn = parseInt(
-      this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION'),
-      10
-    );
-    await this.refreshTokenService.createRefreshToken(
-      user.id,
-      tokens.refresh_token,
-      expiresIn
-    );
-    await this.refreshTokenService.pruneOldestTokens(
-      user.id,
-      MAX_CONCURRENT_SESSIONS
-    );
-
-    return {
-      tokens,
-      user: { ...userWithoutPassword, roles }
-    };
-  }
-
-  private async safeCreateOAuthAccount(
-    userId: string,
-    provider: string,
-    providerId: string
-  ): Promise<void> {
-    try {
-      await this.oauthAccountService.createOAuthAccount(
-        userId,
-        provider,
-        providerId
-      );
-    } catch (error: unknown) {
-      // PostgreSQL unique_violation error code
-      const PG_UNIQUE_VIOLATION = '23505';
-      const dbError = error as { code?: string };
-      if (dbError.code === PG_UNIQUE_VIOLATION) {
-        const existing =
-          await this.oauthAccountService.findByProviderAndProviderId(
-            provider,
-            providerId
-          );
-        if (existing && existing.userId !== userId) {
-          throw new HttpException(
-            {
-              message: 'This OAuth account is already linked to another user',
-              errorKey: ErrorKeys.AUTH.OAUTH_ALREADY_LINKED
-            },
-            HttpStatus.CONFLICT
-          );
-        }
-        // Already linked to this user — safe to ignore
-        return;
-      }
-      throw error;
-    }
-  }
-
-  async linkOAuthToUser(
-    userId: string,
-    provider: string,
-    providerId: string,
-    auditContext?: AuditContext
-  ): Promise<void> {
-    const user = await this.usersService.findOne(userId);
-    if (!user || !user.isActive) {
-      throw new HttpException(
-        {
-          message: 'User account not found or deactivated',
-          errorKey: ErrorKeys.AUTH.USER_NOT_FOUND_OR_DEACTIVATED
-        },
-        HttpStatus.UNAUTHORIZED
-      );
-    }
-    await this.safeCreateOAuthAccount(userId, provider, providerId);
-
-    await this.auditService.log({
-      action: AuditAction.OAUTH_LINK,
-      actorId: userId,
-      actorEmail: user.email,
-      targetId: userId,
-      targetType: 'User',
-      details: { provider },
-      context: auditContext
-    });
   }
 
   async register(
@@ -679,7 +499,11 @@ export class AuthService {
     }
 
     const roles = await this.permissionService.getRoleNamesForUser(user.id);
-    const tokens = this.generateTokens(user.id, user.email, roles);
+    const tokens = this.tokenGenerator.generateTokens(
+      user.id,
+      user.email,
+      roles
+    );
 
     const expiresIn = parseInt(
       this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION'),
@@ -724,35 +548,5 @@ export class AuthService {
         .getRepository(User)
         .update(userId, { tokenRevokedAt: new Date() })
     ]);
-  }
-
-  private generateTokens(
-    userId: string,
-    email: string,
-    roles: string[]
-  ): TokensResponseDto {
-    const jwtPayload: CustomJwtPayload = {
-      sub: userId,
-      email,
-      roles
-    };
-
-    const accessTokenExpiration = parseInt(
-      this.configService.getOrThrow<string>('JWT_EXPIRATION'),
-      10
-    );
-
-    return {
-      access_token: this.jwtService.sign(jwtPayload, {
-        expiresIn: accessTokenExpiration
-      }),
-      refresh_token: this.generateRefreshToken(),
-      expires_in: accessTokenExpiration
-    };
-  }
-
-  private generateRefreshToken(): string {
-    // Generate a random string to use as a refresh token
-    return crypto.randomBytes(40).toString('hex');
   }
 }

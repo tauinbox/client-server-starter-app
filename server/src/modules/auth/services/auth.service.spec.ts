@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { DataSource } from 'typeorm';
@@ -7,14 +6,13 @@ import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { UsersService } from '../../users/services/users.service';
 import { RefreshTokenService } from './refresh-token.service';
-import { OAuthAccountService } from './oauth-account.service';
 import { PermissionService } from './permission.service';
 import { RoleService } from './role.service';
+import { TokenGeneratorService } from './token-generator.service';
+import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
 import { MailService } from '../../mail/mail.service';
 import { AuditService } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
-import { OAuthUserProfile } from '../types/oauth-profile';
-import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -52,8 +50,8 @@ describe('AuthService', () => {
     clearPasswordResetToken: jest.Mock;
     update: jest.Mock;
   };
-  let mockJwtService: {
-    sign: jest.Mock;
+  let mockTokenGenerator: {
+    generateTokens: jest.Mock;
   };
   let mockConfigService: {
     get: jest.Mock;
@@ -65,10 +63,6 @@ describe('AuthService', () => {
     deleteByUserId: jest.Mock;
     revokeToken: jest.Mock;
     pruneOldestTokens: jest.Mock;
-  };
-  let mockOAuthAccountService: {
-    findByProviderAndProviderId: jest.Mock;
-    createOAuthAccount: jest.Mock;
   };
   let mockMailService: {
     sendEmailVerification: jest.Mock;
@@ -175,8 +169,12 @@ describe('AuthService', () => {
       update: jest.fn().mockResolvedValue(mockUser)
     };
 
-    mockJwtService = {
-      sign: jest.fn().mockReturnValue('mock-access-token')
+    mockTokenGenerator = {
+      generateTokens: jest.fn().mockReturnValue({
+        access_token: 'mock-access-token',
+        refresh_token: 'mock-refresh-token',
+        expires_in: 3600
+      })
     };
 
     mockConfigService = {
@@ -206,11 +204,6 @@ describe('AuthService', () => {
       deleteByUserId: jest.fn().mockResolvedValue(undefined),
       revokeToken: jest.fn().mockResolvedValue(undefined),
       pruneOldestTokens: jest.fn().mockResolvedValue(undefined)
-    };
-
-    mockOAuthAccountService = {
-      findByProviderAndProviderId: jest.fn(),
-      createOAuthAccount: jest.fn().mockResolvedValue(undefined)
     };
 
     mockMailService = {
@@ -243,12 +236,11 @@ describe('AuthService', () => {
         AuthService,
         { provide: DataSource, useValue: mockDataSource },
         { provide: UsersService, useValue: mockUsersService },
-        { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: RefreshTokenService, useValue: mockRefreshTokenService },
-        { provide: OAuthAccountService, useValue: mockOAuthAccountService },
         { provide: PermissionService, useValue: mockPermissionService },
         { provide: RoleService, useValue: mockRoleService },
+        { provide: TokenGeneratorService, useValue: mockTokenGenerator },
         { provide: MailService, useValue: mockMailService },
         { provide: AuditService, useValue: mockAuditService },
         { provide: MetricsService, useValue: mockMetricsService }
@@ -435,20 +427,17 @@ describe('AuthService', () => {
       });
 
       await expect(service.login(mockUserResponse)).rejects.toThrow(
-        'Configuration key "JWT_EXPIRATION" does not exist'
+        'Configuration key "JWT_REFRESH_EXPIRATION" does not exist'
       );
     });
 
-    it('should sign JWT with correct payload', async () => {
+    it('should generate tokens with correct payload', async () => {
       await service.login(mockUserResponse);
 
-      expect(mockJwtService.sign).toHaveBeenCalledWith(
-        {
-          sub: 'user-1',
-          email: 'test@example.com',
-          roles: ['user']
-        },
-        { expiresIn: 3600 }
+      expect(mockTokenGenerator.generateTokens).toHaveBeenCalledWith(
+        'user-1',
+        'test@example.com',
+        ['user']
       );
     });
   });
@@ -823,231 +812,6 @@ describe('AuthService', () => {
       const result = await service.refreshTokens('valid-refresh-token');
 
       expect(result.tokens.access_token).toBe('mock-access-token');
-    });
-  });
-
-  describe('loginWithOAuth', () => {
-    const oauthProfile: OAuthUserProfile = {
-      provider: 'google',
-      providerId: 'google-123',
-      email: 'oauth@example.com',
-      firstName: 'OAuth',
-      lastName: 'User'
-    };
-
-    const oauthUser = {
-      ...mockUser,
-      id: 'oauth-user-1',
-      email: 'oauth@example.com',
-      firstName: 'OAuth',
-      lastName: 'User',
-      password: null,
-      isEmailVerified: true
-    };
-
-    it('should login returning OAuth user', async () => {
-      const existingOAuth = {
-        id: '1',
-        provider: 'google',
-        providerId: 'google-123',
-        userId: 'oauth-user-1'
-      };
-      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
-        existingOAuth
-      );
-      mockUsersService.findOne.mockResolvedValue(oauthUser);
-
-      const result = await service.loginWithOAuth(oauthProfile);
-
-      expect(result.user.email).toBe('oauth@example.com');
-      expect(result.tokens).toBeDefined();
-      expect(mockRefreshTokenService.deleteByUserId).not.toHaveBeenCalled();
-      expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
-        'oauth-user-1',
-        MAX_CONCURRENT_SESSIONS
-      );
-    });
-
-    it('should auto-verify email for returning OAuth user', async () => {
-      const unverifiedOauthUser = {
-        ...oauthUser,
-        isEmailVerified: false
-      };
-      const existingOAuth = {
-        id: '1',
-        provider: 'google',
-        providerId: 'google-123',
-        userId: 'oauth-user-1'
-      };
-      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
-        existingOAuth
-      );
-      mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
-
-      await service.loginWithOAuth(oauthProfile);
-
-      expect(mockUsersService.markEmailVerified).toHaveBeenCalledWith(
-        'oauth-user-1'
-      );
-    });
-
-    it('should throw when returning OAuth user is deactivated', async () => {
-      const existingOAuth = {
-        id: '1',
-        provider: 'google',
-        providerId: 'google-123',
-        userId: 'oauth-user-1'
-      };
-      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
-        existingOAuth
-      );
-      mockUsersService.findOne.mockResolvedValue({
-        ...oauthUser,
-        isActive: false
-      });
-
-      await expect(service.loginWithOAuth(oauthProfile)).rejects.toThrow(
-        HttpException
-      );
-    });
-
-    it('should link OAuth to existing user found by email', async () => {
-      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
-        null
-      );
-      mockUsersService.findByEmail.mockResolvedValue({
-        ...mockUser,
-        email: 'oauth@example.com'
-      });
-
-      const result = await service.loginWithOAuth(oauthProfile);
-
-      expect(mockOAuthAccountService.createOAuthAccount).toHaveBeenCalledWith(
-        mockUser.id,
-        'google',
-        'google-123'
-      );
-      expect(result.user).toBeDefined();
-    });
-
-    it('should throw when existing user by email is deactivated', async () => {
-      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
-        null
-      );
-      mockUsersService.findByEmail.mockResolvedValue({
-        ...mockUser,
-        email: 'oauth@example.com',
-        isActive: false
-      });
-
-      await expect(service.loginWithOAuth(oauthProfile)).rejects.toThrow(
-        HttpException
-      );
-    });
-
-    it('should create new user and OAuth account atomically when no existing account found', async () => {
-      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
-        null
-      );
-      mockUsersService.findByEmail.mockResolvedValue(null);
-      // manager.save called twice: first for User, then for OAuthAccount
-      mockManager.save.mockResolvedValueOnce(oauthUser).mockResolvedValueOnce({
-        id: 'oauth-account-1',
-        userId: 'oauth-user-1',
-        provider: 'google',
-        providerId: 'google-123'
-      });
-
-      const result = await service.loginWithOAuth(oauthProfile);
-
-      expect(mockDataSource.transaction).toHaveBeenCalled();
-      // First save: User with OAuth profile data
-      expect(mockManager.save).toHaveBeenCalledWith(
-        expect.anything(), // User entity class
-        expect.objectContaining({
-          email: 'oauth@example.com',
-          firstName: 'OAuth',
-          lastName: 'User',
-          password: null,
-          isEmailVerified: true
-        })
-      );
-      // Second save: OAuthAccount linking user to provider
-      expect(mockManager.save).toHaveBeenCalledWith(
-        expect.anything(), // OAuthAccount entity class
-        expect.objectContaining({
-          userId: 'oauth-user-1',
-          provider: 'google',
-          providerId: 'google-123'
-        })
-      );
-      expect(result.user).toBeDefined();
-    });
-  });
-
-  describe('linkOAuthToUser', () => {
-    it('should link OAuth account to active user', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
-
-      await service.linkOAuthToUser('user-1', 'google', 'google-123');
-
-      expect(mockUsersService.findOne).toHaveBeenCalledWith('user-1');
-      expect(mockOAuthAccountService.createOAuthAccount).toHaveBeenCalledWith(
-        'user-1',
-        'google',
-        'google-123'
-      );
-    });
-
-    it('should throw when user is deactivated', async () => {
-      const inactiveUser = { ...mockUser, isActive: false };
-      mockUsersService.findOne.mockResolvedValue(inactiveUser);
-
-      await expect(
-        service.linkOAuthToUser('user-1', 'google', 'google-123')
-      ).rejects.toThrow(HttpException);
-    });
-
-    it('should throw HttpException when OAuth account linked to another user', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
-      mockOAuthAccountService.createOAuthAccount.mockRejectedValue({
-        code: '23505'
-      });
-      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
-        userId: 'other-user-id',
-        provider: 'google',
-        providerId: 'google-123'
-      });
-
-      await expect(
-        service.linkOAuthToUser('user-1', 'google', 'google-123')
-      ).rejects.toThrow(HttpException);
-    });
-
-    it('should silently succeed when OAuth account already linked to same user', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
-      mockOAuthAccountService.createOAuthAccount.mockRejectedValue({
-        code: '23505'
-      });
-      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
-        userId: 'user-1',
-        provider: 'google',
-        providerId: 'google-123'
-      });
-
-      await expect(
-        service.linkOAuthToUser('user-1', 'google', 'google-123')
-      ).resolves.toBeUndefined();
-    });
-
-    it('should rethrow non-unique-violation errors', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
-      const dbError = new Error('Connection lost');
-      mockOAuthAccountService.createOAuthAccount.mockRejectedValue(dbError);
-
-      await expect(
-        service.linkOAuthToUser('user-1', 'google', 'google-123')
-      ).rejects.toThrow('Connection lost');
     });
   });
 });

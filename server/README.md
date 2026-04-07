@@ -115,7 +115,7 @@ src/
 │   └── schedule/           # @nestjs/schedule for cron jobs
 ├── auth/
 │   ├── controllers/        # AuthController (includes GET /permissions), OAuthController, RbacController
-│   ├── services/           # AuthService, RefreshTokenService, OAuthAccountService, TokenCleanupService, ResourceService, ActionService, ResourceSyncService
+│   ├── services/           # AuthService, OAuthService, TokenGeneratorService, RefreshTokenService, OAuthAccountService, TokenCleanupService, ResourceService, ActionService, ResourceSyncService
 │   ├── strategies/         # LocalStrategy, JwtStrategy (extracts roles), GoogleStrategy, FacebookStrategy, VkStrategy
 │   ├── guards/             # LocalAuthGuard, JwtAuthGuard, Google/Facebook/VkOAuthGuard
 │   ├── entities/           # RefreshToken, OAuthAccount, Resource, Action
@@ -124,6 +124,8 @@ src/
 ├── audit/
 │   ├── audit.service.ts         # AuditService — records 20 security-sensitive actions to audit_logs table
 │   ├── audit-cleanup.service.ts # AuditCleanupService — nightly cron deletes entries older than AUDIT_LOG_RETENTION_DAYS days
+│   ├── decorators/              # @LogAudit({action,targetType,targetIdParam?,targetIdFromResponse?,details?}) declarative audit logging
+│   ├── interceptors/            # AuditLogInterceptor — global APP_INTERCEPTOR reads @LogAudit metadata and fires logFireAndForget after success
 │   └── entities/                # AuditLog entity (action, actorId, actorEmail, targetId, ip, requestId, createdAt)
 ├── mail/
 │   └── mail.service.ts     # Email sending (verification, password reset)

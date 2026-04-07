@@ -10,6 +10,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './controllers/auth.controller';
 import { OAuthController } from './controllers/oauth.controller';
 import { AuthService } from './services/auth.service';
+import { OAuthService } from './services/oauth.service';
+import { TokenGeneratorService } from './services/token-generator.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { OAuthAccount } from './entities/oauth-account.entity';
 import { Role } from './entities/role.entity';
@@ -93,6 +95,8 @@ function conditionalProvider(
   ],
   providers: [
     AuthService,
+    OAuthService,
+    TokenGeneratorService,
     LocalStrategy,
     JwtStrategy,
     RefreshTokenService,
@@ -104,6 +108,6 @@ function conditionalProvider(
     conditionalProvider('VK_CLIENT_ID', VkStrategy),
     UserDeletedListener
   ],
-  exports: [AuthService, CaslModule, RoleService]
+  exports: [AuthService, OAuthService, CaslModule, RoleService]
 })
 export class AuthModule {}

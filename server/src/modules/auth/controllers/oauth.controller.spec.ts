@@ -4,7 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Logger } from '@nestjs/common';
 import { Request as ExpressRequest, Response } from 'express';
 import { OAuthController } from './oauth.controller';
-import { AuthService } from '../services/auth.service';
+import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
 import { UsersService } from '../../users/services/users.service';
 import { AuditService } from '../../audit/audit.service';
@@ -53,7 +53,7 @@ describe('OAuthController', () => {
     sign: jest.Mock;
     verify: jest.Mock;
   };
-  let authServiceMock: {
+  let oauthServiceMock: {
     loginWithOAuth: jest.Mock;
     linkOAuthToUser: jest.Mock;
   };
@@ -74,7 +74,7 @@ describe('OAuthController', () => {
       verify: jest.fn().mockReturnValue({ sub: 'user-1' })
     };
 
-    authServiceMock = {
+    oauthServiceMock = {
       loginWithOAuth: jest.fn(),
       linkOAuthToUser: jest.fn().mockResolvedValue(undefined)
     };
@@ -92,7 +92,7 @@ describe('OAuthController', () => {
       controllers: [OAuthController],
       providers: [
         { provide: JwtService, useValue: jwtServiceMock },
-        { provide: AuthService, useValue: authServiceMock },
+        { provide: OAuthService, useValue: oauthServiceMock },
         { provide: OAuthAccountService, useValue: oauthAccountServiceMock },
         { provide: UsersService, useValue: usersServiceMock },
         {
@@ -254,7 +254,7 @@ describe('OAuthController', () => {
       };
       // The full auth response (with refresh_token) is passed into the JWT payload;
       // the controller's exchangeOAuthData strips refresh_token before returning to client
-      authServiceMock.loginWithOAuth.mockResolvedValue(mockAuthResponse);
+      oauthServiceMock.loginWithOAuth.mockResolvedValue(mockAuthResponse);
 
       const res = mockResponse();
       const profile: OAuthUserProfile = {
@@ -303,7 +303,7 @@ describe('OAuthController', () => {
     });
 
     it('should redirect to login with error on exception', async () => {
-      authServiceMock.loginWithOAuth.mockRejectedValue(new Error('DB error'));
+      oauthServiceMock.loginWithOAuth.mockRejectedValue(new Error('DB error'));
 
       const res = mockResponse();
       const profile: OAuthUserProfile = {
@@ -337,7 +337,7 @@ describe('OAuthController', () => {
       );
 
       expect(jwtServiceMock.verify).toHaveBeenCalledWith('valid-link-token');
-      expect(authServiceMock.linkOAuthToUser).toHaveBeenCalledWith(
+      expect(oauthServiceMock.linkOAuthToUser).toHaveBeenCalledWith(
         'user-1',
         OAuthProvider.GOOGLE,
         '456',
@@ -385,7 +385,7 @@ describe('OAuthController', () => {
         },
         user: { id: '1', email: 'test@example.com' }
       };
-      authServiceMock.loginWithOAuth.mockResolvedValue(mockAuthResponse);
+      oauthServiceMock.loginWithOAuth.mockResolvedValue(mockAuthResponse);
 
       const res = mockResponse();
       const profile: OAuthUserProfile = {
@@ -398,8 +398,8 @@ describe('OAuthController', () => {
 
       await controller.googleCallback(mockExpressRequest(profile), res);
 
-      expect(authServiceMock.loginWithOAuth).toHaveBeenCalledWith(profile);
-      expect(authServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
+      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(profile);
+      expect(oauthServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
     });
   });
 
@@ -476,7 +476,7 @@ describe('OAuthController', () => {
         },
         user: { id: '1', email: 'test@example.com' }
       };
-      authServiceMock.loginWithOAuth.mockResolvedValue(mockAuthResponse);
+      oauthServiceMock.loginWithOAuth.mockResolvedValue(mockAuthResponse);
 
       const res = mockResponse();
       const profile: OAuthUserProfile = {
