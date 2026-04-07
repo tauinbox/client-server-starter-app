@@ -21,7 +21,7 @@ import {
 import { Request as ExpressRequest, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { AuthService } from '../services/auth.service';
+import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
 import { GoogleOAuthGuard } from '../guards/google-oauth.guard';
 import { FacebookOAuthGuard } from '../guards/facebook-oauth.guard';
@@ -51,7 +51,7 @@ export class OAuthController {
   private static readonly OAUTH_DATA_MAX_AGE_SECONDS = 60;
 
   constructor(
-    private readonly authService: AuthService,
+    private readonly oauthService: OAuthService,
     private readonly oauthAccountService: OAuthAccountService,
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
@@ -318,7 +318,7 @@ export class OAuthController {
         return;
       }
 
-      const authResponse = await this.authService.loginWithOAuth(profile);
+      const authResponse = await this.oauthService.loginWithOAuth(profile);
 
       const signedData = this.jwtService.sign(
         { data: authResponse },
@@ -354,7 +354,7 @@ export class OAuthController {
       const payload = this.jwtService.verify<{ sub: string }>(linkToken);
       const userId = payload.sub;
 
-      await this.authService.linkOAuthToUser(
+      await this.oauthService.linkOAuthToUser(
         userId,
         profile.provider,
         profile.providerId,
