@@ -101,7 +101,7 @@ src/
 ├── common/
 │   ├── dtos/               # PaginationQueryDto, PaginatedResponseDto<T>, CursorPaginationQueryDto, CursorPaginatedResponseDto<T>
 │   ├── utils/              # Shared utilities (escapeLikePattern, hashToken, withTransaction, extractAuditContext, cursor encode/decode, applyKeysetPagination)
-│   └── upload/             # createDiskStorageOptions() — reusable multer disk storage factory (destination, allowedExtensions, maxFileSizeBytes)
+│   └── upload/             # createDiskStorageOptions() — reusable multer disk storage factory (destination, allowedExtensions, maxFileSizeBytes); validates both file extension and MIME type to block rename attacks
 └── modules/
 ├── core/                   # Dynamic root module
 │   ├── config/             # @nestjs/config, loads .env

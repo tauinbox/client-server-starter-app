@@ -10,6 +10,25 @@ export const UPLOAD_ALLOWED_DOCUMENTS =
   /\.(jpg|jpeg|png|gif|pdf|doc|docx|txt)$/i;
 
 /**
+ * Allowed MIME types per file extension. Used alongside the extension regex
+ * so a renamed file (e.g. `evil.exe` → `evil.jpg`) is rejected because its
+ * real MIME type does not match what the extension claims.
+ */
+export const UPLOAD_ALLOWED_MIME_TYPES: Record<string, readonly string[]> = {
+  jpg: ['image/jpeg'],
+  jpeg: ['image/jpeg'],
+  png: ['image/png'],
+  gif: ['image/gif'],
+  webp: ['image/webp'],
+  pdf: ['application/pdf'],
+  doc: ['application/msword'],
+  docx: [
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ],
+  txt: ['text/plain']
+};
+
+/**
  * Creates multer disk-storage options for a given upload destination.
  *
  * Usage in a controller:
@@ -54,6 +73,14 @@ export function createDiskStorageOptions(options: {
       if (!allowedExtensions.test(file.originalname)) {
         return callback(
           new BadRequestException('File type not allowed'),
+          false
+        );
+      }
+      const ext = file.originalname.split('.').pop()?.toLowerCase() ?? '';
+      const expectedMimeTypes = UPLOAD_ALLOWED_MIME_TYPES[ext];
+      if (!expectedMimeTypes || !expectedMimeTypes.includes(file.mimetype)) {
+        return callback(
+          new BadRequestException('File MIME type does not match extension'),
           false
         );
       }

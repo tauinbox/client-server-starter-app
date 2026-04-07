@@ -96,7 +96,7 @@ export class OAuthController {
     res.cookie(OAuthController.OAUTH_LINK_COOKIE, linkToken, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: this.configService.get('NODE_ENV') === 'production',
+      secure: this.configService.get('ENVIRONMENT') === 'production',
       path: '/api/v1/auth/oauth',
       maxAge: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS * 1000
     });
@@ -328,7 +328,7 @@ export class OAuthController {
       res.cookie(OAuthController.OAUTH_DATA_COOKIE, signedData, {
         httpOnly: true,
         sameSite: 'lax',
-        secure: this.configService.get('NODE_ENV') === 'production',
+        secure: this.configService.get('ENVIRONMENT') === 'production',
         path: '/api/v1/auth/oauth',
         maxAge: OAuthController.OAUTH_DATA_MAX_AGE_SECONDS * 1000
       });

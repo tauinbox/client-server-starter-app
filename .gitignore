@@ -1,1 +1,10 @@
 *.png
+
+# Secrets and keys
+*.pem
+*.key
+*.p12
+.env.local
+
+# OS
+.DS_Store

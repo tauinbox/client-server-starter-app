@@ -91,11 +91,13 @@ export class AuthService {
           finalize(() => {
             this.#notificationsService.disconnect();
             this.#authStore.clearSession();
+            this.#rbacMetadataStore.clear();
             completeLogout();
           })
         )
         .subscribe();
     } else {
+      this.#rbacMetadataStore.clear();
       completeLogout();
     }
   }
