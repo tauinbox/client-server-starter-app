@@ -299,7 +299,7 @@ fullstack-starter-app/
 │   ├── src/common/
 │   │   ├── dtos/           # PaginationQueryDto, PaginatedResponseDto<T>, CursorPaginationQueryDto, CursorPaginatedResponseDto<T>
 │   │   ├── utils/          # escapeLikePattern, hashToken, withTransaction, extractAuditContext, cursor encode/decode, applyKeysetPagination
-│   │   └── upload/         # createDiskStorageOptions() — reusable multer disk storage factory
+│   │   └── upload/         # createDiskStorageOptions() — reusable multer disk storage factory; validates extension + MIME type
 │   ├── src/migrations/     # TypeORM migrations
 │   └── src/seeders/        # Database seeders
 └── mock-server/            # In-memory Express server for dev/testing

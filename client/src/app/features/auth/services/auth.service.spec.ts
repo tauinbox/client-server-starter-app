@@ -66,6 +66,7 @@ describe('AuthService', () => {
   let rbacMetadataStoreMock: {
     resources: ReturnType<typeof vi.fn>;
     setMetadata: ReturnType<typeof vi.fn>;
+    clear: ReturnType<typeof vi.fn>;
   };
   let authStoreMock: {
     isAuthenticated: ReturnType<typeof vi.fn>;
@@ -90,7 +91,8 @@ describe('AuthService', () => {
     };
     rbacMetadataStoreMock = {
       resources: vi.fn().mockReturnValue([]),
-      setMetadata: vi.fn()
+      setMetadata: vi.fn(),
+      clear: vi.fn()
     };
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(false),
@@ -226,6 +228,7 @@ describe('AuthService', () => {
       req.flush({});
 
       expect(authStoreMock.clearSession).toHaveBeenCalled();
+      expect(rbacMetadataStoreMock.clear).toHaveBeenCalled();
     });
 
     it('should not POST when not authenticated', () => {
@@ -234,6 +237,7 @@ describe('AuthService', () => {
       service.logout();
 
       httpMock.expectNone(AuthApiEnum.Logout);
+      expect(rbacMetadataStoreMock.clear).toHaveBeenCalled();
     });
   });
 
