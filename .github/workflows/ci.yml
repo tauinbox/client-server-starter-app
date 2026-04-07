@@ -31,6 +31,7 @@ jobs:
             mock-server/package-lock.json
 
       - run: npm ci
+      - run: npm audit --audit-level=high --omit=dev
       - run: npm run lint
       - run: npm run format:check
       - run: npm run check:routes
@@ -120,6 +121,7 @@ jobs:
             mock-server/package-lock.json
 
       - run: npm ci
+      - run: npm audit --audit-level=high --omit=dev
       - run: npm run lint
       - run: npm run format:check
       - run: npx tsc --noEmit
@@ -144,6 +146,7 @@ jobs:
             mock-server/package-lock.json
 
       - run: npm ci
+      - run: npm audit --audit-level=high --omit=dev
       - run: npm run lint
       - run: npm run format:check
       - run: npm run test:cov
