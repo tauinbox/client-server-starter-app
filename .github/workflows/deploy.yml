@@ -81,15 +81,15 @@ jobs:
           cache-from: type=gha,scope=server
           cache-to: type=gha,scope=server,mode=max
 
-      # Scan warns but does not block — cached apk layers may lag behind stable Alpine.
-      # The weekly Scheduled Rebuild uses no-cache and enforces zero HIGH/CRITICAL.
+      # Block deploy on CRITICAL CVEs; HIGH is enforced zero by the weekly Scheduled Rebuild
+      # (which uses no-cache to avoid stale apk layers).
       - name: Scan server image
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/nexus-server:sha-${{ env.COMMIT_HASH }}
           format: table
-          exit-code: 0
-          severity: HIGH,CRITICAL
+          exit-code: '1'
+          severity: CRITICAL
 
       - name: Build client image
         uses: docker/build-push-action@v7
@@ -103,14 +103,14 @@ jobs:
           cache-from: type=gha,scope=client
           cache-to: type=gha,scope=client,mode=max
 
-      # Scan warns but does not block — see note on server scan above
+      # Block deploy on CRITICAL CVEs — see note on server scan above
       - name: Scan client image
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/nexus-client:sha-${{ env.COMMIT_HASH }}
           format: table
-          exit-code: 0
-          severity: HIGH,CRITICAL
+          exit-code: '1'
+          severity: CRITICAL
 
       # Push only after both scans pass
       - name: Push server image
