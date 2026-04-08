@@ -50,4 +50,11 @@
   .detail-item {
     @include mix.detail-item;
   }
+
+  // mat-divider host has its own margin: 0 with attribute-encapsulation
+  // specificity that beats `.my-4`. Set it explicitly so the divider keeps
+  // its breathing room.
+  mat-divider {
+    margin-block: vars.$spacing-md;
+  }
 }

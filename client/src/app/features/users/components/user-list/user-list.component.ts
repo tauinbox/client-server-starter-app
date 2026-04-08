@@ -24,6 +24,7 @@ import { MatOption, MatSelect } from '@angular/material/select';
 import { MatButton } from '@angular/material/button';
 import { MatDivider } from '@angular/material/divider';
 import { MatInput } from '@angular/material/input';
+import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import type { Sort } from '@angular/material/sort';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -63,6 +64,7 @@ type UserFilterFormType = {
     MatButton,
     MatDivider,
     MatInput,
+    AriaErrorDirective,
     MatProgressSpinner,
     UserTableComponent,
     TranslocoDirective

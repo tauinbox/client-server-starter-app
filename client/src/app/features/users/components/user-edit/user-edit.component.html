@@ -25,6 +25,7 @@
             <mat-label>{{ t('users.edit.email') }}</mat-label>
             <input
               matInput
+              appAriaError
               type="email"
               formControlName="email"
               [placeholder]="t('users.edit.email')"
@@ -45,6 +46,7 @@
               <mat-label>{{ t('users.edit.firstName') }}</mat-label>
               <input
                 matInput
+                appAriaError
                 type="text"
                 formControlName="firstName"
                 [placeholder]="t('users.edit.firstName')"
@@ -58,6 +60,7 @@
               <mat-label>{{ t('users.edit.lastName') }}</mat-label>
               <input
                 matInput
+                appAriaError
                 type="text"
                 formControlName="lastName"
                 [placeholder]="t('users.edit.lastName')"
@@ -72,6 +75,7 @@
             <mat-label>{{ t('users.edit.newPassword') }}</mat-label>
             <input
               matInput
+              appAriaError
               [type]="pwdToggle.show() ? 'text' : 'password'"
               formControlName="password"
               [placeholder]="t('users.edit.passwordPlaceholder')"

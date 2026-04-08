@@ -2,87 +2,87 @@
 
 // Text alignment
 .text-left {
-  text-align: left !important;
+  text-align: left;
 }
 
 .text-center {
-  text-align: center !important;
+  text-align: center;
 }
 
 .text-right {
-  text-align: right !important;
+  text-align: right;
 }
 
 // Text transforms
 .text-lowercase {
-  text-transform: lowercase !important;
+  text-transform: lowercase;
 }
 
 .text-uppercase {
-  text-transform: uppercase !important;
+  text-transform: uppercase;
 }
 
 .text-capitalize {
-  text-transform: capitalize !important;
+  text-transform: capitalize;
 }
 
 // Font weights
 .font-weight-light {
-  font-weight: vars.$font-weight-light !important;
+  font-weight: vars.$font-weight-light;
 }
 
 .font-weight-normal {
-  font-weight: vars.$font-weight-regular !important;
+  font-weight: vars.$font-weight-regular;
 }
 
 .font-weight-medium {
-  font-weight: vars.$font-weight-medium !important;
+  font-weight: vars.$font-weight-medium;
 }
 
 .font-weight-bold {
-  font-weight: vars.$font-weight-bold !important;
+  font-weight: vars.$font-weight-bold;
 }
 
 // Text overflow
 .text-truncate {
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 // Text colors
 .text-primary {
-  color: var(--color-primary) !important;
+  color: var(--color-primary);
 }
 
 .text-accent {
-  color: var(--color-accent) !important;
+  color: var(--color-accent);
 }
 
 .text-warn {
-  color: var(--color-warn) !important;
+  color: var(--color-warn);
 }
 
 .text-success {
-  color: var(--color-success) !important;
+  color: var(--color-success);
 }
 
 .text-error {
-  color: var(--color-error) !important;
+  color: var(--color-error);
 }
 
 .text-info {
-  color: var(--color-info) !important;
+  color: var(--color-info);
 }
 
 .text-warning {
-  color: var(--color-warning) !important;
+  color: var(--color-warning);
 }
 
 .text-secondary {
-  color: var(--color-text-secondary) !important;
+  color: var(--color-text-secondary);
 }
 
 .text-tertiary {
-  color: var(--color-text-tertiary) !important;
+  color: var(--color-text-tertiary);
 }

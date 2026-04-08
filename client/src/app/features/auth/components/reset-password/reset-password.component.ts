@@ -35,6 +35,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
+import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 type ResetPasswordFormType = {
@@ -67,6 +68,7 @@ function passwordsMatchValidator(
     MatProgressSpinner,
     RouterLink,
     PasswordToggleComponent,
+    AriaErrorDirective,
     MatSuffix,
     TranslocoDirective
   ],

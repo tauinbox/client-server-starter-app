@@ -17,6 +17,7 @@
           <mat-label>{{ t('auth.login.email') }}</mat-label>
           <input
             matInput
+            appAriaError
             autocomplete="on"
             type="email"
             formControlName="email"
@@ -37,6 +38,7 @@
           <mat-label>{{ t('auth.login.password') }}</mat-label>
           <input
             matInput
+            appAriaError
             autocomplete="off"
             [type]="pwdToggle.show() ? 'text' : 'password'"
             formControlName="password"

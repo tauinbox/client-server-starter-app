@@ -44,6 +44,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
+import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
@@ -92,6 +93,7 @@ const PROVIDER_KEYS: Record<string, string> = {
     MatButton,
     DatePipe,
     PasswordToggleComponent,
+    AriaErrorDirective,
     MatSuffix,
     TranslocoDirective
   ],

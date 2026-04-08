@@ -26,6 +26,13 @@
     justify-content: flex-end;
   }
 
+  // mat-divider host has its own margin: 0 with attribute-encapsulation
+  // specificity that beats `.my-4`. Set it explicitly here so the divider
+  // between filter and table keeps its breathing room.
+  mat-divider {
+    margin-block: vars.$spacing-md;
+  }
+
   .empty-state {
     @include mix.empty-state;
   }

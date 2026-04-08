@@ -7,6 +7,7 @@
         <mat-label>{{ t('admin.resourceForm.displayNameLabel') }}</mat-label>
         <input
           matInput
+          appAriaError
           formControlName="displayName"
           [placeholder]="t('admin.resourceForm.displayNamePlaceholder')"
         />
@@ -28,6 +29,7 @@
         <mat-label>{{ t('admin.resourceForm.descriptionLabel') }}</mat-label>
         <textarea
           matInput
+          appAriaError
           formControlName="description"
           [placeholder]="t('admin.resourceForm.descriptionPlaceholder')"
           rows="3"

@@ -11,6 +11,7 @@
             <mat-label>{{ t('users.list.filterEmail') }}</mat-label>
             <input
               matInput
+              appAriaError
               formControlName="email"
               [placeholder]="t('users.list.filterEmailPlaceholder')"
             />
@@ -21,6 +22,7 @@
             <mat-label>{{ t('users.list.filterFirstName') }}</mat-label>
             <input
               matInput
+              appAriaError
               formControlName="firstName"
               [placeholder]="t('users.list.filterFirstNamePlaceholder')"
             />
@@ -31,6 +33,7 @@
             <mat-label>{{ t('users.list.filterLastName') }}</mat-label>
             <input
               matInput
+              appAriaError
               formControlName="lastName"
               [placeholder]="t('users.list.filterLastNamePlaceholder')"
             />
@@ -70,7 +73,7 @@
         </div>
       </form>
 
-      <mat-divider class="my-4"></mat-divider>
+      <mat-divider></mat-divider>
 
       @if (loading()) {
         <div class="skeleton-table" aria-busy="true" aria-label="Loading users">

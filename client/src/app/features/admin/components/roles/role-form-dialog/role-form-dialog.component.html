@@ -15,6 +15,7 @@
         <mat-label>{{ t('admin.roleForm.nameLabel') }}</mat-label>
         <input
           matInput
+          appAriaError
           formControlName="name"
           [placeholder]="t('admin.roleForm.namePlaceholder')"
           [readonly]="isSystemRole"
@@ -32,6 +33,7 @@
         <mat-label>{{ t('admin.roleForm.descriptionLabel') }}</mat-label>
         <textarea
           matInput
+          appAriaError
           formControlName="description"
           [placeholder]="t('admin.roleForm.descriptionPlaceholder')"
           rows="3"

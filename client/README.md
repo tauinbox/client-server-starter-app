@@ -63,6 +63,7 @@ src/app/
     │   ├── confirm-dialog/            # Confirmation dialog
     │   ├── keyboard-shortcuts-help/   # KeyboardShortcutsHelpComponent — Material dialog listing active shortcuts grouped by category
     │   └── password-toggle/           # PasswordToggleComponent (reusable password visibility toggle)
+    ├── forms/              # AriaErrorDirective ([appAriaError]) — links matInput to mat-error via aria-describedby (WCAG 1.3.1 / 3.3.1)
     ├── models/             # user.types
     └── utils/              # css.utils, dialog.utils (DialogSize enum + dialogSizeConfig())
 ```
