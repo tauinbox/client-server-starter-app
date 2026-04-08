@@ -31,6 +31,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
+import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 type RegisterFormType = {
@@ -58,6 +59,7 @@ type RegisterFormType = {
     MatCardActions,
     RouterLink,
     PasswordToggleComponent,
+    AriaErrorDirective,
     MatSuffix,
     TranslocoDirective
   ],

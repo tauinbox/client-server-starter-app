@@ -10,6 +10,7 @@
           <mat-label>{{ t('auth.register.email') }}</mat-label>
           <input
             matInput
+            appAriaError
             type="email"
             formControlName="email"
             [placeholder]="t('auth.register.email')"
@@ -29,6 +30,7 @@
           <mat-label>{{ t('auth.register.firstName') }}</mat-label>
           <input
             matInput
+            appAriaError
             type="text"
             formControlName="firstName"
             [placeholder]="t('auth.register.firstName')"
@@ -42,6 +44,7 @@
           <mat-label>{{ t('auth.register.lastName') }}</mat-label>
           <input
             matInput
+            appAriaError
             type="text"
             formControlName="lastName"
             [placeholder]="t('auth.register.lastName')"
@@ -55,6 +58,7 @@
           <mat-label>{{ t('auth.register.password') }}</mat-label>
           <input
             matInput
+            appAriaError
             autocomplete="off"
             [type]="pwdToggle.show() ? 'text' : 'password'"
             formControlName="password"

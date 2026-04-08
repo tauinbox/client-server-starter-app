@@ -17,6 +17,7 @@ import {
 } from '@angular/material/card';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
+import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
 import { Router, RouterLink } from '@angular/router';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
@@ -75,6 +76,7 @@ type UserFormType = {
     ReactiveFormsModule,
     MatFormField,
     MatInput,
+    AriaErrorDirective,
     MatCheckbox,
     MatChipSet,
     MatChip,

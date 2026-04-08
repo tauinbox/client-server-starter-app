@@ -22,6 +22,7 @@ import {
   MatLabel
 } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
+import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
@@ -56,6 +57,7 @@ const ACTION_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
     MatError,
     MatHint,
     MatInput,
+    AriaErrorDirective,
     MatProgressSpinner,
     TranslocoDirective
   ],

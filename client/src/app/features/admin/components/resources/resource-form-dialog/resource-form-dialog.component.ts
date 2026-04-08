@@ -22,6 +22,7 @@ import {
   MatLabel
 } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
+import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -57,6 +58,7 @@ type ResourceFormType = {
     MatError,
     MatHint,
     MatInput,
+    AriaErrorDirective,
     MatProgressSpinner,
     MatSlideToggleModule,
     MatCheckboxModule,

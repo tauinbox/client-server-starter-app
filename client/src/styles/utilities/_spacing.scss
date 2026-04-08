@@ -14,65 +14,65 @@ $spacing-sizes: (
 // Margin utilities
 @each $size, $value in $spacing-sizes {
   .m-#{$size} {
-    margin: $value !important;
+    margin: $value;
   }
 
   .mx-#{$size} {
-    margin-right: $value !important;
-    margin-left: $value !important;
+    margin-right: $value;
+    margin-left: $value;
   }
 
   .my-#{$size} {
-    margin-top: $value !important;
-    margin-bottom: $value !important;
+    margin-top: $value;
+    margin-bottom: $value;
   }
 
   .mt-#{$size} {
-    margin-top: $value !important;
+    margin-top: $value;
   }
 
   .mr-#{$size} {
-    margin-right: $value !important;
+    margin-right: $value;
   }
 
   .mb-#{$size} {
-    margin-bottom: $value !important;
+    margin-bottom: $value;
   }
 
   .ml-#{$size} {
-    margin-left: $value !important;
+    margin-left: $value;
   }
 }
 
 // Padding utilities
 @each $size, $value in $spacing-sizes {
   .p-#{$size} {
-    padding: $value !important;
+    padding: $value;
   }
 
   .px-#{$size} {
-    padding-right: $value !important;
-    padding-left: $value !important;
+    padding-right: $value;
+    padding-left: $value;
   }
 
   .py-#{$size} {
-    padding-top: $value !important;
-    padding-bottom: $value !important;
+    padding-top: $value;
+    padding-bottom: $value;
   }
 
   .pt-#{$size} {
-    padding-top: $value !important;
+    padding-top: $value;
   }
 
   .pr-#{$size} {
-    padding-right: $value !important;
+    padding-right: $value;
   }
 
   .pb-#{$size} {
-    padding-bottom: $value !important;
+    padding-bottom: $value;
   }
 
   .pl-#{$size} {
-    padding-left: $value !important;
+    padding-left: $value;
   }
 }

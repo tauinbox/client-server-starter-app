@@ -50,6 +50,7 @@
                   <mat-label>{{ t('auth.profile.firstName') }}</mat-label>
                   <input
                     matInput
+                    appAriaError
                     autocomplete="on"
                     type="text"
                     formControlName="firstName"
@@ -71,6 +72,7 @@
                   <mat-label>{{ t('auth.profile.lastName') }}</mat-label>
                   <input
                     matInput
+                    appAriaError
                     autocomplete="on"
                     type="text"
                     formControlName="lastName"
@@ -93,6 +95,7 @@
                 <mat-label>{{ t('auth.profile.newPassword') }}</mat-label>
                 <input
                   matInput
+                  appAriaError
                   autocomplete="off"
                   [type]="pwdToggle.show() ? 'text' : 'password'"
                   formControlName="password"
@@ -115,6 +118,7 @@
                   <mat-label>{{ t('auth.profile.confirmPassword') }}</mat-label>
                   <input
                     matInput
+                    appAriaError
                     autocomplete="off"
                     [type]="confirmPwdToggle.show() ? 'text' : 'password'"
                     formControlName="confirmPassword"

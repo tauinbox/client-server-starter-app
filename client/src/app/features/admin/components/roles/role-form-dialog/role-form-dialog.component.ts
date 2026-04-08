@@ -10,6 +10,7 @@ import {
 } from '@angular/material/dialog';
 import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
+import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
 import { TranslocoDirective } from '@jsverse/transloco';
 import type { RoleResponse } from '@app/shared/types/role.types';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
@@ -38,6 +39,7 @@ type RoleFormType = {
     MatLabel,
     MatError,
     MatInput,
+    AriaErrorDirective,
     TranslocoDirective
   ],
   templateUrl: './role-form-dialog.component.html',

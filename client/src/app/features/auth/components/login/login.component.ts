@@ -35,6 +35,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
 import type { LockoutErrorData } from '../../models/auth.types';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
+import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 type LoginFormType = {
@@ -66,6 +67,7 @@ const OAUTH_ERROR_KEYS: Record<string, string> = {
     MatDivider,
     RouterLink,
     PasswordToggleComponent,
+    AriaErrorDirective,
     MatSuffix,
     TranslocoDirective
   ],
