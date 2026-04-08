@@ -83,7 +83,7 @@ export const appConfig: ApplicationConfig = {
     }),
     {
       provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
-      useValue: { appearance: 'outline', subscriptSizing: 'dynamic' }
+      useValue: { appearance: 'outline' }
     },
     {
       provide: MAT_TOOLTIP_DEFAULT_OPTIONS,
