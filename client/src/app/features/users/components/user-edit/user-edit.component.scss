@@ -35,22 +35,11 @@
   }
 
   .account-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: vars.$spacing-sm;
+    align-items: center;
     margin: vars.$spacing-xs 0 vars.$spacing-md;
-
-    .status-badge {
-      display: flex;
-      gap: vars.$spacing-xs;
-      align-items: center;
-      padding: vars.$spacing-xs vars.$spacing-sm;
-      margin-bottom: vars.$spacing-xs;
-      font-size: vars.$font-size-sm;
-      border-radius: vars.$border-radius-md;
-
-      &.warn {
-        color: var(--mat-sys-on-error-container);
-        background-color: var(--mat-sys-error-container);
-      }
-    }
   }
 
   .error-container {

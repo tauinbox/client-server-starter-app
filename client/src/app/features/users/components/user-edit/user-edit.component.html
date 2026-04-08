@@ -106,24 +106,32 @@
             </div>
 
             <div class="account-status">
-              @if (!u.isEmailVerified) {
-                <div class="status-badge warn">
-                  {{ t('users.edit.emailNotVerified') }}
-                </div>
-              }
+              <mat-chip-set role="list" aria-live="polite">
+                @if (!u.isEmailVerified) {
+                  <mat-chip disabled highlighted role="listitem">
+                    <mat-icon matChipAvatar aria-hidden="true"
+                      >mail_lock</mat-icon
+                    >
+                    {{ t('users.edit.emailNotVerified') }}
+                  </mat-chip>
+                }
+                @if (u.lockedUntil) {
+                  <mat-chip disabled highlighted role="listitem">
+                    <mat-icon matChipAvatar aria-hidden="true">lock</mat-icon>
+                    {{ t('users.edit.accountLocked') }}
+                  </mat-chip>
+                }
+              </mat-chip-set>
               @if (u.lockedUntil) {
-                <div class="status-badge warn">
-                  {{ t('users.edit.accountLocked') }}
-                  <button
-                    mat-button
-                    type="button"
-                    color="primary"
-                    (click)="unlockAccount()"
-                    [disabled]="saving()"
-                  >
-                    {{ t('users.edit.unlock') }}
-                  </button>
-                </div>
+                <button
+                  mat-button
+                  type="button"
+                  color="primary"
+                  (click)="unlockAccount()"
+                  [disabled]="saving()"
+                >
+                  {{ t('users.edit.unlock') }}
+                </button>
               }
             </div>
           }

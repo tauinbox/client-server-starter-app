@@ -31,6 +31,7 @@ import {
 } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatCheckbox } from '@angular/material/checkbox';
+import { MatChipSet, MatChip, MatChipAvatar } from '@angular/material/chips';
 import { MatSelect } from '@angular/material/select';
 import { MatOption } from '@angular/material/core';
 import { UserService } from '../../services/user.service';
@@ -75,6 +76,9 @@ type UserFormType = {
     MatFormField,
     MatInput,
     MatCheckbox,
+    MatChipSet,
+    MatChip,
+    MatChipAvatar,
     MatButton,
     PasswordToggleComponent,
     MatSuffix,
