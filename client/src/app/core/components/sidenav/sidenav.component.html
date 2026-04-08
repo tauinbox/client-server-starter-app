@@ -13,7 +13,6 @@
           [attr.aria-current]="adminRla.isActive ? 'page' : null"
           [matTooltip]="sidenavState.isWide() ? '' : t('sidenav.adminPanel')"
           matTooltipPosition="after"
-          [matTooltipShowDelay]="300"
         >
           <mat-icon aria-hidden="true">admin_panel_settings</mat-icon>
           @if (sidenavState.isWide()) {
@@ -35,7 +34,6 @@
         [attr.aria-current]="profileRla.isActive ? 'page' : null"
         [matTooltip]="sidenavState.isWide() ? '' : t('sidenav.profile')"
         matTooltipPosition="after"
-        [matTooltipShowDelay]="300"
       >
         <mat-icon aria-hidden="true">account_circle</mat-icon>
         @if (sidenavState.isWide()) {
