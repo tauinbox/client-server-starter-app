@@ -86,34 +86,37 @@ describe('LoginComponent', () => {
 
   describe('form validation', () => {
     it('should be invalid when empty', () => {
-      expect(component.loginForm.valid).toBe(false);
+      expect(component.loginForm().valid()).toBe(false);
     });
 
     it('should require email', () => {
-      const emailControl = component.loginForm.controls.email;
-      expect(emailControl.hasError('required')).toBe(true);
+      const emailErrors = component.loginForm.email().errors();
+      expect(emailErrors.some((e) => e.kind === 'required')).toBe(true);
     });
 
     it('should validate email format', () => {
-      const emailControl = component.loginForm.controls.email;
-      emailControl.setValue('invalid');
-      expect(emailControl.hasError('email')).toBe(true);
+      component.loginModel.set({ email: 'invalid', password: '' });
+      TestBed.flushEffects();
+      const emailErrors = component.loginForm.email().errors();
+      expect(emailErrors.some((e) => e.kind === 'email')).toBe(true);
 
-      emailControl.setValue('test@example.com');
-      expect(emailControl.valid).toBe(true);
+      component.loginModel.set({ email: 'test@example.com', password: '' });
+      TestBed.flushEffects();
+      expect(component.loginForm.email().valid()).toBe(true);
     });
 
     it('should require password', () => {
-      const passwordControl = component.loginForm.controls.password;
-      expect(passwordControl.hasError('required')).toBe(true);
+      const passwordErrors = component.loginForm.password().errors();
+      expect(passwordErrors.some((e) => e.kind === 'required')).toBe(true);
     });
 
     it('should be valid with correct values', () => {
-      component.loginForm.setValue({
+      component.loginModel.set({
         email: 'test@example.com',
         password: 'password123'
       });
-      expect(component.loginForm.valid).toBe(true);
+      TestBed.flushEffects();
+      expect(component.loginForm().valid()).toBe(true);
     });
   });
 
@@ -127,10 +130,11 @@ describe('LoginComponent', () => {
       authServiceMock.login.mockReturnValue(of(mockAuthResponse));
       vi.spyOn(router, 'navigateByUrl');
 
-      component.loginForm.setValue({
+      component.loginModel.set({
         email: 'test@example.com',
         password: 'password123'
       });
+      TestBed.flushEffects();
 
       component.onSubmit();
 
@@ -144,10 +148,11 @@ describe('LoginComponent', () => {
       authServiceMock.login.mockReturnValue(of(mockAuthResponse));
       vi.spyOn(router, 'navigateByUrl');
 
-      component.loginForm.setValue({
+      component.loginModel.set({
         email: 'test@example.com',
         password: 'password123'
       });
+      TestBed.flushEffects();
 
       component.onSubmit();
 
@@ -159,10 +164,11 @@ describe('LoginComponent', () => {
       authServiceMock.login.mockReturnValue(of(mockAuthResponse));
       vi.spyOn(router, 'navigateByUrl');
 
-      component.loginForm.setValue({
+      component.loginModel.set({
         email: 'test@example.com',
         password: 'password123'
       });
+      TestBed.flushEffects();
       component.onSubmit();
 
       expect(router.navigateByUrl).toHaveBeenCalledWith('/');
@@ -195,10 +201,11 @@ describe('LoginComponent', () => {
 
       authServiceMock.login.mockReturnValue(of(mockAuthResponse));
 
-      newComponent.loginForm.setValue({
+      newComponent.loginModel.set({
         email: 'test@example.com',
         password: 'password123'
       });
+      TestBed.flushEffects();
       newComponent.onSubmit();
 
       expect(newRouter.navigateByUrl).toHaveBeenCalledWith('/dashboard');
@@ -211,10 +218,11 @@ describe('LoginComponent', () => {
       });
       authServiceMock.login.mockReturnValue(throwError(() => httpError));
 
-      component.loginForm.setValue({
+      component.loginModel.set({
         email: 'test@example.com',
         password: 'wrongpassword'
       });
+      TestBed.flushEffects();
       component.onSubmit();
 
       expect(component['error']()).toBe(
@@ -233,10 +241,11 @@ describe('LoginComponent', () => {
       });
       authServiceMock.login.mockReturnValue(throwError(() => httpError));
 
-      component.loginForm.setValue({
+      component.loginModel.set({
         email: 'test@example.com',
         password: 'wrongpassword'
       });
+      TestBed.flushEffects();
       component.onSubmit();
 
       expect(component['error']()).toBe('Invalid credentials');
@@ -250,10 +259,11 @@ describe('LoginComponent', () => {
       });
       authServiceMock.login.mockReturnValue(throwError(() => httpError));
 
-      component.loginForm.setValue({
+      component.loginModel.set({
         email: 'test@example.com',
         password: 'password123'
       });
+      TestBed.flushEffects();
       component.onSubmit();
 
       expect(component['error']()).toBe(

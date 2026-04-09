@@ -1,6 +1,11 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import type { FormControl, ValidationErrors } from '@angular/forms';
-import { ReactiveFormsModule } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  input
+} from '@angular/core';
+import type { Field } from '@angular/forms/signals';
+import { FormField } from '@angular/forms/signals';
 import {
   MatError,
   MatFormField,
@@ -18,10 +23,12 @@ let nextId = 0;
 /**
  * Unified form-field wrapper around `mat-form-field`.
  *
- * Resolves validation error messages via:
- * 1. per-field `[errors]` override map
- * 2. `DEFAULT_ERROR_KEYS` registry
- * 3. fallback `forms.errors.unknown`
+ * Accepts a Signal Forms `Field<string>` and resolves validation
+ * error messages via:
+ * 1. schema-provided `message` (i18n key set in the form schema)
+ * 2. per-field `[errors]` override map
+ * 3. `DEFAULT_ERROR_KEYS` registry
+ * 4. fallback `forms.errors.unknown`
  *
  * Handles `aria-describedby` linkage, decorative prefix icon (`aria-hidden`),
  * and suffix content projection for password toggles etc.
@@ -29,7 +36,7 @@ let nextId = 0;
 @Component({
   selector: 'app-form-field',
   imports: [
-    ReactiveFormsModule,
+    FormField,
     MatFormField,
     MatLabel,
     MatError,
@@ -44,8 +51,8 @@ let nextId = 0;
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AppFormFieldComponent {
-  /** Reactive form control bound to the input. */
-  readonly control = input.required<FormControl<string>>();
+  /** Signal Forms field bound to the input. */
+  readonly field = input.required<Field<string>>();
 
   /** Transloco i18n key for the label. */
   readonly label = input.required<string>();
@@ -53,7 +60,7 @@ export class AppFormFieldComponent {
   /** Input type. */
   readonly type = input<'text' | 'email' | 'password' | 'textarea'>('text');
 
-  /** Per-field validator-code to i18n-key override map. */
+  /** Per-field validator-code to i18n-key override map (fallback for schemas without `message`). */
   readonly errors = input<Record<string, string>>({});
 
   /** Material icon name for the decorative prefix. */
@@ -72,40 +79,31 @@ export class AppFormFieldComponent {
   readonly errorId = `app-ff-err-${++nextId}`;
 
   /**
-   * Resolves the i18n key for the first active validation error.
-   * Called from the template so Angular's change detection picks up
-   * FormControl status changes naturally.
+   * Resolves the first active validation error into an i18n key + params.
+   * Returns `null` when the field is untouched or valid.
    */
-  getActiveErrorKey(): string | null {
-    const ctrl = this.control();
-    if (!ctrl.errors) return null;
+  readonly activeError = computed(() => {
+    const state = this.field()();
+    if (!state.touched() || !state.invalid()) return null;
 
+    const errs = state.errors();
+    if (errs.length === 0) return null;
+
+    const err = errs[0];
     const overrides = this.errors();
-    const codes = Object.keys(ctrl.errors);
+    const key =
+      err.message ||
+      overrides[err.kind] ||
+      DEFAULT_ERROR_KEYS[err.kind] ||
+      'forms.errors.unknown';
 
-    for (const code of codes) {
-      if (overrides[code]) return overrides[code];
-      if (DEFAULT_ERROR_KEYS[code]) return DEFAULT_ERROR_KEYS[code];
-    }
-
-    return 'forms.errors.unknown';
-  }
-
-  /**
-   * Extracts interpolation params from the first active error
-   * (e.g. `{ requiredLength: 8 }` from minlength).
-   */
-  getErrorParams(): Record<string, unknown> {
-    const ctrl = this.control();
-    if (!ctrl.errors) return {};
-
-    const codes = Object.keys(ctrl.errors);
-    if (codes.length === 0) return {};
-
-    const errorValue = ctrl.errors[codes[0]] as ValidationErrors | true;
-    if (typeof errorValue === 'object' && errorValue !== null) {
-      return errorValue as Record<string, unknown>;
-    }
-    return {};
-  }
+    const {
+      kind: _,
+      fieldTree: _ft,
+      formField: _ff,
+      message: _m,
+      ...params
+    } = err;
+    return { key, params };
+  });
 }
