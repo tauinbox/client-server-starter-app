@@ -1,0 +1,47 @@
+<ng-container *transloco="let t">
+  <mat-form-field
+    appearance="outline"
+    class="full-width"
+    subscriptSizing="dynamic"
+  >
+    <mat-label>{{ t(label()) }}</mat-label>
+
+    @if (prefixIcon()) {
+      <mat-icon matPrefix aria-hidden="true">{{ prefixIcon() }}</mat-icon>
+    }
+
+    @if (type() === 'textarea') {
+      <textarea
+        matInput
+        [formControl]="control()"
+        [placeholder]="t(label())"
+        [rows]="rows()"
+        [autocomplete]="autocomplete() ?? 'off'"
+        [attr.aria-describedby]="
+          control().invalid && control().touched ? errorId : null
+        "
+      ></textarea>
+    } @else {
+      <input
+        matInput
+        [type]="type()"
+        [formControl]="control()"
+        [placeholder]="t(label())"
+        [autocomplete]="autocomplete() ?? 'off'"
+        [attr.aria-describedby]="
+          control().invalid && control().touched ? errorId : null
+        "
+      />
+    }
+
+    <ng-content select="[formFieldSuffix]" />
+
+    @if (hint()) {
+      <mat-hint>{{ t(hint()!) }}</mat-hint>
+    }
+
+    @if (getActiveErrorKey(); as errorKey) {
+      <mat-error [id]="errorId">{{ t(errorKey, getErrorParams()) }}</mat-error>
+    }
+  </mat-form-field>
+</ng-container>

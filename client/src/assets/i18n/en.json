@@ -51,6 +51,20 @@
     "labelSave": "Save changes",
     "labelHelp": "Open keyboard shortcuts help"
   },
+  "forms": {
+    "errors": {
+      "required": "This field is required",
+      "email": "Please enter a valid email address",
+      "minlength": "Must be at least {{ requiredLength }} characters",
+      "maxlength": "Must be no more than {{ requiredLength }} characters",
+      "pattern": "Invalid format",
+      "min": "Value must be at least {{ min }}",
+      "max": "Value must be no more than {{ max }}",
+      "passwordWeak": "Password is too weak",
+      "passwordMismatch": "Passwords do not match",
+      "unknown": "This field is invalid"
+    }
+  },
   "errors": {
     "auth": {
       "invalidCredentials": "Invalid credentials",
