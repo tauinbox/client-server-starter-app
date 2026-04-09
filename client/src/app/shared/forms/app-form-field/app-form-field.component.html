@@ -13,23 +13,23 @@
     @if (type() === 'textarea') {
       <textarea
         matInput
-        [formControl]="control()"
+        [formField]="field()"
         [placeholder]="t(label())"
         [rows]="rows()"
         [autocomplete]="autocomplete() ?? 'off'"
         [attr.aria-describedby]="
-          control().invalid && control().touched ? errorId : null
+          field()().invalid() && field()().touched() ? errorId : null
         "
       ></textarea>
     } @else {
       <input
         matInput
         [type]="type()"
-        [formControl]="control()"
+        [formField]="field()"
         [placeholder]="t(label())"
         [autocomplete]="autocomplete() ?? 'off'"
         [attr.aria-describedby]="
-          control().invalid && control().touched ? errorId : null
+          field()().invalid() && field()().touched() ? errorId : null
         "
       />
     }
@@ -40,8 +40,8 @@
       <mat-hint>{{ t(hint()!) }}</mat-hint>
     }
 
-    @if (getActiveErrorKey(); as errorKey) {
-      <mat-error [id]="errorId">{{ t(errorKey, getErrorParams()) }}</mat-error>
+    @if (activeError(); as error) {
+      <mat-error [id]="errorId">{{ t(error.key, error.params) }}</mat-error>
     }
   </mat-form-field>
 </ng-container>

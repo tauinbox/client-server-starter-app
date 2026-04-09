@@ -13,8 +13,11 @@ import {
   MatCardHeader,
   MatCardTitle
 } from '@angular/material/card';
-import type { FormControl } from '@angular/forms';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  email as emailValidator,
+  form,
+  required
+} from '@angular/forms/signals';
 import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 import { MatIcon } from '@angular/material/icon';
 import { MatButton } from '@angular/material/button';
@@ -31,9 +34,9 @@ import type { LockoutErrorData } from '../../models/auth.types';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
-type LoginFormType = {
-  email: FormControl<string>;
-  password: FormControl<string>;
+type LoginData = {
+  email: string;
+  password: string;
 };
 
 const OAUTH_ERROR_KEYS: Record<string, string> = {
@@ -48,7 +51,6 @@ const OAUTH_ERROR_KEYS: Record<string, string> = {
     MatCardHeader,
     MatCardContent,
     MatCardTitle,
-    ReactiveFormsModule,
     MatIcon,
     MatButton,
     MatProgressSpinner,
@@ -64,7 +66,6 @@ const OAUTH_ERROR_KEYS: Record<string, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LoginComponent implements OnInit, OnDestroy {
-  readonly #fb = inject(FormBuilder);
   readonly #authService = inject(AuthService);
   readonly #router = inject(Router);
   readonly #route = inject(ActivatedRoute);
@@ -89,16 +90,11 @@ export class LoginComponent implements OnInit, OnDestroy {
   // Post-registration banner
   protected readonly pendingVerification = signal(false);
 
-  readonly loginForm = this.#fb.group<LoginFormType>({
-    email: this.#fb.control('', {
-      validators: [Validators.required, Validators.email],
-      nonNullable: true,
-      updateOn: 'blur'
-    }),
-    password: this.#fb.control('', {
-      validators: [Validators.required],
-      nonNullable: true
-    })
+  readonly loginModel = signal<LoginData>({ email: '', password: '' });
+  readonly loginForm = form(this.loginModel, (path) => {
+    required(path.email, { message: 'auth.login.emailRequired' });
+    emailValidator(path.email, { message: 'auth.login.emailInvalid' });
+    required(path.password, { message: 'auth.login.passwordRequired' });
   });
 
   ngOnInit(): void {
@@ -134,7 +130,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   }
 
   onSubmit(): void {
-    if (this.loginForm.invalid) return;
+    if (this.loginForm().invalid()) return;
 
     this.loading.set(true);
     this.error.set(null);
@@ -143,7 +139,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.pendingVerification.set(false);
 
     this.#authService
-      .login(this.loginForm.getRawValue())
+      .login(this.loginModel())
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
@@ -160,7 +156,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   }
 
   resendVerification(): void {
-    const email = this.loginForm.get('email')?.value;
+    const email = this.loginModel().email;
     if (!email) return;
 
     this.resendingVerification.set(true);

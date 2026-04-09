@@ -12,26 +12,21 @@
         </div>
       }
 
-      <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+      <form (submit)="$event.preventDefault(); onSubmit()">
         <app-form-field
-          [control]="loginForm.controls.email"
+          [field]="loginForm.email"
           label="auth.login.email"
           type="email"
           prefixIcon="email"
           autocomplete="on"
-          [errors]="{
-            required: 'auth.login.emailRequired',
-            email: 'auth.login.emailInvalid'
-          }"
         />
 
         <app-form-field
-          [control]="loginForm.controls.password"
+          [field]="loginForm.password"
           label="auth.login.password"
           [type]="pwdToggle.show() ? 'text' : 'password'"
           prefixIcon="lock"
           autocomplete="off"
-          [errors]="{ required: 'auth.login.passwordRequired' }"
         >
           <app-password-toggle formFieldSuffix #pwdToggle />
         </app-form-field>
@@ -81,7 +76,9 @@
             mat-raised-button
             color="primary"
             type="submit"
-            [disabled]="loginForm.invalid || loading() || lockoutSeconds() > 0"
+            [disabled]="
+              loginForm().invalid() || loading() || lockoutSeconds() > 0
+            "
           >
             @if (loading()) {
               <mat-spinner diameter="24"></mat-spinner>
