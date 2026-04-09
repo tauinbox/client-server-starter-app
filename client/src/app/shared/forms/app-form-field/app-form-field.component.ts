@@ -11,7 +11,8 @@ import {
   MatFormField,
   MatHint,
   MatLabel,
-  MatPrefix
+  MatPrefix,
+  MatSuffix
 } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatIcon } from '@angular/material/icon';
@@ -42,6 +43,7 @@ let nextId = 0;
     MatError,
     MatHint,
     MatPrefix,
+    MatSuffix,
     MatInput,
     MatIcon,
     TranslocoDirective
