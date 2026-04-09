@@ -11,7 +11,7 @@ import {
 import { MatInput } from '@angular/material/input';
 import { MatIcon } from '@angular/material/icon';
 import { TranslocoDirective } from '@jsverse/transloco';
-import { DEFAULT_ERROR_KEYS } from '../error-messages';
+import { DEFAULT_ERROR_KEYS } from '@shared/forms';
 
 let nextId = 0;
 
