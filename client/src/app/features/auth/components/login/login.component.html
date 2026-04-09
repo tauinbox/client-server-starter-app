@@ -13,42 +13,28 @@
       }
 
       <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
-        <mat-form-field class="full-width">
-          <mat-label>{{ t('auth.login.email') }}</mat-label>
-          <input
-            matInput
-            appAriaError
-            autocomplete="on"
-            type="email"
-            formControlName="email"
-            [placeholder]="t('auth.login.email')"
-            required
-          />
-          <mat-icon matPrefix>email</mat-icon>
-          <mat-error>
-            @if (loginForm.get('email')?.errors?.['required']) {
-              {{ t('auth.login.emailRequired') }}
-            } @else if (loginForm.get('email')?.errors?.['email']) {
-              {{ t('auth.login.emailInvalid') }}
-            }
-          </mat-error>
-        </mat-form-field>
+        <app-form-field
+          [control]="loginForm.controls.email"
+          label="auth.login.email"
+          type="email"
+          prefixIcon="email"
+          autocomplete="on"
+          [errors]="{
+            required: 'auth.login.emailRequired',
+            email: 'auth.login.emailInvalid'
+          }"
+        />
 
-        <mat-form-field class="full-width">
-          <mat-label>{{ t('auth.login.password') }}</mat-label>
-          <input
-            matInput
-            appAriaError
-            autocomplete="off"
-            [type]="pwdToggle.show() ? 'text' : 'password'"
-            formControlName="password"
-            [placeholder]="t('auth.login.password')"
-            required
-          />
-          <mat-icon matPrefix>lock</mat-icon>
-          <app-password-toggle matSuffix #pwdToggle />
-          <mat-error>{{ t('auth.login.passwordRequired') }}</mat-error>
-        </mat-form-field>
+        <app-form-field
+          [control]="loginForm.controls.password"
+          label="auth.login.password"
+          [type]="pwdToggle.show() ? 'text' : 'password'"
+          prefixIcon="lock"
+          autocomplete="off"
+          [errors]="{ required: 'auth.login.passwordRequired' }"
+        >
+          <app-password-toggle formFieldSuffix #pwdToggle />
+        </app-form-field>
 
         @if (error()) {
           <div class="error-message" role="alert">

@@ -15,13 +15,7 @@ import {
 } from '@angular/material/card';
 import type { FormControl } from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import {
-  MatError,
-  MatFormField,
-  MatLabel,
-  MatSuffix
-} from '@angular/material/form-field';
-import { MatInput } from '@angular/material/input';
+import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 import { MatIcon } from '@angular/material/icon';
 import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
@@ -35,7 +29,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
 import type { LockoutErrorData } from '../../models/auth.types';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
-import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 type LoginFormType = {
@@ -55,20 +48,15 @@ const OAUTH_ERROR_KEYS: Record<string, string> = {
     MatCardHeader,
     MatCardContent,
     MatCardTitle,
-    MatLabel,
-    MatError,
     ReactiveFormsModule,
-    MatFormField,
-    MatInput,
     MatIcon,
     MatButton,
     MatProgressSpinner,
     MatCardActions,
     MatDivider,
     RouterLink,
+    AppFormFieldComponent,
     PasswordToggleComponent,
-    AriaErrorDirective,
-    MatSuffix,
     TranslocoDirective
   ],
   templateUrl: './login.component.html',
