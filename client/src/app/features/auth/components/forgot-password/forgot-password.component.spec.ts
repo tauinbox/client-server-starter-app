@@ -42,25 +42,25 @@ describe('ForgotPasswordComponent', () => {
 
   describe('form validation', () => {
     it('should be invalid when empty', () => {
-      expect(component.forgotPasswordForm.invalid).toBe(true);
+      expect(component.forgotPasswordForm().valid()).toBe(false);
     });
 
     it('should require email', () => {
-      expect(
-        component.forgotPasswordForm.controls.email.hasError('required')
-      ).toBe(true);
+      const emailErrors = component.forgotPasswordForm.email().errors();
+      expect(emailErrors.some((e) => e.kind === 'required')).toBe(true);
     });
 
     it('should validate email format', () => {
-      component.forgotPasswordForm.controls.email.setValue('not-an-email');
-      expect(
-        component.forgotPasswordForm.controls.email.hasError('email')
-      ).toBe(true);
+      component.forgotPasswordModel.set({ email: 'not-an-email' });
+      TestBed.tick();
+      const emailErrors = component.forgotPasswordForm.email().errors();
+      expect(emailErrors.some((e) => e.kind === 'email')).toBe(true);
     });
 
     it('should be valid with a correct email', () => {
-      component.forgotPasswordForm.controls.email.setValue('user@example.com');
-      expect(component.forgotPasswordForm.valid).toBe(true);
+      component.forgotPasswordModel.set({ email: 'user@example.com' });
+      TestBed.tick();
+      expect(component.forgotPasswordForm().valid()).toBe(true);
     });
   });
 
@@ -74,7 +74,8 @@ describe('ForgotPasswordComponent', () => {
       authServiceMock.forgotPassword.mockReturnValue(
         of({ message: 'Reset email sent' })
       );
-      component.forgotPasswordForm.controls.email.setValue('user@example.com');
+      component.forgotPasswordModel.set({ email: 'user@example.com' });
+      TestBed.tick();
 
       component.onSubmit();
 
@@ -87,7 +88,8 @@ describe('ForgotPasswordComponent', () => {
       authServiceMock.forgotPassword.mockReturnValue(
         of({ message: 'Reset email sent' })
       );
-      component.forgotPasswordForm.controls.email.setValue('user@example.com');
+      component.forgotPasswordModel.set({ email: 'user@example.com' });
+      TestBed.tick();
 
       component.onSubmit();
 
@@ -99,7 +101,8 @@ describe('ForgotPasswordComponent', () => {
       authServiceMock.forgotPassword.mockReturnValue(
         of({ message: 'Reset email sent' })
       );
-      component.forgotPasswordForm.controls.email.setValue('user@example.com');
+      component.forgotPasswordModel.set({ email: 'user@example.com' });
+      TestBed.tick();
 
       component.onSubmit();
 
@@ -111,7 +114,8 @@ describe('ForgotPasswordComponent', () => {
       authServiceMock.forgotPassword.mockReturnValue(
         throwError(() => new Error('Network error'))
       );
-      component.forgotPasswordForm.controls.email.setValue('user@example.com');
+      component.forgotPasswordModel.set({ email: 'user@example.com' });
+      TestBed.tick();
 
       component.onSubmit();
 
@@ -127,7 +131,8 @@ describe('ForgotPasswordComponent', () => {
       authServiceMock.forgotPassword.mockReturnValue(
         of({ message: 'Reset email sent' })
       );
-      component.forgotPasswordForm.controls.email.setValue('user@example.com');
+      component.forgotPasswordModel.set({ email: 'user@example.com' });
+      TestBed.tick();
 
       component.onSubmit();
 

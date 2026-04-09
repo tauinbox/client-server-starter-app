@@ -49,56 +49,80 @@ describe('RegisterComponent', () => {
 
   describe('form validation', () => {
     it('should be invalid when empty', () => {
-      expect(component.registerForm.valid).toBe(false);
+      expect(component.registerForm().valid()).toBe(false);
     });
 
     it('should require email', () => {
-      expect(component.registerForm.controls.email.hasError('required')).toBe(
-        true
-      );
+      const emailErrors = component.registerForm.email().errors();
+      expect(emailErrors.some((e) => e.kind === 'required')).toBe(true);
     });
 
     it('should validate email format', () => {
-      const emailControl = component.registerForm.controls.email;
-      emailControl.setValue('invalid');
-      expect(emailControl.hasError('email')).toBe(true);
+      component.registerModel.set({
+        email: 'invalid',
+        firstName: '',
+        lastName: '',
+        password: ''
+      });
+      TestBed.tick();
+      const emailErrors = component.registerForm.email().errors();
+      expect(emailErrors.some((e) => e.kind === 'email')).toBe(true);
+
+      component.registerModel.set({
+        email: 'test@example.com',
+        firstName: '',
+        lastName: '',
+        password: ''
+      });
+      TestBed.tick();
+      expect(component.registerForm.email().valid()).toBe(true);
     });
 
     it('should require firstName', () => {
-      expect(
-        component.registerForm.controls.firstName.hasError('required')
-      ).toBe(true);
+      const errors = component.registerForm.firstName().errors();
+      expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
     it('should require lastName', () => {
-      expect(
-        component.registerForm.controls.lastName.hasError('required')
-      ).toBe(true);
+      const errors = component.registerForm.lastName().errors();
+      expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
     it('should require password', () => {
-      expect(
-        component.registerForm.controls.password.hasError('required')
-      ).toBe(true);
+      const errors = component.registerForm.password().errors();
+      expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
     it('should enforce password minLength of 8', () => {
-      const passwordControl = component.registerForm.controls.password;
-      passwordControl.setValue('short');
-      expect(passwordControl.hasError('minlength')).toBe(true);
+      component.registerModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: 'short'
+      });
+      TestBed.tick();
+      const errors = component.registerForm.password().errors();
+      expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
 
-      passwordControl.setValue('longpassword');
-      expect(passwordControl.hasError('minlength')).toBe(false);
+      component.registerModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: 'longpassword'
+      });
+      TestBed.tick();
+      expect(component.registerForm.password().valid()).toBe(true);
     });
 
     it('should be valid with correct values', () => {
-      component.registerForm.setValue({
+      component.registerModel.set({
         email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
         password: 'password123'
       });
-      expect(component.registerForm.valid).toBe(true);
+      TestBed.tick();
+      expect(component.registerForm().valid()).toBe(true);
     });
   });
 
@@ -119,7 +143,8 @@ describe('RegisterComponent', () => {
       authServiceMock.register.mockReturnValue(of(mockRegisterResponse));
       vi.spyOn(router, 'navigate');
 
-      component.registerForm.setValue(validForm);
+      component.registerModel.set(validForm);
+      TestBed.tick();
       component.onSubmit();
 
       expect(authServiceMock.register).toHaveBeenCalledWith(validForm);
@@ -129,7 +154,8 @@ describe('RegisterComponent', () => {
       authServiceMock.register.mockReturnValue(of(mockRegisterResponse));
       vi.spyOn(router, 'navigate');
 
-      component.registerForm.setValue(validForm);
+      component.registerModel.set(validForm);
+      TestBed.tick();
       component.onSubmit();
 
       expect(router.navigate).toHaveBeenCalledWith(['/login'], {
@@ -145,7 +171,8 @@ describe('RegisterComponent', () => {
       });
       authServiceMock.register.mockReturnValue(throwError(() => httpError));
 
-      component.registerForm.setValue(validForm);
+      component.registerModel.set(validForm);
+      TestBed.tick();
       component.onSubmit();
 
       expect(component['error']()).toBe('User with this email already exists.');
@@ -159,7 +186,8 @@ describe('RegisterComponent', () => {
       });
       authServiceMock.register.mockReturnValue(throwError(() => httpError));
 
-      component.registerForm.setValue(validForm);
+      component.registerModel.set(validForm);
+      TestBed.tick();
       component.onSubmit();
 
       expect(component['error']()).toBe(
@@ -177,7 +205,8 @@ describe('RegisterComponent', () => {
       });
       authServiceMock.register.mockReturnValue(throwError(() => httpError));
 
-      component.registerForm.setValue(validForm);
+      component.registerModel.set(validForm);
+      TestBed.tick();
       component.onSubmit();
 
       expect(component['error']()).toBe('Internal server error');
@@ -190,7 +219,8 @@ describe('RegisterComponent', () => {
       });
       authServiceMock.register.mockReturnValue(throwError(() => httpError));
 
-      component.registerForm.setValue(validForm);
+      component.registerModel.set(validForm);
+      TestBed.tick();
       component.onSubmit();
 
       expect(component['error']()).toBe(

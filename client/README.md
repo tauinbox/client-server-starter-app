@@ -17,7 +17,8 @@ The dev proxy (`proxy.conf.mjs`) forwards `/api` and `/ws` requests to `BACKEND_
 |------|---------|
 | Dev server | `npm start` |
 | Build | `npm run build` |
-| Lint | `npm run lint` |
+| Lint (TS + SCSS) | `npm run lint` |
+| Lint SCSS only | `npm run lint:styles` |
 | Unit tests | `npm test` (Vitest) |
 | E2E tests | `npm run test:e2e` (Playwright) |
 | E2E tests (UI) | `npm run test:e2e:ui` |

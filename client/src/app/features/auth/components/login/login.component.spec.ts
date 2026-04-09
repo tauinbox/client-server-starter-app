@@ -96,12 +96,12 @@ describe('LoginComponent', () => {
 
     it('should validate email format', () => {
       component.loginModel.set({ email: 'invalid', password: '' });
-      TestBed.flushEffects();
+      TestBed.tick();
       const emailErrors = component.loginForm.email().errors();
       expect(emailErrors.some((e) => e.kind === 'email')).toBe(true);
 
       component.loginModel.set({ email: 'test@example.com', password: '' });
-      TestBed.flushEffects();
+      TestBed.tick();
       expect(component.loginForm.email().valid()).toBe(true);
     });
 
@@ -115,7 +115,7 @@ describe('LoginComponent', () => {
         email: 'test@example.com',
         password: 'password123'
       });
-      TestBed.flushEffects();
+      TestBed.tick();
       expect(component.loginForm().valid()).toBe(true);
     });
   });
@@ -134,7 +134,7 @@ describe('LoginComponent', () => {
         email: 'test@example.com',
         password: 'password123'
       });
-      TestBed.flushEffects();
+      TestBed.tick();
 
       component.onSubmit();
 
@@ -152,7 +152,7 @@ describe('LoginComponent', () => {
         email: 'test@example.com',
         password: 'password123'
       });
-      TestBed.flushEffects();
+      TestBed.tick();
 
       component.onSubmit();
 
@@ -168,7 +168,7 @@ describe('LoginComponent', () => {
         email: 'test@example.com',
         password: 'password123'
       });
-      TestBed.flushEffects();
+      TestBed.tick();
       component.onSubmit();
 
       expect(router.navigateByUrl).toHaveBeenCalledWith('/');
@@ -205,7 +205,7 @@ describe('LoginComponent', () => {
         email: 'test@example.com',
         password: 'password123'
       });
-      TestBed.flushEffects();
+      TestBed.tick();
       newComponent.onSubmit();
 
       expect(newRouter.navigateByUrl).toHaveBeenCalledWith('/dashboard');
@@ -222,7 +222,7 @@ describe('LoginComponent', () => {
         email: 'test@example.com',
         password: 'wrongpassword'
       });
-      TestBed.flushEffects();
+      TestBed.tick();
       component.onSubmit();
 
       expect(component['error']()).toBe(
@@ -245,7 +245,7 @@ describe('LoginComponent', () => {
         email: 'test@example.com',
         password: 'wrongpassword'
       });
-      TestBed.flushEffects();
+      TestBed.tick();
       component.onSubmit();
 
       expect(component['error']()).toBe('Invalid credentials');
@@ -263,7 +263,7 @@ describe('LoginComponent', () => {
         email: 'test@example.com',
         password: 'password123'
       });
-      TestBed.flushEffects();
+      TestBed.tick();
       component.onSubmit();
 
       expect(component['error']()).toBe(
