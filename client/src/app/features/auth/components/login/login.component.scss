@@ -4,6 +4,10 @@
 
 :host {
   .login-container {
+    mat-card {
+      width: 100%;
+    }
+
     @include mix.centered-container(vars.$card-width-sm);
   }
 

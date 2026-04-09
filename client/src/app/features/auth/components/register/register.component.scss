@@ -4,6 +4,10 @@
 
 :host {
   .register-container {
+    mat-card {
+      width: 100%;
+    }
+
     @include mix.centered-container(vars.$card-width-sm);
   }
 
@@ -19,6 +23,10 @@
     @include mix.error-message;
   }
 
+  mat-card-actions p {
+    font-size: vars.$font-size-sm;
+  }
+
   button[type='submit'] {
     width: 100%;
 
@@ -29,7 +37,7 @@
     display: flex;
     gap: vars.$spacing-xs;
     align-items: center;
-    margin-top: calc(-1 * vars.$spacing-sm);
+    margin-top: -(vars.$spacing-sm);
     margin-bottom: vars.$spacing-sm;
 
     .strength-bars {

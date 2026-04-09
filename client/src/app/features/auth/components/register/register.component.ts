@@ -14,31 +14,27 @@ import {
   MatCardTitle
 } from '@angular/material/card';
 import {
-  MatError,
-  MatFormField,
-  MatLabel,
-  MatSuffix
-} from '@angular/material/form-field';
-import type { FormControl, FormGroup } from '@angular/forms';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatInput } from '@angular/material/input';
-import { MatIcon } from '@angular/material/icon';
+  email as emailValidator,
+  form,
+  minLength,
+  required
+} from '@angular/forms/signals';
+import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
-import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
-type RegisterFormType = {
-  email: FormControl<string>;
-  firstName: FormControl<string>;
-  lastName: FormControl<string>;
-  password: FormControl<string>;
+type RegisterData = {
+  email: string;
+  firstName: string;
+  lastName: string;
+  password: string;
 };
 
 @Component({
@@ -48,19 +44,12 @@ type RegisterFormType = {
     MatCardHeader,
     MatCardContent,
     MatCardTitle,
-    MatLabel,
-    MatFormField,
-    ReactiveFormsModule,
-    MatInput,
-    MatIcon,
     MatButton,
-    MatError,
     MatProgressSpinner,
     MatCardActions,
     RouterLink,
+    AppFormFieldComponent,
     PasswordToggleComponent,
-    AriaErrorDirective,
-    MatSuffix,
     TranslocoDirective
   ],
   templateUrl: './register.component.html',
@@ -68,7 +57,6 @@ type RegisterFormType = {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class RegisterComponent {
-  readonly #fb = inject(FormBuilder);
   readonly #authService = inject(AuthService);
   readonly #router = inject(Router);
   readonly #destroyRef = inject(DestroyRef);
@@ -79,36 +67,26 @@ export class RegisterComponent {
 
   protected readonly appRouteSegmentEnum = AppRouteSegmentEnum;
 
-  readonly registerForm: FormGroup<RegisterFormType> =
-    this.#fb.group<RegisterFormType>({
-      email: this.#fb.control('', {
-        validators: [Validators.required, Validators.email],
-        nonNullable: true,
-        updateOn: 'blur'
-      }),
-      firstName: this.#fb.control('', {
-        validators: [Validators.required],
-        nonNullable: true,
-        updateOn: 'blur'
-      }),
-      lastName: this.#fb.control('', {
-        validators: [Validators.required],
-        nonNullable: true,
-        updateOn: 'blur'
-      }),
-      password: this.#fb.control('', {
-        validators: [Validators.required, Validators.minLength(8)],
-        nonNullable: true
-      })
-    });
+  readonly registerModel = signal<RegisterData>({
+    email: '',
+    firstName: '',
+    lastName: '',
+    password: ''
+  });
 
-  readonly #passwordValue = toSignal(
-    this.registerForm.controls.password.valueChanges,
-    { initialValue: '' }
-  );
+  readonly registerForm = form(this.registerModel, (path) => {
+    required(path.email, { message: 'auth.register.emailRequired' });
+    emailValidator(path.email, { message: 'auth.register.emailInvalid' });
+    required(path.firstName, { message: 'auth.register.firstNameRequired' });
+    required(path.lastName, { message: 'auth.register.lastNameRequired' });
+    required(path.password, { message: 'auth.register.passwordRequired' });
+    minLength(path.password, 8, {
+      message: 'auth.register.passwordMinLength'
+    });
+  });
 
   protected readonly passwordStrength = computed(() => {
-    const pwd = this.#passwordValue();
+    const pwd = this.registerModel().password;
     if (!pwd || pwd.length === 0) return 0;
     let score = 0;
     if (pwd.length >= 8) score++;
@@ -119,13 +97,13 @@ export class RegisterComponent {
   });
 
   onSubmit(): void {
-    if (this.registerForm.invalid) return;
+    if (this.registerForm().invalid()) return;
 
     this.loading.set(true);
     this.error.set(null);
 
     this.#authService
-      .register(this.registerForm.getRawValue())
+      .register(this.registerModel())
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {

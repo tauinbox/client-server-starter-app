@@ -14,10 +14,12 @@ import {
   MatCardHeader,
   MatCardTitle
 } from '@angular/material/card';
-import type { FormControl } from '@angular/forms';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatError, MatFormField, MatLabel } from '@angular/material/form-field';
-import { MatInput } from '@angular/material/input';
+import {
+  email as emailValidator,
+  form,
+  required
+} from '@angular/forms/signals';
+import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 import { MatIcon } from '@angular/material/icon';
 import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
@@ -26,8 +28,8 @@ import { AuthService } from '../../services/auth.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
-type ForgotPasswordFormType = {
-  email: FormControl<string>;
+type ForgotPasswordData = {
+  email: string;
 };
 
 @Component({
@@ -38,15 +40,11 @@ type ForgotPasswordFormType = {
     MatCardContent,
     MatCardTitle,
     MatCardActions,
-    MatLabel,
-    MatError,
-    ReactiveFormsModule,
-    MatFormField,
-    MatInput,
     MatIcon,
     MatButton,
     MatProgressSpinner,
     RouterLink,
+    AppFormFieldComponent,
     TranslocoDirective
   ],
   templateUrl: './forgot-password.component.html',
@@ -54,7 +52,6 @@ type ForgotPasswordFormType = {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ForgotPasswordComponent {
-  readonly #fb = inject(FormBuilder);
   readonly #authService = inject(AuthService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #translocoService = inject(TranslocoService);
@@ -65,21 +62,20 @@ export class ForgotPasswordComponent {
   protected readonly success = signal(false);
   protected readonly error = signal<string | null>(null);
 
-  readonly forgotPasswordForm = this.#fb.group<ForgotPasswordFormType>({
-    email: this.#fb.control('', {
-      validators: [Validators.required, Validators.email],
-      nonNullable: true
-    })
+  readonly forgotPasswordModel = signal<ForgotPasswordData>({ email: '' });
+  readonly forgotPasswordForm = form(this.forgotPasswordModel, (path) => {
+    required(path.email, { message: 'auth.forgotPassword.emailRequired' });
+    emailValidator(path.email, { message: 'auth.forgotPassword.emailInvalid' });
   });
 
   onSubmit(): void {
-    if (this.forgotPasswordForm.invalid) return;
+    if (this.forgotPasswordForm().invalid()) return;
 
     this.loading.set(true);
     this.error.set(null);
 
     this.#authService
-      .forgotPassword(this.forgotPasswordForm.getRawValue().email)
+      .forgotPassword(this.forgotPasswordModel().email)
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
