@@ -1,9 +1,5 @@
 <ng-container *transloco="let t">
-  <mat-form-field
-    appearance="outline"
-    class="full-width"
-    subscriptSizing="dynamic"
-  >
+  <mat-form-field appearance="outline" class="full-width">
     <mat-label>{{ t(label()) }}</mat-label>
 
     @if (prefixIcon()) {
@@ -34,7 +30,9 @@
       />
     }
 
-    <ng-content select="[formFieldSuffix]" />
+    <span matSuffix>
+      <ng-content select="[formFieldSuffix]" />
+    </span>
 
     @if (hint()) {
       <mat-hint>{{ t(hint()!) }}</mat-hint>
