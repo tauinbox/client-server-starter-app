@@ -1,23 +1,25 @@
 import { createMockJwt } from './jwt.utils';
-import type { UserResponse } from '@app/shared/types';
 
 export {
   createMockUser,
   createOAuthAccount
 } from '../../../mock-server/src/factories';
 
-export type MockUser = UserResponse;
+import type { MockUser } from '../../../mock-server/src/types';
+export type { MockUser };
 
 export const defaultUser: MockUser = {
   id: '1',
   email: 'test@example.com',
   firstName: 'John',
   lastName: 'Doe',
+  password: 'Password1',
   isActive: true,
   roles: ['user'],
   isEmailVerified: true,
   failedLoginAttempts: 0,
   lockedUntil: null,
+  tokenRevokedAt: null,
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt: '2025-01-01T00:00:00.000Z',
   deletedAt: null
@@ -34,11 +36,13 @@ export const mockUsersList: MockUser[] = [
     email: 'admin@example.com',
     firstName: 'Admin',
     lastName: 'User',
+    password: 'Password1',
     roles: ['admin'],
     isActive: true,
     isEmailVerified: true,
     failedLoginAttempts: 0,
     lockedUntil: null,
+    tokenRevokedAt: null,
     createdAt: '2025-01-01T00:00:00.000Z',
     updatedAt: '2025-01-01T00:00:00.000Z',
     deletedAt: null
@@ -48,11 +52,13 @@ export const mockUsersList: MockUser[] = [
     email: 'john@example.com',
     firstName: 'John',
     lastName: 'Smith',
+    password: 'Password1',
     roles: ['user'],
     isActive: true,
     isEmailVerified: true,
     failedLoginAttempts: 0,
     lockedUntil: null,
+    tokenRevokedAt: null,
     createdAt: '2025-02-01T00:00:00.000Z',
     updatedAt: '2025-02-01T00:00:00.000Z',
     deletedAt: null
@@ -62,11 +68,13 @@ export const mockUsersList: MockUser[] = [
     email: 'jane@example.com',
     firstName: 'Jane',
     lastName: 'Doe',
+    password: 'Password1',
     roles: ['user'],
     isActive: false,
     isEmailVerified: true,
     failedLoginAttempts: 0,
     lockedUntil: null,
+    tokenRevokedAt: null,
     createdAt: '2025-03-01T00:00:00.000Z',
     updatedAt: '2025-03-01T00:00:00.000Z',
     deletedAt: null
