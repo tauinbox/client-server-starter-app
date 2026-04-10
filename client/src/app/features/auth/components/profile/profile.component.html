@@ -44,93 +44,43 @@
           </mat-card-header>
 
           <mat-card-content>
-            <form [formGroup]="profileForm" (ngSubmit)="onSubmit()">
+            <form (submit)="$event.preventDefault(); onSubmit()">
               <div class="form-name-row">
-                <mat-form-field appearance="outline">
-                  <mat-label>{{ t('auth.profile.firstName') }}</mat-label>
-                  <input
-                    matInput
-                    appAriaError
-                    autocomplete="on"
-                    type="text"
-                    formControlName="firstName"
-                    [placeholder]="t('auth.profile.firstName')"
-                    required
-                  />
-                  <mat-icon matPrefix>person</mat-icon>
-                  @if (
-                    profileForm.get('firstName')?.invalid &&
-                    profileForm.get('firstName')?.touched
-                  ) {
-                    <mat-error>{{
-                      t('auth.profile.firstNameRequired')
-                    }}</mat-error>
-                  }
-                </mat-form-field>
+                <app-form-field
+                  [field]="profileForm.firstName"
+                  label="auth.profile.firstName"
+                  prefixIcon="person"
+                  autocomplete="on"
+                />
 
-                <mat-form-field appearance="outline">
-                  <mat-label>{{ t('auth.profile.lastName') }}</mat-label>
-                  <input
-                    matInput
-                    appAriaError
-                    autocomplete="on"
-                    type="text"
-                    formControlName="lastName"
-                    [placeholder]="t('auth.profile.lastName')"
-                    required
-                  />
-                  <mat-icon matPrefix>person</mat-icon>
-                  @if (
-                    profileForm.get('lastName')?.invalid &&
-                    profileForm.get('lastName')?.touched
-                  ) {
-                    <mat-error>{{
-                      t('auth.profile.lastNameRequired')
-                    }}</mat-error>
-                  }
-                </mat-form-field>
+                <app-form-field
+                  [field]="profileForm.lastName"
+                  label="auth.profile.lastName"
+                  prefixIcon="person"
+                  autocomplete="on"
+                />
               </div>
 
-              <mat-form-field class="full-width" appearance="outline">
-                <mat-label>{{ t('auth.profile.newPassword') }}</mat-label>
-                <input
-                  matInput
-                  appAriaError
-                  autocomplete="off"
-                  [type]="pwdToggle.show() ? 'text' : 'password'"
-                  formControlName="password"
-                  [placeholder]="t('auth.profile.passwordPlaceholder')"
-                />
-                <mat-icon matPrefix>lock</mat-icon>
-                <app-password-toggle matSuffix #pwdToggle />
-                @if (
-                  profileForm.get('password')?.invalid &&
-                  profileForm.get('password')?.touched
-                ) {
-                  <mat-error>{{
-                    t('auth.profile.passwordMinLength')
-                  }}</mat-error>
-                }
-              </mat-form-field>
+              <app-form-field
+                [field]="profileForm.password"
+                label="auth.profile.newPassword"
+                [type]="pwdToggle.show() ? 'text' : 'password'"
+                prefixIcon="lock"
+                autocomplete="off"
+              >
+                <app-password-toggle formFieldSuffix #pwdToggle />
+              </app-form-field>
 
-              @if (profileForm.get('password')?.value) {
-                <mat-form-field class="full-width" appearance="outline">
-                  <mat-label>{{ t('auth.profile.confirmPassword') }}</mat-label>
-                  <input
-                    matInput
-                    appAriaError
-                    autocomplete="off"
-                    [type]="confirmPwdToggle.show() ? 'text' : 'password'"
-                    formControlName="confirmPassword"
-                    [errorStateMatcher]="confirmPasswordErrorMatcher"
-                    [placeholder]="t('auth.profile.confirmPasswordPlaceholder')"
-                  />
-                  <mat-icon matPrefix>lock</mat-icon>
-                  <app-password-toggle matSuffix #confirmPwdToggle />
-                  <mat-error>{{
-                    t('auth.profile.passwordsMismatch')
-                  }}</mat-error>
-                </mat-form-field>
+              @if (hasPassword()) {
+                <app-form-field
+                  [field]="profileForm.confirmPassword"
+                  label="auth.profile.confirmPassword"
+                  [type]="confirmPwdToggle.show() ? 'text' : 'password'"
+                  prefixIcon="lock"
+                  autocomplete="off"
+                >
+                  <app-password-toggle formFieldSuffix #confirmPwdToggle />
+                </app-form-field>
               }
 
               @if (error()) {
@@ -143,7 +93,9 @@
                   color="primary"
                   type="submit"
                   [disabled]="
-                    profileForm.invalid || saving() || !profileForm.dirty
+                    profileForm().invalid() ||
+                    saving() ||
+                    !profileForm().dirty()
                   "
                 >
                   @if (saving()) {

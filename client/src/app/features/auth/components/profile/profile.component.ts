@@ -16,53 +16,29 @@ import {
 } from '@angular/material/card';
 import { MatChip } from '@angular/material/chips';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import type {
-  AbstractControl,
-  FormControl,
-  FormGroup,
-  ValidationErrors
-} from '@angular/forms';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import {
-  MatError,
-  MatFormField,
-  MatLabel,
-  MatSuffix
-} from '@angular/material/form-field';
-import type { ErrorStateMatcher } from '@angular/material/core';
-import { MatIcon } from '@angular/material/icon';
-import { MatInput } from '@angular/material/input';
+import { form, minLength, required, validate } from '@angular/forms/signals';
 import { MatButton } from '@angular/material/button';
-import { DOCUMENT } from '@angular/common';
+import { MatIcon } from '@angular/material/icon';
+import { DOCUMENT, DatePipe } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 import { SessionStorageService } from '@core/services/session-storage.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import type { User } from '@shared/models/user.types';
 import type { UpdateProfile } from '../../models/auth.types';
-import { DatePipe } from '@angular/common';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
-import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
+import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
-type ProfileFormType = {
-  firstName: FormControl<string>;
-  lastName: FormControl<string>;
-  password: FormControl<string>;
-  confirmPassword: FormControl<string>;
+type ProfileData = {
+  firstName: string;
+  lastName: string;
+  password: string;
+  confirmPassword: string;
 };
-
-function passwordsMatchValidator(
-  group: AbstractControl
-): ValidationErrors | null {
-  const password = group.get('password')?.value;
-  const confirm = group.get('confirmPassword')?.value;
-  if (!password) return null;
-  return password === confirm ? null : { passwordsMismatch: true };
-}
 
 type OAuthAccountInfo = {
   provider: string;
@@ -75,6 +51,13 @@ const PROVIDER_KEYS: Record<string, string> = {
   vk: 'auth.providers.vk'
 };
 
+const INITIAL_PROFILE: ProfileData = {
+  firstName: '',
+  lastName: '',
+  password: '',
+  confirmPassword: ''
+};
+
 @Component({
   selector: 'app-profile',
   imports: [
@@ -83,18 +66,12 @@ const PROVIDER_KEYS: Record<string, string> = {
     MatCardContent,
     MatCardTitle,
     MatChip,
-    MatError,
-    MatLabel,
     MatProgressSpinner,
-    ReactiveFormsModule,
-    MatFormField,
-    MatIcon,
-    MatInput,
     MatButton,
+    MatIcon,
     DatePipe,
     PasswordToggleComponent,
-    AriaErrorDirective,
-    MatSuffix,
+    AppFormFieldComponent,
     TranslocoDirective
   ],
   templateUrl: './profile.component.html',
@@ -102,7 +79,6 @@ const PROVIDER_KEYS: Record<string, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProfileComponent implements OnInit {
-  readonly #fb = inject(FormBuilder);
   readonly #authService = inject(AuthService);
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
@@ -112,12 +88,6 @@ export class ProfileComponent implements OnInit {
   readonly #router = inject(Router);
   readonly #authStore = inject(AuthStore);
   readonly #transloco = inject(TranslocoService);
-
-  protected readonly confirmPasswordErrorMatcher: ErrorStateMatcher = {
-    isErrorState: () =>
-      !!this.profileForm.errors?.['passwordsMismatch'] &&
-      !!this.profileForm.get('confirmPassword')?.touched
-  };
 
   readonly isAdmin = this.#authStore.isAdmin;
   protected readonly user = signal<User | null>(null);
@@ -133,29 +103,35 @@ export class ProfileComponent implements OnInit {
   protected readonly oauthLoading = signal(false);
   protected readonly allProviders = Object.keys(OAUTH_URLS);
 
-  protected readonly profileForm: FormGroup<ProfileFormType> =
-    this.#fb.group<ProfileFormType>(
-      {
-        firstName: this.#fb.control('', {
-          validators: [Validators.required],
-          nonNullable: true,
-          updateOn: 'blur'
-        }),
-        lastName: this.#fb.control('', {
-          validators: [Validators.required],
-          nonNullable: true,
-          updateOn: 'blur'
-        }),
-        password: this.#fb.control('', {
-          validators: [Validators.minLength(8)],
-          nonNullable: true
-        }),
-        confirmPassword: this.#fb.control('', {
-          nonNullable: true
-        })
-      },
-      { validators: [passwordsMatchValidator] }
-    );
+  readonly profileModel = signal<ProfileData>({ ...INITIAL_PROFILE });
+
+  readonly profileForm = form(this.profileModel, (path) => {
+    required(path.firstName, {
+      message: 'auth.profile.firstNameRequired'
+    });
+    required(path.lastName, {
+      message: 'auth.profile.lastNameRequired'
+    });
+    minLength(path.password, 8, {
+      message: 'auth.profile.passwordMinLength'
+    });
+    validate(path.confirmPassword, ({ value, valueOf }) => {
+      const confirm = value();
+      const password = valueOf(path.password);
+      if (!password) return null;
+      if (confirm !== password) {
+        return {
+          kind: 'passwordMismatch',
+          message: 'forms.errors.passwordMismatch'
+        };
+      }
+      return null;
+    });
+  });
+
+  protected readonly hasPassword = computed(
+    () => !!this.profileModel().password
+  );
 
   ngOnInit() {
     this.loadProfile();
@@ -205,14 +181,14 @@ export class ProfileComponent implements OnInit {
       .subscribe({
         next: (user) => {
           this.user.set(user);
-          this.profileForm.patchValue({
+          this.profileModel.set({
             firstName: user.firstName,
             lastName: user.lastName,
             password: '',
             confirmPassword: ''
           });
           this.loading.set(false);
-          this.profileForm.markAsPristine();
+          this.profileForm().reset();
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
@@ -298,9 +274,9 @@ export class ProfileComponent implements OnInit {
   }
 
   onSubmit(): void {
-    if (this.profileForm.invalid || !this.user()) return;
+    if (this.profileForm().invalid() || !this.user()) return;
 
-    const formValues = this.profileForm.getRawValue();
+    const formValues = this.profileModel();
 
     const updateData: UpdateProfile = {
       firstName: formValues.firstName,
@@ -322,8 +298,13 @@ export class ProfileComponent implements OnInit {
           this.saving.set(false);
           this.user.set(updatedUser);
 
-          this.profileForm.patchValue({ password: '', confirmPassword: '' });
-          this.profileForm.markAsPristine();
+          this.profileModel.set({
+            firstName: updatedUser.firstName,
+            lastName: updatedUser.lastName,
+            password: '',
+            confirmPassword: ''
+          });
+          this.profileForm().reset();
 
           this.#snackBar.open(
             this.#transloco.translate('auth.profile.successUpdated'),

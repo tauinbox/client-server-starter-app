@@ -92,13 +92,13 @@ describe('ProfileComponent', () => {
   });
 
   describe('ngOnInit / loadProfile', () => {
-    it('should load profile and patch form on init', () => {
+    it('should load profile and set model on init', () => {
       fixture.detectChanges();
 
       expect(authServiceMock.getProfile).toHaveBeenCalled();
       expect(component['user']()).toEqual(mockUser);
       expect(component['loading']()).toBe(false);
-      expect(component['profileForm'].value).toEqual({
+      expect(component.profileModel()).toEqual({
         firstName: 'Test',
         lastName: 'User',
         password: '',
@@ -106,9 +106,9 @@ describe('ProfileComponent', () => {
       });
     });
 
-    it('should mark form as pristine after loading', () => {
+    it('should reset form dirty state after loading', () => {
       fixture.detectChanges();
-      expect(component['profileForm'].pristine).toBe(true);
+      expect(component.profileForm().dirty()).toBe(false);
     });
 
     it('should set error on profile load failure', () => {
@@ -139,13 +139,95 @@ describe('ProfileComponent', () => {
     });
   });
 
+  describe('form validation', () => {
+    beforeEach(() => {
+      fixture.detectChanges();
+    });
+
+    it('should require firstName', () => {
+      component.profileModel.set({
+        firstName: '',
+        lastName: 'User',
+        password: '',
+        confirmPassword: ''
+      });
+      TestBed.tick();
+      const errors = component.profileForm.firstName().errors();
+      expect(errors.some((e) => e.kind === 'required')).toBe(true);
+    });
+
+    it('should require lastName', () => {
+      component.profileModel.set({
+        firstName: 'Test',
+        lastName: '',
+        password: '',
+        confirmPassword: ''
+      });
+      TestBed.tick();
+      const errors = component.profileForm.lastName().errors();
+      expect(errors.some((e) => e.kind === 'required')).toBe(true);
+    });
+
+    it('should validate password minLength when provided', () => {
+      component.profileModel.set({
+        firstName: 'Test',
+        lastName: 'User',
+        password: 'short',
+        confirmPassword: ''
+      });
+      TestBed.tick();
+      const errors = component.profileForm.password().errors();
+      expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
+    });
+
+    it('should allow empty password (optional)', () => {
+      component.profileModel.set({
+        firstName: 'Test',
+        lastName: 'User',
+        password: '',
+        confirmPassword: ''
+      });
+      TestBed.tick();
+      expect(component.profileForm().valid()).toBe(true);
+    });
+
+    it('should have passwordMismatch when passwords differ', () => {
+      component.profileModel.set({
+        firstName: 'Test',
+        lastName: 'User',
+        password: 'newpassword123',
+        confirmPassword: 'different123'
+      });
+      TestBed.tick();
+      const errors = component.profileForm.confirmPassword().errors();
+      expect(errors.some((e) => e.kind === 'passwordMismatch')).toBe(true);
+    });
+
+    it('should be valid when passwords match', () => {
+      component.profileModel.set({
+        firstName: 'Test',
+        lastName: 'User',
+        password: 'newpassword123',
+        confirmPassword: 'newpassword123'
+      });
+      TestBed.tick();
+      expect(component.profileForm().valid()).toBe(true);
+    });
+  });
+
   describe('onSubmit', () => {
     beforeEach(() => {
       fixture.detectChanges(); // Triggers ngOnInit → loadProfile
     });
 
     it('should not submit when form is invalid', () => {
-      component['profileForm'].controls.firstName.setValue('');
+      component.profileModel.set({
+        firstName: '',
+        lastName: 'User',
+        password: '',
+        confirmPassword: ''
+      });
+      TestBed.tick();
       component.onSubmit();
       expect(authServiceMock.updateProfile).not.toHaveBeenCalled();
     });
@@ -160,8 +242,13 @@ describe('ProfileComponent', () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
-      component['profileForm'].patchValue({ firstName: 'Updated' });
-      component['profileForm'].markAsDirty();
+      component.profileModel.set({
+        firstName: 'Updated',
+        lastName: 'User',
+        password: '',
+        confirmPassword: ''
+      });
+      TestBed.tick();
       component.onSubmit();
 
       expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
@@ -174,12 +261,13 @@ describe('ProfileComponent', () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
-      component['profileForm'].patchValue({
+      component.profileModel.set({
         firstName: 'Updated',
+        lastName: 'User',
         password: 'newpassword123',
         confirmPassword: 'newpassword123'
       });
-      component['profileForm'].markAsDirty();
+      TestBed.tick();
       component.onSubmit();
 
       expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
@@ -193,7 +281,13 @@ describe('ProfileComponent', () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
-      component['profileForm'].patchValue({ firstName: 'Updated' });
+      component.profileModel.set({
+        firstName: 'Updated',
+        lastName: 'User',
+        password: '',
+        confirmPassword: ''
+      });
+      TestBed.tick();
       component.onSubmit();
 
       expect(snackBarMock.open).toHaveBeenCalledWith(
@@ -203,22 +297,23 @@ describe('ProfileComponent', () => {
       );
       expect(component['user']()).toEqual(updatedUser);
       expect(component['saving']()).toBe(false);
-      expect(component['profileForm'].pristine).toBe(true);
     });
 
-    it('should reset password field after successful update', () => {
+    it('should reset password fields after successful update', () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
-      component['profileForm'].patchValue({
+      component.profileModel.set({
         firstName: 'Updated',
+        lastName: 'User',
         password: 'newpassword',
         confirmPassword: 'newpassword'
       });
+      TestBed.tick();
       component.onSubmit();
 
-      expect(component['profileForm'].controls.password.value).toBe('');
-      expect(component['profileForm'].controls.confirmPassword.value).toBe('');
+      expect(component.profileModel().password).toBe('');
+      expect(component.profileModel().confirmPassword).toBe('');
     });
 
     it('should set error on update failure', () => {
@@ -230,7 +325,13 @@ describe('ProfileComponent', () => {
         throwError(() => httpError)
       );
 
-      component['profileForm'].patchValue({ firstName: 'Updated' });
+      component.profileModel.set({
+        firstName: 'Updated',
+        lastName: 'User',
+        password: '',
+        confirmPassword: ''
+      });
+      TestBed.tick();
       component.onSubmit();
 
       expect(component['error']()).toBe('Update failed');
@@ -246,7 +347,13 @@ describe('ProfileComponent', () => {
         throwError(() => httpError)
       );
 
-      component['profileForm'].patchValue({ firstName: 'Updated' });
+      component.profileModel.set({
+        firstName: 'Updated',
+        lastName: 'User',
+        password: '',
+        confirmPassword: ''
+      });
+      TestBed.tick();
       component.onSubmit();
 
       expect(component['error']()).toBe(

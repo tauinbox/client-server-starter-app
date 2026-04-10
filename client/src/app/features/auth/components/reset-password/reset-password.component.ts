@@ -12,20 +12,7 @@ import {
   MatCardHeader,
   MatCardTitle
 } from '@angular/material/card';
-import type {
-  AbstractControl,
-  FormControl,
-  ValidationErrors
-} from '@angular/forms';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import {
-  MatError,
-  MatFormField,
-  MatLabel,
-  MatSuffix
-} from '@angular/material/form-field';
-import type { ErrorStateMatcher } from '@angular/material/core';
-import { MatInput } from '@angular/material/input';
+import { form, minLength, required, validate } from '@angular/forms/signals';
 import { MatIcon } from '@angular/material/icon';
 import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
@@ -35,21 +22,13 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
-import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
+import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
-type ResetPasswordFormType = {
-  password: FormControl<string>;
-  confirmPassword: FormControl<string>;
+type ResetPasswordData = {
+  password: string;
+  confirmPassword: string;
 };
-
-function passwordsMatchValidator(
-  group: AbstractControl
-): ValidationErrors | null {
-  const password = group.get('password')?.value;
-  const confirm = group.get('confirmPassword')?.value;
-  return password === confirm ? null : { passwordsMismatch: true };
-}
 
 @Component({
   selector: 'app-reset-password',
@@ -58,18 +37,12 @@ function passwordsMatchValidator(
     MatCardHeader,
     MatCardContent,
     MatCardTitle,
-    MatLabel,
-    MatError,
-    ReactiveFormsModule,
-    MatFormField,
-    MatInput,
     MatIcon,
     MatButton,
     MatProgressSpinner,
     RouterLink,
     PasswordToggleComponent,
-    AriaErrorDirective,
-    MatSuffix,
+    AppFormFieldComponent,
     TranslocoDirective
   ],
   templateUrl: './reset-password.component.html',
@@ -77,18 +50,11 @@ function passwordsMatchValidator(
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ResetPasswordComponent implements OnInit {
-  readonly #fb = inject(FormBuilder);
   readonly #authService = inject(AuthService);
   readonly #router = inject(Router);
   readonly #route = inject(ActivatedRoute);
   readonly #destroyRef = inject(DestroyRef);
   readonly #translocoService = inject(TranslocoService);
-
-  protected readonly confirmPasswordErrorMatcher: ErrorStateMatcher = {
-    isErrorState: () =>
-      !!this.resetPasswordForm.errors?.['passwordsMismatch'] &&
-      !!this.resetPasswordForm.get('confirmPassword')?.touched
-  };
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -96,19 +62,33 @@ export class ResetPasswordComponent implements OnInit {
 
   #token = '';
 
-  readonly resetPasswordForm = this.#fb.group<ResetPasswordFormType>(
-    {
-      password: this.#fb.control('', {
-        validators: [Validators.required, Validators.minLength(8)],
-        nonNullable: true
-      }),
-      confirmPassword: this.#fb.control('', {
-        validators: [Validators.required],
-        nonNullable: true
-      })
-    },
-    { validators: [passwordsMatchValidator] }
-  );
+  readonly resetPasswordModel = signal<ResetPasswordData>({
+    password: '',
+    confirmPassword: ''
+  });
+
+  readonly resetPasswordForm = form(this.resetPasswordModel, (path) => {
+    required(path.password, {
+      message: 'auth.resetPassword.passwordRequired'
+    });
+    minLength(path.password, 8, {
+      message: 'auth.resetPassword.passwordMinLength'
+    });
+    required(path.confirmPassword, {
+      message: 'auth.resetPassword.confirmPasswordRequired'
+    });
+    validate(path.confirmPassword, ({ value, valueOf }) => {
+      const confirm = value();
+      const password = valueOf(path.password);
+      if (confirm && confirm !== password) {
+        return {
+          kind: 'passwordMismatch',
+          message: 'forms.errors.passwordMismatch'
+        };
+      }
+      return null;
+    });
+  });
 
   ngOnInit(): void {
     this.#token = this.#route.snapshot.queryParams['token'] || '';
@@ -122,13 +102,13 @@ export class ResetPasswordComponent implements OnInit {
   }
 
   onSubmit(): void {
-    if (this.resetPasswordForm.invalid || !this.#token) return;
+    if (this.resetPasswordForm().invalid() || !this.#token) return;
 
     this.loading.set(true);
     this.error.set(null);
 
     this.#authService
-      .resetPassword(this.#token, this.resetPasswordForm.getRawValue().password)
+      .resetPassword(this.#token, this.resetPasswordModel().password)
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
