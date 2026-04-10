@@ -1,0 +1,7 @@
+@use '@angular/material' as mat;
+
+// Compact density for admin tables — reduces row height and padding.
+// Apply via data-density="compact" attribute on a table wrapper.
+[data-density='compact'] {
+  @include mat.all-component-densities(-2);
+}

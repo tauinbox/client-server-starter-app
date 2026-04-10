@@ -145,7 +145,7 @@ describe('UserDetailComponent', () => {
       fixture.detectChanges();
 
       const editButton = fixture.nativeElement.querySelector(
-        'button[color="primary"][mat-raised-button]'
+        'button[color="primary"][mat-flat-button]'
       );
       expect(editButton).toBeTruthy();
     });
@@ -156,7 +156,7 @@ describe('UserDetailComponent', () => {
       fixture.detectChanges();
 
       const editButton = fixture.nativeElement.querySelector(
-        'button[color="primary"][mat-raised-button]'
+        'button[color="primary"][mat-flat-button]'
       );
       expect(editButton).toBeNull();
     });

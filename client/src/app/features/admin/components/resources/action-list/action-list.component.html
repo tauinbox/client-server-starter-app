@@ -3,7 +3,7 @@
     <mat-card-title>{{ t('admin.actions.title') }}</mat-card-title>
     <div class="spacer"></div>
     @if (canCreate()) {
-      <button mat-raised-button color="primary" (click)="openAddAction()">
+      <button mat-flat-button color="primary" (click)="openAddAction()">
         <mat-icon>add</mat-icon>
         {{ t('admin.actions.addAction') }}
       </button>
@@ -16,7 +16,7 @@
         <mat-spinner></mat-spinner>
       </div>
     } @else {
-      <div class="table-wrapper">
+      <div class="table-wrapper" data-density="compact">
         <table mat-table [dataSource]="actions()" class="actions-table">
           <!-- Display Name Column -->
           <ng-container matColumnDef="displayName">

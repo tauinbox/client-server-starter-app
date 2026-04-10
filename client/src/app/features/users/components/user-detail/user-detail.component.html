@@ -107,7 +107,7 @@
         >
           <div class="actions-container">
             <button
-              mat-raised-button
+              mat-flat-button
               color="primary"
               [routerLink]="['/admin/users', u.id, 'edit']"
             >
@@ -121,7 +121,7 @@
           <mat-icon class="error-icon">error_outline</mat-icon>
           <h3>{{ t('users.detail.notFoundTitle') }}</h3>
           <p>{{ t('users.detail.notFoundMessage') }}</p>
-          <button mat-raised-button color="primary" routerLink="/admin/users">
+          <button mat-flat-button color="primary" routerLink="/admin/users">
             {{ t('users.detail.backToUsers') }}
           </button>
         </div>
