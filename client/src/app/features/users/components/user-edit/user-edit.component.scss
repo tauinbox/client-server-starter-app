@@ -44,7 +44,7 @@
 
   .error-container {
     .error-icon {
-      color: var(--color-error);
+      color: var(--mat-sys-error);
     }
 
     @include mix.empty-state;

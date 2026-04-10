@@ -50,39 +50,5 @@
   white-space: nowrap;
 }
 
-// Text colors
-.text-primary {
-  color: var(--color-primary);
-}
-
-.text-accent {
-  color: var(--color-accent);
-}
-
-.text-warn {
-  color: var(--color-warn);
-}
-
-.text-success {
-  color: var(--color-success);
-}
-
-.text-error {
-  color: var(--color-error);
-}
-
-.text-info {
-  color: var(--color-info);
-}
-
-.text-warning {
-  color: var(--color-warning);
-}
-
-.text-secondary {
-  color: var(--color-text-secondary);
-}
-
-.text-tertiary {
-  color: var(--color-text-tertiary);
-}
+// Text colors — only kept if actually used in templates
+// (all were unused as of cleanup; add back with --mat-sys-* or --app-* tokens if needed)

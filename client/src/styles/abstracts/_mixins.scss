@@ -27,7 +27,7 @@
 // Error message styling
 @mixin error-message {
   margin: vars.$spacing-sm 0;
-  color: var(--color-error);
+  color: var(--mat-sys-error);
 }
 
 // Loading spinners container

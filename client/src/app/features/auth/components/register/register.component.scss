@@ -63,23 +63,23 @@
     }
 
     &[data-strength='1'] {
-      .strength-bar.filled { background-color: var(--color-error); }
-      .strength-label { color: var(--color-error); }
+      .strength-bar.filled { background-color: var(--mat-sys-error); }
+      .strength-label { color: var(--mat-sys-error); }
     }
 
     &[data-strength='2'] {
-      .strength-bar.filled { background-color: var(--color-warning); }
-      .strength-label { color: var(--color-warning); }
+      .strength-bar.filled { background-color: var(--app-warning); }
+      .strength-label { color: var(--app-warning); }
     }
 
     &[data-strength='3'] {
-      .strength-bar.filled { background-color: var(--color-info); }
-      .strength-label { color: var(--color-info); }
+      .strength-bar.filled { background-color: var(--app-info); }
+      .strength-label { color: var(--app-info); }
     }
 
     &[data-strength='4'] {
-      .strength-bar.filled { background-color: var(--color-success); }
-      .strength-label { color: var(--color-success); }
+      .strength-bar.filled { background-color: var(--app-success); }
+      .strength-label { color: var(--app-success); }
     }
   }
 }

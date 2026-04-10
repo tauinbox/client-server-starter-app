@@ -123,7 +123,7 @@ NgRx Signal Store (`@ngrx/signals`):
 
 - **Angular Material** + Angular CDK for UI components
 - **SCSS architecture** with themes, utilities, and component styles
-- **Light/dark theming** via CSS custom properties and Material theme mixins
+- **Light/dark theming** via Material M3 system tokens (`--mat-sys-*`) + app-level semantic tokens (`--app-*` for success/info/warning/text-tertiary/color-scheme)
 - **Stylelint** with recess property order
 
 ```

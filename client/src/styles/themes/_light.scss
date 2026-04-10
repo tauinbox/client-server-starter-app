@@ -6,33 +6,15 @@
 // Typography and density are defined once here (dark theme only overrides color).
 
 :root {
-  // ── Semantic color aliases ────────────────────────────────────────────────
-  // Mapped from M3 system tokens so existing component SCSS keeps working.
-  --color-scheme: light;
-  --color-primary: var(--mat-sys-primary);
-  --color-accent: var(--mat-sys-tertiary);
-  --color-warn: var(--mat-sys-error);
-  --color-error: var(--mat-sys-error);
-
-  // State colors (not part of M3 system — defined manually)
-  --color-success: #2e7d32;
-  --color-info: #0277bd;
-  --color-warning: #e65100;
-
-  // Surface / background
-  --color-background: var(--mat-sys-background);
+  // ── App-level semantic tokens (no M3 equivalent) ─────────────────────────
+  --app-color-scheme: light;
+  --app-success: #2e7d32;
+  --app-info: #0277bd;
+  --app-warning: #e65100;
+  --app-text-tertiary: color-mix(in srgb, var(--mat-sys-on-surface) 38%, transparent);
 
   // Sidenav uses a slightly elevated surface so it stands out from page content
   --mat-sidenav-container-background-color: var(--mat-sys-surface-container);
-
-  // Text
-  --color-text-primary: var(--mat-sys-on-surface);
-  --color-text-secondary: var(--mat-sys-on-surface-variant);
-  --color-text-tertiary: color-mix(in srgb, var(--mat-sys-on-surface) 38%, transparent);
-
-  // Borders & dividers
-  --color-border: var(--mat-sys-outline-variant);
-  --color-divider: var(--mat-sys-outline-variant);
 
   @include mat.theme((
     color: (
