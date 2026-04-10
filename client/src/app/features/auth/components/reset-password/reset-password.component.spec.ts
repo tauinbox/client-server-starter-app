@@ -79,51 +79,55 @@ describe('ResetPasswordComponent', () => {
     });
 
     it('should be invalid when empty', () => {
-      expect(component.resetPasswordForm.invalid).toBe(true);
+      expect(component.resetPasswordForm().invalid()).toBe(true);
     });
 
     it('should require password', () => {
-      expect(
-        component.resetPasswordForm.controls.password.hasError('required')
-      ).toBe(true);
+      const errors = component.resetPasswordForm.password().errors();
+      expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
     it('should validate password minLength of 8', () => {
-      component.resetPasswordForm.controls.password.setValue('short');
-      expect(
-        component.resetPasswordForm.controls.password.hasError('minlength')
-      ).toBe(true);
+      component.resetPasswordModel.set({
+        password: 'short',
+        confirmPassword: ''
+      });
+      TestBed.tick();
+      const errors = component.resetPasswordForm.password().errors();
+      expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
     });
 
     it('should accept password of 8+ characters', () => {
-      component.resetPasswordForm.controls.password.setValue('validpass');
-      expect(component.resetPasswordForm.controls.password.valid).toBe(true);
+      component.resetPasswordModel.set({
+        password: 'validpass',
+        confirmPassword: ''
+      });
+      TestBed.tick();
+      expect(component.resetPasswordForm.password().valid()).toBe(true);
     });
 
     it('should require confirmPassword', () => {
-      expect(
-        component.resetPasswordForm.controls.confirmPassword.hasError(
-          'required'
-        )
-      ).toBe(true);
+      const errors = component.resetPasswordForm.confirmPassword().errors();
+      expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
-    it('should have passwordsMismatch error when passwords differ', () => {
-      component.resetPasswordForm.setValue({
+    it('should have passwordMismatch error when passwords differ', () => {
+      component.resetPasswordModel.set({
         password: 'Password1',
         confirmPassword: 'Different1'
       });
-      expect(component.resetPasswordForm.hasError('passwordsMismatch')).toBe(
-        true
-      );
+      TestBed.tick();
+      const errors = component.resetPasswordForm.confirmPassword().errors();
+      expect(errors.some((e) => e.kind === 'passwordMismatch')).toBe(true);
     });
 
     it('should be valid when passwords match and meet requirements', () => {
-      component.resetPasswordForm.setValue({
+      component.resetPasswordModel.set({
         password: 'Password1',
         confirmPassword: 'Password1'
       });
-      expect(component.resetPasswordForm.valid).toBe(true);
+      TestBed.tick();
+      expect(component.resetPasswordForm().valid()).toBe(true);
     });
   });
 
@@ -139,10 +143,11 @@ describe('ResetPasswordComponent', () => {
 
     it('should call resetPassword with token and password', () => {
       authServiceMock.resetPassword.mockReturnValue(of(void 0));
-      component.resetPasswordForm.setValue({
+      component.resetPasswordModel.set({
         password: 'NewPassword1',
         confirmPassword: 'NewPassword1'
       });
+      TestBed.tick();
 
       component.onSubmit();
 
@@ -155,10 +160,11 @@ describe('ResetPasswordComponent', () => {
     it('should navigate to /login on success', () => {
       authServiceMock.resetPassword.mockReturnValue(of(void 0));
       const navigateSpy = vi.spyOn(router, 'navigate');
-      component.resetPasswordForm.setValue({
+      component.resetPasswordModel.set({
         password: 'NewPassword1',
         confirmPassword: 'NewPassword1'
       });
+      TestBed.tick();
 
       component.onSubmit();
 
@@ -173,10 +179,11 @@ describe('ResetPasswordComponent', () => {
       authServiceMock.resetPassword.mockReturnValue(
         throwError(() => httpError)
       );
-      component.resetPasswordForm.setValue({
+      component.resetPasswordModel.set({
         password: 'NewPassword1',
         confirmPassword: 'NewPassword1'
       });
+      TestBed.tick();
 
       component.onSubmit();
 
@@ -189,10 +196,11 @@ describe('ResetPasswordComponent', () => {
       authServiceMock.resetPassword.mockReturnValue(
         throwError(() => httpError)
       );
-      component.resetPasswordForm.setValue({
+      component.resetPasswordModel.set({
         password: 'NewPassword1',
         confirmPassword: 'NewPassword1'
       });
+      TestBed.tick();
 
       component.onSubmit();
 
@@ -205,10 +213,11 @@ describe('ResetPasswordComponent', () => {
   describe('onSubmit — missing token', () => {
     it('should not submit when token is missing', () => {
       createComponent(undefined);
-      component.resetPasswordForm.setValue({
+      component.resetPasswordModel.set({
         password: 'NewPassword1',
         confirmPassword: 'NewPassword1'
       });
+      TestBed.tick();
 
       component.onSubmit();
 
