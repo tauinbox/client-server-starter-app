@@ -20,70 +20,40 @@
           <mat-spinner></mat-spinner>
         </div>
       } @else if (u) {
-        <form [formGroup]="userForm" (ngSubmit)="onSubmit()">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>{{ t('users.edit.email') }}</mat-label>
-            <input
-              matInput
-              appAriaError
-              type="email"
-              formControlName="email"
-              [placeholder]="t('users.edit.email')"
-              required
-            />
-            <mat-icon matPrefix>email</mat-icon>
-            <mat-error>
-              @if (userForm.get('email')?.errors?.['required']) {
-                {{ t('users.edit.emailRequired') }}
-              } @else if (userForm.get('email')?.errors?.['email']) {
-                {{ t('users.edit.emailInvalid') }}
-              }
-            </mat-error>
-          </mat-form-field>
+        <form (submit)="$event.preventDefault(); onSubmit()">
+          <app-form-field
+            [field]="userForm.email"
+            label="users.edit.email"
+            type="email"
+            prefixIcon="email"
+            autocomplete="on"
+          />
 
           <div class="form-name-row">
-            <mat-form-field appearance="outline">
-              <mat-label>{{ t('users.edit.firstName') }}</mat-label>
-              <input
-                matInput
-                appAriaError
-                type="text"
-                formControlName="firstName"
-                [placeholder]="t('users.edit.firstName')"
-                required
-              />
-              <mat-icon matPrefix>person</mat-icon>
-              <mat-error>{{ t('users.edit.firstNameRequired') }}</mat-error>
-            </mat-form-field>
+            <app-form-field
+              [field]="userForm.firstName"
+              label="users.edit.firstName"
+              prefixIcon="person"
+              autocomplete="on"
+            />
 
-            <mat-form-field appearance="outline">
-              <mat-label>{{ t('users.edit.lastName') }}</mat-label>
-              <input
-                matInput
-                appAriaError
-                type="text"
-                formControlName="lastName"
-                [placeholder]="t('users.edit.lastName')"
-                required
-              />
-              <mat-icon matPrefix>person</mat-icon>
-              <mat-error>{{ t('users.edit.lastNameRequired') }}</mat-error>
-            </mat-form-field>
+            <app-form-field
+              [field]="userForm.lastName"
+              label="users.edit.lastName"
+              prefixIcon="person"
+              autocomplete="on"
+            />
           </div>
 
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>{{ t('users.edit.newPassword') }}</mat-label>
-            <input
-              matInput
-              appAriaError
-              [type]="pwdToggle.show() ? 'text' : 'password'"
-              formControlName="password"
-              [placeholder]="t('users.edit.passwordPlaceholder')"
-            />
-            <mat-icon matPrefix>lock</mat-icon>
-            <app-password-toggle matSuffix #pwdToggle />
-            <mat-error>{{ t('users.edit.passwordMinLength') }}</mat-error>
-          </mat-form-field>
+          <app-form-field
+            [field]="userForm.password"
+            label="users.edit.newPassword"
+            [type]="pwdToggle.show() ? 'text' : 'password'"
+            prefixIcon="lock"
+            autocomplete="off"
+          >
+            <app-password-toggle formFieldSuffix #pwdToggle />
+          </app-form-field>
 
           @if (canAssignRoles() && availableRoles().length > 0) {
             <mat-form-field appearance="outline" class="full-width">
@@ -104,9 +74,12 @@
 
           @if (canManageUser()) {
             <div class="checkbox-group">
-              <mat-checkbox formControlName="isActive">{{
-                t('users.edit.active')
-              }}</mat-checkbox>
+              <mat-checkbox
+                [checked]="isActive()"
+                (change)="isActive.set($event.checked)"
+              >
+                {{ t('users.edit.active') }}
+              </mat-checkbox>
             </div>
 
             <div class="account-status">

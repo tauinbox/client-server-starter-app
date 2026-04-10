@@ -83,64 +83,90 @@ describe('ActionFormDialogComponent', () => {
     expect(title?.textContent?.trim()).toBe('Edit Action');
   });
 
-  it('in edit mode: name field is disabled and pre-filled', () => {
+  it('in edit mode: name field is pre-filled', () => {
     createComponent({ action: mockAction });
-    const nameControl = component['form'].get('name');
-    expect(nameControl?.disabled).toBe(true);
-    expect(nameControl?.value).toBe('read');
+    expect(component.actionModel().name).toBe('read');
   });
 
-  it('in create mode: name field is enabled', () => {
+  it('in create mode: model fields are empty', () => {
     createComponent({});
-    const nameControl = component['form'].get('name');
-    expect(nameControl?.disabled).toBe(false);
-  });
-
-  it('in create mode: form fields are empty', () => {
-    createComponent({});
-    const raw = component['form'].getRawValue();
-    expect(raw.name).toBe('');
-    expect(raw.displayName).toBe('');
-    expect(raw.description).toBe('');
+    const model = component.actionModel();
+    expect(model.name).toBe('');
+    expect(model.displayName).toBe('');
+    expect(model.description).toBe('');
   });
 
   it('in edit mode: pre-fills all fields', () => {
     createComponent({ action: mockAction });
-    const raw = component['form'].getRawValue();
-    expect(raw.name).toBe('read');
-    expect(raw.displayName).toBe('Read');
-    expect(raw.description).toBe('Read access');
+    const model = component.actionModel();
+    expect(model.name).toBe('read');
+    expect(model.displayName).toBe('Read');
+    expect(model.description).toBe('Read access');
   });
 
   it('validates name pattern — rejects names not matching /^[a-z][a-z0-9_]*$/', () => {
     createComponent({});
-    const nameControl = component['form'].get('name');
 
-    nameControl?.setValue('InvalidName');
-    expect(nameControl?.errors?.['pattern']).toBeTruthy();
+    component.actionModel.set({
+      name: 'InvalidName',
+      displayName: 'Test',
+      description: ''
+    });
+    TestBed.tick();
+    let errors = component.actionForm.name().errors();
+    expect(errors.some((e) => e.kind === 'pattern')).toBe(true);
 
-    nameControl?.setValue('1invalid');
-    expect(nameControl?.errors?.['pattern']).toBeTruthy();
+    component.actionModel.set({
+      name: '1invalid',
+      displayName: 'Test',
+      description: ''
+    });
+    TestBed.tick();
+    errors = component.actionForm.name().errors();
+    expect(errors.some((e) => e.kind === 'pattern')).toBe(true);
 
-    nameControl?.setValue('with-dash');
-    expect(nameControl?.errors?.['pattern']).toBeTruthy();
+    component.actionModel.set({
+      name: 'with-dash',
+      displayName: 'Test',
+      description: ''
+    });
+    TestBed.tick();
+    errors = component.actionForm.name().errors();
+    expect(errors.some((e) => e.kind === 'pattern')).toBe(true);
   });
 
   it('validates name pattern — accepts valid names', () => {
     createComponent({});
-    const nameControl = component['form'].get('name');
 
-    nameControl?.setValue('read');
-    expect(nameControl?.errors?.['pattern']).toBeFalsy();
+    component.actionModel.set({
+      name: 'read',
+      displayName: 'Read',
+      description: ''
+    });
+    TestBed.tick();
+    let errors = component.actionForm.name().errors();
+    expect(errors.some((e) => e.kind === 'pattern')).toBe(false);
 
-    nameControl?.setValue('read_all');
-    expect(nameControl?.errors?.['pattern']).toBeFalsy();
+    component.actionModel.set({
+      name: 'read_all',
+      displayName: 'Read All',
+      description: ''
+    });
+    TestBed.tick();
+    errors = component.actionForm.name().errors();
+    expect(errors.some((e) => e.kind === 'pattern')).toBe(false);
 
-    nameControl?.setValue('r2d2');
-    expect(nameControl?.errors?.['pattern']).toBeFalsy();
+    component.actionModel.set({
+      name: 'r2d2',
+      displayName: 'R2D2',
+      description: ''
+    });
+    TestBed.tick();
+    errors = component.actionForm.name().errors();
+    expect(errors.some((e) => e.kind === 'pattern')).toBe(false);
   });
 
-  it('disables Save button when form is pristine', () => {
+  it('disables Save button when form is pristine in create mode', () => {
     createComponent({});
     const saveBtn = fixture.nativeElement.querySelector(
       'button[color="primary"]'
@@ -150,20 +176,27 @@ describe('ActionFormDialogComponent', () => {
 
   it('disables Save button when required name field is missing', () => {
     createComponent({});
-    component['form'].get('displayName')?.setValue('Some Name');
-    component['form'].markAsDirty();
+    component.actionModel.set({
+      name: '',
+      displayName: 'Some Name',
+      description: ''
+    });
+    TestBed.tick();
     fixture.detectChanges();
     const saveBtn = fixture.nativeElement.querySelector(
       'button[color="primary"]'
     );
-    // name is still empty — form is invalid
     expect(saveBtn?.disabled).toBe(true);
   });
 
   it('disables Save button when required displayName field is missing', () => {
     createComponent({});
-    component['form'].get('name')?.setValue('read');
-    component['form'].markAsDirty();
+    component.actionModel.set({
+      name: 'read',
+      displayName: '',
+      description: ''
+    });
+    TestBed.tick();
     fixture.detectChanges();
     const saveBtn = fixture.nativeElement.querySelector(
       'button[color="primary"]'
@@ -173,10 +206,12 @@ describe('ActionFormDialogComponent', () => {
 
   it('calls store.createAction with trimmed values and closes dialog on submit in create mode', () => {
     createComponent({});
-    component['form'].get('name')?.setValue('publish');
-    component['form'].get('displayName')?.setValue('  Publish  ');
-    component['form'].get('description')?.setValue('  Publish desc  ');
-    component['form'].markAsDirty();
+    component.actionModel.set({
+      name: 'publish',
+      displayName: '  Publish  ',
+      description: '  Publish desc  '
+    });
+    TestBed.tick();
 
     component.submit();
 
@@ -190,9 +225,12 @@ describe('ActionFormDialogComponent', () => {
 
   it('calls store.updateAction with trimmed values and closes dialog on submit in edit mode', () => {
     createComponent({ action: mockAction });
-    component['form'].get('displayName')?.setValue('  Updated Read  ');
-    component['form'].get('description')?.setValue('Updated desc');
-    component['form'].markAsDirty();
+    component.actionModel.set({
+      name: 'read',
+      displayName: '  Updated Read  ',
+      description: 'Updated desc'
+    });
+    TestBed.tick();
 
     component.submit();
 
@@ -211,7 +249,6 @@ describe('ActionFormDialogComponent', () => {
 
   it('does not call store when form is invalid on submit', () => {
     createComponent({});
-    component['form'].markAsDirty();
 
     component.submit();
 

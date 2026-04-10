@@ -6,61 +6,23 @@
   </h2>
 
   <mat-dialog-content>
-    <form [formGroup]="form" (ngSubmit)="submit()">
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>{{ t('admin.actionForm.nameLabel') }}</mat-label>
-        <input
-          matInput
-          appAriaError
-          formControlName="name"
-          [placeholder]="t('admin.actionForm.namePlaceholder')"
-        />
-        @if (isEdit) {
-          <mat-hint>{{ t('admin.actionForm.nameImmutableHint') }}</mat-hint>
-        }
-        <mat-error>
-          @if (form.get('name')?.errors?.['required']) {
-            {{ t('admin.actionForm.nameRequired') }}
-          } @else if (form.get('name')?.errors?.['maxlength']) {
-            {{ t('admin.actionForm.nameMaxLength') }}
-          } @else if (form.get('name')?.errors?.['pattern']) {
-            {{ t('admin.actionForm.namePattern') }}
-          }
-        </mat-error>
-      </mat-form-field>
+    <form (submit)="$event.preventDefault(); submit()">
+      <app-form-field
+        [field]="actionForm.name"
+        label="admin.actionForm.nameLabel"
+        [hint]="isEdit ? 'admin.actionForm.nameImmutableHint' : undefined"
+      />
 
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>{{ t('admin.actionForm.displayNameLabel') }}</mat-label>
-        <input
-          matInput
-          appAriaError
-          formControlName="displayName"
-          [placeholder]="t('admin.actionForm.displayNamePlaceholder')"
-        />
-        <mat-error>
-          @if (form.get('displayName')?.errors?.['required']) {
-            {{ t('admin.actionForm.displayNameRequired') }}
-          } @else if (form.get('displayName')?.errors?.['maxlength']) {
-            {{ t('admin.actionForm.displayNameMaxLength') }}
-          }
-        </mat-error>
-      </mat-form-field>
+      <app-form-field
+        [field]="actionForm.displayName"
+        label="admin.actionForm.displayNameLabel"
+      />
 
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>{{ t('admin.actionForm.descriptionLabel') }}</mat-label>
-        <textarea
-          matInput
-          appAriaError
-          formControlName="description"
-          [placeholder]="t('admin.actionForm.descriptionPlaceholder')"
-          rows="3"
-        ></textarea>
-        <mat-error>
-          @if (form.get('description')?.errors?.['maxlength']) {
-            {{ t('admin.actionForm.descriptionMaxLength') }}
-          }
-        </mat-error>
-      </mat-form-field>
+      <app-form-field
+        [field]="actionForm.description"
+        label="admin.actionForm.descriptionLabel"
+        type="textarea"
+      />
     </form>
 
     @if (errorMessage()) {
@@ -81,7 +43,9 @@
       mat-raised-button
       color="primary"
       type="button"
-      [disabled]="form.invalid || (isEdit && !form.dirty) || isLoading()"
+      [disabled]="
+        actionForm().invalid() || (isEdit && !formChanged) || isLoading()
+      "
       (click)="submit()"
     >
       @if (isLoading()) {

@@ -111,11 +111,10 @@ describe('ResourceFormDialogComponent', () => {
     expect(title?.textContent?.trim()).toBe('Edit Resource');
   });
 
-  it('pre-fills form with resource displayName and description', () => {
+  it('pre-fills model with resource displayName and description', () => {
     createComponent();
-    const form = component['form'];
-    expect(form.getRawValue().displayName).toBe('Users');
-    expect(form.getRawValue().description).toBe('User management');
+    expect(component.resourceModel().displayName).toBe('Users');
+    expect(component.resourceModel().description).toBe('User management');
   });
 
   it('pre-fills description as empty string when resource description is null', () => {
@@ -123,14 +122,7 @@ describe('ResourceFormDialogComponent', () => {
       resource: { ...mockResource, description: null },
       actions: mockActions
     });
-    const form = component['form'];
-    expect(form.getRawValue().description).toBe('');
-  });
-
-  it('shows internal name as hint text', () => {
-    createComponent();
-    const hint = fixture.nativeElement.querySelector('mat-hint');
-    expect(hint?.textContent).toContain('user');
+    expect(component.resourceModel().description).toBe('');
   });
 
   it('disables Save button when form is pristine', () => {
@@ -141,10 +133,13 @@ describe('ResourceFormDialogComponent', () => {
     expect(saveBtn?.disabled).toBe(true);
   });
 
-  it('enables Save button when form is dirty and valid', () => {
+  it('enables Save button when model changes and form is valid', () => {
     createComponent();
-    component['form'].get('displayName')?.setValue('Updated Name');
-    component['form'].markAsDirty();
+    component.resourceModel.set({
+      displayName: 'Updated Name',
+      description: 'User management'
+    });
+    TestBed.tick();
     fixture.detectChanges();
     const saveBtn = fixture.nativeElement.querySelector(
       'button[color="primary"]'
@@ -154,8 +149,11 @@ describe('ResourceFormDialogComponent', () => {
 
   it('disables Save button when displayName is empty (required)', () => {
     createComponent();
-    component['form'].get('displayName')?.setValue('');
-    component['form'].markAsDirty();
+    component.resourceModel.set({
+      displayName: '',
+      description: 'User management'
+    });
+    TestBed.tick();
     fixture.detectChanges();
     const saveBtn = fixture.nativeElement.querySelector(
       'button[color="primary"]'
@@ -165,8 +163,11 @@ describe('ResourceFormDialogComponent', () => {
 
   it('disables Save button when displayName exceeds 100 chars (maxlength)', () => {
     createComponent();
-    component['form'].get('displayName')?.setValue('a'.repeat(101));
-    component['form'].markAsDirty();
+    component.resourceModel.set({
+      displayName: 'a'.repeat(101),
+      description: 'User management'
+    });
+    TestBed.tick();
     fixture.detectChanges();
     const saveBtn = fixture.nativeElement.querySelector(
       'button[color="primary"]'
@@ -176,9 +177,11 @@ describe('ResourceFormDialogComponent', () => {
 
   it('calls store.updateResource with trimmed values on submit', () => {
     createComponent();
-    component['form'].get('displayName')?.setValue('  Updated  ');
-    component['form'].get('description')?.setValue('  A desc  ');
-    component['form'].markAsDirty();
+    component.resourceModel.set({
+      displayName: '  Updated  ',
+      description: '  A desc  '
+    });
+    TestBed.tick();
     fixture.detectChanges();
 
     component.submit();
@@ -193,9 +196,11 @@ describe('ResourceFormDialogComponent', () => {
 
   it('passes null description when trimmed value is empty on submit', () => {
     createComponent();
-    component['form'].get('displayName')?.setValue('Name');
-    component['form'].get('description')?.setValue('   ');
-    component['form'].markAsDirty();
+    component.resourceModel.set({
+      displayName: 'Name',
+      description: '   '
+    });
+    TestBed.tick();
 
     component.submit();
 
@@ -213,8 +218,11 @@ describe('ResourceFormDialogComponent', () => {
 
   it('does not call store.updateResource when form is invalid on submit', () => {
     createComponent();
-    component['form'].get('displayName')?.setValue('');
-    component['form'].markAsDirty();
+    component.resourceModel.set({
+      displayName: '',
+      description: ''
+    });
+    TestBed.tick();
 
     component.submit();
 

@@ -7,22 +7,13 @@ import {
   signal
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import type { FormControl, FormGroup } from '@angular/forms';
+import { form, maxLength, required } from '@angular/forms/signals';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
   MatDialogModule,
   MatDialogRef
 } from '@angular/material/dialog';
-import {
-  MatError,
-  MatFormField,
-  MatHint,
-  MatLabel
-} from '@angular/material/form-field';
-import { MatInput } from '@angular/material/input';
-import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -36,41 +27,35 @@ import type {
 import type { UpdateResource } from '../../../services/rbac-admin.service';
 import { ResourcesStore } from '../../../store/resources.store';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
+import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 
 export type ResourceFormDialogData = {
   resource: ResourceResponse;
   actions: ActionResponse[];
 };
 
-type ResourceFormType = {
-  displayName: FormControl<string>;
-  description: FormControl<string>;
+type ResourceFormData = {
+  displayName: string;
+  description: string;
 };
 
 @Component({
   selector: 'app-resource-form-dialog',
   imports: [
-    ReactiveFormsModule,
     MatDialogModule,
     MatButtonModule,
-    MatFormField,
-    MatLabel,
-    MatError,
-    MatHint,
-    MatInput,
-    AriaErrorDirective,
     MatProgressSpinner,
     MatSlideToggleModule,
     MatCheckboxModule,
     MatDividerModule,
-    TranslocoDirective
+    TranslocoDirective,
+    AppFormFieldComponent
   ],
   templateUrl: './resource-form-dialog.component.html',
   styleUrl: './resource-form-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ResourceFormDialogComponent implements OnInit, OnDestroy {
-  readonly #fb = inject(FormBuilder);
   readonly #dialogRef = inject(MatDialogRef<ResourceFormDialogComponent>);
   readonly #resourcesStore = inject(ResourcesStore);
   readonly #snackBar = inject(MatSnackBar);
@@ -81,17 +66,15 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
 
   #cleanupSave: (() => void) | null = null;
 
-  protected readonly form: FormGroup<ResourceFormType> =
-    this.#fb.group<ResourceFormType>({
-      displayName: this.#fb.control(this.data.resource.displayName, {
-        validators: [Validators.required, Validators.maxLength(100)],
-        nonNullable: true
-      }),
-      description: this.#fb.control(this.data.resource.description ?? '', {
-        validators: [],
-        nonNullable: true
-      })
-    });
+  readonly resourceModel = signal<ResourceFormData>({
+    displayName: this.data.resource.displayName,
+    description: this.data.resource.description ?? ''
+  });
+
+  readonly resourceForm = form(this.resourceModel, (path) => {
+    required(path.displayName);
+    maxLength(path.displayName, 100);
+  });
 
   protected readonly isCustomMode = signal(
     this.data.resource.allowedActionNames !== null
@@ -118,9 +101,16 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
   }
 
   get isDirty(): boolean {
-    if (this.form.dirty) return true;
+    const current = this.resourceModel();
+    const resource = this.data.resource;
+    if (
+      current.displayName !== resource.displayName ||
+      current.description !== (resource.description ?? '')
+    ) {
+      return true;
+    }
 
-    const original = this.data.resource.allowedActionNames;
+    const original = resource.allowedActionNames;
     const isCustom = this.isCustomMode();
 
     if (original === null) return isCustom;
@@ -155,9 +145,10 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
   }
 
   submit(): void {
-    if (this.form.invalid || !this.isDirty || this.isLoading()) return;
+    if (this.resourceForm().invalid() || !this.isDirty || this.isLoading())
+      return;
 
-    const { displayName, description } = this.form.getRawValue();
+    const { displayName, description } = this.resourceModel();
     const dto: UpdateResource = {
       displayName: displayName.trim(),
       description: description.trim() || null,

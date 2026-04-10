@@ -124,24 +124,23 @@ describe('UserEditComponent', () => {
   });
 
   describe('ngOnInit / loadUser', () => {
-    it('should load user on init and patch form', () => {
+    it('should load user on init and set model', () => {
       fixture.detectChanges();
 
       expect(userServiceMock.getById).toHaveBeenCalledWith('user-1');
       expect(component['user']()).toEqual(mockUser);
       expect(component['loading']()).toBe(false);
-      expect(component['userForm'].value).toMatchObject({
+      expect(component.userModel()).toEqual({
         email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
-        password: '',
-        isActive: true
+        password: ''
       });
     });
 
-    it('should mark form as pristine after loading', () => {
+    it('should reset form dirty state after loading', () => {
       fixture.detectChanges();
-      expect(component['userForm'].pristine).toBe(true);
+      expect(component.userForm().dirty()).toBe(false);
     });
 
     it('should set error on load failure', () => {
@@ -175,50 +174,89 @@ describe('UserEditComponent', () => {
     });
 
     it('should be valid after loading user data', () => {
-      expect(component['userForm'].valid).toBe(true);
+      expect(component.userForm().valid()).toBe(true);
     });
 
     it('should require email', () => {
-      component['userForm'].controls.email.setValue('');
-      expect(component['userForm'].controls.email.hasError('required')).toBe(
-        true
-      );
+      component.userModel.set({
+        email: '',
+        firstName: 'Test',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
+      const errors = component.userForm.email().errors();
+      expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
     it('should validate email format', () => {
-      component['userForm'].controls.email.setValue('not-an-email');
-      expect(component['userForm'].controls.email.hasError('email')).toBe(true);
+      component.userModel.set({
+        email: 'not-an-email',
+        firstName: 'Test',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
+      const errors = component.userForm.email().errors();
+      expect(errors.some((e) => e.kind === 'email')).toBe(true);
     });
 
     it('should require firstName', () => {
-      component['userForm'].controls.firstName.setValue('');
-      expect(
-        component['userForm'].controls.firstName.hasError('required')
-      ).toBe(true);
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: '',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
+      const errors = component.userForm.firstName().errors();
+      expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
     it('should require lastName', () => {
-      component['userForm'].controls.lastName.setValue('');
-      expect(component['userForm'].controls.lastName.hasError('required')).toBe(
-        true
-      );
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: '',
+        password: ''
+      });
+      TestBed.tick();
+      const errors = component.userForm.lastName().errors();
+      expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
     it('should accept empty password (optional field)', () => {
-      component['userForm'].controls.password.setValue('');
-      expect(component['userForm'].controls.password.valid).toBe(true);
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
+      expect(component.userForm().valid()).toBe(true);
     });
 
     it('should validate password minLength of 8', () => {
-      component['userForm'].controls.password.setValue('short');
-      expect(
-        component['userForm'].controls.password.hasError('minlength')
-      ).toBe(true);
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: 'short'
+      });
+      TestBed.tick();
+      const errors = component.userForm.password().errors();
+      expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
     });
 
     it('should accept password of 8+ characters', () => {
-      component['userForm'].controls.password.setValue('validpassword');
-      expect(component['userForm'].controls.password.valid).toBe(true);
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: 'validpassword'
+      });
+      TestBed.tick();
+      expect(component.userForm().valid()).toBe(true);
     });
   });
 
@@ -232,20 +270,35 @@ describe('UserEditComponent', () => {
     });
 
     it('should be true when form is valid and dirty', () => {
-      component['userForm'].controls.firstName.setValue('Changed');
-      component['userForm'].markAsDirty();
-      component['userForm'].updateValueAndValidity();
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Changed',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
       expect(component['canSubmit']()).toBe(true);
     });
 
     it('should be false when form is invalid', () => {
-      component['userForm'].controls.email.setValue('');
-      component['userForm'].markAsDirty();
+      component.userModel.set({
+        email: '',
+        firstName: 'Test',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
       expect(component['canSubmit']()).toBe(false);
     });
 
     it('should be false when saving is in progress', () => {
-      component['userForm'].markAsDirty();
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Changed',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
       component['saving'].set(true);
       expect(component['canSubmit']()).toBe(false);
     });
@@ -253,7 +306,6 @@ describe('UserEditComponent', () => {
 
   describe('canManageUser (instance-level)', () => {
     it('should return false when user is not loaded', () => {
-      // Do NOT call fixture.detectChanges() — user stays null
       expect(component['canManageUser']()).toBe(false);
     });
 
@@ -290,13 +342,13 @@ describe('UserEditComponent', () => {
 
     it('should be true when permitted editing another user', () => {
       permittedSignal.set(true);
-      currentUserSignal.set({ id: 'admin-id' }); // not 'user-1'
+      currentUserSignal.set({ id: 'admin-id' });
       expect(component['canDelete']()).toBe(true);
     });
 
     it('should be false when editing own account', () => {
       permittedSignal.set(true);
-      currentUserSignal.set({ id: 'user-1' }); // same as the input id
+      currentUserSignal.set({ id: 'user-1' });
       expect(component['canDelete']()).toBe(false);
     });
 
@@ -331,30 +383,54 @@ describe('UserEditComponent', () => {
   describe('onSubmit', () => {
     beforeEach(() => {
       fixture.detectChanges();
-      component['userForm'].markAsDirty();
-      component['userForm'].updateValueAndValidity();
+      // Make form dirty by changing a value
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
     });
 
     it('should not submit when form is invalid', () => {
-      component['userForm'].controls.email.setValue('');
+      component.userModel.set({
+        email: '',
+        firstName: 'Test',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
       component.onSubmit();
       expect(usersStoreMock.updateUser).not.toHaveBeenCalled();
     });
 
     it('should call updateUser with form values (no password)', () => {
-      component['userForm'].controls.password.setValue('');
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Changed',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
       component.onSubmit();
 
       expect(usersStoreMock.updateUser).toHaveBeenCalledWith('user-1', {
         email: 'test@example.com',
-        firstName: 'Test',
+        firstName: 'Changed',
         lastName: 'User',
         isActive: true
       });
     });
 
     it('should include password when provided', () => {
-      component['userForm'].controls.password.setValue('newPassword1');
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Changed',
+        lastName: 'User',
+        password: 'newPassword1'
+      });
+      TestBed.tick();
       component.onSubmit();
 
       expect(usersStoreMock.updateUser).toHaveBeenCalledWith(
@@ -365,18 +441,31 @@ describe('UserEditComponent', () => {
 
     it('should not include isActive when lacking update permission', () => {
       permittedSignal.set(false);
-      component['userForm'].controls.password.setValue('');
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Changed',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
       component.onSubmit();
 
       expect(usersStoreMock.updateUser).toHaveBeenCalledWith('user-1', {
         email: 'test@example.com',
-        firstName: 'Test',
+        firstName: 'Changed',
         lastName: 'User'
       });
     });
 
     it('should show snackbar and navigate to user detail on success', () => {
       const navigateSpy = vi.spyOn(router, 'navigate');
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Changed',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
       component.onSubmit();
 
       expect(snackBarMock.open).toHaveBeenCalledWith(
@@ -392,6 +481,13 @@ describe('UserEditComponent', () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
       usersStoreMock.updateUser.mockReturnValue(of(updatedUser));
 
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Updated',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
       component.onSubmit();
 
       expect(authStoreMock.updateCurrentUser).toHaveBeenCalledWith(updatedUser);
@@ -399,17 +495,29 @@ describe('UserEditComponent', () => {
 
     it('should not call updateCurrentUser when editing another user', () => {
       currentUserSignal.set({ id: 'admin-id' });
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Changed',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
       component.onSubmit();
 
       expect(authStoreMock.updateCurrentUser).not.toHaveBeenCalled();
     });
 
-    it('should reset password field and mark form pristine on success', () => {
-      component['userForm'].controls.password.setValue('oldpassword1');
+    it('should reset password field after successful update', () => {
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Changed',
+        lastName: 'User',
+        password: 'oldpassword1'
+      });
+      TestBed.tick();
       component.onSubmit();
 
-      expect(component['userForm'].controls.password.value).toBe('');
-      expect(component['userForm'].pristine).toBe(true);
+      expect(component.userModel().password).toBe('');
     });
 
     it('should set error on update failure', () => {
@@ -419,6 +527,13 @@ describe('UserEditComponent', () => {
       });
       usersStoreMock.updateUser.mockReturnValue(throwError(() => httpError));
 
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Changed',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
       component.onSubmit();
 
       expect(component['error']()).toBe('Update failed');
@@ -429,6 +544,13 @@ describe('UserEditComponent', () => {
       const httpError = new HttpErrorResponse({ error: null, status: 500 });
       usersStoreMock.updateUser.mockReturnValue(throwError(() => httpError));
 
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Changed',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
       component.onSubmit();
 
       expect(component['error']()).toBe(
@@ -522,7 +644,6 @@ describe('UserEditComponent', () => {
     });
 
     it('should populate selectedRoleIds from user roles on load', () => {
-      // mockUser has roles: ['user'], role-user id is 'role-user'
       expect(component['selectedRoleIds']()).toEqual(['role-user']);
     });
 

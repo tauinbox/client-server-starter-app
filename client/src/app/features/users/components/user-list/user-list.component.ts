@@ -6,6 +6,7 @@ import {
   effect,
   inject,
   Injector,
+  signal,
   untracked,
   viewChild
 } from '@angular/core';
@@ -16,15 +17,12 @@ import {
   MatCardHeader,
   MatCardTitle
 } from '@angular/material/card';
-import type { FormControl, FormGroup } from '@angular/forms';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { form } from '@angular/forms/signals';
 import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatOption, MatSelect } from '@angular/material/select';
 import { MatButton } from '@angular/material/button';
 import { MatDivider } from '@angular/material/divider';
-import { MatInput } from '@angular/material/input';
-import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import type { Sort } from '@angular/material/sort';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -40,12 +38,20 @@ import {
   COLUMN_TO_SORT_MAP,
   UserTableComponent
 } from '../user-table/user-table.component';
+import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 
-type UserFilterFormType = {
-  email: FormControl<string>;
-  firstName: FormControl<string>;
-  lastName: FormControl<string>;
-  isActive: FormControl<string>;
+type FilterModel = {
+  email: string;
+  firstName: string;
+  lastName: string;
+  isActive: string;
+};
+
+const INITIAL_FILTER: FilterModel = {
+  email: '',
+  firstName: '',
+  lastName: '',
+  isActive: ''
 };
 
 @Component({
@@ -55,7 +61,6 @@ type UserFilterFormType = {
     MatCardHeader,
     MatCardContent,
     MatCardTitle,
-    ReactiveFormsModule,
     MatFormField,
     MatLabel,
     MatIcon,
@@ -63,18 +68,16 @@ type UserFilterFormType = {
     MatOption,
     MatButton,
     MatDivider,
-    MatInput,
-    AriaErrorDirective,
     MatProgressSpinner,
     UserTableComponent,
-    TranslocoDirective
+    TranslocoDirective,
+    AppFormFieldComponent
   ],
   templateUrl: './user-list.component.html',
   styleUrl: './user-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UserListComponent implements OnInit {
-  readonly #fb = inject(FormBuilder);
   readonly #usersStore = inject(UsersStore);
   readonly #snackBar = inject(MatSnackBar);
   readonly #dialog = inject(MatDialog);
@@ -83,13 +86,10 @@ export class UserListComponent implements OnInit {
   readonly #notificationsService = inject(NotificationsService);
   readonly #translocoService = inject(TranslocoService);
 
-  readonly filterForm: FormGroup<UserFilterFormType> =
-    this.#fb.group<UserFilterFormType>({
-      email: this.#fb.control('', { nonNullable: true }),
-      firstName: this.#fb.control('', { nonNullable: true }),
-      lastName: this.#fb.control('', { nonNullable: true }),
-      isActive: this.#fb.control('', { nonNullable: true })
-    });
+  readonly filterModel = signal<FilterModel>({ ...INITIAL_FILTER });
+  readonly filterForm = form(this.filterModel);
+
+  readonly isActiveFilter = signal('');
 
   readonly loading = this.#usersStore.loading;
   readonly totalUsers = this.#usersStore.totalUsers;
@@ -165,18 +165,19 @@ export class UserListComponent implements OnInit {
   }
 
   onSubmit(): void {
-    const filters = this.#buildFilters(this.filterForm.getRawValue());
+    const formValues = this.filterModel();
+    const filters = this.#buildFilters({
+      ...formValues,
+      isActive: this.isActiveFilter()
+    });
     this.#usersStore.setFilters(filters);
     this.#usersStore.load();
   }
 
   resetForm(): void {
-    this.filterForm.reset({
-      email: '',
-      firstName: '',
-      lastName: '',
-      isActive: ''
-    });
+    this.filterModel.set({ ...INITIAL_FILTER });
+    this.isActiveFilter.set('');
+    this.filterForm().reset();
     this.#usersStore.setFilters({});
     this.#usersStore.load();
   }
@@ -229,9 +230,7 @@ export class UserListComponent implements OnInit {
       });
   }
 
-  #buildFilters(
-    formValues: FormGroup<UserFilterFormType>['value']
-  ): UserSearch {
+  #buildFilters(formValues: FilterModel): UserSearch {
     const filters: UserSearch = {};
 
     if (formValues.email?.trim()) filters.email = formValues.email;
