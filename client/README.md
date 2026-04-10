@@ -64,7 +64,7 @@ src/app/
     │   ├── confirm-dialog/            # Confirmation dialog
     │   ├── keyboard-shortcuts-help/   # KeyboardShortcutsHelpComponent — Material dialog listing active shortcuts grouped by category
     │   └── password-toggle/           # PasswordToggleComponent (reusable password visibility toggle)
-    ├── forms/              # AriaErrorDirective ([appAriaError]) — links matInput to mat-error via aria-describedby (WCAG 1.3.1 / 3.3.1)
+    ├── forms/              # AppFormFieldComponent (Signal Forms wrapper), AriaErrorDirective, DEFAULT_ERROR_KEYS registry
     ├── models/             # user.types
     └── utils/              # css.utils, dialog.utils (DialogSize enum + dialogSizeConfig())
 ```
@@ -167,7 +167,7 @@ npm test
   - `mock-data.ts` — `MockUser` type, `defaultUser`, factory re-exports (`createMockUser`, `createOAuthAccount`)
   - `helpers.ts` — `loginViaUi()`, `expectAuthRedirect()`, `expectForbiddenRedirect()`
 - Test structure: organized by module in `e2e/auth/` and `e2e/users/`
-- Coverage: 104 tests — unit test suite: 374 tests passing covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search, admin roles/resources management. User list and search tests updated to work with server-side paginated responses from mock-server. Error translation tests verify `errorKey` → Transloco pipeline for login, register, and global interceptor snackbar.
+- Coverage: 119 tests — unit test suite: 482 tests passing covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search, admin roles/resources management. User list and search tests updated to work with server-side paginated responses from mock-server. Error translation tests verify `errorKey` → Transloco pipeline for login, register, and global interceptor snackbar.
 - Workers: 4 (fully parallel, per-worker mock-server instances on dynamic ports)
 
 ```bash
