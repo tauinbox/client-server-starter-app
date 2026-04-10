@@ -13,7 +13,7 @@
 
   .error-container {
     .error-icon {
-      color: var(--color-error);
+      color: var(--mat-sys-error);
     }
 
     @include mix.empty-state;
@@ -31,7 +31,7 @@
     justify-content: center;
     width: func.rem(80);
     height: func.rem(80);
-    background-color: var(--color-border);
+    background-color: var(--mat-sys-outline-variant);
     border-radius: vars.$border-radius-circle;
 
     mat-icon {

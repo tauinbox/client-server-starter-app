@@ -76,7 +76,7 @@ fieldset {
 
 // Standardize focus styles
 :focus-visible {
-  outline: func.rem(2) solid var(--color-primary);
+  outline: func.rem(2) solid var(--mat-sys-primary);
   outline-offset: func.rem(2);
 }
 
@@ -95,7 +95,7 @@ textarea {
   font-size: vars.$font-size-base;
   color: #fff;
   text-decoration: none;
-  background: var(--color-primary);
+  background: var(--mat-sys-primary);
   border-radius: vars.$border-radius-sm;
   transition: top vars.$transition-fast ease;
 

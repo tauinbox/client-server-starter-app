@@ -5,32 +5,15 @@
 // Only color is overridden here; typography and density come from :root.
 
 [data-theme='dark']:root {
-  // ── Semantic color aliases (dark overrides) ───────────────────────────────
-  --color-scheme: dark;
-  --color-primary: var(--mat-sys-primary);
-  --color-accent: var(--mat-sys-tertiary);
-  --color-warn: var(--mat-sys-error);
-  --color-error: var(--mat-sys-error);
-
-  // State colors — lighter variants for dark backgrounds
-  --color-success: #66bb6a;
-  --color-info: #29b6f6;
-  --color-warning: #ffa726;
-
-  // Surface / background
-  --color-background: var(--mat-sys-background);
+  // ── App-level semantic tokens (dark overrides) ────────────────────────────
+  --app-color-scheme: dark;
+  --app-success: #66bb6a;
+  --app-info: #29b6f6;
+  --app-warning: #ffa726;
+  --app-text-tertiary: color-mix(in srgb, var(--mat-sys-on-surface) 38%, transparent);
 
   // Sidenav uses a slightly elevated surface so it stands out from page content
   --mat-sidenav-container-background-color: var(--mat-sys-surface-container);
-
-  // Text
-  --color-text-primary: var(--mat-sys-on-surface);
-  --color-text-secondary: var(--mat-sys-on-surface-variant);
-  --color-text-tertiary: color-mix(in srgb, var(--mat-sys-on-surface) 38%, transparent);
-
-  // Borders & dividers
-  --color-border: var(--mat-sys-outline-variant);
-  --color-divider: var(--mat-sys-outline-variant);
 
   @include mat.theme((
     color: (
