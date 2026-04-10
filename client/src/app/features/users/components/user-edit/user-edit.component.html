@@ -68,7 +68,9 @@
                   <mat-option [value]="role.id">{{ role.name }}</mat-option>
                 }
               </mat-select>
-              <mat-icon matPrefix>admin_panel_settings</mat-icon>
+              <mat-icon matPrefix aria-hidden="true"
+                >admin_panel_settings</mat-icon
+              >
             </mat-form-field>
           }
 
@@ -142,7 +144,7 @@
               {{ t('common.cancel') }}
             </button>
 
-            <button mat-raised-button color="primary" type="submit">
+            <button mat-flat-button color="primary" type="submit">
               @if (saving()) {
                 <mat-spinner diameter="24"></mat-spinner>
                 <span class="ml-2">{{ t('users.edit.saving') }}</span>
@@ -157,7 +159,7 @@
           <mat-icon class="error-icon">error_outline</mat-icon>
           <h3>{{ t('users.edit.notFoundTitle') }}</h3>
           <p>{{ t('users.edit.notFoundMessage') }}</p>
-          <button mat-raised-button color="primary" routerLink="/admin/users">
+          <button mat-flat-button color="primary" routerLink="/admin/users">
             {{ t('users.edit.backToUsers') }}
           </button>
         </div>
