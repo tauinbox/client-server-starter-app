@@ -7,22 +7,19 @@ import {
   signal
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import type { FormControl, FormGroup } from '@angular/forms';
+import {
+  form,
+  maxLength,
+  pattern,
+  readonly as readonlyField,
+  required
+} from '@angular/forms/signals';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
   MatDialogModule,
   MatDialogRef
 } from '@angular/material/dialog';
-import {
-  MatError,
-  MatFormField,
-  MatHint,
-  MatLabel
-} from '@angular/material/form-field';
-import { MatInput } from '@angular/material/input';
-import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
@@ -33,15 +30,16 @@ import type {
 } from '../../../services/rbac-admin.service';
 import { ResourcesStore } from '../../../store/resources.store';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
+import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 
 export type ActionFormDialogData = {
   action?: ActionResponse;
 };
 
-type ActionFormType = {
-  name: FormControl<string>;
-  displayName: FormControl<string>;
-  description: FormControl<string>;
+type ActionFormData = {
+  name: string;
+  displayName: string;
+  description: string;
 };
 
 const ACTION_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
@@ -49,24 +47,17 @@ const ACTION_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
 @Component({
   selector: 'app-action-form-dialog',
   imports: [
-    ReactiveFormsModule,
     MatDialogModule,
     MatButtonModule,
-    MatFormField,
-    MatLabel,
-    MatError,
-    MatHint,
-    MatInput,
-    AriaErrorDirective,
     MatProgressSpinner,
-    TranslocoDirective
+    TranslocoDirective,
+    AppFormFieldComponent
   ],
   templateUrl: './action-form-dialog.component.html',
   styleUrl: './action-form-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ActionFormDialogComponent implements OnInit, OnDestroy {
-  readonly #fb = inject(FormBuilder);
   readonly #dialogRef = inject(MatDialogRef<ActionFormDialogComponent>);
   readonly #resourcesStore = inject(ResourcesStore);
   readonly #snackBar = inject(MatSnackBar);
@@ -79,34 +70,26 @@ export class ActionFormDialogComponent implements OnInit, OnDestroy {
 
   protected readonly isEdit = !!this.data.action;
 
-  protected readonly form: FormGroup<ActionFormType> =
-    this.#fb.group<ActionFormType>({
-      name: this.#fb.control(this.data.action?.name ?? '', {
-        validators: [
-          Validators.required,
-          Validators.maxLength(50),
-          Validators.pattern(ACTION_NAME_PATTERN)
-        ],
-        nonNullable: true
-      }),
-      displayName: this.#fb.control(this.data.action?.displayName ?? '', {
-        validators: [Validators.required, Validators.maxLength(100)],
-        nonNullable: true
-      }),
-      description: this.#fb.control(this.data.action?.description ?? '', {
-        validators: [Validators.maxLength(500)],
-        nonNullable: true
-      })
-    });
+  readonly actionModel = signal<ActionFormData>({
+    name: this.data.action?.name ?? '',
+    displayName: this.data.action?.displayName ?? '',
+    description: this.data.action?.description ?? ''
+  });
+
+  readonly actionForm = form(this.actionModel, (path) => {
+    required(path.name);
+    maxLength(path.name, 50);
+    pattern(path.name, ACTION_NAME_PATTERN);
+    required(path.displayName);
+    maxLength(path.displayName, 100);
+    maxLength(path.description, 500);
+    if (this.isEdit) {
+      readonlyField(path.name);
+    }
+  });
 
   protected readonly isLoading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
-
-  constructor() {
-    if (this.isEdit) {
-      this.form.get('name')?.disable();
-    }
-  }
 
   ngOnInit(): void {
     this.#cleanupSave = this.#shortcuts.registerSave(
@@ -120,11 +103,21 @@ export class ActionFormDialogComponent implements OnInit, OnDestroy {
     this.#cleanupSave?.();
   }
 
-  submit(): void {
-    if (this.form.invalid || this.isLoading()) return;
-    if (this.isEdit && !this.form.dirty) return;
+  protected get formChanged(): boolean {
+    const current = this.actionModel();
+    const action = this.data.action;
+    if (!action) return true;
+    return (
+      current.displayName !== action.displayName ||
+      current.description !== (action.description ?? '')
+    );
+  }
 
-    const { name, displayName, description } = this.form.getRawValue();
+  submit(): void {
+    if (this.actionForm().invalid() || this.isLoading()) return;
+    if (this.isEdit && !this.formChanged) return;
+
+    const { name, displayName, description } = this.actionModel();
 
     this.isLoading.set(true);
     this.errorMessage.set(null);

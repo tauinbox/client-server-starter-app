@@ -2,39 +2,18 @@
   <h2 mat-dialog-title>{{ t('admin.resourceForm.editTitle') }}</h2>
 
   <mat-dialog-content>
-    <form [formGroup]="form" (ngSubmit)="submit()">
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>{{ t('admin.resourceForm.displayNameLabel') }}</mat-label>
-        <input
-          matInput
-          appAriaError
-          formControlName="displayName"
-          [placeholder]="t('admin.resourceForm.displayNamePlaceholder')"
-        />
-        <mat-hint>{{
-          t('admin.resourceForm.internalNameHint', {
-            name: data.resource.name
-          })
-        }}</mat-hint>
-        <mat-error>
-          @if (form.get('displayName')?.errors?.['required']) {
-            {{ t('admin.resourceForm.displayNameRequired') }}
-          } @else if (form.get('displayName')?.errors?.['maxlength']) {
-            {{ t('admin.resourceForm.displayNameMaxLength') }}
-          }
-        </mat-error>
-      </mat-form-field>
+    <form (submit)="$event.preventDefault(); submit()">
+      <app-form-field
+        [field]="resourceForm.displayName"
+        label="admin.resourceForm.displayNameLabel"
+        hint="admin.resourceForm.internalNameHint"
+      />
 
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>{{ t('admin.resourceForm.descriptionLabel') }}</mat-label>
-        <textarea
-          matInput
-          appAriaError
-          formControlName="description"
-          [placeholder]="t('admin.resourceForm.descriptionPlaceholder')"
-          rows="3"
-        ></textarea>
-      </mat-form-field>
+      <app-form-field
+        [field]="resourceForm.description"
+        label="admin.resourceForm.descriptionLabel"
+        type="textarea"
+      />
     </form>
 
     <mat-divider />
@@ -93,7 +72,7 @@
       mat-raised-button
       color="primary"
       type="button"
-      [disabled]="form.invalid || !isDirty || isLoading()"
+      [disabled]="resourceForm().invalid() || !isDirty || isLoading()"
       (click)="submit()"
     >
       @if (isLoading()) {

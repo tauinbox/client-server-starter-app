@@ -157,7 +157,7 @@ describe('UserListComponent', () => {
 
   describe('onSubmit', () => {
     it('should set filters and load when isActive is "Active"', () => {
-      component.filterForm.patchValue({ isActive: 'true' });
+      component.isActiveFilter.set('true');
       component.onSubmit();
 
       expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
@@ -167,7 +167,7 @@ describe('UserListComponent', () => {
     });
 
     it('should set filters and load when isActive is "Inactive"', () => {
-      component.filterForm.patchValue({ isActive: 'false' });
+      component.isActiveFilter.set('false');
       component.onSubmit();
 
       expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
@@ -176,7 +176,7 @@ describe('UserListComponent', () => {
     });
 
     it('should exclude isActive when Status is "All"', () => {
-      component.filterForm.patchValue({ isActive: '' });
+      component.isActiveFilter.set('');
       component.onSubmit();
 
       expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
@@ -187,17 +187,24 @@ describe('UserListComponent', () => {
 
   describe('resetForm', () => {
     it('should clear filters and reload', () => {
-      component.filterForm.patchValue({ email: 'test@example.com' });
+      component.filterModel.set({
+        email: 'test@example.com',
+        firstName: '',
+        lastName: '',
+        isActive: ''
+      });
+      component.isActiveFilter.set('true');
       component.resetForm();
 
       expect(usersStoreMock.setFilters).toHaveBeenCalledWith({});
       expect(usersStoreMock.load).toHaveBeenCalledTimes(2);
-      expect(component.filterForm.getRawValue()).toEqual({
+      expect(component.filterModel()).toEqual({
         email: '',
         firstName: '',
         lastName: '',
         isActive: ''
       });
+      expect(component.isActiveFilter()).toBe('');
     });
   });
 

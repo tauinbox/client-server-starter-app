@@ -8,7 +8,7 @@ import {
   input,
   signal
 } from '@angular/core';
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   MatCard,
   MatCardContent,
@@ -17,20 +17,15 @@ import {
 } from '@angular/material/card';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
-import { AriaErrorDirective } from '@shared/forms/aria-error.directive';
 import { Router, RouterLink } from '@angular/router';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import type { FormControl, FormGroup } from '@angular/forms';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { email, form, minLength, required } from '@angular/forms/signals';
 import {
-  MatError,
   MatFormField,
   MatLabel,
-  MatPrefix,
-  MatSuffix
+  MatPrefix
 } from '@angular/material/form-field';
-import { MatInput } from '@angular/material/input';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { MatChipSet, MatChip, MatChipAvatar } from '@angular/material/chips';
 import { MatSelect } from '@angular/material/select';
@@ -44,20 +39,27 @@ import type { UpdateUser, User } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import { catchError, forkJoin, merge, of, tap } from 'rxjs';
+import { catchError, forkJoin, of, tap } from 'rxjs';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { UsersStore } from '../../store/users.store';
 import type { RoleResponse } from '@app/shared/types/role.types';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
+import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 
-type UserFormType = {
-  email: FormControl<string>;
-  firstName: FormControl<string>;
-  lastName: FormControl<string>;
-  password: FormControl<string>;
-  isActive: FormControl<boolean>;
+type UserFormData = {
+  email: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+};
+
+const INITIAL_USER_FORM: UserFormData = {
+  email: '',
+  firstName: '',
+  lastName: '',
+  password: ''
 };
 
 @Component({
@@ -67,34 +69,29 @@ type UserFormType = {
     MatCardHeader,
     MatCardTitle,
     MatLabel,
-    MatError,
     MatIconButton,
     RouterLink,
     MatIcon,
     MatCardContent,
     MatProgressSpinner,
-    ReactiveFormsModule,
     MatFormField,
-    MatInput,
-    AriaErrorDirective,
     MatCheckbox,
     MatChipSet,
     MatChip,
     MatChipAvatar,
     MatButton,
     PasswordToggleComponent,
-    MatSuffix,
     MatPrefix,
     MatSelect,
     MatOption,
-    TranslocoDirective
+    TranslocoDirective,
+    AppFormFieldComponent
   ],
   templateUrl: './user-edit.component.html',
   styleUrl: './user-edit.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UserEditComponent implements OnInit, OnDestroy {
-  readonly #fb = inject(FormBuilder);
   readonly #userService = inject(UserService);
   readonly #roleService = inject(RoleService);
   readonly #usersStore = inject(UsersStore);
@@ -114,37 +111,32 @@ export class UserEditComponent implements OnInit, OnDestroy {
   readonly availableRoles = signal<RoleResponse[]>([]);
   readonly selectedRoleIds = signal<string[]>([]);
   readonly #initialRoleIds = signal<string[]>([]);
+  readonly isActive = signal(true);
+  readonly #initialIsActive = signal(true);
 
   #cleanupSave: (() => void) | null = null;
 
-  protected readonly userForm: FormGroup<UserFormType> =
-    this.#fb.group<UserFormType>({
-      email: this.#fb.control('', {
-        validators: [Validators.required, Validators.email],
-        nonNullable: true,
-        updateOn: 'blur'
-      }),
-      firstName: this.#fb.control('', {
-        validators: [Validators.required],
-        nonNullable: true,
-        updateOn: 'blur'
-      }),
-      lastName: this.#fb.control('', {
-        validators: [Validators.required],
-        nonNullable: true,
-        updateOn: 'blur'
-      }),
-      password: this.#fb.control('', {
-        validators: [Validators.minLength(8)],
-        nonNullable: true
-      }),
-      isActive: this.#fb.control(true, { nonNullable: true })
-    });
+  readonly userModel = signal<UserFormData>({ ...INITIAL_USER_FORM });
+  readonly #initialFormData = signal<UserFormData>({ ...INITIAL_USER_FORM });
 
-  readonly #formChanged = toSignal(
-    merge(this.userForm.statusChanges, this.userForm.valueChanges),
-    { initialValue: null }
-  );
+  readonly userForm = form(this.userModel, (path) => {
+    required(path.email, { message: 'users.edit.emailRequired' });
+    email(path.email, { message: 'users.edit.emailInvalid' });
+    required(path.firstName, { message: 'users.edit.firstNameRequired' });
+    required(path.lastName, { message: 'users.edit.lastNameRequired' });
+    minLength(path.password, 8);
+  });
+
+  protected readonly formChanged = computed(() => {
+    const current = this.userModel();
+    const initial = this.#initialFormData();
+    return (
+      current.email !== initial.email ||
+      current.firstName !== initial.firstName ||
+      current.lastName !== initial.lastName ||
+      current.password !== initial.password
+    );
+  });
 
   protected readonly rolesChanged = computed(() => {
     const initial = this.#initialRoleIds();
@@ -153,12 +145,16 @@ export class UserEditComponent implements OnInit, OnDestroy {
     return selected.some((id) => !initial.includes(id));
   });
 
+  protected readonly isActiveChanged = computed(
+    () => this.isActive() !== this.#initialIsActive()
+  );
+
   protected readonly canSubmit = computed(() => {
-    this.#formChanged(); // track form status/value changes to re-read form state
+    const state = this.userForm();
     return (
-      this.userForm.valid &&
+      state.valid() &&
       !this.saving() &&
-      (this.userForm.dirty || this.rolesChanged())
+      (this.formChanged() || this.rolesChanged() || this.isActiveChanged())
     );
   });
 
@@ -215,14 +211,17 @@ export class UserEditComponent implements OnInit, OnDestroy {
           this.availableRoles.set(roles);
           this.user.set(user);
 
-          this.userForm.patchValue({
+          const formData: UserFormData = {
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
-            isActive: user.isActive,
             password: ''
-          });
-          this.userForm.markAsPristine();
+          };
+          this.userModel.set(formData);
+          this.#initialFormData.set({ ...formData });
+          this.isActive.set(user.isActive);
+          this.#initialIsActive.set(user.isActive);
+          this.userForm().reset();
 
           const roleIds = user.roles.map((role) => role.id);
           this.#initialRoleIds.set(roleIds);
@@ -258,8 +257,8 @@ export class UserEditComponent implements OnInit, OnDestroy {
     const ops: Observable<unknown>[] = [];
     let updatedUser: User | null = null;
 
-    if (this.userForm.dirty) {
-      const updateData = this.#prepareUpdateData(this.userForm.getRawValue());
+    if (this.formChanged() || this.isActiveChanged()) {
+      const updateData = this.#prepareUpdateData();
       ops.push(
         this.#usersStore.updateUser(this.id(), updateData).pipe(
           tap((user) => {
@@ -297,8 +296,10 @@ export class UserEditComponent implements OnInit, OnDestroy {
           }
 
           this.#initialRoleIds.set([...this.selectedRoleIds()]);
-          this.userForm.patchValue({ password: '' });
-          this.userForm.markAsPristine();
+          this.#initialIsActive.set(this.isActive());
+          this.userModel.update((m) => ({ ...m, password: '' }));
+          this.#initialFormData.set({ ...this.userModel() });
+          this.userForm().reset();
 
           this.#snackBar.open(
             this.#translocoService.translate('users.edit.successUpdated'),
@@ -315,19 +316,20 @@ export class UserEditComponent implements OnInit, OnDestroy {
       });
   }
 
-  #prepareUpdateData(formValues: FormGroup<UserFormType>['value']): UpdateUser {
+  #prepareUpdateData(): UpdateUser {
+    const { email: emailVal, firstName, lastName, password } = this.userModel();
     const updateData: UpdateUser = {
-      email: formValues.email,
-      firstName: formValues.firstName,
-      lastName: formValues.lastName
+      email: emailVal,
+      firstName,
+      lastName
     };
 
-    if (formValues.password?.trim()) {
-      updateData.password = formValues.password;
+    if (password?.trim()) {
+      updateData.password = password;
     }
 
     if (this.canManageUser()) {
-      updateData.isActive = formValues.isActive;
+      updateData.isActive = this.isActive();
     }
 
     return updateData;

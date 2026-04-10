@@ -10,41 +10,17 @@
       <p class="system-role-warning">{{ t('admin.roleForm.systemWarning') }}</p>
     }
 
-    <form [formGroup]="form" (ngSubmit)="submit()">
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>{{ t('admin.roleForm.nameLabel') }}</mat-label>
-        <input
-          matInput
-          appAriaError
-          formControlName="name"
-          [placeholder]="t('admin.roleForm.namePlaceholder')"
-          [readonly]="isSystemRole"
-        />
-        <mat-error>
-          @if (form.get('name')?.errors?.['required']) {
-            {{ t('admin.roleForm.nameRequired') }}
-          } @else if (form.get('name')?.errors?.['maxlength']) {
-            {{ t('admin.roleForm.nameMaxLength') }}
-          }
-        </mat-error>
-      </mat-form-field>
+    <form (submit)="$event.preventDefault(); submit()">
+      <app-form-field
+        [field]="roleForm.name"
+        label="admin.roleForm.nameLabel"
+      />
 
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>{{ t('admin.roleForm.descriptionLabel') }}</mat-label>
-        <textarea
-          matInput
-          appAriaError
-          formControlName="description"
-          [placeholder]="t('admin.roleForm.descriptionPlaceholder')"
-          rows="3"
-          [readonly]="isSystemRole"
-        ></textarea>
-        <mat-error>
-          @if (form.get('description')?.errors?.['maxlength']) {
-            {{ t('admin.roleForm.descriptionMaxLength') }}
-          }
-        </mat-error>
-      </mat-form-field>
+      <app-form-field
+        [field]="roleForm.description"
+        label="admin.roleForm.descriptionLabel"
+        type="textarea"
+      />
     </form>
   </mat-dialog-content>
 
@@ -57,7 +33,7 @@
         mat-raised-button
         color="primary"
         type="button"
-        [disabled]="form.invalid || !form.dirty"
+        [disabled]="roleForm().invalid() || !formChanged"
         (click)="submit()"
       >
         {{
