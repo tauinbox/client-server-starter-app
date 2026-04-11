@@ -83,6 +83,11 @@
           <h3>{{ t('users.list.noUsers') }}</h3>
           <p>{{ t('users.list.noUsersMessage') }}</p>
         </div>
+      } @else if (layout.isHandset()) {
+        <app-user-card-list
+          [users]="displayedUsers()"
+          (deleteUser)="confirmDelete($event)"
+        />
       } @else {
         <app-user-table
           [users]="displayedUsers()"

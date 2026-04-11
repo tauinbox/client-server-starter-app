@@ -1,0 +1,128 @@
+<div class="user-card-list" *transloco="let t; scope: 'users'">
+  @for (user of users(); track trackById($index, user)) {
+    <mat-card appearance="outlined" class="user-card">
+      <mat-card-header>
+        <div class="user-card-avatar" mat-card-avatar aria-hidden="true">
+          <mat-icon>person</mat-icon>
+        </div>
+        <mat-card-title>
+          {{ user.firstName }} {{ user.lastName }}
+        </mat-card-title>
+        <mat-card-subtitle class="user-card-email">
+          {{ user.email }}
+        </mat-card-subtitle>
+        <button
+          mat-icon-button
+          class="user-card-menu-trigger"
+          [matMenuTriggerFor]="actionsMenu"
+          [matMenuTriggerData]="{ user: user }"
+          [matTooltip]="t('users.table.columnActions')"
+          [attr.aria-label]="
+            t('users.table.columnActions') +
+            ': ' +
+            user.firstName +
+            ' ' +
+            user.lastName
+          "
+        >
+          <mat-icon>more_vert</mat-icon>
+        </button>
+      </mat-card-header>
+
+      <mat-card-content>
+        <dl class="user-card-fields">
+          <dt>{{ t('users.table.columnId') }}</dt>
+          <dd class="user-card-id" [title]="user.id">{{ user.id }}</dd>
+
+          <dt>{{ t('users.table.columnStatus') }}</dt>
+          <dd>
+            @if (user.isActive) {
+              <mat-chip color="accent" highlighted>{{
+                t('common.active')
+              }}</mat-chip>
+            } @else {
+              <mat-chip color="warn" highlighted>{{
+                t('common.inactive')
+              }}</mat-chip>
+            }
+          </dd>
+
+          <dt>{{ t('users.table.columnRole') }}</dt>
+          <dd>
+            @if (isAdmin(user)) {
+              <mat-chip color="primary" highlighted>{{
+                t('users.table.roleAdmin')
+              }}</mat-chip>
+            } @else {
+              <mat-chip>{{ t('users.table.roleUser') }}</mat-chip>
+            }
+          </dd>
+
+          <dt>{{ t('users.table.columnCreated') }}</dt>
+          <dd>{{ user.createdAt | date: 'medium' }}</dd>
+        </dl>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <mat-menu #actionsMenu="matMenu">
+    <ng-template matMenuContent let-user="user">
+      <a
+        mat-menu-item
+        [routerLink]="['/admin/users', user.id]"
+        [attr.aria-label]="
+          t('users.table.actionViewDetailsAria', {
+            firstName: user.firstName,
+            lastName: user.lastName
+          })
+        "
+      >
+        <mat-icon>visibility</mat-icon>
+        <span>{{ t('users.table.actionViewDetails') }}</span>
+      </a>
+      <ng-container
+        *appRequirePermissions="{
+          action: 'update',
+          subject: 'User',
+          instance: user
+        }"
+      >
+        <a
+          mat-menu-item
+          [routerLink]="['/admin/users', user.id, 'edit']"
+          [attr.aria-label]="
+            t('users.table.actionEditAria', {
+              firstName: user.firstName,
+              lastName: user.lastName
+            })
+          "
+        >
+          <mat-icon>edit</mat-icon>
+          <span>{{ t('users.table.actionEdit') }}</span>
+        </a>
+      </ng-container>
+      <ng-container
+        *appRequirePermissions="{
+          action: 'delete',
+          subject: 'User',
+          instance: user
+        }"
+      >
+        <button
+          mat-menu-item
+          type="button"
+          (click)="deleteUser.emit(user)"
+          [attr.aria-label]="
+            t('users.table.actionDeleteAria', {
+              firstName: user.firstName,
+              lastName: user.lastName
+            })
+          "
+        >
+          <mat-icon>delete</mat-icon>
+          <span>{{ t('users.table.actionDelete') }}</span>
+        </button>
+      </ng-container>
+    </ng-template>
+  </mat-menu>
+</div>

@@ -1,0 +1,77 @@
+@use 'abstracts/variables' as vars;
+@use 'abstracts/functions' as func;
+
+:host {
+  display: block;
+  width: 100%;
+
+  .user-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: vars.$spacing-sm;
+    padding-block: vars.$spacing-sm;
+  }
+
+  .user-card {
+    width: 100%;
+  }
+
+  // Position the menu trigger as the header suffix action.
+  // mat-card-header uses CSS grid; the icon button goes to the far right.
+  .user-card-menu-trigger {
+    margin-inline-start: auto;
+  }
+
+  .user-card-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--mat-sys-on-primary-container);
+    background: var(--mat-sys-primary-container);
+
+    mat-icon {
+      width: func.rem(24);
+      height: func.rem(24);
+      font-size: func.rem(24);
+    }
+  }
+
+  .user-card-email {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .user-card-fields {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: vars.$spacing-xs vars.$spacing-md;
+    margin: 0;
+
+    dt {
+      align-self: center;
+      font-size: vars.$font-size-sm;
+      font-weight: 500;
+      color: var(--mat-sys-on-surface-variant);
+    }
+
+    dd {
+      align-self: center;
+      min-width: 0;
+      margin: 0;
+      font-size: vars.$font-size-sm;
+    }
+  }
+
+  .user-card-id {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: monospace;
+    white-space: nowrap;
+  }
+
+  mat-chip {
+    min-height: func.rem(24);
+    font-size: vars.$font-size-sm;
+  }
+}

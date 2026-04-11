@@ -32,7 +32,7 @@ All components are standalone (no NgModules) with `OnPush` change detection and 
 
 ```
 src/app/
-├── core/                   # Header, sidenav, theme toggle, storage/session-storage services, error interceptor, 404 page, NotificationsService (SSE)
+├── core/                   # Header, sidenav, theme toggle, storage/session-storage services, error interceptor, 404 page, NotificationsService (SSE), LayoutService (CDK Breakpoints → signals: isHandset/isTablet/isWeb)
 ├── features/
 │   ├── auth/               # Login, register, profile, OAuth callback, verify-email, forgot-password, reset-password, forbidden
 │   │   ├── casl/           # app-ability.ts — AppAbility, Actions, Subjects (auto-generated KnownSubjects + AnyObject), PermissionCheck (action, subject, instance?)
@@ -43,7 +43,8 @@ src/app/
 │   │   └── store/          # AuthStore (NgRx Signal Store — state: accessToken (memory) + user (auth_user localStorage) + ability: AppAbility|null), RbacMetadataStore
 │   ├── users/              # User list (with inline filters), detail, edit (admin)
 │   │   ├── components/
-│   │   │   └── user-table/ # UserTableComponent (shared table; sorting + actions only, no paginator)
+│   │   │   ├── user-table/     # UserTableComponent (shared table; sorting + actions only, no paginator) — shown on tablet/desktop
+│   │   │   └── user-card-list/ # UserCardListComponent — mat-card grid with per-user action menu; shown on handset (via LayoutService.isHandset())
 │   │   └── store/          # UsersStore (NgRx Signal Store, route-level)
 │   └── admin/              # Admin panel (roles + resource + user management)
 │       ├── admin.routes.ts # Lazy-loaded child routes under /admin

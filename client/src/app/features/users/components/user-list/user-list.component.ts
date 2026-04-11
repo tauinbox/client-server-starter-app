@@ -29,6 +29,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { filter, merge } from 'rxjs';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { LayoutService } from '@core/services/layout.service';
 import { NotificationsService } from '@core/services/notifications.service';
 import type { User, UserSearch, UserSortColumn } from '../../models/user.types';
 import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
@@ -38,6 +39,7 @@ import {
   COLUMN_TO_SORT_MAP,
   UserTableComponent
 } from '../user-table/user-table.component';
+import { UserCardListComponent } from '../user-card-list/user-card-list.component';
 import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 
 type FilterModel = {
@@ -70,6 +72,7 @@ const INITIAL_FILTER: FilterModel = {
     MatDivider,
     MatProgressSpinner,
     UserTableComponent,
+    UserCardListComponent,
     TranslocoDirective,
     AppFormFieldComponent
   ],
@@ -85,6 +88,8 @@ export class UserListComponent implements OnInit {
   readonly #injector = inject(Injector);
   readonly #notificationsService = inject(NotificationsService);
   readonly #translocoService = inject(TranslocoService);
+
+  readonly layout = inject(LayoutService);
 
   readonly filterModel = signal<FilterModel>({ ...INITIAL_FILTER });
   readonly filterForm = form(this.filterModel);
