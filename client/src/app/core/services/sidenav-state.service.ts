@@ -1,33 +1,27 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { BreakpointObserver } from '@angular/cdk/layout';
-import { map } from 'rxjs';
 import { AuthStore } from '@features/auth/store/auth.store';
+import { LayoutService } from './layout.service';
 import { LocalStorageService } from './local-storage.service';
 
 const WIDE_KEY = (userId: string) => `sidenav_wide_${userId}`;
 
 const NAV_WIDTH_NARROW = '4rem';
 const NAV_WIDTH_WIDE = '13.75rem';
-const MOBILE_BREAKPOINT = '(max-width: 599px)';
 
 @Injectable({ providedIn: 'root' })
 export class SidenavStateService {
   readonly #storage = inject(LocalStorageService);
   readonly #authStore = inject(AuthStore);
-  readonly #breakpointObserver = inject(BreakpointObserver);
+  readonly #layout = inject(LayoutService);
 
   readonly #isWide = signal(false);
   readonly #mobileOpen = signal(false);
 
   readonly isWide = this.#isWide.asReadonly();
 
-  readonly isMobile = toSignal(
-    this.#breakpointObserver
-      .observe(MOBILE_BREAKPOINT)
-      .pipe(map((r) => r.matches)),
-    { initialValue: false }
-  );
+  // Delegate to LayoutService so all responsive logic funnels through a single
+  // source. The API name stays `isMobile` to avoid churn in sidenav callers.
+  readonly isMobile = computed(() => this.#layout.isHandset());
 
   readonly sidenavOpened = computed(() => {
     if (this.isMobile()) return this.#mobileOpen();
