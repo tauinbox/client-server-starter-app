@@ -26,14 +26,12 @@ import { MatDivider } from '@angular/material/divider';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import type { Sort } from '@angular/material/sort';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatDialog } from '@angular/material/dialog';
 import { filter, merge } from 'rxjs';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { LayoutService } from '@core/services/layout.service';
 import { NotificationsService } from '@core/services/notifications.service';
 import type { User, UserSearch, UserSortColumn } from '../../models/user.types';
-import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
-import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
+import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { UsersStore } from '../../store/users.store';
 import {
   COLUMN_TO_SORT_MAP,
@@ -83,7 +81,7 @@ const INITIAL_FILTER: FilterModel = {
 export class UserListComponent implements OnInit {
   readonly #usersStore = inject(UsersStore);
   readonly #snackBar = inject(MatSnackBar);
-  readonly #dialog = inject(MatDialog);
+  readonly #adaptiveDialog = inject(AdaptiveDialogService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #injector = inject(Injector);
   readonly #notificationsService = inject(NotificationsService);
@@ -188,9 +186,8 @@ export class UserListComponent implements OnInit {
   }
 
   confirmDelete(user: User): void {
-    const dialogRef = this.#dialog.open(ConfirmDialogComponent, {
-      ...dialogSizeConfig(DialogSize.Confirm),
-      data: {
+    this.#adaptiveDialog
+      .openConfirm({
         title: this.#translocoService.translate(
           'users.list.confirmDeleteTitle'
         ),
@@ -200,11 +197,7 @@ export class UserListComponent implements OnInit {
         ),
         confirmButton: this.#translocoService.translate('common.delete'),
         cancelButton: this.#translocoService.translate('common.cancel')
-      }
-    });
-
-    dialogRef
-      .afterClosed()
+      })
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((result) => {
         if (result) {

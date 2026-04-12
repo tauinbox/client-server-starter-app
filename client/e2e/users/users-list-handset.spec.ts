@@ -101,7 +101,7 @@ test.describe('User List page — handset layout', () => {
     await expect(page).toHaveURL(/.*\/users\/1$/);
   });
 
-  test('should show confirmation dialog when deleting from card menu', async ({
+  test('should show confirmation as bottom sheet when deleting from card menu', async ({
     _mockServer,
     page
   }) => {
@@ -149,9 +149,19 @@ test.describe('User List page — handset layout', () => {
       .getByRole('menuitem', { name: 'Delete John Smith' })
       .click();
 
-    await expect(page.getByRole('dialog')).toBeVisible();
+    // On handset viewport, confirm opens as a bottom sheet instead of a dialog
+    const bottomSheet = page.locator('mat-bottom-sheet-container');
+    await expect(bottomSheet).toBeVisible();
     await expect(
       page.getByText(/Are you sure you want to delete user John Smith/)
+    ).toBeVisible();
+
+    // Verify both action buttons are present
+    await expect(
+      bottomSheet.getByRole('button', { name: 'Cancel' })
+    ).toBeVisible();
+    await expect(
+      bottomSheet.getByRole('button', { name: 'Delete' })
     ).toBeVisible();
   });
 });

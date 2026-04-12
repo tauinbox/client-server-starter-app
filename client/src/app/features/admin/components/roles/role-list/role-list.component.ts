@@ -37,7 +37,7 @@ import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { RoleResponse } from '@app/shared/types/role.types';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AuthService } from '@features/auth/services/auth.service';
-import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
+import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { RolesStore } from '../../../store/roles.store';
 import type {
@@ -81,6 +81,7 @@ import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-
 export class RoleListComponent implements OnInit {
   readonly #rolesStore = inject(RolesStore);
   readonly #dialog = inject(MatDialog);
+  readonly #adaptiveDialog = inject(AdaptiveDialogService);
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
   readonly #authService = inject(AuthService);
@@ -215,22 +216,18 @@ export class RoleListComponent implements OnInit {
   }
 
   confirmDelete(role: RoleResponse): void {
-    this.#dialog
-      .open(ConfirmDialogComponent, {
-        ...dialogSizeConfig(DialogSize.Confirm),
-        data: {
-          title: this.#translocoService.translate(
-            'admin.roles.confirmDeleteTitle'
-          ),
-          message: this.#translocoService.translate(
-            'admin.roles.confirmDeleteMessage',
-            { name: role.name }
-          ),
-          confirmButton: this.#translocoService.translate('common.delete'),
-          cancelButton: this.#translocoService.translate('common.cancel')
-        }
+    this.#adaptiveDialog
+      .openConfirm({
+        title: this.#translocoService.translate(
+          'admin.roles.confirmDeleteTitle'
+        ),
+        message: this.#translocoService.translate(
+          'admin.roles.confirmDeleteMessage',
+          { name: role.name }
+        ),
+        confirmButton: this.#translocoService.translate('common.delete'),
+        cancelButton: this.#translocoService.translate('common.cancel')
       })
-      .afterClosed()
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((confirmed: boolean | undefined) => {
         if (confirmed) {
