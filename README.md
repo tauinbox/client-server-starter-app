@@ -257,7 +257,7 @@ To apply multiple restrictions simultaneously, use `$and` in a single `custom` c
 - 404 and 403 pages
 - Version display in toolbar (version + git hash via `MatTooltip`)
 - **Collapsible side navigation** — persistent left panel (narrow 64px / wide 220px) with per-user localStorage persistence; auto-collapses to overlay mode on mobile (≤599px) via `BreakpointObserver`; hamburger button in toolbar opens the drawer
-- **Standardized dialog system** — `DialogSize` enum (`Confirm` / `Form` / `Wide`) with `dialogSizeConfig()` helper; all dialogs use Material Design 3 responsive `{ width: '90vw', maxWidth }` pattern; global `_dialogs.scss` handles title padding, Angular Material bug #26352 fix (floating label clipping), and `::before` spacer reset
+- **Standardized dialog system** — `DialogSize` enum (`Confirm` / `Form` / `Wide`) with `dialogSizeConfig()` helper; all dialogs use Material Design 3 responsive `{ width: '90vw', maxWidth }` pattern; global `_dialogs.scss` handles title padding, Angular Material bug #26352 fix (floating label clipping), and `::before` spacer reset. **Adaptive confirm dialogs** — `AdaptiveDialogService.openConfirm()` opens confirm dialogs as bottom sheets on handset viewports and as standard dialogs on larger screens
 
 ### Versioning
 - All three workspaces share a single version (see `package.json`)
