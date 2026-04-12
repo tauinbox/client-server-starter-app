@@ -10,7 +10,6 @@
       <textarea
         matInput
         [formField]="field()"
-        [placeholder]="t(label())"
         [rows]="rows()"
         [autocomplete]="autocomplete() ?? 'off'"
         [attr.aria-describedby]="
@@ -22,7 +21,6 @@
         matInput
         [type]="type()"
         [formField]="field()"
-        [placeholder]="t(label())"
         [autocomplete]="autocomplete() ?? 'off'"
         [attr.aria-describedby]="
           field()().invalid() && field()().touched() ? errorId : null
