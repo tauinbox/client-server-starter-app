@@ -20,8 +20,8 @@ import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatChip } from '@angular/material/chips';
-import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog } from '@angular/material/dialog';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import {
   MatCell,
@@ -37,7 +37,7 @@ import {
 } from '@angular/material/table';
 import type { ActionResponse } from '@app/shared/types/rbac.types';
 import { AuthStore } from '@features/auth/store/auth.store';
-import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
+import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { ResourcesStore } from '../../../store/resources.store';
 import type { ActionFormDialogData } from '../action-form-dialog/action-form-dialog.component';
@@ -76,6 +76,7 @@ import { ActionFormDialogComponent } from '../action-form-dialog/action-form-dia
 export class ActionListComponent implements OnInit {
   readonly #resourcesStore = inject(ResourcesStore);
   readonly #dialog = inject(MatDialog);
+  readonly #adaptiveDialog = inject(AdaptiveDialogService);
   readonly #snackBar = inject(MatSnackBar);
   readonly #destroyRef = inject(DestroyRef);
   readonly #translocoService = inject(TranslocoService);
@@ -127,23 +128,19 @@ export class ActionListComponent implements OnInit {
   }
 
   confirmDeleteAction(action: ActionResponse): void {
-    this.#dialog
-      .open(ConfirmDialogComponent, {
-        ...dialogSizeConfig(DialogSize.Confirm),
-        data: {
-          title: this.#translocoService.translate(
-            'admin.actions.confirmDeleteTitle'
-          ),
-          message: this.#translocoService.translate(
-            'admin.actions.confirmDeleteMessage',
-            { name: action.displayName }
-          ),
-          confirmButton: this.#translocoService.translate('common.delete'),
-          cancelButton: this.#translocoService.translate('common.cancel'),
-          icon: 'warning'
-        }
+    this.#adaptiveDialog
+      .openConfirm({
+        title: this.#translocoService.translate(
+          'admin.actions.confirmDeleteTitle'
+        ),
+        message: this.#translocoService.translate(
+          'admin.actions.confirmDeleteMessage',
+          { name: action.displayName }
+        ),
+        confirmButton: this.#translocoService.translate('common.delete'),
+        cancelButton: this.#translocoService.translate('common.cancel'),
+        icon: 'warning'
       })
-      .afterClosed()
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((confirmed: boolean | undefined) => {
         if (confirmed) {

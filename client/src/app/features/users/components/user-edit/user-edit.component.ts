@@ -33,15 +33,13 @@ import { MatOption } from '@angular/material/core';
 import { UserService } from '../../services/user.service';
 import { RoleService } from '../../../admin/services/role.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatDialog } from '@angular/material/dialog';
 import { AuthStore } from '../../../auth/store/auth.store';
 import type { UpdateUser, User } from '../../models/user.types';
-import { ConfirmDialogComponent } from '@shared/components/confirm-dialog/confirm-dialog.component';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import { catchError, forkJoin, of, tap } from 'rxjs';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
-import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
+import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { UsersStore } from '../../store/users.store';
 import type { RoleResponse } from '@app/shared/types/role.types';
@@ -98,7 +96,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
   readonly #authStore = inject(AuthStore);
   readonly #router = inject(Router);
   readonly #snackBar = inject(MatSnackBar);
-  readonly #dialog = inject(MatDialog);
+  readonly #adaptiveDialog = inject(AdaptiveDialogService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #translocoService = inject(TranslocoService);
   readonly #shortcuts = inject(KeyboardShortcutsService);
@@ -373,26 +371,22 @@ export class UserEditComponent implements OnInit, OnDestroy {
   confirmDelete(): void {
     if (!this.user()) return;
 
-    this.#dialog
-      .open(ConfirmDialogComponent, {
-        ...dialogSizeConfig(DialogSize.Confirm),
-        data: {
-          title: this.#translocoService.translate(
-            'users.edit.confirmDeleteTitle'
-          ),
-          message: this.#translocoService.translate(
-            'users.edit.confirmDeleteMessage',
-            {
-              firstName: this.user()!.firstName,
-              lastName: this.user()!.lastName
-            }
-          ),
-          confirmButton: this.#translocoService.translate('common.delete'),
-          cancelButton: this.#translocoService.translate('common.cancel'),
-          icon: 'warning'
-        }
+    this.#adaptiveDialog
+      .openConfirm({
+        title: this.#translocoService.translate(
+          'users.edit.confirmDeleteTitle'
+        ),
+        message: this.#translocoService.translate(
+          'users.edit.confirmDeleteMessage',
+          {
+            firstName: this.user()!.firstName,
+            lastName: this.user()!.lastName
+          }
+        ),
+        confirmButton: this.#translocoService.translate('common.delete'),
+        cancelButton: this.#translocoService.translate('common.cancel'),
+        icon: 'warning'
       })
-      .afterClosed()
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((result) => {
         if (result) {

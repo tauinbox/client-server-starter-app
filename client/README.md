@@ -62,11 +62,12 @@ src/app/
 │       └── store/          # RolesStore (route-level), ResourcesStore (route-level: resources, actions, loading)
 └── shared/
     ├── components/
-    │   ├── confirm-dialog/            # Confirmation dialog
+    │   ├── confirm-dialog/            # ConfirmDialogComponent (desktop) + ConfirmBottomSheetComponent (handset)
     │   ├── keyboard-shortcuts-help/   # KeyboardShortcutsHelpComponent — Material dialog listing active shortcuts grouped by category
     │   └── password-toggle/           # PasswordToggleComponent (reusable password visibility toggle)
     ├── forms/              # AppFormFieldComponent (Signal Forms wrapper), AriaErrorDirective, DEFAULT_ERROR_KEYS registry
     ├── models/             # user.types
+    ├── services/           # AdaptiveDialogService — opens confirm dialogs as bottom sheets (handset) or dialogs (desktop)
     └── utils/              # css.utils, dialog.utils (DialogSize enum + dialogSizeConfig())
 ```
 
