@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.16](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.15...v0.1.16) (2026-04-12)
+
+
+### Features
+
+* **a11y:** add WCAG 2.1 AA accessibility and dark theme refinement ([d25d1e4](https://github.com/tauinbox/client-server-starter-app/commit/d25d1e4fbf20f319f92f75657856783dc882083c))
+* **a11y:** add WCAG 2.1 AA accessibility and dark theme refinement ([#134](https://github.com/tauinbox/client-server-starter-app/issues/134)) ([8a1ec22](https://github.com/tauinbox/client-server-starter-app/commit/8a1ec226c014099b0abe254730b69c829d88f30c))
+* add cursor-based (keyset) pagination ([#142](https://github.com/tauinbox/client-server-starter-app/issues/142)) ([e931f15](https://github.com/tauinbox/client-server-starter-app/commit/e931f152a518b334087d8ed29b0edd95ac09f7f7))
+* **admin:** add visual condition builder for role permissions ([39486d1](https://github.com/tauinbox/client-server-starter-app/commit/39486d11efbcd6b763c967ce9df2e8fac516117d))
+* **auth:** enforce CASL instance-level ownership checks on user mutations and role assignment ([86f410b](https://github.com/tauinbox/client-server-starter-app/commit/86f410b4ae6ca8e76d9130189dafdac685e0fe85))
+* **auth:** wire CASL instance-level permission checks ([#137](https://github.com/tauinbox/client-server-starter-app/issues/137)) ([19e37fe](https://github.com/tauinbox/client-server-starter-app/commit/19e37fefcdba3a243797f9e783db283613354ba6))
+* **auth:** wire client-side instance-level CASL permission checks ([0254ca9](https://github.com/tauinbox/client-server-starter-app/commit/0254ca94a9112e64dbb6eda886983100e8166422))
+* **ci:** auto-patch Alpine CVEs and open PR when Scheduled Rebuild scan fails ([#132](https://github.com/tauinbox/client-server-starter-app/issues/132)) ([1d12420](https://github.com/tauinbox/client-server-starter-app/commit/1d12420750a358323155ea855f084cc5178ae2f5))
+* **client:** adaptive confirm dialogs — bottom sheet on handset ([#160](https://github.com/tauinbox/client-server-starter-app/issues/160)) ([17be99b](https://github.com/tauinbox/client-server-starter-app/commit/17be99b6ce15d7a250832fd8635eeb574b713394))
+* **client:** aria-describedby for form errors and de-important utility styles ([#149](https://github.com/tauinbox/client-server-starter-app/issues/149)) ([2686df6](https://github.com/tauinbox/client-server-starter-app/commit/2686df64a3909d531f49235f59050807db953d89))
+* **client:** introduce app-form-field wrapper and migrate login form ([6fa68b8](https://github.com/tauinbox/client-server-starter-app/commit/6fa68b8ed988ccb67deb876b15ccbc515e826606))
+* **client:** introduce app-form-field wrapper and migrate login form ([e8a8139](https://github.com/tauinbox/client-server-starter-app/commit/e8a81393d6af242e51175ed13c5f67fadaf21c0d))
+* **client:** keyboard shortcuts for common actions ([#136](https://github.com/tauinbox/client-server-starter-app/issues/136)) ([6248a85](https://github.com/tauinbox/client-server-starter-app/commit/6248a8593a9624a4e53eb71098d8d0f4bb5cfcbf))
+* **client:** m3 design system cleanup — flat buttons, compact density, a11y icons ([#157](https://github.com/tauinbox/client-server-starter-app/issues/157)) ([3f773b7](https://github.com/tauinbox/client-server-starter-app/commit/3f773b7510a0eddf5a9c41fb51ce7814cf175995))
+* **client:** migrate admin forms and user-edit/list to Signal Forms ([#155](https://github.com/tauinbox/client-server-starter-app/issues/155)) ([95fa40c](https://github.com/tauinbox/client-server-starter-app/commit/95fa40c50a734eb0ff3bfa3ed8f781d86fe566e9))
+* **client:** migrate app-form-field wrapper and login to Signal Forms ([#151](https://github.com/tauinbox/client-server-starter-app/issues/151)) ([4c7c8a6](https://github.com/tauinbox/client-server-starter-app/commit/4c7c8a67b4e120cd59b26af0e7f65a731691a29a))
+* **client:** migrate register and forgot-password to Signal Forms ([9b52902](https://github.com/tauinbox/client-server-starter-app/commit/9b529020dec455819e3e53db9372ed901936abe6))
+* **client:** migrate reset-password and profile to Signal Forms ([534d9ad](https://github.com/tauinbox/client-server-starter-app/commit/534d9ad7ba786561d1e67354880cf28fd39197f9))
+* **client:** P0 UI/a11y quick wins ([#148](https://github.com/tauinbox/client-server-starter-app/issues/148)) ([f2689e2](https://github.com/tauinbox/client-server-starter-app/commit/f2689e2b7efa73ebb1cab5a688c7a3bcf20327b6))
+* **client:** replace legacy --color-* aliases with M3 tokens and add form-field lint ([4f3a348](https://github.com/tauinbox/client-server-starter-app/commit/4f3a3486c503e59716541223c6299b8fe5d4b023))
+* **client:** responsive user-list card view on handset + layout service ([#158](https://github.com/tauinbox/client-server-starter-app/issues/158)) ([716ed80](https://github.com/tauinbox/client-server-starter-app/commit/716ed80adfcda50e84ad4499871fe5b51db231f9))
+* **ui:** responsive layout and consistent form validation UX ([#130](https://github.com/tauinbox/client-server-starter-app/issues/130)) ([53f225c](https://github.com/tauinbox/client-server-starter-app/commit/53f225cc5b37534cfbb81698904c7f352d5c5b57))
+
+
+### Bug Fixes
+
+* **ci:** fix Trivy CLI DB error and PR body formatting in rebuild workflow ([0a2bc3b](https://github.com/tauinbox/client-server-starter-app/commit/0a2bc3b2507ddfc425b5e63da75b1fe434b859ff))
+* **ci:** make Trivy scan in deploy.yml informational, not blocking ([db4f491](https://github.com/tauinbox/client-server-starter-app/commit/db4f49118081ebafa7dd147adc77d73f7070fc1c))
+* **ci:** make Trivy scan in deploy.yml informational, not blocking ([#133](https://github.com/tauinbox/client-server-starter-app/issues/133)) ([0acc6c2](https://github.com/tauinbox/client-server-starter-app/commit/0acc6c232598ac1c091b4f483b840706588d5248))
+* **ci:** replace heredoc with string concatenation in rebuild workflow ([050612a](https://github.com/tauinbox/client-server-starter-app/commit/050612ab4c349ae685985c3086c2ec2e1f4babe7))
+* **client:** fix app-form-field suffix positioning and field spacing ([#152](https://github.com/tauinbox/client-server-starter-app/issues/152)) ([93e3e4c](https://github.com/tauinbox/client-server-starter-app/commit/93e3e4c8626b33fa156f22e1f17f5a23ea1843b5))
+* **client:** improve admin panel mobile responsive layout ([bae2384](https://github.com/tauinbox/client-server-starter-app/commit/bae23843bb2a5d6ec4704ce91cf357dc435971bf))
+* **client:** resolve axe-core contrast violations — underline links, fix tertiary text ([#161](https://github.com/tauinbox/client-server-starter-app/issues/161)) ([4f4082f](https://github.com/tauinbox/client-server-starter-app/commit/4f4082f7ab357bcb19dbf01726477ec0f758d63e))
+* **deps:** patch path-to-regexp and picomatch CVEs via overrides ([b6167d9](https://github.com/tauinbox/client-server-starter-app/commit/b6167d92c04d85fa4bd08b16964cb5b534c2ed2b))
+* **docker:** patch libpng CVE-2026-33416 CVE-2026-33636 in client image ([8bacecb](https://github.com/tauinbox/client-server-starter-app/commit/8bacecb839055d26b44ca5f0c716677654e726e9))
+* **security:** harden oauth cookies, logout cleanup, upload mime check, gitignore ([#143](https://github.com/tauinbox/client-server-starter-app/issues/143)) ([c786051](https://github.com/tauinbox/client-server-starter-app/commit/c78605164eb69a121fc4d81388f3da35532707ad))
+* **server:** update axios and nodemailer to fix audit vulnerabilities ([5ad618d](https://github.com/tauinbox/client-server-starter-app/commit/5ad618de56155e67a42ff60cec332b3448ce77ee))
+
 ## [0.1.15](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.14...v0.1.15) (2026-03-29)
 
 
