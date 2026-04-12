@@ -64,15 +64,17 @@ p {
   margin-bottom: vars.$spacing-sm;
 }
 
-// Links
+// Links — underline by default for WCAG link-in-text-block compliance
+// (3:1 contrast between link color and body text is not guaranteed by M3 primary)
 a {
   color: var(--mat-sys-primary);
-  text-decoration: none;
+  text-decoration: underline;
   transition: color vars.$transition-fast ease-in-out;
 
   &:hover,
   &:focus {
-    text-decoration: underline;
+    color: var(--mat-sys-primary);
+    text-decoration: none;
   }
 }
 
