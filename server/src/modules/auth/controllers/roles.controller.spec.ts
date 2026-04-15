@@ -34,6 +34,11 @@ const allowAllGuard = { canActivate: () => true };
 // @ts-expect-error partial mock — only `can` is needed for controller delegation tests
 const mockAbility: AppAbility = { can: jest.fn().mockReturnValue(true) };
 
+const mockReq: import('../types/auth.request').JwtAuthRequest = {
+  // @ts-expect-error partial user — handlers only read req.user.userId
+  user: { userId: 'actor-1', email: 'a@example.com' }
+};
+
 describe('RolesController', () => {
   let controller: RolesController;
   let roleServiceMock: {
@@ -187,11 +192,13 @@ describe('RolesController', () => {
       const items = [{ permissionId: 'perm-1' }, { permissionId: 'perm-2' }];
       const dto = { items };
 
-      await controller.setPermissions('role-1', dto);
+      await controller.setPermissions('role-1', dto, mockAbility, mockReq);
 
       expect(roleServiceMock.setPermissionsForRole).toHaveBeenCalledWith(
         'role-1',
-        items
+        items,
+        mockAbility,
+        'actor-1'
       );
     });
   });
@@ -203,23 +210,26 @@ describe('RolesController', () => {
         conditions: undefined
       };
 
-      await controller.assignPermissions('role-1', dto);
+      await controller.assignPermissions('role-1', dto, mockAbility, mockReq);
 
       expect(roleServiceMock.assignPermissionsToRole).toHaveBeenCalledWith(
         'role-1',
         ['perm-1', 'perm-2'],
-        undefined
+        undefined,
+        mockAbility,
+        'actor-1'
       );
     });
   });
 
   describe('removePermission', () => {
     it('should call roleService.removePermissionFromRole with role id and permission id', async () => {
-      await controller.removePermission('role-1', 'perm-5');
+      await controller.removePermission('role-1', 'perm-5', mockAbility);
 
       expect(roleServiceMock.removePermissionFromRole).toHaveBeenCalledWith(
         'role-1',
-        'perm-5'
+        'perm-5',
+        mockAbility
       );
     });
   });
@@ -228,12 +238,13 @@ describe('RolesController', () => {
     it('should call roleService.assignRoleToUser with userId, roleId and ability', async () => {
       const dto = { roleId: 'role-1' };
 
-      await controller.assignRole('user-99', dto, mockAbility);
+      await controller.assignRole('user-99', dto, mockAbility, mockReq);
 
       expect(roleServiceMock.assignRoleToUser).toHaveBeenCalledWith(
         'user-99',
         'role-1',
-        mockAbility
+        mockAbility,
+        'actor-1'
       );
     });
   });

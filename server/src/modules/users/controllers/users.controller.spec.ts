@@ -145,9 +145,12 @@ describe('UsersController', () => {
       const paginatedResult = { data: [], total: 0, page: 1, limit: 10 };
       usersServiceMock.findPaginated.mockReturnValue(paginatedResult);
 
-      const result = controller.findAll(query);
+      const result = controller.findAll(query, undefined);
 
-      expect(usersServiceMock.findPaginated).toHaveBeenCalledWith(query);
+      expect(usersServiceMock.findPaginated).toHaveBeenCalledWith(
+        query,
+        undefined
+      );
       expect(result).toBe(paginatedResult);
     });
   });
@@ -166,14 +169,17 @@ describe('UsersController', () => {
       };
       usersServiceMock.findPaginated.mockReturnValue(paginatedResult);
 
-      const result = controller.searchUsers(query);
+      const result = controller.searchUsers(query, undefined);
 
-      expect(usersServiceMock.findPaginated).toHaveBeenCalledWith(query);
+      expect(usersServiceMock.findPaginated).toHaveBeenCalledWith(
+        query,
+        undefined
+      );
       expect(result).toBe(paginatedResult);
     });
   });
 
-  // ── findAllCursor ──────────────────────────���──────────────────────
+  // ── findAllCursor ───────────────────────────────────────────────────
 
   describe('findAllCursor', () => {
     it('should call usersService.findCursorPaginated with the query', () => {
@@ -184,9 +190,12 @@ describe('UsersController', () => {
       };
       usersServiceMock.findCursorPaginated.mockReturnValue(cursorResult);
 
-      const result = controller.findAllCursor(query);
+      const result = controller.findAllCursor(query, undefined);
 
-      expect(usersServiceMock.findCursorPaginated).toHaveBeenCalledWith(query);
+      expect(usersServiceMock.findCursorPaginated).toHaveBeenCalledWith(
+        query,
+        undefined
+      );
       expect(result).toBe(cursorResult);
     });
   });
@@ -203,9 +212,12 @@ describe('UsersController', () => {
       };
       usersServiceMock.findCursorPaginated.mockReturnValue(cursorResult);
 
-      const result = controller.searchUsersCursor(query);
+      const result = controller.searchUsersCursor(query, undefined);
 
-      expect(usersServiceMock.findCursorPaginated).toHaveBeenCalledWith(query);
+      expect(usersServiceMock.findCursorPaginated).toHaveBeenCalledWith(
+        query,
+        undefined
+      );
       expect(result).toBe(cursorResult);
     });
   });

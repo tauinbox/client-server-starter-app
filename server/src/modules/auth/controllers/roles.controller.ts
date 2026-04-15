@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Put,
+  Req,
   UseInterceptors
 } from '@nestjs/common';
 import {
@@ -39,6 +40,7 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { LogAudit } from '../../audit/decorators/log-audit.decorator';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserRoleChangedEvent } from '../events/user-role-changed.event';
+import type { JwtAuthRequest } from '../types/auth.request';
 
 @ApiTags('Roles API')
 @Controller({
@@ -169,9 +171,16 @@ export class RolesController {
   @ApiNotFoundResponse({ description: 'Role not found' })
   setPermissions(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: SetPermissionsDto
+    @Body() dto: SetPermissionsDto,
+    @CurrentAbility() ability: AppAbility,
+    @Req() req: JwtAuthRequest
   ) {
-    return this.roleService.setPermissionsForRole(id, dto.items);
+    return this.roleService.setPermissionsForRole(
+      id,
+      dto.items,
+      ability,
+      req.user?.userId
+    );
   }
 
   @Post(':id/permissions')
@@ -190,12 +199,16 @@ export class RolesController {
   @ApiOkResponse({ description: 'Permissions assigned' })
   assignPermissions(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: AssignPermissionsDto
+    @Body() dto: AssignPermissionsDto,
+    @CurrentAbility() ability: AppAbility,
+    @Req() req: JwtAuthRequest
   ) {
     return this.roleService.assignPermissionsToRole(
       id,
       dto.permissionIds,
-      dto.conditions
+      dto.conditions,
+      ability,
+      req.user?.userId
     );
   }
 
@@ -213,9 +226,10 @@ export class RolesController {
   @ApiOkResponse({ description: 'Permission removed' })
   removePermission(
     @Param('id', ParseUUIDPipe) id: string,
-    @Param('permissionId', ParseUUIDPipe) permissionId: string
+    @Param('permissionId', ParseUUIDPipe) permissionId: string,
+    @CurrentAbility() ability: AppAbility
   ) {
-    return this.roleService.removePermissionFromRole(id, permissionId);
+    return this.roleService.removePermissionFromRole(id, permissionId, ability);
   }
 
   @Post('assign/:userId')
@@ -234,12 +248,14 @@ export class RolesController {
   async assignRole(
     @Param('userId', ParseUUIDPipe) userId: string,
     @Body() dto: AssignRoleDto,
-    @CurrentAbility() ability: AppAbility
+    @CurrentAbility() ability: AppAbility,
+    @Req() req: JwtAuthRequest
   ) {
     const result = await this.roleService.assignRoleToUser(
       userId,
       dto.roleId,
-      ability
+      ability,
+      req.user?.userId
     );
     this.eventEmitter.emit(
       UserRoleChangedEvent.name,

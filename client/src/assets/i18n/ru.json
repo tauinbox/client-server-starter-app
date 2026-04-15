@@ -96,7 +96,8 @@
       "nameExists": "Роль с таким названием уже существует",
       "cannotModifySystem": "Системные роли нельзя изменять",
       "cannotDeleteSystem": "Системные роли нельзя удалять",
-      "superFlagForbidden": "Флаг isSuper нельзя установить через API"
+      "superFlagForbidden": "Флаг isSuper нельзя установить через API",
+      "cannotGrantPermission": "Нельзя выдать разрешение, которого у вас нет"
     },
     "actions": {
       "nameReserved": "Имя действия зарезервировано и не может быть использовано",

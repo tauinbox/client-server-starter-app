@@ -15,6 +15,12 @@ import { PermissionService } from './permission.service';
 import { PermissionCondition } from '@app/shared/types';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import type { AppAbility } from '../casl/app-ability';
+import {
+  assertCanGrantPermissions,
+  type ResolvedGrantItem
+} from '../utils/can-grant.util';
+import { AuditService } from '../../audit/audit.service';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 
 @Injectable()
 export class RoleService {
@@ -25,8 +31,78 @@ export class RoleService {
     private readonly permissionRepository: Repository<Permission>,
     @InjectRepository(RolePermission)
     private readonly rolePermissionRepository: Repository<RolePermission>,
-    private readonly permissionService: PermissionService
+    private readonly permissionService: PermissionService,
+    private readonly auditService: AuditService
   ) {}
+
+  private async resolveGrantItems(
+    items: { permissionId: string; conditions?: PermissionCondition | null }[]
+  ): Promise<ResolvedGrantItem[]> {
+    if (items.length === 0) return [];
+    const permissions = await this.permissionRepository.find({
+      where: items.map((i) => ({ id: i.permissionId }))
+    });
+    const byId = new Map(permissions.map((p) => [p.id, p]));
+    return items.map((i) => {
+      const p = byId.get(i.permissionId);
+      if (!p) {
+        throw new HttpException(
+          {
+            message: `Permission ${i.permissionId} not found`,
+            errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
+          },
+          HttpStatus.BAD_REQUEST
+        );
+      }
+      return {
+        permissionId: p.id,
+        actionName: p.action.name,
+        subject: p.resource.subject,
+        bodyConditions: i.conditions ?? null
+      };
+    });
+  }
+
+  private async assertGrantAllowed(
+    ability: AppAbility | undefined,
+    items: { permissionId: string; conditions?: PermissionCondition | null }[],
+    context: { actorId?: string; roleId: string }
+  ): Promise<void> {
+    if (!ability) return;
+    const resolved = await this.resolveGrantItems(items);
+    try {
+      assertCanGrantPermissions(ability, resolved);
+    } catch (err) {
+      if (err instanceof HttpException && err.getStatus() === 403) {
+        const body = err.getResponse();
+        this.auditService.logFireAndForget({
+          action: AuditAction.PERMISSION_GRANT_DENIED,
+          actorId: context.actorId ?? null,
+          targetId: context.roleId,
+          targetType: 'Role',
+          details:
+            typeof body === 'object' && body !== null
+              ? ((body as { details?: Record<string, unknown> }).details ?? {
+                  body
+                })
+              : { message: String(body) }
+        });
+      }
+      throw err;
+    }
+  }
+
+  private assertNotSystem(role: Role, ability?: AppAbility): void {
+    if (!role.isSystem) return;
+    if (ability && ability.can('manage', 'all')) return;
+    throw new HttpException(
+      {
+        message: 'Cannot modify system roles',
+        errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
+      },
+      HttpStatus.BAD_REQUEST
+    );
+  }
 
   async findAll(): Promise<Role[]> {
     return this.roleRepository.find({
@@ -134,7 +210,8 @@ export class RoleService {
   async assignRoleToUser(
     userId: string,
     roleId: string,
-    ability?: AppAbility
+    ability?: AppAbility,
+    actorId?: string
   ): Promise<void> {
     const role = await this.findOne(roleId);
 
@@ -148,6 +225,17 @@ export class RoleService {
       if (targetUser && !ability.can('update', targetUser)) {
         throw new ForbiddenException('Insufficient permissions');
       }
+
+      // Prevent indirect escalation: caller must hold every permission
+      // carried by the role they are assigning.
+      const rolePermissions = await this.rolePermissionRepository.find({
+        where: { roleId }
+      });
+      const grantItems = rolePermissions.map((rp) => ({
+        permissionId: rp.permissionId,
+        conditions: rp.conditions ?? null
+      }));
+      await this.assertGrantAllowed(ability, grantItems, { actorId, roleId });
     }
 
     await this.roleRepository.manager
@@ -208,9 +296,13 @@ export class RoleService {
 
   async setPermissionsForRole(
     roleId: string,
-    items: { permissionId: string; conditions?: PermissionCondition | null }[]
+    items: { permissionId: string; conditions?: PermissionCondition | null }[],
+    ability?: AppAbility,
+    actorId?: string
   ): Promise<void> {
-    await this.findOne(roleId);
+    const role = await this.findOne(roleId);
+    this.assertNotSystem(role, ability);
+    await this.assertGrantAllowed(ability, items, { actorId, roleId });
     await this.rolePermissionRepository.manager.transaction(async (em) => {
       await em.delete(RolePermission, { roleId });
       if (items.length > 0) {
@@ -230,9 +322,17 @@ export class RoleService {
   async assignPermissionsToRole(
     roleId: string,
     permissionIds: string[],
-    conditions?: PermissionCondition
+    conditions?: PermissionCondition,
+    ability?: AppAbility,
+    actorId?: string
   ): Promise<void> {
-    await this.findOne(roleId);
+    const role = await this.findOne(roleId);
+    this.assertNotSystem(role, ability);
+    const items = permissionIds.map((permissionId) => ({
+      permissionId,
+      conditions: conditions ?? null
+    }));
+    await this.assertGrantAllowed(ability, items, { actorId, roleId });
     const rolePermissions = permissionIds.map((permissionId) =>
       this.rolePermissionRepository.create({
         roleId,
@@ -246,8 +346,11 @@ export class RoleService {
 
   async removePermissionFromRole(
     roleId: string,
-    permissionId: string
+    permissionId: string,
+    ability?: AppAbility
   ): Promise<void> {
+    const role = await this.findOne(roleId);
+    this.assertNotSystem(role, ability);
     await this.rolePermissionRepository.delete({ roleId, permissionId });
     await this.invalidateUsersWithRole(roleId);
   }

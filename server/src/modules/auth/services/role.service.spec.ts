@@ -8,6 +8,7 @@ import { RolePermission } from '../entities/role-permission.entity';
 import { PermissionService } from './permission.service';
 import type { AppAbility } from '../casl/app-ability';
 import { User } from '../../users/entities/user.entity';
+import { AuditService } from '../../audit/audit.service';
 
 describe('RoleService', () => {
   let service: RoleService;
@@ -171,7 +172,14 @@ describe('RoleService', () => {
           provide: getRepositoryToken(RolePermission),
           useValue: mockRolePermissionRepo
         },
-        { provide: PermissionService, useValue: mockPermissionService }
+        { provide: PermissionService, useValue: mockPermissionService },
+        {
+          provide: AuditService,
+          useValue: {
+            log: jest.fn(),
+            logFireAndForget: jest.fn()
+          }
+        }
       ]
     }).compile();
 
@@ -321,6 +329,7 @@ describe('RoleService', () => {
 
   describe('removePermissionFromRole', () => {
     it('should remove permission and invalidate cache for all role members', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
       mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
 
@@ -336,6 +345,7 @@ describe('RoleService', () => {
     });
 
     it('should not call invalidate if no users have the role', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
 
       await service.removePermissionFromRole('role-2', 'perm-1');
@@ -383,6 +393,7 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       const targetUser = { id: 'user-1' } as User;
       mockRoleRepo.manager.findOne.mockResolvedValue(targetUser);
+      mockRolePermissionRepo.find.mockResolvedValue([]);
       const canSpy = jest.fn().mockReturnValue(true);
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: canSpy };

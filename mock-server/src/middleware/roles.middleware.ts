@@ -13,6 +13,15 @@ import { pushToUser } from '../sse-hub';
 
 const router = Router();
 
+function isActorSuper(req: unknown): boolean {
+  const actor = (req as AuthenticatedRequest).user;
+  if (!actor) return false;
+  const state = getState();
+  return Array.from(state.roles.values()).some(
+    (r) => r.isSuper && actor.roles.includes(r.name)
+  );
+}
+
 // GET /api/v1/roles
 router.get('/', adminGuard, (_req, res) => {
   const roles = Array.from(getState().roles.values());
@@ -272,6 +281,15 @@ router.put('/:id/permissions', adminGuard, (req, res) => {
     return;
   }
 
+  if (role.isSystem && !isActorSuper(req)) {
+    res.status(400).json({
+      message: 'Cannot modify system roles',
+      statusCode: 400,
+      errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
+    });
+    return;
+  }
+
   const { items } = req.body as {
     items?: { permissionId: string; conditions?: unknown }[];
   };
@@ -325,6 +343,15 @@ router.post('/:id/permissions', adminGuard, (req, res) => {
     return;
   }
 
+  if (role.isSystem && !isActorSuper(req)) {
+    res.status(400).json({
+      message: 'Cannot modify system roles',
+      statusCode: 400,
+      errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
+    });
+    return;
+  }
+
   const { permissionIds, conditions } = req.body;
   if (!Array.isArray(permissionIds)) {
     res
@@ -369,6 +396,16 @@ router.delete('/:id/permissions/:permissionId', adminGuard, (req, res) => {
   const id = req.params['id'] as string;
   const permissionId = req.params['permissionId'] as string;
   const state = getState();
+  const role = state.roles.get(id);
+
+  if (role?.isSystem && !isActorSuper(req)) {
+    res.status(400).json({
+      message: 'Cannot modify system roles',
+      statusCode: 400,
+      errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
+    });
+    return;
+  }
 
   state.rolePermissions = state.rolePermissions.filter(
     (rp) => !(rp.roleId === id && rp.permissionId === permissionId)

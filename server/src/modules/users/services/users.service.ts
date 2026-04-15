@@ -22,6 +22,7 @@ import {
 import { escapeLikePattern } from '../../../common/utils/escape-like';
 import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
 import type { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto';
+import { applyAbilityToUserQuery } from '../utils/apply-ability.util';
 
 const USER_SORT_COLUMN_MAP: Record<string, string> = {
   email: 'user.email',
@@ -66,7 +67,8 @@ export class UsersService {
   }
 
   async findPaginated(
-    query: SearchUsersQueryDto
+    query: SearchUsersQueryDto,
+    ability?: AppAbility
   ): Promise<PaginatedResponseDto<User>> {
     const { page, limit, sortBy, sortOrder, includeDeleted, ...filters } =
       query;
@@ -77,6 +79,10 @@ export class UsersService {
 
     if (includeDeleted) {
       qb.withDeleted();
+    }
+
+    if (ability) {
+      applyAbilityToUserQuery(qb, ability, 'search');
     }
 
     this.applyUserFilters(qb, filters);
@@ -94,7 +100,8 @@ export class UsersService {
   }
 
   async findCursorPaginated(
-    query: SearchUsersCursorQueryDto
+    query: SearchUsersCursorQueryDto,
+    ability?: AppAbility
   ): Promise<CursorPaginatedResponseDto<User>> {
     const { cursor, limit, sortBy, sortOrder, includeDeleted, ...filters } =
       query;
@@ -105,6 +112,10 @@ export class UsersService {
 
     if (includeDeleted) {
       qb.withDeleted();
+    }
+
+    if (ability) {
+      applyAbilityToUserQuery(qb, ability, 'search');
     }
 
     this.applyUserFilters(qb, filters);
