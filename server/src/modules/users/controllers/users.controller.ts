@@ -105,8 +105,11 @@ export class UsersController {
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  findAll(@Query() query: SearchUsersQueryDto) {
-    return this.usersService.findPaginated(query);
+  findAll(
+    @Query() query: SearchUsersQueryDto,
+    @CurrentAbility() ability: AppAbility | undefined
+  ) {
+    return this.usersService.findPaginated(query, ability);
   }
 
   @Get('search')
@@ -118,8 +121,11 @@ export class UsersController {
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  searchUsers(@Query() query: SearchUsersQueryDto) {
-    return this.usersService.findPaginated(query);
+  searchUsers(
+    @Query() query: SearchUsersQueryDto,
+    @CurrentAbility() ability: AppAbility | undefined
+  ) {
+    return this.usersService.findPaginated(query, ability);
   }
 
   @Get('cursor')
@@ -133,8 +139,11 @@ export class UsersController {
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  findAllCursor(@Query() query: SearchUsersCursorQueryDto) {
-    return this.usersService.findCursorPaginated(query);
+  findAllCursor(
+    @Query() query: SearchUsersCursorQueryDto,
+    @CurrentAbility() ability: AppAbility | undefined
+  ) {
+    return this.usersService.findCursorPaginated(query, ability);
   }
 
   @Get('search/cursor')
@@ -148,8 +157,11 @@ export class UsersController {
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  searchUsersCursor(@Query() query: SearchUsersCursorQueryDto) {
-    return this.usersService.findCursorPaginated(query);
+  searchUsersCursor(
+    @Query() query: SearchUsersCursorQueryDto,
+    @CurrentAbility() ability: AppAbility | undefined
+  ) {
+    return this.usersService.findCursorPaginated(query, ability);
   }
 
   @Get(':id')

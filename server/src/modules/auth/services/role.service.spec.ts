@@ -8,6 +8,7 @@ import { RolePermission } from '../entities/role-permission.entity';
 import { PermissionService } from './permission.service';
 import type { AppAbility } from '../casl/app-ability';
 import { User } from '../../users/entities/user.entity';
+import { AuditService } from '../../audit/audit.service';
 
 describe('RoleService', () => {
   let service: RoleService;
@@ -38,6 +39,7 @@ describe('RoleService', () => {
     getMany: jest.Mock;
   };
   let mockPermissionService: { invalidateUserCache: jest.Mock };
+  let mockAuditService: { log: jest.Mock; logFireAndForget: jest.Mock };
   let mockRelationQueryBuilder: {
     relation: jest.Mock;
     of: jest.Mock;
@@ -159,6 +161,11 @@ describe('RoleService', () => {
       invalidateUserCache: jest.fn()
     };
 
+    mockAuditService = {
+      log: jest.fn(),
+      logFireAndForget: jest.fn()
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RoleService,
@@ -171,7 +178,8 @@ describe('RoleService', () => {
           provide: getRepositoryToken(RolePermission),
           useValue: mockRolePermissionRepo
         },
-        { provide: PermissionService, useValue: mockPermissionService }
+        { provide: PermissionService, useValue: mockPermissionService },
+        { provide: AuditService, useValue: mockAuditService }
       ]
     }).compile();
 
@@ -321,6 +329,7 @@ describe('RoleService', () => {
 
   describe('removePermissionFromRole', () => {
     it('should remove permission and invalidate cache for all role members', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
       mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
 
@@ -336,6 +345,7 @@ describe('RoleService', () => {
     });
 
     it('should not call invalidate if no users have the role', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
 
       await service.removePermissionFromRole('role-2', 'perm-1');
@@ -383,6 +393,7 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       const targetUser = { id: 'user-1' } as User;
       mockRoleRepo.manager.findOne.mockResolvedValue(targetUser);
+      mockRolePermissionRepo.find.mockResolvedValue([]);
       const canSpy = jest.fn().mockReturnValue(true);
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: canSpy };
@@ -597,6 +608,259 @@ describe('RoleService', () => {
       await expect(service.findRoleByName('nonexistent')).rejects.toThrow(
         HttpException
       );
+    });
+  });
+
+  // ── RBAC-SEC-1: grant-escalation block ────────────────────────────
+
+  describe('assertCanGrantPermissions (via service)', () => {
+    const permCreateRole = {
+      id: 'perm-create-role',
+      action: { name: 'create' },
+      resource: { subject: 'Role' }
+    };
+    const permUpdateUser = {
+      id: 'perm-update-user',
+      action: { name: 'update' },
+      resource: { subject: 'User' }
+    };
+
+    function abilityMock(opts: {
+      manageAll?: boolean;
+      canMatrix?: Record<string, boolean>;
+      rulesMatrix?: Record<
+        string,
+        { conditions?: unknown; inverted?: boolean }[]
+      >;
+    }) {
+      const can = jest.fn((action: string, subject: unknown) => {
+        if (opts.manageAll && action === 'manage' && subject === 'all')
+          return true;
+        if (opts.manageAll) return true;
+        if (typeof subject === 'object' && subject !== null) {
+          // entity-instance check (ability.can('update', userEntity))
+          return opts.canMatrix?.[`${action}:*`] ?? false;
+        }
+        const key = `${action}:${String(subject)}`;
+        return opts.canMatrix?.[key] ?? false;
+      });
+      const rulesFor = jest.fn((action: string, subject: unknown) => {
+        const key = `${action}:${String(subject)}`;
+        return opts.rulesMatrix?.[key] ?? [];
+      });
+      // @ts-expect-error partial mock — only can/rulesFor are exercised
+      const ability: AppAbility = { can, rulesFor };
+      return { ability, can, rulesFor };
+    }
+
+    it('super (manage:all) bypasses can-grant check and writes permissions', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRolePermissionRepo.save.mockResolvedValue([]);
+      const { ability } = abilityMock({ manageAll: true });
+
+      await service.assignPermissionsToRole(
+        'role-2',
+        ['perm-create-role'],
+        undefined,
+        ability,
+        'actor-1'
+      );
+
+      expect(mockPermissionRepo.find).not.toHaveBeenCalled();
+      expect(mockRolePermissionRepo.save).toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
+    });
+
+    it('rejects with 403 CANNOT_GRANT_PERMISSION and audits when caller lacks the permission', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockPermissionRepo.find.mockResolvedValue([permCreateRole]);
+      const { ability } = abilityMock({
+        canMatrix: { 'create:Role': false }
+      });
+
+      await expect(
+        service.assignPermissionsToRole(
+          'role-2',
+          ['perm-create-role'],
+          undefined,
+          ability,
+          'actor-1'
+        )
+      ).rejects.toMatchObject({
+        status: 403,
+        response: { errorKey: 'errors.roles.cannotGrantPermission' }
+      });
+
+      expect(mockRolePermissionRepo.save).not.toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PERMISSION_GRANT_DENIED',
+          actorId: 'actor-1',
+          targetId: 'role-2',
+          targetType: 'Role'
+        })
+      );
+    });
+
+    it('rejects condition escalation: caller has only conditional rule, body omits conditions', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockPermissionRepo.find.mockResolvedValue([permUpdateUser]);
+      const { ability } = abilityMock({
+        canMatrix: { 'update:User': true },
+        rulesMatrix: {
+          'update:User': [{ conditions: { id: 'caller-1' } }]
+        }
+      });
+
+      await expect(
+        service.assignPermissionsToRole(
+          'role-2',
+          ['perm-update-user'],
+          undefined,
+          ability,
+          'actor-1'
+        )
+      ).rejects.toMatchObject({
+        status: 403,
+        response: { errorKey: 'errors.roles.cannotGrantPermission' }
+      });
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PERMISSION_GRANT_DENIED',
+          details: expect.objectContaining({
+            reason: 'condition-escalation'
+          }) as Record<string, unknown>
+        })
+      );
+    });
+
+    it('allows grant when caller has matching unconditional rule', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRolePermissionRepo.save.mockResolvedValue([]);
+      mockPermissionRepo.find.mockResolvedValue([permCreateRole]);
+      const { ability } = abilityMock({
+        canMatrix: { 'create:Role': true },
+        rulesMatrix: { 'create:Role': [{ conditions: undefined }] }
+      });
+
+      await service.assignPermissionsToRole(
+        'role-2',
+        ['perm-create-role'],
+        undefined,
+        ability,
+        'actor-1'
+      );
+
+      expect(mockRolePermissionRepo.save).toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
+    });
+
+    it('setPermissionsForRole runs the same check', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockPermissionRepo.find.mockResolvedValue([permCreateRole]);
+      const { ability } = abilityMock({});
+
+      await expect(
+        service.setPermissionsForRole(
+          'role-2',
+          [{ permissionId: 'perm-create-role', conditions: null }],
+          ability,
+          'actor-1'
+        )
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    it('assignRoleToUser blocks indirect escalation via role permissions', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRoleRepo.manager.findOne.mockResolvedValue({ id: 'user-1' });
+      mockRolePermissionRepo.find.mockResolvedValue([
+        { permissionId: 'perm-create-role', conditions: null }
+      ]);
+      mockPermissionRepo.find.mockResolvedValue([permCreateRole]);
+      const { ability } = abilityMock({
+        canMatrix: { 'update:*': true } // can update target user, but not create:Role
+      });
+
+      await expect(
+        service.assignRoleToUser('user-1', 'role-2', ability, 'actor-1')
+      ).rejects.toMatchObject({ status: 403 });
+
+      expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'PERMISSION_GRANT_DENIED' })
+      );
+    });
+  });
+
+  // ── RBAC-SEC-3: system-role lock on permission mutations ──────────
+
+  describe('isSystem permission-mutation guard', () => {
+    it('setPermissionsForRole rejects on system role for non-super caller', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(systemRole);
+      // @ts-expect-error partial mock
+      const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
+
+      await expect(
+        service.setPermissionsForRole('role-1', [], ability, 'actor-1')
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: 'errors.roles.cannotModifySystem' }
+      });
+    });
+
+    it('assignPermissionsToRole rejects on system role for non-super caller', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(systemRole);
+      // @ts-expect-error partial mock
+      const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
+
+      await expect(
+        service.assignPermissionsToRole(
+          'role-1',
+          ['perm-1'],
+          undefined,
+          ability,
+          'actor-1'
+        )
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: 'errors.roles.cannotModifySystem' }
+      });
+    });
+
+    it('removePermissionFromRole rejects on system role for non-super caller', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(systemRole);
+      // @ts-expect-error partial mock
+      const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
+
+      await expect(
+        service.removePermissionFromRole('role-1', 'perm-1', ability)
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: 'errors.roles.cannotModifySystem' }
+      });
+    });
+
+    it('super (manage:all) can mutate system-role permissions', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(systemRole);
+      mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
+      // @ts-expect-error partial mock
+      const ability: AppAbility = { can: jest.fn().mockReturnValue(true) };
+
+      await service.removePermissionFromRole('role-1', 'perm-1', ability);
+
+      expect(mockRolePermissionRepo.delete).toHaveBeenCalledWith({
+        roleId: 'role-1',
+        permissionId: 'perm-1'
+      });
+    });
+
+    it('blocks isSystem mutation even when no ability is passed (defense in depth)', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(systemRole);
+
+      await expect(
+        service.removePermissionFromRole('role-1', 'perm-1')
+      ).rejects.toMatchObject({ status: 400 });
     });
   });
 });
