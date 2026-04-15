@@ -69,6 +69,7 @@ export class RoleService {
     context: { actorId?: string; roleId: string }
   ): Promise<void> {
     if (!ability) return;
+    if (ability.can('manage', 'all')) return;
     const resolved = await this.resolveGrantItems(items);
     try {
       assertCanGrantPermissions(ability, resolved);
