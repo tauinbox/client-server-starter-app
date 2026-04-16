@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
 import {
   findUserById,
   getState,
@@ -12,6 +13,18 @@ import type { AuthenticatedRequest } from '../types';
 import { pushToUser } from '../sse-hub';
 
 const router = Router();
+
+function validateCustomCondition(custom: string | undefined): string | null {
+  if (!custom) return null;
+  try {
+    const parsed = JSON.parse(custom);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
+      return 'custom must be a JSON object';
+    return validateMongoQueryKeys(parsed);
+  } catch {
+    return 'custom must be valid JSON';
+  }
+}
 
 function isActorSuper(req: unknown): boolean {
   const actor = (req as AuthenticatedRequest).user;
@@ -300,6 +313,24 @@ router.put('/:id/permissions', adminGuard, (req, res) => {
     return;
   }
 
+  // Validate custom conditions
+  for (const item of items) {
+    const cond = item.conditions as { custom?: string } | null | undefined;
+    if (cond?.custom) {
+      const error = validateCustomCondition(cond.custom);
+      if (error) {
+        res.status(400).json({
+          message: [
+            `conditions.custom contains disallowed operator or is invalid: ${error}`
+          ],
+          statusCode: 400,
+          error: 'Bad Request'
+        });
+        return;
+      }
+    }
+  }
+
   // Replace all existing assignments for this role
   state.rolePermissions = state.rolePermissions.filter(
     (rp) => rp.roleId !== id
@@ -358,6 +389,21 @@ router.post('/:id/permissions', adminGuard, (req, res) => {
       .status(400)
       .json({ message: 'permissionIds must be an array', statusCode: 400 });
     return;
+  }
+
+  // Validate custom condition
+  if (conditions?.custom) {
+    const error = validateCustomCondition(conditions.custom as string);
+    if (error) {
+      res.status(400).json({
+        message: [
+          `conditions.custom contains disallowed operator or is invalid: ${error}`
+        ],
+        statusCode: 400,
+        error: 'Bad Request'
+      });
+      return;
+    }
   }
 
   for (const permissionId of permissionIds) {

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ResolvedPermission } from '@app/shared/types';
+import { findDeniedMongoKey } from '@app/shared/utils/mongo-query-safety';
 import {
   AbilityBuilder,
   AppAbility,
@@ -93,15 +94,14 @@ export class CaslAbilityFactory {
               string,
               unknown
             >;
+            const denied = findDeniedMongoKey(parsed);
+            if (denied) {
+              this.logger.warn(
+                `Denied operator "${denied}" in custom condition for user ${userId}, permission "${p.permission}" — skipping entire permission`
+              );
+              continue;
+            }
             for (const [k, v] of Object.entries(parsed)) {
-              // Skip keys that could pollute the query object's prototype
-              if (
-                k === '__proto__' ||
-                k === 'constructor' ||
-                k === 'prototype'
-              ) {
-                continue;
-              }
               query[k] = v;
             }
           } catch {

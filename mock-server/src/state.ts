@@ -20,6 +20,7 @@ import type {
   ResourceResponse,
   ActionResponse
 } from '@app/shared/types';
+import { findDeniedMongoKey } from '@app/shared/utils/mongo-query-safety';
 import {
   seedOAuthAccounts,
   seedUsers,
@@ -307,6 +308,10 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
     if (conditions.custom) {
       try {
         const parsed = JSON.parse(conditions.custom) as Record<string, unknown>;
+        if (findDeniedMongoKey(parsed)) {
+          // Denied operator — skip entire permission (same as server)
+          continue;
+        }
         for (const [k, v] of Object.entries(parsed)) {
           query[k] = v;
         }

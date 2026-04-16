@@ -155,4 +155,94 @@ describe('CaslAbilityFactory', () => {
     expect(ability.can('search', 'Role')).toBe(true);
     expect(ability.can('delete', 'User')).toBe(false);
   });
+
+  it('should apply safe custom conditions as MongoQuery', async () => {
+    const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+    const permissions: ResolvedPermission[] = [
+      {
+        resource: 'users',
+        action: 'read',
+        permission: 'users:read',
+        conditions: { custom: '{"status":{"$in":["active","pending"]}}' }
+      }
+    ];
+
+    const ability = await factory.createForUser('user-1', roles, permissions);
+
+    expect(
+      ability.can('read', {
+        __caslSubjectType__: 'User',
+        status: 'active'
+      } as never)
+    ).toBe(true);
+    expect(
+      ability.can('read', {
+        __caslSubjectType__: 'User',
+        status: 'deleted'
+      } as never)
+    ).toBe(false);
+  });
+
+  it('should skip custom conditions containing $where and log a warning', async () => {
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+    const permissions: ResolvedPermission[] = [
+      {
+        resource: 'users',
+        action: 'read',
+        permission: 'users:read',
+        conditions: { custom: '{"$where":"function(){return true}"}' }
+      }
+    ];
+
+    const ability = await factory.createForUser('user-1', roles, permissions);
+
+    // $where block skipped → no conditions applied → unconditional deny
+    expect(ability.can('read', 'User')).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('$where'));
+
+    warnSpy.mockRestore();
+  });
+
+  it('should skip custom conditions containing nested $where', async () => {
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+    const permissions: ResolvedPermission[] = [
+      {
+        resource: 'users',
+        action: 'read',
+        permission: 'users:read',
+        conditions: {
+          custom: '{"$or":[{"status":"active"},{"$where":"hack"}]}'
+        }
+      }
+    ];
+
+    const ability = await factory.createForUser('user-1', roles, permissions);
+
+    expect(ability.can('read', 'User')).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('$where'));
+
+    warnSpy.mockRestore();
+  });
+
+  it('should skip custom conditions containing __proto__', async () => {
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+    const permissions: ResolvedPermission[] = [
+      {
+        resource: 'users',
+        action: 'read',
+        permission: 'users:read',
+        conditions: { custom: '{"__proto__":{"admin":true}}' }
+      }
+    ];
+
+    const ability = await factory.createForUser('user-1', roles, permissions);
+
+    expect(ability.can('read', 'User')).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('__proto__'));
+
+    warnSpy.mockRestore();
+  });
 });
