@@ -8,7 +8,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PermissionCondition } from '@app/shared/types';
+import { PermissionConditionDto } from './permission-condition.dto';
 
 export class AssignPermissionsDto {
   @ApiProperty({
@@ -24,7 +24,9 @@ export class AssignPermissionsDto {
     description: 'Optional conditions for the permissions'
   })
   @IsOptional()
-  conditions?: PermissionCondition;
+  @ValidateNested()
+  @Type(() => PermissionConditionDto)
+  conditions?: PermissionConditionDto;
 }
 
 export class PermissionItemDto {
@@ -36,7 +38,9 @@ export class PermissionItemDto {
     description: 'Optional conditions for this permission'
   })
   @IsOptional()
-  conditions?: PermissionCondition | null;
+  @ValidateNested()
+  @Type(() => PermissionConditionDto)
+  conditions?: PermissionConditionDto | null;
 }
 
 export class SetPermissionsDto {
