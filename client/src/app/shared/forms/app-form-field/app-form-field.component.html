@@ -32,10 +32,6 @@
       <ng-content select="[formFieldSuffix]" />
     </span>
 
-    @if (hint()) {
-      <mat-hint>{{ t(hint()!) }}</mat-hint>
-    }
-
     @if (activeError(); as error) {
       <mat-error [id]="errorId">{{ t(error.key, error.params) }}</mat-error>
     }

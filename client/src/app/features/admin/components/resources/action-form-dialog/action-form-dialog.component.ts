@@ -20,8 +20,10 @@ import {
   MatDialogModule,
   MatDialogRef
 } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { ActionResponse } from '@app/shared/types/rbac.types';
 import type {
@@ -49,7 +51,9 @@ const ACTION_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
   imports: [
     MatDialogModule,
     MatButtonModule,
+    MatIconModule,
     MatProgressSpinner,
+    MatTooltipModule,
     TranslocoDirective,
     AppFormFieldComponent
   ],

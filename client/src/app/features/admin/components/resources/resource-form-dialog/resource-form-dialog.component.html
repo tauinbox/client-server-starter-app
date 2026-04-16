@@ -6,8 +6,26 @@
       <app-form-field
         [field]="resourceForm.displayName"
         label="admin.resourceForm.displayNameLabel"
-        hint="admin.resourceForm.internalNameHint"
-      />
+      >
+        <button
+          formFieldSuffix
+          mat-icon-button
+          type="button"
+          [matTooltip]="
+            t('admin.resourceForm.internalNameHint', {
+              name: data.resource.name
+            })
+          "
+          [attr.aria-label]="
+            t('admin.resourceForm.internalNameHint', {
+              name: data.resource.name
+            })
+          "
+          class="hint-button"
+        >
+          <mat-icon>info_outline</mat-icon>
+        </button>
+      </app-form-field>
 
       <app-form-field
         [field]="resourceForm.description"

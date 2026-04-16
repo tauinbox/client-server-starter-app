@@ -1,14 +1,14 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { Component, signal, viewChild } from '@angular/core';
-import { form, FormField, required, email } from '@angular/forms/signals';
+import { form, required, email } from '@angular/forms/signals';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 import { AppFormFieldComponent } from './app-form-field.component';
 
 @Component({
   selector: 'app-test-host',
-  imports: [AppFormFieldComponent, FormField],
+  imports: [AppFormFieldComponent],
   template: `
     <app-form-field
       [field]="testForm.email"
@@ -16,7 +16,6 @@ import { AppFormFieldComponent } from './app-form-field.component';
       [type]="type"
       [errors]="errors"
       [prefixIcon]="prefixIcon"
-      [hint]="hint"
       [autocomplete]="autocomplete"
     >
       <button formFieldSuffix type="button" class="test-suffix">Toggle</button>
@@ -33,7 +32,6 @@ class TestHostComponent {
   type: 'text' | 'email' | 'password' | 'textarea' = 'email';
   errors: Record<string, string> = {};
   prefixIcon = 'email';
-  hint = '';
   autocomplete = 'on';
 
   readonly formField = viewChild(AppFormFieldComponent);
@@ -143,21 +141,6 @@ describe('AppFormFieldComponent', () => {
         'mat-icon[matprefix]'
       );
       expect(icons.length).toBe(0);
-    });
-  });
-
-  describe('hint', () => {
-    it('should render hint when provided', () => {
-      host.hint = 'forms.errors.unknown';
-      fixture.detectChanges();
-
-      const hintEl = fixture.nativeElement.querySelector('mat-hint');
-      expect(hintEl).toBeTruthy();
-    });
-
-    it('should not render hint when not provided', () => {
-      const hintEl = fixture.nativeElement.querySelector('mat-hint');
-      expect(hintEl).toBeNull();
     });
   });
 

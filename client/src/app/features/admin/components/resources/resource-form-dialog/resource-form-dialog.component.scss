@@ -45,6 +45,11 @@ form {
   color: var(--mat-sys-on-surface-variant);
 }
 
+.hint-button {
+  color: var(--mat-sys-on-surface-variant);
+  cursor: help;
+}
+
 .form-error {
   margin-top: vars.$spacing-sm;
   margin-bottom: 0;
