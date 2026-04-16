@@ -10,8 +10,20 @@
       <app-form-field
         [field]="actionForm.name"
         label="admin.actionForm.nameLabel"
-        [hint]="isEdit ? 'admin.actionForm.nameImmutableHint' : undefined"
-      />
+      >
+        @if (isEdit) {
+          <button
+            formFieldSuffix
+            mat-icon-button
+            type="button"
+            [matTooltip]="t('admin.actionForm.nameImmutableHint')"
+            [attr.aria-label]="t('admin.actionForm.nameImmutableHint')"
+            class="hint-button"
+          >
+            <mat-icon>info_outline</mat-icon>
+          </button>
+        }
+      </app-form-field>
 
       <app-form-field
         [field]="actionForm.displayName"

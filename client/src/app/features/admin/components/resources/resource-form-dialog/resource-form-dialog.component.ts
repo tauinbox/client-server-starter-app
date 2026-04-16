@@ -18,7 +18,9 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type {
   ActionResponse,
@@ -48,6 +50,8 @@ type ResourceFormData = {
     MatSlideToggleModule,
     MatCheckboxModule,
     MatDividerModule,
+    MatIconModule,
+    MatTooltipModule,
     TranslocoDirective,
     AppFormFieldComponent
   ],

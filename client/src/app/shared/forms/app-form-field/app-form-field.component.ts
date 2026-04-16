@@ -9,7 +9,6 @@ import { FormField } from '@angular/forms/signals';
 import {
   MatError,
   MatFormField,
-  MatHint,
   MatLabel,
   MatPrefix,
   MatSuffix
@@ -41,7 +40,6 @@ let nextId = 0;
     MatFormField,
     MatLabel,
     MatError,
-    MatHint,
     MatPrefix,
     MatSuffix,
     MatInput,
@@ -67,9 +65,6 @@ export class AppFormFieldComponent {
 
   /** Material icon name for the decorative prefix. */
   readonly prefixIcon = input<string>();
-
-  /** Transloco i18n key for the hint text. */
-  readonly hint = input<string>();
 
   /** HTML `autocomplete` attribute value. */
   readonly autocomplete = input<string>();

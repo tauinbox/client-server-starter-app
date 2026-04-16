@@ -11,6 +11,11 @@ form {
   margin-bottom: vars.$spacing-xs;
 }
 
+.hint-button {
+  color: var(--mat-sys-on-surface-variant);
+  cursor: help;
+}
+
 .form-error {
   margin-top: vars.$spacing-sm;
   margin-bottom: 0;
