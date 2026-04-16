@@ -6,6 +6,7 @@ import { DataSource } from 'typeorm';
 import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
 import { UsersService } from './users.service';
 import { User } from '../entities/user.entity';
+import { AuditService } from '../../audit/audit.service';
 import type { AppAbility } from '../../auth/casl/app-ability';
 
 describe('UsersService', () => {
@@ -85,6 +86,10 @@ describe('UsersService', () => {
         {
           provide: DataSource,
           useValue: mockDataSource
+        },
+        {
+          provide: AuditService,
+          useValue: { logFireAndForget: jest.fn() }
         }
       ]
     }).compile();

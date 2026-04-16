@@ -470,6 +470,9 @@ router.post('/assign/:userId', adminGuard, (req, res) => {
     user.roles.push(role.name);
   }
 
+  // Revoke tokens on any role change (mirrors UserRoleChangedListener)
+  user.tokenRevokedAt = new Date().toISOString();
+
   const actor = (req as AuthenticatedRequest).user;
   logAudit('ROLE_ASSIGN', {
     actorId: actor.id,
@@ -527,9 +530,8 @@ router.delete('/assign/:userId/:roleId', adminGuard, (req, res) => {
 
   user.roles = user.roles.filter((r) => r !== role.name);
 
-  if (role.isSuper) {
-    user.tokenRevokedAt = new Date().toISOString();
-  }
+  // Revoke tokens on any role change (mirrors UserRoleChangedListener)
+  user.tokenRevokedAt = new Date().toISOString();
 
   const actor = (req as AuthenticatedRequest).user;
   logAudit('ROLE_UNASSIGN', {

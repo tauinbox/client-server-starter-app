@@ -456,18 +456,12 @@ describe('RoleService', () => {
       expect(mockRelationQueryBuilder.remove).toHaveBeenCalledWith('role-2');
     });
 
-    it('should revoke tokens when removing a super role (no ability)', async () => {
+    it('should remove super role and invalidate cache (token revocation handled by listener)', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
 
       await service.removeRoleFromUser('user-1', 'role-1');
 
       expect(mockRelationQueryBuilder.remove).toHaveBeenCalledWith('role-1');
-      expect(mockRoleRepo.manager.update).toHaveBeenCalledWith(
-        expect.anything(),
-        'user-1',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        expect.objectContaining({ tokenRevokedAt: expect.any(Date) })
-      );
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
         'user-1'
       );
