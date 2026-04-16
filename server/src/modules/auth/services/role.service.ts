@@ -21,6 +21,7 @@ import {
 } from '../utils/can-grant.util';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { assertCan } from '../../../common/utils/assert-can.util';
 
 @Injectable()
 export class RoleService {
@@ -223,8 +224,12 @@ export class RoleService {
       const targetUser = await this.roleRepository.manager.findOne(User, {
         where: { id: userId }
       });
-      if (targetUser && !ability.can('update', targetUser)) {
-        throw new ForbiddenException('Insufficient permissions');
+      if (targetUser) {
+        assertCan(ability, 'update', targetUser, this.auditService, {
+          actorId,
+          targetId: userId,
+          targetType: 'User'
+        });
       }
 
       // Prevent indirect escalation: caller must hold every permission
@@ -261,8 +266,11 @@ export class RoleService {
       const targetUser = await this.roleRepository.manager.findOne(User, {
         where: { id: userId }
       });
-      if (targetUser && !ability.can('update', targetUser)) {
-        throw new ForbiddenException('Insufficient permissions');
+      if (targetUser) {
+        assertCan(ability, 'update', targetUser, this.auditService, {
+          targetId: userId,
+          targetType: 'User'
+        });
       }
     }
 
@@ -271,11 +279,6 @@ export class RoleService {
       .relation(User, 'roles')
       .of(userId)
       .remove(roleId);
-    if (role.isSuper) {
-      await this.roleRepository.manager.update(User, userId, {
-        tokenRevokedAt: new Date()
-      });
-    }
     await this.permissionService.invalidateUserCache(userId);
   }
 

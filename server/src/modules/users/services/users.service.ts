@@ -1,9 +1,4 @@
-import {
-  ForbiddenException,
-  HttpException,
-  HttpStatus,
-  Injectable
-} from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
@@ -11,6 +6,8 @@ import * as bcrypt from 'bcrypt';
 import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import type { AppAbility } from '../../auth/casl/app-ability';
+import { AuditService } from '../../audit/audit.service';
+import { assertCan } from '../../../common/utils/assert-can.util';
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
@@ -37,7 +34,8 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
-    private dataSource: DataSource
+    private dataSource: DataSource,
+    private auditService: AuditService
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -198,8 +196,11 @@ export class UsersService {
   ): Promise<User> {
     const user = await this.findOne(id);
 
-    if (ability && !ability.can('update', user)) {
-      throw new ForbiddenException('Insufficient permissions');
+    if (ability) {
+      assertCan(ability, 'update', user, this.auditService, {
+        targetId: id,
+        targetType: 'User'
+      });
     }
 
     const { unlockAccount, ...rest } = updateUserDto;
@@ -323,8 +324,11 @@ export class UsersService {
   async remove(id: string, ability?: AppAbility): Promise<void> {
     const user = await this.findOne(id);
 
-    if (ability && !ability.can('delete', user)) {
-      throw new ForbiddenException('Insufficient permissions');
+    if (ability) {
+      assertCan(ability, 'delete', user, this.auditService, {
+        targetId: id,
+        targetType: 'User'
+      });
     }
 
     await this.userRepository.softRemove(user);
@@ -346,8 +350,11 @@ export class UsersService {
       );
     }
 
-    if (ability && !ability.can('delete', user)) {
-      throw new ForbiddenException('Insufficient permissions');
+    if (ability) {
+      assertCan(ability, 'delete', user, this.auditService, {
+        targetId: id,
+        targetType: 'User'
+      });
     }
 
     await withTransaction(this.dataSource, async (manager) => {
