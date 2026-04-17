@@ -199,11 +199,20 @@ Meaning: user can update only their own record, only if it's active, and only if
 
 **Client-side** — three mechanisms:
 
-1. **`*appRequirePermissions` directive** (templates) — evaluates per-row:
+1. **`*appRequirePermissions` directive** (templates) — evaluates per-row, supports an optional `else` template for rendering a fallback when access is denied (e.g. disabled button + tooltip instead of hiding it entirely):
    ```html
-   <ng-container *appRequirePermissions="{ action: 'update', subject: 'User', instance: user }">
-     <button>Edit</button>
-   </ng-container>
+   <button
+     *appRequirePermissions="
+       { action: 'update', subject: 'User', instance: user };
+       else denied
+     "
+     (click)="edit(user)"
+   >Edit</button>
+   <ng-template #denied>
+     <span [matTooltip]="'You do not have permission to edit this user'">
+       <button disabled>Edit</button>
+     </span>
+   </ng-template>
    ```
 
 2. **`instancePermissionGuard`** (routes) — checks before route activation:

@@ -19,6 +19,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatChip } from '@angular/material/chips';
 import { MatDivider } from '@angular/material/divider';
+import { MatTooltip } from '@angular/material/tooltip';
 import { TranslocoDirective } from '@jsverse/transloco';
 import { UsersStore } from '../../store/users.store';
 import { RequirePermissionsDirective } from '../../../auth/directives/require-permissions.directive';
@@ -37,6 +38,7 @@ import { RequirePermissionsDirective } from '../../../auth/directives/require-pe
     MatChip,
     MatDivider,
     MatButton,
+    MatTooltip,
     DatePipe,
     RequirePermissionsDirective,
     TranslocoDirective

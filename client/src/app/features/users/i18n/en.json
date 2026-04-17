@@ -27,6 +27,7 @@
     "createdOn": "Created On",
     "lastUpdated": "Last Updated",
     "editButton": "Edit User",
+    "editNoPermission": "You do not have permission to edit this user",
     "notFoundTitle": "User Not Found",
     "notFoundMessage": "The requested user could not be found.",
     "backToUsers": "Back to Users"

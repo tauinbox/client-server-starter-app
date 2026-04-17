@@ -98,24 +98,28 @@
           </div>
         </div>
 
-        <ng-container
-          *appRequirePermissions="{
-            action: 'update',
-            subject: 'User',
-            instance: u
-          }"
-        >
-          <div class="actions-container">
-            <button
-              mat-flat-button
-              color="primary"
-              [routerLink]="['/admin/users', u.id, 'edit']"
-            >
-              <mat-icon>edit</mat-icon>
-              {{ t('users.detail.editButton') }}
-            </button>
-          </div>
-        </ng-container>
+        <div class="actions-container">
+          <button
+            *appRequirePermissions="
+              { action: 'update', subject: 'User', instance: u };
+              else editDenied
+            "
+            mat-flat-button
+            color="primary"
+            [routerLink]="['/admin/users', u.id, 'edit']"
+          >
+            <mat-icon>edit</mat-icon>
+            {{ t('users.detail.editButton') }}
+          </button>
+          <ng-template #editDenied>
+            <span [matTooltip]="t('users.detail.editNoPermission')">
+              <button mat-flat-button color="primary" disabled>
+                <mat-icon>edit</mat-icon>
+                {{ t('users.detail.editButton') }}
+              </button>
+            </span>
+          </ng-template>
+        </div>
       } @else {
         <div class="error-container">
           <mat-icon class="error-icon">error_outline</mat-icon>

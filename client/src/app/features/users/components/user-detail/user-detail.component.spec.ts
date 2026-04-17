@@ -139,26 +139,31 @@ describe('UserDetailComponent', () => {
   });
 
   describe('edit button visibility', () => {
-    it('should show edit button when hasPermissions returns true for the user instance', () => {
+    const editButton = (fixture: ComponentFixture<UserDetailComponent>) => {
+      const root = fixture.nativeElement as HTMLElement;
+      return root.querySelector<HTMLButtonElement>(
+        '.actions-container button[mat-flat-button]'
+      );
+    };
+
+    it('should show an enabled edit button when hasPermissions returns true for the user instance', () => {
       authStoreMock.hasPermissions.mockReturnValue(true);
       entityMapSignal.set({ 'user-1': mockUser });
       fixture.detectChanges();
 
-      const editButton = fixture.nativeElement.querySelector(
-        'button[color="primary"][mat-flat-button]'
-      );
-      expect(editButton).toBeTruthy();
+      const button = editButton(fixture);
+      expect(button).toBeTruthy();
+      expect(button?.disabled).toBe(false);
     });
 
-    it('should hide edit button when hasPermissions returns false', () => {
+    it('should show a disabled edit button when hasPermissions returns false', () => {
       authStoreMock.hasPermissions.mockReturnValue(false);
       entityMapSignal.set({ 'user-1': mockUser });
       fixture.detectChanges();
 
-      const editButton = fixture.nativeElement.querySelector(
-        'button[color="primary"][mat-flat-button]'
-      );
-      expect(editButton).toBeNull();
+      const button = editButton(fixture);
+      expect(button).toBeTruthy();
+      expect(button?.disabled).toBe(true);
     });
 
     it('should pass instance with user data to hasPermissions', () => {
