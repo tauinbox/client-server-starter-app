@@ -17,25 +17,40 @@ export class RequirePermissionsDirective {
     PermissionCheck | PermissionCheck[]
   >();
 
+  readonly appRequirePermissionsElse = input<TemplateRef<unknown> | null>(null);
+
   readonly #templateRef = inject(TemplateRef<unknown>);
   readonly #viewContainer = inject(ViewContainerRef);
   readonly #authStore = inject(AuthStore);
 
-  #hasView = false;
+  #currentBranch: 'then' | 'else' | null = null;
 
   constructor() {
     effect(() => {
       const hasPermissions = this.#authStore.hasPermissions(
         this.appRequirePermissions()
       );
+      const elseTemplate = this.appRequirePermissionsElse();
 
-      if (hasPermissions && !this.#hasView) {
-        this.#viewContainer.createEmbeddedView(this.#templateRef);
-        this.#hasView = true;
-      } else if (!hasPermissions && this.#hasView) {
-        this.#viewContainer.clear();
-        this.#hasView = false;
+      const nextBranch: 'then' | 'else' | null = hasPermissions
+        ? 'then'
+        : elseTemplate
+          ? 'else'
+          : null;
+
+      if (nextBranch === this.#currentBranch) {
+        return;
       }
+
+      this.#viewContainer.clear();
+
+      if (nextBranch === 'then') {
+        this.#viewContainer.createEmbeddedView(this.#templateRef);
+      } else if (nextBranch === 'else' && elseTemplate) {
+        this.#viewContainer.createEmbeddedView(elseTemplate);
+      }
+
+      this.#currentBranch = nextBranch;
     });
   }
 }

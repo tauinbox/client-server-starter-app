@@ -36,7 +36,7 @@ src/app/
 ├── features/
 │   ├── auth/               # Login, register, profile, OAuth callback, verify-email, forgot-password, reset-password, forbidden
 │   │   ├── casl/           # app-ability.ts — AppAbility, Actions, Subjects (auto-generated KnownSubjects + AnyObject), PermissionCheck (action, subject, instance?)
-│   │   ├── directives/     # RequirePermissionsDirective (*appRequirePermissions="{ action, subject } | [...]")
+│   │   ├── directives/     # RequirePermissionsDirective (*appRequirePermissions="check; else fallbackTpl" — optional else template renders a fallback view (e.g. disabled button + tooltip) when access is denied)
 │   │   ├── guards/         # authGuard, guestGuard, permissionGuard(action, subject), instancePermissionGuard(action, subject, instanceFactory)
 │   │   ├── interceptors/   # jwtInterceptor
 │   │   ├── services/       # AuthService (HTTP, refresh scheduling, fetchPermissions: Promise<void>), rbac-metadata.service.ts
