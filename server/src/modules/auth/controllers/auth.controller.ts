@@ -39,6 +39,7 @@ import { RegisterDto } from '../dtos/register.dto';
 import { UpdateProfileDto } from '../dtos/update-profile.dto';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { LoginDto } from '../dtos/login.dto';
+import { Authorize } from '../decorators/authorize.decorator';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { UsersService } from '../../users/services/users.service';
 import { AuthResponseDto } from '../dtos/auth-response.dto';
@@ -204,7 +205,7 @@ export class AuthController {
     return await this.userService.findOne(req.user.userId);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @Authorize(['update', 'Profile'])
   @Patch('profile')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update the current user profile' })

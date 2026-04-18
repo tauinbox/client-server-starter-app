@@ -1,6 +1,12 @@
 import { Logger } from '@nestjs/common';
 import { CaslAbilityFactory, RoleInfo } from './casl-ability.factory';
 import { ResolvedPermission } from '@app/shared/types';
+import {
+  OwnershipResolver,
+  FieldMatchResolver,
+  UserAttrResolver,
+  CustomResolver
+} from './condition-resolvers';
 
 const MOCK_SUBJECT_MAP: Record<string, string> = {
   users: 'User',
@@ -17,8 +23,16 @@ describe('CaslAbilityFactory', () => {
     resourceService = {
       getSubjectMap: jest.fn().mockResolvedValue(MOCK_SUBJECT_MAP)
     };
-    // @ts-expect-error testing mock — only getSubjectMap is needed
-    factory = new CaslAbilityFactory(resourceService);
+    factory = new CaslAbilityFactory(
+      // @ts-expect-error testing mock — only getSubjectMap is needed
+      resourceService,
+      [
+        new OwnershipResolver(),
+        new FieldMatchResolver(),
+        new UserAttrResolver(),
+        new CustomResolver()
+      ]
+    );
   });
 
   it('should grant super role full access to all subjects', async () => {

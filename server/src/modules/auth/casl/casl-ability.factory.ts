@@ -1,6 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ResolvedPermission } from '@app/shared/types';
-import { findDeniedMongoKey } from '@app/shared/utils/mongo-query-safety';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { PermissionCondition, ResolvedPermission } from '@app/shared/types';
 import {
   AbilityBuilder,
   AppAbility,
@@ -8,6 +7,11 @@ import {
   Subjects
 } from './app-ability';
 import { ResourceService } from '../services/resource.service';
+import {
+  CONDITION_RESOLVERS,
+  ConditionResolver,
+  ResolverContext
+} from './condition-resolvers';
 
 export interface RoleInfo {
   name: string;
@@ -18,7 +22,11 @@ export interface RoleInfo {
 export class CaslAbilityFactory {
   private readonly logger = new Logger(CaslAbilityFactory.name);
 
-  constructor(private readonly resourceService: ResourceService) {}
+  constructor(
+    private readonly resourceService: ResourceService,
+    @Inject(CONDITION_RESOLVERS)
+    private readonly resolvers: ConditionResolver[]
+  ) {}
 
   async createForUser(
     userId: string,
@@ -29,96 +37,70 @@ export class CaslAbilityFactory {
 
     if (roles.some((r) => r.isSuper)) {
       can('manage', 'all');
-    } else {
-      const subjectMap = await this.resourceService.getSubjectMap();
+      return build();
+    }
 
-      for (const p of permissions) {
-        const rawSubject = subjectMap[p.resource];
-        if (!rawSubject) {
-          this.logger.warn(
-            `Unknown resource "${p.resource}" in permissions for user ${userId} — skipping`
-          );
-          continue;
-        }
+    const subjectMap = await this.resourceService.getSubjectMap();
 
-        // Values in subjectMap come from @RegisterResource and are valid string subjects.
-        // Cast to Extract<Subjects, string> because AbilityBuilder.can() takes constructors
-        // or string literals — never entity instances (those are for ability.can() checks).
-        const subject = rawSubject as Extract<Subjects, string>;
-        const action = p.action;
+    for (const p of permissions) {
+      const rawSubject = subjectMap[p.resource];
+      if (!rawSubject) {
+        this.logger.warn(
+          `Unknown resource "${p.resource}" in permissions for user ${userId} — skipping`
+        );
+        continue;
+      }
 
-        if (!p.conditions) {
-          can(action, subject);
-          continue;
-        }
+      // Values in subjectMap come from @RegisterResource and are valid string subjects.
+      // Cast to Extract<Subjects, string> because AbilityBuilder.can() takes constructors
+      // or string literals — never entity instances (those are for ability.can() checks).
+      const subject = rawSubject as Extract<Subjects, string>;
+      const action = p.action;
 
-        const query: Record<string, unknown> = {};
+      if (!p.conditions) {
+        can(action, subject);
+        continue;
+      }
 
-        // ownership: record[field] === userId
-        if (p.conditions.ownership) {
-          query[p.conditions.ownership.userField] = userId;
-        }
+      const queryResult = this.resolveConditions(p.conditions, {
+        userId,
+        permissionLabel: p.permission,
+        logger: this.logger
+      });
 
-        // fieldMatch: record[field] must be one of the allowed values
-        if (p.conditions.fieldMatch) {
-          for (const [field, values] of Object.entries(
-            p.conditions.fieldMatch
-          )) {
-            if (Array.isArray(values) && values.length > 0) {
-              query[field] = { $in: values };
-            }
-          }
-        }
+      if (queryResult.skipPermission) continue;
 
-        // userAttr: record[field] === user[attrName]
-        // userContext can be extended as more user attributes become available
-        if (p.conditions.userAttr) {
-          const userContext: Record<string, unknown> = { id: userId };
-          for (const [field, attrName] of Object.entries(
-            p.conditions.userAttr
-          )) {
-            if (typeof attrName === 'string' && attrName in userContext) {
-              query[field] = userContext[attrName];
-            } else {
-              this.logger.warn(
-                `userAttr references unknown attribute "${String(attrName)}" for user ${userId} — skipping field "${field}"`
-              );
-            }
-          }
-        }
-
-        // custom: raw JSON MongoQuery merged into the conditions object
-        if (p.conditions.custom) {
-          try {
-            const parsed = JSON.parse(p.conditions.custom) as Record<
-              string,
-              unknown
-            >;
-            const denied = findDeniedMongoKey(parsed);
-            if (denied) {
-              this.logger.warn(
-                `Denied operator "${denied}" in custom condition for user ${userId}, permission "${p.permission}" — skipping entire permission`
-              );
-              continue;
-            }
-            for (const [k, v] of Object.entries(parsed)) {
-              query[k] = v;
-            }
-          } catch {
-            this.logger.warn(
-              `Invalid JSON in custom condition for user ${userId}: "${p.conditions.custom}" — skipping`
-            );
-          }
-        }
-
-        if (Object.keys(query).length > 0) {
-          can(action, subject, query);
-        } else {
-          can(action, subject);
-        }
+      if (Object.keys(queryResult.query).length > 0) {
+        can(action, subject, queryResult.query);
+      } else {
+        can(action, subject);
       }
     }
 
     return build();
+  }
+
+  /**
+   * Iterates registered resolvers, merging their MongoQuery fragments into a
+   * single conditions object. A resolver may veto the entire permission
+   * (e.g. unsafe custom operator) by returning `skipPermission`.
+   */
+  private resolveConditions(
+    conditions: PermissionCondition,
+    ctx: ResolverContext
+  ): { query: Record<string, unknown>; skipPermission: boolean } {
+    const query: Record<string, unknown> = {};
+    for (const resolver of this.resolvers) {
+      const value = conditions[resolver.key];
+      if (value === undefined || value === null) continue;
+      const outcome = resolver.resolve(value as never, ctx);
+      if (outcome.skipPermission) {
+        return { query, skipPermission: true };
+      }
+      if (outcome.fragment) {
+        Object.assign(query, outcome.fragment);
+      }
+    }
+    return { query, skipPermission: false };
   }
 }
