@@ -39,7 +39,8 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - **Role management** — tabbed `/admin` shell (`AdminPanelComponent`) with "Users", "Roles", and "Resources" tabs. Role list with create/edit/delete dialogs; `RolePermissionsDialogComponent` assigns permissions to roles with optional CASL conditions (ownership, fieldMatch, userAttr, custom)
 - **Resource/Action management** — "Manage Resources" tab at `/admin/resources` (requires `read:Permission`). Resources table allows editing display name, description, and allowed actions per resource (`allowedActionNames`); Actions table supports create, edit, and delete of non-default actions. Each mutation refreshes `RbacMetadataStore` automatically
 - **CASL condition editors** — all four condition types supported in the permissions dialog: `ownership` checkbox, `fieldMatch` / `userAttr` JSON editors, and a `custom` visual condition builder with field/operator/value form, nested `$or`/`$and` groups, JSON preview, and raw JSON fallback toggle
-- **Prototype-pollution-safe `custom` conditions** — `CaslAbilityFactory` uses `Object.entries()` loop instead of `Object.assign` when merging user-supplied JSON into the CASL query object
+- **Prototype-pollution-safe `custom` conditions** — `CustomResolver` runs `findDeniedMongoKey()` on parsed user-supplied JSON before any merge; presence of `__proto__`/`constructor`/`prototype` keys vetoes the entire permission
+- **Pluggable condition resolvers** — each branch of `PermissionCondition` (ownership, fieldMatch, userAttr, custom) is a standalone `ConditionResolver` strategy registered under the `CONDITION_RESOLVERS` token in `CaslModule`. To add a new condition type, implement the interface, register it in `condition-resolvers/index.ts`, and extend `PermissionCondition` in `shared/src/types/role.types.ts`
 
 ### CASL Permission Conditions
 
