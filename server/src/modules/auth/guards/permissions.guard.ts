@@ -12,6 +12,7 @@ import type { PermissionCheck } from '../casl/app-ability';
 import { JwtAuthRequest } from '../types/auth.request';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { MetricsService } from '../../core/metrics/metrics.service';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -19,7 +20,8 @@ export class PermissionsGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly permissionService: PermissionService,
     private readonly caslAbilityFactory: CaslAbilityFactory,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly metricsService: MetricsService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -48,11 +50,22 @@ export class PermissionsGuard implements CanActivate {
     // Attach for downstream instance-level checks via @CurrentAbility()
     req.ability = ability;
 
-    const hasAll = requiredPermissions.every(([action, subject]) =>
-      ability.can(action, subject)
+    const denied = requiredPermissions.filter(
+      ([action, subject]) => !ability.can(action, subject)
     );
 
-    if (!hasAll) {
+    if (denied.length > 0) {
+      for (const [action, subject] of denied) {
+        const subjectName =
+          typeof subject === 'string'
+            ? subject
+            : ((subject as { name?: string })?.name ?? 'unknown');
+        this.metricsService.recordPermissionDenied(
+          'guard',
+          String(action),
+          subjectName
+        );
+      }
       this.auditService.logFireAndForget({
         action: AuditAction.PERMISSION_CHECK_FAILURE,
         actorId: user.userId,

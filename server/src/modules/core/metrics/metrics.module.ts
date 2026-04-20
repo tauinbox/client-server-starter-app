@@ -40,6 +40,11 @@ export const SSE_CONNECTIONS_REF = Symbol('SSE_CONNECTIONS_REF');
       help: 'Total number of authentication events',
       labelNames: ['event']
     }),
+    makeCounterProvider({
+      name: 'rbac_permission_denied_total',
+      help: 'Total number of RBAC/ABAC permission denials',
+      labelNames: ['action', 'subject', 'level']
+    }),
     {
       provide: SSE_CONNECTIONS_REF,
       useFactory: (): SseConnectionsRef => ({ getCount: () => 0 })

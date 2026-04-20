@@ -7,6 +7,7 @@ import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
 import { UsersService } from './users.service';
 import { User } from '../entities/user.entity';
 import { AuditService } from '../../audit/audit.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import type { AppAbility } from '../../auth/casl/app-ability';
 
 describe('UsersService', () => {
@@ -90,6 +91,10 @@ describe('UsersService', () => {
         {
           provide: AuditService,
           useValue: { logFireAndForget: jest.fn() }
+        },
+        {
+          provide: MetricsService,
+          useValue: { recordPermissionDenied: jest.fn() }
         }
       ]
     }).compile();

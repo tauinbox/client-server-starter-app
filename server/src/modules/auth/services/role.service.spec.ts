@@ -9,6 +9,7 @@ import { PermissionService } from './permission.service';
 import type { AppAbility } from '../casl/app-ability';
 import { User } from '../../users/entities/user.entity';
 import { AuditService } from '../../audit/audit.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 
 describe('RoleService', () => {
   let service: RoleService;
@@ -40,6 +41,7 @@ describe('RoleService', () => {
   };
   let mockPermissionService: { invalidateUserCache: jest.Mock };
   let mockAuditService: { log: jest.Mock; logFireAndForget: jest.Mock };
+  let mockMetricsService: { recordPermissionDenied: jest.Mock };
   let mockRelationQueryBuilder: {
     relation: jest.Mock;
     of: jest.Mock;
@@ -166,6 +168,10 @@ describe('RoleService', () => {
       logFireAndForget: jest.fn()
     };
 
+    mockMetricsService = {
+      recordPermissionDenied: jest.fn()
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RoleService,
@@ -179,7 +185,8 @@ describe('RoleService', () => {
           useValue: mockRolePermissionRepo
         },
         { provide: PermissionService, useValue: mockPermissionService },
-        { provide: AuditService, useValue: mockAuditService }
+        { provide: AuditService, useValue: mockAuditService },
+        { provide: MetricsService, useValue: mockMetricsService }
       ]
     }).compile();
 
@@ -693,6 +700,11 @@ describe('RoleService', () => {
           targetId: 'role-2',
           targetType: 'Role'
         })
+      );
+      expect(mockMetricsService.recordPermissionDenied).toHaveBeenCalledWith(
+        'instance',
+        'create',
+        'Role'
       );
     });
 

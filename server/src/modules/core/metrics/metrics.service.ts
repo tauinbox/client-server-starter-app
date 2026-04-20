@@ -10,6 +10,8 @@ export type AuthEvent =
   | 'logout'
   | 'register';
 
+export type PermissionDenialLevel = 'guard' | 'instance';
+
 @Injectable()
 export class MetricsService {
   constructor(
@@ -18,7 +20,9 @@ export class MetricsService {
     @InjectMetric('http_request_duration_seconds')
     private readonly httpDurationHistogram: Histogram<string>,
     @InjectMetric('auth_events_total')
-    private readonly authEventsCounter: Counter<string>
+    private readonly authEventsCounter: Counter<string>,
+    @InjectMetric('rbac_permission_denied_total')
+    private readonly permissionDeniedCounter: Counter<string>
   ) {}
 
   recordHttpRequest(
@@ -34,5 +38,13 @@ export class MetricsService {
 
   recordAuthEvent(event: AuthEvent): void {
     this.authEventsCounter.inc({ event });
+  }
+
+  recordPermissionDenied(
+    level: PermissionDenialLevel,
+    action: string,
+    subject: string
+  ): void {
+    this.permissionDeniedCounter.inc({ action, subject, level });
   }
 }

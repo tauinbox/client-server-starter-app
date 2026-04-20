@@ -8,6 +8,7 @@ import { ErrorKeys } from '@app/shared/constants/error-keys';
 import type { AppAbility } from '../../auth/casl/app-ability';
 import { AuditService } from '../../audit/audit.service';
 import { assertCan } from '../../../common/utils/assert-can.util';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
@@ -35,7 +36,8 @@ export class UsersService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private dataSource: DataSource,
-    private auditService: AuditService
+    private auditService: AuditService,
+    private metricsService: MetricsService
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -197,10 +199,14 @@ export class UsersService {
     const user = await this.findOne(id);
 
     if (ability) {
-      assertCan(ability, 'update', user, this.auditService, {
-        targetId: id,
-        targetType: 'User'
-      });
+      assertCan(
+        ability,
+        'update',
+        user,
+        this.auditService,
+        { targetId: id, targetType: 'User' },
+        this.metricsService
+      );
     }
 
     const { unlockAccount, ...rest } = updateUserDto;
@@ -325,10 +331,14 @@ export class UsersService {
     const user = await this.findOne(id);
 
     if (ability) {
-      assertCan(ability, 'delete', user, this.auditService, {
-        targetId: id,
-        targetType: 'User'
-      });
+      assertCan(
+        ability,
+        'delete',
+        user,
+        this.auditService,
+        { targetId: id, targetType: 'User' },
+        this.metricsService
+      );
     }
 
     await this.userRepository.softRemove(user);
@@ -351,10 +361,14 @@ export class UsersService {
     }
 
     if (ability) {
-      assertCan(ability, 'delete', user, this.auditService, {
-        targetId: id,
-        targetType: 'User'
-      });
+      assertCan(
+        ability,
+        'delete',
+        user,
+        this.auditService,
+        { targetId: id, targetType: 'User' },
+        this.metricsService
+      );
     }
 
     await withTransaction(this.dataSource, async (manager) => {
