@@ -146,6 +146,53 @@ describe('PermissionService', () => {
 
       expect(result).toHaveLength(1);
     });
+
+    it('should keep allow and deny for the same resource+action as separate rules', async () => {
+      const allowRp = {
+        ...mockRolePermission,
+        id: 'rp-allow',
+        conditions: null
+      };
+      const denyRp = {
+        ...mockRolePermission,
+        id: 'rp-deny',
+        conditions: { effect: 'deny', fieldMatch: { status: ['locked'] } }
+      };
+      const userWithAllowAndDeny = {
+        id: 'user-1',
+        roles: [
+          {
+            id: 'role-allow',
+            name: 'editor',
+            isSuper: false,
+            rolePermissions: [allowRp]
+          },
+          {
+            id: 'role-deny',
+            name: 'limiter',
+            isSuper: false,
+            rolePermissions: [denyRp]
+          }
+        ]
+      };
+      mockUserRepository.findOne.mockResolvedValue(userWithAllowAndDeny);
+
+      const result = await service.getPermissionsForUser('user-1');
+
+      expect(result).toHaveLength(2);
+      expect(result).toContainEqual({
+        resource: 'users',
+        action: 'read',
+        permission: 'users:read',
+        conditions: null
+      });
+      expect(result).toContainEqual({
+        resource: 'users',
+        action: 'read',
+        permission: 'users:read',
+        conditions: { effect: 'deny', fieldMatch: { status: ['locked'] } }
+      });
+    });
   });
 
   describe('getRolesForUser', () => {

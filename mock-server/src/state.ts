@@ -215,7 +215,9 @@ type Subjects = 'User' | 'Role' | 'Permission' | 'Profile' | 'all';
 type MockAbility = MongoAbility<[Actions, Subjects]>;
 
 export function getPackedRulesForUser(user: MockUser): unknown[][] {
-  const { can, build } = new AbilityBuilder<MockAbility>(createMongoAbility);
+  const { can, cannot, build } = new AbilityBuilder<MockAbility>(
+    createMongoAbility
+  );
 
   const currentState = getState();
 
@@ -261,7 +263,10 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
       const resource = currentState.resources.get(permission.resourceId);
       const action = currentState.actions.get(permission.actionId);
       if (!resource || !action) continue;
-      const key = `${resource.name}:${action.name}`;
+      // Dedup keyed by effect so allow+deny on the same (resource, action)
+      // coexist — mirrors PermissionService.getPermissionsForUser.
+      const effect = rp.conditions?.effect === 'deny' ? 'deny' : 'allow';
+      const key = `${effect}:${resource.name}:${action.name}`;
       if (!permissionMap.has(key)) {
         permissionMap.set(key, {
           resource: resource.name,
@@ -272,13 +277,24 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
     }
   }
 
-  // Build CASL abilities — mirrors casl-ability.factory.ts logic
-  for (const { resource, action, conditions } of permissionMap.values()) {
+  // Build CASL abilities — mirrors casl-ability.factory.ts logic.
+  // Inverted rules (cannot) must come after direct rules (can) in CASL, so
+  // partition entries into allow-first / deny-last order.
+  const entries = [...permissionMap.values()];
+  const orderedEntries = [
+    ...entries.filter((e) => e.conditions?.effect !== 'deny'),
+    ...entries.filter((e) => e.conditions?.effect === 'deny')
+  ];
+
+  for (const { resource, action, conditions } of orderedEntries) {
     const subject = subjectMap.get(resource) as Subjects | undefined;
     if (!subject) continue;
 
+    const isDeny = conditions?.effect === 'deny';
+    const register = isDeny ? cannot : can;
+
     if (!conditions) {
-      can(action as Actions, subject);
+      register(action as Actions, subject);
       continue;
     }
 
@@ -322,9 +338,9 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
 
     if (Object.keys(query).length > 0) {
       // CASL infers MongoQuery<never> for string subjects — cast is required
-      can(action as Actions, subject, query as MongoQuery<never>);
+      register(action as Actions, subject, query as MongoQuery<never>);
     } else {
-      can(action as Actions, subject);
+      register(action as Actions, subject);
     }
   }
 

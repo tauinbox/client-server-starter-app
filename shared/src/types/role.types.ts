@@ -27,7 +27,10 @@ export type RoleWithPermissionsResponse = RoleResponse & {
   permissions: RolePermissionResponse[];
 };
 
+export type PermissionEffect = 'allow' | 'deny';
+
 export type PermissionCondition = {
+  effect?: PermissionEffect;
   ownership?: { userField: string };
   fieldMatch?: Record<string, unknown[]>;
   userAttr?: Record<string, unknown>;

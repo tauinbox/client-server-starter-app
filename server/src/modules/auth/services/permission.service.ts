@@ -42,18 +42,24 @@ export class PermissionService {
       return [];
     }
 
+    // Dedup by effect + resource + action so allow and deny rules for the
+    // same (resource, action) coexist. The CASL factory registers them in
+    // allow-first / deny-last order, letting deny rules override broader
+    // allow rules (e.g. allow update:Article + deny update:Article when
+    // published=true).
     const permissionMap = new Map<string, ResolvedPermission>();
 
     for (const role of user.roles) {
       for (const rp of role.rolePermissions) {
         const resourceName = rp.permission.resource.name;
         const actionName = rp.permission.action.name;
-        const key = `${resourceName}:${actionName}`;
+        const effect = rp.conditions?.effect === 'deny' ? 'deny' : 'allow';
+        const key = `${effect}:${resourceName}:${actionName}`;
         if (!permissionMap.has(key)) {
           permissionMap.set(key, {
             resource: resourceName,
             action: actionName,
-            permission: key,
+            permission: `${resourceName}:${actionName}`,
             conditions: rp.conditions
           });
         }

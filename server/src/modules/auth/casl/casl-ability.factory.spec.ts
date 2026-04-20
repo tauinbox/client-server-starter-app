@@ -259,4 +259,160 @@ describe('CaslAbilityFactory', () => {
 
     warnSpy.mockRestore();
   });
+
+  describe('effect: deny (inverted rules)', () => {
+    it('should block access when a deny rule with no conditions follows an allow', async () => {
+      const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+      const permissions: ResolvedPermission[] = [
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update',
+          conditions: null
+        },
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update',
+          conditions: { effect: 'deny' }
+        }
+      ];
+
+      const ability = await factory.createForUser('user-1', roles, permissions);
+
+      expect(ability.can('update', 'User')).toBe(false);
+    });
+
+    it('should register deny after allow regardless of input order', async () => {
+      const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+      const permissions: ResolvedPermission[] = [
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update',
+          conditions: { effect: 'deny' }
+        },
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update',
+          conditions: null
+        }
+      ];
+
+      const ability = await factory.createForUser('user-1', roles, permissions);
+
+      // Deny reordered after allow → blanket deny wins.
+      expect(ability.can('update', 'User')).toBe(false);
+    });
+
+    it('should allow unconditionally when only a deny rule with matching conditions exists but record does not match', async () => {
+      const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+      const permissions: ResolvedPermission[] = [
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update',
+          conditions: null
+        },
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update',
+          conditions: {
+            effect: 'deny',
+            custom: '{"status":{"$in":["archived"]}}'
+          }
+        }
+      ];
+
+      const ability = await factory.createForUser('user-1', roles, permissions);
+
+      // Blanket subject-type check with no instance — CASL conservatively
+      // reports false because it cannot decide the conditional deny.
+      expect(ability.can('update', 'User')).toBe(true);
+
+      // Instance with non-matching status → only the allow applies.
+      expect(
+        ability.can('update', {
+          __caslSubjectType__: 'User',
+          status: 'active'
+        } as never)
+      ).toBe(true);
+
+      // Instance with matching status → deny rule blocks.
+      expect(
+        ability.can('update', {
+          __caslSubjectType__: 'User',
+          status: 'archived'
+        } as never)
+      ).toBe(false);
+    });
+
+    it('should apply conditional deny alongside ownership-based allow', async () => {
+      const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+      const permissions: ResolvedPermission[] = [
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update:own',
+          conditions: { ownership: { userField: 'createdBy' } }
+        },
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update',
+          conditions: {
+            effect: 'deny',
+            fieldMatch: { status: ['locked'] }
+          }
+        }
+      ];
+
+      const ability = await factory.createForUser('user-1', roles, permissions);
+
+      // Own and unlocked → allowed.
+      expect(
+        ability.can('update', {
+          __caslSubjectType__: 'User',
+          createdBy: 'user-1',
+          status: 'active'
+        } as never)
+      ).toBe(true);
+
+      // Own but locked → deny overrides.
+      expect(
+        ability.can('update', {
+          __caslSubjectType__: 'User',
+          createdBy: 'user-1',
+          status: 'locked'
+        } as never)
+      ).toBe(false);
+
+      // Not own → allow never matched.
+      expect(
+        ability.can('update', {
+          __caslSubjectType__: 'User',
+          createdBy: 'user-2',
+          status: 'active'
+        } as never)
+      ).toBe(false);
+    });
+
+    it('should treat conditions.effect === "allow" as the default', async () => {
+      const roles: RoleInfo[] = [{ name: 'viewer', isSuper: false }];
+      const permissions: ResolvedPermission[] = [
+        {
+          resource: 'users',
+          action: 'read',
+          permission: 'users:read',
+          conditions: { effect: 'allow' }
+        }
+      ];
+
+      const ability = await factory.createForUser('user-1', roles, permissions);
+
+      expect(ability.can('read', 'User')).toBe(true);
+    });
+  });
 });

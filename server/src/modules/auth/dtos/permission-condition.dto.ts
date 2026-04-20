@@ -1,8 +1,19 @@
-import { IsOptional, IsObject, IsString } from 'class-validator';
+import { IsIn, IsOptional, IsObject, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import type { PermissionEffect } from '@app/shared/types';
 import { IsSafeMongoQuery } from '../../../common/validators/is-safe-mongo-query.validator';
 
 export class PermissionConditionDto {
+  @ApiPropertyOptional({
+    description:
+      'Rule effect — "allow" (default) grants, "deny" revokes matching access. Deny rules are applied after allow rules and override them (CASL last-matching semantics).',
+    enum: ['allow', 'deny'],
+    example: 'deny'
+  })
+  @IsOptional()
+  @IsIn(['allow', 'deny'])
+  effect?: PermissionEffect;
+
   @ApiPropertyOptional({
     description: 'Ownership condition — record[userField] must equal userId',
     example: { userField: 'createdBy' }

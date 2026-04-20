@@ -172,7 +172,7 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 - **GoogleStrategy / FacebookStrategy / VkStrategy** — OAuth2 login (conditionally registered when env vars are set)
 - **PermissionsGuard** — resolves user permissions (cached 5 min), checks required permissions from typed `@RequirePermissions([Actions, Subjects])`; roles with `isSuper` flag bypass all checks
 - **@Authorize([action, subject]) decorator** — composite: `JwtAuthGuard` + `PermissionsGuard` + typed `@RequirePermissions()`. Replaces `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` pattern
-- **CaslAbilityFactory** — builds `AppAbility` from user roles + permissions; used by `AuthController` to return CASL packed rules via `packRules()` from `GET /permissions`
+- **CaslAbilityFactory** — builds `AppAbility` from user roles + permissions; used by `AuthController` to return CASL packed rules via `packRules()` from `GET /permissions`. Partitions rules allow-first / deny-last so permissions with `conditions.effect === 'deny'` register as CASL `cannot()` rules and reliably override prior allows for the same `(resource, action)` pair
 - **Instance-level enforcement** — `UsersService.update/remove/restore` and `RoleService.assignRoleToUser/removeRoleFromUser` accept an optional `AppAbility` (injected via `@CurrentAbility()` in controllers) and check `ability.can(action, entity)` after loading the record; super-role assignment/removal is blocked for non-super actors
 - **JWT payload** — includes `roles: string[]`; `isAdmin` column removed from database (migration `drop-is-admin`)
 - **Refresh tokens** — opaque 80-char hex tokens stored in DB (SHA-256 hashed), delivered to the client as an `HttpOnly SameSite=Strict` cookie (`path=/api/v1/auth`), rotated on every use; never appear in response body
@@ -374,7 +374,7 @@ npm run test:e2e
 
 Server imports common types and constants from the root `shared/` directory via `@app/shared/*` path alias (maps to `../shared/src/*` in `tsconfig.json`). This includes:
 
-- **Types**: `UserResponse`, `OAuthAccountResponse`, `TokensResponse`, `AuthResponse`, `PaginationMeta`, `PaginatedResponse<T>`, `CursorPaginationMeta`, `CursorPaginatedResponse<T>`, `SortOrder`; `RoleResponse`, `PermissionResponse`, `RolePermissionResponse`, `RoleWithPermissionsResponse`, `PermissionCondition`, `ResolvedPermission`, `UserPermissionsResponse`; `ResourceResponse`, `ActionResponse`, `RbacMetadataResponse`
+- **Types**: `UserResponse`, `OAuthAccountResponse`, `TokensResponse`, `AuthResponse`, `PaginationMeta`, `PaginatedResponse<T>`, `CursorPaginationMeta`, `CursorPaginatedResponse<T>`, `SortOrder`; `RoleResponse`, `PermissionResponse`, `RolePermissionResponse`, `RoleWithPermissionsResponse`, `PermissionCondition`, `PermissionEffect`, `ResolvedPermission`, `UserPermissionsResponse`; `ResourceResponse`, `ActionResponse`, `RbacMetadataResponse`
 - **Constants**: `PASSWORD_REGEX`, `PASSWORD_ERROR`, `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, `MAX_CONCURRENT_SESSIONS`, pagination defaults, user sort columns; `SYSTEM_ROLES`, `SystemRole` (note: `PERMISSIONS` + `Permission` removed — typed `[Actions, Subjects]` tuples used instead)
 
 NestJS build compiles shared files into `dist/shared/` alongside `dist/server/`. Migration and seed scripts use paths like `dist/server/src/...` to reflect the nested output structure.

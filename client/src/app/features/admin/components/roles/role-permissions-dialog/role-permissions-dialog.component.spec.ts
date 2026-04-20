@@ -364,4 +364,113 @@ describe('RolePermissionsDialogComponent', () => {
       expect(anyDisabled).toBe(true);
     });
   });
+
+  describe('effect (allow / deny)', () => {
+    it('isDeny() returns false when no effect is set', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      expect(component.isDeny('perm-a')).toBe(false);
+    });
+
+    it('setEffect("deny") marks the permission as deny and dirties the form', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      component.setEffect('perm-a', 'deny');
+
+      expect(component.isDeny('perm-a')).toBe(true);
+      expect(component.isDirty()).toBe(true);
+    });
+
+    it('setEffect("allow") strips the effect field and collapses conditions to null when nothing else remains', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      component.setEffect('perm-a', 'deny');
+      component.setEffect('perm-a', 'allow');
+
+      expect(component.isDeny('perm-a')).toBe(false);
+      // conditions must be null (matches the original empty state) — not an
+      // empty object, otherwise dirty detection would stay true forever.
+      expect(component.isDirty()).toBe(false);
+    });
+
+    it('setEffect preserves other condition keys when flipping back to allow', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      component.setEffect('perm-a', 'deny');
+      component.toggleOwnership('perm-a');
+      component.setEffect('perm-a', 'allow');
+
+      expect(component.isDeny('perm-a')).toBe(false);
+      expect(component.hasOwnership('perm-a')).toBe(true);
+    });
+
+    it('save() sends conditions with effect: "deny" in payload', () => {
+      const { component, roleServiceMock } = setup([
+        makeRolePermItem('perm-a')
+      ]);
+
+      component.setEffect('perm-a', 'deny');
+      component.save();
+
+      const [, items] = roleServiceMock.setPermissions.mock.calls[0] as [
+        string,
+        { permissionId: string; conditions: { effect?: string } | null }[]
+      ];
+      const item = items.find((i) => i.permissionId === 'perm-a');
+      expect(item?.conditions?.effect).toBe('deny');
+    });
+
+    it('hasAnyCondition() ignores effect (it is not a restriction)', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      component.setEffect('perm-a', 'deny');
+
+      // deny alone is not a "restriction condition" — the condition chip must
+      // not appear just because effect is set.
+      expect(component.hasAnyCondition('perm-a')).toBe(false);
+    });
+
+    it('initialises isDeny() from server response containing effect', () => {
+      const denyItem: RolePermissionItem = {
+        ...makeRolePermItem('perm-a'),
+        conditions: { effect: 'deny' }
+      };
+      const { component } = setup([denyItem]);
+
+      expect(component.isDeny('perm-a')).toBe(true);
+      expect(component.isDirty()).toBe(false);
+    });
+
+    it('setEffect is a no-op for system roles', () => {
+      const systemRole: RoleResponse = { ...mockRole, isSystem: true };
+      const roleServiceMock = {
+        getAllPermissions: vi
+          .fn()
+          .mockReturnValue(of([mockPermissionA, mockPermissionB])),
+        getRolePermissions: vi.fn().mockReturnValue(of([])),
+        setPermissions: vi.fn().mockReturnValue(of(undefined))
+      };
+      TestBed.configureTestingModule({
+        imports: [
+          RolePermissionsDialogComponent,
+          TranslocoTestingModuleWithLangs
+        ],
+        providers: [
+          provideNoopAnimations(),
+          { provide: MAT_DIALOG_DATA, useValue: { role: systemRole } },
+          { provide: MatDialogRef, useValue: { close: vi.fn() } },
+          { provide: RoleService, useValue: roleServiceMock },
+          { provide: MatSnackBar, useValue: { open: vi.fn() } }
+        ]
+      });
+      const fixture = TestBed.createComponent(RolePermissionsDialogComponent);
+      fixture.detectChanges();
+      fixture.detectChanges();
+      const component = fixture.componentInstance;
+
+      component.setEffect('perm-a', 'deny');
+
+      expect(component.isDeny('perm-a')).toBe(false);
+    });
+  });
 });
