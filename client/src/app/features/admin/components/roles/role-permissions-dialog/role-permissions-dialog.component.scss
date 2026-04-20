@@ -67,7 +67,11 @@ $panel-max-height: calc(65vh - #{func.rem(124)});
   margin: 0 0 vars.$spacing-sm;
   font-size: vars.$font-size-sm;
   color: var(--mat-sys-on-surface-variant);
-  background: color-mix(in srgb, var(--mat-sys-outline-variant) 20%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--mat-sys-outline-variant) 20%,
+    transparent
+  );
   border-radius: vars.$border-radius-sm;
 }
 
@@ -100,7 +104,8 @@ $panel-max-height: calc(65vh - #{func.rem(124)});
     text-transform: capitalize;
   }
 
-  .condition-chip {
+  .condition-chip,
+  .deny-chip {
     height: func.rem(20);
     min-height: unset;
     padding: 0 vars.$spacing-xs;
@@ -239,7 +244,11 @@ mat-divider {
   }
 
   &.has-condition {
-    background-color: color-mix(in srgb, var(--mat-sys-primary) 5%, transparent);
+    background-color: color-mix(
+      in srgb,
+      var(--mat-sys-primary) 5%,
+      transparent
+    );
   }
 }
 
@@ -249,6 +258,11 @@ mat-divider {
   gap: vars.$spacing-md;
   padding: vars.$spacing-sm vars.$spacing-md vars.$spacing-md;
   border-top: 1px solid var(--mat-sys-outline-variant);
+}
+
+.condition-effect {
+  padding-bottom: vars.$spacing-sm;
+  border-bottom: 1px dashed var(--mat-sys-outline-variant);
 }
 
 // ── Individual condition block ─────────────────────────────────────────────

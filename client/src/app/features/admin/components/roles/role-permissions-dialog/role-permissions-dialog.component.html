@@ -53,6 +53,19 @@
                     >
                       {{ permission.action.name }}
                     </mat-checkbox>
+                    @if (isChecked(permission.id) && isDeny(permission.id)) {
+                      <mat-chip
+                        class="deny-chip"
+                        color="warn"
+                        highlighted
+                        [matTooltip]="
+                          t('admin.rolePermissions.effectDenyBadgeHint')
+                        "
+                      >
+                        <mat-icon class="chip-icon">block</mat-icon>
+                        {{ t('admin.rolePermissions.effectDenyBadge') }}
+                      </mat-chip>
+                    }
                     @if (
                       isChecked(permission.id) && hasAnyCondition(permission.id)
                     ) {
@@ -114,6 +127,11 @@
                       permission.action.name
                     }}</span>
                   </span>
+                  @if (isDeny(permission.id)) {
+                    <mat-chip class="inline-chip" color="warn" highlighted>
+                      {{ t('admin.rolePermissions.effectDenyBadge') }}
+                    </mat-chip>
+                  }
                   @if (hasAnyCondition(permission.id)) {
                     @for (
                       type of activeConditionTypes(permission.id);
@@ -123,7 +141,7 @@
                         {{ type }}
                       </mat-chip>
                     }
-                  } @else {
+                  } @else if (!isDeny(permission.id)) {
                     <span class="no-condition">{{
                       t('admin.rolePermissions.noRestriction')
                     }}</span>
@@ -132,6 +150,28 @@
 
                 @if (isExpanded(permission.id)) {
                   <div class="condition-editor">
+                    <!-- ── Effect (allow / deny) ── -->
+                    <div class="condition-block condition-effect">
+                      <mat-slide-toggle
+                        color="warn"
+                        [checked]="isDeny(permission.id)"
+                        [disabled]="role.isSystem || isReadonly()"
+                        (change)="
+                          setEffect(
+                            permission.id,
+                            $event.checked ? 'deny' : 'allow'
+                          )
+                        "
+                      >
+                        <span class="condition-label">{{
+                          t('admin.rolePermissions.effectDenyLabel')
+                        }}</span>
+                        <span class="checkbox-hint">{{
+                          t('admin.rolePermissions.effectDenyHint')
+                        }}</span>
+                      </mat-slide-toggle>
+                    </div>
+
                     <!-- ── Ownership ── -->
                     <div class="condition-block">
                       <mat-checkbox

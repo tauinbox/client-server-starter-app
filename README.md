@@ -63,6 +63,7 @@ Type definition (`shared/src/types/role.types.ts`):
 
 ```typescript
 type PermissionCondition = {
+  effect?: 'allow' | 'deny';                // default 'allow'
   ownership?: { userField: string };
   fieldMatch?: Record<string, unknown[]>;
   userAttr?: Record<string, unknown>;
@@ -70,7 +71,7 @@ type PermissionCondition = {
 };
 ```
 
-All four types can be combined on a single permission — they are merged into one query with implicit AND logic.
+All four condition types can be combined on a single permission — they are merged into one query with implicit AND logic. The separate `effect` flag controls whether the resulting rule is a CASL `can()` (allow) or `cannot()` (deny) — see "Deny Rules" below.
 
 ---
 
@@ -236,13 +237,22 @@ Meaning: user can update only their own record, only if it's active, and only if
 
 Roles with `isSuper: true` receive `can('manage', 'all')` — a CASL wildcard that bypasses all condition checks. All buttons visible, all routes accessible, all API calls allowed.
 
+#### Deny Rules (`effect: 'deny'`)
+
+Any permission on a role can set `effect: 'deny'` in its `conditions` to register a CASL `cannot()` rule instead of a `can()` rule. The factory partitions rules allow-first, deny-last; CASL's last-matching-rule semantics mean a deny always overrides a prior allow for the same `(resource, action)` pair. Deny rules may carry the same MongoQuery conditions as allow rules (ownership / fieldMatch / userAttr / custom), so you can express patterns like:
+
+- Blanket deny after allow: Role A has `update:User` (allow, no conditions); Role B has `update:User` with `{ effect: 'deny' }` → net: cannot update any user.
+- Conditional deny: Role A has `update:User` with `{ ownership: { userField: 'createdBy' } }` (allow-own); Role B has `update:User` with `{ effect: 'deny', fieldMatch: { status: ['locked'] } }` → net: can update own records except when `status === 'locked'`.
+
+Expose the flag in the admin UI via the "Deny" toggle at the top of each permission's condition block in `RolePermissionsDialogComponent`.
+
 #### Multiple Roles and Condition Precedence
 
-When a user has multiple roles, permissions are deduplicated by `resource:action` key — later roles override earlier ones. Conditions are **not merged** across roles.
+When a user has multiple roles, permissions are deduplicated by `effect:resource:action` key — so allow and deny rules for the same `(resource, action)` coming from different roles are preserved as separate entries. Within the same effect bucket, later roles override earlier ones; conditions are **not merged** across roles.
 
-Example: if Role A grants `update:User` with `{ ownership: { userField: "id" } }` and Role B grants `update:User` with no conditions — the user gets **unrestricted** `update:User` (Role B overrides Role A).
+Example: if Role A grants `update:User` with `{ ownership: { userField: "id" } }` and Role B grants `update:User` with no conditions — the user gets **unrestricted** `update:User` (Role B overrides Role A on the allow side).
 
-To apply multiple restrictions simultaneously, use `$and` in a single `custom` condition on one role, rather than splitting across roles.
+To apply multiple restrictions simultaneously, either use `$and` in a single `custom` condition on one role, or move the extra restrictions to a separate role with `effect: 'deny'`.
 
 ### User Management (Admin)
 - **Unified Manage Users page** — inline filter form (email, first/last name, status) on the same page as the user list; empty filters load all users, filled filters trigger a search via `GET /users/search`

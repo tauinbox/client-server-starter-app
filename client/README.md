@@ -53,7 +53,7 @@ src/app/
 │       │   ├── roles/
 │       │   │   ├── role-list/           # RoleListComponent — data table with create/edit/delete actions
 │       │   │   ├── role-form-dialog/    # RoleFormDialogComponent — create and edit role (name, description)
-│       │   │   └── role-permissions-dialog/ # RolePermissionsDialogComponent — permission matrix with CASL condition editors
+│       │   │   └── role-permissions-dialog/ # RolePermissionsDialogComponent — permission matrix with CASL condition editors and per-permission Allow/Deny toggle (effect)
 │       │   └── resources/
 │       │       ├── resource-list/       # ResourceListComponent — two-section page (Resources + Actions tables)
 │       │       ├── resource-form-dialog/ # ResourceFormDialogComponent — edit resource displayName/description

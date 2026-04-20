@@ -82,6 +82,10 @@
     "customJsonExample": "напр. { \"$or\": [{\"status\": \"active\"}] }",
     "invalidJsonObject": "Некорректный JSON-объект",
     "invalidJson": "Некорректный JSON",
+    "effectDenyLabel": "Запретить это разрешение",
+    "effectDenyHint": "— инвертирует правило; отнимает доступ у более общих разрешающих правил (напр. разрешить update:Article + запретить update:Article, когда published=true)",
+    "effectDenyBadge": "Запрет",
+    "effectDenyBadgeHint": "Это разрешение работает как правило запрета — оно отнимает совпадающий доступ, предоставленный другими правилами",
     "errorLoadFailed": "Не удалось загрузить разрешения. Попробуйте снова.",
     "errorSaveFailed": "Не удалось сохранить разрешения."
   },

@@ -33,7 +33,9 @@ export class CaslAbilityFactory {
     roles: RoleInfo[],
     permissions: ResolvedPermission[]
   ): Promise<AppAbility> {
-    const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+    const { can, cannot, build } = new AbilityBuilder<AppAbility>(
+      createMongoAbility
+    );
 
     if (roles.some((r) => r.isSuper)) {
       can('manage', 'all');
@@ -42,7 +44,15 @@ export class CaslAbilityFactory {
 
     const subjectMap = await this.resourceService.getSubjectMap();
 
-    for (const p of permissions) {
+    // CASL evaluates rules in order; inverted rules (cannot) must come after
+    // direct rules (can) to override them. Partition so allows are registered
+    // first, denies last.
+    const ordered = [
+      ...permissions.filter((p) => p.conditions?.effect !== 'deny'),
+      ...permissions.filter((p) => p.conditions?.effect === 'deny')
+    ];
+
+    for (const p of ordered) {
       const rawSubject = subjectMap[p.resource];
       if (!rawSubject) {
         this.logger.warn(
@@ -52,13 +62,16 @@ export class CaslAbilityFactory {
       }
 
       // Values in subjectMap come from @RegisterResource and are valid string subjects.
-      // Cast to Extract<Subjects, string> because AbilityBuilder.can() takes constructors
-      // or string literals — never entity instances (those are for ability.can() checks).
+      // Cast to Extract<Subjects, string> because AbilityBuilder.can()/cannot() take
+      // constructors or string literals — never entity instances (those are for
+      // ability.can() checks).
       const subject = rawSubject as Extract<Subjects, string>;
       const action = p.action;
+      const isDeny = p.conditions?.effect === 'deny';
+      const register = isDeny ? cannot : can;
 
       if (!p.conditions) {
-        can(action, subject);
+        register(action, subject);
         continue;
       }
 
@@ -71,9 +84,9 @@ export class CaslAbilityFactory {
       if (queryResult.skipPermission) continue;
 
       if (Object.keys(queryResult.query).length > 0) {
-        can(action, subject, queryResult.query);
+        register(action, subject, queryResult.query);
       } else {
-        can(action, subject);
+        register(action, subject);
       }
     }
 

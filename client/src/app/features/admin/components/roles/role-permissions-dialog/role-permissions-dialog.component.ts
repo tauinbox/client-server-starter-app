@@ -20,6 +20,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -27,6 +28,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type {
   PermissionCondition,
+  PermissionEffect,
   PermissionResponse,
   RoleResponse
 } from '@app/shared/types/role.types';
@@ -54,6 +56,7 @@ export type PermissionGroup = {
     MatDividerModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSlideToggleModule,
     MatChipsModule,
     MatTooltipModule,
     MatIconModule,
@@ -212,8 +215,7 @@ export class RolePermissionsDialogComponent implements OnInit {
   }
 
   hasAnyCondition(permissionId: string): boolean {
-    const c = this.conditionsMap().get(permissionId);
-    return c != null && Object.keys(c).length > 0;
+    return this.activeConditionTypes(permissionId).length > 0;
   }
 
   activeConditionTypes(permissionId: string): string[] {
@@ -225,6 +227,29 @@ export class RolePermissionsDialogComponent implements OnInit {
     if (c.userAttr) types.push('userAttr');
     if (c.custom) types.push('custom');
     return types;
+  }
+
+  // ─── Effect (allow / deny) ────────────────────────────────────────────
+
+  isDeny(permissionId: string): boolean {
+    return this.conditionsMap().get(permissionId)?.effect === 'deny';
+  }
+
+  setEffect(permissionId: string, effect: PermissionEffect): void {
+    if (this.role.isSystem || this.isReadonly()) return;
+    const map = new Map(this.conditionsMap());
+    const current = map.get(permissionId) ?? {};
+    if (effect === 'deny') {
+      map.set(permissionId, { ...current, effect: 'deny' });
+    } else {
+      // 'allow' is the implicit default — strip the field. If nothing else
+      // is left, collapse to null so the dirty check treats a pure-allow
+      // permission as unconditional.
+      const next: PermissionCondition = { ...current };
+      delete next.effect;
+      map.set(permissionId, Object.keys(next).length > 0 ? next : null);
+    }
+    this.conditionsMap.set(map);
   }
 
   toggleExpand(permissionId: string): void {

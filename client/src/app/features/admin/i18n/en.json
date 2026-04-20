@@ -82,6 +82,10 @@
     "customJsonExample": "e.g. { \"$or\": [{\"status\": \"active\"}] }",
     "invalidJsonObject": "Invalid JSON object",
     "invalidJson": "Invalid JSON",
+    "effectDenyLabel": "Deny this permission",
+    "effectDenyHint": "— inverts the rule; revokes matching access from broader allow rules (e.g. allow update:Article + deny update:Article when published=true)",
+    "effectDenyBadge": "Deny",
+    "effectDenyBadgeHint": "This permission is a deny rule — it revokes matching access granted by other rules",
     "errorLoadFailed": "Failed to load permissions. Please try again.",
     "errorSaveFailed": "Failed to save permissions."
   },
