@@ -261,6 +261,7 @@ To apply multiple restrictions simultaneously, either use `$and` in a single `cu
 - **Restore** soft-deleted users via `POST /users/:id/restore` — reactivates the account
 - `includeDeleted=true` query param shows soft-deleted users in list and search
 - Role assignment in user edit form — multi-select field (visible to users with `assign:Role` permission); diffs initial vs selected roles and issues `POST /roles/assign/:userId` / `DELETE /roles/assign/:userId/:roleId` calls on save
+- **Effective permissions preview** — read-only `/admin/users/:id/permissions` page (linked from user detail) showing assigned roles, allow/deny/conditional summary chips, and a resource-grouped `mat-accordion` list of resolved permissions with per-rule action + effect chip and expandable CASL condition JSON; super-role users see a single "full access" note
 - Pagination response envelope: `{ data: User[], meta: { page, limit, total, totalPages } }`
 - **Cursor-based (keyset) pagination** — alternative to offset-based, available via `/cursor` and `/search/cursor` endpoints with response `{ data: User[], meta: { nextCursor, hasMore, limit } }`
 - **Sticky header** — toolbar remains fixed at the top while scrolling through long lists
@@ -525,6 +526,7 @@ API base URL: `/api/v1`
 | GET | `/users/cursor` | `users:search` | List users with cursor-based (keyset) pagination |
 | GET | `/users/search/cursor` | `users:search` | Search users with cursor-based pagination + filters |
 | GET | `/users/:id` | `users:read` | Get user by ID |
+| GET | `/users/:id/permissions` | `users:read` | Get effective permissions (roles + resolved permissions + packed CASL rules) |
 | POST | `/users` | `users:create` | Create user |
 | PATCH | `/users/:id` | `users:update` | Update user |
 | DELETE | `/users/:id` | `users:delete` | Soft-delete user (sets `deleted_at`, revokes sessions) |

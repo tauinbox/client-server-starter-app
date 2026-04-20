@@ -13,11 +13,14 @@ import {
   Request,
   UseInterceptors
 } from '@nestjs/common';
+import { packRules } from '@casl/ability/extra';
 import { UsersService } from '../services/users.service';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { SearchUsersQueryDto } from '../dtos/search-users-query.dto';
 import { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto';
+import { PermissionService } from '../../auth/services/permission.service';
+import { CaslAbilityFactory } from '../../auth/casl/casl-ability.factory';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -58,7 +61,9 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly eventEmitter: EventEmitter2,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly permissionService: PermissionService,
+    private readonly caslAbilityFactory: CaslAbilityFactory
   ) {}
 
   @Post()
@@ -178,6 +183,36 @@ export class UsersController {
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.findOne(id);
+  }
+
+  @Get(':id/permissions')
+  @Authorize(['read', 'User'])
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Get effective permissions for a user: roles, resolved DB permissions and compiled CASL rules (admin only)'
+  })
+  @ApiParam({ name: 'id', description: 'The user ID' })
+  @ApiOkResponse({ description: 'Effective permissions for the user' })
+  @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
+  async getPermissions(@Param('id', ParseUUIDPipe) id: string) {
+    const user = await this.usersService.findOne(id);
+    const [roleInfos, permissions] = await Promise.all([
+      this.permissionService.getRolesForUser(id),
+      this.permissionService.getPermissionsForUser(id)
+    ]);
+    const ability = await this.caslAbilityFactory.createForUser(
+      id,
+      roleInfos,
+      permissions
+    );
+    return {
+      roles: user.roles,
+      permissions,
+      rules: packRules(ability.rules)
+    };
   }
 
   @Patch(':id')

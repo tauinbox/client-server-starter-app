@@ -28,6 +28,8 @@ import {
   findUserByEmail,
   findUserById,
   findUserByIdWithDeleted,
+  getPackedRulesForUser,
+  getResolvedPermissionsForUser,
   getState,
   logAudit,
   toAdminUserResponse
@@ -398,6 +400,30 @@ router.get('/:id', authGuard, (req, res) => {
   }
 
   res.json(toAdminUserResponse(user));
+});
+
+// GET /api/v1/users/:id/permissions — admin read-only preview of a user's
+// effective permissions: DB roles, resolved permissions and compiled CASL rules.
+router.get('/:id/permissions', adminGuard, (req, res) => {
+  const id = req.params['id'] as string;
+  const user = findUserById(id);
+  if (!user) {
+    res.status(404).json({
+      message: 'User not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.USERS.NOT_FOUND
+    });
+    return;
+  }
+
+  const adminResponse = toAdminUserResponse(user);
+  const permissions = getResolvedPermissionsForUser(user);
+  const rules = getPackedRulesForUser(user);
+  res.json({
+    roles: adminResponse.roles,
+    permissions,
+    rules
+  });
 });
 
 // PATCH /api/v1/users/:id

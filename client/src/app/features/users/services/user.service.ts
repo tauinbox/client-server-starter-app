@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import type { Observable } from 'rxjs';
+import type { UserEffectivePermissionsResponse } from '@app/shared/types';
 import type {
   CreateUser,
   CursorPaginatedResponse,
@@ -41,6 +42,12 @@ export class UserService {
 
   delete(id: string): Observable<void> {
     return this.#http.delete<void>(`${USERS_API_V1}/${id}`);
+  }
+
+  getPermissions(id: string): Observable<UserEffectivePermissionsResponse> {
+    return this.#http.get<UserEffectivePermissionsResponse>(
+      `${USERS_API_V1}/${id}/permissions`
+    );
   }
 
   getAllCursor(

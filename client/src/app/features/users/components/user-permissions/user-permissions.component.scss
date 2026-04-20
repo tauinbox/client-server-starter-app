@@ -1,0 +1,131 @@
+@use 'abstracts/variables' as vars;
+@use 'abstracts/mixins' as mix;
+@use 'abstracts/functions' as func;
+
+:host {
+  .user-permissions-container {
+    @include mix.card-container;
+  }
+
+  .loading-container {
+    @include mix.loading-container;
+  }
+
+  .error-container {
+    .error-icon {
+      color: var(--mat-sys-error);
+    }
+
+    @include mix.empty-state;
+  }
+
+  .spacer {
+    flex: 1 1 auto;
+  }
+
+  section {
+    padding-block: vars.$spacing-md;
+
+    h3 {
+      margin-block: 0 vars.$spacing-sm;
+    }
+  }
+
+  .empty-hint {
+    font-style: italic;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  mat-divider {
+    margin-block: vars.$spacing-xs;
+  }
+
+  .permissions-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: vars.$spacing-sm;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: vars.$spacing-sm;
+
+    h3 {
+      margin: 0;
+    }
+  }
+
+  .super-note {
+    display: flex;
+    gap: vars.$spacing-xs;
+    align-items: center;
+    margin: 0;
+    color: var(--mat-sys-on-surface);
+
+    .super-icon {
+      color: var(--mat-sys-tertiary);
+    }
+  }
+
+  .resource-title {
+    font-weight: vars.$font-weight-medium;
+  }
+
+  .deny-indicator {
+    width: func.rem(18);
+    height: func.rem(18);
+    margin-left: vars.$spacing-xs;
+    font-size: func.rem(18);
+    color: var(--mat-sys-error);
+  }
+
+  .permission-list {
+    display: flex;
+    flex-direction: column;
+    gap: vars.$spacing-sm;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+
+  .permission-row {
+    display: flex;
+    flex-direction: column;
+    gap: vars.$spacing-xs;
+    padding-block: vars.$spacing-xs;
+    border-bottom: func.rem(1) solid var(--mat-sys-outline-variant);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .permission-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: vars.$spacing-sm;
+    align-items: center;
+
+    .action-name {
+      font-family: monospace;
+      font-size: vars.$font-size-sm;
+    }
+  }
+
+  .conditions {
+    padding: vars.$spacing-xs vars.$spacing-sm;
+    background-color: var(--mat-sys-surface-container-low);
+    border-radius: vars.$border-radius-sm;
+
+    summary {
+      font-size: vars.$font-size-sm;
+      color: var(--mat-sys-on-surface-variant);
+      cursor: pointer;
+    }
+
+    pre {
+      margin: vars.$spacing-xs 0 0;
+      font-size: vars.$font-size-sm;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+  }
+}

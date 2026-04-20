@@ -119,6 +119,14 @@
               </button>
             </span>
           </ng-template>
+          <button
+            mat-stroked-button
+            color="primary"
+            [routerLink]="['/admin/users', u.id, 'permissions']"
+          >
+            <mat-icon>verified_user</mat-icon>
+            {{ t('users.permissions.viewButton') }}
+          </button>
         </div>
       } @else {
         <div class="error-container">

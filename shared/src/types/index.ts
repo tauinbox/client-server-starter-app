@@ -27,7 +27,8 @@ export type {
   PermissionCondition,
   PermissionEffect,
   ResolvedPermission,
-  UserPermissionsResponse
+  UserPermissionsResponse,
+  UserEffectivePermissionsResponse
 } from './role.types';
 
 export type {

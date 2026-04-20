@@ -86,5 +86,27 @@
     "errorLoadFailed": "Не удалось загрузить пользователей. Попробуйте снова.",
     "errorLoadMoreFailed": "Не удалось загрузить ещё пользователей. Попробуйте снова.",
     "errorLoadDetailsFailed": "Не удалось загрузить данные пользователя. Попробуйте снова."
+  },
+  "permissions": {
+    "title": "Действующие разрешения",
+    "subtitle": "{{ firstName }} {{ lastName }}",
+    "backAriaLabel": "Назад к пользователю",
+    "viewButton": "Показать действующие разрешения",
+    "rolesSection": "Роли",
+    "noRoles": "Роли не назначены",
+    "summarySection": "Итого",
+    "summaryAllow": "{{ count }} разрешено",
+    "summaryDeny": "{{ count }} запрещено",
+    "summaryConditional": "{{ count }} с условиями",
+    "summarySuper": "Супер-роль — полный доступ ко всем ресурсам",
+    "permissionsSection": "Ресурсы",
+    "noPermissions": "Явных разрешений не назначено",
+    "expandAll": "Развернуть всё",
+    "collapseAll": "Свернуть всё",
+    "resourceCount": "{{ count }} правил",
+    "effectAllow": "разрешено",
+    "effectDeny": "запрещено",
+    "conditionsLabel": "Условия",
+    "errorLoadFailed": "Не удалось загрузить разрешения. Попробуйте снова."
   }
 }

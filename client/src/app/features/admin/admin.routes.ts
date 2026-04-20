@@ -62,6 +62,14 @@ export const adminRoutes: Routes = [
                 id: route.params['id']
               }))
             ]
+          },
+          {
+            path: ':id/permissions',
+            loadComponent: () =>
+              import('@features/users/components/user-permissions/user-permissions.component').then(
+                (c) => c.UserPermissionsComponent
+              ),
+            canActivate: [permissionGuard('read', 'User')]
           }
         ]
       },

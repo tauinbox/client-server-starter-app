@@ -41,10 +41,11 @@ src/app/
 │   │   ├── interceptors/   # jwtInterceptor
 │   │   ├── services/       # AuthService (HTTP, refresh scheduling, fetchPermissions: Promise<void>), rbac-metadata.service.ts
 │   │   └── store/          # AuthStore (NgRx Signal Store — state: accessToken (memory) + user (auth_user localStorage) + ability: AppAbility|null), RbacMetadataStore
-│   ├── users/              # User list (with inline filters), detail, edit (admin)
+│   ├── users/              # User list (with inline filters), detail, edit, effective-permissions (admin)
 │   │   ├── components/
-│   │   │   ├── user-table/     # UserTableComponent (shared table; sorting + actions only, no paginator) — shown on tablet/desktop
-│   │   │   └── user-card-list/ # UserCardListComponent — mat-card grid with per-user action menu; shown on handset (via LayoutService.isHandset())
+│   │   │   ├── user-table/        # UserTableComponent (shared table; sorting + actions only, no paginator) — shown on tablet/desktop
+│   │   │   ├── user-card-list/    # UserCardListComponent — mat-card grid with per-user action menu; shown on handset (via LayoutService.isHandset())
+│   │   │   └── user-permissions/  # UserPermissionsComponent — read-only effective-permissions preview grouped by resource (mat-accordion + deny indicators)
 │   │   └── store/          # UsersStore (NgRx Signal Store, route-level)
 │   └── admin/              # Admin panel (roles + resource + user management)
 │       ├── admin.routes.ts # Lazy-loaded child routes under /admin
@@ -85,6 +86,7 @@ src/app/
 | `/admin/users` | UserListComponent | permissionGuard('search', 'User') |
 | `/admin/users/:id` | UserDetailComponent | permissionGuard('read', 'User') |
 | `/admin/users/:id/edit` | UserEditComponent | instancePermissionGuard('update', 'User') |
+| `/admin/users/:id/permissions` | UserPermissionsComponent | permissionGuard('read', 'User') |
 | `/admin/roles` | RoleListComponent | permissionGuard('read', 'Role') |
 | `/admin/resources` | ResourceListComponent | permissionGuard('read', 'Permission') |
 | `/verify-email` | VerifyEmailComponent | - |
@@ -170,7 +172,7 @@ npm test
   - `helpers.ts` — `loginViaUi()`, `expectAuthRedirect()`, `expectForbiddenRedirect()`
 - Test structure: organized by module in `e2e/auth/`, `e2e/users/`, and `e2e/admin/`
 - **Accessibility**: `e2e/a11y.spec.ts` runs `@axe-core/playwright` (WCAG 2.1 AA) against every major route; `e2e/keyboard-nav.spec.ts` verifies keyboard-only flows (login, sidenav, user-edit, dialog focus trap)
-- Coverage: 136 tests — unit test suite: 497 tests passing covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search, admin roles/resources management, a11y audit, keyboard navigation. Error translation tests verify `errorKey` → Transloco pipeline for login, register, and global interceptor snackbar.
+- Coverage: 136 tests — unit test suite: 537 tests passing covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search, admin roles/resources management, effective-permissions preview, a11y audit, keyboard navigation. Error translation tests verify `errorKey` → Transloco pipeline for login, register, and global interceptor snackbar.
 - Workers: 4 (fully parallel, per-worker mock-server instances on dynamic ports)
 
 ```bash
