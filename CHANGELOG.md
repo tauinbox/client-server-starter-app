@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.17](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.16...v0.1.17) (2026-04-20)
+
+
+### Features
+
+* **client:** introduce app-form-field wrapper and migrate login form ([21f9f14](https://github.com/tauinbox/client-server-starter-app/commit/21f9f14cd16aab3c5f4c69683677d84a722897e8))
+* **rbac:** add else template to *appRequirePermissions ([#166](https://github.com/tauinbox/client-server-starter-app/issues/166)) ([d292547](https://github.com/tauinbox/client-server-starter-app/commit/d2925474b3b262738e2e602aefd8d2667f303cc7))
+* **rbac:** add rbac_permission_denied_total Prometheus counter ([#169](https://github.com/tauinbox/client-server-starter-app/issues/169)) ([04e9d9e](https://github.com/tauinbox/client-server-starter-app/commit/04e9d9ec9f353c04cf0d8147323b64c8e8999322))
+* **rbac:** admin effective permissions preview page ([#170](https://github.com/tauinbox/client-server-starter-app/issues/170)) ([25284a7](https://github.com/tauinbox/client-server-starter-app/commit/25284a7ef021b25f51656295bfecc3323b0a4834))
+* **rbac:** deny rules via effect on PermissionCondition ([#168](https://github.com/tauinbox/client-server-starter-app/issues/168)) ([73d6127](https://github.com/tauinbox/client-server-starter-app/commit/73d61279fc91439509ba5b79de347399e243d0b6))
+* **rbac:** P0 security hardening — grant-escalation, ABAC list filtering, system-role lock ([#162](https://github.com/tauinbox/client-server-starter-app/issues/162)) ([c63b5dd](https://github.com/tauinbox/client-server-starter-app/commit/c63b5dd393d59a98c0283473ef4039852d60fb53))
+* **rbac:** revoke tokens on role change and audit instance-level denials ([#163](https://github.com/tauinbox/client-server-starter-app/issues/163)) ([e959fca](https://github.com/tauinbox/client-server-starter-app/commit/e959fca7f4ff8271e1aefb5edcd82c82b88401f0))
+* **rbac:** whitelist MongoQuery operators in PermissionCondition.custom ([#165](https://github.com/tauinbox/client-server-starter-app/issues/165)) ([f44e66f](https://github.com/tauinbox/client-server-starter-app/commit/f44e66f4ef6fff59be62f55d7fa6b0b0bb3c62dd))
+
+
+### Bug Fixes
+
+* **client:** replace mat-hint with tooltip in resource/action form di… ([#164](https://github.com/tauinbox/client-server-starter-app/issues/164)) ([63b0cc6](https://github.com/tauinbox/client-server-starter-app/commit/63b0cc6bba2150dee52f3db2ef784d6a645c346f))
+
 ## [0.1.16](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.15...v0.1.16) (2026-04-12)
 
 
