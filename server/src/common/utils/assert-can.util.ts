@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import type { AppAbility, Subjects } from '../../modules/auth/casl/app-ability';
 import { AuditService } from '../../modules/audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import type { MetricsService } from '../../modules/core/metrics/metrics.service';
 
 interface AssertCanContext {
   actorId?: string;
@@ -11,14 +12,16 @@ interface AssertCanContext {
 
 /**
  * Assert that the ability allows the given action on the subject.
- * On denial, fires an audit log (fire-and-forget) and throws ForbiddenException.
+ * On denial, fires an audit log (fire-and-forget), increments the
+ * rbac_permission_denied_total metric with level='instance', and throws.
  */
 export function assertCan(
   ability: AppAbility,
   action: string,
   subject: Subjects,
   auditService: AuditService,
-  context: AssertCanContext
+  context: AssertCanContext,
+  metricsService?: MetricsService
 ): void {
   if (ability.can(action, subject)) {
     return;
@@ -40,6 +43,8 @@ export function assertCan(
       subject: subjectName
     }
   });
+
+  metricsService?.recordPermissionDenied('instance', action, subjectName);
 
   throw new ForbiddenException('Insufficient permissions');
 }

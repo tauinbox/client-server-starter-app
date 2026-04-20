@@ -111,7 +111,8 @@ src/
 │   ├── health/             # HealthModule (GET /api/health/live, /api/health/ready — DB ping + Redis warning in production + optional SMTP)
 │   ├── metrics/            # MetricsModule (@Global) — Prometheus metrics via @willsoto/nestjs-prometheus
 │   │                       #   GET /metrics (excluded from /api prefix); http_requests_total,
-│   │                       #   http_request_duration_seconds, auth_events_total; HttpMetricsInterceptor
+│   │                       #   http_request_duration_seconds, auth_events_total,
+│   │                       #   rbac_permission_denied_total{action,subject,level}; HttpMetricsInterceptor
 │   └── schedule/           # @nestjs/schedule for cron jobs
 ├── auth/
 │   ├── controllers/        # AuthController (includes GET /permissions), OAuthController, RbacController

@@ -5,6 +5,7 @@ import { createMongoAbility } from '@casl/ability';
 import type { RawRuleOf } from '@casl/ability';
 import type { AppAbility, Subjects } from '../casl/app-ability';
 import type { AuditService } from '../../audit/audit.service';
+import type { MetricsService } from '../../core/metrics/metrics.service';
 
 describe('PermissionsGuard', () => {
   let guard: PermissionsGuard;
@@ -15,6 +16,7 @@ describe('PermissionsGuard', () => {
   };
   let caslAbilityFactory: { createForUser: jest.Mock };
   let auditService: Pick<AuditService, 'logFireAndForget'>;
+  let metricsService: Pick<MetricsService, 'recordPermissionDenied'>;
 
   function createMockContext(user: Record<string, unknown>): {
     context: ExecutionContext;
@@ -65,13 +67,15 @@ describe('PermissionsGuard', () => {
       createForUser: jest.fn()
     };
     auditService = { logFireAndForget: jest.fn() };
+    metricsService = { recordPermissionDenied: jest.fn() };
 
     guard = new PermissionsGuard(
       reflector,
       // @ts-expect-error testing mock
       permissionService,
       caslAbilityFactory,
-      auditService as AuditService
+      auditService as AuditService,
+      metricsService as MetricsService
     );
   });
 
@@ -183,6 +187,11 @@ describe('PermissionsGuard', () => {
     );
     expect(auditService.logFireAndForget).toHaveBeenCalledWith(
       expect.objectContaining({ actorId: 'user-1' })
+    );
+    expect(metricsService.recordPermissionDenied).toHaveBeenCalledWith(
+      'guard',
+      'delete',
+      'User'
     );
   });
 

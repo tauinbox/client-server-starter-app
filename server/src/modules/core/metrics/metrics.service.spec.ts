@@ -26,6 +26,10 @@ describe('MetricsService', () => {
         {
           provide: getToken('auth_events_total'),
           useValue: mockCounter as unknown as Counter<string>
+        },
+        {
+          provide: getToken('rbac_permission_denied_total'),
+          useValue: mockCounter
         }
       ]
     }).compile();
@@ -59,6 +63,28 @@ describe('MetricsService', () => {
       service.recordAuthEvent('login_success');
 
       expect(mockCounter.inc).toHaveBeenCalledWith({ event: 'login_success' });
+    });
+  });
+
+  describe('recordPermissionDenied', () => {
+    it('increments the counter with guard-level labels', () => {
+      service.recordPermissionDenied('guard', 'update', 'User');
+
+      expect(mockCounter.inc).toHaveBeenCalledWith({
+        action: 'update',
+        subject: 'User',
+        level: 'guard'
+      });
+    });
+
+    it('increments the counter with instance-level labels', () => {
+      service.recordPermissionDenied('instance', 'delete', 'User');
+
+      expect(mockCounter.inc).toHaveBeenCalledWith({
+        action: 'delete',
+        subject: 'User',
+        level: 'instance'
+      });
     });
   });
 });

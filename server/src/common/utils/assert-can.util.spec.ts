@@ -87,4 +87,51 @@ describe('assertCan', () => {
       })
     );
   });
+
+  it('records rbac_permission_denied_total with level=instance when metricsService passed', () => {
+    const ability = { can: jest.fn().mockReturnValue(false) };
+    const metricsService = { recordPermissionDenied: jest.fn() };
+
+    class User {
+      id = '5';
+    }
+    const user = new User();
+
+    try {
+      assertCan(
+        // @ts-expect-error partial mock
+        ability,
+        'update',
+        user,
+        auditService,
+        { actorId: 'actor-1', targetId: '5', targetType: 'User' },
+        metricsService
+      );
+    } catch {
+      // expected
+    }
+
+    expect(metricsService.recordPermissionDenied).toHaveBeenCalledWith(
+      'instance',
+      'update',
+      'User'
+    );
+  });
+
+  it('does not touch metrics on allow path', () => {
+    const ability = { can: jest.fn().mockReturnValue(true) };
+    const metricsService = { recordPermissionDenied: jest.fn() };
+
+    assertCan(
+      // @ts-expect-error partial mock
+      ability,
+      'update',
+      { id: '6' },
+      auditService,
+      { targetId: '6', targetType: 'User' },
+      metricsService
+    );
+
+    expect(metricsService.recordPermissionDenied).not.toHaveBeenCalled();
+  });
 });

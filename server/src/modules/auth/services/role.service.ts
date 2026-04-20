@@ -22,6 +22,7 @@ import {
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { assertCan } from '../../../common/utils/assert-can.util';
+import { MetricsService } from '../../core/metrics/metrics.service';
 
 @Injectable()
 export class RoleService {
@@ -33,7 +34,8 @@ export class RoleService {
     @InjectRepository(RolePermission)
     private readonly rolePermissionRepository: Repository<RolePermission>,
     private readonly permissionService: PermissionService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly metricsService: MetricsService
   ) {}
 
   private async resolveGrantItems(
@@ -77,18 +79,36 @@ export class RoleService {
     } catch (err) {
       if (err instanceof HttpException && err.getStatus() === 403) {
         const body = err.getResponse();
+        const details =
+          typeof body === 'object' && body !== null
+            ? ((body as { details?: Record<string, unknown> }).details ?? {
+                body
+              })
+            : { message: String(body) };
         this.auditService.logFireAndForget({
           action: AuditAction.PERMISSION_GRANT_DENIED,
           actorId: context.actorId ?? null,
           targetId: context.roleId,
           targetType: 'Role',
-          details:
-            typeof body === 'object' && body !== null
-              ? ((body as { details?: Record<string, unknown> }).details ?? {
-                  body
-                })
-              : { message: String(body) }
+          details
         });
+        const rawAction =
+          typeof details === 'object' && 'action' in details
+            ? (details as { action?: unknown }).action
+            : undefined;
+        const rawSubject =
+          typeof details === 'object' && 'subject' in details
+            ? (details as { subject?: unknown }).subject
+            : undefined;
+        const deniedAction =
+          typeof rawAction === 'string' ? rawAction : 'grant';
+        const deniedSubject =
+          typeof rawSubject === 'string' ? rawSubject : 'Permission';
+        this.metricsService.recordPermissionDenied(
+          'instance',
+          deniedAction,
+          deniedSubject
+        );
       }
       throw err;
     }
@@ -219,17 +239,25 @@ export class RoleService {
 
     if (ability) {
       if (role.isSuper) {
+        this.metricsService.recordPermissionDenied(
+          'instance',
+          'assign',
+          'Role'
+        );
         throw new ForbiddenException('Cannot assign super roles');
       }
       const targetUser = await this.roleRepository.manager.findOne(User, {
         where: { id: userId }
       });
       if (targetUser) {
-        assertCan(ability, 'update', targetUser, this.auditService, {
-          actorId,
-          targetId: userId,
-          targetType: 'User'
-        });
+        assertCan(
+          ability,
+          'update',
+          targetUser,
+          this.auditService,
+          { actorId, targetId: userId, targetType: 'User' },
+          this.metricsService
+        );
       }
 
       // Prevent indirect escalation: caller must hold every permission
@@ -261,16 +289,25 @@ export class RoleService {
 
     if (ability) {
       if (role.isSuper) {
+        this.metricsService.recordPermissionDenied(
+          'instance',
+          'unassign',
+          'Role'
+        );
         throw new ForbiddenException('Cannot remove super roles');
       }
       const targetUser = await this.roleRepository.manager.findOne(User, {
         where: { id: userId }
       });
       if (targetUser) {
-        assertCan(ability, 'update', targetUser, this.auditService, {
-          targetId: userId,
-          targetType: 'User'
-        });
+        assertCan(
+          ability,
+          'update',
+          targetUser,
+          this.auditService,
+          { targetId: userId, targetType: 'User' },
+          this.metricsService
+        );
       }
     }
 
