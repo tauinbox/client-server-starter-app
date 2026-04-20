@@ -50,3 +50,9 @@ export type UserPermissionsResponse = {
   roles: string[];
   rules: PackedRules;
 };
+
+export type UserEffectivePermissionsResponse = {
+  roles: RoleResponse[];
+  permissions: ResolvedPermission[];
+  rules: PackedRules;
+};

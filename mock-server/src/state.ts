@@ -15,8 +15,8 @@ import type {
   UserResponse
 } from './types';
 import type {
-  PermissionCondition,
   PermissionResponse,
+  ResolvedPermission,
   ResourceResponse,
   ActionResponse
 } from '@app/shared/types';
@@ -214,6 +214,47 @@ type Actions =
 type Subjects = 'User' | 'Role' | 'Permission' | 'Profile' | 'all';
 type MockAbility = MongoAbility<[Actions, Subjects]>;
 
+export function getResolvedPermissionsForUser(
+  user: MockUser
+): ResolvedPermission[] {
+  const currentState = getState();
+
+  const roleIds: string[] = [];
+  for (const [id, role] of currentState.roles) {
+    if (user.roles.includes(role.name)) {
+      roleIds.push(id);
+    }
+  }
+
+  // Dedup keyed by effect:resource:action, first wins — mirrors
+  // PermissionService.getPermissionsForUser on the server.
+  const permissionMap = new Map<string, ResolvedPermission>();
+
+  for (const roleId of roleIds) {
+    for (const rp of currentState.rolePermissions.filter(
+      (p) => p.roleId === roleId
+    )) {
+      const permission = currentState.permissions.get(rp.permissionId);
+      if (!permission) continue;
+      const resource = currentState.resources.get(permission.resourceId);
+      const action = currentState.actions.get(permission.actionId);
+      if (!resource || !action) continue;
+      const effect = rp.conditions?.effect === 'deny' ? 'deny' : 'allow';
+      const key = `${effect}:${resource.name}:${action.name}`;
+      if (!permissionMap.has(key)) {
+        permissionMap.set(key, {
+          resource: resource.name,
+          action: action.name,
+          permission: `${resource.name}:${action.name}`,
+          conditions: rp.conditions
+        });
+      }
+    }
+  }
+
+  return Array.from(permissionMap.values());
+}
+
 export function getPackedRulesForUser(user: MockUser): unknown[][] {
   const { can, cannot, build } = new AbilityBuilder<MockAbility>(
     createMongoAbility
@@ -221,7 +262,6 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
 
   const currentState = getState();
 
-  // Check if user has any super role
   const hasSuperRole = user.roles.some((roleName) => {
     for (const role of currentState.roles.values()) {
       if (role.name === roleName && role.isSuper) return true;
@@ -234,56 +274,19 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
     return packRules(build().rules);
   }
 
-  // Build subject map from resources
   const subjectMap = new Map<string, string>();
   for (const resource of currentState.resources.values()) {
     subjectMap.set(resource.name, resource.subject);
   }
 
-  // Find role IDs for this user's role names
-  const roleIds: string[] = [];
-  for (const [id, role] of currentState.roles) {
-    if (user.roles.includes(role.name)) {
-      roleIds.push(id);
-    }
-  }
-
-  // Collect resolved permissions — deduplicated by resource:action, first wins
-  const permissionMap = new Map<
-    string,
-    { resource: string; action: string; conditions: PermissionCondition | null }
-  >();
-
-  for (const roleId of roleIds) {
-    for (const rp of currentState.rolePermissions.filter(
-      (p) => p.roleId === roleId
-    )) {
-      const permission = currentState.permissions.get(rp.permissionId);
-      if (!permission) continue;
-      const resource = currentState.resources.get(permission.resourceId);
-      const action = currentState.actions.get(permission.actionId);
-      if (!resource || !action) continue;
-      // Dedup keyed by effect so allow+deny on the same (resource, action)
-      // coexist — mirrors PermissionService.getPermissionsForUser.
-      const effect = rp.conditions?.effect === 'deny' ? 'deny' : 'allow';
-      const key = `${effect}:${resource.name}:${action.name}`;
-      if (!permissionMap.has(key)) {
-        permissionMap.set(key, {
-          resource: resource.name,
-          action: action.name,
-          conditions: rp.conditions
-        });
-      }
-    }
-  }
+  const resolved = getResolvedPermissionsForUser(user);
 
   // Build CASL abilities — mirrors casl-ability.factory.ts logic.
   // Inverted rules (cannot) must come after direct rules (can) in CASL, so
   // partition entries into allow-first / deny-last order.
-  const entries = [...permissionMap.values()];
   const orderedEntries = [
-    ...entries.filter((e) => e.conditions?.effect !== 'deny'),
-    ...entries.filter((e) => e.conditions?.effect === 'deny')
+    ...resolved.filter((e) => e.conditions?.effect !== 'deny'),
+    ...resolved.filter((e) => e.conditions?.effect === 'deny')
   ];
 
   for (const { resource, action, conditions } of orderedEntries) {
@@ -325,7 +328,6 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
       try {
         const parsed = JSON.parse(conditions.custom) as Record<string, unknown>;
         if (findDeniedMongoKey(parsed)) {
-          // Denied operator — skip entire permission (same as server)
           continue;
         }
         for (const [k, v] of Object.entries(parsed)) {
@@ -337,7 +339,6 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
     }
 
     if (Object.keys(query).length > 0) {
-      // CASL infers MongoQuery<never> for string subjects — cast is required
       register(action as Actions, subject, query as MongoQuery<never>);
     } else {
       register(action as Actions, subject);

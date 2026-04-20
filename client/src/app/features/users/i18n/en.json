@@ -86,5 +86,27 @@
     "errorLoadFailed": "Failed to load users. Please try again.",
     "errorLoadMoreFailed": "Failed to load more users. Please try again.",
     "errorLoadDetailsFailed": "Failed to load user details. Please try again."
+  },
+  "permissions": {
+    "title": "Effective Permissions",
+    "subtitle": "{{ firstName }} {{ lastName }}",
+    "backAriaLabel": "Back to user",
+    "viewButton": "View effective permissions",
+    "rolesSection": "Roles",
+    "noRoles": "No roles assigned",
+    "summarySection": "Summary",
+    "summaryAllow": "{{ count }} allow",
+    "summaryDeny": "{{ count }} deny",
+    "summaryConditional": "{{ count }} conditional",
+    "summarySuper": "Super role — full access to all resources",
+    "permissionsSection": "Resources",
+    "noPermissions": "No explicit permissions granted",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "resourceCount": "{{ count }} rules",
+    "effectAllow": "allow",
+    "effectDeny": "deny",
+    "conditionsLabel": "Conditions",
+    "errorLoadFailed": "Failed to load effective permissions. Please try again."
   }
 }

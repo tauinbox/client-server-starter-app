@@ -3,6 +3,8 @@ import { UsersController } from './users.controller';
 import { UsersService } from '../services/users.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../../audit/audit.service';
+import { PermissionService } from '../../auth/services/permission.service';
+import { CaslAbilityFactory } from '../../auth/casl/casl-ability.factory';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { JwtAuthRequest } from '../../auth/types/auth.request';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -48,6 +50,11 @@ describe('UsersController', () => {
   };
   let eventEmitterMock: { emit: jest.Mock };
   let auditServiceMock: { log: jest.Mock };
+  let permissionServiceMock: {
+    getRolesForUser: jest.Mock;
+    getPermissionsForUser: jest.Mock;
+  };
+  let caslAbilityFactoryMock: { createForUser: jest.Mock };
 
   beforeEach(async () => {
     usersServiceMock = {
@@ -64,12 +71,21 @@ describe('UsersController', () => {
 
     auditServiceMock = { log: jest.fn().mockResolvedValue(undefined) };
 
+    permissionServiceMock = {
+      getRolesForUser: jest.fn(),
+      getPermissionsForUser: jest.fn()
+    };
+
+    caslAbilityFactoryMock = { createForUser: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
       providers: [
         { provide: UsersService, useValue: usersServiceMock },
         { provide: EventEmitter2, useValue: eventEmitterMock },
-        { provide: AuditService, useValue: auditServiceMock }
+        { provide: AuditService, useValue: auditServiceMock },
+        { provide: PermissionService, useValue: permissionServiceMock },
+        { provide: CaslAbilityFactory, useValue: caslAbilityFactoryMock }
       ]
     })
       .overrideGuard(JwtAuthGuard)
@@ -496,6 +512,78 @@ describe('UsersController', () => {
           details: { targetEmail: 'restored@example.com' }
         })
       );
+    });
+  });
+
+  // ── getPermissions ────────────────────────────────────────────────
+
+  describe('getPermissions', () => {
+    it('should return roles, resolved permissions and packed CASL rules for a user', async () => {
+      const user = {
+        id: 'user-12',
+        email: 'target@example.com',
+        roles: [
+          {
+            id: 'role-1',
+            name: 'user',
+            description: null,
+            isSystem: true,
+            isSuper: false,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        ]
+      };
+      const roleInfos = [{ name: 'user', isSuper: false }];
+      const permissions = [
+        {
+          resource: 'users',
+          action: 'read',
+          permission: 'users:read',
+          conditions: null
+        }
+      ];
+      const ability = {
+        rules: [{ action: 'read', subject: 'User' }]
+      };
+
+      usersServiceMock.findOne.mockResolvedValue(user);
+      permissionServiceMock.getRolesForUser.mockResolvedValue(roleInfos);
+      permissionServiceMock.getPermissionsForUser.mockResolvedValue(
+        permissions
+      );
+      caslAbilityFactoryMock.createForUser.mockResolvedValue(ability);
+
+      const result = await controller.getPermissions('user-12');
+
+      expect(usersServiceMock.findOne).toHaveBeenCalledWith('user-12');
+      expect(permissionServiceMock.getRolesForUser).toHaveBeenCalledWith(
+        'user-12'
+      );
+      expect(permissionServiceMock.getPermissionsForUser).toHaveBeenCalledWith(
+        'user-12'
+      );
+      expect(caslAbilityFactoryMock.createForUser).toHaveBeenCalledWith(
+        'user-12',
+        roleInfos,
+        permissions
+      );
+      expect(result.roles).toBe(user.roles);
+      expect(result.permissions).toBe(permissions);
+      expect(Array.isArray(result.rules)).toBe(true);
+      expect(result.rules).toHaveLength(1);
+    });
+
+    it('should propagate 404 from usersService.findOne when user does not exist', async () => {
+      usersServiceMock.findOne.mockRejectedValue(new Error('User not found'));
+
+      await expect(controller.getPermissions('missing')).rejects.toThrow(
+        'User not found'
+      );
+      expect(permissionServiceMock.getRolesForUser).not.toHaveBeenCalled();
+      expect(
+        permissionServiceMock.getPermissionsForUser
+      ).not.toHaveBeenCalled();
     });
   });
 });

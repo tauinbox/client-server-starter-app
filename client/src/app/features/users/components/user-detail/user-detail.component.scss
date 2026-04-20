@@ -47,6 +47,13 @@
     gap: vars.$spacing-xs;
   }
 
+  .actions-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: vars.$spacing-sm;
+    align-items: center;
+  }
+
   .detail-item {
     @include mix.detail-item;
   }
