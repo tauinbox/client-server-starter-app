@@ -91,6 +91,7 @@ Copy `.env.example` to `.env` and configure:
 | `DB_POOL_IDLE_TIMEOUT` | `30000` | Milliseconds before an idle connection is closed |
 | `DB_POOL_CONNECTION_TIMEOUT` | `5000` | Milliseconds to wait for a connection before erroring |
 | `CORS_ORIGINS` | - | Comma-separated allowed origins (e.g. `https://app.example.com,https://admin.example.com`); `*` is rejected in production |
+| `TRUSTED_PROXIES` | - | Express `trust proxy` setting. Required behind a reverse proxy so `req.ip` resolves to the real client (see [Deployment behind a reverse proxy](#deployment-behind-a-reverse-proxy)). Accepts `loopback` / `linklocal` / `uniquelocal`, a comma-separated IP/CIDR list, a hop count (e.g. `1`), or `true`. Leave empty to disable. |
 
 ## Architecture
 
@@ -208,6 +209,38 @@ Ten tables managed via TypeORM migrations:
 | `audit_logs` | UUID PK, action (enum), actorId (nullable), actorEmail (nullable), targetId (nullable), targetType (nullable), details (jsonb), ipAddress, requestId, createdAt |
 
 Migration and seed commands operate on compiled JS in `dist/` — always run `npm run build` first.
+
+## Deployment behind a reverse proxy
+
+When the app runs behind nginx, Caddy, a Kubernetes ingress, or Cloudflare, the
+TCP peer for every request is the proxy — not the real client. Without any
+configuration, `req.ip` is the proxy's IP for every request, which silently
+breaks:
+
+- `@nestjs/throttler` — all traffic is keyed under one IP, so either every
+  request counts toward the same quota (global lockout) or the quota is
+  effectively disabled
+- the `login-long-window` throttler that protects against brute-force account
+  lockout
+- `AuditService` IP recording — audit logs show the proxy's IP, not the real
+  client
+
+Set `TRUSTED_PROXIES` so Express trusts the `X-Forwarded-For` header from your
+proxy (and, importantly, _only_ from it). Examples:
+
+| Deployment | Recommended value |
+|------------|-------------------|
+| nginx / Caddy on the same host | `loopback` |
+| Sidecar proxy in Kubernetes | `loopback,uniquelocal` |
+| Two hops (e.g. CDN → nginx → app) | `2` |
+| Cloudflare with no private-range proxy in front | Cloudflare's published CIDR list, comma-separated |
+
+Do **not** set `TRUSTED_PROXIES=true` unless you are certain nothing untrusted
+can reach the app directly — it causes Express to trust `X-Forwarded-For` from
+any source, which lets clients spoof their IP.
+
+See the Express [trust proxy docs](https://expressjs.com/en/guide/behind-proxies.html)
+for the full syntax.
 
 ## Docker
 

@@ -9,6 +9,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import * as cookieParser from 'cookie-parser';
 import { corsOptions } from './cors-options';
+import { applyTrustProxy } from './modules/core/trust-proxy.util';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(
@@ -16,6 +17,13 @@ async function bootstrap() {
     { bufferLogs: true }
   );
   app.useLogger(app.get(Logger));
+
+  const trustProxy = applyTrustProxy(app, process.env['TRUSTED_PROXIES']);
+  if (trustProxy !== undefined) {
+    app
+      .get(Logger)
+      .log(`trust proxy enabled: ${String(trustProxy)}`, 'Bootstrap');
+  }
 
   if (
     process.env['ENVIRONMENT'] === 'production' &&

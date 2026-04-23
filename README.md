@@ -395,6 +395,7 @@ Edit `.env` with your database credentials and settings:
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
 | `REDIS_URL` | - | Redis connection URL (optional; enables distributed rate limiting and shared permission cache for multi-instance deployments) |
+| `TRUSTED_PROXIES` | - | Express `trust proxy` setting — required when running behind nginx / Caddy / K8s ingress / Cloudflare so `req.ip` resolves to the real client IP (used by throttlers and audit-log IP recording). Accepts `loopback` / `linklocal` / `uniquelocal`, an IP-CIDR list, a hop count, or `true`. See `server/README.md` "Deployment behind a reverse proxy" |
 | `SWAGGER_ENABLED` | - | Set to `true` to enable Swagger UI in staging/production (always on in `local`/`development`) |
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to retain audit log entries |
 | `DB_POOL_MAX` | `10` | Maximum PostgreSQL connection pool size |
