@@ -82,7 +82,8 @@ export class CoreModule implements NestModule {
             AUDIT_LOG_RETENTION_DAYS: Joi.number().min(1).default(90),
             DB_POOL_MAX: Joi.number().min(1).default(10),
             DB_POOL_IDLE_TIMEOUT: Joi.number().min(0).default(30000),
-            DB_POOL_CONNECTION_TIMEOUT: Joi.number().min(0).default(5000)
+            DB_POOL_CONNECTION_TIMEOUT: Joi.number().min(0).default(5000),
+            TRUSTED_PROXIES: Joi.string().optional().allow('')
           }),
           validationOptions: {
             allowUnknown: true,

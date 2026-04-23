@@ -34,6 +34,12 @@ services:
       DB_HOST: db
       REDIS_URL: redis://redis:6379
       ENVIRONMENT: production
+      # Trust the reverse proxy on the same host (loopback) and any proxy sitting
+      # inside docker bridge / shared networks (uniquelocal covers RFC1918).
+      # Without this, req.ip is the proxy's address and every request shares
+      # one throttler/audit key — see server/README.md "Deployment behind a
+      # reverse proxy". Override by exporting TRUSTED_PROXIES in the shell.
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-loopback,uniquelocal}
     expose:
       - "3000"
     volumes:
