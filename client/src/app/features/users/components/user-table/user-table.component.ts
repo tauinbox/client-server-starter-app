@@ -82,4 +82,8 @@ export class UserTableComponent {
   trackById(_index: number, user: User): string {
     return user.id;
   }
+
+  isAdmin(user: User): boolean {
+    return user.roles?.some((r) => r.name === 'admin') ?? false;
+  }
 }

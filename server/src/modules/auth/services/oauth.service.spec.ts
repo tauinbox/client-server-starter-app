@@ -6,7 +6,6 @@ import { OAuthService } from './oauth.service';
 import { UsersService } from '../../users/services/users.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { OAuthAccountService } from './oauth-account.service';
-import { PermissionService } from './permission.service';
 import { RoleService } from './role.service';
 import { TokenGeneratorService } from './token-generator.service';
 import { AuditService } from '../../audit/audit.service';
@@ -44,9 +43,6 @@ describe('OAuthService', () => {
     findByProviderAndProviderId: jest.Mock;
     createOAuthAccount: jest.Mock;
   };
-  let mockPermissionService: {
-    getRoleNamesForUser: jest.Mock;
-  };
   let mockRoleService: {
     findRoleByName: jest.Mock;
   };
@@ -58,6 +54,18 @@ describe('OAuthService', () => {
     logFireAndForget: jest.Mock;
   };
 
+  const mockUserRole = {
+    id: 'role-uuid-user',
+    name: 'user',
+    description: null,
+    isSystem: true,
+    isSuper: false,
+    rolePermissions: [],
+    users: [],
+    createdAt: new Date('2025-01-01'),
+    updatedAt: new Date('2025-01-01')
+  };
+
   const mockUser = {
     id: 'user-1',
     email: 'test@example.com',
@@ -67,7 +75,8 @@ describe('OAuthService', () => {
     isActive: true,
     isEmailVerified: true,
     failedLoginAttempts: 0,
-    lockedUntil: null
+    lockedUntil: null,
+    roles: [mockUserRole]
   };
 
   beforeEach(async () => {
@@ -121,10 +130,6 @@ describe('OAuthService', () => {
       createOAuthAccount: jest.fn().mockResolvedValue(undefined)
     };
 
-    mockPermissionService = {
-      getRoleNamesForUser: jest.fn().mockResolvedValue(['user'])
-    };
-
     mockRoleService = {
       findRoleByName: jest
         .fn()
@@ -152,7 +157,6 @@ describe('OAuthService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: RefreshTokenService, useValue: mockRefreshTokenService },
         { provide: OAuthAccountService, useValue: mockOAuthAccountService },
-        { provide: PermissionService, useValue: mockPermissionService },
         { provide: RoleService, useValue: mockRoleService },
         { provide: TokenGeneratorService, useValue: mockTokenGenerator },
         { provide: AuditService, useValue: mockAuditService }
@@ -206,6 +210,8 @@ describe('OAuthService', () => {
         'oauth-user-1',
         MAX_CONCURRENT_SESSIONS
       );
+      // Regression (BKL-002): OAuth response must carry roles as RoleResponse[].
+      expect(result.user.roles).toEqual([mockUserRole]);
     });
 
     it('should auto-verify email for returning OAuth user', async () => {
@@ -296,6 +302,9 @@ describe('OAuthService', () => {
         provider: 'google',
         providerId: 'google-123'
       });
+      // After the transaction, oauth.service re-reads the user with
+      // `roles` relation hydrated so the response carries RoleResponse[].
+      mockUsersService.findOne.mockResolvedValue(oauthUser);
 
       const result = await service.loginWithOAuth(oauthProfile);
 
@@ -318,7 +327,10 @@ describe('OAuthService', () => {
           providerId: 'google-123'
         })
       );
+      expect(mockUsersService.findOne).toHaveBeenCalledWith('oauth-user-1');
       expect(result.user).toBeDefined();
+      // Regression (BKL-002): new OAuth user response carries RoleResponse[].
+      expect(result.user.roles).toEqual([mockUserRole]);
     });
   });
 

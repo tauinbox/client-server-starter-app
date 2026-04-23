@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import type { UserResponse, WireType, _AssertNever } from '@app/shared/types';
+import { RoleResponseDto } from '../../auth/dtos/role-response.dto';
 
 export class UserResponseDto {
   @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
@@ -17,8 +18,8 @@ export class UserResponseDto {
   @ApiProperty({ example: true })
   isActive: boolean;
 
-  @ApiProperty({ example: ['user'] })
-  roles: string[];
+  @ApiProperty({ type: [RoleResponseDto] })
+  roles: RoleResponseDto[];
 
   @ApiProperty({ example: true })
   isEmailVerified: boolean;

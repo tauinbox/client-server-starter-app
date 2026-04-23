@@ -147,7 +147,7 @@ src/
     ├── controllers/        # UsersController (CRUD + search, all endpoints use @Authorize([action, 'User']))
     ├── services/           # UsersService
     ├── entities/           # User entity (ManyToMany to Role via user_roles)
-    └── dto/                # CreateUserDto, UpdateUserDto, UserResponseDto (includes roles: string[])
+    └── dto/                # CreateUserDto, UpdateUserDto, UserResponseDto (roles: RoleResponse[])
 ```
 
 ### Request Pipeline

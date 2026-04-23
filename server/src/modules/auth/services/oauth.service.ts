@@ -6,7 +6,6 @@ import { User } from '../../users/entities/user.entity';
 import { OAuthAccount } from '../entities/oauth-account.entity';
 import { RefreshTokenService } from './refresh-token.service';
 import { OAuthAccountService } from './oauth-account.service';
-import { PermissionService } from './permission.service';
 import { RoleService } from './role.service';
 import { TokenGeneratorService } from './token-generator.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
@@ -24,7 +23,6 @@ export class OAuthService {
     private readonly configService: ConfigService,
     private readonly refreshTokenService: RefreshTokenService,
     private readonly oauthAccountService: OAuthAccountService,
-    private readonly permissionService: PermissionService,
     private readonly roleService: RoleService,
     private readonly auditService: AuditService,
     private readonly tokenGenerator: TokenGeneratorService
@@ -87,43 +85,49 @@ export class OAuthService {
         // 3. Create new user + OAuth account atomically (isEmailVerified: true).
         // Without a transaction, a failure after user creation would leave an
         // orphaned user with no OAuth account — they would be unable to log in.
-        user = await withTransaction(this.dataSource, async (manager) => {
-          const newUser = await manager.save(User, {
-            email: profile.email,
-            firstName: profile.firstName,
-            lastName: profile.lastName,
-            password: null,
-            isEmailVerified: true
-          });
-          await manager.save(OAuthAccount, {
-            userId: newUser.id,
-            provider: profile.provider,
-            providerId: profile.providerId
-          });
+        const createdUserId = await withTransaction(
+          this.dataSource,
+          async (manager) => {
+            const newUser = await manager.save(User, {
+              email: profile.email,
+              firstName: profile.firstName,
+              lastName: profile.lastName,
+              password: null,
+              isEmailVerified: true
+            });
+            await manager.save(OAuthAccount, {
+              userId: newUser.id,
+              provider: profile.provider,
+              providerId: profile.providerId
+            });
 
-          // Assign default 'user' role
-          const userRole = await this.roleService.findRoleByName(
-            SYSTEM_ROLES.USER
-          );
-          await manager
-            .createQueryBuilder()
-            .relation(User, 'roles')
-            .of(newUser.id)
-            .add(userRole.id);
+            // Assign default 'user' role
+            const userRole = await this.roleService.findRoleByName(
+              SYSTEM_ROLES.USER
+            );
+            await manager
+              .createQueryBuilder()
+              .relation(User, 'roles')
+              .of(newUser.id)
+              .add(userRole.id);
 
-          return newUser;
-        });
+            return newUser.id;
+          }
+        );
+        // Re-read with `roles` relation so the response includes the full
+        // RoleResponse[] shape expected by UserResponseDto.
+        user = await this.usersService.findOne(createdUserId);
       }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = user;
 
-    const roles = await this.permissionService.getRoleNamesForUser(user.id);
+    const roleNames = user.roles.map((r) => r.name);
     const tokens = this.tokenGenerator.generateTokens(
       user.id,
       user.email,
-      roles
+      roleNames
     );
 
     const expiresIn = parseInt(
@@ -142,7 +146,7 @@ export class OAuthService {
 
     return {
       tokens,
-      user: { ...userWithoutPassword, roles }
+      user: userWithoutPassword
     };
   }
 

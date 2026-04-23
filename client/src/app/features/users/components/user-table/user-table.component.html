@@ -58,7 +58,7 @@
         {{ t('users.table.columnRole') }}
       </th>
       <td mat-cell *matCellDef="let user">
-        @if (user.roles?.includes('admin')) {
+        @if (isAdmin(user)) {
           <mat-chip color="primary" highlighted>{{
             t('users.table.roleAdmin')
           }}</mat-chip>

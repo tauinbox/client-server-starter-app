@@ -160,6 +160,29 @@ describe('AuthStore', () => {
 
       expect(store.isAdmin()).toBe(true);
     });
+
+    // Regression (BKL-002): isAdmin relied on roles being RoleResponse[]; when
+    // the server's auth.service returned roles as string[], this computed was
+    // silently false immediately after login (forcing a reload to fix the UI).
+    // This test pins the shape: saveAuthResponse with RoleResponse[] → admin.
+    it('should be true immediately after saveAuthResponse for admin (no reload)', () => {
+      const store = createStore(null);
+
+      const auth = createMockAuthResponse();
+      auth.user.roles = [mockAdminRole];
+      store.saveAuthResponse(auth);
+
+      expect(store.isAdmin()).toBe(true);
+    });
+
+    it('should be false for a non-admin user', () => {
+      const store = createStore(null);
+      const auth = createMockAuthResponse();
+      auth.user.roles = [mockUserRole];
+      store.saveAuthResponse(auth);
+
+      expect(store.isAdmin()).toBe(false);
+    });
   });
 
   describe('saveAuthResponse', () => {
