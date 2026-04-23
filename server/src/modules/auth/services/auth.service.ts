@@ -10,7 +10,6 @@ import { RefreshToken } from '../entities/refresh-token.entity';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { LocalAuthRequest } from '../types/auth.request';
 import { RefreshTokenService } from './refresh-token.service';
-import { PermissionService } from './permission.service';
 import { RoleService } from './role.service';
 import { TokenGeneratorService } from './token-generator.service';
 import { MailService } from '../../mail/mail.service';
@@ -39,7 +38,6 @@ export class AuthService {
     private usersService: UsersService,
     private configService: ConfigService,
     private refreshTokenService: RefreshTokenService,
-    private permissionService: PermissionService,
     private roleService: RoleService,
     private tokenGenerator: TokenGeneratorService,
     private mailService: MailService,
@@ -151,20 +149,20 @@ export class AuthService {
       await this.usersService.resetLoginAttempts(user.id);
     }
 
-    const { password: _pw, roles: roleEntities, ...rest } = user;
+    const { password: _pw, ...rest } = user;
     const result: UserResponseDto = {
       ...rest,
-      roles: roleEntities?.map((r) => r.name) ?? []
+      roles: user.roles ?? []
     };
     return result;
   }
 
   async login(user: LocalAuthRequest['user']) {
-    const roles = await this.permissionService.getRoleNamesForUser(user.id);
+    const roleNames = user.roles.map((r) => r.name);
     const tokens = this.tokenGenerator.generateTokens(
       user.id,
       user.email,
-      roles
+      roleNames
     );
 
     const expiresIn = parseInt(
@@ -183,7 +181,7 @@ export class AuthService {
 
     return {
       tokens,
-      user: { ...user, roles }
+      user
     };
   }
 
@@ -498,11 +496,11 @@ export class AuthService {
       );
     }
 
-    const roles = await this.permissionService.getRoleNamesForUser(user.id);
+    const roleNames = user.roles.map((r) => r.name);
     const tokens = this.tokenGenerator.generateTokens(
       user.id,
       user.email,
-      roles
+      roleNames
     );
 
     const expiresIn = parseInt(
@@ -528,7 +526,7 @@ export class AuthService {
 
     return {
       tokens,
-      user: { ...userWithoutPassword, roles }
+      user: userWithoutPassword
     };
   }
 

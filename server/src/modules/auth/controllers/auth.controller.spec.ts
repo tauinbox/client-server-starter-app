@@ -32,6 +32,16 @@ function mockJwtRequest(
   };
 }
 
+const mockAdminRole = {
+  id: 'role-uuid-admin',
+  name: 'admin',
+  description: 'Administrator role',
+  isSystem: true,
+  isSuper: false,
+  createdAt: new Date('2024-01-01'),
+  updatedAt: new Date('2024-01-01')
+};
+
 function mockLocalAuthRequest(
   id = 'user-1',
   email = 'admin@example.com'
@@ -47,7 +57,7 @@ function mockLocalAuthRequest(
     firstName: 'Admin',
     lastName: 'User',
     isActive: true,
-    roles: ['admin'],
+    roles: [mockAdminRole],
     isEmailVerified: true,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
@@ -104,7 +114,18 @@ describe('AuthController', () => {
       refresh_token: 'refresh-token',
       expires_in: 3600
     },
-    user: { id: 'user-1', email: 'admin@example.com' }
+    user: {
+      id: 'user-1',
+      email: 'admin@example.com',
+      firstName: 'Admin',
+      lastName: 'User',
+      isActive: true,
+      roles: [mockAdminRole],
+      isEmailVerified: true,
+      createdAt: new Date('2024-01-01'),
+      updatedAt: new Date('2024-01-01'),
+      deletedAt: null
+    }
   };
 
   beforeEach(async () => {
@@ -242,6 +263,30 @@ describe('AuthController', () => {
       );
     });
 
+    // Regression (BKL-002): login response.user.roles must be RoleResponse[]
+    // objects — the client relies on this to decide the admin badge without a
+    // reload. A regression to `string[]` here is the exact bug this test pins.
+    it('should return user.roles as RoleResponse[] objects', async () => {
+      const req = mockLocalAuthRequest() as LocalAuthRequest;
+      const res = mockResponse();
+
+      const result = await controller.login(req, res);
+
+      expect(Array.isArray(result.user.roles)).toBe(true);
+      expect(result.user.roles).toHaveLength(1);
+      const [role] = result.user.roles;
+      expect(role).toEqual(
+        expect.objectContaining({
+          id: expect.any(String) as unknown,
+          name: 'admin',
+          isSystem: expect.any(Boolean) as unknown,
+          isSuper: expect.any(Boolean) as unknown
+        })
+      );
+      // Must not regress to the legacy string[] shape.
+      expect(typeof role).not.toBe('string');
+    });
+
     it('should log USER_LOGIN_SUCCESS audit event', async () => {
       const req = mockLocalAuthRequest(
         'user-42',
@@ -290,6 +335,24 @@ describe('AuthController', () => {
         'refresh-token',
         expect.objectContaining({ httpOnly: true, path: '/api/v1/auth' })
       );
+    });
+
+    // Regression (BKL-002): refresh-token response.user.roles must be
+    // RoleResponse[] objects so the client keeps the admin badge after a
+    // silent refresh.
+    it('should return user.roles as RoleResponse[] objects', async () => {
+      const req = mockExpressRequest({
+        refresh_token: 'old-refresh'
+      }) as ExpressRequest;
+      const res = mockResponse();
+
+      const result = await controller.refreshToken(req, res);
+
+      expect(Array.isArray(result.user.roles)).toBe(true);
+      expect(result.user.roles[0]).toEqual(
+        expect.objectContaining({ name: 'admin' })
+      );
+      expect(typeof result.user.roles[0]).not.toBe('string');
     });
   });
 

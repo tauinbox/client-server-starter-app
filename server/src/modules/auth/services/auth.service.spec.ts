@@ -6,7 +6,6 @@ import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { UsersService } from '../../users/services/users.service';
 import { RefreshTokenService } from './refresh-token.service';
-import { PermissionService } from './permission.service';
 import { RoleService } from './role.service';
 import { TokenGeneratorService } from './token-generator.service';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
@@ -68,10 +67,6 @@ describe('AuthService', () => {
     sendEmailVerification: jest.Mock;
     sendPasswordReset: jest.Mock;
   };
-  let mockPermissionService: {
-    getRoleNamesForUser: jest.Mock;
-    invalidateUserCache: jest.Mock;
-  };
   let mockRoleService: {
     findRoleByName: jest.Mock;
   };
@@ -81,6 +76,18 @@ describe('AuthService', () => {
   };
   let mockMetricsService: {
     recordAuthEvent: jest.Mock;
+  };
+
+  const mockUserRole = {
+    id: 'role-uuid-user',
+    name: 'user',
+    description: null,
+    isSystem: true,
+    isSuper: false,
+    rolePermissions: [],
+    users: [],
+    createdAt: new Date('2025-01-01'),
+    updatedAt: new Date('2025-01-01')
   };
 
   const mockUser = {
@@ -97,6 +104,8 @@ describe('AuthService', () => {
     emailVerificationExpiresAt: null,
     passwordResetToken: null,
     passwordResetExpiresAt: null,
+    tokenRevokedAt: null,
+    roles: [mockUserRole],
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
     deletedAt: null
@@ -108,7 +117,7 @@ describe('AuthService', () => {
     firstName: mockUser.firstName,
     lastName: mockUser.lastName,
     isActive: mockUser.isActive,
-    roles: [] as string[],
+    roles: mockUser.roles,
     isEmailVerified: mockUser.isEmailVerified,
     failedLoginAttempts: mockUser.failedLoginAttempts,
     lockedUntil: mockUser.lockedUntil,
@@ -116,6 +125,7 @@ describe('AuthService', () => {
     emailVerificationExpiresAt: mockUser.emailVerificationExpiresAt,
     passwordResetToken: mockUser.passwordResetToken,
     passwordResetExpiresAt: mockUser.passwordResetExpiresAt,
+    tokenRevokedAt: mockUser.tokenRevokedAt,
     createdAt: mockUser.createdAt,
     updatedAt: mockUser.updatedAt,
     deletedAt: mockUser.deletedAt
@@ -211,11 +221,6 @@ describe('AuthService', () => {
       sendPasswordReset: jest.fn().mockResolvedValue(undefined)
     };
 
-    mockPermissionService = {
-      getRoleNamesForUser: jest.fn().mockResolvedValue(['user']),
-      invalidateUserCache: jest.fn().mockResolvedValue(undefined)
-    };
-
     mockRoleService = {
       findRoleByName: jest
         .fn()
@@ -238,7 +243,6 @@ describe('AuthService', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: RefreshTokenService, useValue: mockRefreshTokenService },
-        { provide: PermissionService, useValue: mockPermissionService },
         { provide: RoleService, useValue: mockRoleService },
         { provide: TokenGeneratorService, useValue: mockTokenGenerator },
         { provide: MailService, useValue: mockMailService },
@@ -418,7 +422,11 @@ describe('AuthService', () => {
       expect(result.tokens.access_token).toBe('mock-access-token');
       expect(typeof result.tokens.refresh_token).toBe('string');
       expect(result.tokens.expires_in).toBe(3600);
-      expect(result.user).toEqual({ ...mockUserResponse, roles: ['user'] });
+      // Regression (BKL-002): login must return roles as RoleResponse[] objects,
+      // NOT as string[] of role names — the client relies on this shape to
+      // render the admin badge correctly immediately after login.
+      expect(result.user).toEqual(mockUserResponse);
+      expect(result.user.roles).toEqual([mockUserRole]);
     });
 
     it('should throw when config values are missing', async () => {
@@ -434,6 +442,8 @@ describe('AuthService', () => {
     it('should generate tokens with correct payload', async () => {
       await service.login(mockUserResponse);
 
+      // JWT payload keeps role names as string[] (CASL / storage contract),
+      // even though the response body carries RoleResponse[] objects.
       expect(mockTokenGenerator.generateTokens).toHaveBeenCalledWith(
         'user-1',
         'test@example.com',
@@ -709,11 +719,12 @@ describe('AuthService', () => {
       expect(result.tokens.access_token).toBe('mock-access-token');
       expect(typeof result.tokens.refresh_token).toBe('string');
       expect(result.tokens.expires_in).toBe(3600);
+      // Regression (BKL-002): refresh must return roles as RoleResponse[] objects.
       expect(result.user).toEqual(
         expect.objectContaining({
           id: 'user-1',
           email: 'test@example.com',
-          roles: ['user']
+          roles: [mockUserRole]
         })
       );
     });

@@ -20,6 +20,16 @@ const mockUserRole: RoleResponse = {
   updatedAt: '2024-01-01T00:00:00.000Z'
 };
 
+const mockAdminRole: RoleResponse = {
+  id: 'role-admin',
+  name: 'admin',
+  description: 'Administrator',
+  isSystem: true,
+  isSuper: false,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z'
+};
+
 const mockUser: User = {
   id: 'test-user-id',
   email: 'test@example.com',
@@ -137,6 +147,57 @@ describe('UserTableComponent', () => {
 
     it('should have deleteUser output', () => {
       expect(component.deleteUser).toBeDefined();
+    });
+  });
+
+  describe('isAdmin', () => {
+    it('should return true when user has a role named "admin"', () => {
+      const adminUser: User = { ...mockUser, roles: [mockAdminRole] };
+      expect(component.isAdmin(adminUser)).toBe(true);
+    });
+
+    it('should return false when user has no admin role', () => {
+      expect(component.isAdmin(mockUser)).toBe(false);
+    });
+
+    it('should return false when roles is empty', () => {
+      const userWithoutRoles: User = { ...mockUser, roles: [] };
+      expect(component.isAdmin(userWithoutRoles)).toBe(false);
+    });
+  });
+
+  // Regression (BKL-002): the role column previously used
+  // user.roles?.includes('admin'), which always returned false when the
+  // server returned RoleResponse[] objects (the true wire format). This test
+  // renders the table and verifies the admin chip appears for RoleResponse[].
+  describe('role column rendering (BKL-002 regression)', () => {
+    it('should render the Admin chip for a user with a RoleResponse admin role', () => {
+      const adminUser: User = {
+        ...mockUser,
+        id: 'admin-user',
+        roles: [mockAdminRole]
+      };
+      componentRef.setInput('users', [adminUser]);
+      fixture.detectChanges();
+
+      const chips = fixture.nativeElement.querySelectorAll(
+        'mat-chip[highlighted]'
+      );
+      const adminChip = Array.from(chips).find(
+        (el) => (el as HTMLElement).textContent?.trim() === 'Admin'
+      );
+      expect(adminChip).toBeTruthy();
+    });
+
+    it('should render the User chip when roles does not include admin', () => {
+      componentRef.setInput('users', [mockUser]);
+      fixture.detectChanges();
+
+      const userChips = fixture.nativeElement.querySelectorAll('mat-chip');
+      const plainChip = Array.from(userChips).find(
+        (el) => (el as HTMLElement).textContent?.trim() === 'User'
+      );
+      expect(plainChip).toBeTruthy();
     });
   });
 
