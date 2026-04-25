@@ -40,7 +40,7 @@ import { UpdateProfileDto } from '../dtos/update-profile.dto';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { LoginDto } from '../dtos/login.dto';
 import { Authorize } from '../decorators/authorize.decorator';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { Public } from '../decorators/public.decorator';
 import { UsersService } from '../../users/services/users.service';
 import { AuthResponseDto } from '../dtos/auth-response.dto';
 import { JwtAuthRequest, LocalAuthRequest } from '../types/auth.request';
@@ -95,6 +95,7 @@ export class AuthController {
     res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
   }
 
+  @Public()
   @Throttle({ default: { ttl: 3600000, limit: 5 } })
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
@@ -107,6 +108,7 @@ export class AuthController {
     return this.authService.register(registerDto, extractAuditContext(req));
   }
 
+  @Public()
   @Throttle({
     default: { ttl: 60000, limit: 3 },
     'login-long-window': {
@@ -144,6 +146,7 @@ export class AuthController {
     return { tokens: publicTokens, user: result.user };
   }
 
+  @Public()
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('refresh-token')
   @HttpCode(HttpStatus.OK)
@@ -170,7 +173,6 @@ export class AuthController {
     return { tokens: publicTokens, user: result.user };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
@@ -192,7 +194,6 @@ export class AuthController {
     return { message: 'Successfully logged out' };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('profile')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get the current user profile' })
@@ -242,7 +243,6 @@ export class AuthController {
     return updatedUser;
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('permissions')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user permissions' })
@@ -262,6 +262,7 @@ export class AuthController {
     return { roles: roleNames, rules: packRules(ability.rules) };
   }
 
+  @Public()
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify email address using token' })
@@ -271,6 +272,7 @@ export class AuthController {
     return this.authService.verifyEmail(verifyEmailDto.token);
   }
 
+  @Public()
   @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
@@ -281,6 +283,7 @@ export class AuthController {
     return this.authService.resendVerificationEmail(dto.email);
   }
 
+  @Public()
   @Throttle({ default: { ttl: 300000, limit: 2 } })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
@@ -294,6 +297,7 @@ export class AuthController {
     return this.authService.forgotPassword(dto.email, extractAuditContext(req));
   }
 
+  @Public()
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reset password using token' })

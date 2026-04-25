@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  MessageEvent,
-  Req,
-  Res,
-  Sse,
-  UseGuards
-} from '@nestjs/common';
+import { Controller, Get, MessageEvent, Req, Res, Sse } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -19,7 +11,6 @@ import { randomUUID } from 'crypto';
 const HEARTBEAT_INTERVAL_MS = 30_000;
 import type { Response } from 'express';
 import { NotificationsService } from './notifications.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { JwtAuthRequest } from '../auth/types/auth.request';
 
 @ApiTags('Notifications API')
@@ -31,7 +22,6 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get('stream')
-  @UseGuards(JwtAuthGuard)
   @Sse()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Subscribe to real-time server-sent events' })

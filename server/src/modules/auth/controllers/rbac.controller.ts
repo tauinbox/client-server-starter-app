@@ -9,8 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Request,
-  UseGuards
+  Request
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -30,7 +29,6 @@ import type { Cache } from 'cache-manager';
 import { ResourceService } from '../services/resource.service';
 import { ActionService } from '../services/action.service';
 import { Authorize } from '../decorators/authorize.decorator';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { CreateActionDto } from '../dtos/create-action.dto';
 import { UpdateActionDto } from '../dtos/update-action.dto';
 import { UpdateResourceDto } from '../dtos/update-resource.dto';
@@ -64,7 +62,6 @@ export class RbacController {
   // ── Metadata ──────────────────────────────────────────────────────
 
   @Get('metadata')
-  @UseGuards(JwtAuthGuard)
   @Throttle({ default: { ttl: 60000, limit: 30 } })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get RBAC metadata (resources and actions)' })

@@ -23,6 +23,13 @@ const SERVER_PKG = path.resolve(__dirname, '../package.json');
 const EXCLUDE_DIRS = new Set(['feature']);
 
 /**
+ * Controller files whose routes are NOT part of the public API contract.
+ * Prometheus scrape endpoint is registered dynamically by `PrometheusModule`
+ * outside the `/api` prefix and is intentionally absent from `routes.json`.
+ */
+const EXCLUDE_FILES = new Set(['metrics.controller.ts']);
+
+/**
  * Default param → sample-value substitutions.
  * Applied to every controller unless overridden below.
  */
@@ -130,7 +137,10 @@ function findControllers(dir: string): string[] {
       if (!EXCLUDE_DIRS.has(entry.name)) {
         results.push(...findControllers(path.join(dir, entry.name)));
       }
-    } else if (entry.name.endsWith('.controller.ts')) {
+    } else if (
+      entry.name.endsWith('.controller.ts') &&
+      !EXCLUDE_FILES.has(entry.name)
+    ) {
       results.push(path.join(dir, entry.name));
     }
   }

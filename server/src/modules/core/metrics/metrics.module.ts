@@ -7,6 +7,7 @@ import {
 } from '@willsoto/nestjs-prometheus';
 import { Gauge, register } from 'prom-client';
 import { MetricsService } from './metrics.service';
+import { MetricsController } from './metrics.controller';
 
 export interface SseConnectionsRef {
   getCount: () => number;
@@ -19,6 +20,7 @@ export const SSE_CONNECTIONS_REF = Symbol('SSE_CONNECTIONS_REF');
   imports: [
     PrometheusModule.register({
       path: '/metrics',
+      controller: MetricsController,
       defaultMetrics: { enabled: true }
     })
   ],
