@@ -609,6 +609,7 @@ npm run release            # Bump versions, generate CHANGELOG.md, create git ta
 
 - **Modular NestJS architecture** with dynamic root `CoreModule`
 - **Passport strategies**: `LocalStrategy` (email/password), `JwtStrategy` (Bearer token; verifies signature and `tokenRevokedAt`, extracts `{ userId, email, roles }`), `GoogleStrategy`, `FacebookStrategy`, `VkStrategy` (OAuth, conditionally registered)
+- **Secure-by-default routing**: `JwtAuthGuard` is registered globally via `APP_GUARD`; every endpoint requires a valid Bearer token unless explicitly opted out with `@Public()`. The `check-auth-coverage` e2e suite iterates `contracts/routes.json` to enforce that no protected endpoint accidentally goes unauthenticated.
 - **RBAC**: `RolesModule` provides `PermissionsGuard`, `PolicyEvaluatorService`, `PermissionService`, `CaslAbilityFactory`. `@Authorize(['action', 'Subject'])` typed tuples replace `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` on all protected endpoints
 - **Request pipeline**: Global middleware -> Module middleware -> Guards -> Interceptors -> Pipes -> Controller
 - **Pagination**: Offset-based (`PaginationQueryDto` / `PaginatedResponseDto<T>`) and cursor-based (`CursorPaginationQueryDto` / `CursorPaginatedResponseDto<T>`) — both available, reusable across endpoints

@@ -172,6 +172,8 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 - **LocalStrategy** — validates email/password via bcrypt on login
 - **JwtStrategy** — verifies Bearer-token signature, enforces `JWT_MIN_IAT` and per-user `tokenRevokedAt` cutoffs, returns `PayloadFromJwt` (`{ userId, email, roles }`) — no `isAdmin` flag
 - **GoogleStrategy / FacebookStrategy / VkStrategy** — OAuth2 login (conditionally registered when env vars are set)
+- **Secure-by-default routing** — `JwtAuthGuard` is registered globally via `APP_GUARD` in `CoreModule`. Every endpoint requires a valid Bearer token unless explicitly opted out with `@Public()` (handler- or controller-level). Forgetting to mark a new endpoint protects it by default — the `check-auth-coverage` e2e suite iterates `contracts/routes.json` to enforce this.
+- **@Public() decorator** — opt-out marker for endpoints intentionally reachable without authentication (login, register, password reset, OAuth init/callback, health, `/metrics`)
 - **PermissionsGuard** — resolves user permissions (cached 5 min), checks required permissions from typed `@RequirePermissions([Actions, Subjects])`; roles with `isSuper` flag bypass all checks
 - **@Authorize([action, subject]) decorator** — composite: `JwtAuthGuard` + `PermissionsGuard` + typed `@RequirePermissions()`. Replaces `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` pattern
 - **CaslAbilityFactory** — builds `AppAbility` from user roles + permissions; used by `AuthController` to return CASL packed rules via `packRules()` from `GET /permissions`. Partitions rules allow-first / deny-last so permissions with `conditions.effect === 'deny'` register as CASL `cannot()` rules and reliably override prior allows for the same `(resource, action)` pair

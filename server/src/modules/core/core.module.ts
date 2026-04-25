@@ -15,6 +15,7 @@ import { AuthModule } from '../auth/auth.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { LoginThrottlerGuard } from './login-throttler.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS
@@ -171,6 +172,10 @@ export class CoreModule implements NestModule {
         {
           provide: APP_FILTER,
           useClass: GlobalExceptionFilter
+        },
+        {
+          provide: APP_GUARD,
+          useClass: JwtAuthGuard
         },
         {
           provide: APP_GUARD,

@@ -26,7 +26,7 @@ import { OAuthAccountService } from '../services/oauth-account.service';
 import { GoogleOAuthGuard } from '../guards/google-oauth.guard';
 import { FacebookOAuthGuard } from '../guards/facebook-oauth.guard';
 import { VkOAuthGuard } from '../guards/vk-oauth.guard';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { Public } from '../decorators/public.decorator';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
@@ -81,7 +81,6 @@ export class OAuthController {
   // --- Link initiation ---
 
   @Post('link-init')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Initiate OAuth account linking for current user' })
   initOAuthLink(
@@ -106,6 +105,7 @@ export class OAuthController {
 
   // --- Google ---
 
+  @Public()
   @Get('google')
   @UseGuards(GoogleOAuthGuard)
   @ApiOperation({ summary: 'Initiate Google OAuth login' })
@@ -113,6 +113,7 @@ export class OAuthController {
     // Guard redirects to Google
   }
 
+  @Public()
   @Get('google/callback')
   @UseGuards(GoogleOAuthGuard)
   @ApiOperation({ summary: 'Google OAuth callback' })
@@ -125,6 +126,7 @@ export class OAuthController {
 
   // --- Facebook ---
 
+  @Public()
   @Get('facebook')
   @UseGuards(FacebookOAuthGuard)
   @ApiOperation({ summary: 'Initiate Facebook OAuth login' })
@@ -132,6 +134,7 @@ export class OAuthController {
     // Guard redirects to Facebook
   }
 
+  @Public()
   @Get('facebook/callback')
   @UseGuards(FacebookOAuthGuard)
   @ApiOperation({ summary: 'Facebook OAuth callback' })
@@ -144,6 +147,7 @@ export class OAuthController {
 
   // --- VK ---
 
+  @Public()
   @Get('vk')
   @UseGuards(VkOAuthGuard)
   @ApiOperation({ summary: 'Initiate VK OAuth login' })
@@ -151,6 +155,7 @@ export class OAuthController {
     // Guard redirects to VK
   }
 
+  @Public()
   @Get('vk/callback')
   @UseGuards(VkOAuthGuard)
   @ApiOperation({ summary: 'VK OAuth callback' })
@@ -164,7 +169,6 @@ export class OAuthController {
   // --- OAuth accounts management ---
 
   @Get('/accounts')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get linked OAuth accounts for current user' })
   @ApiOkResponse({ description: 'List of linked OAuth accounts' })
@@ -179,7 +183,6 @@ export class OAuthController {
   }
 
   @Delete('/accounts/:provider')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Unlink an OAuth provider from current user' })
   @ApiParam({
@@ -238,6 +241,7 @@ export class OAuthController {
 
   // --- Common callback handler ---
 
+  @Public()
   @Post('exchange')
   @ApiOperation({ summary: 'Exchange OAuth data cookie for auth response' })
   @ApiOkResponse({ description: 'Auth response from OAuth login' })

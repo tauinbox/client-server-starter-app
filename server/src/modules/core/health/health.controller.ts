@@ -15,8 +15,10 @@ import { ConfigService } from '@nestjs/config';
 import { SmtpHealthIndicator } from './smtp.health';
 import { RedisHealthIndicator } from './redis.health';
 import { MailService } from '../../mail/mail.service';
+import { Public } from '../../auth/decorators/public.decorator';
 
 @ApiTags('Health')
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(
