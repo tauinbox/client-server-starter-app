@@ -22,7 +22,7 @@
                   <mat-chip>{{ t('auth.profile.statusInactive') }}</mat-chip>
                 }
                 <mat-chip>{{
-                  isAdmin()
+                  hasSuper()
                     ? t('auth.profile.roleAdmin')
                     : t('auth.profile.roleUser')
                 }}</mat-chip>

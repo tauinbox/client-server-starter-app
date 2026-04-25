@@ -9,10 +9,11 @@ import { COLUMN_TO_SORT_MAP, UserTableComponent } from './user-table.component';
 import { AuthStore } from '../../../auth/store/auth.store';
 import type { User } from '../../models/user.types';
 import type { RoleResponse } from '@app/shared/types';
+import { SYSTEM_ROLES } from '@app/shared/constants';
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
-  name: 'user',
+  name: SYSTEM_ROLES.USER,
   description: 'Regular user',
   isSystem: true,
   isSuper: false,
@@ -22,7 +23,7 @@ const mockUserRole: RoleResponse = {
 
 const mockAdminRole: RoleResponse = {
   id: 'role-admin',
-  name: 'admin',
+  name: SYSTEM_ROLES.ADMIN,
   description: 'Administrator',
   isSystem: true,
   isSuper: false,
@@ -151,18 +152,31 @@ describe('UserTableComponent', () => {
   });
 
   describe('isAdmin', () => {
-    it('should return true when user has a role named "admin"', () => {
+    it('returns true when a role.name matches SYSTEM_ROLES.ADMIN', () => {
       const adminUser: User = { ...mockUser, roles: [mockAdminRole] };
       expect(component.isAdmin(adminUser)).toBe(true);
     });
 
-    it('should return false when user has no admin role', () => {
+    it('returns false when no role matches SYSTEM_ROLES.ADMIN', () => {
       expect(component.isAdmin(mockUser)).toBe(false);
     });
 
-    it('should return false when roles is empty', () => {
+    it('returns false when roles is empty', () => {
       const userWithoutRoles: User = { ...mockUser, roles: [] };
       expect(component.isAdmin(userWithoutRoles)).toBe(false);
+    });
+
+    // Regression (BKL-007): the detection used a hardcoded 'admin' literal,
+    // so renaming the system role would silently break the chip. By keying off
+    // SYSTEM_ROLES.ADMIN, an arbitrary role name like 'super' must NOT match —
+    // even if it was the previous super-admin role — until the constant changes.
+    it('does not match a role whose name differs from SYSTEM_ROLES.ADMIN', () => {
+      const renamed: User = {
+        ...mockUser,
+        roles: [{ ...mockAdminRole, name: 'super' }]
+      };
+      expect(SYSTEM_ROLES.ADMIN).not.toBe('super');
+      expect(component.isAdmin(renamed)).toBe(false);
     });
   });
 

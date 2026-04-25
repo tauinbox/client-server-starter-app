@@ -395,7 +395,7 @@ Edit `.env` with your database credentials and settings:
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
 | `REDIS_URL` | - | Redis connection URL (optional; enables distributed rate limiting and shared permission cache for multi-instance deployments) |
-| `TRUSTED_PROXIES` | - | Express `trust proxy` setting — required when running behind nginx / Caddy / K8s ingress / Cloudflare so `req.ip` resolves to the real client IP (used by throttlers and audit-log IP recording). Accepts `loopback` / `linklocal` / `uniquelocal`, an IP-CIDR list, a hop count, or `true`. See `server/README.md` "Deployment behind a reverse proxy" |
+| `TRUSTED_PROXIES` | - (local), `loopback,uniquelocal` (docker-compose) | Express `trust proxy` setting — required when running behind nginx / Caddy / K8s ingress / Cloudflare so `req.ip` resolves to the real client IP (used by throttlers and audit-log IP recording). Accepts `loopback` / `linklocal` / `uniquelocal`, an IP-CIDR list, a hop count, or `true`. The application has no built-in default; `docker-compose.yml` provides `loopback,uniquelocal` for prod deployments. See `server/README.md` "Deployment behind a reverse proxy" |
 | `SWAGGER_ENABLED` | - | Set to `true` to enable Swagger UI in staging/production (always on in `local`/`development`) |
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to retain audit log entries |
 | `DB_POOL_MAX` | `10` | Maximum PostgreSQL connection pool size |
@@ -608,7 +608,7 @@ npm run release            # Bump versions, generate CHANGELOG.md, create git ta
 ### Server
 
 - **Modular NestJS architecture** with dynamic root `CoreModule`
-- **Passport strategies**: `LocalStrategy` (email/password), `JwtStrategy` (Bearer token; extracts roles, computes isAdmin), `GoogleStrategy`, `FacebookStrategy`, `VkStrategy` (OAuth, conditionally registered)
+- **Passport strategies**: `LocalStrategy` (email/password), `JwtStrategy` (Bearer token; verifies signature and `tokenRevokedAt`, extracts `{ userId, email, roles }`), `GoogleStrategy`, `FacebookStrategy`, `VkStrategy` (OAuth, conditionally registered)
 - **RBAC**: `RolesModule` provides `PermissionsGuard`, `PolicyEvaluatorService`, `PermissionService`, `CaslAbilityFactory`. `@Authorize(['action', 'Subject'])` typed tuples replace `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` on all protected endpoints
 - **Request pipeline**: Global middleware -> Module middleware -> Guards -> Interceptors -> Pipes -> Controller
 - **Pagination**: Offset-based (`PaginationQueryDto` / `PaginatedResponseDto<T>`) and cursor-based (`CursorPaginationQueryDto` / `CursorPaginatedResponseDto<T>`) — both available, reusable across endpoints

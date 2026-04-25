@@ -91,7 +91,7 @@ Copy `.env.example` to `.env` and configure:
 | `DB_POOL_IDLE_TIMEOUT` | `30000` | Milliseconds before an idle connection is closed |
 | `DB_POOL_CONNECTION_TIMEOUT` | `5000` | Milliseconds to wait for a connection before erroring |
 | `CORS_ORIGINS` | - | Comma-separated allowed origins (e.g. `https://app.example.com,https://admin.example.com`); `*` is rejected in production |
-| `TRUSTED_PROXIES` | - | Express `trust proxy` setting. Required behind a reverse proxy so `req.ip` resolves to the real client (see [Deployment behind a reverse proxy](#deployment-behind-a-reverse-proxy)). Accepts `loopback` / `linklocal` / `uniquelocal`, a comma-separated IP/CIDR list, a hop count (e.g. `1`), or `true`. Leave empty to disable. |
+| `TRUSTED_PROXIES` | - (local), `loopback,uniquelocal` (docker-compose) | Express `trust proxy` setting. Required behind a reverse proxy so `req.ip` resolves to the real client (see [Deployment behind a reverse proxy](#deployment-behind-a-reverse-proxy)). Accepts `loopback` / `linklocal` / `uniquelocal`, a comma-separated IP/CIDR list, a hop count (e.g. `1`), or `true`. The application has no built-in default — leave the env var empty to disable. The repo's `docker-compose.yml` overrides this to `loopback,uniquelocal` for prod deployments behind a host-local reverse proxy or a docker-bridge sidecar; export `TRUSTED_PROXIES` in the shell to override. |
 
 ## Architecture
 
@@ -170,13 +170,13 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 ### Authentication
 
 - **LocalStrategy** — validates email/password via bcrypt on login
-- **JwtStrategy** — extracts and verifies Bearer token; extracts `roles[]` from payload, computes `isAdmin` from roles
+- **JwtStrategy** — verifies Bearer-token signature, enforces `JWT_MIN_IAT` and per-user `tokenRevokedAt` cutoffs, returns `PayloadFromJwt` (`{ userId, email, roles }`) — no `isAdmin` flag
 - **GoogleStrategy / FacebookStrategy / VkStrategy** — OAuth2 login (conditionally registered when env vars are set)
 - **PermissionsGuard** — resolves user permissions (cached 5 min), checks required permissions from typed `@RequirePermissions([Actions, Subjects])`; roles with `isSuper` flag bypass all checks
 - **@Authorize([action, subject]) decorator** — composite: `JwtAuthGuard` + `PermissionsGuard` + typed `@RequirePermissions()`. Replaces `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` pattern
 - **CaslAbilityFactory** — builds `AppAbility` from user roles + permissions; used by `AuthController` to return CASL packed rules via `packRules()` from `GET /permissions`. Partitions rules allow-first / deny-last so permissions with `conditions.effect === 'deny'` register as CASL `cannot()` rules and reliably override prior allows for the same `(resource, action)` pair
 - **Instance-level enforcement** — `UsersService.update/remove/restore` and `RoleService.assignRoleToUser/removeRoleFromUser` accept an optional `AppAbility` (injected via `@CurrentAbility()` in controllers) and check `ability.can(action, entity)` after loading the record; super-role assignment/removal is blocked for non-super actors
-- **JWT payload** — includes `roles: string[]`; `isAdmin` column removed from database (migration `drop-is-admin`)
+- **JWT payload** — `CustomJwtPayload` carries `email` and optional `roles: string[]` on top of the standard `JwtPayload` claims; access decisions go through CASL/RBAC, not the payload
 - **Refresh tokens** — opaque 80-char hex tokens stored in DB (SHA-256 hashed), delivered to the client as an `HttpOnly SameSite=Strict` cookie (`path=/api/v1/auth`), rotated on every use; never appear in response body
 - **OAuth accounts** — auto-link by email, manage linked providers, safety check on unlink
 - **Token cleanup** — daily cron removes expired tokens, weekly cron removes revoked+expired

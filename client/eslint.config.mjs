@@ -77,7 +77,31 @@ export default tseslint.config(
           style: 'kebab-case'
         }
       ],
-      'import/no-cycle': 'error'
+      'import/no-cycle': 'error',
+      // BKL-007: never compare a role.name against the raw 'admin' literal —
+      // always go through SYSTEM_ROLES.ADMIN from @app/shared/constants so the
+      // system role can be renamed without breaking client RBAC checks.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "BinaryExpression[operator='==='] > Literal[value='admin']",
+          message:
+            "Use SYSTEM_ROLES.ADMIN from '@app/shared/constants' instead of the 'admin' literal."
+        },
+        {
+          selector:
+            "BinaryExpression[operator='!=='] > Literal[value='admin']",
+          message:
+            "Use SYSTEM_ROLES.ADMIN from '@app/shared/constants' instead of the 'admin' literal."
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name='includes'] > Literal[value='admin']",
+          message:
+            "Use SYSTEM_ROLES.ADMIN from '@app/shared/constants' instead of the 'admin' literal."
+        }
+      ]
     }
   },
   {

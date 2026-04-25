@@ -9,10 +9,11 @@ import { UserCardListComponent } from './user-card-list.component';
 import { AuthStore } from '../../../auth/store/auth.store';
 import type { User } from '../../models/user.types';
 import type { RoleResponse } from '@app/shared/types';
+import { SYSTEM_ROLES } from '@app/shared/constants';
 
 const userRole: RoleResponse = {
   id: 'role-user',
-  name: 'user',
+  name: SYSTEM_ROLES.USER,
   description: 'Regular user',
   isSystem: true,
   isSuper: false,
@@ -22,7 +23,7 @@ const userRole: RoleResponse = {
 
 const adminRole: RoleResponse = {
   id: 'role-admin',
-  name: 'admin',
+  name: SYSTEM_ROLES.ADMIN,
   description: 'Administrator',
   isSystem: true,
   isSuper: true,

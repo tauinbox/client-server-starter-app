@@ -40,17 +40,6 @@ export const AuthStore = signalStore(
   }),
   withComputed((store) => ({
     isAuthenticated: computed(() => store.accessToken() !== null),
-    /**
-     * For displaying the current user's role label only.
-     * Use hasPermissions() for all access control decisions.
-     */
-    isAdmin: computed(
-      () =>
-        store
-          .user()
-          ?.roles?.map((role) => role.name)
-          .includes('admin') ?? false
-    ),
     roles: computed<RoleResponse[]>(() => store.user()?.roles ?? [])
   })),
   withMethods((store) => {
