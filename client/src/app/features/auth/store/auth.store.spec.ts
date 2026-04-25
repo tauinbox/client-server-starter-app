@@ -7,23 +7,14 @@ import { LocalStorageService } from '@core/services/local-storage.service';
 import type { AuthResponse } from '../models/auth.types';
 import type { User } from '@shared/models/user.types';
 import type { RoleResponse } from '@app/shared/types';
+import { SYSTEM_ROLES } from '@app/shared/constants';
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
-  name: 'user',
+  name: SYSTEM_ROLES.USER,
   description: 'Regular user',
   isSystem: true,
   isSuper: false,
-  createdAt: '2024-01-01T00:00:00.000Z',
-  updatedAt: '2024-01-01T00:00:00.000Z'
-};
-
-const mockAdminRole: RoleResponse = {
-  id: 'role-admin',
-  name: 'admin',
-  description: 'Administrator',
-  isSystem: true,
-  isSuper: true,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z'
 };
@@ -152,36 +143,17 @@ describe('AuthStore', () => {
       expect(store.isAccessTokenExpired()).toBe(true);
     });
 
-    it('should compute isAdmin from user', () => {
+    it('should expose roles from user', () => {
       const store = createStore(null);
-      const auth = createMockAuthResponse();
-      auth.user.roles = [mockAdminRole];
-      store.saveAuthResponse(auth);
+      store.saveAuthResponse(createMockAuthResponse());
 
-      expect(store.isAdmin()).toBe(true);
+      expect(store.roles()).toEqual([mockUserRole]);
     });
 
-    // Regression (BKL-002): isAdmin relied on roles being RoleResponse[]; when
-    // the server's auth.service returned roles as string[], this computed was
-    // silently false immediately after login (forcing a reload to fix the UI).
-    // This test pins the shape: saveAuthResponse with RoleResponse[] → admin.
-    it('should be true immediately after saveAuthResponse for admin (no reload)', () => {
+    it('should expose empty roles when user is null', () => {
       const store = createStore(null);
 
-      const auth = createMockAuthResponse();
-      auth.user.roles = [mockAdminRole];
-      store.saveAuthResponse(auth);
-
-      expect(store.isAdmin()).toBe(true);
-    });
-
-    it('should be false for a non-admin user', () => {
-      const store = createStore(null);
-      const auth = createMockAuthResponse();
-      auth.user.roles = [mockUserRole];
-      store.saveAuthResponse(auth);
-
-      expect(store.isAdmin()).toBe(false);
+      expect(store.roles()).toEqual([]);
     });
   });
 

@@ -89,7 +89,14 @@ export class ProfileComponent implements OnInit {
   readonly #authStore = inject(AuthStore);
   readonly #transloco = inject(TranslocoService);
 
-  readonly isAdmin = this.#authStore.isAdmin;
+  /**
+   * Drives the role chip label. Based on the super-ability rather than a
+   * role-name string so the label tracks the user's effective permissions
+   * even if the system role is renamed.
+   */
+  readonly hasSuper = computed(() =>
+    this.#authStore.hasPermissions({ action: 'manage', subject: 'all' })
+  );
   protected readonly user = signal<User | null>(null);
   readonly initials = computed(() => {
     const u = this.user();

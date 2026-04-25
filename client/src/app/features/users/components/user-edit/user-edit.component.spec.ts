@@ -19,10 +19,11 @@ import { UsersStore } from '../../store/users.store';
 import { AuthStore } from '../../../auth/store/auth.store';
 import type { User } from '../../models/user.types';
 import type { RoleResponse } from '@app/shared/types';
+import { SYSTEM_ROLES } from '@app/shared/constants';
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
-  name: 'user',
+  name: SYSTEM_ROLES.USER,
   description: 'Regular user',
   isSystem: true,
   isSuper: false,
@@ -620,7 +621,7 @@ describe('UserEditComponent', () => {
     const mockRoles = [
       {
         id: 'role-user',
-        name: 'user',
+        name: SYSTEM_ROLES.USER,
         description: null,
         isSystem: true,
         isSuper: false,
@@ -629,7 +630,7 @@ describe('UserEditComponent', () => {
       },
       {
         id: 'role-admin',
-        name: 'admin',
+        name: SYSTEM_ROLES.ADMIN,
         description: null,
         isSystem: true,
         isSuper: false,

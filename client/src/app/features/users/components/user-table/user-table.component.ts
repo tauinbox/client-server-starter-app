@@ -25,6 +25,7 @@ import { MatChip } from '@angular/material/chips';
 import { MatIcon } from '@angular/material/icon';
 import { DatePipe } from '@angular/common';
 import { TranslocoDirective } from '@jsverse/transloco';
+import { SYSTEM_ROLES } from '@app/shared/constants';
 import { RequirePermissionsDirective } from '../../../auth/directives/require-permissions.directive';
 import type { User, UserSortColumn } from '../../models/user.types';
 
@@ -84,6 +85,6 @@ export class UserTableComponent {
   }
 
   isAdmin(user: User): boolean {
-    return user.roles?.some((r) => r.name === 'admin') ?? false;
+    return user.roles?.some((r) => r.name === SYSTEM_ROLES.ADMIN) ?? false;
   }
 }

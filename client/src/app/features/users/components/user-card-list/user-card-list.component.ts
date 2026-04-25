@@ -25,6 +25,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { TranslocoDirective } from '@jsverse/transloco';
+import { SYSTEM_ROLES } from '@app/shared/constants';
 import { RequirePermissionsDirective } from '../../../auth/directives/require-permissions.directive';
 import type { User } from '../../models/user.types';
 
@@ -64,6 +65,6 @@ export class UserCardListComponent {
   }
 
   isAdmin(user: User): boolean {
-    return user.roles?.some((r) => r.name === 'admin') ?? false;
+    return user.roles?.some((r) => r.name === SYSTEM_ROLES.ADMIN) ?? false;
   }
 }

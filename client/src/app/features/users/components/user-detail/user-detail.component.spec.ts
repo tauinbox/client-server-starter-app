@@ -47,7 +47,6 @@ describe('UserDetailComponent', () => {
   };
   let authStoreMock: {
     hasPermissions: ReturnType<typeof vi.fn>;
-    isAdmin: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
@@ -60,8 +59,7 @@ describe('UserDetailComponent', () => {
     };
 
     authStoreMock = {
-      hasPermissions: vi.fn().mockReturnValue(false),
-      isAdmin: vi.fn().mockReturnValue(false)
+      hasPermissions: vi.fn().mockReturnValue(false)
     };
 
     await TestBed.configureTestingModule({

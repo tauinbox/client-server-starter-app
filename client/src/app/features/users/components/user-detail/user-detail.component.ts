@@ -21,6 +21,7 @@ import { MatChip } from '@angular/material/chips';
 import { MatDivider } from '@angular/material/divider';
 import { MatTooltip } from '@angular/material/tooltip';
 import { TranslocoDirective } from '@jsverse/transloco';
+import { SYSTEM_ROLES } from '@app/shared/constants';
 import { UsersStore } from '../../store/users.store';
 import { RequirePermissionsDirective } from '../../../auth/directives/require-permissions.directive';
 
@@ -55,7 +56,7 @@ export class UserDetailComponent implements OnInit {
     () => this.#usersStore.entityMap()[this.id()] ?? null
   );
   readonly isAdmin = computed(
-    () => this.user()?.roles.some((r) => r.name === 'admin') ?? false
+    () => this.user()?.roles.some((r) => r.name === SYSTEM_ROLES.ADMIN) ?? false
   );
   readonly loading = this.#usersStore.detailLoading;
 
