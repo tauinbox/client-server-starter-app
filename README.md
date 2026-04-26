@@ -512,7 +512,7 @@ API base URL: `/api/v1`
 | POST | `/auth/refresh-token` | None | Refresh access token (reads `refresh_token` cookie, rotates cookie) |
 | POST | `/auth/logout` | Bearer | Logout, revokes refresh tokens |
 | GET | `/auth/profile` | Bearer | Get current user profile |
-| PATCH | `/auth/profile` | Bearer | Update own profile (name, password) |
+| PATCH | `/auth/profile` | Bearer | Update own profile (name, password); `currentPassword` required when changing password (OAuth-only users may omit) |
 | GET | `/auth/oauth/:provider` | None | Initiate OAuth login (google, facebook, vk) |
 | GET | `/auth/oauth/:provider/callback` | None | OAuth provider callback |
 | POST | `/auth/verify-email` | None | Verify email with token |
@@ -690,6 +690,7 @@ Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file
 - **Email verification** required before first login
 - **Password reset tokens** are single-use with 30-minute expiry; reset revokes all sessions
 - **Admin password change** immediately revokes all sessions for the target user
+- **Self-service password change** (`PATCH /auth/profile`) requires `currentPassword` to mitigate token theft → permanent account takeover; OAuth-only accounts (no password set) may omit the field when establishing their first password
 - **HttpOnly refresh token cookie** (`SameSite=Strict`, `path=/api/v1/auth`, 7d expiry) — JavaScript cannot read or steal the token (XSS-proof); rotated on every use
 - JWT access tokens (1h) stored in Angular signals only — never written to `localStorage`; user info persisted to `localStorage` (`auth_user` key) only to detect prior sessions on page reload
 - `@Exclude()` decorator hides password in API responses

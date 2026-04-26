@@ -145,7 +145,22 @@ test.describe('Profile page', () => {
     ).toBeDisabled();
   });
 
-  test('should allow submitting with valid password and matching confirm', async ({
+  test('should allow submitting with valid password, matching confirm and current password', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url);
+
+    await page.getByLabel('New Password (Optional)').fill('newpass123');
+    await page.getByLabel('Confirm New Password').fill('newpass123');
+    await page.getByLabel('Current Password').fill('Password1');
+
+    await expect(
+      page.getByRole('button', { name: 'Update Profile' })
+    ).toBeEnabled();
+  });
+
+  test('should disable submit when password is set without current password', async ({
     _mockServer,
     page
   }) => {
@@ -156,7 +171,7 @@ test.describe('Profile page', () => {
 
     await expect(
       page.getByRole('button', { name: 'Update Profile' })
-    ).toBeEnabled();
+    ).toBeDisabled();
   });
 
   test('should disable submit when passwords do not match', async ({

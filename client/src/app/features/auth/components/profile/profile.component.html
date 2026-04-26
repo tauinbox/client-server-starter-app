@@ -73,6 +73,16 @@
 
               @if (hasPassword()) {
                 <app-form-field
+                  [field]="profileForm.currentPassword"
+                  label="auth.profile.currentPassword"
+                  [type]="currentPwdToggle.show() ? 'text' : 'password'"
+                  prefixIcon="lock"
+                  autocomplete="current-password"
+                >
+                  <app-password-toggle formFieldSuffix #currentPwdToggle />
+                </app-form-field>
+
+                <app-form-field
                   [field]="profileForm.confirmPassword"
                   label="auth.profile.confirmPassword"
                   [type]="confirmPwdToggle.show() ? 'text' : 'password'"
