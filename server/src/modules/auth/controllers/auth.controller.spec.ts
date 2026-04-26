@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { Logger, UnauthorizedException } from '@nestjs/common';
+import { HttpException, Logger, UnauthorizedException } from '@nestjs/common';
 import { Request as ExpressRequest, Response } from 'express';
 import { AuthController } from './auth.controller';
 import { AuthService } from '../services/auth.service';
@@ -92,6 +92,7 @@ describe('AuthController', () => {
     resendVerificationEmail: jest.Mock;
     forgotPassword: jest.Mock;
     resetPassword: jest.Mock;
+    verifyCurrentPassword: jest.Mock;
   };
   let userServiceMock: {
     findOne: jest.Mock;
@@ -141,7 +142,8 @@ describe('AuthController', () => {
       verifyEmail: jest.fn().mockResolvedValue({ message: 'verified' }),
       resendVerificationEmail: jest.fn().mockResolvedValue({ message: 'sent' }),
       forgotPassword: jest.fn().mockResolvedValue({ message: 'sent' }),
-      resetPassword: jest.fn().mockResolvedValue({ message: 'reset' })
+      resetPassword: jest.fn().mockResolvedValue({ message: 'reset' }),
+      verifyCurrentPassword: jest.fn().mockResolvedValue(undefined)
     };
 
     userServiceMock = {
@@ -418,6 +420,7 @@ describe('AuthController', () => {
       const result = await controller.updateProfile(req, dto as never, res);
 
       expect(userServiceMock.update).toHaveBeenCalledWith('user-1', dto);
+      expect(authServiceMock.verifyCurrentPassword).not.toHaveBeenCalled();
       expect(authServiceMock.logout).not.toHaveBeenCalled();
       expect(res.clearCookie).not.toHaveBeenCalled();
       expect(auditServiceMock.log).not.toHaveBeenCalled();
@@ -430,10 +433,14 @@ describe('AuthController', () => {
         'changer@example.com'
       ) as JwtAuthRequest;
       const res = mockResponse();
-      const dto = { password: 'NewPassword1' };
+      const dto = { password: 'NewPassword1', currentPassword: 'CurrentPass1' };
 
       await controller.updateProfile(req, dto as never, res);
 
+      expect(authServiceMock.verifyCurrentPassword).toHaveBeenCalledWith(
+        'user-1',
+        'CurrentPass1'
+      );
       expect(authServiceMock.logout).toHaveBeenCalledWith('user-1');
       expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
         path: '/api/v1/auth'
@@ -448,6 +455,36 @@ describe('AuthController', () => {
           details: { source: 'self' }
         })
       );
+    });
+
+    it('should strip currentPassword before delegating to userService.update', async () => {
+      const req = mockJwtRequest('user-1') as JwtAuthRequest;
+      const res = mockResponse();
+      const dto = { password: 'NewPassword1', currentPassword: 'CurrentPass1' };
+
+      await controller.updateProfile(req, dto as never, res);
+
+      expect(userServiceMock.update).toHaveBeenCalledWith('user-1', {
+        password: 'NewPassword1'
+      });
+    });
+
+    it('should propagate INVALID_CURRENT_PASSWORD when verifyCurrentPassword throws', async () => {
+      const req = mockJwtRequest('user-1') as JwtAuthRequest;
+      const res = mockResponse();
+      const dto = { password: 'NewPassword1', currentPassword: 'WrongPass1' };
+      const httpErr = new HttpException(
+        { errorKey: 'errors.auth.invalidCurrentPassword' },
+        400
+      );
+      authServiceMock.verifyCurrentPassword.mockRejectedValueOnce(httpErr);
+
+      await expect(
+        controller.updateProfile(req, dto as never, res)
+      ).rejects.toBe(httpErr);
+
+      expect(userServiceMock.update).not.toHaveBeenCalled();
+      expect(authServiceMock.logout).not.toHaveBeenCalled();
     });
   });
 

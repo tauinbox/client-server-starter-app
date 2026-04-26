@@ -221,9 +221,17 @@ export class AuthController {
     @Body() updateProfileDto: UpdateProfileDto,
     @Res({ passthrough: true }) res: Response
   ) {
+    if (updateProfileDto.password) {
+      await this.authService.verifyCurrentPassword(
+        req.user.userId,
+        updateProfileDto.currentPassword
+      );
+    }
+
+    const { currentPassword: _ignored, ...updatePayload } = updateProfileDto;
     const updatedUser = await this.userService.update(
       req.user.userId,
-      updateProfileDto
+      updatePayload
     );
 
     if (updateProfileDto.password) {

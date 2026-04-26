@@ -27,7 +27,8 @@ export const ErrorKeys = {
     INVALID_OAUTH_PROVIDER: 'errors.auth.invalidOauthProvider',
     MISSING_OAUTH_DATA: 'errors.auth.missingOauthData',
     INVALID_OAUTH_DATA: 'errors.auth.invalidOauthData',
-    UNLINK_LAST_PROVIDER: 'errors.auth.unlinkLastProvider'
+    UNLINK_LAST_PROVIDER: 'errors.auth.unlinkLastProvider',
+    INVALID_CURRENT_PASSWORD: 'errors.auth.invalidCurrentPassword'
   },
   USERS: {
     NOT_FOUND: 'errors.users.notFound',

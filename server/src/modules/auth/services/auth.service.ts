@@ -530,6 +530,34 @@ export class AuthService {
     };
   }
 
+  async verifyCurrentPassword(
+    userId: string,
+    currentPassword: string | undefined
+  ): Promise<void> {
+    const user = await this.usersService.findOne(userId);
+
+    // OAuth-only users (no password set yet) may set their first password
+    // without supplying a current one — they never had one.
+    if (user.password === null) return;
+
+    const invalidCurrentPasswordError = new HttpException(
+      {
+        message: 'Current password is incorrect',
+        errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
+      },
+      HttpStatus.BAD_REQUEST
+    );
+
+    if (!currentPassword) {
+      throw invalidCurrentPasswordError;
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      throw invalidCurrentPasswordError;
+    }
+  }
+
   async logout(userId: string): Promise<void> {
     await Promise.all([
       this.refreshTokenService.deleteByUserId(userId),

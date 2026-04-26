@@ -2,9 +2,11 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsNotEmpty,
   IsOptional,
+  IsString,
   Matches,
   MaxLength,
-  MinLength
+  MinLength,
+  ValidateIf
 } from 'class-validator';
 import {
   PASSWORD_REGEX,
@@ -41,4 +43,16 @@ export class UpdateProfileDto {
   @MaxLength(128)
   @Matches(PASSWORD_REGEX, { message: PASSWORD_ERROR })
   password?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Current password — required when changing the password. ' +
+      'OAuth-only users (no password set) may omit this field when setting their first password.',
+    example: 'CurrentPassword123'
+  })
+  @ValidateIf((o: UpdateProfileDto) => o.password !== undefined)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(128)
+  currentPassword?: string;
 }

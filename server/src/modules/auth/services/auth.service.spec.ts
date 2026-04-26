@@ -825,4 +825,62 @@ describe('AuthService', () => {
       expect(result.tokens.access_token).toBe('mock-access-token');
     });
   });
+
+  describe('verifyCurrentPassword', () => {
+    it('should resolve when bcrypt.compare succeeds', async () => {
+      mockUsersService.findOne.mockResolvedValue(mockUser);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      await expect(
+        service.verifyCurrentPassword(mockUser.id, 'CurrentPass1')
+      ).resolves.toBeUndefined();
+    });
+
+    it('should throw 400 with INVALID_CURRENT_PASSWORD when bcrypt.compare fails', async () => {
+      mockUsersService.findOne.mockResolvedValue(mockUser);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+
+      const promise = service.verifyCurrentPassword(mockUser.id, 'WrongPass1');
+
+      await expect(promise).rejects.toThrow(HttpException);
+      try {
+        await service.verifyCurrentPassword(mockUser.id, 'WrongPass1');
+      } catch (err) {
+        expect(err).toBeInstanceOf(HttpException);
+        const httpErr = err as HttpException;
+        expect(httpErr.getStatus()).toBe(HttpStatus.BAD_REQUEST);
+        expect(httpErr.getResponse()).toMatchObject({
+          errorKey: 'errors.auth.invalidCurrentPassword'
+        });
+      }
+    });
+
+    it('should throw INVALID_CURRENT_PASSWORD when currentPassword is undefined and user has a password', async () => {
+      mockUsersService.findOne.mockResolvedValue(mockUser);
+
+      try {
+        await service.verifyCurrentPassword(mockUser.id, undefined);
+        fail('Expected HttpException to be thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(HttpException);
+        const httpErr = err as HttpException;
+        expect(httpErr.getStatus()).toBe(HttpStatus.BAD_REQUEST);
+        expect(httpErr.getResponse()).toMatchObject({
+          errorKey: 'errors.auth.invalidCurrentPassword'
+        });
+      }
+    });
+
+    it('should resolve without checking when user has no password (OAuth-only)', async () => {
+      const oauthOnlyUser = { ...mockUser, password: null };
+      mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
+      const compareSpy = jest.spyOn(bcrypt, 'compare');
+      compareSpy.mockClear();
+
+      await expect(
+        service.verifyCurrentPassword(oauthOnlyUser.id, undefined)
+      ).resolves.toBeUndefined();
+      expect(compareSpy).not.toHaveBeenCalled();
+    });
+  });
 });

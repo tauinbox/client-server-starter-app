@@ -101,6 +101,7 @@ describe('ProfileComponent', () => {
       expect(component.profileModel()).toEqual({
         firstName: 'Test',
         lastName: 'User',
+        currentPassword: '',
         password: '',
         confirmPassword: ''
       });
@@ -148,6 +149,7 @@ describe('ProfileComponent', () => {
       component.profileModel.set({
         firstName: '',
         lastName: 'User',
+        currentPassword: '',
         password: '',
         confirmPassword: ''
       });
@@ -160,6 +162,7 @@ describe('ProfileComponent', () => {
       component.profileModel.set({
         firstName: 'Test',
         lastName: '',
+        currentPassword: '',
         password: '',
         confirmPassword: ''
       });
@@ -172,6 +175,7 @@ describe('ProfileComponent', () => {
       component.profileModel.set({
         firstName: 'Test',
         lastName: 'User',
+        currentPassword: 'CurrentPass1',
         password: 'short',
         confirmPassword: ''
       });
@@ -184,6 +188,7 @@ describe('ProfileComponent', () => {
       component.profileModel.set({
         firstName: 'Test',
         lastName: 'User',
+        currentPassword: '',
         password: '',
         confirmPassword: ''
       });
@@ -195,6 +200,7 @@ describe('ProfileComponent', () => {
       component.profileModel.set({
         firstName: 'Test',
         lastName: 'User',
+        currentPassword: 'CurrentPass1',
         password: 'newpassword123',
         confirmPassword: 'different123'
       });
@@ -203,15 +209,47 @@ describe('ProfileComponent', () => {
       expect(errors.some((e) => e.kind === 'passwordMismatch')).toBe(true);
     });
 
-    it('should be valid when passwords match', () => {
+    it('should be valid when passwords match and current password is provided', () => {
       component.profileModel.set({
         firstName: 'Test',
         lastName: 'User',
+        currentPassword: 'CurrentPass1',
         password: 'newpassword123',
         confirmPassword: 'newpassword123'
       });
       TestBed.tick();
       expect(component.profileForm().valid()).toBe(true);
+    });
+
+    it('should require currentPassword when new password is entered', () => {
+      component.profileModel.set({
+        firstName: 'Test',
+        lastName: 'User',
+        currentPassword: '',
+        password: 'newpassword123',
+        confirmPassword: 'newpassword123'
+      });
+      TestBed.tick();
+      const errors = component.profileForm.currentPassword().errors();
+      expect(errors.some((e) => e.kind === 'currentPasswordRequired')).toBe(
+        true
+      );
+      expect(component.profileForm().valid()).toBe(false);
+    });
+
+    it('should NOT require currentPassword when password is blank', () => {
+      component.profileModel.set({
+        firstName: 'Test',
+        lastName: 'User',
+        currentPassword: '',
+        password: '',
+        confirmPassword: ''
+      });
+      TestBed.tick();
+      const errors = component.profileForm.currentPassword().errors();
+      expect(errors.some((e) => e.kind === 'currentPasswordRequired')).toBe(
+        false
+      );
     });
   });
 
@@ -224,6 +262,7 @@ describe('ProfileComponent', () => {
       component.profileModel.set({
         firstName: '',
         lastName: 'User',
+        currentPassword: '',
         password: '',
         confirmPassword: ''
       });
@@ -245,6 +284,7 @@ describe('ProfileComponent', () => {
       component.profileModel.set({
         firstName: 'Updated',
         lastName: 'User',
+        currentPassword: '',
         password: '',
         confirmPassword: ''
       });
@@ -257,13 +297,14 @@ describe('ProfileComponent', () => {
       });
     });
 
-    it('should include password when provided', () => {
+    it('should include password and currentPassword when password is provided', () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component.profileModel.set({
         firstName: 'Updated',
         lastName: 'User',
+        currentPassword: 'CurrentPass1',
         password: 'newpassword123',
         confirmPassword: 'newpassword123'
       });
@@ -273,7 +314,8 @@ describe('ProfileComponent', () => {
       expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
         firstName: 'Updated',
         lastName: 'User',
-        password: 'newpassword123'
+        password: 'newpassword123',
+        currentPassword: 'CurrentPass1'
       });
     });
 
@@ -284,6 +326,7 @@ describe('ProfileComponent', () => {
       component.profileModel.set({
         firstName: 'Updated',
         lastName: 'User',
+        currentPassword: '',
         password: '',
         confirmPassword: ''
       });
@@ -299,13 +342,14 @@ describe('ProfileComponent', () => {
       expect(component['saving']()).toBe(false);
     });
 
-    it('should reset password fields after successful update', () => {
+    it('should reset password and currentPassword fields after successful update', () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component.profileModel.set({
         firstName: 'Updated',
         lastName: 'User',
+        currentPassword: 'CurrentPass1',
         password: 'newpassword',
         confirmPassword: 'newpassword'
       });
@@ -314,6 +358,7 @@ describe('ProfileComponent', () => {
 
       expect(component.profileModel().password).toBe('');
       expect(component.profileModel().confirmPassword).toBe('');
+      expect(component.profileModel().currentPassword).toBe('');
     });
 
     it('should set error on update failure', () => {
@@ -328,6 +373,7 @@ describe('ProfileComponent', () => {
       component.profileModel.set({
         firstName: 'Updated',
         lastName: 'User',
+        currentPassword: '',
         password: '',
         confirmPassword: ''
       });
@@ -350,6 +396,7 @@ describe('ProfileComponent', () => {
       component.profileModel.set({
         firstName: 'Updated',
         lastName: 'User',
+        currentPassword: '',
         password: '',
         confirmPassword: ''
       });

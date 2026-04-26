@@ -574,7 +574,7 @@ router.get('/permissions', authGuard, (req, res) => {
 
 // PATCH /api/v1/auth/profile
 router.patch('/profile', authGuard, (req, res) => {
-  const { firstName, lastName, password } = req.body;
+  const { firstName, lastName, password, currentPassword } = req.body;
   const { user } = req as AuthenticatedRequest;
 
   if (firstName !== undefined) {
@@ -599,6 +599,20 @@ router.patch('/profile', authGuard, (req, res) => {
     if (pwMinErr || pwMaxErr) {
       res.status(400).json({ message: pwMinErr || pwMaxErr, statusCode: 400 });
       return;
+    }
+
+    // OAuth-only users (no password set) may set their first password without
+    // currentPassword. Users with an existing password must supply a matching one.
+    if (user.password !== null) {
+      // Plaintext comparison — mock only. Real server uses bcrypt.compare().
+      if (!currentPassword || user.password !== currentPassword) {
+        res.status(400).json({
+          message: 'Current password is incorrect',
+          statusCode: 400,
+          errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
+        });
+        return;
+      }
     }
   }
 

@@ -36,6 +36,7 @@ import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 type ProfileData = {
   firstName: string;
   lastName: string;
+  currentPassword: string;
   password: string;
   confirmPassword: string;
 };
@@ -54,6 +55,7 @@ const PROVIDER_KEYS: Record<string, string> = {
 const INITIAL_PROFILE: ProfileData = {
   firstName: '',
   lastName: '',
+  currentPassword: '',
   password: '',
   confirmPassword: ''
 };
@@ -121,6 +123,17 @@ export class ProfileComponent implements OnInit {
     });
     minLength(path.password, 8, {
       message: 'auth.profile.passwordMinLength'
+    });
+    validate(path.currentPassword, ({ value, valueOf }) => {
+      const password = valueOf(path.password);
+      if (!password) return null;
+      if (!value().trim()) {
+        return {
+          kind: 'currentPasswordRequired',
+          message: 'auth.profile.currentPasswordRequired'
+        };
+      }
+      return null;
     });
     validate(path.confirmPassword, ({ value, valueOf }) => {
       const confirm = value();
@@ -191,6 +204,7 @@ export class ProfileComponent implements OnInit {
           this.profileModel.set({
             firstName: user.firstName,
             lastName: user.lastName,
+            currentPassword: '',
             password: '',
             confirmPassword: ''
           });
@@ -292,6 +306,7 @@ export class ProfileComponent implements OnInit {
 
     if (formValues.password.trim()) {
       updateData.password = formValues.password;
+      updateData.currentPassword = formValues.currentPassword;
     }
 
     this.saving.set(true);
@@ -308,6 +323,7 @@ export class ProfileComponent implements OnInit {
           this.profileModel.set({
             firstName: updatedUser.firstName,
             lastName: updatedUser.lastName,
+            currentPassword: '',
             password: '',
             confirmPassword: ''
           });

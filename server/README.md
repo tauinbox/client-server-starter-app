@@ -281,7 +281,7 @@ Base URL: `/api/v1`
 | POST | `/refresh-token` | None | Refresh access token |
 | POST | `/logout` | Bearer | Revoke all refresh tokens |
 | GET | `/profile` | Bearer | Get current user |
-| PATCH | `/profile` | Bearer | Update own profile (name, password) |
+| PATCH | `/profile` | Bearer | Update own profile (name, password); `currentPassword` required when changing password (OAuth-only users may omit) |
 | GET | `/permissions` | Bearer | Get current user's resolved permissions |
 | POST | `/verify-email` | None | Verify email address using token |
 | POST | `/resend-verification` | None | Resend email verification (3/min) |
