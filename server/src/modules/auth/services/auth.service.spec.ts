@@ -422,9 +422,9 @@ describe('AuthService', () => {
       expect(result.tokens.access_token).toBe('mock-access-token');
       expect(typeof result.tokens.refresh_token).toBe('string');
       expect(result.tokens.expires_in).toBe(3600);
-      // Regression (BKL-002): login must return roles as RoleResponse[] objects,
-      // NOT as string[] of role names — the client relies on this shape to
-      // render the admin badge correctly immediately after login.
+      // Login must return roles as RoleResponse[] objects, NOT as string[]
+      // of role names — the client relies on this shape to render the admin
+      // badge correctly immediately after login.
       expect(result.user).toEqual(mockUserResponse);
       expect(result.user.roles).toEqual([mockUserRole]);
     });
@@ -719,7 +719,7 @@ describe('AuthService', () => {
       expect(result.tokens.access_token).toBe('mock-access-token');
       expect(typeof result.tokens.refresh_token).toBe('string');
       expect(result.tokens.expires_in).toBe(3600);
-      // Regression (BKL-002): refresh must return roles as RoleResponse[] objects.
+      // Refresh must return roles as RoleResponse[] objects, not string[].
       expect(result.user).toEqual(
         expect.objectContaining({
           id: 'user-1',

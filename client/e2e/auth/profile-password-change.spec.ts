@@ -1,9 +1,9 @@
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
 
-// Regression: BKL-004 — changing password from /auth/profile must require
-// the user's current password. Without it (or with a wrong one) the request
-// must fail with a 400 carrying errors.auth.invalidCurrentPassword.
-test.describe('Profile password change (BKL-004)', () => {
+// Changing password from /auth/profile must require the user's current
+// password. Without it (or with a wrong one) the request must fail with a
+// 400 carrying errors.auth.invalidCurrentPassword.
+test.describe('Profile password change', () => {
   test('should reject password change with no current password', async ({
     _mockServer,
     page

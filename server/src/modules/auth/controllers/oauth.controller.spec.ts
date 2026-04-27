@@ -305,9 +305,9 @@ describe('OAuthController', () => {
       );
     });
 
-    // BKL-005: when OAuthService throws OAUTH_EMAIL_ALREADY_REGISTERED,
-    // the controller redirects with a specific oauth_error param so the
-    // login page can show the right translated message.
+    // When OAuthService throws OAUTH_EMAIL_ALREADY_REGISTERED, the controller
+    // redirects with a specific oauth_error param so the login page can show
+    // the right translated message.
     it('should redirect with email_already_registered when service throws OAUTH_EMAIL_ALREADY_REGISTERED', async () => {
       oauthServiceMock.loginWithOAuth.mockRejectedValue(
         new HttpException(

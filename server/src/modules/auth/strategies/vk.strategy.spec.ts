@@ -18,9 +18,9 @@ function makeStrategy(): VkStrategy {
 }
 
 describe('VkStrategy.validate', () => {
-  // BKL-005: VK does not expose an email-verification flag, so emailVerified
-  // must always be false. This forces the OAuth flow to send a verification
-  // email when creating a new user via VK.
+  // VK does not expose an email-verification flag, so emailVerified must
+  // always be false. This forces the OAuth flow to send a verification email
+  // when creating a new user via VK.
   it('always sets emailVerified=false (VK has no verified signal)', () => {
     const strategy = makeStrategy();
     const done = jest.fn();

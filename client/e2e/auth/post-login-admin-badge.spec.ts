@@ -10,7 +10,7 @@ import { expect, loginViaUi, test } from '../fixtures/base.fixture';
  * These tests pin the fixed wire contract end-to-end: an admin who logs in
  * must see the admin badge / chip on every relevant screen without reloading.
  */
-test.describe('Post-login admin badge (BKL-002)', () => {
+test.describe('Post-login admin badge', () => {
   test('should show "Administrator" chip on profile immediately after login — no reload', async ({
     _mockServer,
     page

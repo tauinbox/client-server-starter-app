@@ -26,7 +26,7 @@ describe('GoogleStrategy.validate', () => {
     done = jest.fn();
   });
 
-  // BKL-005: emailVerified must propagate from the provider's verified flag.
+  // emailVerified must propagate from the provider's verified flag.
   it('sets emailVerified=true when Google asserts verified=true', () => {
     strategy.validate(
       'access',

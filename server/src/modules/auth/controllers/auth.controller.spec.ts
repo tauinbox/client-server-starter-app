@@ -265,9 +265,9 @@ describe('AuthController', () => {
       );
     });
 
-    // Regression (BKL-002): login response.user.roles must be RoleResponse[]
-    // objects — the client relies on this to decide the admin badge without a
-    // reload. A regression to `string[]` here is the exact bug this test pins.
+    // Login response.user.roles must be RoleResponse[] objects — the client
+    // relies on this to decide the admin badge without a reload. A regression
+    // to `string[]` here would resurrect a fixed bug.
     it('should return user.roles as RoleResponse[] objects', async () => {
       const req = mockLocalAuthRequest() as LocalAuthRequest;
       const res = mockResponse();
@@ -339,9 +339,8 @@ describe('AuthController', () => {
       );
     });
 
-    // Regression (BKL-002): refresh-token response.user.roles must be
-    // RoleResponse[] objects so the client keeps the admin badge after a
-    // silent refresh.
+    // Refresh-token response.user.roles must be RoleResponse[] objects so
+    // the client keeps the admin badge after a silent refresh.
     it('should return user.roles as RoleResponse[] objects', async () => {
       const req = mockExpressRequest({
         refresh_token: 'old-refresh'
