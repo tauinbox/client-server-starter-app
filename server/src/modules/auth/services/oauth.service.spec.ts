@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { HttpException } from '@nestjs/common';
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { OAuthService } from './oauth.service';
 import { UsersService } from '../../users/services/users.service';
@@ -9,7 +9,9 @@ import { OAuthAccountService } from './oauth-account.service';
 import { RoleService } from './role.service';
 import { TokenGeneratorService } from './token-generator.service';
 import { AuditService } from '../../audit/audit.service';
+import { MailService } from '../../mail/mail.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
+import { ErrorKeys } from '@app/shared/constants';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
 
 describe('OAuthService', () => {
@@ -52,6 +54,9 @@ describe('OAuthService', () => {
   let mockAuditService: {
     log: jest.Mock;
     logFireAndForget: jest.Mock;
+  };
+  let mockMailService: {
+    sendEmailVerification: jest.Mock;
   };
 
   const mockUserRole = {
@@ -149,6 +154,10 @@ describe('OAuthService', () => {
       logFireAndForget: jest.fn()
     };
 
+    mockMailService = {
+      sendEmailVerification: jest.fn().mockResolvedValue(undefined)
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OAuthService,
@@ -159,7 +168,8 @@ describe('OAuthService', () => {
         { provide: OAuthAccountService, useValue: mockOAuthAccountService },
         { provide: RoleService, useValue: mockRoleService },
         { provide: TokenGeneratorService, useValue: mockTokenGenerator },
-        { provide: AuditService, useValue: mockAuditService }
+        { provide: AuditService, useValue: mockAuditService },
+        { provide: MailService, useValue: mockMailService }
       ]
     }).compile();
 
@@ -176,7 +186,8 @@ describe('OAuthService', () => {
       providerId: 'google-123',
       email: 'oauth@example.com',
       firstName: 'OAuth',
-      lastName: 'User'
+      lastName: 'User',
+      emailVerified: true
     };
 
     const oauthUser = {
@@ -257,7 +268,10 @@ describe('OAuthService', () => {
       );
     });
 
-    it('should link OAuth to existing user found by email', async () => {
+    // BKL-005: auto-link is disabled. When a local account already exists for
+    // the OAuth-asserted email but no OAuth row matches, we MUST throw and
+    // refuse to create the link silently.
+    it('should throw OAUTH_EMAIL_ALREADY_REGISTERED when local account exists for the email', async () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         null
       );
@@ -266,17 +280,22 @@ describe('OAuthService', () => {
         email: 'oauth@example.com'
       });
 
-      const result = await service.loginWithOAuth(oauthProfile);
+      await expect(service.loginWithOAuth(oauthProfile)).rejects.toMatchObject({
+        constructor: HttpException,
+        status: HttpStatus.CONFLICT,
+        response: {
+          errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
+        }
+      });
 
-      expect(mockOAuthAccountService.createOAuthAccount).toHaveBeenCalledWith(
-        mockUser.id,
-        'google',
-        'google-123'
-      );
-      expect(result.user).toBeDefined();
+      // Side-effect assertion: NO OAuth account row created, NO tokens issued.
+      expect(mockOAuthAccountService.createOAuthAccount).not.toHaveBeenCalled();
+      expect(mockManager.save).not.toHaveBeenCalled();
+      expect(mockTokenGenerator.generateTokens).not.toHaveBeenCalled();
+      expect(mockRefreshTokenService.createRefreshToken).not.toHaveBeenCalled();
     });
 
-    it('should throw when existing user by email is deactivated', async () => {
+    it('should throw OAUTH_EMAIL_ALREADY_REGISTERED even if the existing local account is deactivated', async () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         null
       );
@@ -286,12 +305,14 @@ describe('OAuthService', () => {
         isActive: false
       });
 
-      await expect(service.loginWithOAuth(oauthProfile)).rejects.toThrow(
-        HttpException
-      );
+      await expect(service.loginWithOAuth(oauthProfile)).rejects.toMatchObject({
+        response: {
+          errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
+        }
+      });
     });
 
-    it('should create new user and OAuth account atomically when no existing account found', async () => {
+    it('should create new verified user when provider asserts emailVerified=true', async () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         null
       );
@@ -316,7 +337,9 @@ describe('OAuthService', () => {
           firstName: 'OAuth',
           lastName: 'User',
           password: null,
-          isEmailVerified: true
+          isEmailVerified: true,
+          emailVerificationToken: null,
+          emailVerificationExpiresAt: null
         })
       );
       expect(mockManager.save).toHaveBeenCalledWith(
@@ -328,9 +351,62 @@ describe('OAuthService', () => {
         })
       );
       expect(mockUsersService.findOne).toHaveBeenCalledWith('oauth-user-1');
+      // Verification email is NOT sent when provider already verified.
+      expect(mockMailService.sendEmailVerification).not.toHaveBeenCalled();
       expect(result.user).toBeDefined();
       // Regression (BKL-002): new OAuth user response carries RoleResponse[].
       expect(result.user.roles).toEqual([mockUserRole]);
+    });
+
+    // BKL-005: when the provider does NOT assert email verification (e.g. VK,
+    // or Google/Facebook returning verified=false), we create the user with
+    // isEmailVerified=false and trigger a verification email. Otherwise an
+    // attacker controlling an unverified provider profile could be granted
+    // a verified-status local account.
+    it('should create unverified user and send verification email when provider asserts emailVerified=false', async () => {
+      const unverifiedProfile: OAuthUserProfile = {
+        ...oauthProfile,
+        emailVerified: false
+      };
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
+        null
+      );
+      mockUsersService.findByEmail.mockResolvedValue(null);
+      mockManager.save
+        .mockResolvedValueOnce({ ...oauthUser, isEmailVerified: false })
+        .mockResolvedValueOnce({
+          id: 'oauth-account-1',
+          userId: 'oauth-user-1',
+          provider: 'google',
+          providerId: 'google-123'
+        });
+      mockUsersService.findOne.mockResolvedValue({
+        ...oauthUser,
+        isEmailVerified: false
+      });
+
+      await service.loginWithOAuth(unverifiedProfile);
+
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          email: 'oauth@example.com',
+          isEmailVerified: false,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          emailVerificationToken: expect.any(String),
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          emailVerificationExpiresAt: expect.any(Date)
+        })
+      );
+      expect(mockMailService.sendEmailVerification).toHaveBeenCalledTimes(1);
+      const callArgs = mockMailService.sendEmailVerification.mock.calls[0] as [
+        string,
+        string
+      ];
+      expect(callArgs[0]).toBe('oauth@example.com');
+      // Token passed to mail is the RAW token, not the hashed one stored.
+      expect(typeof callArgs[1]).toBe('string');
+      expect(callArgs[1]).toHaveLength(64); // 32 bytes hex
     });
   });
 

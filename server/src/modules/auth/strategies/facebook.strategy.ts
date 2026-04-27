@@ -30,6 +30,7 @@ export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
       id: string;
       emails?: { value: string }[];
       name?: { givenName?: string; familyName?: string };
+      _json?: { verified?: boolean };
     },
     done: (error: Error | null, user?: OAuthUserProfile) => void
   ): void {
@@ -38,7 +39,8 @@ export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
       providerId: profile.id,
       email: profile.emails?.[0]?.value || '',
       firstName: profile.name?.givenName || '',
-      lastName: profile.name?.familyName || ''
+      lastName: profile.name?.familyName || '',
+      emailVerified: profile._json?.verified === true
     };
 
     done(null, oauthProfile);

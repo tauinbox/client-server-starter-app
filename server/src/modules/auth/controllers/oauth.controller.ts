@@ -339,6 +339,16 @@ export class OAuthController {
 
       res.redirect(`${this.clientUrl}/oauth/callback`);
     } catch (error) {
+      if (
+        error instanceof HttpException &&
+        (error.getResponse() as { errorKey?: string })?.errorKey ===
+          ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
+      ) {
+        res.redirect(
+          `${this.clientUrl}/login?oauth_error=email_already_registered`
+        );
+        return;
+      }
       this.logger.error('OAuth callback error', error);
       res.redirect(`${this.clientUrl}/login?oauth_error=auth_failed`);
     }

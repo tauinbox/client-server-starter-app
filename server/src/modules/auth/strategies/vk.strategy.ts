@@ -36,7 +36,9 @@ export class VkStrategy extends PassportStrategy(Strategy, 'vkontakte') {
       providerId: String(profile.id),
       email: params.email || '',
       firstName: profile.name?.givenName || '',
-      lastName: profile.name?.familyName || ''
+      lastName: profile.name?.familyName || '',
+      // VK OAuth does not expose an email-verification flag.
+      emailVerified: false
     };
 
     done(null, oauthProfile);

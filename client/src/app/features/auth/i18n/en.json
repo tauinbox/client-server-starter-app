@@ -18,6 +18,7 @@
     "register": "Register",
     "errorOauthFailed": "OAuth authentication failed. Please try again.",
     "errorNoEmail": "No email was provided by the OAuth provider. Please use a different sign-in method.",
+    "errorEmailAlreadyRegistered": "This email is already registered. Log in with your password first, then link the provider from your profile.",
     "errorAuthFailed": "Authentication failed. Please try again.",
     "errorCredentialsInvalid": "Login failed. Please check your credentials."
   },
