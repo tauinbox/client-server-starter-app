@@ -1,7 +1,7 @@
 import { expect, test } from '../fixtures/base.fixture';
 
-// BKL-005: when a local account already exists for the OAuth-asserted email,
-// the server refuses to auto-link and redirects back with
+// When a local account already exists for the OAuth-asserted email, the
+// server refuses to auto-link and redirects back with
 // `?oauth_error=email_already_registered`. The login page must show the
 // translated banner so users understand why login failed.
 //
@@ -9,7 +9,7 @@ import { expect, test } from '../fixtures/base.fixture';
 // redirect at the browser level via page.route(). The server-side throw +
 // redirect mapping is covered by oauth.service.spec.ts and oauth.controller.spec.ts.
 
-test.describe('OAuth login — auto-link disabled (BKL-005)', () => {
+test.describe('OAuth login — auto-link disabled', () => {
   test('shows email_already_registered banner when local account exists', async ({
     page,
     _mockServer

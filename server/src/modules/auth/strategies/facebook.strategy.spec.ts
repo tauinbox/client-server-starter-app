@@ -26,7 +26,7 @@ describe('FacebookStrategy.validate', () => {
     done = jest.fn();
   });
 
-  // BKL-005: emailVerified must propagate from `_json.verified`.
+  // emailVerified must propagate from `_json.verified`.
   it('sets emailVerified=true when Facebook asserts _json.verified=true', () => {
     strategy.validate(
       'access',

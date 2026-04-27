@@ -68,7 +68,7 @@ export class OAuthService {
       const existingUser = await this.usersService.findByEmail(profile.email);
 
       if (existingUser) {
-        // BKL-005: do NOT auto-link OAuth to a pre-existing local account.
+        // Do NOT auto-link OAuth to a pre-existing local account.
         // A provider asserting an email address is not sufficient consent
         // to take over the linked user's session. The user must explicitly
         // initiate linking from their profile page.

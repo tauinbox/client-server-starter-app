@@ -166,8 +166,8 @@ describe('UserTableComponent', () => {
       expect(component.isAdmin(userWithoutRoles)).toBe(false);
     });
 
-    // Regression (BKL-007): the detection used a hardcoded 'admin' literal,
-    // so renaming the system role would silently break the chip. By keying off
+    // The detection used to use a hardcoded 'admin' literal, so renaming the
+    // system role would silently break the chip. By keying off
     // SYSTEM_ROLES.ADMIN, an arbitrary role name like 'super' must NOT match —
     // even if it was the previous super-admin role — until the constant changes.
     it('does not match a role whose name differs from SYSTEM_ROLES.ADMIN', () => {
@@ -180,11 +180,11 @@ describe('UserTableComponent', () => {
     });
   });
 
-  // Regression (BKL-002): the role column previously used
-  // user.roles?.includes('admin'), which always returned false when the
-  // server returned RoleResponse[] objects (the true wire format). This test
-  // renders the table and verifies the admin chip appears for RoleResponse[].
-  describe('role column rendering (BKL-002 regression)', () => {
+  // The role column previously used user.roles?.includes('admin'), which
+  // always returned false when the server returned RoleResponse[] objects
+  // (the true wire format). This test renders the table and verifies the
+  // admin chip appears for RoleResponse[].
+  describe('role column rendering for RoleResponse[]', () => {
     it('should render the Admin chip for a user with a RoleResponse admin role', () => {
       const adminUser: User = {
         ...mockUser,

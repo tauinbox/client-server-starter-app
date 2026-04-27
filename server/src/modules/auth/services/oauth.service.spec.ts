@@ -221,7 +221,7 @@ describe('OAuthService', () => {
         'oauth-user-1',
         MAX_CONCURRENT_SESSIONS
       );
-      // Regression (BKL-002): OAuth response must carry roles as RoleResponse[].
+      // OAuth response must carry roles as RoleResponse[] (not string[]).
       expect(result.user.roles).toEqual([mockUserRole]);
     });
 
@@ -268,8 +268,8 @@ describe('OAuthService', () => {
       );
     });
 
-    // BKL-005: auto-link is disabled. When a local account already exists for
-    // the OAuth-asserted email but no OAuth row matches, we MUST throw and
+    // Auto-link is disabled. When a local account already exists for the
+    // OAuth-asserted email but no OAuth row matches, we MUST throw and
     // refuse to create the link silently.
     it('should throw OAUTH_EMAIL_ALREADY_REGISTERED when local account exists for the email', async () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
@@ -354,12 +354,12 @@ describe('OAuthService', () => {
       // Verification email is NOT sent when provider already verified.
       expect(mockMailService.sendEmailVerification).not.toHaveBeenCalled();
       expect(result.user).toBeDefined();
-      // Regression (BKL-002): new OAuth user response carries RoleResponse[].
+      // New OAuth user response carries RoleResponse[] (not string[]).
       expect(result.user.roles).toEqual([mockUserRole]);
     });
 
-    // BKL-005: when the provider does NOT assert email verification (e.g. VK,
-    // or Google/Facebook returning verified=false), we create the user with
+    // When the provider does NOT assert email verification (e.g. VK, or
+    // Google/Facebook returning verified=false), we create the user with
     // isEmailVerified=false and trigger a verification email. Otherwise an
     // attacker controlling an unverified provider profile could be granted
     // a verified-status local account.
