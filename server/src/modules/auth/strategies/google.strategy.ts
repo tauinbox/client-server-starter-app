@@ -27,17 +27,19 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     _refreshToken: string,
     profile: {
       id: string;
-      emails?: { value: string }[];
+      emails?: { value: string; verified?: boolean }[];
       name?: { givenName?: string; familyName?: string };
     },
     done: VerifyCallback
   ): void {
+    const primaryEmail = profile.emails?.[0];
     const oauthProfile: OAuthUserProfile = {
       provider: OAuthProvider.GOOGLE,
       providerId: profile.id,
-      email: profile.emails?.[0]?.value || '',
+      email: primaryEmail?.value || '',
       firstName: profile.name?.givenName || '',
-      lastName: profile.name?.familyName || ''
+      lastName: profile.name?.familyName || '',
+      emailVerified: primaryEmail?.verified === true
     };
 
     done(null, oauthProfile);

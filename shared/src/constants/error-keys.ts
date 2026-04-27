@@ -15,6 +15,7 @@ export const ErrorKeys = {
     USER_DEACTIVATED: 'errors.auth.userDeactivated',
     USER_NOT_FOUND: 'errors.auth.userNotFound',
     OAUTH_ALREADY_LINKED: 'errors.auth.oauthAlreadyLinked',
+    OAUTH_EMAIL_ALREADY_REGISTERED: 'errors.auth.oauthEmailAlreadyRegistered',
     USER_NOT_FOUND_OR_DEACTIVATED: 'errors.auth.userNotFoundOrDeactivated',
     INVALID_VERIFICATION_TOKEN: 'errors.auth.invalidVerificationToken',
     VERIFICATION_TOKEN_EXPIRED: 'errors.auth.verificationTokenExpired',

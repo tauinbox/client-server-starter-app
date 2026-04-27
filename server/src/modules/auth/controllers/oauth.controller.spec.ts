@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Request as ExpressRequest, Response } from 'express';
 import { OAuthController } from './oauth.controller';
 import { OAuthService } from '../services/oauth.service';
@@ -11,6 +11,7 @@ import { AuditService } from '../../audit/audit.service';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthUserProfile } from '../types/oauth-profile';
+import { ErrorKeys } from '@app/shared/constants';
 
 function mockJwtRequest(userId: string): {
   user: JwtAuthRequest['user'];
@@ -262,7 +263,8 @@ describe('OAuthController', () => {
         providerId: '123',
         email: 'test@example.com',
         firstName: 'Test',
-        lastName: 'User'
+        lastName: 'User',
+        emailVerified: true
       };
 
       await controller.googleCallback(mockExpressRequest(profile), res);
@@ -292,7 +294,8 @@ describe('OAuthController', () => {
         providerId: '123',
         email: '',
         firstName: 'Test',
-        lastName: 'User'
+        lastName: 'User',
+        emailVerified: false
       };
 
       await controller.vkCallback(mockExpressRequest(profile), res);
@@ -300,6 +303,39 @@ describe('OAuthController', () => {
       expect(res.redirect).toHaveBeenCalledWith(
         'http://localhost:4200/login?oauth_error=no_email'
       );
+    });
+
+    // BKL-005: when OAuthService throws OAUTH_EMAIL_ALREADY_REGISTERED,
+    // the controller redirects with a specific oauth_error param so the
+    // login page can show the right translated message.
+    it('should redirect with email_already_registered when service throws OAUTH_EMAIL_ALREADY_REGISTERED', async () => {
+      oauthServiceMock.loginWithOAuth.mockRejectedValue(
+        new HttpException(
+          {
+            message: 'This email is already registered',
+            errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
+          },
+          HttpStatus.CONFLICT
+        )
+      );
+
+      const res = mockResponse();
+      const profile: OAuthUserProfile = {
+        provider: OAuthProvider.GOOGLE,
+        providerId: '999',
+        email: 'taken@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        emailVerified: true
+      };
+
+      await controller.googleCallback(mockExpressRequest(profile), res);
+
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://localhost:4200/login?oauth_error=email_already_registered'
+      );
+      // Must NOT set the oauth_data cookie when login was rejected.
+      expect(res.cookie).not.toHaveBeenCalled();
     });
 
     it('should redirect to login with error on exception', async () => {
@@ -311,7 +347,8 @@ describe('OAuthController', () => {
         providerId: '123',
         email: 'test@example.com',
         firstName: 'Test',
-        lastName: 'User'
+        lastName: 'User',
+        emailVerified: true
       };
 
       await controller.googleCallback(mockExpressRequest(profile), res);
@@ -328,7 +365,8 @@ describe('OAuthController', () => {
         providerId: '456',
         email: 'different@example.com',
         firstName: 'Test',
-        lastName: 'User'
+        lastName: 'User',
+        emailVerified: true
       };
 
       await controller.googleCallback(
@@ -362,7 +400,8 @@ describe('OAuthController', () => {
         providerId: '456',
         email: 'test@example.com',
         firstName: 'Test',
-        lastName: 'User'
+        lastName: 'User',
+        emailVerified: true
       };
 
       await controller.googleCallback(
@@ -393,7 +432,8 @@ describe('OAuthController', () => {
         providerId: '123',
         email: 'test@example.com',
         firstName: 'Test',
-        lastName: 'User'
+        lastName: 'User',
+        emailVerified: true
       };
 
       await controller.googleCallback(mockExpressRequest(profile), res);
@@ -484,7 +524,8 @@ describe('OAuthController', () => {
         providerId: '789',
         email: 'fb@example.com',
         firstName: 'Face',
-        lastName: 'Book'
+        lastName: 'Book',
+        emailVerified: true
       };
 
       await controller.facebookCallback(mockExpressRequest(profile), res);

@@ -29,6 +29,7 @@ import { AuthService } from '../../services/auth.service';
 import { SessionStorageService } from '@core/services/session-storage.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { take } from 'rxjs/operators';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
 import type { LockoutErrorData } from '../../models/auth.types';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
@@ -41,7 +42,8 @@ type LoginData = {
 
 const OAUTH_ERROR_KEYS: Record<string, string> = {
   auth_failed: 'auth.login.errorOauthFailed',
-  no_email: 'auth.login.errorNoEmail'
+  no_email: 'auth.login.errorNoEmail',
+  email_already_registered: 'auth.login.errorEmailAlreadyRegistered'
 };
 
 @Component({
@@ -100,12 +102,17 @@ export class LoginComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     const oauthError = this.#route.snapshot.queryParams['oauth_error'];
     if (oauthError) {
-      const key = OAUTH_ERROR_KEYS[oauthError];
-      this.error.set(
-        key
-          ? this.#translocoService.translate(key)
-          : this.#translocoService.translate('auth.login.errorAuthFailed')
-      );
+      const fullKey =
+        OAUTH_ERROR_KEYS[oauthError] ?? 'auth.login.errorAuthFailed';
+      // Strip the 'auth.' prefix because we pass scope='auth' separately.
+      // selectTranslate(key, params, 'auth') auto-loads the scope's
+      // translation file (which the *transloco directive only does at
+      // render time — after ngOnInit), then emits the translated string.
+      const scopedKey = fullKey.replace(/^auth\./, '');
+      this.#translocoService
+        .selectTranslate(scopedKey, undefined, 'auth')
+        .pipe(take(1), takeUntilDestroyed(this.#destroyRef))
+        .subscribe((value) => this.error.set(value));
     }
 
     const registered = this.#route.snapshot.queryParams['registered'];
