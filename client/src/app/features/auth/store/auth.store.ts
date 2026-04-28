@@ -11,11 +11,11 @@ import type { RawRuleOf } from '@casl/ability';
 import { createMongoAbility, subject } from '@casl/ability';
 import type { PackRule } from '@casl/ability/extra';
 import { unpackRules } from '@casl/ability/extra';
-import type { User } from '@shared/models/user.types';
 import type {
   RoleResponse,
-  UserPermissionsResponse
-} from '@app/shared/types/role.types';
+  UserPermissionsResponse,
+  UserResponse
+} from '@app/shared/types';
 import type { AuthResponse, CustomJwtPayload } from '../models/auth.types';
 import type { AppAbility, PermissionCheck } from '../casl/app-ability';
 import { LocalStorageService } from '@core/services/local-storage.service';
@@ -24,7 +24,7 @@ export const AUTH_USER_KEY = 'auth_user';
 
 type AuthState = {
   accessToken: string | null; // in-memory ONLY — lost on page reload
-  user: User | null; // persisted to localStorage (for reload detection)
+  user: UserResponse | null; // persisted to localStorage (for reload detection)
   ability: AppAbility | null;
 };
 
@@ -34,7 +34,7 @@ export const AuthStore = signalStore(
     const storage = inject(LocalStorageService);
     return {
       accessToken: null,
-      user: storage.getItem<User>(AUTH_USER_KEY) ?? null,
+      user: storage.getItem<UserResponse>(AUTH_USER_KEY) ?? null,
       ability: null
     };
   }),
@@ -81,7 +81,7 @@ export const AuthStore = signalStore(
       });
     }
 
-    function updateCurrentUser(user: User): void {
+    function updateCurrentUser(user: UserResponse): void {
       storage.setItem(AUTH_USER_KEY, user);
       patchState(store, { user });
     }

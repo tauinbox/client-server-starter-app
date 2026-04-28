@@ -147,7 +147,8 @@ src/
     ├── controllers/        # UsersController (CRUD + search, all endpoints use @Authorize([action, 'User']))
     ├── services/           # UsersService
     ├── entities/           # User entity (ManyToMany to Role via user_roles)
-    └── dto/                # CreateUserDto, UpdateUserDto, UserResponseDto (roles: RoleResponse[])
+    └── dto/                # CreateUserDto, UpdateUserDto, UserResponseDto (public; roles: RoleResponse[])
+                            # AdminUserResponseDto extends UserResponseDto + lockedUntil + roles: RoleAdminResponseDto[]
 ```
 
 ### Request Pipeline
@@ -156,7 +157,7 @@ src/
 Request → Global Middleware (Compression, CookieParser, CORS)
         → Module Middleware
         → Guards (JwtAuthGuard, RolesGuard)
-        → Interceptors (ClassSerializer, custom)
+        → Interceptors (ClassSerializer with @SerializeOptions, custom)
         → Pipes (ValidationPipe, custom)
         → Controller Handler
         → Interceptors (response phase)
@@ -179,6 +180,7 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 - **CaslAbilityFactory** — builds `AppAbility` from user roles + permissions; used by `AuthController` to return CASL packed rules via `packRules()` from `GET /permissions`. Partitions rules allow-first / deny-last so permissions with `conditions.effect === 'deny'` register as CASL `cannot()` rules and reliably override prior allows for the same `(resource, action)` pair
 - **Instance-level enforcement** — `UsersService.update/remove/restore` and `RoleService.assignRoleToUser/removeRoleFromUser` accept an optional `AppAbility` (injected via `@CurrentAbility()` in controllers) and check `ability.can(action, entity)` after loading the record; super-role assignment/removal is blocked for non-super actors
 - **JWT payload** — `CustomJwtPayload` carries `email` and optional `roles: string[]` on top of the standard `JwtPayload` claims; access decisions go through CASL/RBAC, not the payload
+- **Field-level response gating** — `class-transformer` decorators on entities determine wire shape: `@Exclude()` always hides (e.g. `User.password`, `User.failedLoginAttempts`), `@Expose({ groups: ['privileged'] })` hides by default and surfaces only on controllers with `@SerializeOptions({ groups: ['privileged'] })` (e.g. `User.lockedUntil`, `Role.isSystem`, `Role.isSuper`). Authorization (`@Authorize`) decides who can call the endpoint; serialization decides what fields the authorized caller sees. Self/auth endpoints (`AuthController`) carry no group → public form; admin endpoints (`UsersController`, `RolesController`) carry the `privileged` group → admin form
 - **Refresh tokens** — opaque 80-char hex tokens stored in DB (SHA-256 hashed), delivered to the client as an `HttpOnly SameSite=Strict` cookie (`path=/api/v1/auth`), rotated on every use; never appear in response body
 - **OAuth accounts** — manage linked providers, safety check on unlink. **Auto-link disabled**: if a local account already exists for the OAuth-asserted email, the callback throws `OAUTH_EMAIL_ALREADY_REGISTERED` (409) and redirects to `/login?oauth_error=email_already_registered`; users must log in with their password and link the provider explicitly via `POST /auth/oauth/link-init`. New users created via OAuth use the provider's `email_verified` flag (`profile.emails[0].verified` for Google, `profile._json.verified` for Facebook, always `false` for VK)
 - **Token cleanup** — daily cron removes expired tokens, weekly cron removes revoked+expired
@@ -411,7 +413,7 @@ npm run test:e2e
 
 Server imports common types and constants from the root `shared/` directory via `@app/shared/*` path alias (maps to `../shared/src/*` in `tsconfig.json`). This includes:
 
-- **Types**: `UserResponse`, `OAuthAccountResponse`, `TokensResponse`, `AuthResponse`, `PaginationMeta`, `PaginatedResponse<T>`, `CursorPaginationMeta`, `CursorPaginatedResponse<T>`, `SortOrder`; `RoleResponse`, `PermissionResponse`, `RolePermissionResponse`, `RoleWithPermissionsResponse`, `PermissionCondition`, `PermissionEffect`, `ResolvedPermission`, `UserPermissionsResponse`, `UserEffectivePermissionsResponse`; `ResourceResponse`, `ActionResponse`, `RbacMetadataResponse`
+- **Types**: `UserResponse` (public), `AdminUserResponse` (admin-only superset with `lockedUntil` + `roles: RoleAdminResponse[]`), `OAuthAccountResponse`, `TokensResponse`, `AuthResponse`, `PaginationMeta`, `PaginatedResponse<T>`, `CursorPaginationMeta`, `CursorPaginatedResponse<T>`, `SortOrder`; `RoleResponse` (public, no `isSystem`/`isSuper`), `RoleAdminResponse` (admin-only superset), `PermissionResponse`, `RolePermissionResponse`, `RoleWithPermissionsResponse`, `PermissionCondition`, `PermissionEffect`, `ResolvedPermission`, `UserPermissionsResponse`, `UserEffectivePermissionsResponse`; `ResourceResponse`, `ActionResponse`, `RbacMetadataResponse`
 - **Constants**: `PASSWORD_REGEX`, `PASSWORD_ERROR`, `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, `MAX_CONCURRENT_SESSIONS`, pagination defaults, user sort columns; `SYSTEM_ROLES`, `SystemRole` (note: `PERMISSIONS` + `Permission` removed — typed `[Actions, Subjects]` tuples used instead)
 
 NestJS build compiles shared files into `dist/shared/` alongside `dist/server/`. Migration and seed scripts use paths like `dist/server/src/...` to reflect the nested output structure.

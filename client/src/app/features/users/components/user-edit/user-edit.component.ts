@@ -42,7 +42,7 @@ import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { UsersStore } from '../../store/users.store';
-import type { RoleResponse } from '@app/shared/types/role.types';
+import type { RoleAdminResponse } from '@app/shared/types/role.types';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 
@@ -106,7 +106,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
-  readonly availableRoles = signal<RoleResponse[]>([]);
+  readonly availableRoles = signal<RoleAdminResponse[]>([]);
   readonly selectedRoleIds = signal<string[]>([]);
   readonly #initialRoleIds = signal<string[]>([]);
   readonly isActive = signal(true);

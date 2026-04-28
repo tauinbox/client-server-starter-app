@@ -4,7 +4,7 @@ import type { Observable } from 'rxjs';
 import type {
   PermissionCondition,
   PermissionResponse,
-  RoleResponse
+  RoleAdminResponse
 } from '@app/shared/types/role.types';
 
 export type CreateRole = {
@@ -33,8 +33,8 @@ export const ROLES_API_V1 = '/api/v1/roles';
 export class RoleService {
   readonly #http = inject(HttpClient);
 
-  getAll(): Observable<RoleResponse[]> {
-    return this.#http.get<RoleResponse[]>(ROLES_API_V1);
+  getAll(): Observable<RoleAdminResponse[]> {
+    return this.#http.get<RoleAdminResponse[]>(ROLES_API_V1);
   }
 
   getAllPermissions(): Observable<PermissionResponse[]> {
@@ -47,12 +47,12 @@ export class RoleService {
     );
   }
 
-  create(role: CreateRole): Observable<RoleResponse> {
-    return this.#http.post<RoleResponse>(ROLES_API_V1, role);
+  create(role: CreateRole): Observable<RoleAdminResponse> {
+    return this.#http.post<RoleAdminResponse>(ROLES_API_V1, role);
   }
 
-  update(id: string, role: UpdateRole): Observable<RoleResponse> {
-    return this.#http.patch<RoleResponse>(`${ROLES_API_V1}/${id}`, role);
+  update(id: string, role: UpdateRole): Observable<RoleAdminResponse> {
+    return this.#http.patch<RoleAdminResponse>(`${ROLES_API_V1}/${id}`, role);
   }
 
   delete(id: string): Observable<void> {

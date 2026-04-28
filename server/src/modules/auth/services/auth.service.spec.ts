@@ -11,6 +11,7 @@ import { TokenGeneratorService } from './token-generator.service';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
 import { MailService } from '../../mail/mail.service';
 import { AuditService } from '../../audit/audit.service';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MetricsService } from '../../core/metrics/metrics.service';
 
 describe('AuthService', () => {
@@ -109,26 +110,6 @@ describe('AuthService', () => {
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
     deletedAt: null
-  };
-
-  const mockUserResponse = {
-    id: mockUser.id,
-    email: mockUser.email,
-    firstName: mockUser.firstName,
-    lastName: mockUser.lastName,
-    isActive: mockUser.isActive,
-    roles: mockUser.roles,
-    isEmailVerified: mockUser.isEmailVerified,
-    failedLoginAttempts: mockUser.failedLoginAttempts,
-    lockedUntil: mockUser.lockedUntil,
-    emailVerificationToken: mockUser.emailVerificationToken,
-    emailVerificationExpiresAt: mockUser.emailVerificationExpiresAt,
-    passwordResetToken: mockUser.passwordResetToken,
-    passwordResetExpiresAt: mockUser.passwordResetExpiresAt,
-    tokenRevokedAt: mockUser.tokenRevokedAt,
-    createdAt: mockUser.createdAt,
-    updatedAt: mockUser.updatedAt,
-    deletedAt: mockUser.deletedAt
   };
 
   beforeEach(async () => {
@@ -259,13 +240,15 @@ describe('AuthService', () => {
   });
 
   describe('validateUser', () => {
-    it('should return user without password when credentials are valid', async () => {
+    it('should return the User entity when credentials are valid', async () => {
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
       const result = await service.validateUser('test@example.com', 'password');
 
-      expect(result).toEqual(mockUserResponse);
+      // validateUser now returns the User entity itself; ClassSerializerInterceptor
+      // strips @Exclude() / @Expose({ groups }) fields downstream.
+      expect(result).toEqual(mockUser);
       expect(mockUsersService.findByEmail).toHaveBeenCalledWith(
         'test@example.com'
       );
@@ -395,6 +378,71 @@ describe('AuthService', () => {
       );
     });
 
+    it('should record running failedLoginAttempts in invalid_credentials audit', async () => {
+      // Regression for BKL-006: failedLoginAttempts is hidden from API
+      // responses, so the audit log must carry the running count for ops.
+      mockUsersService.findByEmail.mockResolvedValue(mockUser);
+      mockUsersService.incrementFailedAttemptsAndLockIfNeeded.mockResolvedValue(
+        { failedLoginAttempts: 2, lockedUntil: null }
+      );
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+
+      await expect(
+        service.validateUser('test@example.com', 'wrong-password')
+      ).rejects.toThrow(HttpException);
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_LOGIN_FAILURE,
+          actorEmail: 'test@example.com',
+          details: { reason: 'invalid_credentials', failedLoginAttempts: 2 }
+        })
+      );
+    });
+
+    it('should record failedLoginAttempts in account_locked_after_max_attempts audit', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(mockUser);
+      mockUsersService.incrementFailedAttemptsAndLockIfNeeded.mockResolvedValue(
+        {
+          failedLoginAttempts: 5,
+          lockedUntil: new Date(Date.now() + 900000)
+        }
+      );
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+
+      await expect(
+        service.validateUser('test@example.com', 'wrong-password')
+      ).rejects.toThrow(HttpException);
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_LOGIN_FAILURE,
+          targetId: 'user-1',
+          details: {
+            reason: 'account_locked_after_max_attempts',
+            failedLoginAttempts: 5
+          }
+        })
+      );
+    });
+
+    it('should omit failedLoginAttempts in audit when no user matches', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(null);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+
+      await expect(
+        service.validateUser('nobody@example.com', 'password')
+      ).rejects.toThrow(HttpException);
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_LOGIN_FAILURE,
+          actorEmail: 'nobody@example.com',
+          details: { reason: 'invalid_credentials' }
+        })
+      );
+    });
+
     it('should not reset attempts when count is zero', async () => {
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
@@ -407,7 +455,7 @@ describe('AuthService', () => {
 
   describe('login', () => {
     it('should create a new session token and prune oldest beyond limit', async () => {
-      const result = await service.login(mockUserResponse);
+      const result = await service.login(mockUser);
 
       expect(mockRefreshTokenService.deleteByUserId).not.toHaveBeenCalled();
       expect(mockRefreshTokenService.createRefreshToken).toHaveBeenCalledWith(
@@ -425,7 +473,10 @@ describe('AuthService', () => {
       // Login must return roles as RoleResponse[] objects, NOT as string[]
       // of role names — the client relies on this shape to render the admin
       // badge correctly immediately after login.
-      expect(result.user).toEqual(mockUserResponse);
+      // Login returns the User entity passed in; ClassSerializerInterceptor
+      // strips @Exclude() / @Expose({ groups }) fields downstream at the
+      // controller boundary.
+      expect(result.user).toEqual(mockUser);
       expect(result.user.roles).toEqual([mockUserRole]);
     });
 
@@ -434,13 +485,13 @@ describe('AuthService', () => {
         throw new Error(`Configuration key "${key}" does not exist`);
       });
 
-      await expect(service.login(mockUserResponse)).rejects.toThrow(
+      await expect(service.login(mockUser)).rejects.toThrow(
         'Configuration key "JWT_REFRESH_EXPIRATION" does not exist'
       );
     });
 
     it('should generate tokens with correct payload', async () => {
-      await service.login(mockUserResponse);
+      await service.login(mockUser);
 
       // JWT payload keeps role names as string[] (CASL / storage contract),
       // even though the response body carries RoleResponse[] objects.

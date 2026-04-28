@@ -18,7 +18,9 @@ import type {
   PermissionResponse,
   ResolvedPermission,
   ResourceResponse,
-  ActionResponse
+  ActionResponse,
+  RoleResponse,
+  RoleAdminResponse
 } from '@app/shared/types';
 import { findDeniedMongoKey } from '@app/shared/utils/mongo-query-safety';
 import {
@@ -137,6 +139,38 @@ export function toPermissionResponse(
   };
 }
 
+function toRolePublicResponse(role: {
+  id: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}): RoleResponse {
+  return {
+    id: role.id,
+    name: role.name,
+    description: role.description,
+    createdAt: role.createdAt,
+    updatedAt: role.updatedAt
+  };
+}
+
+function toRoleAdminResponse(role: {
+  id: string;
+  name: string;
+  description: string | null;
+  isSystem: boolean;
+  isSuper: boolean;
+  createdAt: string;
+  updatedAt: string;
+}): RoleAdminResponse {
+  return {
+    ...toRolePublicResponse(role),
+    isSystem: role.isSystem,
+    isSuper: role.isSuper
+  };
+}
+
 export function toUserResponse(user: MockUser): UserResponse {
   const {
     password: _,
@@ -148,7 +182,7 @@ export function toUserResponse(user: MockUser): UserResponse {
   } = user;
   const roles = roleNames.flatMap((name) => {
     const role = Array.from(state.roles.values()).find((r) => r.name === name);
-    return role ? [role] : [];
+    return role ? [toRolePublicResponse(role)] : [];
   });
   return { ...rest, roles };
 }
@@ -163,7 +197,7 @@ export function toAdminUserResponse(user: MockUser): AdminUserResponse {
   } = user;
   const roles = roleNames.flatMap((name) => {
     const role = Array.from(state.roles.values()).find((r) => r.name === name);
-    return role ? [role] : [];
+    return role ? [toRoleAdminResponse(role)] : [];
   });
   return { ...rest, roles };
 }

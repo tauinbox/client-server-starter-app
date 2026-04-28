@@ -5,14 +5,14 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
-import type { RoleResponse } from '@app/shared/types/role.types';
+import type { RoleAdminResponse } from '@app/shared/types/role.types';
 import type { RolePermissionItem } from '../../../services/role.service';
 import { RoleService } from '../../../services/role.service';
 import { RolePermissionsDialogComponent } from './role-permissions-dialog.component';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-const mockRole: RoleResponse = {
+const mockRole: RoleAdminResponse = {
   id: 'role-custom',
   name: 'Custom Role',
   description: null,
@@ -442,7 +442,7 @@ describe('RolePermissionsDialogComponent', () => {
     });
 
     it('setEffect is a no-op for system roles', () => {
-      const systemRole: RoleResponse = { ...mockRole, isSystem: true };
+      const systemRole: RoleAdminResponse = { ...mockRole, isSystem: true };
       const roleServiceMock = {
         getAllPermissions: vi
           .fn()

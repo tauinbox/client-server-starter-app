@@ -10,6 +10,7 @@ import {
   Post,
   Put,
   Req,
+  SerializeOptions,
   UseInterceptors
 } from '@nestjs/common';
 import {
@@ -49,6 +50,7 @@ import type { JwtAuthRequest } from '../types/auth.request';
 })
 @RegisterResource({ name: 'roles', subject: 'Role', displayName: 'Roles' })
 @UseInterceptors(ClassSerializerInterceptor)
+@SerializeOptions({ groups: ['privileged'] })
 export class RolesController {
   constructor(
     private readonly roleService: RoleService,

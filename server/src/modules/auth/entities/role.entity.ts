@@ -7,6 +7,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn
 } from 'typeorm';
+import { Expose } from 'class-transformer';
 import { RolePermission } from './role-permission.entity';
 import { User } from '../../users/entities/user.entity';
 
@@ -22,9 +23,11 @@ export class Role {
   description: string | null;
 
   @Column({ name: 'is_system', default: false })
+  @Expose({ groups: ['privileged'] })
   isSystem: boolean;
 
   @Column({ name: 'is_super', default: false })
+  @Expose({ groups: ['privileged'] })
   isSuper: boolean;
 
   @OneToMany(() => RolePermission, (rp) => rp.role)

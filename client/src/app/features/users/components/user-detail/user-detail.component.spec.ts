@@ -10,9 +10,9 @@ import { UserDetailComponent } from './user-detail.component';
 import { UsersStore } from '../../store/users.store';
 import { AuthStore } from '../../../auth/store/auth.store';
 import type { User } from '../../models/user.types';
-import type { RoleResponse } from '@app/shared/types';
+import type { RoleAdminResponse } from '@app/shared/types';
 
-const mockUserRole: RoleResponse = {
+const mockUserRole: RoleAdminResponse = {
   id: 'role-user',
   name: 'user',
   description: 'Regular user',

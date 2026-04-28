@@ -18,10 +18,10 @@ import { RoleService } from '../../../admin/services/role.service';
 import { UsersStore } from '../../store/users.store';
 import { AuthStore } from '../../../auth/store/auth.store';
 import type { User } from '../../models/user.types';
-import type { RoleResponse } from '@app/shared/types';
+import type { RoleAdminResponse } from '@app/shared/types';
 import { SYSTEM_ROLES } from '@app/shared/constants';
 
-const mockUserRole: RoleResponse = {
+const mockUserRole: RoleAdminResponse = {
   id: 'role-user',
   name: SYSTEM_ROLES.USER,
   description: 'Regular user',

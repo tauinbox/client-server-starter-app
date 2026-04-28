@@ -21,6 +21,7 @@ export type {
 
 export type {
   RoleResponse,
+  RoleAdminResponse,
   PermissionResponse,
   RolePermissionResponse,
   RoleWithPermissionsResponse,

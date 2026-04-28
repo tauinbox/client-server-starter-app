@@ -1,10 +1,10 @@
 import { Request } from 'express';
-import { UserResponseDto } from '../../users/dtos/user-response.dto';
+import { User } from '../../users/entities/user.entity';
 import { PayloadFromJwt } from './jwt-payload';
 import type { AppAbility } from '../casl/app-ability';
 
 export type LocalAuthRequest = Request & {
-  user: UserResponseDto;
+  user: User;
 };
 export type JwtAuthRequest = Request & {
   user: PayloadFromJwt;

@@ -19,8 +19,6 @@ const mockUserRole: RoleResponse = {
   id: 'role-user',
   name: 'user',
   description: 'Regular user',
-  isSystem: true,
-  isSuper: false,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z'
 };

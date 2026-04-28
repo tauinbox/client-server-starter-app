@@ -295,7 +295,8 @@ fullstack-starter-app/
 ├── shared/                 # Shared types and constants (no build step)
 │   ├── tsconfig.json       # Minimal config for IDE support
 │   └── src/
-│       ├── types/          # UserResponse, AuthResponse, PaginatedResponse<T>, RoleResponse,
+│       ├── types/          # UserResponse, AdminUserResponse, AuthResponse, PaginatedResponse<T>,
+│       │                   # RoleResponse (public) / RoleAdminResponse (with isSystem/isSuper),
 │       │                   # PermissionResponse, UserPermissionsResponse, etc.
 │       ├── constants/      # PASSWORD_REGEX, pagination defaults, SYSTEM_ROLES, MAX_CONCURRENT_SESSIONS, etc.
 │       └── index.ts        # Barrel exports

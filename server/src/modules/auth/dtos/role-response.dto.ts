@@ -11,12 +11,6 @@ export class RoleResponseDto {
   @ApiProperty({ example: 'Administrator role', nullable: true })
   description: string | null;
 
-  @ApiProperty({ example: true })
-  isSystem: boolean;
-
-  @ApiProperty({ example: false })
-  isSuper: boolean;
-
   @ApiProperty({ example: '2023-01-01T00:00:00Z' })
   createdAt: Date;
 

@@ -5,16 +5,13 @@ import { AUTH_USER_KEY, AuthStore } from './auth.store';
 import type { AppAbility } from '../casl/app-ability';
 import { LocalStorageService } from '@core/services/local-storage.service';
 import type { AuthResponse } from '../models/auth.types';
-import type { User } from '@shared/models/user.types';
-import type { RoleResponse } from '@app/shared/types';
+import type { RoleResponse, UserResponse } from '@app/shared/types';
 import { SYSTEM_ROLES } from '@app/shared/constants';
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
   name: SYSTEM_ROLES.USER,
   description: 'Regular user',
-  isSystem: true,
-  isSuper: false,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z'
 };
@@ -30,7 +27,7 @@ function createJwt(payload: Record<string, unknown>): string {
   return `${encode(header)}.${encode(payload)}.fake-signature`;
 }
 
-function createMockUser(): User {
+function createMockUser(): UserResponse {
   return {
     id: '1',
     email: 'test@example.com',
@@ -39,7 +36,6 @@ function createMockUser(): User {
     isActive: true,
     roles: [mockUserRole],
     isEmailVerified: true,
-    lockedUntil: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
     deletedAt: null
@@ -73,7 +69,7 @@ describe('AuthStore', () => {
     removeItem: ReturnType<typeof vi.fn>;
   };
 
-  function createStore(savedUser: User | null = null) {
+  function createStore(savedUser: UserResponse | null = null) {
     storageMock = {
       getItem: vi.fn().mockReturnValue(savedUser),
       setItem: vi.fn(),

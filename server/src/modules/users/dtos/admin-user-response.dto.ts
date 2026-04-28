@@ -5,8 +5,12 @@ import type {
   _AssertNever
 } from '@app/shared/types';
 import { UserResponseDto } from './user-response.dto';
+import { RoleAdminResponseDto } from '../../auth/dtos/role-admin-response.dto';
 
 export class AdminUserResponseDto extends UserResponseDto {
+  @ApiProperty({ type: [RoleAdminResponseDto] })
+  declare roles: RoleAdminResponseDto[];
+
   @ApiProperty({ example: null, nullable: true })
   lockedUntil: Date | null;
 }

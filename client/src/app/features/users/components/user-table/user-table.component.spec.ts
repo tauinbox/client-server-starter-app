@@ -8,10 +8,10 @@ import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/trans
 import { COLUMN_TO_SORT_MAP, UserTableComponent } from './user-table.component';
 import { AuthStore } from '../../../auth/store/auth.store';
 import type { User } from '../../models/user.types';
-import type { RoleResponse } from '@app/shared/types';
+import type { RoleAdminResponse } from '@app/shared/types';
 import { SYSTEM_ROLES } from '@app/shared/constants';
 
-const mockUserRole: RoleResponse = {
+const mockUserRole: RoleAdminResponse = {
   id: 'role-user',
   name: SYSTEM_ROLES.USER,
   description: 'Regular user',
@@ -21,7 +21,7 @@ const mockUserRole: RoleResponse = {
   updatedAt: '2024-01-01T00:00:00.000Z'
 };
 
-const mockAdminRole: RoleResponse = {
+const mockAdminRole: RoleAdminResponse = {
   id: 'role-admin',
   name: SYSTEM_ROLES.ADMIN,
   description: 'Administrator',
@@ -181,11 +181,11 @@ describe('UserTableComponent', () => {
   });
 
   // The role column previously used user.roles?.includes('admin'), which
-  // always returned false when the server returned RoleResponse[] objects
+  // always returned false when the server returned RoleAdminResponse[] objects
   // (the true wire format). This test renders the table and verifies the
-  // admin chip appears for RoleResponse[].
-  describe('role column rendering for RoleResponse[]', () => {
-    it('should render the Admin chip for a user with a RoleResponse admin role', () => {
+  // admin chip appears for RoleAdminResponse[].
+  describe('role column rendering for RoleAdminResponse[]', () => {
+    it('should render the Admin chip for a user with a RoleAdminResponse admin role', () => {
       const adminUser: User = {
         ...mockUser,
         id: 'admin-user',

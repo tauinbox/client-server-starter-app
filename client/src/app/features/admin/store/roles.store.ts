@@ -12,7 +12,7 @@ import {
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslocoService } from '@jsverse/transloco';
-import type { RoleResponse } from '@app/shared/types/role.types';
+import type { RoleAdminResponse } from '@app/shared/types/role.types';
 import type { CreateRole, UpdateRole } from '../services/role.service';
 import { RoleService } from '../services/role.service';
 
@@ -22,7 +22,7 @@ type RolesState = {
 };
 
 export const RolesStore = signalStore(
-  withEntities<RoleResponse>(),
+  withEntities<RoleAdminResponse>(),
   withState<RolesState>({
     loading: false,
     error: null
@@ -63,7 +63,7 @@ export const RolesStore = signalStore(
         )
       ),
 
-      createRole(data: CreateRole): Observable<RoleResponse> {
+      createRole(data: CreateRole): Observable<RoleAdminResponse> {
         return roleService.create(data).pipe(
           tap((role) => {
             patchState(store, setEntity(role));
@@ -71,7 +71,7 @@ export const RolesStore = signalStore(
         );
       },
 
-      updateRole(id: string, data: UpdateRole): Observable<RoleResponse> {
+      updateRole(id: string, data: UpdateRole): Observable<RoleAdminResponse> {
         return roleService.update(id, data).pipe(
           tap((role) => {
             patchState(store, setEntity(role));

@@ -12,9 +12,9 @@ import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/trans
 import { UserListComponent } from './user-list.component';
 import { UsersStore } from '../../store/users.store';
 import type { User } from '../../models/user.types';
-import type { RoleResponse } from '@app/shared/types';
+import type { RoleAdminResponse } from '@app/shared/types';
 
-const mockUserRole: RoleResponse = {
+const mockUserRole: RoleAdminResponse = {
   id: 'role-user',
   name: 'user',
   description: 'Regular user',

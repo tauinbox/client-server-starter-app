@@ -11,6 +11,7 @@ import {
   Post,
   Query,
   Request,
+  SerializeOptions,
   UseInterceptors
 } from '@nestjs/common';
 import { packRules } from '@casl/ability/extra';
@@ -57,6 +58,7 @@ import { UserRestoredEvent } from '../events/user-restored.event';
 })
 @RegisterResource({ name: 'users', subject: 'User', displayName: 'Users' })
 @UseInterceptors(ClassSerializerInterceptor)
+@SerializeOptions({ groups: ['privileged'] })
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
