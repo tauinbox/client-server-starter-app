@@ -18,12 +18,12 @@ import {
   MAT_DIALOG_DATA
 } from '@angular/material/dialog';
 import { TranslocoDirective } from '@jsverse/transloco';
-import type { RoleResponse } from '@app/shared/types/role.types';
+import type { RoleAdminResponse } from '@app/shared/types/role.types';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 
 export type RoleFormDialogData = {
-  role?: RoleResponse;
+  role?: RoleAdminResponse;
 };
 
 export type RoleFormDialogResult = {

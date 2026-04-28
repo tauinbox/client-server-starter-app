@@ -199,9 +199,11 @@ router.post('/login', (req, res) => {
 
   // Plaintext comparison — mock only. Real server uses bcrypt.compare().
   if (!user || !user.isActive || user.password !== password) {
+    let attemptsAfterIncrement: number | null = null;
     // Handle failed login attempt tracking
     if (user && user.isActive) {
       user.failedLoginAttempts++;
+      attemptsAfterIncrement = user.failedLoginAttempts;
 
       if (user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
         user.lockedUntil = new Date(
@@ -212,7 +214,10 @@ router.post('/login', (req, res) => {
           actorEmail: email,
           targetId: user.id,
           targetType: 'User',
-          details: { reason: 'account_locked_after_max_attempts' },
+          details: {
+            reason: 'account_locked_after_max_attempts',
+            failedLoginAttempts: user.failedLoginAttempts
+          },
           ip: req.ip
         });
         res.status(423).json({
@@ -227,7 +232,12 @@ router.post('/login', (req, res) => {
     }
     logAudit('USER_LOGIN_FAILURE', {
       actorEmail: email,
-      details: { reason: 'invalid_credentials' },
+      details: {
+        reason: 'invalid_credentials',
+        ...(attemptsAfterIncrement !== null
+          ? { failedLoginAttempts: attemptsAfterIncrement }
+          : {})
+      },
       ip: req.ip
     });
     res.status(401).json({

@@ -1,4 +1,4 @@
-import { RoleResponse } from './role.types';
+import { RoleResponse, RoleAdminResponse } from './role.types';
 
 export type UserResponse = {
   id: string;
@@ -15,9 +15,11 @@ export type UserResponse = {
 
 /**
  * Extended response used only by admin endpoints (UsersController).
- * Includes lockout state needed for the admin user-management UI.
+ * Adds lockout state and switches roles to RoleAdminResponse so the
+ * admin UI can read isSystem/isSuper.
  */
-export type AdminUserResponse = UserResponse & {
+export type AdminUserResponse = Omit<UserResponse, 'roles'> & {
+  roles: RoleAdminResponse[];
   lockedUntil?: string | null;
 };
 

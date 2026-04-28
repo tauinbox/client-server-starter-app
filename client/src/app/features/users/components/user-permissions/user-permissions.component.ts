@@ -33,7 +33,7 @@ import { TranslocoDirective } from '@jsverse/transloco';
 import type {
   PermissionCondition,
   ResolvedPermission,
-  RoleResponse,
+  RoleAdminResponse,
   UserEffectivePermissionsResponse
 } from '@app/shared/types';
 import { UserService } from '../../services/user.service';
@@ -90,7 +90,9 @@ export class UserPermissionsComponent implements OnInit {
   readonly loading = this.#loading.asReadonly();
   readonly error = this.#error.asReadonly();
   readonly expanded = this.#expanded.asReadonly();
-  readonly roles = computed<RoleResponse[]>(() => this.#data()?.roles ?? []);
+  readonly roles = computed<RoleAdminResponse[]>(
+    () => this.#data()?.roles ?? []
+  );
 
   readonly isSuper = computed(() => this.roles().some((r) => r.isSuper));
 

@@ -34,7 +34,7 @@ import {
   MatTable
 } from '@angular/material/table';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
-import type { RoleResponse } from '@app/shared/types/role.types';
+import type { RoleAdminResponse } from '@app/shared/types/role.types';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AuthService } from '@features/auth/services/auth.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
@@ -152,7 +152,7 @@ export class RoleListComponent implements OnInit {
       });
   }
 
-  openEditDialog(role: RoleResponse): void {
+  openEditDialog(role: RoleAdminResponse): void {
     const data: RoleFormDialogData = { role };
     this.#dialog
       .open(RoleFormDialogComponent, {
@@ -191,7 +191,7 @@ export class RoleListComponent implements OnInit {
       });
   }
 
-  openPermissionsDialog(role: RoleResponse): void {
+  openPermissionsDialog(role: RoleAdminResponse): void {
     const data: RolePermissionsDialogData = {
       role,
       readonly: !this.canUpdate()
@@ -215,7 +215,7 @@ export class RoleListComponent implements OnInit {
       });
   }
 
-  confirmDelete(role: RoleResponse): void {
+  confirmDelete(role: RoleAdminResponse): void {
     this.#adaptiveDialog
       .openConfirm({
         title: this.#translocoService.translate(

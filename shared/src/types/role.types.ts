@@ -4,10 +4,13 @@ export type RoleResponse = {
   id: string;
   name: string;
   description: string | null;
-  isSystem: boolean;
-  isSuper: boolean;
   createdAt: string;
   updatedAt: string;
+};
+
+export type RoleAdminResponse = RoleResponse & {
+  isSystem: boolean;
+  isSuper: boolean;
 };
 
 export type PermissionResponse = {
@@ -23,7 +26,7 @@ export type RolePermissionResponse = {
   conditions: PermissionCondition | null;
 };
 
-export type RoleWithPermissionsResponse = RoleResponse & {
+export type RoleWithPermissionsResponse = RoleAdminResponse & {
   permissions: RolePermissionResponse[];
 };
 
@@ -52,7 +55,7 @@ export type UserPermissionsResponse = {
 };
 
 export type UserEffectivePermissionsResponse = {
-  roles: RoleResponse[];
+  roles: RoleAdminResponse[];
   permissions: ResolvedPermission[];
   rules: PackedRules;
 };

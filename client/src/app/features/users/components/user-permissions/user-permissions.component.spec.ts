@@ -12,11 +12,11 @@ import type {
   PermissionCondition,
   ResolvedPermission,
   ResourceResponse,
-  RoleResponse,
+  RoleAdminResponse,
   UserEffectivePermissionsResponse
 } from '@app/shared/types';
 
-const mockRole: RoleResponse = {
+const mockRole: RoleAdminResponse = {
   id: 'role-user',
   name: 'user',
   description: 'Regular user',
@@ -26,7 +26,7 @@ const mockRole: RoleResponse = {
   updatedAt: '2024-01-01T00:00:00.000Z'
 };
 
-const mockSuperRole: RoleResponse = {
+const mockSuperRole: RoleAdminResponse = {
   id: 'role-super',
   name: 'super',
   description: 'Super user',

@@ -8,7 +8,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn
 } from 'typeorm';
-import { Exclude } from 'class-transformer';
+import { Exclude, Expose } from 'class-transformer';
 import { Role } from '../../auth/entities/role.entity';
 
 @Entity('users')
@@ -41,9 +41,11 @@ export class User {
   roles: Role[];
 
   @Column({ name: 'failed_login_attempts', default: 0 })
+  @Exclude()
   failedLoginAttempts: number;
 
   @Column({ name: 'locked_until', type: 'timestamp', nullable: true })
+  @Expose({ groups: ['privileged'] })
   lockedUntil: Date | null;
 
   @Column({ name: 'is_email_verified', default: false })

@@ -24,8 +24,9 @@ import type { UserResponse, _AssertNever } from '@app/shared/types';
 
 /**
  * Fields excluded from the base UserResponse wire format.
- * Includes both @Exclude()-decorated fields and admin-only fields
- * (failedLoginAttempts, lockedUntil) that are exposed only via AdminUserResponseDto.
+ * - @Exclude()-decorated fields are never serialised (password, tokens, failedLoginAttempts).
+ * - lockedUntil is gated by @Expose({ groups: ['privileged'] }) and surfaces only via
+ *   AdminUserResponseDto on endpoints with @SerializeOptions({ groups: ['privileged'] }).
  */
 type _ExcludedFields =
   | 'password'

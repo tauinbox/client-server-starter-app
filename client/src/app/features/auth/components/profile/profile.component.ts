@@ -23,7 +23,7 @@ import { DOCUMENT, DatePipe } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 import { SessionStorageService } from '@core/services/session-storage.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import type { User } from '@shared/models/user.types';
+import type { UserResponse } from '@app/shared/types';
 import type { UpdateProfile } from '../../models/auth.types';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -99,7 +99,7 @@ export class ProfileComponent implements OnInit {
   readonly hasSuper = computed(() =>
     this.#authStore.hasPermissions({ action: 'manage', subject: 'all' })
   );
-  protected readonly user = signal<User | null>(null);
+  protected readonly user = signal<UserResponse | null>(null);
   readonly initials = computed(() => {
     const u = this.user();
     if (!u) return '';

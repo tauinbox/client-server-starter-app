@@ -7,7 +7,6 @@ import { UsersService } from '../../users/services/users.service';
 import { RegisterDto } from '../dtos/register.dto';
 import { User } from '../../users/entities/user.entity';
 import { RefreshToken } from '../entities/refresh-token.entity';
-import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { LocalAuthRequest } from '../types/auth.request';
 import { RefreshTokenService } from './refresh-token.service';
 import { RoleService } from './role.service';
@@ -49,10 +48,7 @@ export class AuthService {
   private static readonly DUMMY_HASH =
     '$2b$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012';
 
-  async validateUser(
-    email: string,
-    password: string
-  ): Promise<UserResponseDto> {
+  async validateUser(email: string, password: string): Promise<User> {
     const user = await this.usersService.findByEmail(email);
 
     // Check account lockout
@@ -85,6 +81,7 @@ export class AuthService {
     const isMatch = await bcrypt.compare(password, hashToCompare);
 
     if (!user || !user.isActive || !user.password || !isMatch) {
+      let attemptsAfterIncrement: number | null = null;
       // Handle failed login attempt atomically to prevent race conditions
       if (user && user.isActive && user.password) {
         const { failedLoginAttempts, lockedUntil } =
@@ -93,6 +90,7 @@ export class AuthService {
             MAX_FAILED_ATTEMPTS,
             LOCKOUT_DURATION_MS
           );
+        attemptsAfterIncrement = failedLoginAttempts;
 
         if (failedLoginAttempts >= MAX_FAILED_ATTEMPTS && lockedUntil) {
           const retryAfter = Math.ceil(
@@ -103,7 +101,10 @@ export class AuthService {
             actorEmail: email,
             targetId: user.id,
             targetType: 'User',
-            details: { reason: 'account_locked_after_max_attempts' }
+            details: {
+              reason: 'account_locked_after_max_attempts',
+              failedLoginAttempts
+            }
           });
           throw new HttpException(
             {
@@ -120,7 +121,12 @@ export class AuthService {
       this.auditService.logFireAndForget({
         action: AuditAction.USER_LOGIN_FAILURE,
         actorEmail: email,
-        details: { reason: 'invalid_credentials' }
+        details: {
+          reason: 'invalid_credentials',
+          ...(attemptsAfterIncrement !== null
+            ? { failedLoginAttempts: attemptsAfterIncrement }
+            : {})
+        }
       });
       this.metricsService.recordAuthEvent('login_failure');
       throw new HttpException(
@@ -149,12 +155,11 @@ export class AuthService {
       await this.usersService.resetLoginAttempts(user.id);
     }
 
-    const { password: _pw, ...rest } = user;
-    const result: UserResponseDto = {
-      ...rest,
-      roles: user.roles ?? []
-    };
-    return result;
+    // Return the User entity itself so ClassSerializerInterceptor can apply
+    // @Exclude() / @Expose({ groups: [...] }) decorators downstream. Manually
+    // building a plain object would bypass those decorators and leak fields
+    // such as failedLoginAttempts / lockedUntil into the login response.
+    return user;
   }
 
   async login(user: LocalAuthRequest['user']) {

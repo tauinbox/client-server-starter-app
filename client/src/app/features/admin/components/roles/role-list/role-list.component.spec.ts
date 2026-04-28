@@ -6,7 +6,7 @@ import { of } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
-import type { RoleResponse } from '@app/shared/types/role.types';
+import type { RoleAdminResponse } from '@app/shared/types/role.types';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { RolesStore } from '../../../store/roles.store';
 import { RoleListComponent } from './role-list.component';
@@ -14,7 +14,7 @@ import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-const mockRole: RoleResponse = {
+const mockRole: RoleAdminResponse = {
   id: 'role-1',
   name: 'Editor',
   description: null,
@@ -29,7 +29,7 @@ const mockRole: RoleResponse = {
 describe('RoleListComponent — openPermissionsDialog', () => {
   let authStoreMock: { hasPermissions: ReturnType<typeof vi.fn> };
   let rolesStoreMock: {
-    entities: ReturnType<typeof signal<RoleResponse[]>>;
+    entities: ReturnType<typeof signal<RoleAdminResponse[]>>;
     loading: ReturnType<typeof signal<boolean>>;
     load: ReturnType<typeof vi.fn>;
     createRole: ReturnType<typeof vi.fn>;

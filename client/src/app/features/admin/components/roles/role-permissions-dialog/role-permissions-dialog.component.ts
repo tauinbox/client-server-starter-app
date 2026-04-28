@@ -30,14 +30,14 @@ import type {
   PermissionCondition,
   PermissionEffect,
   PermissionResponse,
-  RoleResponse
+  RoleAdminResponse
 } from '@app/shared/types/role.types';
 import type { RolePermissionItem } from '../../../services/role.service';
 import { RoleService } from '../../../services/role.service';
 import { ConditionBuilderComponent } from './condition-builder/condition-builder.component';
 
 export type RolePermissionsDialogData = {
-  role: RoleResponse;
+  role: RoleAdminResponse;
   readonly?: boolean;
 };
 

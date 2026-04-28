@@ -8,10 +8,10 @@ import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/trans
 import { UserCardListComponent } from './user-card-list.component';
 import { AuthStore } from '../../../auth/store/auth.store';
 import type { User } from '../../models/user.types';
-import type { RoleResponse } from '@app/shared/types';
+import type { RoleAdminResponse } from '@app/shared/types';
 import { SYSTEM_ROLES } from '@app/shared/constants';
 
-const userRole: RoleResponse = {
+const userRole: RoleAdminResponse = {
   id: 'role-user',
   name: SYSTEM_ROLES.USER,
   description: 'Regular user',
@@ -21,7 +21,7 @@ const userRole: RoleResponse = {
   updatedAt: '2024-01-01T00:00:00.000Z'
 };
 
-const adminRole: RoleResponse = {
+const adminRole: RoleAdminResponse = {
   id: 'role-admin',
   name: SYSTEM_ROLES.ADMIN,
   description: 'Administrator',

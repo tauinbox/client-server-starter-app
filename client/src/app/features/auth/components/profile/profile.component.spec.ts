@@ -12,20 +12,17 @@ import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/trans
 
 import { ProfileComponent } from './profile.component';
 import { AuthService } from '../../services/auth.service';
-import type { User } from '@shared/models/user.types';
-import type { RoleResponse } from '@app/shared/types';
+import type { RoleResponse, UserResponse } from '@app/shared/types';
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
   name: 'user',
   description: 'Regular user',
-  isSystem: true,
-  isSuper: false,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z'
 };
 
-const mockUser: User = {
+const mockUser: UserResponse = {
   id: '1',
   email: 'test@example.com',
   firstName: 'Test',
@@ -33,7 +30,6 @@ const mockUser: User = {
   isActive: true,
   roles: [mockUserRole],
   isEmailVerified: true,
-  lockedUntil: null,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
   deletedAt: null
