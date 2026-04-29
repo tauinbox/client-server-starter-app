@@ -468,10 +468,15 @@ router.post('/reset-password', (req, res) => {
   // Clear the reset token
   state.passwordResetTokens.delete(token);
 
-  // Invalidate all refresh tokens for this user
+  // Invalidate all refresh tokens for this user (active + revoked)
   for (const [rt, uid] of state.refreshTokens.entries()) {
     if (uid === user.id) {
       state.refreshTokens.delete(rt);
+    }
+  }
+  for (const [rt, uid] of state.revokedRefreshTokens.entries()) {
+    if (uid === user.id) {
+      state.revokedRefreshTokens.delete(rt);
     }
   }
 
@@ -485,6 +490,18 @@ router.post('/reset-password', (req, res) => {
 
   res.json({ message: 'Password has been reset successfully' });
 });
+
+function revokeAllUserSessions(userId: string): void {
+  const state = getState();
+  for (const [rt, uid] of state.refreshTokens.entries()) {
+    if (uid === userId) state.refreshTokens.delete(rt);
+  }
+  for (const [rt, uid] of state.revokedRefreshTokens.entries()) {
+    if (uid === userId) state.revokedRefreshTokens.delete(rt);
+  }
+  const user = findUserById(userId);
+  if (user) user.tokenRevokedAt = new Date().toISOString();
+}
 
 // POST /api/v1/auth/refresh-token
 router.post('/refresh-token', (req, res) => {
@@ -502,6 +519,28 @@ router.post('/refresh-token', (req, res) => {
   }
 
   const state = getState();
+
+  // OAuth 2.0 BCP — refresh-token reuse detection. If a token was rotated
+  // (moved to revokedRefreshTokens) and is presented again, treat as a
+  // possible compromise: revoke ALL sessions for the user.
+  const reusedUserId = state.revokedRefreshTokens.get(cookieToken);
+  if (reusedUserId) {
+    logAudit('TOKEN_REUSE_DETECTED', {
+      actorId: reusedUserId,
+      targetId: reusedUserId,
+      targetType: 'User',
+      ip: req.ip
+    });
+    revokeAllUserSessions(reusedUserId);
+    res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
+    res.status(401).json({
+      message: 'Invalid refresh token',
+      statusCode: 401,
+      errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+    });
+    return;
+  }
+
   const userId = state.refreshTokens.get(cookieToken);
   if (!userId) {
     logAudit('TOKEN_REFRESH_FAILURE', {
@@ -534,8 +573,10 @@ router.post('/refresh-token', (req, res) => {
     return;
   }
 
-  // Remove old refresh token
+  // Rotate: move old token to revoked map (kept for reuse detection)
+  // and issue a fresh pair.
   state.refreshTokens.delete(cookieToken);
+  state.revokedRefreshTokens.set(cookieToken, user.id);
 
   // Generate new tokens
   const tokens = generateTokens(user);
@@ -550,11 +591,16 @@ router.post('/refresh-token', (req, res) => {
 router.post('/logout', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
 
-  // Remove all refresh tokens for this user and revoke access tokens
+  // Remove all refresh tokens for this user (active + revoked) and revoke access tokens
   const state = getState();
   for (const [token, userId] of state.refreshTokens.entries()) {
     if (userId === user.id) {
       state.refreshTokens.delete(token);
+    }
+  }
+  for (const [token, userId] of state.revokedRefreshTokens.entries()) {
+    if (userId === user.id) {
+      state.revokedRefreshTokens.delete(token);
     }
   }
   user.tokenRevokedAt = new Date().toISOString();
@@ -650,6 +696,11 @@ router.patch('/profile', authGuard, (req, res) => {
     for (const [rt, uid] of state.refreshTokens.entries()) {
       if (uid === user.id) {
         state.refreshTokens.delete(rt);
+      }
+    }
+    for (const [rt, uid] of state.revokedRefreshTokens.entries()) {
+      if (uid === user.id) {
+        state.revokedRefreshTokens.delete(rt);
       }
     }
     res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });

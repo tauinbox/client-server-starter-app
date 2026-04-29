@@ -7,6 +7,7 @@ export type AuthEvent =
   | 'login_failure'
   | 'token_refresh_success'
   | 'token_refresh_failure'
+  | 'token_reuse_detected'
   | 'logout'
   | 'register';
 

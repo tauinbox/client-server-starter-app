@@ -797,6 +797,99 @@ describe('AuthService', () => {
       );
     });
 
+    describe('reuse detection (BKL-009)', () => {
+      it('should revoke ALL user sessions, audit and meter on revoked-but-not-expired token', async () => {
+        // OAuth 2.0 BCP: a revoked token presented before its natural expiry
+        // signals possible compromise — kill the whole session for the user.
+        const revokedToken = {
+          ...mockTokenDoc,
+          revoked: true,
+          isExpired: () => false
+        };
+        mockRefreshTokenService.findByToken.mockResolvedValue(revokedToken);
+
+        await expect(service.refreshTokens('reused-token')).rejects.toThrow(
+          HttpException
+        );
+
+        expect(mockRefreshTokenService.deleteByUserId).toHaveBeenCalledWith(
+          'user-1'
+        );
+        expect(mockUserRepository.update).toHaveBeenCalledWith(
+          'user-1',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          expect.objectContaining({ tokenRevokedAt: expect.any(Date) })
+        );
+        expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: AuditAction.TOKEN_REUSE_DETECTED,
+            actorId: 'user-1',
+            targetId: 'user-1',
+            targetType: 'User',
+            details: { tokenId: 'token-1' }
+          })
+        );
+        expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
+          'token_reuse_detected'
+        );
+      });
+
+      it('should fall through to plain failure for revoked AND expired tokens', async () => {
+        // Expired-and-revoked is the natural cleanup path; do not panic-revoke
+        // the user's other sessions in that case.
+        const revokedExpired = {
+          ...mockTokenDoc,
+          revoked: true,
+          isExpired: () => true
+        };
+        mockRefreshTokenService.findByToken.mockResolvedValue(revokedExpired);
+
+        await expect(service.refreshTokens('stale-token')).rejects.toThrow(
+          HttpException
+        );
+
+        expect(mockRefreshTokenService.deleteByUserId).not.toHaveBeenCalled();
+        expect(mockUserRepository.update).not.toHaveBeenCalled();
+        expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
+          expect.objectContaining({ action: AuditAction.TOKEN_REUSE_DETECTED })
+        );
+        expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
+          'token_refresh_failure'
+        );
+      });
+
+      it('should kill all sessions when the SAME original token is presented twice', async () => {
+        // First refresh — happy path, rotates the token.
+        mockRefreshTokenService.findByToken.mockResolvedValueOnce(mockTokenDoc);
+        mockUsersService.findOne.mockResolvedValue(mockUser);
+
+        const first = await service.refreshTokens('original-token');
+        expect(first.tokens.access_token).toBe('mock-access-token');
+
+        // Second refresh with the SAME original token — service now sees it as
+        // revoked-but-not-yet-expired, triggering reuse detection.
+        const revokedNow = {
+          ...mockTokenDoc,
+          revoked: true,
+          isExpired: () => false
+        };
+        mockRefreshTokenService.findByToken.mockResolvedValueOnce(revokedNow);
+
+        await expect(service.refreshTokens('original-token')).rejects.toThrow(
+          HttpException
+        );
+
+        expect(mockRefreshTokenService.deleteByUserId).toHaveBeenCalledWith(
+          'user-1'
+        );
+        expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: AuditAction.TOKEN_REUSE_DETECTED
+          })
+        );
+      });
+    });
+
     it('should throw HttpException when token is expired', async () => {
       const expiredToken = { ...mockTokenDoc, isExpired: () => true };
       mockRefreshTokenService.findByToken.mockResolvedValue(expiredToken);

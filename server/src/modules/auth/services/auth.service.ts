@@ -434,6 +434,30 @@ export class AuthService {
   async refreshTokens(refreshToken: string) {
     const tokenDoc = await this.refreshTokenService.findByToken(refreshToken);
 
+    // OAuth 2.0 Security BCP — refresh-token reuse detection.
+    // A token already revoked but not yet expired means the legitimate chain
+    // has rotated past it; presenting it indicates a possible compromise.
+    // Revoke ALL sessions for the user as a safety measure (RFC 6819,
+    // draft-ietf-oauth-security-topics §4.13).
+    if (tokenDoc && tokenDoc.revoked && !tokenDoc.isExpired()) {
+      await this.revokeAllUserSessions(tokenDoc.userId);
+      this.auditService.logFireAndForget({
+        action: AuditAction.TOKEN_REUSE_DETECTED,
+        actorId: tokenDoc.userId,
+        targetId: tokenDoc.userId,
+        targetType: 'User',
+        details: { tokenId: tokenDoc.id }
+      });
+      this.metricsService.recordAuthEvent('token_reuse_detected');
+      throw new HttpException(
+        {
+          message: 'Invalid refresh token',
+          errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+        },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+
     if (!tokenDoc || tokenDoc.revoked || tokenDoc.isExpired()) {
       this.auditService.logFireAndForget({
         action: AuditAction.TOKEN_REFRESH_FAILURE,

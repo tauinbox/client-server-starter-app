@@ -96,6 +96,11 @@ export interface State {
   users: Map<string, MockUser>;
   oauthAccounts: Map<string, OAuthAccount[]>;
   refreshTokens: Map<string, string>;
+  // Revoked refresh tokens — kept around to detect token reuse (OAuth 2.0 BCP).
+  // If a token was rotated (moved to this map) and is presented again before
+  // it would naturally expire, treat as a possible compromise: revoke all
+  // sessions for the user.
+  revokedRefreshTokens: Map<string, string>; // token -> userId
   emailVerificationTokens: Map<string, string>; // token -> userId
   passwordResetTokens: Map<string, string>; // token -> userId
   resources: Map<string, MockResource>;
