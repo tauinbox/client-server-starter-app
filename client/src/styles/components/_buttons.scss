@@ -1,0 +1,55 @@
+// ── Destructive button utility ─────────────────────────────────────────────
+// Re-themes any Angular Material button variant (filled, text, outlined,
+// tonal, elevated, icon) to the system error palette. Apply on the host
+// element together with the regular matButton/matIconButton selector.
+// Why a CSS-custom-property override (no `!important`): M3 buttons resolve
+// their colours from CSS variables emitted by `mat.theme(...)`. Setting the
+// same variables on a more-specific scope (the button host) wins by the
+// cascade — global theme variables stay untouched, and dark/light themes
+// Just Work.
+// Usage:
+//   <button matButton="filled" class="app-btn-danger">Delete</button>
+//   <button matButton="text" class="app-btn-danger">Cancel</button>
+//   <button matIconButton class="app-btn-danger"><mat-icon>delete</mat-icon></button>
+// Tokens reference: node_modules/@angular/material/button/_m3-button.scss
+// and _m3-icon-button.scss.
+
+.app-btn-danger {
+  // Filled (matButton="filled" / mat-flat-button)
+  --mat-button-filled-container-color: var(--mat-sys-error);
+  --mat-button-filled-label-text-color: var(--mat-sys-on-error);
+  --mat-button-filled-state-layer-color: var(--mat-sys-on-error);
+  --mat-button-filled-ripple-color: color-mix(
+    in srgb,
+    var(--mat-sys-on-error) calc(var(--mat-sys-pressed-state-layer-opacity) * 100%),
+    transparent
+  );
+
+  // Text (matButton="text" / mat-button)
+  --mat-button-text-label-text-color: var(--mat-sys-error);
+  --mat-button-text-state-layer-color: var(--mat-sys-error);
+  --mat-button-text-ripple-color: color-mix(
+    in srgb,
+    var(--mat-sys-error) calc(var(--mat-sys-pressed-state-layer-opacity) * 100%),
+    transparent
+  );
+
+  // Outlined (matButton="outlined" / mat-stroked-button)
+  --mat-button-outlined-label-text-color: var(--mat-sys-error);
+  --mat-button-outlined-outline-color: var(--mat-sys-error);
+  --mat-button-outlined-state-layer-color: var(--mat-sys-error);
+  --mat-button-outlined-ripple-color: color-mix(
+    in srgb,
+    var(--mat-sys-error) calc(var(--mat-sys-pressed-state-layer-opacity) * 100%),
+    transparent
+  );
+
+  // Icon (matIconButton / mat-icon-button)
+  --mat-icon-button-icon-color: var(--mat-sys-error);
+  --mat-icon-button-state-layer-color: var(--mat-sys-error);
+  --mat-icon-button-ripple-color: color-mix(
+    in srgb,
+    var(--mat-sys-error) calc(var(--mat-sys-pressed-state-layer-opacity) * 100%),
+    transparent
+  );
+}

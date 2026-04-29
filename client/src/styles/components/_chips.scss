@@ -1,0 +1,26 @@
+// ── Destructive chip utility ───────────────────────────────────────────────
+// Re-themes a <mat-chip> / <mat-chip-row> to the error-container tone of the
+// system palette. Use for chips that flag a denied or removed permission.
+// M3 chips resolve container/label colours from CSS variables emitted by
+// `mat.theme(...)`. Setting the same variables on a more-specific scope (the
+// chip host) wins by the cascade — no `!important`, dark/light themes
+// automatic via the system error tokens.
+// Usage:
+//   <mat-chip class="app-chip-danger">Denied</mat-chip>
+//   <mat-chip class="app-chip-danger" highlighted>Selected denial</mat-chip>
+// Tokens reference: node_modules/@angular/material/chips/_m3-chip.scss
+
+.app-chip-danger {
+  --mat-chip-elevated-container-color: var(--mat-sys-error-container);
+  --mat-chip-elevated-selected-container-color: var(--mat-sys-error-container);
+  --mat-chip-label-text-color: var(--mat-sys-on-error-container);
+  --mat-chip-selected-label-text-color: var(--mat-sys-on-error-container);
+  --mat-chip-with-icon-icon-color: var(--mat-sys-on-error-container);
+  --mat-chip-with-icon-selected-icon-color: var(--mat-sys-on-error-container);
+  --mat-chip-selected-trailing-icon-color: var(--mat-sys-on-error-container);
+  --mat-chip-trailing-action-state-layer-color: var(--mat-sys-on-error-container);
+  --mat-chip-hover-state-layer-color: var(--mat-sys-on-error-container);
+  --mat-chip-focus-state-layer-color: var(--mat-sys-on-error-container);
+  --mat-chip-selected-hover-state-layer-color: var(--mat-sys-on-error-container);
+  --mat-chip-selected-focus-state-layer-color: var(--mat-sys-on-error-container);
+}
