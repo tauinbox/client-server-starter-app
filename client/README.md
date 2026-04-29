@@ -17,8 +17,9 @@ The dev proxy (`proxy.conf.mjs`) forwards `/api` and `/ws` requests to `BACKEND_
 |------|---------|
 | Dev server | `npm start` |
 | Build | `npm run build` |
-| Lint (TS + SCSS) | `npm run lint` |
+| Lint (TS + SCSS + checks) | `npm run lint` |
 | Lint SCSS only | `npm run lint:styles` |
+| Check M3 color attribute | `npm run check:mat-color-attr` |
 | Unit tests | `npm test` (Vitest) |
 | E2E tests | `npm run test:e2e` (Playwright) |
 | E2E tests (UI) | `npm run test:e2e:ui` |
@@ -136,11 +137,13 @@ src/styles/
 ├── base/             # Reset, typography, animations
 ├── themes/           # Light and dark Material themes + CSS vars
 ├── layout/           # Containers, grids
-├── components/       # Cards, forms, loading, tables, dialogs (_dialogs.scss — global dialog overrides)
+├── components/       # Cards, forms, loading, tables, dialogs (_dialogs.scss — global dialog overrides), buttons (_buttons.scss — .app-btn-danger destructive utility), chips (_chips.scss — .app-chip-danger destructive utility)
 └── utilities/        # Flex, spacing, text, visibility helpers
 ```
 
 All size values use `func.rem(N)` (pixels → rem conversion) — never hardcoded `px`/`rem` literals. Global dialog styles live in `_dialogs.scss` (title padding, `::before` reset, bug #26352 fix). Dialog sizes are managed via `DialogSize` enum + `dialogSizeConfig()` in `shared/utils/dialog.utils.ts`.
+
+**M3 colour API** — the project uses an M3 theme (`@include mat.theme(...)`); the M2 `color="primary|accent|warn"` attribute is a silent no-op and is banned by `check:mat-color-attr` (allow-list at `client/scripts/check-mat-color-attr.mjs` shrinks per migration PR). For destructive actions, apply `class="app-btn-danger"` on any matButton/matIconButton or `class="app-chip-danger"` on a `<mat-chip>` instead — both are token-driven (`var(--mat-sys-error)` / `var(--mat-sys-error-container)`) and respect dark/light themes automatically.
 
 **Accessibility (WCAG 2.1 AA):** skip link in `index.html` targets `id="main-content"` on `<main>`; sidenav nav links have `aria-label` + `aria-current`; sidenav toggle has `aria-label` + `aria-expanded`; decorative `mat-icon` elements carry `aria-hidden="true"`; toolbar control `aria-label`s are bound to transloco strings.
 
