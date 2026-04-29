@@ -508,6 +508,11 @@ router.patch('/:id', adminGuard, (req, res) => {
         sessionState.refreshTokens.delete(token);
       }
     }
+    for (const [token, uid] of sessionState.revokedRefreshTokens.entries()) {
+      if (uid === user.id) {
+        sessionState.revokedRefreshTokens.delete(token);
+      }
+    }
   }
   if (isActive !== undefined) {
     if (isActive === false && user.isActive !== false) {
@@ -568,10 +573,15 @@ router.delete('/:id', adminGuard, (req, res) => {
   targetUser.deletedAt = new Date().toISOString();
   targetUser.updatedAt = new Date().toISOString();
 
-  // Revoke all refresh tokens for this user
+  // Revoke all refresh tokens for this user (active + revoked)
   for (const [token, userId] of state.refreshTokens.entries()) {
     if (userId === id) {
       state.refreshTokens.delete(token);
+    }
+  }
+  for (const [token, userId] of state.revokedRefreshTokens.entries()) {
+    if (userId === id) {
+      state.revokedRefreshTokens.delete(token);
     }
   }
 

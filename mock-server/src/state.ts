@@ -48,6 +48,7 @@ export function resetState(): void {
       ])
     ),
     refreshTokens: new Map(),
+    revokedRefreshTokens: new Map(),
     emailVerificationTokens: new Map(),
     passwordResetTokens: new Map(),
     resources: new Map(seedResources.map((r) => [r.id, { ...r }])),

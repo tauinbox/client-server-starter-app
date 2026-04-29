@@ -27,6 +27,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
     users: Array.from(state.users.values()).map(toUserResponse),
     oauthAccounts: Object.fromEntries(state.oauthAccounts),
     refreshTokens: state.refreshTokens.size,
+    revokedRefreshTokens: state.revokedRefreshTokens.size,
     emailVerificationTokens: state.emailVerificationTokens.size,
     passwordResetTokens: state.passwordResetTokens.size,
     resources: Array.from(state.resources.values()),
