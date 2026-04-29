@@ -160,6 +160,8 @@ The value is a **JSON string** (stringified MongoDB query). It is parsed and mer
 
 Security: prototype pollution keys (`__proto__`, `constructor`, `prototype`) are silently skipped during parsing.
 
+> **Server-side SQL translation (`apply-ability.util.ts`)** — when CASL conditions are translated into SQL `WHERE` fragments for the `GET /users` listing, the translator supports a strict subset: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$and`, `$or`, `$nor`, `$not`, against the user fields `id`, `email`, `firstName`, `lastName`, `isActive`. Any rule that uses other operators (e.g. `$regex`, `$exists`, `$all`) or other fields is **dropped entirely** (fail-closed) and a warning is logged. Run `npm run check:role-conditions` (in `server/`) against a staging dump to surface any existing rows that will be affected.
+
 #### Combining Multiple Condition Types
 
 Multiple types on the same permission are merged into one query (AND):

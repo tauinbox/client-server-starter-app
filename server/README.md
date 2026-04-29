@@ -43,6 +43,7 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Run seeders | `npm run seed:run` (build first) |
 | Validate i18n keys | `npm run check:i18n` — verifies all `ErrorKeys` values exist in every client i18n JSON |
 | Generate CASL subjects | `npm run generate:subjects` — scans `@RegisterResource` decorators and writes `shared/src/generated/casl-subjects.ts`; run when adding a new resource |
+| Audit role-permission conditions | `npm run check:role-conditions` — flags any `role_permissions.conditions.custom` rows that contain operators or fields the SQL translator (`apply-ability.util.ts`) cannot handle. Run against staging dumps before deploying changes to the translator. |
 
 ## Environment Configuration
 
