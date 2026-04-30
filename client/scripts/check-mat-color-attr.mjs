@@ -30,15 +30,7 @@ const srcDir = resolve(__dirname, '..', 'src');
 // Files frozen with legacy `color="..."` usage. Use forward-slash POSIX paths
 // relative to client/src. Migration PRs MUST remove the entry as the file is
 // updated; the script fails on stale entries.
-const ALLOW_LIST = new Set([
-  'app/features/admin/components/resources/action-form-dialog/action-form-dialog.component.html',
-  'app/features/admin/components/resources/action-list/action-list.component.html',
-  'app/features/admin/components/resources/resource-form-dialog/resource-form-dialog.component.html',
-  'app/features/admin/components/resources/resource-list/resource-list.component.html',
-  'app/features/admin/components/roles/role-form-dialog/role-form-dialog.component.html',
-  'app/features/admin/components/roles/role-list/role-list.component.html',
-  'app/features/admin/components/roles/role-permissions-dialog/role-permissions-dialog.component.html',
-]);
+const ALLOW_LIST = new Set();
 
 const PATTERN = /\bcolor="(?:primary|accent|warn)"/;
 

@@ -128,7 +128,7 @@ describe('ResourceFormDialogComponent', () => {
   it('disables Save button when form is pristine', () => {
     createComponent();
     const saveBtn = fixture.nativeElement.querySelector(
-      'button[color="primary"]'
+      'button[matButton="filled"]'
     );
     expect(saveBtn?.disabled).toBe(true);
   });
@@ -142,7 +142,7 @@ describe('ResourceFormDialogComponent', () => {
     TestBed.tick();
     fixture.detectChanges();
     const saveBtn = fixture.nativeElement.querySelector(
-      'button[color="primary"]'
+      'button[matButton="filled"]'
     );
     expect(saveBtn?.disabled).toBe(false);
   });
@@ -156,7 +156,7 @@ describe('ResourceFormDialogComponent', () => {
     TestBed.tick();
     fixture.detectChanges();
     const saveBtn = fixture.nativeElement.querySelector(
-      'button[color="primary"]'
+      'button[matButton="filled"]'
     );
     expect(saveBtn?.disabled).toBe(true);
   });
@@ -170,7 +170,7 @@ describe('ResourceFormDialogComponent', () => {
     TestBed.tick();
     fixture.detectChanges();
     const saveBtn = fixture.nativeElement.querySelector(
-      'button[color="primary"]'
+      'button[matButton="filled"]'
     );
     expect(saveBtn?.disabled).toBe(true);
   });

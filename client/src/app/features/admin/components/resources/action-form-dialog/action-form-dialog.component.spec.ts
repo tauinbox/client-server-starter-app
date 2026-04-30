@@ -169,7 +169,7 @@ describe('ActionFormDialogComponent', () => {
   it('disables Save button when form is pristine in create mode', () => {
     createComponent({});
     const saveBtn = fixture.nativeElement.querySelector(
-      'button[color="primary"]'
+      'button[matButton="filled"]'
     );
     expect(saveBtn?.disabled).toBe(true);
   });
@@ -184,7 +184,7 @@ describe('ActionFormDialogComponent', () => {
     TestBed.tick();
     fixture.detectChanges();
     const saveBtn = fixture.nativeElement.querySelector(
-      'button[color="primary"]'
+      'button[matButton="filled"]'
     );
     expect(saveBtn?.disabled).toBe(true);
   });
@@ -199,7 +199,7 @@ describe('ActionFormDialogComponent', () => {
     TestBed.tick();
     fixture.detectChanges();
     const saveBtn = fixture.nativeElement.querySelector(
-      'button[color="primary"]'
+      'button[matButton="filled"]'
     );
     expect(saveBtn?.disabled).toBe(true);
   });

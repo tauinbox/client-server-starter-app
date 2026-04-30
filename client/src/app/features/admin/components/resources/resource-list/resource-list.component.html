@@ -59,7 +59,7 @@
             <td mat-cell *matCellDef="let resource">
               @if (resource.isOrphaned) {
                 <mat-chip
-                  color="warn"
+                  class="app-chip-danger"
                   highlighted
                   [matTooltip]="
                     resource.isRegistered
@@ -70,7 +70,7 @@
                   {{ t('admin.resources.statusOrphaned') }}
                 </mat-chip>
               } @else if (resource.isSystem) {
-                <mat-chip color="primary" highlighted>{{
+                <mat-chip highlighted>{{
                   t('admin.roles.typeSystem')
                 }}</mat-chip>
               }
@@ -86,8 +86,7 @@
               @if (canUpdate()) {
                 @if (resource.isOrphaned && resource.isRegistered) {
                   <button
-                    mat-icon-button
-                    color="warn"
+                    matIconButton
                     (click)="restoreResource(resource)"
                     [matTooltip]="t('admin.resources.restoreTooltip')"
                     [attr.aria-label]="
@@ -100,8 +99,7 @@
                   </button>
                 } @else if (!resource.isOrphaned) {
                   <button
-                    mat-icon-button
-                    color="accent"
+                    matIconButton
                     (click)="openEditResource(resource)"
                     [matTooltip]="t('admin.resources.editResource')"
                     [attr.aria-label]="

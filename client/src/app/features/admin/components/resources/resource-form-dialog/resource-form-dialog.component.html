@@ -79,7 +79,7 @@
 
   <mat-dialog-actions align="end">
     <button
-      mat-button
+      matButton="text"
       type="button"
       [disabled]="isLoading()"
       (click)="cancel()"
@@ -87,8 +87,7 @@
       {{ t('common.cancel') }}
     </button>
     <button
-      mat-flat-button
-      color="primary"
+      matButton="filled"
       type="button"
       [disabled]="resourceForm().invalid() || !isDirty || isLoading()"
       (click)="submit()"
