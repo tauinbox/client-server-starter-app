@@ -785,4 +785,26 @@ describe('UserEditComponent', () => {
       );
     });
   });
+
+  // The delete button must carry the `app-btn-danger` utility class so the
+  // M3 destructive tone (mapped to `--mat-sys-error`) is applied. Without
+  // the class, the button silently renders in the default neutral text tone
+  // — exactly the BKL-018 silent regression. Computed-style verification
+  // against the resolved palette runs in the Playwright visual regression
+  // spec (jsdom does not load global stylesheets).
+  describe('destructive button class regression', () => {
+    it('renders the delete button with the app-btn-danger class', () => {
+      permittedSignal.set(true);
+      fixture.detectChanges();
+
+      const root = fixture.nativeElement as HTMLElement;
+      const buttons = Array.from(root.querySelectorAll<HTMLElement>('button'));
+      const deleteButton = buttons.find(
+        (b) => b.querySelector('mat-icon')?.textContent?.trim() === 'delete'
+      );
+
+      expect(deleteButton).toBeTruthy();
+      expect(deleteButton?.classList.contains('app-btn-danger')).toBe(true);
+    });
+  });
 });
