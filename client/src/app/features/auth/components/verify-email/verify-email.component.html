@@ -15,7 +15,7 @@
           <mat-icon>check_circle</mat-icon>
           <h3>{{ t('auth.verifyEmail.successTitle') }}</h3>
           <p>{{ t('auth.verifyEmail.successMessage') }}</p>
-          <button mat-flat-button color="primary" routerLink="/login">
+          <button matButton="filled" routerLink="/login">
             {{ t('auth.verifyEmail.goToLogin') }}
           </button>
         </div>
@@ -24,7 +24,7 @@
           <mat-icon>error_outline</mat-icon>
           <h3>{{ t('auth.verifyEmail.failedTitle') }}</h3>
           <p>{{ error() }}</p>
-          <button mat-flat-button color="primary" routerLink="/login">
+          <button matButton="filled" routerLink="/login">
             {{ t('auth.verifyEmail.goToLogin') }}
           </button>
         </div>
