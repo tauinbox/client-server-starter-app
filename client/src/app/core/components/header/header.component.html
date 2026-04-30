@@ -1,7 +1,7 @@
-<mat-toolbar color="primary" *transloco="let t">
+<mat-toolbar *transloco="let t">
   @if (authStore.isAuthenticated() && sidenavState.isMobile()) {
     <button
-      mat-icon-button
+      matIconButton
       (click)="sidenavState.toggleMobileOpen()"
       [attr.aria-label]="t('sidenav.openNavigation')"
     >
@@ -15,7 +15,7 @@
   <app-theme-toggle></app-theme-toggle>
 
   @if (authStore.isAuthenticated()) {
-    <button mat-button [matMenuTriggerFor]="menu">
+    <button matButton="text" [matMenuTriggerFor]="menu">
       {{ authStore.user()?.firstName }} {{ authStore.user()?.lastName }}
       <mat-icon aria-hidden="true">expand_more</mat-icon>
     </button>
@@ -27,14 +27,14 @@
     </mat-menu>
   } @else {
     <button
-      mat-button
+      matButton="text"
       [routerLink]="'/' + routes.Login"
       routerLinkActive="active"
     >
       {{ t('header.login') }}
     </button>
     <button
-      mat-button
+      matButton="text"
       [routerLink]="'/' + routes.Register"
       routerLinkActive="active"
     >
