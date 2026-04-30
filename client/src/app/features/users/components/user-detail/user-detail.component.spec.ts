@@ -139,8 +139,13 @@ describe('UserDetailComponent', () => {
   describe('edit button visibility', () => {
     const editButton = (fixture: ComponentFixture<UserDetailComponent>) => {
       const root = fixture.nativeElement as HTMLElement;
-      return root.querySelector<HTMLButtonElement>(
-        '.actions-container button[mat-flat-button]'
+      const buttons = Array.from(
+        root.querySelectorAll<HTMLButtonElement>('.actions-container button')
+      );
+      return (
+        buttons.find(
+          (b) => b.querySelector('mat-icon')?.textContent?.trim() === 'edit'
+        ) ?? null
       );
     };
 

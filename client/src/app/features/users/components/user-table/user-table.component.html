@@ -41,11 +41,9 @@
       </th>
       <td mat-cell *matCellDef="let user">
         @if (user.isActive) {
-          <mat-chip color="accent" highlighted>{{
-            t('common.active')
-          }}</mat-chip>
+          <mat-chip highlighted>{{ t('common.active') }}</mat-chip>
         } @else {
-          <mat-chip color="warn" highlighted>{{
+          <mat-chip highlighted class="app-chip-danger">{{
             t('common.inactive')
           }}</mat-chip>
         }
@@ -59,9 +57,7 @@
       </th>
       <td mat-cell *matCellDef="let user">
         @if (isAdmin(user)) {
-          <mat-chip color="primary" highlighted>{{
-            t('users.table.roleAdmin')
-          }}</mat-chip>
+          <mat-chip highlighted>{{ t('users.table.roleAdmin') }}</mat-chip>
         } @else {
           <mat-chip>{{ t('users.table.roleUser') }}</mat-chip>
         }
@@ -85,8 +81,7 @@
       </th>
       <td mat-cell *matCellDef="let user">
         <button
-          mat-icon-button
-          color="primary"
+          matIconButton
           [routerLink]="['/admin/users', user.id]"
           [matTooltip]="t('users.table.actionViewDetails')"
           [attr.aria-label]="
@@ -106,8 +101,7 @@
           }"
         >
           <button
-            mat-icon-button
-            color="accent"
+            matIconButton
             [routerLink]="['/admin/users', user.id, 'edit']"
             [matTooltip]="t('users.table.actionEdit')"
             [attr.aria-label]="
@@ -128,8 +122,8 @@
           }"
         >
           <button
-            mat-icon-button
-            color="warn"
+            matIconButton
+            class="app-btn-danger"
             (click)="deleteUser.emit(user)"
             [matTooltip]="t('users.table.actionDelete')"
             [attr.aria-label]="

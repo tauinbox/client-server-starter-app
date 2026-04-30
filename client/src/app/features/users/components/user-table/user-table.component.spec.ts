@@ -216,15 +216,20 @@ describe('UserTableComponent', () => {
   });
 
   describe('instance-level permission checks', () => {
+    const findEditButton = (root: HTMLElement): HTMLElement | null =>
+      Array.from(root.querySelectorAll<HTMLElement>('button')).find(
+        (b) => b.querySelector('mat-icon')?.textContent?.trim() === 'edit'
+      ) ?? null;
+
+    const findDeleteButton = (root: HTMLElement): HTMLElement | null =>
+      root.querySelector('button.app-btn-danger');
+
     it('should show edit button when hasPermissions returns true for the user instance', () => {
       authStoreMock.hasPermissions.mockReturnValue(true);
       componentRef.setInput('users', [mockUser]);
       fixture.detectChanges();
 
-      const editButton = fixture.nativeElement.querySelector(
-        'button[color="accent"]'
-      );
-      expect(editButton).toBeTruthy();
+      expect(findEditButton(fixture.nativeElement)).toBeTruthy();
     });
 
     it('should hide edit and delete buttons when hasPermissions returns false', () => {
@@ -232,14 +237,8 @@ describe('UserTableComponent', () => {
       componentRef.setInput('users', [mockUser]);
       fixture.detectChanges();
 
-      const editButton = fixture.nativeElement.querySelector(
-        'button[color="accent"]'
-      );
-      const deleteButton = fixture.nativeElement.querySelector(
-        'button[color="warn"]'
-      );
-      expect(editButton).toBeNull();
-      expect(deleteButton).toBeNull();
+      expect(findEditButton(fixture.nativeElement)).toBeNull();
+      expect(findDeleteButton(fixture.nativeElement)).toBeNull();
     });
 
     it('should show delete button when hasPermissions returns true for the user instance', () => {
@@ -247,10 +246,7 @@ describe('UserTableComponent', () => {
       componentRef.setInput('users', [mockUser]);
       fixture.detectChanges();
 
-      const deleteButton = fixture.nativeElement.querySelector(
-        'button[color="warn"]'
-      );
-      expect(deleteButton).toBeTruthy();
+      expect(findDeleteButton(fixture.nativeElement)).toBeTruthy();
     });
 
     it('should call hasPermissions with instance data for each row', () => {

@@ -12,7 +12,7 @@
           {{ user.email }}
         </mat-card-subtitle>
         <button
-          mat-icon-button
+          matIconButton
           class="user-card-menu-trigger"
           [matMenuTriggerFor]="actionsMenu"
           [matMenuTriggerData]="{ user: user }"
@@ -37,11 +37,9 @@
           <dt>{{ t('users.table.columnStatus') }}</dt>
           <dd>
             @if (user.isActive) {
-              <mat-chip color="accent" highlighted>{{
-                t('common.active')
-              }}</mat-chip>
+              <mat-chip highlighted>{{ t('common.active') }}</mat-chip>
             } @else {
-              <mat-chip color="warn" highlighted>{{
+              <mat-chip highlighted class="app-chip-danger">{{
                 t('common.inactive')
               }}</mat-chip>
             }
@@ -50,9 +48,7 @@
           <dt>{{ t('users.table.columnRole') }}</dt>
           <dd>
             @if (isAdmin(user)) {
-              <mat-chip color="primary" highlighted>{{
-                t('users.table.roleAdmin')
-              }}</mat-chip>
+              <mat-chip highlighted>{{ t('users.table.roleAdmin') }}</mat-chip>
             } @else {
               <mat-chip>{{ t('users.table.roleUser') }}</mat-chip>
             }

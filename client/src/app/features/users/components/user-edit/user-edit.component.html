@@ -5,8 +5,7 @@
       <mat-card-title>{{ t('users.edit.title') }}</mat-card-title>
       <div class="spacer"></div>
       <button
-        mat-icon-button
-        color="primary"
+        matIconButton
         [routerLink]="['/admin/users', id()]"
         [attr.aria-label]="t('users.edit.backAriaLabel')"
       >
@@ -103,9 +102,8 @@
               </mat-chip-set>
               @if (u.lockedUntil) {
                 <button
-                  mat-button
+                  matButton="text"
                   type="button"
-                  color="primary"
                   (click)="unlockAccount()"
                   [disabled]="saving()"
                 >
@@ -124,9 +122,9 @@
           <div class="form-actions">
             @if (canDelete()) {
               <button
-                mat-button
+                matButton="text"
+                class="app-btn-danger"
                 type="button"
-                color="warn"
                 (click)="confirmDelete()"
               >
                 <mat-icon>delete</mat-icon>
@@ -137,14 +135,14 @@
             <div class="spacer"></div>
 
             <button
-              mat-button
+              matButton="text"
               type="button"
               [routerLink]="['/admin/users', id()]"
             >
               {{ t('common.cancel') }}
             </button>
 
-            <button mat-flat-button color="primary" type="submit">
+            <button matButton="filled" type="submit">
               @if (saving()) {
                 <mat-spinner diameter="24"></mat-spinner>
                 <span class="ml-2">{{ t('users.edit.saving') }}</span>
@@ -159,7 +157,7 @@
           <mat-icon class="error-icon">error_outline</mat-icon>
           <h3>{{ t('users.edit.notFoundTitle') }}</h3>
           <p>{{ t('users.edit.notFoundMessage') }}</p>
-          <button mat-flat-button color="primary" routerLink="/admin/users">
+          <button matButton="filled" routerLink="/admin/users">
             {{ t('users.edit.backToUsers') }}
           </button>
         </div>
