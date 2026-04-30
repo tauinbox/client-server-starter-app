@@ -31,8 +31,6 @@ const srcDir = resolve(__dirname, '..', 'src');
 // relative to client/src. Migration PRs MUST remove the entry as the file is
 // updated; the script fails on stale entries.
 const ALLOW_LIST = new Set([
-  'app/core/components/header/header.component.html',
-  'app/core/components/page-not-found/page-not-found.component.html',
   'app/features/admin/components/resources/action-form-dialog/action-form-dialog.component.html',
   'app/features/admin/components/resources/action-list/action-list.component.html',
   'app/features/admin/components/resources/resource-form-dialog/resource-form-dialog.component.html',
