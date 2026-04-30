@@ -326,7 +326,7 @@ describe('RolePermissionsDialogComponent', () => {
       });
 
       const saveButton = fixture.nativeElement.querySelector(
-        'button[color="primary"]'
+        'button[matButton="filled"]'
       );
       expect(saveButton).toBeNull();
     });

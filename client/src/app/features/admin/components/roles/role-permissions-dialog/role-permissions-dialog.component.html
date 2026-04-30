@@ -2,7 +2,7 @@
   <h2 mat-dialog-title class="dialog-title">
     {{ t('admin.rolePermissions.title', { name: role.name }) }}
     @if (role.isSystem) {
-      <mat-chip class="system-chip" color="primary" highlighted>{{
+      <mat-chip class="system-chip" highlighted>{{
         t('admin.roles.typeSystem')
       }}</mat-chip>
     }
@@ -55,8 +55,7 @@
                     </mat-checkbox>
                     @if (isChecked(permission.id) && isDeny(permission.id)) {
                       <mat-chip
-                        class="deny-chip"
-                        color="warn"
+                        class="deny-chip app-chip-danger"
                         highlighted
                         [matTooltip]="
                           t('admin.rolePermissions.effectDenyBadgeHint')
@@ -108,7 +107,7 @@
             @for (permission of checkedPermissions(); track permission.id) {
               <div class="condition-row">
                 <button
-                  mat-button
+                  matButton="text"
                   class="condition-toggle"
                   [class.has-condition]="hasAnyCondition(permission.id)"
                   (click)="toggleExpand(permission.id)"
@@ -128,7 +127,7 @@
                     }}</span>
                   </span>
                   @if (isDeny(permission.id)) {
-                    <mat-chip class="inline-chip" color="warn" highlighted>
+                    <mat-chip class="inline-chip app-chip-danger" highlighted>
                       {{ t('admin.rolePermissions.effectDenyBadge') }}
                     </mat-chip>
                   }
@@ -137,7 +136,7 @@
                       type of activeConditionTypes(permission.id);
                       track type
                     ) {
-                      <mat-chip class="inline-chip" color="accent" highlighted>
+                      <mat-chip class="inline-chip" highlighted>
                         {{ type }}
                       </mat-chip>
                     }
@@ -153,7 +152,6 @@
                     <!-- ── Effect (allow / deny) ── -->
                     <div class="condition-block condition-effect">
                       <mat-slide-toggle
-                        color="warn"
                         [checked]="isDeny(permission.id)"
                         [disabled]="role.isSystem || isReadonly()"
                         (change)="
@@ -340,13 +338,12 @@
   </mat-dialog-content>
 
   <mat-dialog-actions align="end">
-    <button mat-button type="button" (click)="cancel()">
+    <button matButton="text" type="button" (click)="cancel()">
       {{ t('common.cancel') }}
     </button>
     @if (!role.isSystem && !isReadonly()) {
       <button
-        mat-flat-button
-        color="primary"
+        matButton="filled"
         type="button"
         [disabled]="!canSave()"
         (click)="save()"

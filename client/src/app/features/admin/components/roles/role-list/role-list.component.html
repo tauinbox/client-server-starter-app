@@ -3,7 +3,7 @@
     <mat-card-title>{{ t('admin.roles.title') }}</mat-card-title>
     <div class="spacer"></div>
     @if (canCreate()) {
-      <button mat-flat-button color="primary" (click)="openCreateDialog()">
+      <button matButton="filled" (click)="openCreateDialog()">
         <mat-icon>add</mat-icon>
         {{ t('admin.roles.newRole') }}
       </button>
@@ -45,7 +45,7 @@
             </th>
             <td mat-cell *matCellDef="let role">
               @if (role.isSystem) {
-                <mat-chip color="primary" highlighted>{{
+                <mat-chip highlighted>{{
                   t('admin.roles.typeSystem')
                 }}</mat-chip>
               } @else {
@@ -72,8 +72,7 @@
             <td mat-cell *matCellDef="let role">
               @if (!role.isSuper) {
                 <button
-                  mat-icon-button
-                  color="primary"
+                  matIconButton
                   (click)="openPermissionsDialog(role)"
                   [matTooltip]="t('admin.roles.managePermissions')"
                   [attr.aria-label]="
@@ -85,8 +84,7 @@
               }
               @if (canUpdate() && !role.isSystem) {
                 <button
-                  mat-icon-button
-                  color="accent"
+                  matIconButton
                   (click)="openEditDialog(role)"
                   [matTooltip]="t('admin.roles.editRole')"
                   [attr.aria-label]="
@@ -98,8 +96,8 @@
               }
               @if (canDelete() && !role.isSystem) {
                 <button
-                  mat-icon-button
-                  color="warn"
+                  matIconButton
+                  class="app-btn-danger"
                   (click)="confirmDelete(role)"
                   [matTooltip]="t('admin.roles.deleteRole')"
                   [attr.aria-label]="
