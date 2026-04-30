@@ -8,8 +8,7 @@
         *appRequirePermissions="{ action: 'search', subject: 'User' }"
       >
         <button
-          mat-icon-button
-          color="primary"
+          matIconButton
           routerLink="/admin/users"
           [attr.aria-label]="t('users.detail.backAriaLabel')"
         >
@@ -34,17 +33,15 @@
               <p class="email">{{ u.email }}</p>
               <div class="chips">
                 @if (u.isActive) {
-                  <mat-chip color="accent" highlighted>{{
-                    t('common.active')
-                  }}</mat-chip>
+                  <mat-chip highlighted>{{ t('common.active') }}</mat-chip>
                 } @else {
-                  <mat-chip color="warn" highlighted>{{
+                  <mat-chip highlighted class="app-chip-danger">{{
                     t('common.inactive')
                   }}</mat-chip>
                 }
 
                 @if (isAdmin()) {
-                  <mat-chip color="primary" highlighted>{{
+                  <mat-chip highlighted>{{
                     t('users.table.roleAdmin')
                   }}</mat-chip>
                 } @else {
@@ -52,17 +49,17 @@
                 }
 
                 @if (u.isEmailVerified) {
-                  <mat-chip color="accent" highlighted>{{
+                  <mat-chip highlighted>{{
                     t('users.detail.emailVerified')
                   }}</mat-chip>
                 } @else {
-                  <mat-chip color="warn" highlighted>{{
+                  <mat-chip highlighted class="app-chip-danger">{{
                     t('users.detail.emailNotVerified')
                   }}</mat-chip>
                 }
 
                 @if (u.lockedUntil) {
-                  <mat-chip color="warn" highlighted>{{
+                  <mat-chip highlighted class="app-chip-danger">{{
                     t('users.detail.accountLocked')
                   }}</mat-chip>
                 }
@@ -104,8 +101,7 @@
               { action: 'update', subject: 'User', instance: u };
               else editDenied
             "
-            mat-flat-button
-            color="primary"
+            matButton="filled"
             [routerLink]="['/admin/users', u.id, 'edit']"
           >
             <mat-icon>edit</mat-icon>
@@ -113,15 +109,14 @@
           </button>
           <ng-template #editDenied>
             <span [matTooltip]="t('users.detail.editNoPermission')">
-              <button mat-flat-button color="primary" disabled>
+              <button matButton="filled" disabled>
                 <mat-icon>edit</mat-icon>
                 {{ t('users.detail.editButton') }}
               </button>
             </span>
           </ng-template>
           <button
-            mat-stroked-button
-            color="primary"
+            matButton="outlined"
             [routerLink]="['/admin/users', u.id, 'permissions']"
           >
             <mat-icon>verified_user</mat-icon>
@@ -133,7 +128,7 @@
           <mat-icon class="error-icon">error_outline</mat-icon>
           <h3>{{ t('users.detail.notFoundTitle') }}</h3>
           <p>{{ t('users.detail.notFoundMessage') }}</p>
-          <button mat-flat-button color="primary" routerLink="/admin/users">
+          <button matButton="filled" routerLink="/admin/users">
             {{ t('users.detail.backToUsers') }}
           </button>
         </div>

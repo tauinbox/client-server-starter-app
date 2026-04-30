@@ -5,8 +5,7 @@
       <mat-card-subtitle>{{ id() }}</mat-card-subtitle>
       <div class="spacer"></div>
       <button
-        mat-icon-button
-        color="primary"
+        matIconButton
         [routerLink]="['/admin/users', id()]"
         [attr.aria-label]="t('users.permissions.backAriaLabel')"
       >
@@ -32,10 +31,7 @@
           } @else {
             <mat-chip-set>
               @for (role of roles(); track role.id) {
-                <mat-chip
-                  [color]="role.isSuper ? 'warn' : 'primary'"
-                  highlighted
-                >
+                <mat-chip highlighted [class.app-chip-danger]="role.isSuper">
                   {{ role.name }}
                 </mat-chip>
               }
@@ -54,10 +50,10 @@
             </p>
           } @else {
             <mat-chip-set>
-              <mat-chip color="accent" highlighted>{{
+              <mat-chip highlighted>{{
                 t('users.permissions.summaryAllow', { count: summary().allow })
               }}</mat-chip>
-              <mat-chip color="warn" highlighted>{{
+              <mat-chip highlighted class="app-chip-danger">{{
                 t('users.permissions.summaryDeny', { count: summary().deny })
               }}</mat-chip>
               <mat-chip>{{
@@ -76,7 +72,7 @@
             <div class="permissions-header">
               <h3>{{ t('users.permissions.permissionsSection') }}</h3>
               @if (groups().length > 0) {
-                <button mat-button (click)="toggleAll()">
+                <button matButton="text" (click)="toggleAll()">
                   <mat-icon>{{
                     expanded() ? 'unfold_less' : 'unfold_more'
                   }}</mat-icon>
@@ -132,11 +128,11 @@
                               permission.action
                             }}</span>
                             @if (permission.conditions?.effect === 'deny') {
-                              <mat-chip color="warn" highlighted>{{
+                              <mat-chip highlighted class="app-chip-danger">{{
                                 t('users.permissions.effectDeny')
                               }}</mat-chip>
                             } @else {
-                              <mat-chip color="accent" highlighted>{{
+                              <mat-chip highlighted>{{
                                 t('users.permissions.effectAllow')
                               }}</mat-chip>
                             }

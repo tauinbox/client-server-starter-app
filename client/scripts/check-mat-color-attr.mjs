@@ -38,12 +38,6 @@ const ALLOW_LIST = new Set([
   'app/features/admin/components/roles/role-form-dialog/role-form-dialog.component.html',
   'app/features/admin/components/roles/role-list/role-list.component.html',
   'app/features/admin/components/roles/role-permissions-dialog/role-permissions-dialog.component.html',
-  'app/features/users/components/user-card-list/user-card-list.component.html',
-  'app/features/users/components/user-detail/user-detail.component.html',
-  'app/features/users/components/user-edit/user-edit.component.html',
-  'app/features/users/components/user-list/user-list.component.html',
-  'app/features/users/components/user-permissions/user-permissions.component.html',
-  'app/features/users/components/user-table/user-table.component.html'
 ]);
 
 const PATTERN = /\bcolor="(?:primary|accent|warn)"/;

@@ -40,18 +40,13 @@
 
         <div class="filter-actions">
           @let isLoading = loading();
-          <button
-            mat-flat-button
-            color="primary"
-            type="submit"
-            [disabled]="isLoading"
-          >
+          <button matButton="filled" type="submit" [disabled]="isLoading">
             <mat-icon>search</mat-icon>
             {{ t('common.search') }}
           </button>
 
           <button
-            mat-button
+            matButton="text"
             type="button"
             (click)="resetForm()"
             [disabled]="isLoading"
