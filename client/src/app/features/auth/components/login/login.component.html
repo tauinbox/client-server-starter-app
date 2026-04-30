@@ -54,9 +54,8 @@
               }}</span>
             } @else {
               <button
-                mat-button
+                matButton="text"
                 type="button"
-                color="primary"
                 [disabled]="resendingVerification()"
                 (click)="resendVerification()"
               >
@@ -73,8 +72,7 @@
 
         <div class="form-actions">
           <button
-            mat-flat-button
-            color="primary"
+            matButton="filled"
             type="submit"
             [disabled]="
               loginForm().invalid() || loading() || lockoutSeconds() > 0
@@ -106,7 +104,7 @@
 
       <div class="oauth-buttons">
         <button
-          mat-stroked-button
+          matButton="outlined"
           type="button"
           class="oauth-button"
           (click)="onOAuthLogin('google')"
@@ -117,7 +115,7 @@
           </span>
         </button>
         <button
-          mat-stroked-button
+          matButton="outlined"
           type="button"
           class="oauth-button"
           (click)="onOAuthLogin('facebook')"
@@ -128,7 +126,7 @@
           </span>
         </button>
         <button
-          mat-stroked-button
+          matButton="outlined"
           type="button"
           class="oauth-button"
           (click)="onOAuthLogin('vk')"

@@ -15,7 +15,7 @@
               <p class="profile-email">{{ u.email }}</p>
               <div class="profile-badges">
                 @if (u.isActive) {
-                  <mat-chip color="primary" highlighted>{{
+                  <mat-chip highlighted>{{
                     t('auth.profile.statusActive')
                   }}</mat-chip>
                 } @else {
@@ -99,8 +99,7 @@
 
               <div class="form-actions">
                 <button
-                  mat-flat-button
-                  color="primary"
+                  matButton="filled"
                   type="submit"
                   [disabled]="
                     profileForm().invalid() ||
@@ -137,8 +136,8 @@
                   </div>
                   @if (isProviderLinked(provider)) {
                     <button
-                      mat-stroked-button
-                      color="warn"
+                      matButton="outlined"
+                      class="app-btn-danger"
                       [disabled]="oauthLoading()"
                       (click)="disconnectProvider(provider)"
                     >
@@ -146,7 +145,7 @@
                     </button>
                   } @else {
                     <button
-                      mat-stroked-button
+                      matButton="outlined"
                       [disabled]="oauthLoading()"
                       (click)="connectProvider(provider)"
                     >
