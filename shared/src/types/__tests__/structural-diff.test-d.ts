@@ -93,28 +93,30 @@ type _Wire_LeavesPrimitivesAlone = Expect<
   >
 >;
 
-// ── 6. BKL-002 regression sample ────────────────────────────────────────────
-//     Exercises the exact bug class the new helper protects against:
-//     the DTO claims `roles: string[]` but the shared type uses
-//     `roles: { id; name; ... }[]`. The keys-only check would have missed
-//     this; StructuralDiff reports `roles`.
-type _SharedRole = { id: string; name: string };
-type _SharedUser = { id: string; roles: _SharedRole[] };
+// ── 6. Nested-array element retyped to a primitive ──────────────────────────
+//     The most subtle drift the helper protects against: a DTO claims
+//     `items: string[]` but the shared type uses `items: { id; name; ... }[]`.
+//     A keys-only check would pass — both sides have key `items`. The
+//     structural check correctly reports `items`.
+type _NestedShape = { id: string; name: string };
+type _ParentWithObjects = { id: string; items: _NestedShape[] };
+type _ParentWithMatchingObjects = {
+  id: string;
+  items: { id: string; name: string }[];
+};
+type _ParentWithStrings = { id: string; items: string[] };
 
-type _GoodDto = { id: string; roles: { id: string; name: string }[] };
-type _BadDto = { id: string; roles: string[] };
-
-type _Bkl002_GoodMatches = Expect<
-  Equal<StructuralDiff<_SharedUser, _GoodDto>, never>
+type _NestedShape_StructurallyEqual = Expect<
+  Equal<StructuralDiff<_ParentWithObjects, _ParentWithMatchingObjects>, never>
 >;
-type _Bkl002_GoodMatchesReverse = Expect<
-  Equal<StructuralDiff<_GoodDto, _SharedUser>, never>
+type _NestedShape_StructurallyEqualReverse = Expect<
+  Equal<StructuralDiff<_ParentWithMatchingObjects, _ParentWithObjects>, never>
 >;
-type _Bkl002_BadIsCaught = Expect<
-  Equal<StructuralDiff<_SharedUser, _BadDto>, 'roles'>
+type _NestedShape_PrimitiveDriftCaught = Expect<
+  Equal<StructuralDiff<_ParentWithObjects, _ParentWithStrings>, 'items'>
 >;
-type _Bkl002_BadIsCaughtReverse = Expect<
-  Equal<StructuralDiff<_BadDto, _SharedUser>, 'roles'>
+type _NestedShape_PrimitiveDriftCaughtReverse = Expect<
+  Equal<StructuralDiff<_ParentWithStrings, _ParentWithObjects>, 'items'>
 >;
 
 // ── 7. _AssertNever rejects a non-`never` diff ──────────────────────────────
@@ -124,11 +126,13 @@ type _Bkl002_BadIsCaughtReverse = Expect<
 //     rejection happens — exactly the failure a broken DTO contract would
 //     produce in CI.
 
-// @ts-expect-error - StructuralDiff yields 'roles' (not never); _AssertNever rejects.
-type _AssertNever_RejectsNonNever = _AssertNever<StructuralDiff<_SharedUser, _BadDto>>;
+type _Drift = StructuralDiff<_ParentWithObjects, _ParentWithStrings>;
+// @ts-expect-error - _Drift is 'items' (not never); _AssertNever rejects.
+type _AssertNever_RejectsNonNever = _AssertNever<_Drift>;
 
 // Sanity: a matching pair satisfies _AssertNever cleanly (no error).
-type _AssertNever_AcceptsMatch = _AssertNever<StructuralDiff<_SharedUser, _GoodDto>>;
+type _Match = StructuralDiff<_ParentWithObjects, _ParentWithMatchingObjects>;
+type _AssertNever_AcceptsMatch = _AssertNever<_Match>;
 
 // Module marker — keeps this file in module mode so the side-effect import
 // from type-utils.ts resolves predictably.
