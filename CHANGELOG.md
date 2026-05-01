@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.19](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.18...v0.1.19) (2026-05-01)
+
+
+### Features
+
+* **auth:** block OAuth auto-link to existing accounts; honor email_verified (BKL-005) ([#177](https://github.com/tauinbox/client-server-starter-app/issues/177)) ([cb63cfa](https://github.com/tauinbox/client-server-starter-app/commit/cb63cfa57468b5e09cf9286040753deca047a3b8))
+* **auth:** refresh-token reuse detection (OAuth 2.0 BCP) ([#180](https://github.com/tauinbox/client-server-starter-app/issues/180)) ([844c5ba](https://github.com/tauinbox/client-server-starter-app/commit/844c5baf1b65f0b6091881eaa8f00a4e4c0b6388))
+* **auth:** require currentPassword on self-service password change (BKL-004) ([#176](https://github.com/tauinbox/client-server-starter-app/issues/176)) ([00922d6](https://github.com/tauinbox/client-server-starter-app/commit/00922d6b3fa38c374aa9d894bd17239f8965f23f))
+* **client:** finalise M3 button-color migration with regression safety net ([#187](https://github.com/tauinbox/client-server-starter-app/issues/187)) ([d630327](https://github.com/tauinbox/client-server-starter-app/commit/d63032745ccfeba206141cce4fcf6add44417289))
+* **client:** groundwork for M3 button color migration ([#182](https://github.com/tauinbox/client-server-starter-app/issues/182)) ([cc9efe9](https://github.com/tauinbox/client-server-starter-app/commit/cc9efe920d3b6281c5a0b88564474a25a3f6d8cd))
+* **client:** migrate admin feature to M3 matButton API ([#186](https://github.com/tauinbox/client-server-starter-app/issues/186)) ([b2560fa](https://github.com/tauinbox/client-server-starter-app/commit/b2560faf117c3440bf7e993b7cd1b9f19e026d0a))
+* **client:** migrate auth pages to M3 matButton API ([#183](https://github.com/tauinbox/client-server-starter-app/issues/183)) ([52e06cc](https://github.com/tauinbox/client-server-starter-app/commit/52e06cc9c4fa8b8f94a06b856200e2e4aa54bc85))
+* **client:** migrate core templates to M3 matButton API ([#184](https://github.com/tauinbox/client-server-starter-app/issues/184)) ([bd98703](https://github.com/tauinbox/client-server-starter-app/commit/bd98703fd4c7c11ddb2454e91746a5da3866f0de))
+* **client:** migrate users feature to M3 matButton API ([#185](https://github.com/tauinbox/client-server-starter-app/issues/185)) ([31968f3](https://github.com/tauinbox/client-server-starter-app/commit/31968f39c1cd754e578f14a72e40a1921299cfa8))
+* **rbac:** fail-closed CASL→SQL translator with full operator support ([#181](https://github.com/tauinbox/client-server-starter-app/issues/181)) ([63da029](https://github.com/tauinbox/client-server-starter-app/commit/63da02961e4f0eb13e236a2d4fc756a1e5a7f178))
+* **security:** hide privileged User/Role fields from non-admin responses ([#179](https://github.com/tauinbox/client-server-starter-app/issues/179)) ([7cfb1f5](https://github.com/tauinbox/client-server-starter-app/commit/7cfb1f53ef1ce681435d4e835edd5b7b08ec28b8))
+* **server:** honour TRUSTED_PROXIES env for deployment behind reverse proxy ([#171](https://github.com/tauinbox/client-server-starter-app/issues/171)) ([6d6e396](https://github.com/tauinbox/client-server-starter-app/commit/6d6e396b31c953b581ff70229bf65479ccd0ddbe))
+* **server:** secure-by-default with global JwtAuthGuard + @Public() opt-out ([#175](https://github.com/tauinbox/client-server-starter-app/issues/175)) ([3cf1cdc](https://github.com/tauinbox/client-server-starter-app/commit/3cf1cdc8a04a8e8b2fdcf8596a6a24f5297830da))
+* **shared:** structural wire-contract check between DTO and shared types ([#188](https://github.com/tauinbox/client-server-starter-app/issues/188)) ([0d13aa4](https://github.com/tauinbox/client-server-starter-app/commit/0d13aa491bd690467a559a5bce5383c8e4134915))
+
+
+### Bug Fixes
+
+* **auth:** return user.roles as RoleResponse[] from login/refresh/oauth ([#172](https://github.com/tauinbox/client-server-starter-app/issues/172)) ([1036d37](https://github.com/tauinbox/client-server-starter-app/commit/1036d37fcc98d0b26be95eab47ccdccbc39605a8))
+* **client:** patch OpenSSL CVE-2026-31789 via edge repo ([#174](https://github.com/tauinbox/client-server-starter-app/issues/174)) ([4b24757](https://github.com/tauinbox/client-server-starter-app/commit/4b24757cf01de1e244c926f3df7bc895cb1b6eb8))
+
 ## [0.1.18](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.16...v0.1.18) (2026-04-20)
 
 
