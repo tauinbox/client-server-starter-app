@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import type {
   RoleAdminResponse,
+  StructuralDiff,
   WireType,
   _AssertNever
 } from '@app/shared/types';
@@ -14,10 +15,11 @@ export class RoleAdminResponseDto extends RoleResponseDto {
   isSuper: boolean;
 }
 
-// Compile-time contract: wire format of RoleAdminResponseDto must exactly match RoleAdminResponse.
-type _DtoHasAllResponseFields = _AssertNever<
-  Exclude<keyof RoleAdminResponse, keyof WireType<RoleAdminResponseDto>>
+// Compile-time contract: wire format of RoleAdminResponseDto must match
+// RoleAdminResponse structurally in both directions.
+type _DtoMatchesShared = _AssertNever<
+  StructuralDiff<WireType<RoleAdminResponseDto>, RoleAdminResponse>
 >;
-type _ResponseHasAllDtoFields = _AssertNever<
-  Exclude<keyof WireType<RoleAdminResponseDto>, keyof RoleAdminResponse>
+type _SharedMatchesDto = _AssertNever<
+  StructuralDiff<RoleAdminResponse, WireType<RoleAdminResponseDto>>
 >;

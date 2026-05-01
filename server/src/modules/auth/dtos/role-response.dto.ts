@@ -1,5 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { RoleResponse, WireType, _AssertNever } from '@app/shared/types';
+import type {
+  RoleResponse,
+  StructuralDiff,
+  WireType,
+  _AssertNever
+} from '@app/shared/types';
 
 export class RoleResponseDto {
   @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
@@ -18,10 +23,11 @@ export class RoleResponseDto {
   updatedAt: Date;
 }
 
-// Compile-time contract: wire format of RoleResponseDto must exactly match RoleResponse.
-type _DtoHasAllResponseFields = _AssertNever<
-  Exclude<keyof RoleResponse, keyof WireType<RoleResponseDto>>
+// Compile-time contract: wire format of RoleResponseDto must match
+// RoleResponse structurally in both directions.
+type _DtoMatchesShared = _AssertNever<
+  StructuralDiff<WireType<RoleResponseDto>, RoleResponse>
 >;
-type _ResponseHasAllDtoFields = _AssertNever<
-  Exclude<keyof WireType<RoleResponseDto>, keyof RoleResponse>
+type _SharedMatchesDto = _AssertNever<
+  StructuralDiff<RoleResponse, WireType<RoleResponseDto>>
 >;
