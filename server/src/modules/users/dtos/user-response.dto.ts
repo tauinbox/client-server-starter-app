@@ -1,5 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { UserResponse, WireType, _AssertNever } from '@app/shared/types';
+import type {
+  StructuralDiff,
+  UserResponse,
+  WireType,
+  _AssertNever
+} from '@app/shared/types';
 import { RoleResponseDto } from '../../auth/dtos/role-response.dto';
 
 export class UserResponseDto {
@@ -34,12 +39,14 @@ export class UserResponseDto {
   deletedAt: Date | null;
 }
 
-// Compile-time contract: wire format of UserResponseDto must exactly match UserResponse.
-// If either side gains or loses a field, one of these lines will fail to compile.
+// Compile-time contract: wire format of UserResponseDto must match UserResponse
+// structurally — same keys AND same value types at each key. If either side
+// gains a field, loses one, or drifts at a value type (e.g. roles silently
+// retyped to string[]), one of these lines fails to compile.
 // To fix: update both this DTO and shared/src/types/user.types.ts together.
-type _DtoHasAllResponseFields = _AssertNever<
-  Exclude<keyof UserResponse, keyof WireType<UserResponseDto>>
+type _DtoMatchesShared = _AssertNever<
+  StructuralDiff<WireType<UserResponseDto>, UserResponse>
 >;
-type _ResponseHasAllDtoFields = _AssertNever<
-  Exclude<keyof WireType<UserResponseDto>, keyof UserResponse>
+type _SharedMatchesDto = _AssertNever<
+  StructuralDiff<UserResponse, WireType<UserResponseDto>>
 >;

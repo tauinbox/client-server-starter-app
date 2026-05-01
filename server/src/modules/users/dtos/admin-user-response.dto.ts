@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import type {
   AdminUserResponse,
+  StructuralDiff,
   WireType,
   _AssertNever
 } from '@app/shared/types';
@@ -15,10 +16,11 @@ export class AdminUserResponseDto extends UserResponseDto {
   lockedUntil: Date | null;
 }
 
-// Compile-time contract: wire format of AdminUserResponseDto must exactly match AdminUserResponse.
-type _DtoHasAllAdminResponseFields = _AssertNever<
-  Exclude<keyof AdminUserResponse, keyof WireType<AdminUserResponseDto>>
+// Compile-time contract: wire format of AdminUserResponseDto must match
+// AdminUserResponse structurally in both directions.
+type _DtoMatchesShared = _AssertNever<
+  StructuralDiff<WireType<AdminUserResponseDto>, AdminUserResponse>
 >;
-type _AdminResponseHasAllDtoFields = _AssertNever<
-  Exclude<keyof WireType<AdminUserResponseDto>, keyof AdminUserResponse>
+type _SharedMatchesDto = _AssertNever<
+  StructuralDiff<AdminUserResponse, WireType<AdminUserResponseDto>>
 >;

@@ -1,4 +1,4 @@
-export type { WireType, _AssertNever } from './type-utils';
+export type { WireType, StructuralDiff, _AssertNever } from './type-utils';
 
 export type {
   UserResponse,
