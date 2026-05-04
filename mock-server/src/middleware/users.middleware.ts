@@ -486,9 +486,14 @@ router.patch('/:id', adminGuard, (req, res) => {
     if (existing && existing.id !== user.id) {
       res.status(409).json({
         message: 'User with this email already exists',
-        statusCode: 409
+        statusCode: 409,
+        errorKey: ErrorKeys.USERS.EMAIL_EXISTS,
+        field: 'email'
       });
       return;
+    }
+    if (email !== user.email) {
+      user.isEmailVerified = false;
     }
     user.email = email;
   }

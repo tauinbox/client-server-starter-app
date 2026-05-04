@@ -15,6 +15,7 @@ import { MailService } from '../../mail/mail.service';
 import { AuditService, AuditContext } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { hashToken } from '../../../common/utils/hash-token';
+import { issueEmailVerificationToken } from '../../../common/utils/issue-verification-token.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { SYSTEM_ROLES, ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -25,7 +26,6 @@ import {
   BCRYPT_SALT_ROUNDS
 } from '@app/shared/constants/auth.constants';
 
-const VERIFICATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 const RESET_TOKEN_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
 
 @Injectable()
@@ -199,9 +199,7 @@ export class AuthService {
       registerDto.password,
       BCRYPT_SALT_ROUNDS
     );
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = hashToken(rawToken);
-    const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS);
+    const { rawToken, hashedToken, expiresAt } = issueEmailVerificationToken();
 
     // Create user and set verification token atomically so a partial failure
     // never leaves a user without a token (which would prevent email verification).
@@ -305,9 +303,7 @@ export class AuthService {
       };
     }
 
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = hashToken(rawToken);
-    const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS);
+    const { rawToken, hashedToken, expiresAt } = issueEmailVerificationToken();
 
     await this.usersService.setEmailVerificationToken(
       user.id,

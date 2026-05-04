@@ -20,7 +20,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 ### Authentication
 - Email/password registration and login
 - **Account lockout** — 5 consecutive failed login attempts lock the account for 15 minutes (HTTP 423 with countdown); admin can unlock early via user-edit page
-- **Email verification** — new registrations require email verification before login (HTTP 403); resend-verification endpoint; OAuth users marked verified only when the provider asserts `email_verified=true` (Google/Facebook); otherwise a verification email is sent
+- **Email verification** — new registrations require email verification before login (HTTP 403); resend-verification endpoint; OAuth users marked verified only when the provider asserts `email_verified=true` (Google/Facebook); otherwise a verification email is sent. Admin email changes via `PATCH /api/v1/users/:id` reset `isEmailVerified` to false, issue a new hashed verification token, and dispatch a fresh verification email; uniqueness is enforced server-side (HTTP 409 with `errorKey: errors.users.emailExists` and `field: 'email'`)
 - **Password reset** — forgot-password sends a reset link (30-minute token expiry); reset invalidates all active sessions
 - **OAuth2 login via Google, Facebook, VK** — never auto-links to a pre-existing local account (account-takeover prevention); users must log in with their password and link the provider explicitly from their profile. Creates OAuth-only users for emails not yet registered
 - JWT access tokens (1h, stored in-memory only) + opaque refresh tokens (7d, stored as HttpOnly `SameSite=Strict` cookie — never readable by JavaScript)

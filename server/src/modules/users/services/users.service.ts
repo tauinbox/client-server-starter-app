@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
@@ -9,6 +9,8 @@ import type { AppAbility } from '../../auth/casl/app-ability';
 import { AuditService } from '../../audit/audit.service';
 import { assertCan } from '../../../common/utils/assert-can.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { MailService } from '../../mail/mail.service';
+import { issueEmailVerificationToken } from '../../../common/utils/issue-verification-token.util';
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
@@ -32,12 +34,15 @@ const USER_SORT_COLUMN_MAP: Record<string, string> = {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private dataSource: DataSource,
     private auditService: AuditService,
-    private metricsService: MetricsService
+    private metricsService: MetricsService,
+    private mailService: MailService
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -225,9 +230,43 @@ export class UsersService {
       changes.tokenRevokedAt = new Date();
     }
 
-    this.userRepository.merge(user, changes);
+    let pendingVerificationRawToken: string | null = null;
+    if (rest.email !== undefined && rest.email !== user.email) {
+      const conflicting = await this.userRepository.findOne({
+        where: { email: rest.email }
+      });
+      if (conflicting && conflicting.id !== user.id) {
+        throw new HttpException(
+          {
+            message: 'User with this email already exists',
+            errorKey: ErrorKeys.USERS.EMAIL_EXISTS,
+            field: 'email'
+          },
+          HttpStatus.CONFLICT
+        );
+      }
+      const issued = issueEmailVerificationToken();
+      pendingVerificationRawToken = issued.rawToken;
+      changes.isEmailVerified = false;
+      changes.emailVerificationToken = issued.hashedToken;
+      changes.emailVerificationExpiresAt = issued.expiresAt;
+    }
 
-    return this.userRepository.save(user);
+    this.userRepository.merge(user, changes);
+    const saved = await this.userRepository.save(user);
+
+    if (pendingVerificationRawToken) {
+      this.mailService
+        .sendEmailVerification(saved.email, pendingVerificationRawToken)
+        .catch((err) =>
+          this.logger.error(
+            'Failed to send verification email after email change',
+            err
+          )
+        );
+    }
+
+    return saved;
   }
 
   async incrementFailedAttemptsAndLockIfNeeded(
