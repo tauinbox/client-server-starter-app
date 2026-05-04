@@ -260,6 +260,49 @@ describe('CaslAbilityFactory', () => {
     warnSpy.mockRestore();
   });
 
+  it('should veto the ENTIRE permission when a prototype-pollution key sits next to a safe branch', async () => {
+    // End-to-end check that a single resolver veto (skipPermission) wins over
+    // every other branch in the same conditions object — the safe `ownership`
+    // fragment must not leak through when the `custom` resolver rejects the
+    // payload.
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+    const permissions: ResolvedPermission[] = [
+      {
+        resource: 'users',
+        action: 'update',
+        permission: 'users:update',
+        conditions: {
+          ownership: { userField: 'createdBy' },
+          custom:
+            '{"$or":[{"status":"active"},{"profile":{"constructor":{"x":1}}}]}'
+        }
+      }
+    ];
+
+    const ability = await factory.createForUser('user-1', roles, permissions);
+
+    // No rules registered → cannot update even own records.
+    expect(
+      ability.can('update', {
+        __caslSubjectType__: 'User',
+        createdBy: 'user-1',
+        status: 'active'
+      } as never)
+    ).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('constructor')
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('users:update')
+    );
+
+    // Sanity: original prototype not polluted by the parsed payload.
+    expect((Object.prototype as Record<string, unknown>)['x']).toBeUndefined();
+
+    warnSpy.mockRestore();
+  });
+
   describe('effect: deny (inverted rules)', () => {
     it('should block access when a deny rule with no conditions follows an allow', async () => {
       const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
