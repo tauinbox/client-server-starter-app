@@ -117,6 +117,27 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(rolePermissions)
         });
+      },
+      async invalidateAccessTokens(userId) {
+        await fetch(`${baseUrl}/__control/invalidate-access-tokens`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+      },
+      async changeUserRoles(userId, newRoles) {
+        await fetch(`${baseUrl}/__control/change-user-roles`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, newRoles })
+        });
+      },
+      async revokeUserSessions(userId, newRoles) {
+        await fetch(`${baseUrl}/__control/revoke-user-sessions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, newRoles })
+        });
       }
     };
 
@@ -141,6 +162,7 @@ export { defaultUser } from './mock-data';
 // Re-export helpers
 export {
   loginViaUi,
+  loginViaUiKeepSse,
   expectAuthRedirect,
   expectForbiddenRedirect
 } from './helpers';
