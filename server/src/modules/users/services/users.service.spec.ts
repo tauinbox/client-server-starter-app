@@ -1,12 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ForbiddenException, HttpException } from '@nestjs/common';
+import { ForbiddenException, HttpException, HttpStatus } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
 import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { UsersService } from './users.service';
 import { User } from '../entities/user.entity';
 import { AuditService } from '../../audit/audit.service';
+import { MailService } from '../../mail/mail.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import type { AppAbility } from '../../auth/casl/app-ability';
 
@@ -25,6 +27,7 @@ describe('UsersService', () => {
     update: jest.Mock;
   };
   let mockDataSource: { transaction: jest.Mock };
+  let mockMailService: { sendEmailVerification: jest.Mock };
   let mockQueryBuilder: {
     leftJoinAndSelect: jest.Mock;
     withDeleted: jest.Mock;
@@ -76,6 +79,9 @@ describe('UsersService', () => {
     };
 
     mockDataSource = { transaction: jest.fn() };
+    mockMailService = {
+      sendEmailVerification: jest.fn().mockResolvedValue(undefined)
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -95,6 +101,10 @@ describe('UsersService', () => {
         {
           provide: MetricsService,
           useValue: { recordPermissionDenied: jest.fn() }
+        },
+        {
+          provide: MailService,
+          useValue: mockMailService
         }
       ]
     }).compile();
@@ -511,6 +521,87 @@ describe('UsersService', () => {
       const result = await service.update('user-1', { firstName: 'Updated' });
 
       expect(result.firstName).toBe('Updated');
+    });
+
+    describe('email change', () => {
+      const buildVerifiedUser = (): User =>
+        ({
+          ...mockUser,
+          isEmailVerified: true,
+          emailVerificationToken: null,
+          emailVerificationExpiresAt: null
+        }) as User;
+
+      beforeEach(() => {
+        mockRepository.merge.mockImplementation(
+          (target: User, changes: Partial<User>) =>
+            Object.assign(target, changes)
+        );
+        mockRepository.save.mockImplementation((u: User) => Promise.resolve(u));
+      });
+
+      it('resets isEmailVerified, issues a verification token and sends a verification email when email changes', async () => {
+        const user = buildVerifiedUser();
+        // First findOne -> findOne(id) inside update; second findOne -> uniqueness check
+        mockRepository.findOne
+          .mockResolvedValueOnce(user)
+          .mockResolvedValueOnce(null);
+
+        const result = await service.update('user-1', {
+          email: 'changed@example.com'
+        });
+
+        expect(result.email).toBe('changed@example.com');
+        expect(result.isEmailVerified).toBe(false);
+        expect(result.emailVerificationToken).toEqual(expect.any(String));
+        expect(result.emailVerificationToken).not.toBeNull();
+        expect(result.emailVerificationExpiresAt).toBeInstanceOf(Date);
+        expect(mockMailService.sendEmailVerification).toHaveBeenCalledTimes(1);
+        expect(mockMailService.sendEmailVerification).toHaveBeenCalledWith(
+          'changed@example.com',
+          expect.any(String)
+        );
+      });
+
+      it('does not reset verification when email field is unchanged', async () => {
+        const user = buildVerifiedUser();
+        mockRepository.findOne.mockResolvedValueOnce(user);
+
+        const result = await service.update('user-1', { email: user.email });
+
+        expect(result.isEmailVerified).toBe(true);
+        expect(mockMailService.sendEmailVerification).not.toHaveBeenCalled();
+      });
+
+      it('throws 409 with EMAIL_EXISTS errorKey when target email is taken by another user', async () => {
+        const user = buildVerifiedUser();
+        mockRepository.findOne
+          .mockResolvedValueOnce(user)
+          .mockResolvedValueOnce({ ...user, id: 'other-user' } as User);
+
+        await expect(
+          service.update('user-1', { email: 'taken@example.com' })
+        ).rejects.toMatchObject({
+          status: HttpStatus.CONFLICT,
+          response: {
+            errorKey: ErrorKeys.USERS.EMAIL_EXISTS,
+            field: 'email'
+          }
+        });
+        expect(mockMailService.sendEmailVerification).not.toHaveBeenCalled();
+      });
+
+      it('allows changing to an email already owned by the same user (no conflict)', async () => {
+        const user = buildVerifiedUser();
+        mockRepository.findOne
+          .mockResolvedValueOnce(user)
+          .mockResolvedValueOnce(user);
+
+        // Same id returned by uniqueness check should be ignored
+        await expect(
+          service.update('user-1', { email: 'taken@example.com' })
+        ).resolves.toBeDefined();
+      });
     });
   });
 
