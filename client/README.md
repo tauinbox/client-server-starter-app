@@ -50,7 +50,7 @@ src/app/
 │   └── admin/              # Admin panel (roles + resource + user management)
 │       ├── admin.routes.ts # Lazy-loaded child routes under /admin
 │       ├── components/
-│       │   ├── admin-panel/             # AdminPanelComponent — tabbed shell (Users / Roles / Resources)
+│       │   ├── admin-panel/             # AdminPanelComponent — tabbed shell (Users / Roles / Resources); auto-redirects to /forbidden when admin permissions are revoked mid-session via `effect()` watching the same OR-of-three permission set as adminPanelGuard
 │       │   ├── roles/
 │       │   │   ├── role-list/           # RoleListComponent — data table with create/edit/delete actions
 │       │   │   ├── role-form-dialog/    # RoleFormDialogComponent — create and edit role (name, description)
@@ -171,10 +171,11 @@ npm test
   - `base.fixture.ts` — `_mockServer` (MockServerApi) and `_workerMockServer` fixtures + re-exports all modules
   - `jwt.utils.ts` — JWT creation utilities (`base64url`, `createMockJwt`, `createExpiredJwt`, `createValidJwt`)
   - `mock-data.ts` — `MockUser` type, `defaultUser`, factory re-exports (`createMockUser`, `createOAuthAccount`)
-  - `helpers.ts` — `loginViaUi()`, `expectAuthRedirect()`, `expectForbiddenRedirect()`
+  - `helpers.ts` — `loginViaUi()`, `loginViaUiKeepSse()` (variant that skips `networkidle` so tests can hold a real SSE stream open), `expectAuthRedirect()`, `expectForbiddenRedirect()`
 - Test structure: organized by module in `e2e/auth/`, `e2e/users/`, and `e2e/admin/`
 - **Accessibility**: `e2e/a11y.spec.ts` runs `@axe-core/playwright` (WCAG 2.1 AA) against every major route; `e2e/keyboard-nav.spec.ts` verifies keyboard-only flows (login, sidenav, user-edit, dialog focus trap)
-- Coverage: 138 tests — unit test suite: 544 tests passing covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search, admin roles/resources management, effective-permissions preview, a11y audit, keyboard navigation. Error translation tests verify `errorKey` → Transloco pipeline for login, register, and global interceptor snackbar.
+- **Live RBAC + auth regression net** (BKL-027): refresh-token reuse detection (`refresh-token-reuse.spec.ts`), SSE-driven role revocation hides admin link (`role-revocation-via-sse.spec.ts`), admin-on-/admin auto-redirect to /forbidden (`admin/admin-panel-permission-loss.spec.ts`), reactive 401 → refresh → retry (`reactive-token-refresh.spec.ts`), logout + browser Back navigation (`logout-back-button.spec.ts`), OAuth unlink-last-provider safety (`oauth-unlink-last-provider.spec.ts`), wire-contract assertion that `auth_user.roles` is `RoleResponse[]` (`post-login-admin-badge.spec.ts`)
+- Coverage: 145 tests — unit test suite: 550 tests passing covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search, admin roles/resources management, effective-permissions preview, admin-panel auto-redirect (BKL-013), a11y audit, keyboard navigation. Error translation tests verify `errorKey` → Transloco pipeline for login, register, and global interceptor snackbar.
 - Workers: 4 (fully parallel, per-worker mock-server instances on dynamic ports)
 
 ```bash

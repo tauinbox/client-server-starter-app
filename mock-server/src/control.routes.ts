@@ -141,6 +141,83 @@ router.post('/role-permissions', (req, res) => {
   res.json({ message: `Set ${rolePermissions.length} role-permission(s)` });
 });
 
+// POST /__control/invalidate-access-tokens — set tokenRevokedAt for a user.
+// Existing access tokens issued before this call become invalid (the auth
+// helper compares decoded.iat to user.tokenRevokedAt). Refresh tokens are
+// LEFT INTACT so the client's 401 interceptor can refresh-and-retry.
+router.post('/invalidate-access-tokens', (req, res) => {
+  const { userId } = req.body as { userId?: string };
+  if (!userId) {
+    res.status(400).json({ message: 'userId is required' });
+    return;
+  }
+  const state = getState();
+  const user = state.users.get(userId);
+  if (!user) {
+    res.status(404).json({ message: 'user not found' });
+    return;
+  }
+  user.tokenRevokedAt = new Date().toISOString();
+  res.json({ message: `tokens invalidated for user ${userId}` });
+});
+
+// POST /__control/change-user-roles — mutate user.roles and push SSE without
+// revoking tokens. Lets tests verify live RBAC reactivity on the client (the
+// next /auth/permissions fetch reflects the new roles, but the existing
+// session keeps working — no forced logout).
+router.post('/change-user-roles', (req, res) => {
+  const { userId, newRoles } = req.body as {
+    userId?: string;
+    newRoles?: string[];
+  };
+  if (!userId || !Array.isArray(newRoles)) {
+    res.status(400).json({ message: 'userId and newRoles[] required' });
+    return;
+  }
+  const state = getState();
+  const user = state.users.get(userId);
+  if (!user) {
+    res.status(404).json({ message: 'user not found' });
+    return;
+  }
+  user.roles = newRoles;
+  pushToUser(userId, { type: 'permissions_updated', userId });
+  res.json({ message: `roles updated for user ${userId}` });
+});
+
+// POST /__control/revoke-user-sessions — full simulation of the server's
+// UserRoleChangedListener. Optionally swaps user.roles, deletes ALL refresh
+// tokens for the user, sets tokenRevokedAt, and pushes a `permissions_updated`
+// SSE event. Use to verify forced-logout semantics on role revocation.
+router.post('/revoke-user-sessions', (req, res) => {
+  const { userId, newRoles } = req.body as {
+    userId?: string;
+    newRoles?: string[];
+  };
+  if (!userId) {
+    res.status(400).json({ message: 'userId is required' });
+    return;
+  }
+  const state = getState();
+  const user = state.users.get(userId);
+  if (!user) {
+    res.status(404).json({ message: 'user not found' });
+    return;
+  }
+  if (Array.isArray(newRoles)) {
+    user.roles = newRoles;
+  }
+  for (const [token, uid] of state.refreshTokens.entries()) {
+    if (uid === userId) state.refreshTokens.delete(token);
+  }
+  for (const [token, uid] of state.revokedRefreshTokens.entries()) {
+    if (uid === userId) state.revokedRefreshTokens.delete(token);
+  }
+  user.tokenRevokedAt = new Date().toISOString();
+  pushToUser(userId, { type: 'permissions_updated', userId });
+  res.json({ message: `sessions revoked for user ${userId}` });
+});
+
 // POST /__control/notify — push a test notification event (E2E helper)
 router.post('/notify', (req, res) => {
   const event = req.body as NotificationEvent;

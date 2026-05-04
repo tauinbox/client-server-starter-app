@@ -41,4 +41,29 @@ test.describe('Post-login admin badge', () => {
       .first();
     await expect(adminCell).toBeVisible();
   });
+
+  // Given an admin logs in, when the AuthStore persists the authenticated user
+  // to localStorage, then `user.roles` must be an array of RoleResponse objects
+  // with a `name` field — never plain strings. Pre-fix the server returned
+  // string[], the persisted shape was wrong, and the next page-reload read
+  // back a structurally-broken `user` that downstream guards rejected.
+  test('persists user.roles as RoleResponse[] in localStorage immediately after login', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+
+    const storedRoles = await page.evaluate(() => {
+      const raw = localStorage.getItem('auth_user');
+      return raw ? (JSON.parse(raw) as { roles: unknown[] }).roles : null;
+    });
+
+    expect(Array.isArray(storedRoles)).toBe(true);
+    expect(storedRoles).not.toHaveLength(0);
+    const first = (storedRoles as Record<string, unknown>[])[0];
+    expect(typeof first).toBe('object');
+    expect(first).not.toBeNull();
+    expect(first).toHaveProperty('id');
+    expect(first).toHaveProperty('name', 'admin');
+  });
 });
