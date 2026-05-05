@@ -1,5 +1,6 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { AuthStore } from '@features/auth/store/auth.store';
+import { canAccessAdminPanel } from '@features/admin/utils/can-access-admin-panel';
 import { LayoutService } from './layout.service';
 import { LocalStorageService } from './local-storage.service';
 
@@ -32,11 +33,8 @@ export class SidenavStateService {
     this.#isWide() ? NAV_WIDTH_WIDE : NAV_WIDTH_NARROW
   );
 
-  readonly canAccessAdmin = computed(
-    () =>
-      this.#authStore.hasPermissions({ action: 'search', subject: 'User' }) ||
-      this.#authStore.hasPermissions({ action: 'read', subject: 'Role' }) ||
-      this.#authStore.hasPermissions({ action: 'read', subject: 'Permission' })
+  readonly canAccessAdmin = computed(() =>
+    canAccessAdminPanel(this.#authStore)
   );
 
   constructor() {
