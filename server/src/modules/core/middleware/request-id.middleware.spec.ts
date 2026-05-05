@@ -1,7 +1,10 @@
 import { RequestIdMiddleware } from './request-id.middleware';
 import type { Request, Response, NextFunction } from 'express';
 
-function makeReq(headers: Record<string, string> = {}): Request {
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+function makeReq(headers: Record<string, string | string[]> = {}): Request {
   return { headers } as Request;
 }
 
@@ -18,7 +21,7 @@ describe('RequestIdMiddleware', () => {
     next = jest.fn();
   });
 
-  it('should use x-request-id from incoming header when present', () => {
+  it('should use x-request-id from incoming header when present and valid', () => {
     const req = makeReq({ 'x-request-id': 'existing-id-123' });
     const res = makeRes();
 
@@ -33,6 +36,17 @@ describe('RequestIdMiddleware', () => {
     );
   });
 
+  it('should keep a valid UUID', () => {
+    const uuid = '11111111-2222-3333-4444-555555555555';
+    const req = makeReq({ 'x-request-id': uuid });
+    const res = makeRes();
+
+    middleware.use(req, res as Response, next);
+
+    expect((req as Request & { requestId: string }).requestId).toBe(uuid);
+    expect(res.setHeader).toHaveBeenCalledWith('X-Request-Id', uuid);
+  });
+
   it('should generate a UUID when x-request-id header is absent', () => {
     const req = makeReq({});
     const res = makeRes();
@@ -40,10 +54,74 @@ describe('RequestIdMiddleware', () => {
     middleware.use(req, res as Response, next);
 
     const requestId = (req as Request & { requestId: string }).requestId;
-    expect(requestId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
-    );
+    expect(requestId).toMatch(UUID_REGEX);
     expect(res.setHeader).toHaveBeenCalledWith('X-Request-Id', requestId);
+  });
+
+  it('should replace empty x-request-id with a generated UUID', () => {
+    const req = makeReq({ 'x-request-id': '' });
+    const res = makeRes();
+
+    middleware.use(req, res as Response, next);
+
+    const requestId = (req as Request & { requestId: string }).requestId;
+    expect(requestId).toMatch(UUID_REGEX);
+    expect(res.setHeader).toHaveBeenCalledWith('X-Request-Id', requestId);
+  });
+
+  it('should replace overly long x-request-id with a generated UUID', () => {
+    const req = makeReq({ 'x-request-id': 'a'.repeat(65) });
+    const res = makeRes();
+
+    middleware.use(req, res as Response, next);
+
+    const requestId = (req as Request & { requestId: string }).requestId;
+    expect(requestId).toMatch(UUID_REGEX);
+    expect(requestId).not.toBe('a'.repeat(65));
+    expect(res.setHeader).toHaveBeenCalledWith('X-Request-Id', requestId);
+  });
+
+  it('should accept a maximum-length 64-char value', () => {
+    const value = 'a'.repeat(64);
+    const req = makeReq({ 'x-request-id': value });
+    const res = makeRes();
+
+    middleware.use(req, res as Response, next);
+
+    expect((req as Request & { requestId: string }).requestId).toBe(value);
+    expect(res.setHeader).toHaveBeenCalledWith('X-Request-Id', value);
+  });
+
+  it('should replace x-request-id containing disallowed characters with a generated UUID', () => {
+    const req = makeReq({ 'x-request-id': 'evil<script>alert(1)</script>' });
+    const res = makeRes();
+
+    middleware.use(req, res as Response, next);
+
+    const requestId = (req as Request & { requestId: string }).requestId;
+    expect(requestId).toMatch(UUID_REGEX);
+    expect(requestId).not.toContain('<');
+  });
+
+  it('should replace x-request-id containing whitespace with a generated UUID', () => {
+    const req = makeReq({ 'x-request-id': 'has spaces' });
+    const res = makeRes();
+
+    middleware.use(req, res as Response, next);
+
+    const requestId = (req as Request & { requestId: string }).requestId;
+    expect(requestId).toMatch(UUID_REGEX);
+    expect(requestId).not.toContain(' ');
+  });
+
+  it('should replace an array-typed x-request-id (multiple headers) with a generated UUID', () => {
+    const req = makeReq({ 'x-request-id': ['a', 'b'] });
+    const res = makeRes();
+
+    middleware.use(req, res as Response, next);
+
+    const requestId = (req as Request & { requestId: string }).requestId;
+    expect(requestId).toMatch(UUID_REGEX);
   });
 
   it('should call next()', () => {
