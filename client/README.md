@@ -144,7 +144,7 @@ All size values use `func.rem(N)` (pixels → rem conversion) — never hardcode
 
 **M3 colour API** — the project uses an M3 theme (`@include mat.theme(...)`); the M2 `color="primary|accent|warn"` attribute is a silent no-op and is unconditionally banned by `lint:no-mat-color` (`client/scripts/lint-no-mat-color.mjs`) — any reintroduction fails CI. For destructive actions, apply `class="app-btn-danger"` on any matButton/matIconButton or `class="app-chip-danger"` on a `<mat-chip>` instead — both are token-driven (`var(--mat-sys-error)` / `var(--mat-sys-error-container)`) and respect dark/light themes automatically.
 
-**Accessibility (WCAG 2.1 AA):** skip link in `index.html` targets `id="main-content"` on `<main>`; sidenav nav links have `aria-label` + `aria-current`; sidenav toggle has `aria-label` + `aria-expanded`; decorative `mat-icon` elements carry `aria-hidden="true"`; toolbar control `aria-label`s are bound to transloco strings.
+**Accessibility (WCAG 2.1 AA):** skip link rendered at the top of `app.component.html` (translated via `common.skipToContent`) targets `id="main"` on `<main role="main">`, satisfying WCAG 2.4.1 *Bypass Blocks*; sidenav nav links have `aria-label` + `aria-current`; sidenav toggle has `aria-label` + `aria-expanded`; decorative `mat-icon` elements carry `aria-hidden="true"`; toolbar control `aria-label`s are bound to transloco strings.
 
 ## Testing
 

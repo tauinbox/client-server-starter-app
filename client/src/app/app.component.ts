@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatDialog } from '@angular/material/dialog';
+import { TranslocoDirective } from '@jsverse/transloco';
 import { HeaderComponent } from '@core/components/header/header.component';
 import { SidenavComponent } from '@core/components/sidenav/sidenav.component';
 import { AuthStore } from '@features/auth/store/auth.store';
@@ -13,7 +14,13 @@ import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, HeaderComponent, SidenavComponent, MatSidenavModule],
+  imports: [
+    RouterOutlet,
+    HeaderComponent,
+    SidenavComponent,
+    MatSidenavModule,
+    TranslocoDirective
+  ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

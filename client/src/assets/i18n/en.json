@@ -14,7 +14,8 @@
     "description": "Description",
     "created": "Created",
     "actions": "Actions",
-    "saveChanges": "Save Changes"
+    "saveChanges": "Save Changes",
+    "skipToContent": "Skip to main content"
   },
   "header": {
     "login": "Login",

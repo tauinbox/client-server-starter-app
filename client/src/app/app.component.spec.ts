@@ -33,4 +33,18 @@ describe('AppComponent', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('app-header')).toBeTruthy();
   });
+
+  it('renders a translated skip link as the first focusable element', () => {
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    const skipLink = compiled.querySelector<HTMLAnchorElement>('a.skip-link');
+    expect(skipLink).toBeTruthy();
+    expect(skipLink?.getAttribute('href')).toBe('#main');
+    expect(skipLink?.textContent?.trim()).toBe('Skip to main content');
+
+    const main = compiled.querySelector('main');
+    expect(main?.id).toBe('main');
+    expect(main?.getAttribute('role')).toBe('main');
+  });
 });

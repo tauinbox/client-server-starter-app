@@ -5,6 +5,30 @@ import { expect, loginViaUi, test } from './fixtures/base.fixture';
  * without a mouse. Part of the standard E2E suite.
  */
 test.describe('Keyboard navigation', () => {
+  test('skip-link: first Tab from fresh page focuses skip-link, Enter jumps to main', async ({
+    _mockServer,
+    page
+  }) => {
+    await page.goto('/login');
+    await page.waitForLoadState('networkidle');
+
+    // Move focus into the document, then advance with Tab — the skip-link
+    // must be the first focusable element (WCAG 2.4.1 Bypass Blocks).
+    await page.evaluate(() => document.body.focus());
+    await page.keyboard.press('Tab');
+
+    const skipLink = page.locator('a.skip-link');
+    await expect(skipLink).toBeFocused();
+    await expect(skipLink).toHaveAttribute('href', '#main');
+    await expect(skipLink).toHaveText('Skip to main content');
+
+    // Activating the link should move the URL fragment to #main and bring
+    // <main id="main"> into view.
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/#main$/);
+    await expect(page.locator('main#main')).toBeInViewport();
+  });
+
   test('login form: tab through fields and submit with Enter', async ({
     _mockServer,
     page
