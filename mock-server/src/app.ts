@@ -13,8 +13,13 @@ export function createApp() {
   app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
   // Request ID middleware (mirrors server's RequestIdMiddleware)
+  const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
   app.use((req, res, next) => {
-    const requestId = (req.headers['x-request-id'] as string) || randomUUID();
+    const incoming = req.headers['x-request-id'];
+    const candidate = typeof incoming === 'string' ? incoming : '';
+    const requestId = REQUEST_ID_PATTERN.test(candidate)
+      ? candidate
+      : randomUUID();
     res.setHeader('X-Request-Id', requestId);
     next();
   });
