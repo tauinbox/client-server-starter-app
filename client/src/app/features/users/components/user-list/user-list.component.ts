@@ -25,11 +25,11 @@ import { MatButton } from '@angular/material/button';
 import { MatDivider } from '@angular/material/divider';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import type { Sort } from '@angular/material/sort';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { filter, merge } from 'rxjs';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { LayoutService } from '@core/services/layout.service';
 import { NotificationsService } from '@core/services/notifications.service';
+import { NotifyService } from '@core/services/notify.service';
 import type { User, UserSearch, UserSortColumn } from '../../models/user.types';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { UsersStore } from '../../store/users.store';
@@ -80,7 +80,7 @@ const INITIAL_FILTER: FilterModel = {
 })
 export class UserListComponent implements OnInit {
   readonly #usersStore = inject(UsersStore);
-  readonly #snackBar = inject(MatSnackBar);
+  readonly #notify = inject(NotifyService);
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #injector = inject(Injector);
@@ -212,18 +212,10 @@ export class UserListComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
-          this.#snackBar.open(
-            this.#translocoService.translate('users.list.successDeleted'),
-            this.#translocoService.translate('common.close'),
-            { duration: 5000 }
-          );
+          this.#notify.success('users.list.successDeleted');
         },
         error: () => {
-          this.#snackBar.open(
-            this.#translocoService.translate('users.list.errorDeleteFailed'),
-            this.#translocoService.translate('common.close'),
-            { duration: 5000 }
-          );
+          this.#notify.error('users.list.errorDeleteFailed');
         }
       });
   }

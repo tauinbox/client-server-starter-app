@@ -4,13 +4,13 @@ import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { signal } from '@angular/core';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import type { Sort } from '@angular/material/sort';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { UserListComponent } from './user-list.component';
 import { UsersStore } from '../../store/users.store';
+import { NotifyService } from '@core/services/notify.service';
 import type { User } from '../../models/user.types';
 import type { RoleAdminResponse } from '@app/shared/types';
 
@@ -55,7 +55,12 @@ describe('UserListComponent', () => {
     setFilters: ReturnType<typeof vi.fn>;
     deleteUser: ReturnType<typeof vi.fn>;
   };
-  let snackBarMock: { open: ReturnType<typeof vi.fn> };
+  let notifyMock: {
+    success: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+    info: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+  };
   let dialogMock: { open: ReturnType<typeof vi.fn> };
 
   afterEach(() => {
@@ -84,7 +89,12 @@ describe('UserListComponent', () => {
       deleteUser: vi.fn().mockReturnValue(of(void 0))
     };
 
-    snackBarMock = { open: vi.fn() };
+    notifyMock = {
+      success: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn()
+    };
     dialogMock = { open: vi.fn() };
 
     await TestBed.configureTestingModule({
@@ -93,7 +103,7 @@ describe('UserListComponent', () => {
         provideRouter([]),
         provideNoopAnimations(),
         { provide: UsersStore, useValue: usersStoreMock },
-        { provide: MatSnackBar, useValue: snackBarMock },
+        { provide: NotifyService, useValue: notifyMock },
         { provide: MatDialog, useValue: dialogMock }
       ]
     }).compileComponents();
@@ -229,10 +239,8 @@ describe('UserListComponent', () => {
       component.confirmDelete(mockUser);
 
       expect(usersStoreMock.deleteUser).toHaveBeenCalledWith('user-1');
-      expect(snackBarMock.open).toHaveBeenCalledWith(
-        'User deleted successfully',
-        'Close',
-        { duration: 5000 }
+      expect(notifyMock.success).toHaveBeenCalledWith(
+        'users.list.successDeleted'
       );
       expect(usersStoreMock.load).toHaveBeenCalledTimes(1); // only on init
     });
@@ -259,10 +267,8 @@ describe('UserListComponent', () => {
 
       component.confirmDelete(mockUser);
 
-      expect(snackBarMock.open).toHaveBeenCalledWith(
-        'Failed to delete user. Please try again.',
-        'Close',
-        { duration: 5000 }
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        'users.list.errorDeleteFailed'
       );
     });
   });
