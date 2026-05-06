@@ -5,7 +5,6 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal } from '@angular/core';
@@ -17,6 +16,7 @@ import { UserService } from '../../services/user.service';
 import { RoleService } from '../../../admin/services/role.service';
 import { UsersStore } from '../../store/users.store';
 import { AuthStore } from '../../../auth/store/auth.store';
+import { NotifyService } from '@core/services/notify.service';
 import type { User } from '../../models/user.types';
 import type { RoleAdminResponse } from '@app/shared/types';
 import { SYSTEM_ROLES } from '@app/shared/constants';
@@ -65,7 +65,12 @@ describe('UserEditComponent', () => {
     user: WritableSignal<{ id: string } | null>;
     updateCurrentUser: ReturnType<typeof vi.fn>;
   };
-  let snackBarMock: { open: ReturnType<typeof vi.fn> };
+  let notifyMock: {
+    success: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+    info: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+  };
   let dialogMock: { open: ReturnType<typeof vi.fn> };
   let router: Router;
 
@@ -94,7 +99,12 @@ describe('UserEditComponent', () => {
       updateCurrentUser: vi.fn()
     };
 
-    snackBarMock = { open: vi.fn() };
+    notifyMock = {
+      success: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn()
+    };
     dialogMock = { open: vi.fn() };
 
     await TestBed.configureTestingModule({
@@ -108,7 +118,7 @@ describe('UserEditComponent', () => {
         { provide: RoleService, useValue: roleServiceMock },
         { provide: UsersStore, useValue: usersStoreMock },
         { provide: AuthStore, useValue: authStoreMock },
-        { provide: MatSnackBar, useValue: snackBarMock },
+        { provide: NotifyService, useValue: notifyMock },
         { provide: MatDialog, useValue: dialogMock }
       ]
     }).compileComponents();
@@ -469,10 +479,8 @@ describe('UserEditComponent', () => {
       TestBed.tick();
       component.onSubmit();
 
-      expect(snackBarMock.open).toHaveBeenCalledWith(
-        'User updated successfully',
-        'Close',
-        { duration: 5000 }
+      expect(notifyMock.success).toHaveBeenCalledWith(
+        'users.edit.successUpdated'
       );
       expect(navigateSpy).toHaveBeenCalledWith(['/admin', 'users', 'user-1']);
     });
@@ -580,10 +588,8 @@ describe('UserEditComponent', () => {
       component.unlockAccount();
 
       expect(component['user']()).toEqual(unlockedUser);
-      expect(snackBarMock.open).toHaveBeenCalledWith(
-        'Account unlocked successfully',
-        'Close',
-        { duration: 5000 }
+      expect(notifyMock.success).toHaveBeenCalledWith(
+        'users.edit.successUnlocked'
       );
       expect(component['saving']()).toBe(false);
     });
@@ -597,9 +603,10 @@ describe('UserEditComponent', () => {
 
       component.unlockAccount();
 
-      expect(snackBarMock.open).toHaveBeenCalledWith('Unlock failed', 'Close', {
-        duration: 5000
-      });
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        httpError,
+        'users.edit.errorUnlockFailed'
+      );
       expect(component['saving']()).toBe(false);
     });
 
@@ -609,10 +616,9 @@ describe('UserEditComponent', () => {
 
       component.unlockAccount();
 
-      expect(snackBarMock.open).toHaveBeenCalledWith(
-        'Failed to unlock account',
-        'Close',
-        { duration: 5000 }
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        httpError,
+        'users.edit.errorUnlockFailed'
       );
     });
   });
@@ -811,10 +817,8 @@ describe('UserEditComponent', () => {
       component.confirmDelete();
 
       expect(usersStoreMock.deleteUser).toHaveBeenCalledWith('user-1');
-      expect(snackBarMock.open).toHaveBeenCalledWith(
-        'User deleted successfully',
-        'Close',
-        { duration: 5000 }
+      expect(notifyMock.success).toHaveBeenCalledWith(
+        'users.edit.successDeleted'
       );
       expect(navigateSpy).toHaveBeenCalledWith(['/admin', 'users']);
     });
@@ -843,9 +847,10 @@ describe('UserEditComponent', () => {
 
       component.confirmDelete();
 
-      expect(snackBarMock.open).toHaveBeenCalledWith('Delete failed', 'Close', {
-        duration: 5000
-      });
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        httpError,
+        'users.edit.errorDeleteFailed'
+      );
     });
 
     it('should show fallback message when delete fails without server message', () => {
@@ -858,10 +863,9 @@ describe('UserEditComponent', () => {
 
       component.confirmDelete();
 
-      expect(snackBarMock.open).toHaveBeenCalledWith(
-        'Failed to delete user. Please try again.',
-        'Close',
-        { duration: 5000 }
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        httpError,
+        'users.edit.errorDeleteFailed'
       );
     });
   });
