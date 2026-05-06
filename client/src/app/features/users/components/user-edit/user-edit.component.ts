@@ -32,7 +32,7 @@ import { MatSelect } from '@angular/material/select';
 import { MatOption } from '@angular/material/core';
 import { UserService } from '../../services/user.service';
 import { RoleService } from '../../../admin/services/role.service';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '../../../auth/store/auth.store';
 import type { UpdateUser, User } from '../../models/user.types';
 import type { HttpErrorResponse } from '@angular/common/http';
@@ -95,7 +95,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
   readonly #usersStore = inject(UsersStore);
   readonly #authStore = inject(AuthStore);
   readonly #router = inject(Router);
-  readonly #snackBar = inject(MatSnackBar);
+  readonly #notify = inject(NotifyService);
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #translocoService = inject(TranslocoService);
@@ -229,15 +229,11 @@ export class UserEditComponent implements OnInit, OnDestroy {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          const errorMessage =
+          this.error.set(
             err.error?.message ||
-            this.#translocoService.translate('users.edit.errorLoadFailed');
-          this.error.set(errorMessage);
-          this.#snackBar.open(
-            errorMessage,
-            this.#translocoService.translate('common.close'),
-            { duration: 5000 }
+              this.#translocoService.translate('users.edit.errorLoadFailed')
           );
+          this.#notify.error(err, 'users.edit.errorLoadFailed');
         }
       });
   }
@@ -336,11 +332,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
           this.#initialFormData.set({ ...this.userModel() });
           this.userForm().reset();
 
-          this.#snackBar.open(
-            this.#translocoService.translate('users.edit.successUpdated'),
-            this.#translocoService.translate('common.close'),
-            { duration: 5000 }
-          );
+          this.#notify.success('users.edit.successUpdated');
           void this.#router.navigate([
             `/${AppRouteSegmentEnum.Admin}`,
             AppRouteSegmentEnum.Users,
@@ -387,20 +379,11 @@ export class UserEditComponent implements OnInit, OnDestroy {
         next: (user) => {
           this.saving.set(false);
           this.user.set(user);
-          this.#snackBar.open(
-            this.#translocoService.translate('users.edit.successUnlocked'),
-            this.#translocoService.translate('common.close'),
-            { duration: 5000 }
-          );
+          this.#notify.success('users.edit.successUnlocked');
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.#snackBar.open(
-            err.error?.message ||
-              this.#translocoService.translate('users.edit.errorUnlockFailed'),
-            this.#translocoService.translate('common.close'),
-            { duration: 5000 }
-          );
+          this.#notify.error(err, 'users.edit.errorUnlockFailed');
         }
       });
   }
@@ -438,23 +421,14 @@ export class UserEditComponent implements OnInit, OnDestroy {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
-          this.#snackBar.open(
-            this.#translocoService.translate('users.edit.successDeleted'),
-            this.#translocoService.translate('common.close'),
-            { duration: 5000 }
-          );
+          this.#notify.success('users.edit.successDeleted');
           void this.#router.navigate([
             `/${AppRouteSegmentEnum.Admin}`,
             AppRouteSegmentEnum.Users
           ]);
         },
         error: (err: HttpErrorResponse) => {
-          this.#snackBar.open(
-            err.error?.message ||
-              this.#translocoService.translate('users.edit.errorDeleteFailed'),
-            this.#translocoService.translate('common.close'),
-            { duration: 5000 }
-          );
+          this.#notify.error(err, 'users.edit.errorDeleteFailed');
         }
       });
   }
