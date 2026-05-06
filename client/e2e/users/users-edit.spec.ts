@@ -141,6 +141,70 @@ test.describe('User Edit page', () => {
     await expect(page.locator('.error-message')).toBeVisible();
   });
 
+  test('should show confirmation dialog when changing email', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await page.goto('/users/3/edit');
+
+    await page.getByLabel('Email').fill('renamed@example.com');
+    await page.getByLabel('Email').blur();
+    await page.getByRole('button', { name: 'Save Changes' }).click();
+
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByText('Confirm email change')).toBeVisible();
+    await expect(page.getByText(/renamed@example\.com/)).toBeVisible();
+  });
+
+  test('should not call PATCH when email-change dialog is cancelled', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+
+    let patchCalled = false;
+    await page.route('**/api/v1/users/*', (route) => {
+      if (route.request().method() === 'PATCH') {
+        patchCalled = true;
+      }
+      return route.fallback();
+    });
+
+    await page.goto('/users/3/edit');
+    await page.getByLabel('Email').fill('renamed@example.com');
+    await page.getByLabel('Email').blur();
+    await page.getByRole('button', { name: 'Save Changes' }).click();
+
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Cancel' })
+      .click();
+
+    await expect(page.getByRole('dialog')).toBeHidden();
+    expect(patchCalled).toBe(false);
+  });
+
+  test('should submit email change after confirmation', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await page.goto('/users/3/edit');
+
+    await page.getByLabel('Email').fill('renamed@example.com');
+    await page.getByLabel('Email').blur();
+    await page.getByRole('button', { name: 'Save Changes' }).click();
+
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Change email' })
+      .click();
+
+    await expect(page.getByText('User updated successfully')).toBeVisible();
+    await expect(page).toHaveURL(/.*\/users\/3$/);
+  });
+
   test('should show confirmation dialog on "Delete User" click', async ({
     _mockServer,
     page
