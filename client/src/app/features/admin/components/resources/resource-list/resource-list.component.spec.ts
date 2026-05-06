@@ -5,12 +5,12 @@ import { signal } from '@angular/core';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { of } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 
 import { ResourceListComponent } from './resource-list.component';
 import { ResourcesStore } from '../../../store/resources.store';
 import { AuthStore } from '@features/auth/store/auth.store';
+import { NotifyService } from '@core/services/notify.service';
 import type {
   ResourceResponse,
   ActionResponse
@@ -51,7 +51,12 @@ describe('ResourceListComponent', () => {
   };
   let authStoreMock: { hasPermissions: ReturnType<typeof vi.fn> };
   let dialogMock: { open: ReturnType<typeof vi.fn> };
-  let snackBarMock: { open: ReturnType<typeof vi.fn> };
+  let notifyMock: {
+    success: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+    info: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+  };
 
   async function setupComponent(): Promise<void> {
     await TestBed.configureTestingModule({
@@ -61,7 +66,7 @@ describe('ResourceListComponent', () => {
         { provide: ResourcesStore, useValue: resourcesStoreMock },
         { provide: AuthStore, useValue: authStoreMock },
         { provide: MatDialog, useValue: dialogMock },
-        { provide: MatSnackBar, useValue: snackBarMock }
+        { provide: NotifyService, useValue: notifyMock }
       ]
     }).compileComponents();
 
@@ -81,7 +86,12 @@ describe('ResourceListComponent', () => {
 
     authStoreMock = { hasPermissions: vi.fn().mockReturnValue(false) };
     dialogMock = { open: vi.fn() };
-    snackBarMock = { open: vi.fn() };
+    notifyMock = {
+      success: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn()
+    };
   });
 
   afterEach(() => {

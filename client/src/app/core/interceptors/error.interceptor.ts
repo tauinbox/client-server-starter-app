@@ -8,11 +8,10 @@ import type {
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { switchMap, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { TranslocoService } from '@jsverse/transloco';
 import type { UserPermissionsResponse } from '@app/shared/types';
 import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
 import { RBAC_RETRY_CONTEXT } from '@core/context-tokens/rbac-retry';
+import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AuthApiEnum } from '@features/auth/constants/auth-api.const';
 
@@ -20,14 +19,12 @@ export const errorInterceptor: HttpInterceptorFn = (
   request: HttpRequest<unknown>,
   next: HttpHandlerFn
 ) => {
-  const snackBar = inject(MatSnackBar);
+  const notify = inject(NotifyService);
   const http = inject(HttpClient);
   const authStore = inject(AuthStore);
-  const transloco = inject(TranslocoService);
 
   return next(request).pipe(
     catchError((error: HttpErrorResponse) => {
-      const closeLabel = transloco.translate('common.close');
       const silentMode = request.context.get(
         DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN
       );
@@ -50,13 +47,7 @@ export const errorInterceptor: HttpInterceptorFn = (
             catchError(() => {
               // Permissions fetch itself failed — show snackbar for original 403
               if (!silentMode) {
-                snackBar.open(
-                  getErrorMessageText(error, transloco),
-                  closeLabel,
-                  {
-                    duration: 5000
-                  }
-                );
+                notify.error(error);
               }
               return throwError(() => error);
             }),
@@ -69,13 +60,7 @@ export const errorInterceptor: HttpInterceptorFn = (
                 catchError((retryError: HttpErrorResponse) => {
                   // Retry failed — permission is genuinely revoked
                   if (!silentMode) {
-                    snackBar.open(
-                      getErrorMessageText(retryError, transloco),
-                      closeLabel,
-                      {
-                        duration: 5000
-                      }
-                    );
+                    notify.error(retryError);
                   }
                   return throwError(() => retryError);
                 })
@@ -86,33 +71,10 @@ export const errorInterceptor: HttpInterceptorFn = (
 
       // 401 is handled by jwt interceptor (token refresh / logout)
       if (error.status !== 401 && !silentMode) {
-        const errorMessage = getErrorMessageText(error, transloco);
-        snackBar.open(errorMessage, closeLabel, { duration: 5000 });
+        notify.error(error);
       }
 
       return throwError(() => error);
     })
   );
 };
-
-function getErrorMessageText(
-  e: HttpErrorResponse,
-  transloco: TranslocoService
-): string {
-  if (typeof e.error === 'object' && e.error !== null) {
-    const errorObj = e.error as { message?: string; errorKey?: string };
-
-    if (errorObj.errorKey) {
-      const translated = transloco.translate(errorObj.errorKey);
-      if (translated !== errorObj.errorKey) {
-        return translated;
-      }
-    }
-
-    if (errorObj.message) {
-      return errorObj.message;
-    }
-  }
-
-  return e.message || `Error Code: ${e.status}`;
-}

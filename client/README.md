@@ -111,7 +111,7 @@ NgRx Signal Store (`@ngrx/signals`):
 
 ### HTTP Interceptors
 
-1. **errorInterceptor** — catches errors, shows `MatSnackBar` notifications, skips 401s. If `errorKey` is present in the error response, translates it via `TranslocoService` (falls back to `message` if key not found). On first 403: silently re-fetches `GET /auth/permissions`, calls `AuthStore.setRules()` (which triggers `RequirePermissionsDirective` via `effect()`), then retries the original request once. `RBAC_RETRY_CONTEXT` token prevents retry loops. Permissions-fetch failure and retry failure are handled separately with distinct snackbar messages.
+1. **errorInterceptor** — catches errors, dispatches snackbar notifications via `NotifyService.error(httpErrorResponse)`, skips 401s. `NotifyService` performs the `errorKey > message > status` parsing chain (translated `errorKey` if present, otherwise server-provided `message`, otherwise HTTP status). On first 403: silently re-fetches `GET /auth/permissions`, calls `AuthStore.setRules()` (which triggers `RequirePermissionsDirective` via `effect()`), then retries the original request once. `RBAC_RETRY_CONTEXT` token prevents retry loops. Permissions-fetch failure and retry failure are handled separately and notify with the corresponding error.
 2. **jwtInterceptor** — attaches `Authorization: Bearer` header, handles 401 with token refresh + request retry, uses `shareReplay(1)` to prevent concurrent refreshes
 
 ### Path Aliases

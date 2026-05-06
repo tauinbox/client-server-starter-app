@@ -20,7 +20,6 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatChip } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   MatCell,
   MatCellDef,
@@ -35,6 +34,7 @@ import {
 } from '@angular/material/table';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { RoleAdminResponse } from '@app/shared/types/role.types';
+import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AuthService } from '@features/auth/services/auth.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
@@ -82,7 +82,7 @@ export class RoleListComponent implements OnInit {
   readonly #rolesStore = inject(RolesStore);
   readonly #dialog = inject(MatDialog);
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
-  readonly #snackBar = inject(MatSnackBar);
+  readonly #notify = inject(NotifyService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #authService = inject(AuthService);
   readonly #translocoService = inject(TranslocoService);
@@ -129,23 +129,10 @@ export class RoleListComponent implements OnInit {
             .pipe(takeUntilDestroyed(this.#destroyRef))
             .subscribe({
               next: () => {
-                this.#snackBar.open(
-                  this.#translocoService.translate(
-                    'admin.roles.successCreated'
-                  ),
-                  this.#translocoService.translate('common.close'),
-                  { duration: 5000 }
-                );
+                this.#notify.success('admin.roles.successCreated');
               },
               error: (err) => {
-                this.#snackBar.open(
-                  (err.error?.message as string) ||
-                    this.#translocoService.translate(
-                      'admin.roles.errorCreateFailed'
-                    ),
-                  this.#translocoService.translate('common.close'),
-                  { duration: 5000 }
-                );
+                this.#notify.error(err, 'admin.roles.errorCreateFailed');
               }
             });
         }
@@ -168,23 +155,10 @@ export class RoleListComponent implements OnInit {
             .pipe(takeUntilDestroyed(this.#destroyRef))
             .subscribe({
               next: () => {
-                this.#snackBar.open(
-                  this.#translocoService.translate(
-                    'admin.roles.successUpdated'
-                  ),
-                  this.#translocoService.translate('common.close'),
-                  { duration: 5000 }
-                );
+                this.#notify.success('admin.roles.successUpdated');
               },
               error: (err) => {
-                this.#snackBar.open(
-                  (err.error?.message as string) ||
-                    this.#translocoService.translate(
-                      'admin.roles.errorUpdateFailed'
-                    ),
-                  this.#translocoService.translate('common.close'),
-                  { duration: 5000 }
-                );
+                this.#notify.error(err, 'admin.roles.errorUpdateFailed');
               }
             });
         }
@@ -205,11 +179,7 @@ export class RoleListComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((changed: boolean | undefined) => {
         if (changed) {
-          this.#snackBar.open(
-            this.#translocoService.translate('admin.roles.permissionsUpdated'),
-            this.#translocoService.translate('common.close'),
-            { duration: 5000 }
-          );
+          this.#notify.success('admin.roles.permissionsUpdated');
           void this.#authService.fetchPermissions();
         }
       });
@@ -236,23 +206,10 @@ export class RoleListComponent implements OnInit {
             .pipe(takeUntilDestroyed(this.#destroyRef))
             .subscribe({
               next: () => {
-                this.#snackBar.open(
-                  this.#translocoService.translate(
-                    'admin.roles.successDeleted'
-                  ),
-                  this.#translocoService.translate('common.close'),
-                  { duration: 5000 }
-                );
+                this.#notify.success('admin.roles.successDeleted');
               },
               error: (err) => {
-                this.#snackBar.open(
-                  (err.error?.message as string) ||
-                    this.#translocoService.translate(
-                      'admin.roles.errorDeleteFailed'
-                    ),
-                  this.#translocoService.translate('common.close'),
-                  { duration: 5000 }
-                );
+                this.#notify.error(err, 'admin.roles.errorDeleteFailed');
               }
             });
         }

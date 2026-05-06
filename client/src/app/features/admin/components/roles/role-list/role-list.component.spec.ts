@@ -4,9 +4,9 @@ import { signal } from '@angular/core';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { of } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import type { RoleAdminResponse } from '@app/shared/types/role.types';
+import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { RolesStore } from '../../../store/roles.store';
 import { RoleListComponent } from './role-list.component';
@@ -37,7 +37,12 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     deleteRole: ReturnType<typeof vi.fn>;
   };
   let dialogMock: { open: ReturnType<typeof vi.fn> };
-  let snackBarMock: { open: ReturnType<typeof vi.fn> };
+  let notifyMock: {
+    success: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+    info: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     rolesStoreMock = {
@@ -57,7 +62,12 @@ describe('RoleListComponent — openPermissionsDialog', () => {
       })
     };
 
-    snackBarMock = { open: vi.fn() };
+    notifyMock = {
+      success: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn()
+    };
   });
 
   afterEach(() => {
@@ -72,7 +82,7 @@ describe('RoleListComponent — openPermissionsDialog', () => {
         { provide: RolesStore, useValue: rolesStoreMock },
         { provide: AuthStore, useValue: authStoreMock },
         { provide: MatDialog, useValue: dialogMock },
-        { provide: MatSnackBar, useValue: snackBarMock }
+        { provide: NotifyService, useValue: notifyMock }
       ]
     }).compileComponents();
 

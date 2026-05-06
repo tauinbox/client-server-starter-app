@@ -10,11 +10,11 @@ import {
   HttpTestingController,
   provideHttpClientTesting
 } from '@angular/common/http/testing';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslocoTestingModuleWithLangs } from '../../../test-utils/transloco-testing';
 import { errorInterceptor } from './error.interceptor';
 import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
 import { RBAC_RETRY_CONTEXT } from '@core/context-tokens/rbac-retry';
+import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AuthApiEnum } from '@features/auth/constants/auth-api.const';
 
@@ -23,11 +23,21 @@ const mockRules = [[['read', 'User']]];
 describe('errorInterceptor', () => {
   let http: HttpClient;
   let httpMock: HttpTestingController;
-  let snackBarMock: { open: ReturnType<typeof vi.fn> };
+  let notifyMock: {
+    success: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+    info: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+  };
   let authStoreMock: { setRules: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
-    snackBarMock = { open: vi.fn() };
+    notifyMock = {
+      success: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn()
+    };
     authStoreMock = { setRules: vi.fn() };
 
     TestBed.configureTestingModule({
@@ -35,7 +45,7 @@ describe('errorInterceptor', () => {
       providers: [
         provideHttpClient(withInterceptors([errorInterceptor])),
         provideHttpClientTesting(),
-        { provide: MatSnackBar, useValue: snackBarMock },
+        { provide: NotifyService, useValue: notifyMock },
         { provide: AuthStore, useValue: authStoreMock }
       ]
     });
@@ -48,7 +58,7 @@ describe('errorInterceptor', () => {
     httpMock.verify();
   });
 
-  it('should show snackbar for non-401 error', () => {
+  it('should notify for non-401 error', () => {
     http.get('/api/test').subscribe({ error: vi.fn() });
 
     const req = httpMock.expectOne('/api/test');
@@ -57,12 +67,12 @@ describe('errorInterceptor', () => {
       { status: 500, statusText: 'Internal Server Error' }
     );
 
-    expect(snackBarMock.open).toHaveBeenCalledWith('Server Error', 'Close', {
-      duration: 5000
-    });
+    expect(notifyMock.error).toHaveBeenCalledTimes(1);
+    const arg = notifyMock.error.mock.calls[0][0] as HttpErrorResponse;
+    expect(arg.status).toBe(500);
   });
 
-  it('should not show snackbar for 401 error', () => {
+  it('should not notify for 401 error', () => {
     http.get('/api/test').subscribe({ error: vi.fn() });
 
     const req = httpMock.expectOne('/api/test');
@@ -71,10 +81,10 @@ describe('errorInterceptor', () => {
       { status: 401, statusText: 'Unauthorized' }
     );
 
-    expect(snackBarMock.open).not.toHaveBeenCalled();
+    expect(notifyMock.error).not.toHaveBeenCalled();
   });
 
-  it('should not show snackbar when silent context is set', () => {
+  it('should not notify when silent context is set', () => {
     const context = new HttpContext().set(
       DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN,
       true
@@ -88,7 +98,7 @@ describe('errorInterceptor', () => {
       { status: 400, statusText: 'Bad Request' }
     );
 
-    expect(snackBarMock.open).not.toHaveBeenCalled();
+    expect(notifyMock.error).not.toHaveBeenCalled();
   });
 
   it('should rethrow the error', () => {
@@ -110,18 +120,16 @@ describe('errorInterceptor', () => {
     expect(caughtError!.status).toBe(404);
   });
 
-  it('should fallback to error.message when no server message', () => {
+  it('should notify when no server message in response body', () => {
     http.get('/api/test').subscribe({ error: vi.fn() });
 
     const req = httpMock.expectOne('/api/test');
     req.flush(null, { status: 500, statusText: 'Internal Server Error' });
 
-    expect(snackBarMock.open).toHaveBeenCalled();
-    const message = snackBarMock.open.mock.calls[0][0] as string;
-    expect(message).toBeTruthy();
+    expect(notifyMock.error).toHaveBeenCalledTimes(1);
   });
 
-  it('should fallback to status code when no message available', () => {
+  it('should notify on network errors (no error body)', () => {
     http.get('/api/test').subscribe({ error: vi.fn() });
 
     const req = httpMock.expectOne('/api/test');
@@ -131,7 +139,7 @@ describe('errorInterceptor', () => {
       statusText: 'Unknown Error'
     });
 
-    expect(snackBarMock.open).toHaveBeenCalled();
+    expect(notifyMock.error).toHaveBeenCalledTimes(1);
   });
 
   describe('403 permissions refresh', () => {
@@ -152,7 +160,7 @@ describe('errorInterceptor', () => {
         .flush({ data: 'ok' }, { status: 200, statusText: 'OK' });
 
       expect(authStoreMock.setRules).toHaveBeenCalledWith(mockRules);
-      expect(snackBarMock.open).not.toHaveBeenCalled();
+      expect(notifyMock.error).not.toHaveBeenCalled();
     });
 
     it('should return retried response on success', () => {
@@ -177,7 +185,7 @@ describe('errorInterceptor', () => {
       expect(result).toEqual({ data: 'ok' });
     });
 
-    it('should show snackbar with retry error message when retry fails', () => {
+    it('should notify with retry error (not original) when retry fails', () => {
       http.get('/api/test').subscribe({ error: vi.fn() });
 
       httpMock
@@ -197,13 +205,12 @@ describe('errorInterceptor', () => {
           { status: 403, statusText: 'Forbidden' }
         );
 
-      // Snackbar shows retry error (not original), so caller knows the current state
-      expect(snackBarMock.open).toHaveBeenCalledWith(
-        'Still Forbidden',
-        'Close',
-        { duration: 5000 }
+      // Notify is called with the retry error (not original), so caller knows the current state
+      expect(notifyMock.error).toHaveBeenCalledTimes(1);
+      const arg = notifyMock.error.mock.calls[0][0] as HttpErrorResponse;
+      expect((arg.error as { message: string }).message).toBe(
+        'Still Forbidden'
       );
-      expect(snackBarMock.open).toHaveBeenCalledTimes(1);
     });
 
     it('should rethrow retry error (not original) when retry fails', () => {
@@ -233,7 +240,7 @@ describe('errorInterceptor', () => {
       );
     });
 
-    it('should show snackbar with original error when permissions fetch fails', () => {
+    it('should notify with original error when permissions fetch fails', () => {
       http.get('/api/test').subscribe({ error: vi.fn() });
 
       httpMock
@@ -254,9 +261,9 @@ describe('errorInterceptor', () => {
       httpMock.expectNone('/api/test');
 
       expect(authStoreMock.setRules).not.toHaveBeenCalled();
-      expect(snackBarMock.open).toHaveBeenCalledWith('Forbidden', 'Close', {
-        duration: 5000
-      });
+      expect(notifyMock.error).toHaveBeenCalledTimes(1);
+      const arg = notifyMock.error.mock.calls[0][0] as HttpErrorResponse;
+      expect((arg.error as { message: string }).message).toBe('Forbidden');
     });
 
     it('should rethrow original error when permissions fetch fails', () => {
@@ -291,12 +298,12 @@ describe('errorInterceptor', () => {
 
       httpMock.expectNone(AuthApiEnum.Permissions);
 
-      expect(snackBarMock.open).toHaveBeenCalledWith('Forbidden', 'Close', {
-        duration: 5000
-      });
+      expect(notifyMock.error).toHaveBeenCalledTimes(1);
+      const arg = notifyMock.error.mock.calls[0][0] as HttpErrorResponse;
+      expect((arg.error as { message: string }).message).toBe('Forbidden');
     });
 
-    it('should not show snackbar for silent 403 when permissions fetch fails', () => {
+    it('should not notify for silent 403 when permissions fetch fails', () => {
       const context = new HttpContext().set(
         DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN,
         true
@@ -315,10 +322,10 @@ describe('errorInterceptor', () => {
         .expectOne(AuthApiEnum.Permissions)
         .flush({ message: 'Error' }, { status: 500, statusText: 'Error' });
 
-      expect(snackBarMock.open).not.toHaveBeenCalled();
+      expect(notifyMock.error).not.toHaveBeenCalled();
     });
 
-    it('should not show snackbar for silent 403 when retry fails', () => {
+    it('should not notify for silent 403 when retry fails', () => {
       const context = new HttpContext().set(
         DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN,
         true
@@ -342,7 +349,7 @@ describe('errorInterceptor', () => {
           { status: 403, statusText: 'Forbidden' }
         );
 
-      expect(snackBarMock.open).not.toHaveBeenCalled();
+      expect(notifyMock.error).not.toHaveBeenCalled();
     });
   });
 });

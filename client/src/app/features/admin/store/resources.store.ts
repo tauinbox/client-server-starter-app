@@ -4,12 +4,11 @@ import { forkJoin, pipe, switchMap, tap } from 'rxjs';
 import { tapResponse } from '@ngrx/operators';
 import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { TranslocoService } from '@jsverse/transloco';
 import type {
   ActionResponse,
   ResourceResponse
 } from '@app/shared/types/rbac.types';
+import { NotifyService } from '@core/services/notify.service';
 import { AuthService } from '@features/auth/services/auth.service';
 import type {
   CreateAction,
@@ -33,8 +32,7 @@ export const ResourcesStore = signalStore(
   withMethods((store) => {
     const rbacService = inject(RbacAdminService);
     const authService = inject(AuthService);
-    const snackBar = inject(MatSnackBar);
-    const translocoService = inject(TranslocoService);
+    const notify = inject(NotifyService);
 
     return {
       load: rxMethod<void>(
@@ -51,13 +49,7 @@ export const ResourcesStore = signalStore(
                 },
                 error: () => {
                   patchState(store, { loading: false });
-                  snackBar.open(
-                    translocoService.translate(
-                      'admin.store.errorLoadResourcesFailed'
-                    ),
-                    translocoService.translate('common.close'),
-                    { duration: 5000 }
-                  );
+                  notify.error('admin.store.errorLoadResourcesFailed');
                 }
               })
             )
