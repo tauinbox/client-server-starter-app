@@ -1,4 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
+import { subject } from '@casl/ability';
 import { assertCan } from './assert-can.util';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 
@@ -111,6 +112,43 @@ describe('assertCan', () => {
       // expected
     }
 
+    expect(metricsService.recordPermissionDenied).toHaveBeenCalledWith(
+      'instance',
+      'update',
+      'User'
+    );
+  });
+
+  it('uses CASL __caslSubjectType__ brand as audit subject when present', () => {
+    const ability = { can: jest.fn().mockReturnValue(false) };
+    const metricsService = { recordPermissionDenied: jest.fn() };
+
+    class FooEntity {
+      id = '7';
+    }
+    const branded = subject('User', new FooEntity());
+
+    try {
+      assertCan(
+        // @ts-expect-error partial mock
+        ability,
+        'update',
+        branded,
+        auditService,
+        { actorId: 'actor-1', targetId: '7', targetType: 'User' },
+        metricsService
+      );
+    } catch {
+      // expected
+    }
+
+    expect(auditService.logFireAndForget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: expect.objectContaining({
+          subject: 'User'
+        }) as Record<string, unknown>
+      })
+    );
     expect(metricsService.recordPermissionDenied).toHaveBeenCalledWith(
       'instance',
       'update',

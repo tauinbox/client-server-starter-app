@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { subject } from '@casl/ability';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import * as bcrypt from 'bcrypt';
 import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
@@ -207,7 +208,7 @@ export class UsersService {
       assertCan(
         ability,
         'update',
-        user,
+        subject('User', user),
         this.auditService,
         { targetId: id, targetType: 'User' },
         this.metricsService
@@ -373,7 +374,7 @@ export class UsersService {
       assertCan(
         ability,
         'delete',
-        user,
+        subject('User', user),
         this.auditService,
         { targetId: id, targetType: 'User' },
         this.metricsService
@@ -403,7 +404,7 @@ export class UsersService {
       assertCan(
         ability,
         'delete',
-        user,
+        subject('User', user),
         this.auditService,
         { targetId: id, targetType: 'User' },
         this.metricsService
