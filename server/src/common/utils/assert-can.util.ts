@@ -30,7 +30,9 @@ export function assertCan(
   const subjectName =
     typeof subject === 'string'
       ? subject
-      : (subject.constructor?.name ?? 'unknown');
+      : ((subject as { __caslSubjectType__?: string }).__caslSubjectType__ ??
+        subject.constructor?.name ??
+        'unknown');
 
   auditService.logFireAndForget({
     action: AuditAction.PERMISSION_CHECK_FAILURE,

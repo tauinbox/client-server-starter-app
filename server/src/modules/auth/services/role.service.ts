@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { subject } from '@casl/ability';
 import { Role } from '../entities/role.entity';
 import { Permission } from '../entities/permission.entity';
 import { RolePermission } from '../entities/role-permission.entity';
@@ -253,7 +254,7 @@ export class RoleService {
         assertCan(
           ability,
           'update',
-          targetUser,
+          subject('User', targetUser),
           this.auditService,
           { actorId, targetId: userId, targetType: 'User' },
           this.metricsService
@@ -303,7 +304,7 @@ export class RoleService {
         assertCan(
           ability,
           'update',
-          targetUser,
+          subject('User', targetUser),
           this.auditService,
           { targetId: userId, targetType: 'User' },
           this.metricsService

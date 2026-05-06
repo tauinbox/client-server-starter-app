@@ -1,16 +1,13 @@
 import {
   AbilityBuilder,
   createMongoAbility,
-  InferSubjects,
+  ForcedSubject,
   MongoAbility
 } from '@casl/ability';
 import type {
   KnownActions,
   KnownSubjects
 } from '@app/shared/generated/casl-subjects';
-import type { User } from '../../users/entities/user.entity';
-import type { Role } from '../entities/role.entity';
-import type { Permission } from '../entities/permission.entity';
 
 /**
  * CASL action type — string for MongoAbility compatibility (custom actions
@@ -20,15 +17,29 @@ import type { Permission } from '../entities/permission.entity';
 export type Actions = string;
 
 /**
- * Entity classes that support instance-level CASL checks (ability.can(action, entity)).
- * Add new entity classes here when their controller registers a new resource.
- * String literals come from KnownSubjects (auto-generated from @RegisterResource).
+ * Branded plain-object subject for instance-level CASL checks. Wrap entity
+ * instances at the call site with CASL's `subject()` helper:
+ *
+ *   import { subject } from '@casl/ability';
+ *   ability.can('update', subject('User', userInstance));
+ *
+ * Adding a new entity does not require editing this file — `KnownSubjects`
+ * is auto-generated from `@RegisterResource` decorators.
+ *
+ * The mapped type distributes over each subject string so CASL's
+ * `Extract<…, TaggedInterface<S>>` resolves to the matching brand. The
+ * `Record<PropertyKey, any>` intersection lets MongoQuery accept arbitrary
+ * condition fields and keeps TypeORM class instances assignable (CASL's own
+ * `setSubjectType` uses the same shape — class instances satisfy it via
+ * `any`'s bivariance).
  */
-type EntitySubjects = InferSubjects<
-  typeof User | typeof Role | typeof Permission
->;
+type SubjectInstanceMap = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [K in KnownSubjects]: ForcedSubject<K> & Record<PropertyKey, any>;
+};
+export type SubjectInstance = SubjectInstanceMap[KnownSubjects];
 
-export type Subjects = EntitySubjects | KnownSubjects | 'all';
+export type Subjects = KnownSubjects | SubjectInstance | 'all';
 
 export type AppAbility = MongoAbility<[Actions, Subjects]>;
 
