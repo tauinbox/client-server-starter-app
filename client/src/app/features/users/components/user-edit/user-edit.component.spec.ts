@@ -696,6 +696,86 @@ describe('UserEditComponent', () => {
     });
   });
 
+  describe('email change confirmation', () => {
+    beforeEach(() => {
+      fixture.detectChanges();
+    });
+
+    it('should open confirm dialog when email changes on submit', () => {
+      const dialogRefMock = {
+        afterClosed: vi.fn().mockReturnValue(of(false))
+      };
+      dialogMock.open.mockReturnValue(dialogRefMock);
+
+      component.userModel.set({
+        email: 'new@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
+      component.onSubmit();
+
+      expect(dialogMock.open).toHaveBeenCalled();
+      const dialogData = dialogMock.open.mock.calls[0][1]['data'];
+      expect(dialogData['message']).toContain('new@example.com');
+      expect(dialogData['message']).toContain('Test User');
+    });
+
+    it('should not call updateUser when email-change dialog is cancelled', () => {
+      const dialogRefMock = {
+        afterClosed: vi.fn().mockReturnValue(of(false))
+      };
+      dialogMock.open.mockReturnValue(dialogRefMock);
+
+      component.userModel.set({
+        email: 'new@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
+      component.onSubmit();
+
+      expect(usersStoreMock.updateUser).not.toHaveBeenCalled();
+    });
+
+    it('should call updateUser with new email when dialog is confirmed', () => {
+      const dialogRefMock = {
+        afterClosed: vi.fn().mockReturnValue(of(true))
+      };
+      dialogMock.open.mockReturnValue(dialogRefMock);
+
+      component.userModel.set({
+        email: 'new@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
+      component.onSubmit();
+
+      expect(usersStoreMock.updateUser).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({ email: 'new@example.com' })
+      );
+    });
+
+    it('should not open dialog when only non-email fields changed', () => {
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Changed',
+        lastName: 'User',
+        password: ''
+      });
+      TestBed.tick();
+      component.onSubmit();
+
+      expect(dialogMock.open).not.toHaveBeenCalled();
+      expect(usersStoreMock.updateUser).toHaveBeenCalled();
+    });
+  });
+
   describe('confirmDelete', () => {
     beforeEach(() => {
       fixture.detectChanges();

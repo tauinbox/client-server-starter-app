@@ -249,6 +249,43 @@ export class UserEditComponent implements OnInit, OnDestroy {
   onSubmit(): void {
     if (!this.canSubmit()) return;
 
+    const newEmail = this.userModel().email;
+    const emailChanged = newEmail !== this.#initialFormData().email;
+    const u = this.user();
+
+    if (!emailChanged || !u) {
+      this.#performSave();
+      return;
+    }
+
+    this.#adaptiveDialog
+      .openConfirm({
+        title: this.#translocoService.translate(
+          'users.edit.confirmEmailChangeTitle'
+        ),
+        message: this.#translocoService.translate(
+          'users.edit.confirmEmailChangeMessage',
+          {
+            firstName: u.firstName,
+            lastName: u.lastName,
+            newEmail
+          }
+        ),
+        confirmButton: this.#translocoService.translate(
+          'users.edit.confirmEmailChangeButton'
+        ),
+        cancelButton: this.#translocoService.translate('common.cancel'),
+        icon: 'mark_email_unread'
+      })
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe((confirmed) => {
+        if (confirmed) {
+          this.#performSave();
+        }
+      });
+  }
+
+  #performSave(): void {
     this.saving.set(true);
     this.error.set(null);
 
