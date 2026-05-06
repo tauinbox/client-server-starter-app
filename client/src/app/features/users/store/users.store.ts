@@ -1,5 +1,4 @@
 import { computed, inject } from '@angular/core';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslocoService } from '@jsverse/transloco';
 import type { Observable } from 'rxjs';
 import { pipe, switchMap, tap } from 'rxjs';
@@ -20,6 +19,7 @@ import {
 } from '@ngrx/signals/entities';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { DEFAULT_SORT_BY, DEFAULT_SORT_ORDER } from '@app/shared/constants';
+import { NotifyService } from '@core/services/notify.service';
 import { UserService } from '../services/user.service';
 import type {
   PaginatedResponse,
@@ -68,7 +68,7 @@ export const UsersStore = signalStore(
   })),
   withMethods((store) => {
     const userService = inject(UserService);
-    const snackBar = inject(MatSnackBar);
+    const notify = inject(NotifyService);
     const translocoService = inject(TranslocoService);
 
     function buildRequest(page: number): Observable<PaginatedResponse<User>> {
@@ -107,18 +107,13 @@ export const UsersStore = signalStore(
                   });
                 },
                 error: () => {
-                  const msg = translocoService.translate(
-                    'users.store.errorLoadFailed'
-                  );
                   patchState(store, {
                     loading: false,
-                    error: msg
+                    error: translocoService.translate(
+                      'users.store.errorLoadFailed'
+                    )
                   });
-                  snackBar.open(
-                    msg,
-                    translocoService.translate('common.close'),
-                    { duration: 5000 }
-                  );
+                  notify.error('users.store.errorLoadFailed');
                 }
               })
             )
@@ -146,19 +141,14 @@ export const UsersStore = signalStore(
                   });
                 },
                 error: () => {
-                  const msg = translocoService.translate(
-                    'users.store.errorLoadMoreFailed'
-                  );
                   patchState(store, {
                     isLoadingMore: false,
                     currentPage: store.currentPage() - 1,
-                    error: msg
+                    error: translocoService.translate(
+                      'users.store.errorLoadMoreFailed'
+                    )
                   });
-                  snackBar.open(
-                    msg,
-                    translocoService.translate('common.close'),
-                    { duration: 5000 }
-                  );
+                  notify.error('users.store.errorLoadMoreFailed');
                 }
               })
             )
@@ -179,18 +169,13 @@ export const UsersStore = signalStore(
                   patchState(store, { detailLoading: false });
                 },
                 error: () => {
-                  const msg = translocoService.translate(
-                    'users.store.errorLoadDetailsFailed'
-                  );
                   patchState(store, {
                     detailLoading: false,
-                    detailError: msg
+                    detailError: translocoService.translate(
+                      'users.store.errorLoadDetailsFailed'
+                    )
                   });
-                  snackBar.open(
-                    msg,
-                    translocoService.translate('common.close'),
-                    { duration: 5000 }
-                  );
+                  notify.error('users.store.errorLoadDetailsFailed');
                 }
               })
             )
