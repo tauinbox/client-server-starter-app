@@ -22,7 +22,7 @@ import { MatIcon } from '@angular/material/icon';
 import { DOCUMENT, DatePipe } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 import { SessionStorageService } from '@core/services/session-storage.service';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { NotifyService } from '@core/services/notify.service';
 import type { UserResponse } from '@app/shared/types';
 import type { UpdateProfile } from '../../models/auth.types';
 import type { HttpErrorResponse } from '@angular/common/http';
@@ -82,7 +82,7 @@ const INITIAL_PROFILE: ProfileData = {
 })
 export class ProfileComponent implements OnInit {
   readonly #authService = inject(AuthService);
-  readonly #snackBar = inject(MatSnackBar);
+  readonly #notify = inject(NotifyService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #sessionStorage = inject(SessionStorageService);
   readonly #window = inject(DOCUMENT).defaultView;
@@ -167,23 +167,15 @@ export class ProfileComponent implements OnInit {
       const providerLabel = this.#transloco.translate(
         PROVIDER_KEYS[provider] || 'auth.providers.' + provider
       );
-      this.#snackBar.open(
-        this.#transloco.translate('auth.profile.oauthConnected', {
-          provider: providerLabel
-        }),
-        'Close',
-        { duration: 5000 }
-      );
+      this.#notify.success('auth.profile.oauthConnected', {
+        provider: providerLabel
+      });
       void this.#router.navigate([], {
         queryParams: { oauth_linked: null },
         queryParamsHandling: 'merge'
       });
     } else if (error) {
-      this.#snackBar.open(
-        this.#transloco.translate('auth.profile.errorLinkFailed'),
-        'Close',
-        { duration: 5000 }
-      );
+      this.#notify.error('auth.profile.errorLinkFailed');
       void this.#router.navigate([], {
         queryParams: { oauth_error: null },
         queryParamsHandling: 'merge'
@@ -250,12 +242,7 @@ export class ProfileComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.oauthLoading.set(false);
-          this.#snackBar.open(
-            err.error?.message ||
-              this.#transloco.translate('auth.profile.errorInitiateLinkFailed'),
-            'Close',
-            { duration: 5000 }
-          );
+          this.#notify.error(err, 'auth.profile.errorInitiateLinkFailed');
         }
       });
   }
@@ -274,22 +261,13 @@ export class ProfileComponent implements OnInit {
           const providerLabel = this.#transloco.translate(
             PROVIDER_KEYS[provider] || 'auth.providers.' + provider
           );
-          this.#snackBar.open(
-            this.#transloco.translate('auth.profile.oauthDisconnected', {
-              provider: providerLabel
-            }),
-            'Close',
-            { duration: 5000 }
-          );
+          this.#notify.success('auth.profile.oauthDisconnected', {
+            provider: providerLabel
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.oauthLoading.set(false);
-          this.#snackBar.open(
-            err.error?.message ||
-              this.#transloco.translate('auth.profile.errorDisconnectFailed'),
-            'Close',
-            { duration: 5000 }
-          );
+          this.#notify.error(err, 'auth.profile.errorDisconnectFailed');
         }
       });
   }
@@ -329,11 +307,7 @@ export class ProfileComponent implements OnInit {
           });
           this.profileForm().reset();
 
-          this.#snackBar.open(
-            this.#transloco.translate('auth.profile.successUpdated'),
-            'Close',
-            { duration: 5000 }
-          );
+          this.#notify.success('auth.profile.successUpdated');
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);

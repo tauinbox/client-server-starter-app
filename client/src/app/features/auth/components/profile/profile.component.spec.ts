@@ -5,13 +5,13 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute } from '@angular/router';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { ProfileComponent } from './profile.component';
 import { AuthService } from '../../services/auth.service';
+import { NotifyService } from '@core/services/notify.service';
 import type { RoleResponse, UserResponse } from '@app/shared/types';
 
 const mockUserRole: RoleResponse = {
@@ -45,7 +45,12 @@ describe('ProfileComponent', () => {
     unlinkOAuthAccount: ReturnType<typeof vi.fn>;
     initOAuthLink: ReturnType<typeof vi.fn>;
   };
-  let snackBarMock: { open: ReturnType<typeof vi.fn> };
+  let notifyMock: {
+    success: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+    info: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+  };
   let activatedRouteMock: { snapshot: { queryParamMap: Map<string, string> } };
 
   beforeEach(async () => {
@@ -57,7 +62,12 @@ describe('ProfileComponent', () => {
       initOAuthLink: vi.fn().mockReturnValue(of({ message: 'Link initiated' }))
     };
 
-    snackBarMock = { open: vi.fn() };
+    notifyMock = {
+      success: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn()
+    };
 
     activatedRouteMock = {
       snapshot: {
@@ -73,7 +83,7 @@ describe('ProfileComponent', () => {
         provideHttpClientTesting(),
         provideNoopAnimations(),
         { provide: AuthService, useValue: authServiceMock },
-        { provide: MatSnackBar, useValue: snackBarMock },
+        { provide: NotifyService, useValue: notifyMock },
         { provide: ActivatedRoute, useValue: activatedRouteMock }
       ]
     }).compileComponents();
@@ -329,10 +339,8 @@ describe('ProfileComponent', () => {
       TestBed.tick();
       component.onSubmit();
 
-      expect(snackBarMock.open).toHaveBeenCalledWith(
-        'Profile updated successfully',
-        'Close',
-        { duration: 5000 }
+      expect(notifyMock.success).toHaveBeenCalledWith(
+        'auth.profile.successUpdated'
       );
       expect(component['user']()).toEqual(updatedUser);
       expect(component['saving']()).toBe(false);
