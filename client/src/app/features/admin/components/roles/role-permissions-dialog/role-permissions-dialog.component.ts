@@ -21,7 +21,6 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatIconModule } from '@angular/material/icon';
@@ -32,6 +31,7 @@ import type {
   PermissionResponse,
   RoleAdminResponse
 } from '@app/shared/types/role.types';
+import { NotifyService } from '@core/services/notify.service';
 import type { RolePermissionItem } from '../../../services/role.service';
 import { RoleService } from '../../../services/role.service';
 import { ConditionBuilderComponent } from './condition-builder/condition-builder.component';
@@ -70,7 +70,7 @@ export type PermissionGroup = {
 export class RolePermissionsDialogComponent implements OnInit {
   readonly #roleService = inject(RoleService);
   readonly #dialogRef = inject(MatDialogRef<RolePermissionsDialogComponent>);
-  readonly #snackBar = inject(MatSnackBar);
+  readonly #notify = inject(NotifyService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #translocoService = inject(TranslocoService);
 
@@ -467,14 +467,7 @@ export class RolePermissionsDialogComponent implements OnInit {
         },
         error: (err) => {
           this.saving.set(false);
-          this.#snackBar.open(
-            (err.error?.message as string) ||
-              this.#translocoService.translate(
-                'admin.rolePermissions.errorSaveFailed'
-              ),
-            this.#translocoService.translate('common.close'),
-            { duration: 5000 }
-          );
+          this.#notify.error(err, 'admin.rolePermissions.errorSaveFailed');
         }
       });
   }

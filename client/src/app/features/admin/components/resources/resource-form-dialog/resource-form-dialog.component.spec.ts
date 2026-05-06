@@ -5,12 +5,12 @@ import { signal } from '@angular/core';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { of } from 'rxjs';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 
 import { ResourceFormDialogComponent } from './resource-form-dialog.component';
 import type { ResourceFormDialogData } from './resource-form-dialog.component';
 import { ResourcesStore } from '../../../store/resources.store';
+import { NotifyService } from '@core/services/notify.service';
 import type {
   ActionResponse,
   ResourceResponse
@@ -67,7 +67,12 @@ describe('ResourceFormDialogComponent', () => {
     load: ReturnType<typeof vi.fn>;
     updateResource: ReturnType<typeof vi.fn>;
   };
-  let snackBarMock: { open: ReturnType<typeof vi.fn> };
+  let notifyMock: {
+    success: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+    info: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+  };
 
   function createComponent(
     data: ResourceFormDialogData = {
@@ -84,7 +89,7 @@ describe('ResourceFormDialogComponent', () => {
         { provide: MatDialogRef, useValue: dialogRefMock },
         { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: ResourcesStore, useValue: resourcesStoreMock },
-        { provide: MatSnackBar, useValue: snackBarMock }
+        { provide: NotifyService, useValue: notifyMock }
       ]
     });
 
@@ -102,7 +107,12 @@ describe('ResourceFormDialogComponent', () => {
       load: vi.fn(),
       updateResource: vi.fn().mockReturnValue(of(mockResource))
     };
-    snackBarMock = { open: vi.fn() };
+    notifyMock = {
+      success: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn()
+    };
   });
 
   it('renders "Edit Resource" title', () => {

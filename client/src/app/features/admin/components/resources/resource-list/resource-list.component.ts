@@ -20,8 +20,7 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatChip } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { TranslocoDirective } from '@jsverse/transloco';
 import {
   MatCell,
   MatCellDef,
@@ -35,6 +34,7 @@ import {
   MatTable
 } from '@angular/material/table';
 import type { ResourceResponse } from '@app/shared/types/rbac.types';
+import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { ResourcesStore } from '../../../store/resources.store';
@@ -72,9 +72,8 @@ import { ResourceFormDialogComponent } from '../resource-form-dialog/resource-fo
 export class ResourceListComponent implements OnInit {
   readonly #resourcesStore = inject(ResourcesStore);
   readonly #dialog = inject(MatDialog);
-  readonly #snackBar = inject(MatSnackBar);
+  readonly #notify = inject(NotifyService);
   readonly #destroyRef = inject(DestroyRef);
-  readonly #translocoService = inject(TranslocoService);
   readonly #viewContainerRef = inject(ViewContainerRef);
   protected readonly authStore = inject(AuthStore);
 
@@ -104,24 +103,12 @@ export class ResourceListComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
-          this.#snackBar.open(
-            this.#translocoService.translate(
-              'admin.resources.successRestored',
-              { name: resource.displayName }
-            ),
-            this.#translocoService.translate('common.close'),
-            { duration: 5000 }
-          );
+          this.#notify.success('admin.resources.successRestored', {
+            name: resource.displayName
+          });
         },
-        error: (err: { error?: { message?: string } }) => {
-          this.#snackBar.open(
-            err.error?.message ??
-              this.#translocoService.translate(
-                'admin.resources.errorRestoreFailed'
-              ),
-            this.#translocoService.translate('common.close'),
-            { duration: 5000 }
-          );
+        error: (err) => {
+          this.#notify.error(err, 'admin.resources.errorRestoreFailed');
         }
       });
   }

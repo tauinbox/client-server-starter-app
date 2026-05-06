@@ -3,9 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { of } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import type { RoleAdminResponse } from '@app/shared/types/role.types';
+import { NotifyService } from '@core/services/notify.service';
 import type { RolePermissionItem } from '../../../services/role.service';
 import { RoleService } from '../../../services/role.service';
 import { RolePermissionsDialogComponent } from './role-permissions-dialog.component';
@@ -89,7 +89,12 @@ function setup(
     setPermissions: vi.fn().mockReturnValue(of(undefined))
   };
   const dialogRefMock = { close: vi.fn() };
-  const snackBarMock = { open: vi.fn() };
+  const notifyMock = {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn()
+  };
 
   const dialogData =
     options.readonly !== undefined
@@ -103,7 +108,7 @@ function setup(
       { provide: MAT_DIALOG_DATA, useValue: dialogData },
       { provide: MatDialogRef, useValue: dialogRefMock },
       { provide: RoleService, useValue: roleServiceMock },
-      { provide: MatSnackBar, useValue: snackBarMock }
+      { provide: NotifyService, useValue: notifyMock }
     ]
   });
 
@@ -460,7 +465,15 @@ describe('RolePermissionsDialogComponent', () => {
           { provide: MAT_DIALOG_DATA, useValue: { role: systemRole } },
           { provide: MatDialogRef, useValue: { close: vi.fn() } },
           { provide: RoleService, useValue: roleServiceMock },
-          { provide: MatSnackBar, useValue: { open: vi.fn() } }
+          {
+            provide: NotifyService,
+            useValue: {
+              success: vi.fn(),
+              error: vi.fn(),
+              info: vi.fn(),
+              warn: vi.fn()
+            }
+          }
         ]
       });
       const fixture = TestBed.createComponent(RolePermissionsDialogComponent);

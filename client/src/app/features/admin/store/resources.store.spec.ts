@@ -1,12 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { of, throwError } from 'rxjs';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 
 import { ResourcesStore } from './resources.store';
 import { RbacAdminService } from '../services/rbac-admin.service';
 import { AuthService } from '@features/auth/services/auth.service';
+import { NotifyService } from '@core/services/notify.service';
 import type {
   ResourceResponse,
   ActionResponse
@@ -67,7 +67,12 @@ describe('ResourcesStore', () => {
     deleteAction: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: { fetchRbacMetadata: ReturnType<typeof vi.fn> };
-  let snackBarMock: { open: ReturnType<typeof vi.fn> };
+  let notifyMock: {
+    success: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+    info: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+  };
 
   function createStore() {
     rbacServiceMock = {
@@ -84,7 +89,12 @@ describe('ResourcesStore', () => {
       fetchRbacMetadata: vi.fn().mockResolvedValue(undefined)
     };
 
-    snackBarMock = { open: vi.fn() };
+    notifyMock = {
+      success: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn()
+    };
 
     TestBed.configureTestingModule({
       imports: [TranslocoTestingModuleWithLangs],
@@ -92,7 +102,7 @@ describe('ResourcesStore', () => {
         ResourcesStore,
         { provide: RbacAdminService, useValue: rbacServiceMock },
         { provide: AuthService, useValue: authServiceMock },
-        { provide: MatSnackBar, useValue: snackBarMock }
+        { provide: NotifyService, useValue: notifyMock }
       ]
     });
 
@@ -119,7 +129,12 @@ describe('ResourcesStore', () => {
       authServiceMock = {
         fetchRbacMetadata: vi.fn().mockResolvedValue(undefined)
       };
-      snackBarMock = { open: vi.fn() };
+      notifyMock = {
+        success: vi.fn(),
+        error: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn()
+      };
 
       TestBed.configureTestingModule({
         imports: [TranslocoTestingModuleWithLangs],
@@ -127,7 +142,7 @@ describe('ResourcesStore', () => {
           ResourcesStore,
           { provide: RbacAdminService, useValue: rbacServiceMock },
           { provide: AuthService, useValue: authServiceMock },
-          { provide: MatSnackBar, useValue: snackBarMock }
+          { provide: NotifyService, useValue: notifyMock }
         ]
       });
 
@@ -156,7 +171,12 @@ describe('ResourcesStore', () => {
       authServiceMock = {
         fetchRbacMetadata: vi.fn().mockResolvedValue(undefined)
       };
-      snackBarMock = { open: vi.fn() };
+      notifyMock = {
+        success: vi.fn(),
+        error: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn()
+      };
 
       TestBed.configureTestingModule({
         imports: [TranslocoTestingModuleWithLangs],
@@ -164,17 +184,15 @@ describe('ResourcesStore', () => {
           ResourcesStore,
           { provide: RbacAdminService, useValue: rbacServiceMock },
           { provide: AuthService, useValue: authServiceMock },
-          { provide: MatSnackBar, useValue: snackBarMock }
+          { provide: NotifyService, useValue: notifyMock }
         ]
       });
 
       const store = TestBed.inject(ResourcesStore);
       store.load();
 
-      expect(snackBarMock.open).toHaveBeenCalledWith(
-        'Failed to load resources. Please try again.',
-        'Close',
-        { duration: 5000 }
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        'admin.store.errorLoadResourcesFailed'
       );
       expect(store.loading()).toBe(false);
     });
@@ -271,7 +289,12 @@ describe('ResourcesStore', () => {
       authServiceMock = {
         fetchRbacMetadata: vi.fn().mockResolvedValue(undefined)
       };
-      snackBarMock = { open: vi.fn() };
+      notifyMock = {
+        success: vi.fn(),
+        error: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn()
+      };
 
       TestBed.configureTestingModule({
         imports: [TranslocoTestingModuleWithLangs],
@@ -279,7 +302,7 @@ describe('ResourcesStore', () => {
           ResourcesStore,
           { provide: RbacAdminService, useValue: rbacServiceMock },
           { provide: AuthService, useValue: authServiceMock },
-          { provide: MatSnackBar, useValue: snackBarMock }
+          { provide: NotifyService, useValue: notifyMock }
         ]
       });
 

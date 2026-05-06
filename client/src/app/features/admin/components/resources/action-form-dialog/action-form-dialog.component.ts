@@ -22,7 +22,6 @@ import {
 } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { ActionResponse } from '@app/shared/types/rbac.types';
@@ -32,6 +31,7 @@ import type {
 } from '../../../services/rbac-admin.service';
 import { ResourcesStore } from '../../../store/resources.store';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
+import { NotifyService } from '@core/services/notify.service';
 import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 
 export type ActionFormDialogData = {
@@ -64,7 +64,7 @@ const ACTION_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
 export class ActionFormDialogComponent implements OnInit, OnDestroy {
   readonly #dialogRef = inject(MatDialogRef<ActionFormDialogComponent>);
   readonly #resourcesStore = inject(ResourcesStore);
-  readonly #snackBar = inject(MatSnackBar);
+  readonly #notify = inject(NotifyService);
   readonly #translocoService = inject(TranslocoService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #shortcuts = inject(KeyboardShortcutsService);
@@ -136,11 +136,7 @@ export class ActionFormDialogComponent implements OnInit, OnDestroy {
         .pipe(takeUntilDestroyed(this.#destroyRef))
         .subscribe({
           next: () => {
-            this.#snackBar.open(
-              this.#translocoService.translate('admin.actions.successUpdated'),
-              this.#translocoService.translate('common.close'),
-              { duration: 5000 }
-            );
+            this.#notify.success('admin.actions.successUpdated');
             this.#dialogRef.close(true);
           },
           error: (err: { error?: { message?: string } }) => {
@@ -164,11 +160,7 @@ export class ActionFormDialogComponent implements OnInit, OnDestroy {
         .pipe(takeUntilDestroyed(this.#destroyRef))
         .subscribe({
           next: () => {
-            this.#snackBar.open(
-              this.#translocoService.translate('admin.actions.successCreated'),
-              this.#translocoService.translate('common.close'),
-              { duration: 5000 }
-            );
+            this.#notify.success('admin.actions.successCreated');
             this.#dialogRef.close(true);
           },
           error: (err: { error?: { message?: string } }) => {

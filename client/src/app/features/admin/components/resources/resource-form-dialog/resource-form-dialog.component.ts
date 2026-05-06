@@ -19,7 +19,6 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type {
@@ -29,6 +28,7 @@ import type {
 import type { UpdateResource } from '../../../services/rbac-admin.service';
 import { ResourcesStore } from '../../../store/resources.store';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
+import { NotifyService } from '@core/services/notify.service';
 import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 
 export type ResourceFormDialogData = {
@@ -62,7 +62,7 @@ type ResourceFormData = {
 export class ResourceFormDialogComponent implements OnInit, OnDestroy {
   readonly #dialogRef = inject(MatDialogRef<ResourceFormDialogComponent>);
   readonly #resourcesStore = inject(ResourcesStore);
-  readonly #snackBar = inject(MatSnackBar);
+  readonly #notify = inject(NotifyService);
   readonly #translocoService = inject(TranslocoService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #shortcuts = inject(KeyboardShortcutsService);
@@ -169,11 +169,7 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
-          this.#snackBar.open(
-            this.#translocoService.translate('admin.resources.successUpdated'),
-            this.#translocoService.translate('common.close'),
-            { duration: 5000 }
-          );
+          this.#notify.success('admin.resources.successUpdated');
           this.#dialogRef.close(true);
         },
         error: (err: { error?: { message?: string } }) => {
