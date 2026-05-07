@@ -66,6 +66,12 @@
       "unknown": "This field is invalid"
     }
   },
+  "passwordStrength": {
+    "weak": "Weak",
+    "fair": "Fair",
+    "good": "Good",
+    "strong": "Strong"
+  },
   "errors": {
     "auth": {
       "invalidCredentials": "Invalid credentials",

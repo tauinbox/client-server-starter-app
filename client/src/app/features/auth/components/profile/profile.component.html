@@ -71,6 +71,8 @@
                 <app-password-toggle formFieldSuffix #pwdToggle />
               </app-form-field>
 
+              <app-password-strength [password]="profileModel().password" />
+
               @if (hasPassword()) {
                 <app-form-field
                   [field]="profileForm.currentPassword"

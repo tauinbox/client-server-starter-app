@@ -65,6 +65,7 @@ src/app/
     ├── components/
     │   ├── confirm-dialog/            # ConfirmDialogComponent (desktop) + ConfirmBottomSheetComponent (handset)
     │   ├── keyboard-shortcuts-help/   # KeyboardShortcutsHelpComponent — Material dialog listing active shortcuts grouped by category
+    │   ├── password-strength/         # PasswordStrengthComponent — 4-bar meter + aria-live label, score 0..4 mapped to PASSWORD_REGEX rules; used in register, profile, reset-password
     │   └── password-toggle/           # PasswordToggleComponent (reusable password visibility toggle)
     ├── forms/              # AppFormFieldComponent (Signal Forms wrapper), AriaErrorDirective, DEFAULT_ERROR_KEYS registry
     ├── models/             # user.types

@@ -195,6 +195,32 @@ test.describe('Register page', () => {
     await expect(page.locator('.error-message')).toBeVisible();
   });
 
+  test('shows weak strength label when typing a short password', async ({
+    _mockServer,
+    page
+  }) => {
+    await page.goto('/register');
+
+    const meter = page.locator('[role="progressbar"][aria-valuemax="4"]');
+    await page.getByLabel('Password', { exact: true }).fill('abc');
+
+    await expect(meter).toHaveAttribute('data-strength', '1');
+    await expect(meter).toContainText('Weak');
+  });
+
+  test('shows strong strength label when typing a strong password', async ({
+    _mockServer,
+    page
+  }) => {
+    await page.goto('/register');
+
+    const meter = page.locator('[role="progressbar"][aria-valuemax="4"]');
+    await page.getByLabel('Password', { exact: true }).fill('Str0ngPassword!');
+
+    await expect(meter).toHaveAttribute('data-strength', '4');
+    await expect(meter).toContainText('Strong');
+  });
+
   test('should have a link to login page', async ({ _mockServer, page }) => {
     await page.goto('/register');
 
