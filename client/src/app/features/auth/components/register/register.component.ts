@@ -2,7 +2,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  computed,
   inject,
   signal
 } from '@angular/core';
@@ -28,6 +27,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
+import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 type RegisterData = {
@@ -50,6 +50,7 @@ type RegisterData = {
     RouterLink,
     AppFormFieldComponent,
     PasswordToggleComponent,
+    PasswordStrengthComponent,
     TranslocoDirective
   ],
   templateUrl: './register.component.html',
@@ -83,17 +84,6 @@ export class RegisterComponent {
     minLength(path.password, 8, {
       message: 'auth.register.passwordMinLength'
     });
-  });
-
-  protected readonly passwordStrength = computed(() => {
-    const pwd = this.registerModel().password;
-    if (!pwd || pwd.length === 0) return 0;
-    let score = 0;
-    if (pwd.length >= 8) score++;
-    if (/[A-Z]/.test(pwd)) score++;
-    if (/[a-z]/.test(pwd)) score++;
-    if (/[0-9!@#$%^&*]/.test(pwd)) score++;
-    return Math.max(score, 1);
   });
 
   onSubmit(): void {

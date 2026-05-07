@@ -276,7 +276,7 @@ To apply multiple restrictions simultaneously, either use `$and` in a single `cu
 - **Keyboard shortcuts** — `Ctrl+S` / `Cmd+S` saves the active form; `?` or `Ctrl+/` opens a contextual shortcuts reference dialog; stack-based registration so dialog overlays handle shortcut scoping automatically
 - Responsive SCSS architecture
 - Snackbar error notifications
-- Form validation with error messages; password strength indicator on registration (4-bar visual meter)
+- Form validation with error messages; reusable password strength indicator (`<app-password-strength>`, 4-bar visual meter, aria-live label) shown in register, profile, and reset-password forms
 - 404 and 403 pages
 - Version display in toolbar (version + git hash via `MatTooltip`)
 - **Collapsible side navigation** — persistent left panel (narrow 64px / wide 220px) with per-user localStorage persistence; auto-collapses to overlay mode on mobile (≤599px) via `BreakpointObserver`; hamburger button in toolbar opens the drawer

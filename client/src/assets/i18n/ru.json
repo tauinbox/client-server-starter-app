@@ -66,6 +66,12 @@
       "unknown": "Поле заполнено некорректно"
     }
   },
+  "passwordStrength": {
+    "weak": "Слабый",
+    "fair": "Средний",
+    "good": "Хороший",
+    "strong": "Сильный"
+  },
   "errors": {
     "auth": {
       "invalidCredentials": "Неверные учётные данные",

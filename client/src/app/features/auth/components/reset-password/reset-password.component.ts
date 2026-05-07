@@ -22,6 +22,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
+import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
 import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
@@ -42,6 +43,7 @@ type ResetPasswordData = {
     MatProgressSpinner,
     RouterLink,
     PasswordToggleComponent,
+    PasswordStrengthComponent,
     AppFormFieldComponent,
     TranslocoDirective
   ],
