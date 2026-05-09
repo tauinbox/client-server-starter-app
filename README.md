@@ -22,7 +22,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - **Account lockout** — 5 consecutive failed login attempts lock the account for 15 minutes (HTTP 423 with countdown); admin can unlock early via user-edit page
 - **Email verification** — new registrations require email verification before login (HTTP 403); resend-verification endpoint; OAuth users marked verified only when the provider asserts `email_verified=true` (Google/Facebook); otherwise a verification email is sent. Admin email changes via `PATCH /api/v1/users/:id` reset `isEmailVerified` to false, issue a new hashed verification token, and dispatch a fresh verification email; uniqueness is enforced server-side (HTTP 409 with `errorKey: errors.users.emailExists` and `field: 'email'`)
 - **Password reset** — forgot-password sends a reset link (30-minute token expiry); reset invalidates all active sessions
-- **CAPTCHA soft-trigger on register / forgot-password** — Cloudflare Turnstile challenge activated server-side only when `X-RateLimit-Remaining ≤ 1` for the caller's IP, so legitimate users normally do not see it. Disabled by default; enable by setting `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` (use Cloudflare's public test keys for local dev). Client fetches the public site key from `GET /api/v1/auth/captcha-config` and lazy-loads the Turnstile script only when needed
+- **CAPTCHA soft-trigger on register / forgot-password** — Cloudflare Turnstile challenge activated server-side only when `X-RateLimit-Remaining ≤ 1` for the caller's IP, so legitimate users normally do not see it. **Disabled by default** — production activation requires a free Cloudflare account (the included test keys provide zero abuse protection in prod and are intended for local dev / CI only). Step-by-step deploy flow in [`server/README.md` → "Enabling CAPTCHA in production"](server/README.md#enabling-captcha-in-production). Client fetches the public site key from `GET /api/v1/auth/captcha-config` and lazy-loads the Turnstile script only when needed
 - **OAuth2 login via Google, Facebook, VK** — never auto-links to a pre-existing local account (account-takeover prevention); users must log in with their password and link the provider explicitly from their profile. Creates OAuth-only users for emails not yet registered
 - JWT access tokens (1h, stored in-memory only) + opaque refresh tokens (7d, stored as HttpOnly `SameSite=Strict` cookie — never readable by JavaScript)
 - Session restored on page reload via cookie-refresh in `provideAppInitializer` before route guards run
@@ -410,6 +410,8 @@ Edit `.env` with your database credentials and settings:
 | `ADMIN_PASSWORD` | - | Password for the initial admin user |
 | `ADMIN_FIRST_NAME` | `Admin` | First name for the initial admin user |
 | `ADMIN_LAST_NAME` | `User` | Last name for the initial admin user |
+| `TURNSTILE_SITE_KEY` | - | Cloudflare Turnstile public site key. CAPTCHA on `/register` and `/forgot-password` is disabled while either key is empty. Get a real pair from `dash.cloudflare.com → Turnstile → Add site` (free). Test keys (`1x00000000000000000000AA` / `1x0000000000000000000000000000000AA`) work for local dev and CI but are public — provide zero protection in production. See [`server/README.md` → "Enabling CAPTCHA in production"](server/README.md#enabling-captcha-in-production) |
+| `TURNSTILE_SECRET_KEY` | - | Cloudflare Turnstile secret key for server-side `siteverify` calls. Paired with `TURNSTILE_SITE_KEY` |
 
 ### 3. Set up the database
 
