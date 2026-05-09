@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.20](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.19...v0.1.20) (2026-05-09)
+
+
+### Features
+
+* captcha soft-trigger on register and forgot-password ([#204](https://github.com/tauinbox/client-server-starter-app/issues/204)) ([1733382](https://github.com/tauinbox/client-server-starter-app/commit/17333821db12fafa517cc6e3eb179a08d962b9e4))
+* **client:** add NotifyService and migrate auth/profile ([#197](https://github.com/tauinbox/client-server-starter-app/issues/197)) ([24368b3](https://github.com/tauinbox/client-server-starter-app/commit/24368b358ae78b9aa6dcfa2a79bc742db06bac54))
+* **client:** confirm email change in user-edit (BKL-008b) ([#196](https://github.com/tauinbox/client-server-starter-app/issues/196)) ([493ec96](https://github.com/tauinbox/client-server-starter-app/commit/493ec9658c92b97c7f31a54ecd2a67496094937a))
+* **client:** finish NotifyService rollout — admin + error interceptor ([#202](https://github.com/tauinbox/client-server-starter-app/issues/202)) ([3a4286b](https://github.com/tauinbox/client-server-starter-app/commit/3a4286b125e407c0837834148b387135fb09e557)), closes [#197](https://github.com/tauinbox/client-server-starter-app/issues/197) [#198](https://github.com/tauinbox/client-server-starter-app/issues/198) [#199](https://github.com/tauinbox/client-server-starter-app/issues/199) [#200](https://github.com/tauinbox/client-server-starter-app/issues/200) [#201](https://github.com/tauinbox/client-server-starter-app/issues/201)
+* **client:** migrate roles.store to NotifyService ([#201](https://github.com/tauinbox/client-server-starter-app/issues/201)) ([a6d099a](https://github.com/tauinbox/client-server-starter-app/commit/a6d099a2c77c469fed9131084605c9258669efca))
+* **client:** migrate user-edit to NotifyService ([#198](https://github.com/tauinbox/client-server-starter-app/issues/198)) ([726c2bb](https://github.com/tauinbox/client-server-starter-app/commit/726c2bb62dbbd44479864ecc7c5805c0c3222145))
+* **client:** migrate user-list to NotifyService ([#199](https://github.com/tauinbox/client-server-starter-app/issues/199)) ([296b82f](https://github.com/tauinbox/client-server-starter-app/commit/296b82f1665f601d9a99cea756f5041955c53cf3))
+* **client:** migrate users.store to NotifyService ([#200](https://github.com/tauinbox/client-server-starter-app/issues/200)) ([630456f](https://github.com/tauinbox/client-server-starter-app/commit/630456f85f7670c13ce590dfa4826f2bbd581363))
+* **client:** reusable password strength indicator ([#203](https://github.com/tauinbox/client-server-starter-app/issues/203)) ([520a399](https://github.com/tauinbox/client-server-starter-app/commit/520a399ed43d5ea8df109551a54e321e5ac7d715))
+* **client:** translate skip-link and move it into Angular template ([#194](https://github.com/tauinbox/client-server-starter-app/issues/194)) ([adc200b](https://github.com/tauinbox/client-server-starter-app/commit/adc200b41ff2542ab83c590365a581ca4cd52b6b))
+
+
+### Bug Fixes
+
+* **server:** reset email verification on admin email change ([#191](https://github.com/tauinbox/client-server-starter-app/issues/191)) ([183fe98](https://github.com/tauinbox/client-server-starter-app/commit/183fe98f416f49ef4d3b2cc9a32894fd5e1f35d8))
+* **server:** validate x-request-id header shape (BKL-014) ([#192](https://github.com/tauinbox/client-server-starter-app/issues/192)) ([84077a7](https://github.com/tauinbox/client-server-starter-app/commit/84077a7c2c206e1d4521a8d307d70d85eb2526c5))
+
 ## [0.1.19](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.18...v0.1.19) (2026-05-01)
 
 
