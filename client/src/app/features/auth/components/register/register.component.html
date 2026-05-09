@@ -40,6 +40,10 @@
 
         <app-password-strength [password]="registerModel().password" />
 
+        @if (captchaRequired()) {
+          <app-captcha-widget (tokenChange)="onCaptchaToken($event)" />
+        }
+
         @if (error()) {
           <div class="error-message" role="alert">
             {{ error() }}
@@ -47,11 +51,7 @@
         }
 
         <div class="form-actions">
-          <button
-            matButton="filled"
-            type="submit"
-            [disabled]="registerForm().invalid() || loading()"
-          >
+          <button matButton="filled" type="submit" [disabled]="!canSubmit()">
             @if (loading()) {
               <mat-spinner diameter="24"></mat-spinner>
               <span class="ml-2">{{ t('auth.register.registering') }}</span>

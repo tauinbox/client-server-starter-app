@@ -25,6 +25,7 @@ import { FacebookStrategy } from './strategies/facebook.strategy';
 import { VkStrategy } from './strategies/vk.strategy';
 import { User } from '../users/entities/user.entity';
 import { CaslModule } from './casl/casl.module';
+import { CaptchaModule } from './captcha/captcha.module';
 import { RoleService } from './services/role.service';
 import { RolesController } from './controllers/roles.controller';
 import { RbacController } from './controllers/rbac.controller';
@@ -54,6 +55,7 @@ function conditionalProvider(
   imports: [
     UsersModule,
     CaslModule,
+    CaptchaModule,
     PassportModule,
     TypeOrmModule.forFeature([
       RefreshToken,
@@ -110,6 +112,6 @@ function conditionalProvider(
     UserDeletedListener,
     UserRoleChangedListener
   ],
-  exports: [AuthService, OAuthService, CaslModule, RoleService]
+  exports: [AuthService, OAuthService, CaslModule, RoleService, CaptchaModule]
 })
 export class AuthModule {}

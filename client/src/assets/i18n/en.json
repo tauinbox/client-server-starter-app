@@ -93,7 +93,9 @@
       "missingOauthData": "Missing OAuth data",
       "invalidOauthData": "Invalid or expired OAuth data",
       "unlinkLastProvider": "Cannot unlink the last OAuth provider without a password set. Please set a password first.",
-      "invalidCurrentPassword": "Current password is incorrect"
+      "invalidCurrentPassword": "Current password is incorrect",
+      "captchaRequired": "Please complete the CAPTCHA challenge to continue.",
+      "captchaInvalid": "CAPTCHA verification failed. Please try again."
     },
     "users": {
       "notFound": "User not found",

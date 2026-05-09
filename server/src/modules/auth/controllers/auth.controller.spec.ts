@@ -11,6 +11,7 @@ import { AuditService } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { CaptchaRequiredGuard } from '../captcha/captcha-required.guard';
 import { JwtAuthRequest, LocalAuthRequest } from '../types/auth.request';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
@@ -195,6 +196,8 @@ describe('AuthController', () => {
       .overrideGuard(LocalAuthGuard)
       .useValue(allowAllGuard)
       .overrideGuard(JwtAuthGuard)
+      .useValue(allowAllGuard)
+      .overrideGuard(CaptchaRequiredGuard)
       .useValue(allowAllGuard)
       .compile();
 

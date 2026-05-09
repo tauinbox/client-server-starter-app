@@ -188,6 +188,7 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 - **Account lockout** — 5 failed login attempts → 15 min lock (HTTP 423), admin unlock via user update
 - **Email verification** — required before login, 24-hour token expiry, resend capability. OAuth users created with `isEmailVerified=true` only when the provider asserts the email is verified; otherwise a verification email is sent at signup (same flow as local registration). Admin email changes via `PATCH /api/v1/users/:id` reset `isEmailVerified` to false, issue a new hashed token, and dispatch a verification email; uniqueness is enforced server-side (HTTP 409 with `errorKey: errors.users.emailExists` and `field: 'email'`)
 - **Password reset** — forgot-password/reset-password flow, 30-minute token expiry, invalidates all sessions
+- **CAPTCHA soft-trigger** — `CaptchaRequiredGuard` gates `/register` and `/forgot-password` with a Cloudflare Turnstile challenge that activates only when `X-RateLimit-Remaining ≤ 1` for the caller's IP. **Disabled by default** (both env vars empty). Production activation requires a free Cloudflare account; full step-by-step in [Enabling CAPTCHA in production](#enabling-captcha-in-production). Test keys (`1x00000000000000000000AA` / `1x0000000000000000000000000000000AA`) work for local dev and CI but are **public — zero protection in production**.
 
 ### Email (MailModule)
 
@@ -247,6 +248,89 @@ any source, which lets clients spoof their IP.
 See the Express [trust proxy docs](https://expressjs.com/en/guide/behind-proxies.html)
 for the full syntax.
 
+## Enabling CAPTCHA in production
+
+CAPTCHA on `/register` and `/forgot-password` is **disabled by default**. After
+deploy the endpoints are protected only by the rate-limiter (5 req/hour for
+register, 2 req/5min for forgot-password per IP). To enable a Cloudflare
+Turnstile soft-trigger challenge that activates when an IP nears the rate
+limit:
+
+1. **Get keys from Cloudflare** (free, ~2 minutes):
+   - Sign in at https://dash.cloudflare.com (any plan, including Free)
+   - Open **Turnstile** → **Add site**
+   - Enter your production domain (only this domain will be allowed to use
+     the site key — protects against your key being embedded on other sites)
+   - Widget Mode: **Managed** (Cloudflare picks interactive vs invisible
+     based on risk score; recommended)
+   - Save and copy the generated **Site Key** and **Secret Key**
+
+2. **Set the keys on the production host**:
+   ```bash
+   ssh user@your-vps
+   cd /path/to/project
+   nano server/.env
+   # Add or replace:
+   #   TURNSTILE_SITE_KEY=0x4AAAAAAA...   ← your real Site Key
+   #   TURNSTILE_SECRET_KEY=0x4AAAAAAA... ← your real Secret Key
+   chmod 600 server/.env
+   ```
+
+3. **Restart the server container** (only the `server` service — client and
+   db stay up):
+   ```bash
+   docker compose up -d server
+   ```
+   Docker Compose re-reads `env_file: server/.env`. The client does **not**
+   need to be rebuilt — it fetches the public Site Key at runtime from
+   `GET /api/v1/auth/captcha-config`.
+
+4. **Verify**:
+   ```bash
+   curl https://your-domain/api/v1/auth/captcha-config
+   # → {"enabled":true,"provider":"turnstile","siteKey":"0x4AAAAAAA..."}
+   ```
+   Open `/register` in a browser, submit the form 4 times in a row (use
+   different emails or expect 409 on existing). On the 4th attempt the
+   widget should appear; once solved, registration goes through.
+
+5. **Disable temporarily** (e.g. if Cloudflare has an outage and the
+   `Turnstile siteverify request failed` log starts spamming):
+   ```bash
+   # On the VPS:
+   sed -i 's/^TURNSTILE_/# TURNSTILE_/' server/.env
+   docker compose up -d server
+   ```
+   Re-enable by uncommenting the same lines.
+
+### Test keys vs production keys
+
+| Key pair | Behaviour | Use case |
+|----------|-----------|----------|
+| `1x00000000000000000000AA` / `1x0000000000000000000000000000000AA` | Always pass — public, anyone can mint a token | Local dev, unit tests, CI — **never production** |
+| `2x00000000000000000000AB` / `2x0000000000000000000000000000000AA` | Always block — useful for testing the failure path | Negative-path tests |
+| Real Site Key + Secret Key from your dashboard | Real ML-driven challenge | Production |
+
+The test keys are **public** — bots can use them too. They provide zero
+abuse protection. A production deploy that leaves `TURNSTILE_*` set to test
+values is effectively the same as having CAPTCHA disabled (and worse,
+because users see a widget that does nothing useful).
+
+### What if you don't want a Cloudflare dependency?
+
+The throttler alone (5/h register, 2/5min forgot-password) gives reasonable
+protection against single-IP brute force. If you observe spam in
+`audit_logs` despite the throttler, options are:
+
+- Switch the provider to hCaptcha — change the `siteverify` URL in
+  `CaptchaService` and the script URL in `CaptchaService.loadScript()`;
+  the protocol is identical (form-encoded `secret`/`response`,
+  JSON `{ success: boolean }` reply). hCaptcha also requires an account.
+- Self-host a CAPTCHA-free proof-of-work challenge (mCaptcha, Friendly
+  Captcha) — adds a container to `docker-compose.yml`, no external account.
+- Add a honeypot field + minimum form-fill time as a first line — works
+  out of the box, no third-party dependency, but bypassed by smarter bots.
+
 ## Docker
 
 A multi-stage `Dockerfile` is provided for production builds.
@@ -288,8 +372,9 @@ Base URL: `/api/v1`
 | GET | `/permissions` | Bearer | Get current user's resolved permissions |
 | POST | `/verify-email` | None | Verify email address using token |
 | POST | `/resend-verification` | None | Resend email verification (3/min) |
-| POST | `/forgot-password` | None | Request password reset email (3/min) |
+| POST | `/forgot-password` | None | Request password reset email (3/min); CAPTCHA token required when near rate limit |
 | POST | `/reset-password` | None | Reset password using token |
+| GET | `/captcha-config` | None | Public CAPTCHA configuration (provider, site key, enabled flag) |
 
 ### OAuth (`/api/v1/auth/oauth`)
 

@@ -147,7 +147,7 @@ describe('RegisterComponent', () => {
       TestBed.tick();
       component.onSubmit();
 
-      expect(authServiceMock.register).toHaveBeenCalledWith(validForm);
+      expect(authServiceMock.register).toHaveBeenCalledWith(validForm, null);
     });
 
     it('should navigate to login with pending-verification on success', () => {
@@ -225,6 +225,89 @@ describe('RegisterComponent', () => {
 
       expect(component['error']()).toBe(
         'Registration failed. Please try again.'
+      );
+    });
+  });
+
+  describe('captcha soft-trigger', () => {
+    const validForm = {
+      email: 'test@example.com',
+      firstName: 'Test',
+      lastName: 'User',
+      password: 'password123'
+    };
+
+    it('shows captcha on CAPTCHA_REQUIRED response and disables submit until token', () => {
+      const httpError = new HttpErrorResponse({
+        error: {
+          message: 'Captcha required',
+          errorKey: ErrorKeys.AUTH.CAPTCHA_REQUIRED
+        },
+        status: 400
+      });
+      authServiceMock.register.mockReturnValueOnce(throwError(() => httpError));
+
+      component.registerModel.set(validForm);
+      TestBed.tick();
+      component.onSubmit();
+
+      expect(component['captchaRequired']()).toBe(true);
+      expect(component['captchaToken']()).toBeNull();
+      expect(component['canSubmit']()).toBe(false);
+      expect(component['error']()).toBe(
+        'Please complete the CAPTCHA challenge to continue.'
+      );
+    });
+
+    it('passes captchaToken on retry after solving', () => {
+      const httpError = new HttpErrorResponse({
+        error: {
+          message: 'Captcha required',
+          errorKey: ErrorKeys.AUTH.CAPTCHA_REQUIRED
+        },
+        status: 400
+      });
+      authServiceMock.register
+        .mockReturnValueOnce(throwError(() => httpError))
+        .mockReturnValueOnce(of(mockRegisterResponse));
+      vi.spyOn(router, 'navigate');
+
+      component.registerModel.set(validForm);
+      TestBed.tick();
+      component.onSubmit();
+
+      // Simulate widget callback firing
+      component['onCaptchaToken']('turnstile-token');
+      expect(component['canSubmit']()).toBe(true);
+
+      component.onSubmit();
+      expect(authServiceMock.register).toHaveBeenLastCalledWith(
+        validForm,
+        'turnstile-token'
+      );
+      expect(router.navigate).toHaveBeenCalled();
+    });
+
+    it('clears the token and shows the same widget when CAPTCHA_INVALID is returned', () => {
+      const invalidErr = new HttpErrorResponse({
+        error: {
+          message: 'Bad captcha',
+          errorKey: ErrorKeys.AUTH.CAPTCHA_INVALID
+        },
+        status: 400
+      });
+      authServiceMock.register.mockReturnValue(throwError(() => invalidErr));
+
+      component.registerModel.set(validForm);
+      TestBed.tick();
+      component['captchaRequired'].set(true);
+      component['captchaToken'].set('stale-token');
+      component.onSubmit();
+
+      expect(component['captchaRequired']()).toBe(true);
+      expect(component['captchaToken']()).toBeNull();
+      expect(component['error']()).toBe(
+        'CAPTCHA verification failed. Please try again.'
       );
     });
   });

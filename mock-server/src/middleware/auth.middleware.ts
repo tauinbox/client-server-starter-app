@@ -26,6 +26,11 @@ import {
   toUserResponse
 } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
+import {
+  CAPTCHA_ROUTE_LIMITS,
+  evaluateCaptcha,
+  trackAttemptAndSetHeader
+} from '../helpers/captcha.helpers';
 import type { AuthenticatedRequest, MockUser } from '../types';
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
@@ -55,8 +60,29 @@ function pruneOldestUserTokens(
   }
 }
 
+// GET /api/v1/auth/captcha-config — public configuration consumed by the client
+router.get('/captcha-config', (_req, res) => {
+  const state = getState();
+  res.json({
+    enabled: state.captchaConfig.enabled,
+    provider: 'turnstile',
+    siteKey: state.captchaConfig.siteKey
+  });
+});
+
 // POST /api/v1/auth/register
 router.post('/register', (req, res) => {
+  const remaining = trackAttemptAndSetHeader(
+    CAPTCHA_ROUTE_LIMITS['register'],
+    req.ip ?? '',
+    res
+  );
+  const captchaCheck = evaluateCaptcha(remaining, req.body?.captchaToken);
+  if (!captchaCheck.ok) {
+    res.status(captchaCheck.status).json(captchaCheck.body);
+    return;
+  }
+
   const { firstName, lastName, password } = req.body;
   const email = req.body.email?.trim().toLowerCase();
 
@@ -366,6 +392,17 @@ router.post('/resend-verification', (req, res) => {
 
 // POST /api/v1/auth/forgot-password
 router.post('/forgot-password', (req, res) => {
+  const remaining = trackAttemptAndSetHeader(
+    CAPTCHA_ROUTE_LIMITS['forgot-password'],
+    req.ip ?? '',
+    res
+  );
+  const captchaCheck = evaluateCaptcha(remaining, req.body?.captchaToken);
+  if (!captchaCheck.ok) {
+    res.status(captchaCheck.status).json(captchaCheck.body);
+    return;
+  }
+
   const email = req.body.email?.trim().toLowerCase();
 
   const successMessage =

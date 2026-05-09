@@ -1,0 +1,13 @@
+<div class="captcha-widget" *transloco="let t">
+  @if (status() === 'loading') {
+    <div class="captcha-widget__placeholder" role="status">
+      <mat-spinner diameter="20"></mat-spinner>
+      <span>{{ t('common.loading') }}</span>
+    </div>
+  } @else if (status() === 'error') {
+    <p class="captcha-widget__error" role="alert">
+      {{ t('errors.auth.captchaInvalid') }}
+    </p>
+  }
+  <div #container class="captcha-widget__host" data-testid="captcha-host"></div>
+</div>

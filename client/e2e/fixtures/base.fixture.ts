@@ -138,6 +138,13 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, newRoles })
         });
+      },
+      async setCaptcha(enabled, siteKey) {
+        await fetch(`${baseUrl}/__control/captcha`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled, siteKey: siteKey ?? null })
+        });
       }
     };
 

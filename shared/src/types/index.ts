@@ -8,7 +8,9 @@ export type {
 
 export type {
   TokensResponse,
-  AuthResponse
+  AuthResponse,
+  CaptchaProvider,
+  CaptchaConfigResponse
 } from './auth.types';
 
 export type {

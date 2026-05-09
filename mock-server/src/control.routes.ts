@@ -35,7 +35,9 @@ function buildStateSnapshot(state: State): StateSnapshot {
     roles: Array.from(state.roles.values()),
     permissions: Array.from(state.permissions.values()),
     rolePermissions: state.rolePermissions,
-    auditLogs: state.auditLogs
+    auditLogs: state.auditLogs,
+    captchaConfig: state.captchaConfig,
+    captchaAttempts: state.captchaAttempts.size
   };
 }
 
@@ -216,6 +218,29 @@ router.post('/revoke-user-sessions', (req, res) => {
   user.tokenRevokedAt = new Date().toISOString();
   pushToUser(userId, { type: 'permissions_updated', userId });
   res.json({ message: `sessions revoked for user ${userId}` });
+});
+
+// POST /__control/captcha — toggle captcha enablement and reset attempts.
+// Used by E2E to drive the soft-trigger flow without depending on real
+// Turnstile. When enabled, the client resolves the advertised site key from
+// /api/v1/auth/captcha-config; mock-server accepts any non-empty token.
+router.post('/captcha', (req, res) => {
+  const { enabled, siteKey } = req.body as {
+    enabled?: boolean;
+    siteKey?: string | null;
+  };
+  if (typeof enabled !== 'boolean') {
+    res.status(400).json({ message: 'enabled (boolean) is required' });
+    return;
+  }
+  const state = getState();
+  state.captchaConfig = {
+    enabled,
+    // Default to the Turnstile public test sitekey that always passes.
+    siteKey: siteKey ?? (enabled ? '1x00000000000000000000AA' : null)
+  };
+  state.captchaAttempts.clear();
+  res.json({ message: `captcha ${enabled ? 'enabled' : 'disabled'}` });
 });
 
 // POST /__control/notify — push a test notification event (E2E helper)
