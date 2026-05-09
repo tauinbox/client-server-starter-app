@@ -188,6 +188,7 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 - **Account lockout** — 5 failed login attempts → 15 min lock (HTTP 423), admin unlock via user update
 - **Email verification** — required before login, 24-hour token expiry, resend capability. OAuth users created with `isEmailVerified=true` only when the provider asserts the email is verified; otherwise a verification email is sent at signup (same flow as local registration). Admin email changes via `PATCH /api/v1/users/:id` reset `isEmailVerified` to false, issue a new hashed token, and dispatch a verification email; uniqueness is enforced server-side (HTTP 409 with `errorKey: errors.users.emailExists` and `field: 'email'`)
 - **Password reset** — forgot-password/reset-password flow, 30-minute token expiry, invalidates all sessions
+- **CAPTCHA soft-trigger** — `CaptchaRequiredGuard` gates `/register` and `/forgot-password` with a Cloudflare Turnstile challenge that activates only when `X-RateLimit-Remaining ≤ 1` for the caller's IP. Set `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` to enable; both empty = disabled (default). Clients fetch the public site key from `GET /api/v1/auth/captcha-config`. Turnstile provides test keys (`1x00000000000000000000AA` site / `1x0000000000000000000000000000000AA` secret) that always pass — useful for local dev and CI.
 
 ### Email (MailModule)
 
@@ -288,8 +289,9 @@ Base URL: `/api/v1`
 | GET | `/permissions` | Bearer | Get current user's resolved permissions |
 | POST | `/verify-email` | None | Verify email address using token |
 | POST | `/resend-verification` | None | Resend email verification (3/min) |
-| POST | `/forgot-password` | None | Request password reset email (3/min) |
+| POST | `/forgot-password` | None | Request password reset email (3/min); CAPTCHA token required when near rate limit |
 | POST | `/reset-password` | None | Reset password using token |
+| GET | `/captcha-config` | None | Public CAPTCHA configuration (provider, site key, enabled flag) |
 
 ### OAuth (`/api/v1/auth/oauth`)
 

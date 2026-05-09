@@ -27,6 +27,9 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { CaptchaWidgetComponent } from '@shared/components/captcha-widget/captcha-widget.component';
+import { ErrorKeys } from '@app/shared/constants';
+import type { HttpErrorResponse } from '@angular/common/http';
 
 type ForgotPasswordData = {
   email: string;
@@ -45,6 +48,7 @@ type ForgotPasswordData = {
     MatProgressSpinner,
     RouterLink,
     AppFormFieldComponent,
+    CaptchaWidgetComponent,
     TranslocoDirective
   ],
   templateUrl: './forgot-password.component.html',
@@ -61,6 +65,8 @@ export class ForgotPasswordComponent {
   protected readonly loading = signal(false);
   protected readonly success = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly captchaRequired = signal(false);
+  protected readonly captchaToken = signal<string | null>(null);
 
   readonly forgotPasswordModel = signal<ForgotPasswordData>({ email: '' });
   readonly forgotPasswordForm = form(this.forgotPasswordModel, (path) => {
@@ -68,14 +74,24 @@ export class ForgotPasswordComponent {
     emailValidator(path.email, { message: 'auth.forgotPassword.emailInvalid' });
   });
 
+  protected onCaptchaToken(token: string | null): void {
+    this.captchaToken.set(token);
+  }
+
+  protected canSubmit(): boolean {
+    if (this.forgotPasswordForm().invalid() || this.loading()) return false;
+    if (this.captchaRequired() && !this.captchaToken()) return false;
+    return true;
+  }
+
   onSubmit(): void {
-    if (this.forgotPasswordForm().invalid()) return;
+    if (!this.canSubmit()) return;
 
     this.loading.set(true);
     this.error.set(null);
 
     this.#authService
-      .forgotPassword(this.forgotPasswordModel().email)
+      .forgotPassword(this.forgotPasswordModel().email, this.captchaToken())
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
@@ -83,8 +99,18 @@ export class ForgotPasswordComponent {
           this.success.set(true);
           setTimeout(() => this.successHeading?.nativeElement.focus());
         },
-        error: () => {
+        error: (err: HttpErrorResponse) => {
           this.loading.set(false);
+          const errorKey = err.error?.errorKey as string | undefined;
+          if (
+            errorKey === ErrorKeys.AUTH.CAPTCHA_REQUIRED ||
+            errorKey === ErrorKeys.AUTH.CAPTCHA_INVALID
+          ) {
+            this.captchaRequired.set(true);
+            this.captchaToken.set(null);
+            this.error.set(this.#translocoService.translate(errorKey));
+            return;
+          }
           this.error.set(
             this.#translocoService.translate('auth.forgotPassword.errorFailed')
           );

@@ -92,6 +92,16 @@ export interface MockAuditLog {
   createdAt: string;
 }
 
+export interface CaptchaConfig {
+  enabled: boolean;
+  siteKey: string | null;
+}
+
+export interface CaptchaAttemptWindow {
+  // Sliding-window timestamps (epoch ms) of recent attempts within the route's TTL.
+  timestamps: number[];
+}
+
 export interface State {
   users: Map<string, MockUser>;
   oauthAccounts: Map<string, OAuthAccount[]>;
@@ -109,6 +119,13 @@ export interface State {
   permissions: Map<string, MockPermission>;
   rolePermissions: MockRolePermission[];
   auditLogs: MockAuditLog[];
+  // CAPTCHA — public configuration advertised via /api/v1/auth/captcha-config.
+  // Default: disabled. Tests can flip via /__control/captcha to exercise the
+  // soft-trigger flow without an external Turnstile dependency.
+  captchaConfig: CaptchaConfig;
+  // Per-route + per-IP attempt tracker for captcha soft-trigger. Keyed
+  // `${routeName}:${ip}`.
+  captchaAttempts: Map<string, CaptchaAttemptWindow>;
 }
 
 export interface AuthenticatedRequest extends Request {

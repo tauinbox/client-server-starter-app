@@ -4,8 +4,10 @@ import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 
 import { ForgotPasswordComponent } from './forgot-password.component';
 import { AuthService } from '../../services/auth.service';
@@ -80,7 +82,8 @@ describe('ForgotPasswordComponent', () => {
       component.onSubmit();
 
       expect(authServiceMock.forgotPassword).toHaveBeenCalledWith(
-        'user@example.com'
+        'user@example.com',
+        null
       );
     });
 
@@ -137,6 +140,62 @@ describe('ForgotPasswordComponent', () => {
       component.onSubmit();
 
       expect(component['error']()).toBeNull();
+    });
+  });
+
+  describe('captcha soft-trigger', () => {
+    const validEmail = { email: 'user@example.com' };
+
+    it('shows captcha widget on CAPTCHA_REQUIRED and disables submit', () => {
+      const httpError = new HttpErrorResponse({
+        error: {
+          message: 'Captcha required',
+          errorKey: ErrorKeys.AUTH.CAPTCHA_REQUIRED
+        },
+        status: 400
+      });
+      authServiceMock.forgotPassword.mockReturnValueOnce(
+        throwError(() => httpError)
+      );
+
+      component.forgotPasswordModel.set(validEmail);
+      TestBed.tick();
+      component.onSubmit();
+
+      expect(component['captchaRequired']()).toBe(true);
+      expect(component['canSubmit']()).toBe(false);
+      expect(component['error']()).toBe(
+        'Please complete the CAPTCHA challenge to continue.'
+      );
+      expect(component['success']()).toBe(false);
+    });
+
+    it('passes captchaToken on retry after solving', () => {
+      const httpError = new HttpErrorResponse({
+        error: {
+          message: 'Captcha required',
+          errorKey: ErrorKeys.AUTH.CAPTCHA_REQUIRED
+        },
+        status: 400
+      });
+      authServiceMock.forgotPassword
+        .mockReturnValueOnce(throwError(() => httpError))
+        .mockReturnValueOnce(of({ message: 'OK' }));
+
+      component.forgotPasswordModel.set(validEmail);
+      TestBed.tick();
+      component.onSubmit();
+
+      component['onCaptchaToken']('turnstile-token');
+      expect(component['canSubmit']()).toBe(true);
+
+      component.onSubmit();
+
+      expect(authServiceMock.forgotPassword).toHaveBeenLastCalledWith(
+        'user@example.com',
+        'turnstile-token'
+      );
+      expect(component['success']()).toBe(true);
     });
   });
 });

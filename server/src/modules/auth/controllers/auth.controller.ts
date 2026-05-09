@@ -54,6 +54,7 @@ import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { RegisterResource } from '../decorators/register-resource.decorator';
 import { Request as ExpressRequest } from 'express';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { CaptchaRequiredGuard } from '../captcha/captcha-required.guard';
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
 
@@ -97,6 +98,7 @@ export class AuthController {
 
   @Public()
   @Throttle({ default: { ttl: 3600000, limit: 5 } })
+  @UseGuards(CaptchaRequiredGuard)
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
   @ApiBody({ type: RegisterDto })
@@ -293,6 +295,7 @@ export class AuthController {
 
   @Public()
   @Throttle({ default: { ttl: 300000, limit: 2 } })
+  @UseGuards(CaptchaRequiredGuard)
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request a password reset link' })

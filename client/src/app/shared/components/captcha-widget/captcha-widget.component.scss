@@ -1,0 +1,28 @@
+@use '../../../../styles/abstracts/functions' as func;
+@use '../../../../styles/abstracts/variables' as vars;
+
+.captcha-widget {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-xs;
+  margin-block: vars.$spacing-sm;
+
+  &__placeholder {
+    display: flex;
+    gap: vars.$spacing-xs;
+    align-items: center;
+    min-height: func.rem(65);
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  &__error {
+    margin: 0;
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-error);
+  }
+
+  &__host {
+    min-height: func.rem(65);
+  }
+}

@@ -67,8 +67,14 @@ export class AuthService {
       );
   }
 
-  register(registerData: RegisterRequest): Observable<User> {
-    return this.#http.post<User>(AuthApiEnum.Register, registerData, {
+  register(
+    registerData: RegisterRequest,
+    captchaToken?: string | null
+  ): Observable<User> {
+    const body = captchaToken
+      ? { ...registerData, captchaToken }
+      : registerData;
+    return this.#http.post<User>(AuthApiEnum.Register, body, {
       context: silentContext()
     });
   }
@@ -154,10 +160,13 @@ export class AuthService {
     );
   }
 
-  forgotPassword(email: string): Observable<{ message: string }> {
+  forgotPassword(
+    email: string,
+    captchaToken?: string | null
+  ): Observable<{ message: string }> {
     return this.#http.post<{ message: string }>(
       AuthApiEnum.ForgotPassword,
-      { email },
+      captchaToken ? { email, captchaToken } : { email },
       { context: silentContext() }
     );
   }

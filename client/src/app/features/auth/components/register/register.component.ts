@@ -28,7 +28,9 @@ import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
+import { CaptchaWidgetComponent } from '@shared/components/captcha-widget/captcha-widget.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { ErrorKeys } from '@app/shared/constants';
 
 type RegisterData = {
   email: string;
@@ -51,6 +53,7 @@ type RegisterData = {
     AppFormFieldComponent,
     PasswordToggleComponent,
     PasswordStrengthComponent,
+    CaptchaWidgetComponent,
     TranslocoDirective
   ],
   templateUrl: './register.component.html',
@@ -65,6 +68,8 @@ export class RegisterComponent {
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly captchaRequired = signal(false);
+  protected readonly captchaToken = signal<string | null>(null);
 
   protected readonly appRouteSegmentEnum = AppRouteSegmentEnum;
 
@@ -86,14 +91,24 @@ export class RegisterComponent {
     });
   });
 
+  protected onCaptchaToken(token: string | null): void {
+    this.captchaToken.set(token);
+  }
+
+  protected canSubmit(): boolean {
+    if (this.registerForm().invalid() || this.loading()) return false;
+    if (this.captchaRequired() && !this.captchaToken()) return false;
+    return true;
+  }
+
   onSubmit(): void {
-    if (this.registerForm().invalid()) return;
+    if (!this.canSubmit()) return;
 
     this.loading.set(true);
     this.error.set(null);
 
     this.#authService
-      .register(this.registerModel())
+      .register(this.registerModel(), this.captchaToken())
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
@@ -104,12 +119,21 @@ export class RegisterComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
+          const errorKey = err.error?.errorKey as string | undefined;
+          if (
+            errorKey === ErrorKeys.AUTH.CAPTCHA_REQUIRED ||
+            errorKey === ErrorKeys.AUTH.CAPTCHA_INVALID
+          ) {
+            this.captchaRequired.set(true);
+            this.captchaToken.set(null);
+            this.error.set(this.#translocoService.translate(errorKey));
+            return;
+          }
           if (err.status === 409) {
             this.error.set(
               this.#translocoService.translate('auth.register.errorEmailExists')
             );
           } else {
-            const errorKey = err.error?.errorKey as string | undefined;
             this.error.set(
               errorKey
                 ? this.#translocoService.translate(errorKey)

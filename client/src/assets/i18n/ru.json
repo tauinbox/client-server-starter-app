@@ -93,7 +93,9 @@
       "missingOauthData": "Отсутствуют данные OAuth",
       "invalidOauthData": "Недействительные или просроченные данные OAuth",
       "unlinkLastProvider": "Невозможно отвязать последнего OAuth-провайдера без установленного пароля. Сначала установите пароль.",
-      "invalidCurrentPassword": "Текущий пароль неверен"
+      "invalidCurrentPassword": "Текущий пароль неверен",
+      "captchaRequired": "Пожалуйста, пройдите проверку CAPTCHA для продолжения.",
+      "captchaInvalid": "Проверка CAPTCHA не пройдена. Попробуйте ещё раз."
     },
     "users": {
       "notFound": "Пользователь не найден",

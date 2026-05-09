@@ -56,7 +56,9 @@ export function resetState(): void {
     roles: new Map(seedRoles.map((r) => [r.id, { ...r }])),
     permissions: new Map(seedPermissions.map((p) => [p.id, { ...p }])),
     rolePermissions: seedRolePermissions.map((rp) => ({ ...rp })),
-    auditLogs: []
+    auditLogs: [],
+    captchaConfig: { enabled: false, siteKey: null },
+    captchaAttempts: new Map()
   };
 }
 

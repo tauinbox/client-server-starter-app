@@ -9,3 +9,11 @@ export type AuthResponse = {
   tokens: TokensResponse;
   user: UserResponse;
 };
+
+export type CaptchaProvider = 'turnstile';
+
+export type CaptchaConfigResponse = {
+  enabled: boolean;
+  provider: CaptchaProvider;
+  siteKey: string | null;
+};

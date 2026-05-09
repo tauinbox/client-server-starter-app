@@ -44,4 +44,8 @@ export type ControlApi = {
   // SSE event. Use when testing forced-logout semantics (mirrors the server's
   // UserRoleChangedListener exactly).
   revokeUserSessions(userId: string, newRoles?: string[]): Promise<void>;
+  // Toggles captcha enablement and resets the per-IP attempt tracker. Pass
+  // `siteKey: null` (or omit) to use the public Turnstile test site key
+  // (1x00000000000000000000AA), which always passes the visible challenge.
+  setCaptcha(enabled: boolean, siteKey?: string | null): Promise<void>;
 };

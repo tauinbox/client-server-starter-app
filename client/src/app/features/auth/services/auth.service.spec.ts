@@ -166,7 +166,7 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    it('should POST registration data', async () => {
+    it('should POST registration data without captchaToken when not provided', async () => {
       const registerData = {
         email: 'new@example.com',
         firstName: 'New',
@@ -179,10 +179,58 @@ describe('AuthService', () => {
 
       const req = httpMock.expectOne(AuthApiEnum.Register);
       expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual(registerData);
+      expect(req.request.body.captchaToken).toBeUndefined();
       req.flush(mockUser);
 
       const result = await registerPromise;
       expect(result).toEqual(mockUser);
+    });
+
+    it('should include captchaToken in body when provided', async () => {
+      const registerData = {
+        email: 'new@example.com',
+        firstName: 'New',
+        lastName: 'User',
+        password: 'password123'
+      };
+      const mockUser = createMockAuthResponse().user;
+
+      const registerPromise = firstValueFrom(
+        service.register(registerData, 'turnstile-xyz')
+      );
+
+      const req = httpMock.expectOne(AuthApiEnum.Register);
+      expect(req.request.body).toEqual({
+        ...registerData,
+        captchaToken: 'turnstile-xyz'
+      });
+      req.flush(mockUser);
+
+      await registerPromise;
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('POSTs without captchaToken when null', async () => {
+      const promise = firstValueFrom(service.forgotPassword('a@b.com'));
+      const req = httpMock.expectOne(AuthApiEnum.ForgotPassword);
+      expect(req.request.body).toEqual({ email: 'a@b.com' });
+      req.flush({ message: 'OK' });
+      await promise;
+    });
+
+    it('POSTs with captchaToken when provided', async () => {
+      const promise = firstValueFrom(
+        service.forgotPassword('a@b.com', 'tok-1')
+      );
+      const req = httpMock.expectOne(AuthApiEnum.ForgotPassword);
+      expect(req.request.body).toEqual({
+        email: 'a@b.com',
+        captchaToken: 'tok-1'
+      });
+      req.flush({ message: 'OK' });
+      await promise;
     });
   });
 
