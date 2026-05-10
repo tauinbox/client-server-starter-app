@@ -146,6 +146,8 @@ src/styles/
 
 All size values use `func.rem(N)` (pixels → rem conversion) — never hardcoded `px`/`rem` literals. Global dialog styles live in `_dialogs.scss` (title padding, `::before` reset, bug #26352 fix). Dialog sizes are managed via `DialogSize` enum + `dialogSizeConfig()` in `shared/utils/dialog.utils.ts`.
 
+**Spacing tokens** — `_variables.scss` exposes both a primitive scale (`$spacing-xxs/xs/sm/md/lg/xl/xxl`) and a semantic layer on top (`$space-component-gap`, `$space-form-row-gap`, `$space-section-gap`). Mixins and shared component styles use the semantic tokens so the scale can be re-tuned in one place; primitives remain available for one-off / non-semantic spots.
+
 **M3 colour API** — the project uses an M3 theme (`@include mat.theme(...)`); the M2 `color="primary|accent|warn"` attribute is a silent no-op and is unconditionally banned by `lint:no-mat-color` (`client/scripts/lint-no-mat-color.mjs`) — any reintroduction fails CI. For destructive actions, apply `class="app-btn-danger"` on any matButton/matIconButton or `class="app-chip-danger"` on a `<mat-chip>` instead — both are token-driven (`var(--mat-sys-error)` / `var(--mat-sys-error-container)`) and respect dark/light themes automatically.
 
 **Accessibility (WCAG 2.1 AA):** skip link rendered at the top of `app.component.html` (translated via `common.skipToContent`) targets `id="main"` on `<main role="main">`, satisfying WCAG 2.4.1 *Bypass Blocks*; sidenav nav links have `aria-label` + `aria-current`; sidenav toggle has `aria-label` + `aria-expanded`; decorative `mat-icon` elements carry `aria-hidden="true"`; toolbar control `aria-label`s are bound to transloco strings.

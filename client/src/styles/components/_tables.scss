@@ -9,7 +9,7 @@
 
   &__actions {
     display: flex;
-    gap: vars.$spacing-xs;
+    gap: vars.$space-component-gap;
   }
 
   &__truncate {
