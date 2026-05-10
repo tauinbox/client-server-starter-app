@@ -1,6 +1,6 @@
 @use '../abstracts/functions' as func;
 
-// Spacing
+// Spacing — primitive scale (raw sizes)
 $spacing-unit: func.rem(4);
 $spacing-xxs: $spacing-unit; // 0.25rem (4px)
 $spacing-xs: $spacing-unit * 2; // 0.5rem (8px)
@@ -9,6 +9,14 @@ $spacing-md: $spacing-unit * 4; // 1rem (16px)
 $spacing-lg: $spacing-unit * 6; // 1.5rem (24px)
 $spacing-xl: $spacing-unit * 8; // 2rem (32px)
 $spacing-xxl: $spacing-unit * 12; // 3rem (48px)
+
+// Spacing — semantic tokens (layered on top of the primitive scale).
+// Prefer these in mixins and shared components when the intent is clear:
+// changing the scale here re-tunes the whole system without touching every
+// callsite. Use raw $spacing-* for one-off / non-semantic cases.
+$space-component-gap: $spacing-xs; // 8px — gap between adjacent items inside a component (icon+text, chips, inline controls)
+$space-form-row-gap: $spacing-sm; // 12px — vertical separation between form rows / fields
+$space-section-gap: $spacing-md; // 16px — separation between blocks / sections within a page
 
 // Typography
 $font-family-base: roboto, 'Helvetica Neue', sans-serif;
