@@ -331,6 +331,125 @@ protection against single-IP brute force. If you observe spam in
 - Add a honeypot field + minimum form-fill time as a first line — works
   out of the box, no third-party dependency, but bypassed by smarter bots.
 
+## Observability
+
+### Prometheus metrics
+
+The `MetricsModule` (`src/modules/core/metrics/metrics.module.ts`) exposes
+`GET /metrics` (excluded from the `/api` prefix, reachable without auth via
+`@Public()`). Counters and histograms:
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `http_requests_total` | counter | `method`, `route`, `status_code` | Every HTTP request reaching the app |
+| `http_request_duration_seconds` | histogram | `method`, `route`, `status_code` | Per-route request latency (seconds) |
+| `auth_events_total` | counter | `event` ∈ `login_success`, `login_failure`, `token_refresh_success`, `token_refresh_failure`, `token_reuse_detected`, `logout`, `register` | Authentication events |
+| `rbac_permission_denied_total` | counter | `action`, `subject`, `level` ∈ `guard`, `instance` | RBAC/ABAC denials. `level=guard` is an `@Authorize` decorator rejection; `level=instance` is an `ability.can(action, entity)` rejection after the record was loaded |
+| `sse_connections_active` | gauge | — | Currently open SSE notification streams |
+
+Plus the default Node.js process metrics (heap, GC, event-loop lag, file
+descriptors, ...) provided by `prom-client`.
+
+### Scrape configuration
+
+The bundled `monitoring/prometheus.yml` already targets `server:3000 → /metrics`
+on a 15-second interval inside the Docker Compose network. Self-hosted
+Prometheus instances should add an equivalent scrape job.
+
+### Permission-denied alert recipes
+
+`rbac_permission_denied_total` is the single best signal for unexpected RBAC
+behaviour — misconfigured roles, brute-force probing of admin routes, a
+front-end bug that hits endpoints the user is not entitled to, or a
+regression that introduces a new check before the seed data was updated.
+
+Drop the following into a Prometheus rules file (e.g. `monitoring/rbac-rules.yml`,
+loaded via `rule_files:` in `prometheus.yml`). Thresholds are starting points
+— tune them to your baseline traffic before paging on them:
+
+```yaml
+groups:
+  - name: rbac
+    rules:
+      # 1. Burst: > 10 denials/min averaged over a 5-min window.
+      # Usually points at a deploy that broke a role, or a runaway script.
+      - alert: RbacDenialBurst
+        expr: sum(rate(rbac_permission_denied_total[5m])) * 60 > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RBAC denials averaging > 10/min over 5 min"
+          description: |
+            Per-subject breakdown:
+              sum by (subject, action) (rate(rbac_permission_denied_total[5m]))
+
+      # 2. Concentrated abuse: one subject takes > 70 % of denials.
+      # Typical when a single role / UI screen is denied repeatedly.
+      - alert: RbacDenialHotSubject
+        expr: |
+          (
+            max(sum by (subject) (rate(rbac_permission_denied_total[10m])))
+            /
+            sum(rate(rbac_permission_denied_total[10m]))
+          ) > 0.7
+          and
+          sum(rate(rbac_permission_denied_total[10m])) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Single subject accounts for > 70 % of RBAC denials"
+
+      # 3. Instance-level denial spike — usually an ownership-check bug or
+      # a tampered client cache. Guards block typed access; instance checks
+      # block "you don't own this row", so a sudden rise often means the UI
+      # is showing rows that shouldn't be visible.
+      - alert: RbacInstanceDenialSpike
+        expr: sum(rate(rbac_permission_denied_total{level="instance"}[5m])) * 60 > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance-level RBAC denials > 5/min over 5 min"
+
+      # 4. Sustained background noise — under steady load these counters
+      # should sit near zero for an authenticated user. Long-running
+      # drizzle is usually a broken UI that hides nothing client-side.
+      - alert: RbacDenialChronic
+        expr: sum(rate(rbac_permission_denied_total[30m])) * 60 > 2
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "RBAC denials > 2/min for 30 min (likely a UI bug, not abuse)"
+```
+
+For low-traffic deployments, replace `rate(...)` with
+`increase(rbac_permission_denied_total[1h]) > N` so the alert is not eaten
+by ratio-against-tiny-base noise.
+
+### Grafana dashboard
+
+A starter dashboard focused on permission-denied breakdown lives at
+`doc/grafana/rbac.json` (the project's `doc/` folder is intentionally
+gitignored — copy or symlink it where you need it). Import via
+**Grafana → Dashboards → New → Import** and select the Prometheus
+datasource bundled with the Docker stack (UID `prometheus`).
+
+Panels:
+
+- Denials/min (overall, 5-min window) — single stat
+- Denials/sec by level (`guard` vs `instance`) — time series
+- Top (subject, action) denials over 5 min — bar gauge
+- Distribution of denials by subject over 1 h — pie chart
+- Cumulative denials by (subject, action) over 24 h — table
+
+The provisioned NestJS dashboard
+(`monitoring/grafana/provisioning/dashboards/nestjs.json`) covers the
+remaining metrics (HTTP traffic, auth events, latency p95s, SSE, Node.js
+runtime). Use the RBAC dashboard alongside it for security drill-downs.
+
 ## Docker
 
 A multi-stage `Dockerfile` is provided for production builds.
