@@ -474,7 +474,7 @@ Services:
 - **server** — NestJS API on port 3000; entrypoint runs migrations, optional admin seed, then starts the server; exposes `GET /metrics` for Prometheus scraping
 - **client** — Angular SPA served by nginx on port 8080; host binding `127.0.0.1:4200:8080` (localhost-only; Caddy accesses internally via `client:8080`); built with `--base-href /nexus/` (overridable via `docker build --build-arg BASE_HREF=/`)
 - **prometheus** — prom/prometheus:v2.54.1, internal network only (no ports exposed); scrapes `/metrics` every 15s, 30d retention; config at `monitoring/prometheus.yml`
-- **grafana** — grafana/grafana:11.3.1, accessible at port 3001; provisioned datasource (Prometheus) and NestJS dashboard (18 panels: HTTP traffic, per-route p95 latency, auth events, SSE connections, Node.js runtime)
+- **grafana** — grafana/grafana:11.3.1, accessible at port 3001; provisioned datasource (Prometheus) and NestJS dashboard (18 panels: HTTP traffic, per-route p95 latency, auth events, SSE connections, Node.js runtime). See [`server/README.md` → "Observability"](server/README.md#observability) for the full metric list, Prometheus alert recipes for `rbac_permission_denied_total`, and an RBAC drill-down dashboard (`doc/grafana/rbac.json`)
 
 ### Docker environment variables
 
