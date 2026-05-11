@@ -57,14 +57,14 @@ describe('RegisterComponent', () => {
       expect(emailErrors.some((e) => e.kind === 'required')).toBe(true);
     });
 
-    it('should validate email format', () => {
+    it('should validate email format', async () => {
       component.registerModel.set({
         email: 'invalid',
         firstName: '',
         lastName: '',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       const emailErrors = component.registerForm.email().errors();
       expect(emailErrors.some((e) => e.kind === 'email')).toBe(true);
 
@@ -74,7 +74,7 @@ describe('RegisterComponent', () => {
         lastName: '',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       expect(component.registerForm.email().valid()).toBe(true);
     });
 
@@ -93,14 +93,14 @@ describe('RegisterComponent', () => {
       expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
-    it('should enforce password minLength of 8', () => {
+    it('should enforce password minLength of 8', async () => {
       component.registerModel.set({
         email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
         password: 'short'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       const errors = component.registerForm.password().errors();
       expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
 
@@ -110,18 +110,18 @@ describe('RegisterComponent', () => {
         lastName: 'User',
         password: 'longpassword'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       expect(component.registerForm.password().valid()).toBe(true);
     });
 
-    it('should be valid with correct values', () => {
+    it('should be valid with correct values', async () => {
       component.registerModel.set({
         email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
         password: 'password123'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       expect(component.registerForm().valid()).toBe(true);
     });
   });
@@ -139,23 +139,23 @@ describe('RegisterComponent', () => {
       expect(authServiceMock.register).not.toHaveBeenCalled();
     });
 
-    it('should call register with form values', () => {
+    it('should call register with form values', async () => {
       authServiceMock.register.mockReturnValue(of(mockRegisterResponse));
       vi.spyOn(router, 'navigate');
 
       component.registerModel.set(validForm);
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(authServiceMock.register).toHaveBeenCalledWith(validForm, null);
     });
 
-    it('should navigate to login with pending-verification on success', () => {
+    it('should navigate to login with pending-verification on success', async () => {
       authServiceMock.register.mockReturnValue(of(mockRegisterResponse));
       vi.spyOn(router, 'navigate');
 
       component.registerModel.set(validForm);
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(router.navigate).toHaveBeenCalledWith(['/login'], {
@@ -164,7 +164,7 @@ describe('RegisterComponent', () => {
       expect(component['loading']()).toBe(false);
     });
 
-    it('should show "email exists" error on 409', () => {
+    it('should show "email exists" error on 409', async () => {
       const httpError = new HttpErrorResponse({
         error: { message: 'Conflict' },
         status: 409
@@ -172,14 +172,14 @@ describe('RegisterComponent', () => {
       authServiceMock.register.mockReturnValue(throwError(() => httpError));
 
       component.registerModel.set(validForm);
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(component['error']()).toBe('User with this email already exists.');
       expect(component['loading']()).toBe(false);
     });
 
-    it('should show fallback translation on non-409 error without errorKey', () => {
+    it('should show fallback translation on non-409 error without errorKey', async () => {
       const httpError = new HttpErrorResponse({
         error: { message: 'Validation failed' },
         status: 400
@@ -187,7 +187,7 @@ describe('RegisterComponent', () => {
       authServiceMock.register.mockReturnValue(throwError(() => httpError));
 
       component.registerModel.set(validForm);
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(component['error']()).toBe(
@@ -195,7 +195,7 @@ describe('RegisterComponent', () => {
       );
     });
 
-    it('should translate error from errorKey on non-409 error', () => {
+    it('should translate error from errorKey on non-409 error', async () => {
       const httpError = new HttpErrorResponse({
         error: {
           message: 'Validation failed',
@@ -206,13 +206,13 @@ describe('RegisterComponent', () => {
       authServiceMock.register.mockReturnValue(throwError(() => httpError));
 
       component.registerModel.set(validForm);
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(component['error']()).toBe('Internal server error');
     });
 
-    it('should show fallback error message when no server message', () => {
+    it('should show fallback error message when no server message', async () => {
       const httpError = new HttpErrorResponse({
         error: null,
         status: 500
@@ -220,7 +220,7 @@ describe('RegisterComponent', () => {
       authServiceMock.register.mockReturnValue(throwError(() => httpError));
 
       component.registerModel.set(validForm);
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(component['error']()).toBe(
@@ -237,7 +237,7 @@ describe('RegisterComponent', () => {
       password: 'password123'
     };
 
-    it('shows captcha on CAPTCHA_REQUIRED response and disables submit until token', () => {
+    it('shows captcha on CAPTCHA_REQUIRED response and disables submit until token', async () => {
       const httpError = new HttpErrorResponse({
         error: {
           message: 'Captcha required',
@@ -248,7 +248,7 @@ describe('RegisterComponent', () => {
       authServiceMock.register.mockReturnValueOnce(throwError(() => httpError));
 
       component.registerModel.set(validForm);
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(component['captchaRequired']()).toBe(true);
@@ -259,7 +259,7 @@ describe('RegisterComponent', () => {
       );
     });
 
-    it('passes captchaToken on retry after solving', () => {
+    it('passes captchaToken on retry after solving', async () => {
       const httpError = new HttpErrorResponse({
         error: {
           message: 'Captcha required',
@@ -273,7 +273,7 @@ describe('RegisterComponent', () => {
       vi.spyOn(router, 'navigate');
 
       component.registerModel.set(validForm);
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       // Simulate widget callback firing
@@ -288,7 +288,7 @@ describe('RegisterComponent', () => {
       expect(router.navigate).toHaveBeenCalled();
     });
 
-    it('clears the token and shows the same widget when CAPTCHA_INVALID is returned', () => {
+    it('clears the token and shows the same widget when CAPTCHA_INVALID is returned', async () => {
       const invalidErr = new HttpErrorResponse({
         error: {
           message: 'Bad captcha',
@@ -299,7 +299,7 @@ describe('RegisterComponent', () => {
       authServiceMock.register.mockReturnValue(throwError(() => invalidErr));
 
       component.registerModel.set(validForm);
-      TestBed.tick();
+      await fixture.whenStable();
       component['captchaRequired'].set(true);
       component['captchaToken'].set('stale-token');
       component.onSubmit();

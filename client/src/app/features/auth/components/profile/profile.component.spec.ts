@@ -151,7 +151,7 @@ describe('ProfileComponent', () => {
       fixture.detectChanges();
     });
 
-    it('should require firstName', () => {
+    it('should require firstName', async () => {
       component.profileModel.set({
         firstName: '',
         lastName: 'User',
@@ -159,12 +159,12 @@ describe('ProfileComponent', () => {
         password: '',
         confirmPassword: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       const errors = component.profileForm.firstName().errors();
       expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
-    it('should require lastName', () => {
+    it('should require lastName', async () => {
       component.profileModel.set({
         firstName: 'Test',
         lastName: '',
@@ -172,12 +172,12 @@ describe('ProfileComponent', () => {
         password: '',
         confirmPassword: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       const errors = component.profileForm.lastName().errors();
       expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
-    it('should validate password minLength when provided', () => {
+    it('should validate password minLength when provided', async () => {
       component.profileModel.set({
         firstName: 'Test',
         lastName: 'User',
@@ -185,12 +185,12 @@ describe('ProfileComponent', () => {
         password: 'short',
         confirmPassword: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       const errors = component.profileForm.password().errors();
       expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
     });
 
-    it('should allow empty password (optional)', () => {
+    it('should allow empty password (optional)', async () => {
       component.profileModel.set({
         firstName: 'Test',
         lastName: 'User',
@@ -198,11 +198,11 @@ describe('ProfileComponent', () => {
         password: '',
         confirmPassword: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       expect(component.profileForm().valid()).toBe(true);
     });
 
-    it('should have passwordMismatch when passwords differ', () => {
+    it('should have passwordMismatch when passwords differ', async () => {
       component.profileModel.set({
         firstName: 'Test',
         lastName: 'User',
@@ -210,12 +210,12 @@ describe('ProfileComponent', () => {
         password: 'newpassword123',
         confirmPassword: 'different123'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       const errors = component.profileForm.confirmPassword().errors();
       expect(errors.some((e) => e.kind === 'passwordMismatch')).toBe(true);
     });
 
-    it('should be valid when passwords match and current password is provided', () => {
+    it('should be valid when passwords match and current password is provided', async () => {
       component.profileModel.set({
         firstName: 'Test',
         lastName: 'User',
@@ -223,11 +223,11 @@ describe('ProfileComponent', () => {
         password: 'newpassword123',
         confirmPassword: 'newpassword123'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       expect(component.profileForm().valid()).toBe(true);
     });
 
-    it('should require currentPassword when new password is entered', () => {
+    it('should require currentPassword when new password is entered', async () => {
       component.profileModel.set({
         firstName: 'Test',
         lastName: 'User',
@@ -235,7 +235,7 @@ describe('ProfileComponent', () => {
         password: 'newpassword123',
         confirmPassword: 'newpassword123'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       const errors = component.profileForm.currentPassword().errors();
       expect(errors.some((e) => e.kind === 'currentPasswordRequired')).toBe(
         true
@@ -243,7 +243,7 @@ describe('ProfileComponent', () => {
       expect(component.profileForm().valid()).toBe(false);
     });
 
-    it('should NOT require currentPassword when password is blank', () => {
+    it('should NOT require currentPassword when password is blank', async () => {
       component.profileModel.set({
         firstName: 'Test',
         lastName: 'User',
@@ -251,7 +251,7 @@ describe('ProfileComponent', () => {
         password: '',
         confirmPassword: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       const errors = component.profileForm.currentPassword().errors();
       expect(errors.some((e) => e.kind === 'currentPasswordRequired')).toBe(
         false
@@ -264,7 +264,7 @@ describe('ProfileComponent', () => {
       fixture.detectChanges(); // Triggers ngOnInit → loadProfile
     });
 
-    it('should not submit when form is invalid', () => {
+    it('should not submit when form is invalid', async () => {
       component.profileModel.set({
         firstName: '',
         lastName: 'User',
@@ -272,7 +272,7 @@ describe('ProfileComponent', () => {
         password: '',
         confirmPassword: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
       expect(authServiceMock.updateProfile).not.toHaveBeenCalled();
     });
@@ -283,7 +283,7 @@ describe('ProfileComponent', () => {
       expect(authServiceMock.updateProfile).not.toHaveBeenCalled();
     });
 
-    it('should submit without password when password is empty', () => {
+    it('should submit without password when password is empty', async () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
@@ -294,7 +294,7 @@ describe('ProfileComponent', () => {
         password: '',
         confirmPassword: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
@@ -303,7 +303,7 @@ describe('ProfileComponent', () => {
       });
     });
 
-    it('should include password and currentPassword when password is provided', () => {
+    it('should include password and currentPassword when password is provided', async () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
@@ -314,7 +314,7 @@ describe('ProfileComponent', () => {
         password: 'newpassword123',
         confirmPassword: 'newpassword123'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
@@ -325,7 +325,7 @@ describe('ProfileComponent', () => {
       });
     });
 
-    it('should show snackbar and update user on success', () => {
+    it('should show snackbar and update user on success', async () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
@@ -336,7 +336,7 @@ describe('ProfileComponent', () => {
         password: '',
         confirmPassword: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(notifyMock.success).toHaveBeenCalledWith(
@@ -346,7 +346,7 @@ describe('ProfileComponent', () => {
       expect(component['saving']()).toBe(false);
     });
 
-    it('should reset password and currentPassword fields after successful update', () => {
+    it('should reset password and currentPassword fields after successful update', async () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
@@ -357,7 +357,7 @@ describe('ProfileComponent', () => {
         password: 'newpassword',
         confirmPassword: 'newpassword'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(component.profileModel().password).toBe('');
@@ -365,7 +365,7 @@ describe('ProfileComponent', () => {
       expect(component.profileModel().currentPassword).toBe('');
     });
 
-    it('should set error on update failure', () => {
+    it('should set error on update failure', async () => {
       const httpError = new HttpErrorResponse({
         error: { message: 'Update failed' },
         status: 400
@@ -381,14 +381,14 @@ describe('ProfileComponent', () => {
         password: '',
         confirmPassword: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(component['error']()).toBe('Update failed');
       expect(component['saving']()).toBe(false);
     });
 
-    it('should show fallback error on update failure without message', () => {
+    it('should show fallback error on update failure without message', async () => {
       const httpError = new HttpErrorResponse({
         error: null,
         status: 500
@@ -404,7 +404,7 @@ describe('ProfileComponent', () => {
         password: '',
         confirmPassword: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(component['error']()).toBe(
