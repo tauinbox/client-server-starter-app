@@ -52,16 +52,16 @@ describe('ForgotPasswordComponent', () => {
       expect(emailErrors.some((e) => e.kind === 'required')).toBe(true);
     });
 
-    it('should validate email format', () => {
+    it('should validate email format', async () => {
       component.forgotPasswordModel.set({ email: 'not-an-email' });
-      TestBed.tick();
+      await fixture.whenStable();
       const emailErrors = component.forgotPasswordForm.email().errors();
       expect(emailErrors.some((e) => e.kind === 'email')).toBe(true);
     });
 
-    it('should be valid with a correct email', () => {
+    it('should be valid with a correct email', async () => {
       component.forgotPasswordModel.set({ email: 'user@example.com' });
-      TestBed.tick();
+      await fixture.whenStable();
       expect(component.forgotPasswordForm().valid()).toBe(true);
     });
   });
@@ -72,12 +72,12 @@ describe('ForgotPasswordComponent', () => {
       expect(authServiceMock.forgotPassword).not.toHaveBeenCalled();
     });
 
-    it('should call forgotPassword with the email value', () => {
+    it('should call forgotPassword with the email value', async () => {
       authServiceMock.forgotPassword.mockReturnValue(
         of({ message: 'Reset email sent' })
       );
       component.forgotPasswordModel.set({ email: 'user@example.com' });
-      TestBed.tick();
+      await fixture.whenStable();
 
       component.onSubmit();
 
@@ -87,12 +87,12 @@ describe('ForgotPasswordComponent', () => {
       );
     });
 
-    it('should set loading to true while submitting', () => {
+    it('should set loading to true while submitting', async () => {
       authServiceMock.forgotPassword.mockReturnValue(
         of({ message: 'Reset email sent' })
       );
       component.forgotPasswordModel.set({ email: 'user@example.com' });
-      TestBed.tick();
+      await fixture.whenStable();
 
       component.onSubmit();
 
@@ -100,12 +100,12 @@ describe('ForgotPasswordComponent', () => {
       expect(component['loading']()).toBe(false);
     });
 
-    it('should set success to true on successful submission', () => {
+    it('should set success to true on successful submission', async () => {
       authServiceMock.forgotPassword.mockReturnValue(
         of({ message: 'Reset email sent' })
       );
       component.forgotPasswordModel.set({ email: 'user@example.com' });
-      TestBed.tick();
+      await fixture.whenStable();
 
       component.onSubmit();
 
@@ -113,12 +113,12 @@ describe('ForgotPasswordComponent', () => {
       expect(component['loading']()).toBe(false);
     });
 
-    it('should set error message on failure', () => {
+    it('should set error message on failure', async () => {
       authServiceMock.forgotPassword.mockReturnValue(
         throwError(() => new Error('Network error'))
       );
       component.forgotPasswordModel.set({ email: 'user@example.com' });
-      TestBed.tick();
+      await fixture.whenStable();
 
       component.onSubmit();
 
@@ -129,13 +129,13 @@ describe('ForgotPasswordComponent', () => {
       expect(component['success']()).toBe(false);
     });
 
-    it('should clear previous error before submitting', () => {
+    it('should clear previous error before submitting', async () => {
       component['error'].set('Previous error');
       authServiceMock.forgotPassword.mockReturnValue(
         of({ message: 'Reset email sent' })
       );
       component.forgotPasswordModel.set({ email: 'user@example.com' });
-      TestBed.tick();
+      await fixture.whenStable();
 
       component.onSubmit();
 
@@ -146,7 +146,7 @@ describe('ForgotPasswordComponent', () => {
   describe('captcha soft-trigger', () => {
     const validEmail = { email: 'user@example.com' };
 
-    it('shows captcha widget on CAPTCHA_REQUIRED and disables submit', () => {
+    it('shows captcha widget on CAPTCHA_REQUIRED and disables submit', async () => {
       const httpError = new HttpErrorResponse({
         error: {
           message: 'Captcha required',
@@ -159,7 +159,7 @@ describe('ForgotPasswordComponent', () => {
       );
 
       component.forgotPasswordModel.set(validEmail);
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(component['captchaRequired']()).toBe(true);
@@ -170,7 +170,7 @@ describe('ForgotPasswordComponent', () => {
       expect(component['success']()).toBe(false);
     });
 
-    it('passes captchaToken on retry after solving', () => {
+    it('passes captchaToken on retry after solving', async () => {
       const httpError = new HttpErrorResponse({
         error: {
           message: 'Captcha required',
@@ -183,7 +183,7 @@ describe('ForgotPasswordComponent', () => {
         .mockReturnValueOnce(of({ message: 'OK' }));
 
       component.forgotPasswordModel.set(validEmail);
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       component['onCaptchaToken']('turnstile-token');

@@ -188,85 +188,85 @@ describe('UserEditComponent', () => {
       expect(component.userForm().valid()).toBe(true);
     });
 
-    it('should require email', () => {
+    it('should require email', async () => {
       component.userModel.set({
         email: '',
         firstName: 'Test',
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       const errors = component.userForm.email().errors();
       expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
-    it('should validate email format', () => {
+    it('should validate email format', async () => {
       component.userModel.set({
         email: 'not-an-email',
         firstName: 'Test',
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       const errors = component.userForm.email().errors();
       expect(errors.some((e) => e.kind === 'email')).toBe(true);
     });
 
-    it('should require firstName', () => {
+    it('should require firstName', async () => {
       component.userModel.set({
         email: 'test@example.com',
         firstName: '',
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       const errors = component.userForm.firstName().errors();
       expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
-    it('should require lastName', () => {
+    it('should require lastName', async () => {
       component.userModel.set({
         email: 'test@example.com',
         firstName: 'Test',
         lastName: '',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       const errors = component.userForm.lastName().errors();
       expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
-    it('should accept empty password (optional field)', () => {
+    it('should accept empty password (optional field)', async () => {
       component.userModel.set({
         email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       expect(component.userForm().valid()).toBe(true);
     });
 
-    it('should validate password minLength of 8', () => {
+    it('should validate password minLength of 8', async () => {
       component.userModel.set({
         email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
         password: 'short'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       const errors = component.userForm.password().errors();
       expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
     });
 
-    it('should accept password of 8+ characters', () => {
+    it('should accept password of 8+ characters', async () => {
       component.userModel.set({
         email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
         password: 'validpassword'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       expect(component.userForm().valid()).toBe(true);
     });
   });
@@ -280,36 +280,36 @@ describe('UserEditComponent', () => {
       expect(component['canSubmit']()).toBe(false);
     });
 
-    it('should be true when form is valid and dirty', () => {
+    it('should be true when form is valid and dirty', async () => {
       component.userModel.set({
         email: 'test@example.com',
         firstName: 'Changed',
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       expect(component['canSubmit']()).toBe(true);
     });
 
-    it('should be false when form is invalid', () => {
+    it('should be false when form is invalid', async () => {
       component.userModel.set({
         email: '',
         firstName: 'Test',
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       expect(component['canSubmit']()).toBe(false);
     });
 
-    it('should be false when saving is in progress', () => {
+    it('should be false when saving is in progress', async () => {
       component.userModel.set({
         email: 'test@example.com',
         firstName: 'Changed',
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component['saving'].set(true);
       expect(component['canSubmit']()).toBe(false);
     });
@@ -392,7 +392,7 @@ describe('UserEditComponent', () => {
   });
 
   describe('onSubmit', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       fixture.detectChanges();
       // Make form dirty by changing a value
       component.userModel.set({
@@ -401,29 +401,29 @@ describe('UserEditComponent', () => {
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
     });
 
-    it('should not submit when form is invalid', () => {
+    it('should not submit when form is invalid', async () => {
       component.userModel.set({
         email: '',
         firstName: 'Test',
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
       expect(usersStoreMock.updateUser).not.toHaveBeenCalled();
     });
 
-    it('should call updateUser with form values (no password)', () => {
+    it('should call updateUser with form values (no password)', async () => {
       component.userModel.set({
         email: 'test@example.com',
         firstName: 'Changed',
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(usersStoreMock.updateUser).toHaveBeenCalledWith('user-1', {
@@ -434,14 +434,14 @@ describe('UserEditComponent', () => {
       });
     });
 
-    it('should include password when provided', () => {
+    it('should include password when provided', async () => {
       component.userModel.set({
         email: 'test@example.com',
         firstName: 'Changed',
         lastName: 'User',
         password: 'newPassword1'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(usersStoreMock.updateUser).toHaveBeenCalledWith(
@@ -450,7 +450,7 @@ describe('UserEditComponent', () => {
       );
     });
 
-    it('should not include isActive when lacking update permission', () => {
+    it('should not include isActive when lacking update permission', async () => {
       permittedSignal.set(false);
       component.userModel.set({
         email: 'test@example.com',
@@ -458,7 +458,7 @@ describe('UserEditComponent', () => {
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(usersStoreMock.updateUser).toHaveBeenCalledWith('user-1', {
@@ -468,7 +468,7 @@ describe('UserEditComponent', () => {
       });
     });
 
-    it('should show snackbar and navigate to user detail on success', () => {
+    it('should show snackbar and navigate to user detail on success', async () => {
       const navigateSpy = vi.spyOn(router, 'navigate');
       component.userModel.set({
         email: 'test@example.com',
@@ -476,7 +476,7 @@ describe('UserEditComponent', () => {
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(notifyMock.success).toHaveBeenCalledWith(
@@ -485,7 +485,7 @@ describe('UserEditComponent', () => {
       expect(navigateSpy).toHaveBeenCalledWith(['/admin', 'users', 'user-1']);
     });
 
-    it('should call updateCurrentUser when editing own account', () => {
+    it('should call updateCurrentUser when editing own account', async () => {
       currentUserSignal.set({ id: 'user-1' });
       const updatedUser = { ...mockUser, firstName: 'Updated' };
       usersStoreMock.updateUser.mockReturnValue(of(updatedUser));
@@ -496,13 +496,13 @@ describe('UserEditComponent', () => {
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(authStoreMock.updateCurrentUser).toHaveBeenCalledWith(updatedUser);
     });
 
-    it('should not call updateCurrentUser when editing another user', () => {
+    it('should not call updateCurrentUser when editing another user', async () => {
       currentUserSignal.set({ id: 'admin-id' });
       component.userModel.set({
         email: 'test@example.com',
@@ -510,26 +510,26 @@ describe('UserEditComponent', () => {
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(authStoreMock.updateCurrentUser).not.toHaveBeenCalled();
     });
 
-    it('should reset password field after successful update', () => {
+    it('should reset password field after successful update', async () => {
       component.userModel.set({
         email: 'test@example.com',
         firstName: 'Changed',
         lastName: 'User',
         password: 'oldpassword1'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(component.userModel().password).toBe('');
     });
 
-    it('should set error on update failure', () => {
+    it('should set error on update failure', async () => {
       const httpError = new HttpErrorResponse({
         error: { message: 'Update failed' },
         status: 400
@@ -542,14 +542,14 @@ describe('UserEditComponent', () => {
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(component['error']()).toBe('Update failed');
       expect(component['saving']()).toBe(false);
     });
 
-    it('should show fallback error when no server message on failure', () => {
+    it('should show fallback error when no server message on failure', async () => {
       const httpError = new HttpErrorResponse({ error: null, status: 500 });
       usersStoreMock.updateUser.mockReturnValue(throwError(() => httpError));
 
@@ -559,7 +559,7 @@ describe('UserEditComponent', () => {
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(component['error']()).toBe(
@@ -707,7 +707,7 @@ describe('UserEditComponent', () => {
       fixture.detectChanges();
     });
 
-    it('should open confirm dialog when email changes on submit', () => {
+    it('should open confirm dialog when email changes on submit', async () => {
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(false))
       };
@@ -719,7 +719,7 @@ describe('UserEditComponent', () => {
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(dialogMock.open).toHaveBeenCalled();
@@ -728,7 +728,7 @@ describe('UserEditComponent', () => {
       expect(dialogData['message']).toContain('Test User');
     });
 
-    it('should not call updateUser when email-change dialog is cancelled', () => {
+    it('should not call updateUser when email-change dialog is cancelled', async () => {
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(false))
       };
@@ -740,13 +740,13 @@ describe('UserEditComponent', () => {
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(usersStoreMock.updateUser).not.toHaveBeenCalled();
     });
 
-    it('should call updateUser with new email when dialog is confirmed', () => {
+    it('should call updateUser with new email when dialog is confirmed', async () => {
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(true))
       };
@@ -758,7 +758,7 @@ describe('UserEditComponent', () => {
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(usersStoreMock.updateUser).toHaveBeenCalledWith(
@@ -767,14 +767,14 @@ describe('UserEditComponent', () => {
       );
     });
 
-    it('should not open dialog when only non-email fields changed', () => {
+    it('should not open dialog when only non-email fields changed', async () => {
       component.userModel.set({
         email: 'test@example.com',
         firstName: 'Changed',
         lastName: 'User',
         password: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(dialogMock.open).not.toHaveBeenCalled();

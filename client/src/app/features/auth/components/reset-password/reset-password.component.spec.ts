@@ -87,22 +87,22 @@ describe('ResetPasswordComponent', () => {
       expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
-    it('should validate password minLength of 8', () => {
+    it('should validate password minLength of 8', async () => {
       component.resetPasswordModel.set({
         password: 'short',
         confirmPassword: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       const errors = component.resetPasswordForm.password().errors();
       expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
     });
 
-    it('should accept password of 8+ characters', () => {
+    it('should accept password of 8+ characters', async () => {
       component.resetPasswordModel.set({
         password: 'validpass',
         confirmPassword: ''
       });
-      TestBed.tick();
+      await fixture.whenStable();
       expect(component.resetPasswordForm.password().valid()).toBe(true);
     });
 
@@ -111,22 +111,22 @@ describe('ResetPasswordComponent', () => {
       expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
-    it('should have passwordMismatch error when passwords differ', () => {
+    it('should have passwordMismatch error when passwords differ', async () => {
       component.resetPasswordModel.set({
         password: 'Password1',
         confirmPassword: 'Different1'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       const errors = component.resetPasswordForm.confirmPassword().errors();
       expect(errors.some((e) => e.kind === 'passwordMismatch')).toBe(true);
     });
 
-    it('should be valid when passwords match and meet requirements', () => {
+    it('should be valid when passwords match and meet requirements', async () => {
       component.resetPasswordModel.set({
         password: 'Password1',
         confirmPassword: 'Password1'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       expect(component.resetPasswordForm().valid()).toBe(true);
     });
   });
@@ -141,13 +141,13 @@ describe('ResetPasswordComponent', () => {
       expect(authServiceMock.resetPassword).not.toHaveBeenCalled();
     });
 
-    it('should call resetPassword with token and password', () => {
+    it('should call resetPassword with token and password', async () => {
       authServiceMock.resetPassword.mockReturnValue(of(void 0));
       component.resetPasswordModel.set({
         password: 'NewPassword1',
         confirmPassword: 'NewPassword1'
       });
-      TestBed.tick();
+      await fixture.whenStable();
 
       component.onSubmit();
 
@@ -157,21 +157,21 @@ describe('ResetPasswordComponent', () => {
       );
     });
 
-    it('should navigate to /login on success', () => {
+    it('should navigate to /login on success', async () => {
       authServiceMock.resetPassword.mockReturnValue(of(void 0));
       const navigateSpy = vi.spyOn(router, 'navigate');
       component.resetPasswordModel.set({
         password: 'NewPassword1',
         confirmPassword: 'NewPassword1'
       });
-      TestBed.tick();
+      await fixture.whenStable();
 
       component.onSubmit();
 
       expect(navigateSpy).toHaveBeenCalledWith(['/login']);
     });
 
-    it('should set error from server on failure', () => {
+    it('should set error from server on failure', async () => {
       const httpError = new HttpErrorResponse({
         error: { message: 'Token expired' },
         status: 400
@@ -183,7 +183,7 @@ describe('ResetPasswordComponent', () => {
         password: 'NewPassword1',
         confirmPassword: 'NewPassword1'
       });
-      TestBed.tick();
+      await fixture.whenStable();
 
       component.onSubmit();
 
@@ -191,7 +191,7 @@ describe('ResetPasswordComponent', () => {
       expect(component['loading']()).toBe(false);
     });
 
-    it('should show fallback error when no server message', () => {
+    it('should show fallback error when no server message', async () => {
       const httpError = new HttpErrorResponse({ error: null, status: 500 });
       authServiceMock.resetPassword.mockReturnValue(
         throwError(() => httpError)
@@ -200,7 +200,7 @@ describe('ResetPasswordComponent', () => {
         password: 'NewPassword1',
         confirmPassword: 'NewPassword1'
       });
-      TestBed.tick();
+      await fixture.whenStable();
 
       component.onSubmit();
 
@@ -211,13 +211,13 @@ describe('ResetPasswordComponent', () => {
   });
 
   describe('onSubmit — missing token', () => {
-    it('should not submit when token is missing', () => {
+    it('should not submit when token is missing', async () => {
       createComponent(undefined);
       component.resetPasswordModel.set({
         password: 'NewPassword1',
         confirmPassword: 'NewPassword1'
       });
-      TestBed.tick();
+      await fixture.whenStable();
 
       component.onSubmit();
 

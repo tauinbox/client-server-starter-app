@@ -92,14 +92,14 @@ describe('LoginComponent', () => {
       expect(emailErrors.some((e) => e.kind === 'required')).toBe(true);
     });
 
-    it('should validate email format', () => {
+    it('should validate email format', async () => {
       component.loginModel.set({ email: 'invalid', password: '' });
-      TestBed.tick();
+      await fixture.whenStable();
       const emailErrors = component.loginForm.email().errors();
       expect(emailErrors.some((e) => e.kind === 'email')).toBe(true);
 
       component.loginModel.set({ email: 'test@example.com', password: '' });
-      TestBed.tick();
+      await fixture.whenStable();
       expect(component.loginForm.email().valid()).toBe(true);
     });
 
@@ -108,12 +108,12 @@ describe('LoginComponent', () => {
       expect(passwordErrors.some((e) => e.kind === 'required')).toBe(true);
     });
 
-    it('should be valid with correct values', () => {
+    it('should be valid with correct values', async () => {
       component.loginModel.set({
         email: 'test@example.com',
         password: 'password123'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       expect(component.loginForm().valid()).toBe(true);
     });
   });
@@ -124,7 +124,7 @@ describe('LoginComponent', () => {
       expect(authServiceMock.login).not.toHaveBeenCalled();
     });
 
-    it('should call login with form values when valid', () => {
+    it('should call login with form values when valid', async () => {
       authServiceMock.login.mockReturnValue(of(mockAuthResponse));
       vi.spyOn(router, 'navigateByUrl');
 
@@ -132,7 +132,7 @@ describe('LoginComponent', () => {
         email: 'test@example.com',
         password: 'password123'
       });
-      TestBed.tick();
+      await fixture.whenStable();
 
       component.onSubmit();
 
@@ -142,7 +142,7 @@ describe('LoginComponent', () => {
       });
     });
 
-    it('should set loading to true during login', () => {
+    it('should set loading to true during login', async () => {
       authServiceMock.login.mockReturnValue(of(mockAuthResponse));
       vi.spyOn(router, 'navigateByUrl');
 
@@ -150,7 +150,7 @@ describe('LoginComponent', () => {
         email: 'test@example.com',
         password: 'password123'
       });
-      TestBed.tick();
+      await fixture.whenStable();
 
       component.onSubmit();
 
@@ -158,7 +158,7 @@ describe('LoginComponent', () => {
       expect(component['loading']()).toBe(false);
     });
 
-    it('should navigate to returnUrl on success', () => {
+    it('should navigate to returnUrl on success', async () => {
       authServiceMock.login.mockReturnValue(of(mockAuthResponse));
       vi.spyOn(router, 'navigateByUrl');
 
@@ -166,13 +166,13 @@ describe('LoginComponent', () => {
         email: 'test@example.com',
         password: 'password123'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(router.navigateByUrl).toHaveBeenCalledWith('/');
     });
 
-    it('should navigate to custom returnUrl when present', () => {
+    it('should navigate to custom returnUrl when present', async () => {
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
         imports: [LoginComponent, TranslocoTestingModuleWithLangs],
@@ -203,13 +203,13 @@ describe('LoginComponent', () => {
         email: 'test@example.com',
         password: 'password123'
       });
-      TestBed.tick();
+      await newFixture.whenStable();
       newComponent.onSubmit();
 
       expect(newRouter.navigateByUrl).toHaveBeenCalledWith('/dashboard');
     });
 
-    it('should show fallback translation on login failure without errorKey', () => {
+    it('should show fallback translation on login failure without errorKey', async () => {
       const httpError = new HttpErrorResponse({
         error: { message: 'Invalid credentials' },
         status: 401
@@ -220,7 +220,7 @@ describe('LoginComponent', () => {
         email: 'test@example.com',
         password: 'wrongpassword'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(component['error']()).toBe(
@@ -229,7 +229,7 @@ describe('LoginComponent', () => {
       expect(component['loading']()).toBe(false);
     });
 
-    it('should translate error from errorKey on login failure', () => {
+    it('should translate error from errorKey on login failure', async () => {
       const httpError = new HttpErrorResponse({
         error: {
           message: 'Invalid credentials',
@@ -243,14 +243,14 @@ describe('LoginComponent', () => {
         email: 'test@example.com',
         password: 'wrongpassword'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(component['error']()).toBe('Invalid credentials');
       expect(component['loading']()).toBe(false);
     });
 
-    it('should show fallback error message when no server message', () => {
+    it('should show fallback error message when no server message', async () => {
       const httpError = new HttpErrorResponse({
         error: null,
         status: 500
@@ -261,7 +261,7 @@ describe('LoginComponent', () => {
         email: 'test@example.com',
         password: 'password123'
       });
-      TestBed.tick();
+      await fixture.whenStable();
       component.onSubmit();
 
       expect(component['error']()).toBe(
