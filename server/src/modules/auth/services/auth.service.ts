@@ -23,10 +23,17 @@ import {
   MAX_FAILED_ATTEMPTS,
   LOCKOUT_DURATION_MS,
   MAX_CONCURRENT_SESSIONS,
-  BCRYPT_SALT_ROUNDS
+  BCRYPT_SALT_ROUNDS,
+  EMAIL_CHANGE_TOKEN_EXPIRY_MS
 } from '@app/shared/constants/auth.constants';
+import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
 
 const RESET_TOKEN_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
+
+const ENUMERATION_SAFE_INITIATE_RESPONSE = {
+  message:
+    'If the new email is available, a confirmation link has been sent to it.'
+};
 
 @Injectable()
 export class AuthService {
@@ -204,8 +211,13 @@ export class AuthService {
     // Create user and set verification token atomically so a partial failure
     // never leaves a user without a token (which would prevent email verification).
     const user = await withTransaction(this.dataSource, async (manager) => {
+      // Also reject if another user holds this address as a pending email
+      // change — otherwise two accounts could claim the same address in flight.
       const existing = await manager.findOne(User, {
-        where: { email: registerDto.email }
+        where: [
+          { email: registerDto.email },
+          { pendingEmail: registerDto.email }
+        ]
       });
       if (existing) {
         throw new HttpException(
@@ -410,6 +422,11 @@ export class AuthService {
         password: hashedPassword,
         passwordResetToken: null,
         passwordResetExpiresAt: null,
+        // Reset also cancels any in-flight self-service email change — proof
+        // of email ownership is invalidated when password ownership changes.
+        pendingEmail: null,
+        pendingEmailToken: null,
+        pendingEmailExpiresAt: null,
         tokenRevokedAt: new Date()
       });
       await manager.delete(RefreshToken, { userId: user.id });
@@ -552,6 +569,216 @@ export class AuthService {
     return {
       tokens,
       user: userWithoutPassword
+    };
+  }
+
+  /**
+   * Step 1 of self-service email change. Verifies the user's current password,
+   * stores the requested new address + a hashed confirmation token on the user
+   * row, sends a confirmation link to the new address and an alert to the old
+   * one. The user's `email` is NOT changed until step 2 (confirmEmailChange).
+   *
+   * Returns the same response shape regardless of whether the new address is
+   * available — never leaks uniqueness state.
+   */
+  async initiateEmailChange(
+    userId: string,
+    dto: InitiateEmailChangeDto,
+    auditContext?: AuditContext
+  ): Promise<{ message: string }> {
+    const user = await this.usersService.findOne(userId);
+
+    if (user.password === null) {
+      throw new HttpException(
+        {
+          message: 'Please set a password before changing your email',
+          errorKey: ErrorKeys.AUTH.OAUTH_ONLY_SET_PASSWORD_FIRST
+        },
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    const isMatch = await bcrypt.compare(dto.currentPassword, user.password);
+    if (!isMatch) {
+      throw new HttpException(
+        {
+          message: 'Current password is incorrect',
+          errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
+        },
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    if (dto.newEmail === user.email) {
+      throw new HttpException(
+        {
+          message: 'New email is the same as the current email',
+          errorKey: ErrorKeys.AUTH.SAME_EMAIL
+        },
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + EMAIL_CHANGE_TOKEN_EXPIRY_MS);
+
+    const conflict = await withTransaction(this.dataSource, async (manager) => {
+      // Conflict if any OTHER user already holds this address as their
+      // primary email OR as a pending email change in flight.
+      const existing = await manager
+        .createQueryBuilder(User, 'u')
+        .where('(u.email = :email OR u.pendingEmail = :email)', {
+          email: dto.newEmail
+        })
+        .andWhere('u.id != :userId', { userId })
+        .getOne();
+
+      if (existing) return true;
+
+      await manager.update(User, userId, {
+        pendingEmail: dto.newEmail,
+        pendingEmailToken: hashedToken,
+        pendingEmailExpiresAt: expiresAt
+      });
+      return false;
+    });
+
+    const domain = dto.newEmail.slice(dto.newEmail.indexOf('@') + 1);
+    this.auditService.logFireAndForget({
+      action: AuditAction.USER_EMAIL_CHANGE_REQUEST,
+      actorId: userId,
+      actorEmail: user.email,
+      targetId: userId,
+      targetType: 'User',
+      details: { newEmailDomain: domain, conflict },
+      context: auditContext
+    });
+
+    if (conflict) {
+      // Enumeration-safe: same response shape as success. No email is sent —
+      // we must not reveal whether the address is taken, and we must not
+      // notify a third party that someone tried to claim their address.
+      return ENUMERATION_SAFE_INITIATE_RESPONSE;
+    }
+
+    this.mailService
+      .sendEmailChangeConfirmation(dto.newEmail, rawToken)
+      .catch((err) =>
+        this.logger.error('Failed to send email change confirmation', err)
+      );
+    this.mailService
+      .sendEmailChangeNotificationOld(user.email, dto.newEmail)
+      .catch((err) =>
+        this.logger.error('Failed to send email change OLD-address alert', err)
+      );
+
+    return ENUMERATION_SAFE_INITIATE_RESPONSE;
+  }
+
+  /**
+   * Step 2 of self-service email change. Looks up the user by the hashed
+   * token, re-checks uniqueness (concurrency: another account may have
+   * claimed the address since step 1), applies the change, revokes all
+   * sessions, and notifies the old address.
+   */
+  async confirmEmailChange(
+    rawToken: string,
+    auditContext?: AuditContext
+  ): Promise<{ message: string }> {
+    const hashedToken = hashToken(rawToken);
+
+    const result = await withTransaction(this.dataSource, async (manager) => {
+      const user = await manager.findOne(User, {
+        where: { pendingEmailToken: hashedToken }
+      });
+      if (!user || !user.pendingEmail) {
+        throw new HttpException(
+          {
+            message: 'Invalid or expired email-change token',
+            errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED
+          },
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      if (
+        user.pendingEmailExpiresAt &&
+        user.pendingEmailExpiresAt.getTime() < Date.now()
+      ) {
+        await manager.update(User, user.id, {
+          pendingEmail: null,
+          pendingEmailToken: null,
+          pendingEmailExpiresAt: null
+        });
+        throw new HttpException(
+          {
+            message:
+              'Email-change token has expired. Please request a new one.',
+            errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED
+          },
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      const newEmail = user.pendingEmail;
+      const oldEmail = user.email;
+
+      const conflicting = await manager
+        .createQueryBuilder(User, 'u')
+        .where('u.email = :email', { email: newEmail })
+        .andWhere('u.id != :userId', { userId: user.id })
+        .getOne();
+      if (conflicting) {
+        await manager.update(User, user.id, {
+          pendingEmail: null,
+          pendingEmailToken: null,
+          pendingEmailExpiresAt: null
+        });
+        throw new HttpException(
+          {
+            message: 'User with this email already exists',
+            errorKey: ErrorKeys.USERS.EMAIL_EXISTS
+          },
+          HttpStatus.CONFLICT
+        );
+      }
+
+      await manager.update(User, user.id, {
+        email: newEmail,
+        isEmailVerified: true,
+        pendingEmail: null,
+        pendingEmailToken: null,
+        pendingEmailExpiresAt: null,
+        tokenRevokedAt: new Date()
+      });
+      await manager.delete(RefreshToken, { userId: user.id });
+
+      return { userId: user.id, oldEmail, newEmail };
+    });
+
+    await this.auditService.log({
+      action: AuditAction.USER_EMAIL_CHANGE_COMPLETE,
+      actorId: result.userId,
+      actorEmail: result.newEmail,
+      targetId: result.userId,
+      targetType: 'User',
+      details: { oldEmail: result.oldEmail, newEmail: result.newEmail },
+      context: auditContext
+    });
+
+    this.mailService
+      .sendEmailChangeCompletedNotification(result.oldEmail, result.newEmail)
+      .catch((err) =>
+        this.logger.error(
+          'Failed to send email change completed notification',
+          err
+        )
+      );
+
+    return {
+      message:
+        'Email has been updated. Please sign in again with your new email.'
     };
   }
 

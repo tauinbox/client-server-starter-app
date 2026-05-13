@@ -91,6 +91,9 @@
   },
   "profile": {
     "updateCard": "Update Profile",
+    "email": "Email",
+    "emailRequired": "Email is required",
+    "emailInvalid": "Please enter a valid email address",
     "firstName": "First Name",
     "firstNameRequired": "First name is required",
     "lastName": "Last Name",
@@ -100,7 +103,7 @@
     "passwordMinLength": "Password must be at least 8 characters",
     "currentPassword": "Current Password",
     "currentPasswordPlaceholder": "Enter your current password",
-    "currentPasswordRequired": "Current password is required to change your password",
+    "currentPasswordRequired": "Current password is required to change your password or email",
     "confirmPassword": "Confirm New Password",
     "confirmPasswordPlaceholder": "Confirm new password",
     "passwordsMismatch": "Passwords do not match",
@@ -121,7 +124,22 @@
     "errorInitiateLinkFailed": "Failed to initiate link",
     "errorDisconnectFailed": "Failed to disconnect account",
     "successUpdated": "Profile updated successfully",
-    "errorUpdateFailed": "Failed to update profile. Please try again."
+    "errorUpdateFailed": "Failed to update profile. Please try again.",
+    "confirmEmailChangeTitle": "Confirm email change",
+    "confirmEmailChangeMessage": "We'll send a confirmation link to {{ newEmail }}. Your email won't change until you click it. You'll also get a notification at your current address.",
+    "confirmEmailChangeButton": "Send confirmation link",
+    "emailChangeInitiated": "Confirmation link sent. Check your new email inbox to complete the change.",
+    "errorEmailChangeFailed": "Failed to initiate email change. Please try again."
+  },
+  "confirmEmailChange": {
+    "title": "Confirm Email Change",
+    "verifying": "Confirming your new email address...",
+    "successTitle": "Email Updated",
+    "successMessage": "Your account email has been updated. Please sign in again with your new email.",
+    "goToLogin": "Go to Login",
+    "failedTitle": "Confirmation Failed",
+    "errorNoToken": "No confirmation token provided.",
+    "errorFailed": "Email change confirmation failed. The token may be invalid or expired."
   },
   "oauthCallback": {
     "completingSignIn": "Completing sign in..."

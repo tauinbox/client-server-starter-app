@@ -51,6 +51,7 @@ export function resetState(): void {
     revokedRefreshTokens: new Map(),
     emailVerificationTokens: new Map(),
     passwordResetTokens: new Map(),
+    pendingEmailTokens: new Map(),
     resources: new Map(seedResources.map((r) => [r.id, { ...r }])),
     actions: new Map(seedActions.map((a) => [a.id, { ...a }])),
     roles: new Map(seedRoles.map((r) => [r.id, { ...r }])),
@@ -180,6 +181,9 @@ export function toUserResponse(user: MockUser): UserResponse {
     tokenRevokedAt: __,
     failedLoginAttempts: ___,
     lockedUntil: ____,
+    pendingEmail: _____,
+    pendingEmailToken: ______,
+    pendingEmailExpiresAt: _______,
     roles: roleNames,
     ...rest
   } = user;
@@ -195,6 +199,9 @@ export function toAdminUserResponse(user: MockUser): AdminUserResponse {
     password: _,
     tokenRevokedAt: __,
     failedLoginAttempts: ___,
+    pendingEmail: ____,
+    pendingEmailToken: _____,
+    pendingEmailExpiresAt: ______,
     roles: roleNames,
     ...rest
   } = user;

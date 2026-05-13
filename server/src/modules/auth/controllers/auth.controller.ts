@@ -48,6 +48,8 @@ import { VerifyEmailDto } from '../dtos/verify-email.dto';
 import { ResendVerificationDto } from '../dtos/resend-verification.dto';
 import { ForgotPasswordDto } from '../dtos/forgot-password.dto';
 import { ResetPasswordDto } from '../dtos/reset-password.dto';
+import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
+import { ConfirmEmailChangeDto } from '../dtos/confirm-email-change.dto';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
@@ -251,6 +253,43 @@ export class AuthController {
     }
 
     return updatedUser;
+  }
+
+  @Throttle({ default: { ttl: 3600000, limit: 3 } })
+  @Post('profile/email/initiate')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Initiate a self-service email change' })
+  @ApiBody({ type: InitiateEmailChangeDto })
+  @ApiOkResponse({
+    description:
+      'If the new email is available, a confirmation link has been sent to it'
+  })
+  initiateEmailChange(
+    @Request() req: JwtAuthRequest,
+    @Body() dto: InitiateEmailChangeDto
+  ) {
+    return this.authService.initiateEmailChange(
+      req.user.userId,
+      dto,
+      extractAuditContext(req)
+    );
+  }
+
+  @Public()
+  @Post('profile/email/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Confirm a self-service email change' })
+  @ApiBody({ type: ConfirmEmailChangeDto })
+  @ApiOkResponse({ description: 'Email has been updated' })
+  confirmEmailChange(
+    @Body() dto: ConfirmEmailChangeDto,
+    @Request() req: ExpressRequest
+  ) {
+    return this.authService.confirmEmailChange(
+      dto.token,
+      extractAuditContext(req)
+    );
   }
 
   @Get('permissions')

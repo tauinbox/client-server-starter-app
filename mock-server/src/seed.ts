@@ -30,6 +30,9 @@ function generateUsers(): MockUser[] {
       failedLoginAttempts: 0,
       lockedUntil: null,
       tokenRevokedAt: null,
+      pendingEmail: null,
+      pendingEmailToken: null,
+      pendingEmailExpiresAt: null,
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z',
       deletedAt: null
@@ -46,6 +49,9 @@ function generateUsers(): MockUser[] {
       failedLoginAttempts: 0,
       lockedUntil: null,
       tokenRevokedAt: null,
+      pendingEmail: null,
+      pendingEmailToken: null,
+      pendingEmailExpiresAt: null,
       createdAt: '2025-01-15T00:00:00.000Z',
       updatedAt: '2025-01-15T00:00:00.000Z',
       deletedAt: null
@@ -62,6 +68,9 @@ function generateUsers(): MockUser[] {
       failedLoginAttempts: 0,
       lockedUntil: null,
       tokenRevokedAt: null,
+      pendingEmail: null,
+      pendingEmailToken: null,
+      pendingEmailExpiresAt: null,
       createdAt: '2025-02-01T00:00:00.000Z',
       updatedAt: '2025-02-01T00:00:00.000Z',
       deletedAt: null
@@ -78,6 +87,9 @@ function generateUsers(): MockUser[] {
       failedLoginAttempts: 0,
       lockedUntil: null,
       tokenRevokedAt: null,
+      pendingEmail: null,
+      pendingEmailToken: null,
+      pendingEmailExpiresAt: null,
       createdAt: '2025-03-01T00:00:00.000Z',
       updatedAt: '2025-03-01T00:00:00.000Z',
       deletedAt: null
@@ -94,6 +106,9 @@ function generateUsers(): MockUser[] {
       failedLoginAttempts: 0,
       lockedUntil: null,
       tokenRevokedAt: null,
+      pendingEmail: null,
+      pendingEmailToken: null,
+      pendingEmailExpiresAt: null,
       createdAt: '2025-04-01T00:00:00.000Z',
       updatedAt: '2025-04-01T00:00:00.000Z',
       deletedAt: null

@@ -30,6 +30,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
     revokedRefreshTokens: state.revokedRefreshTokens.size,
     emailVerificationTokens: state.emailVerificationTokens.size,
     passwordResetTokens: state.passwordResetTokens.size,
+    pendingEmailTokens: state.pendingEmailTokens.size,
     resources: Array.from(state.resources.values()),
     actions: Array.from(state.actions.values()),
     roles: Array.from(state.roles.values()),
@@ -73,7 +74,8 @@ router.get('/tokens', (_req, res) => {
   const state = getState();
   res.json({
     emailVerificationTokens: Object.fromEntries(state.emailVerificationTokens),
-    passwordResetTokens: Object.fromEntries(state.passwordResetTokens)
+    passwordResetTokens: Object.fromEntries(state.passwordResetTokens),
+    pendingEmailTokens: Object.fromEntries(state.pendingEmailTokens)
   });
 });
 

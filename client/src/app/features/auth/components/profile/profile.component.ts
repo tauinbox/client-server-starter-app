@@ -16,7 +16,14 @@ import {
 } from '@angular/material/card';
 import { MatChip } from '@angular/material/chips';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import { form, minLength, required, validate } from '@angular/forms/signals';
+import {
+  email as emailValidator,
+  form,
+  minLength,
+  required,
+  validate
+} from '@angular/forms/signals';
+import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { DOCUMENT, DatePipe } from '@angular/common';
@@ -35,6 +42,7 @@ import { AuthStore } from '@features/auth/store/auth.store';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 type ProfileData = {
+  email: string;
   firstName: string;
   lastName: string;
   currentPassword: string;
@@ -54,6 +62,7 @@ const PROVIDER_KEYS: Record<string, string> = {
 };
 
 const INITIAL_PROFILE: ProfileData = {
+  email: '',
   firstName: '',
   lastName: '',
   currentPassword: '',
@@ -92,6 +101,7 @@ export class ProfileComponent implements OnInit {
   readonly #router = inject(Router);
   readonly #authStore = inject(AuthStore);
   readonly #transloco = inject(TranslocoService);
+  readonly #adaptiveDialog = inject(AdaptiveDialogService);
 
   /**
    * Drives the role chip label. Based on the super-ability rather than a
@@ -117,6 +127,8 @@ export class ProfileComponent implements OnInit {
   readonly profileModel = signal<ProfileData>({ ...INITIAL_PROFILE });
 
   readonly profileForm = form(this.profileModel, (path) => {
+    required(path.email, { message: 'auth.profile.emailRequired' });
+    emailValidator(path.email, { message: 'auth.profile.emailInvalid' });
     required(path.firstName, {
       message: 'auth.profile.firstNameRequired'
     });
@@ -128,7 +140,10 @@ export class ProfileComponent implements OnInit {
     });
     validate(path.currentPassword, ({ value, valueOf }) => {
       const password = valueOf(path.password);
-      if (!password) return null;
+      const emailValue = valueOf(path.email).trim().toLowerCase();
+      const loaded = this.user()?.email ?? '';
+      const emailChanged = !!loaded && emailValue !== loaded;
+      if (!password && !emailChanged) return null;
       if (!value().trim()) {
         return {
           kind: 'currentPasswordRequired',
@@ -154,6 +169,19 @@ export class ProfileComponent implements OnInit {
   protected readonly hasPassword = computed(
     () => !!this.profileModel().password
   );
+
+  /**
+   * The currentPassword field appears whenever a sensitive change is queued —
+   * either a password update OR an email change. Both require fresh proof of
+   * password ownership.
+   */
+  protected readonly requiresCurrentPassword = computed(() => {
+    const data = this.profileModel();
+    if (data.password) return true;
+    const loaded = this.user()?.email ?? '';
+    if (!loaded) return false;
+    return data.email.trim().toLowerCase() !== loaded;
+  });
 
   ngOnInit() {
     this.loadProfile();
@@ -196,6 +224,7 @@ export class ProfileComponent implements OnInit {
         next: (user) => {
           this.user.set(user);
           this.profileModel.set({
+            email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
             currentPassword: '',
@@ -275,8 +304,75 @@ export class ProfileComponent implements OnInit {
   }
 
   onSubmit(): void {
-    if (this.profileForm().invalid() || !this.user()) return;
+    const u = this.user();
+    if (this.profileForm().invalid() || !u) return;
 
+    const formValues = this.profileModel();
+    const newEmail = formValues.email.trim().toLowerCase();
+    const emailChanged = !!u.email && newEmail !== u.email;
+
+    if (emailChanged) {
+      this.#adaptiveDialog
+        .openConfirm({
+          title: this.#transloco.translate(
+            'auth.profile.confirmEmailChangeTitle'
+          ),
+          message: this.#transloco.translate(
+            'auth.profile.confirmEmailChangeMessage',
+            { newEmail }
+          ),
+          confirmButton: this.#transloco.translate(
+            'auth.profile.confirmEmailChangeButton'
+          ),
+          cancelButton: this.#transloco.translate('common.cancel'),
+          icon: 'mark_email_unread'
+        })
+        .pipe(takeUntilDestroyed(this.#destroyRef))
+        .subscribe((confirmed) => {
+          if (confirmed) {
+            this.#initiateEmailChange(newEmail, formValues.currentPassword);
+          }
+        });
+      return;
+    }
+
+    this.#savePersonalUpdates();
+  }
+
+  #initiateEmailChange(newEmail: string, currentPassword: string): void {
+    this.saving.set(true);
+    this.error.set(null);
+
+    this.#authService
+      .initiateEmailChange(newEmail, currentPassword)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.saving.set(false);
+          this.#notify.success('auth.profile.emailChangeInitiated');
+          // Revert the form's email back to the loaded address — the change
+          // is not applied until the user confirms via the email link.
+          const current = this.user();
+          if (current) {
+            this.profileModel.update((data) => ({
+              ...data,
+              email: current.email,
+              currentPassword: ''
+            }));
+            this.profileForm().reset();
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.saving.set(false);
+          const errorMessage =
+            err.error?.message ||
+            this.#transloco.translate('auth.profile.errorEmailChangeFailed');
+          this.error.set(errorMessage);
+        }
+      });
+  }
+
+  #savePersonalUpdates(): void {
     const formValues = this.profileModel();
 
     const updateData: UpdateProfile = {
@@ -301,6 +397,7 @@ export class ProfileComponent implements OnInit {
           this.user.set(updatedUser);
 
           this.profileModel.set({
+            email: updatedUser.email,
             firstName: updatedUser.firstName,
             lastName: updatedUser.lastName,
             currentPassword: '',

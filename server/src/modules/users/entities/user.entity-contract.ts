@@ -34,6 +34,9 @@ type _ExcludedFields =
   | 'emailVerificationExpiresAt'
   | 'passwordResetToken'
   | 'passwordResetExpiresAt'
+  | 'pendingEmail'
+  | 'pendingEmailToken'
+  | 'pendingEmailExpiresAt'
   | 'tokenRevokedAt'
   | 'failedLoginAttempts'
   | 'lockedUntil';

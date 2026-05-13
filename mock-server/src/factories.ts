@@ -28,6 +28,9 @@ export function createMockUser(options: MockUserOptions = {}): MockUser {
     failedLoginAttempts: options.failedLoginAttempts ?? 0,
     lockedUntil: options.lockedUntil ?? null,
     tokenRevokedAt: options.tokenRevokedAt ?? null,
+    pendingEmail: options.pendingEmail ?? null,
+    pendingEmailToken: options.pendingEmailToken ?? null,
+    pendingEmailExpiresAt: options.pendingEmailExpiresAt ?? null,
     createdAt: options.createdAt ?? now,
     updatedAt: options.updatedAt ?? now,
     deletedAt: options.deletedAt ?? null

@@ -105,6 +105,7 @@ describe('ProfileComponent', () => {
       expect(component['user']()).toEqual(mockUser);
       expect(component['loading']()).toBe(false);
       expect(component.profileModel()).toEqual({
+        email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
         currentPassword: '',
@@ -153,6 +154,7 @@ describe('ProfileComponent', () => {
 
     it('should require firstName', async () => {
       component.profileModel.set({
+        email: 'test@example.com',
         firstName: '',
         lastName: 'User',
         currentPassword: '',
@@ -166,6 +168,7 @@ describe('ProfileComponent', () => {
 
     it('should require lastName', async () => {
       component.profileModel.set({
+        email: 'test@example.com',
         firstName: 'Test',
         lastName: '',
         currentPassword: '',
@@ -179,6 +182,7 @@ describe('ProfileComponent', () => {
 
     it('should validate password minLength when provided', async () => {
       component.profileModel.set({
+        email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
         currentPassword: 'CurrentPass1',
@@ -192,6 +196,7 @@ describe('ProfileComponent', () => {
 
     it('should allow empty password (optional)', async () => {
       component.profileModel.set({
+        email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
         currentPassword: '',
@@ -204,6 +209,7 @@ describe('ProfileComponent', () => {
 
     it('should have passwordMismatch when passwords differ', async () => {
       component.profileModel.set({
+        email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
         currentPassword: 'CurrentPass1',
@@ -217,6 +223,7 @@ describe('ProfileComponent', () => {
 
     it('should be valid when passwords match and current password is provided', async () => {
       component.profileModel.set({
+        email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
         currentPassword: 'CurrentPass1',
@@ -229,6 +236,7 @@ describe('ProfileComponent', () => {
 
     it('should require currentPassword when new password is entered', async () => {
       component.profileModel.set({
+        email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
         currentPassword: '',
@@ -245,6 +253,7 @@ describe('ProfileComponent', () => {
 
     it('should NOT require currentPassword when password is blank', async () => {
       component.profileModel.set({
+        email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
         currentPassword: '',
@@ -266,6 +275,7 @@ describe('ProfileComponent', () => {
 
     it('should not submit when form is invalid', async () => {
       component.profileModel.set({
+        email: 'test@example.com',
         firstName: '',
         lastName: 'User',
         currentPassword: '',
@@ -288,6 +298,7 @@ describe('ProfileComponent', () => {
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component.profileModel.set({
+        email: 'test@example.com',
         firstName: 'Updated',
         lastName: 'User',
         currentPassword: '',
@@ -308,6 +319,7 @@ describe('ProfileComponent', () => {
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component.profileModel.set({
+        email: 'test@example.com',
         firstName: 'Updated',
         lastName: 'User',
         currentPassword: 'CurrentPass1',
@@ -330,6 +342,7 @@ describe('ProfileComponent', () => {
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component.profileModel.set({
+        email: 'test@example.com',
         firstName: 'Updated',
         lastName: 'User',
         currentPassword: '',
@@ -351,6 +364,7 @@ describe('ProfileComponent', () => {
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component.profileModel.set({
+        email: 'test@example.com',
         firstName: 'Updated',
         lastName: 'User',
         currentPassword: 'CurrentPass1',
@@ -375,6 +389,7 @@ describe('ProfileComponent', () => {
       );
 
       component.profileModel.set({
+        email: 'test@example.com',
         firstName: 'Updated',
         lastName: 'User',
         currentPassword: '',
@@ -398,6 +413,7 @@ describe('ProfileComponent', () => {
       );
 
       component.profileModel.set({
+        email: 'test@example.com',
         firstName: 'Updated',
         lastName: 'User',
         currentPassword: '',

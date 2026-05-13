@@ -1,0 +1,34 @@
+<div class="confirm-email-change-container" *transloco="let t; scope: 'auth'">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>{{ t('auth.confirmEmailChange.title') }}</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      @if (loading()) {
+        <div class="status-container">
+          <mat-spinner diameter="48"></mat-spinner>
+          <p>{{ t('auth.confirmEmailChange.verifying') }}</p>
+        </div>
+      } @else if (success()) {
+        <div class="status-container success">
+          <mat-icon>check_circle</mat-icon>
+          <h3>{{ t('auth.confirmEmailChange.successTitle') }}</h3>
+          <p>{{ t('auth.confirmEmailChange.successMessage') }}</p>
+          <button matButton="filled" routerLink="/login">
+            {{ t('auth.confirmEmailChange.goToLogin') }}
+          </button>
+        </div>
+      } @else {
+        <div class="status-container error">
+          <mat-icon>error_outline</mat-icon>
+          <h3>{{ t('auth.confirmEmailChange.failedTitle') }}</h3>
+          <p>{{ error() }}</p>
+          <button matButton="filled" routerLink="/login">
+            {{ t('auth.confirmEmailChange.goToLogin') }}
+          </button>
+        </div>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

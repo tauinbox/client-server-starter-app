@@ -95,7 +95,10 @@
       "unlinkLastProvider": "Невозможно отвязать последнего OAuth-провайдера без установленного пароля. Сначала установите пароль.",
       "invalidCurrentPassword": "Текущий пароль неверен",
       "captchaRequired": "Пожалуйста, пройдите проверку CAPTCHA для продолжения.",
-      "captchaInvalid": "Проверка CAPTCHA не пройдена. Попробуйте ещё раз."
+      "captchaInvalid": "Проверка CAPTCHA не пройдена. Попробуйте ещё раз.",
+      "sameEmail": "Новый email совпадает с текущим",
+      "pendingEmailTokenExpired": "Токен подтверждения смены email недействителен или просрочен",
+      "oauthOnlySetPasswordFirst": "Установите пароль перед сменой email"
     },
     "users": {
       "notFound": "Пользователь не найден",
