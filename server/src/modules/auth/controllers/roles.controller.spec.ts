@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ForbiddenException } from '@nestjs/common';
 import { RolesController } from './roles.controller';
 import { RoleService } from '../services/role.service';
+import { AuditService } from '../../audit/audit.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { PermissionsGuard } from '../guards/permissions.guard';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -34,6 +37,9 @@ const allowAllGuard = { canActivate: () => true };
 // @ts-expect-error partial mock — only `can` is needed for controller delegation tests
 const mockAbility: AppAbility = { can: jest.fn().mockReturnValue(true) };
 
+// @ts-expect-error partial mock — drives the deny path of assertCan
+const denyAbility: AppAbility = { can: jest.fn().mockReturnValue(false) };
+
 const mockReq: import('../types/auth.request').JwtAuthRequest = {
   // @ts-expect-error partial user — handlers only read req.user.userId
   user: { userId: 'actor-1', email: 'a@example.com' }
@@ -55,6 +61,8 @@ describe('RolesController', () => {
     assignRoleToUser: jest.Mock;
     removeRoleFromUser: jest.Mock;
   };
+  let auditServiceMock: { log: jest.Mock; logFireAndForget: jest.Mock };
+  let metricsServiceMock: { recordPermissionDenied: jest.Mock };
 
   beforeEach(async () => {
     roleServiceMock = {
@@ -72,11 +80,19 @@ describe('RolesController', () => {
       removeRoleFromUser: jest.fn().mockResolvedValue(undefined)
     };
 
+    auditServiceMock = {
+      log: jest.fn().mockResolvedValue(undefined),
+      logFireAndForget: jest.fn()
+    };
+    metricsServiceMock = { recordPermissionDenied: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [RolesController],
       providers: [
         { provide: RoleService, useValue: roleServiceMock },
-        { provide: EventEmitter2, useValue: { emit: jest.fn() } }
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        { provide: AuditService, useValue: auditServiceMock },
+        { provide: MetricsService, useValue: metricsServiceMock }
       ]
     })
       .overrideGuard(JwtAuthGuard)
@@ -125,28 +141,62 @@ describe('RolesController', () => {
   });
 
   describe('findOne', () => {
-    it('should delegate to roleService.findOne with the correct id', () => {
+    it('should load the role and return it when ability allows', async () => {
       const role = { id: 'role-42', name: 'moderator' };
-      roleServiceMock.findOne.mockReturnValue(role);
+      roleServiceMock.findOne.mockResolvedValue(role);
 
-      const result = controller.findOne('role-42');
+      const result = await controller.findOne('role-42', mockReq, mockAbility);
 
       expect(roleServiceMock.findOne).toHaveBeenCalledWith('role-42');
       expect(result).toBe(role);
     });
+
+    it('should throw ForbiddenException when ability denies the loaded role instance', async () => {
+      const role = { id: 'role-42', name: 'system', isSystem: true };
+      roleServiceMock.findOne.mockResolvedValue(role);
+
+      await expect(
+        controller.findOne('role-42', mockReq, denyAbility)
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.PERMISSION_CHECK_FAILURE,
+          actorId: 'actor-1',
+          targetId: 'role-42',
+          targetType: 'Role'
+        })
+      );
+    });
   });
 
   describe('getPermissionsForRole', () => {
-    it('should delegate to roleService.getPermissionsForRole with the correct id', () => {
+    it('should load the role, assert read access, then delegate to roleService.getPermissionsForRole', async () => {
+      const role = { id: 'role-42', name: 'moderator' };
       const perms = [{ id: 'rp-1' }];
-      roleServiceMock.getPermissionsForRole.mockReturnValue(perms);
+      roleServiceMock.findOne.mockResolvedValue(role);
+      roleServiceMock.getPermissionsForRole.mockResolvedValue(perms);
 
-      const result = controller.getPermissionsForRole('role-42');
+      const result = await controller.getPermissionsForRole(
+        'role-42',
+        mockReq,
+        mockAbility
+      );
 
+      expect(roleServiceMock.findOne).toHaveBeenCalledWith('role-42');
       expect(roleServiceMock.getPermissionsForRole).toHaveBeenCalledWith(
         'role-42'
       );
       expect(result).toBe(perms);
+    });
+
+    it('should throw ForbiddenException and skip getPermissionsForRole when ability denies', async () => {
+      const role = { id: 'role-42', name: 'moderator' };
+      roleServiceMock.findOne.mockResolvedValue(role);
+
+      await expect(
+        controller.getPermissionsForRole('role-42', mockReq, denyAbility)
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(roleServiceMock.getPermissionsForRole).not.toHaveBeenCalled();
     });
   });
 
@@ -164,26 +214,67 @@ describe('RolesController', () => {
   });
 
   describe('update', () => {
-    it('should call roleService.update with the correct id and dto and return result', async () => {
+    it('should load the role, assert update access, then call roleService.update', async () => {
       const dto = { name: 'senior-editor' };
+      const role = { id: 'role-1', name: 'editor' };
       const updated = { id: 'role-1', name: 'senior-editor' };
+      roleServiceMock.findOne.mockResolvedValue(role);
       roleServiceMock.update.mockResolvedValue(updated);
 
-      const result = await controller.update('role-1', dto);
+      const result = await controller.update(
+        'role-1',
+        dto,
+        mockReq,
+        mockAbility
+      );
 
+      expect(roleServiceMock.findOne).toHaveBeenCalledWith('role-1');
       expect(roleServiceMock.update).toHaveBeenCalledWith('role-1', dto);
       expect(result).toBe(updated);
+    });
+
+    it('should throw ForbiddenException and skip update when ability denies the loaded role', async () => {
+      const role = { id: 'role-1', name: 'editor' };
+      roleServiceMock.findOne.mockResolvedValue(role);
+
+      await expect(
+        controller.update('role-1', { name: 'x' }, mockReq, denyAbility)
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(roleServiceMock.update).not.toHaveBeenCalled();
+      expect(metricsServiceMock.recordPermissionDenied).toHaveBeenCalledWith(
+        'instance',
+        'update',
+        'Role'
+      );
     });
   });
 
   describe('remove', () => {
-    it('should call roleService.delete with the correct id and return result', async () => {
+    it('should load the role, assert delete access, then call roleService.delete', async () => {
+      const role = { id: 'role-1', name: 'editor' };
+      roleServiceMock.findOne.mockResolvedValue(role);
       roleServiceMock.delete.mockResolvedValue(undefined);
 
-      const result = await controller.remove('role-1');
+      const result = await controller.remove('role-1', mockReq, mockAbility);
 
+      expect(roleServiceMock.findOne).toHaveBeenCalledWith('role-1');
       expect(roleServiceMock.delete).toHaveBeenCalledWith('role-1');
       expect(result).toBeUndefined();
+    });
+
+    it('should throw ForbiddenException and skip delete when ability denies the loaded role', async () => {
+      const role = { id: 'role-1', name: 'editor' };
+      roleServiceMock.findOne.mockResolvedValue(role);
+
+      await expect(
+        controller.remove('role-1', mockReq, denyAbility)
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(roleServiceMock.delete).not.toHaveBeenCalled();
+      expect(metricsServiceMock.recordPermissionDenied).toHaveBeenCalledWith(
+        'instance',
+        'delete',
+        'Role'
+      );
     });
   });
 
