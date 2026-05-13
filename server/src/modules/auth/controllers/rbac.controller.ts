@@ -4,6 +4,8 @@ import {
   Delete,
   Get,
   HttpCode,
+  HttpException,
+  HttpStatus,
   Inject,
   Param,
   ParseUUIDPipe,
@@ -26,16 +28,22 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
+import { subject } from '@casl/ability';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { ResourceService } from '../services/resource.service';
 import { ActionService } from '../services/action.service';
 import { Authorize } from '../decorators/authorize.decorator';
+import { CurrentAbility } from '../decorators/current-ability.decorator';
 import { CreateActionDto } from '../dtos/create-action.dto';
 import { UpdateActionDto } from '../dtos/update-action.dto';
 import { UpdateResourceDto } from '../dtos/update-resource.dto';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { assertCan } from '../../../common/utils/assert-can.util';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { JwtAuthRequest } from '../types/auth.request';
+import type { AppAbility } from '../casl/app-ability';
 import { RegisterResource } from '../decorators/register-resource.decorator';
 
 const METADATA_CACHE_KEY = 'rbac:metadata';
@@ -56,6 +64,7 @@ export class RbacController {
     private readonly resourceService: ResourceService,
     private readonly actionService: ActionService,
     private readonly auditService: AuditService,
+    private readonly metricsService: MetricsService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache
   ) {}
 
@@ -105,8 +114,27 @@ export class RbacController {
   @ApiNotFoundResponse({ description: 'Resource not found' })
   async restoreResource(
     @Param('id', ParseUUIDPipe) id: string,
-    @Request() req: JwtAuthRequest
+    @Request() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
+    const resource = await this.resourceService.findOne(id);
+    if (!resource) {
+      throw new HttpException(
+        {
+          message: 'Resource not found',
+          errorKey: ErrorKeys.RESOURCES.NOT_FOUND
+        },
+        HttpStatus.NOT_FOUND
+      );
+    }
+    assertCan(
+      ability,
+      'update',
+      subject('Permission', resource),
+      this.auditService,
+      { actorId: req.user.userId, targetId: id, targetType: 'Resource' },
+      this.metricsService
+    );
     const result = await this.resourceService.restore(id);
     await this.cacheManager.del(METADATA_CACHE_KEY);
     await this.auditService.log({
@@ -131,8 +159,27 @@ export class RbacController {
   async updateResource(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateResourceDto,
-    @Request() req: JwtAuthRequest
+    @Request() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
+    const resource = await this.resourceService.findOne(id);
+    if (!resource) {
+      throw new HttpException(
+        {
+          message: 'Resource not found',
+          errorKey: ErrorKeys.RESOURCES.NOT_FOUND
+        },
+        HttpStatus.NOT_FOUND
+      );
+    }
+    assertCan(
+      ability,
+      'update',
+      subject('Permission', resource),
+      this.auditService,
+      { actorId: req.user.userId, targetId: id, targetType: 'Resource' },
+      this.metricsService
+    );
     const result = await this.resourceService.update(id, dto);
     await this.cacheManager.del(METADATA_CACHE_KEY);
     await this.auditService.log({
@@ -193,8 +240,18 @@ export class RbacController {
   async updateAction(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateActionDto,
-    @Request() req: JwtAuthRequest
+    @Request() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
+    const action = await this.actionService.findOne(id);
+    assertCan(
+      ability,
+      'update',
+      subject('Permission', action),
+      this.auditService,
+      { actorId: req.user.userId, targetId: id, targetType: 'Action' },
+      this.metricsService
+    );
     const result = await this.actionService.update(id, dto);
     await this.cacheManager.del(METADATA_CACHE_KEY);
     await this.auditService.log({
@@ -218,8 +275,18 @@ export class RbacController {
   @ApiNotFoundResponse({ description: 'Action not found' })
   async deleteAction(
     @Param('id', ParseUUIDPipe) id: string,
-    @Request() req: JwtAuthRequest
+    @Request() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
+    const action = await this.actionService.findOne(id);
+    assertCan(
+      ability,
+      'delete',
+      subject('Permission', action),
+      this.auditService,
+      { actorId: req.user.userId, targetId: id, targetType: 'Action' },
+      this.metricsService
+    );
     await this.actionService.delete(id);
     await this.cacheManager.del(METADATA_CACHE_KEY);
     await this.auditService.log({

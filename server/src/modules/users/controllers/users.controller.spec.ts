@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ForbiddenException } from '@nestjs/common';
 import { UsersController } from './users.controller';
 import { UsersService } from '../services/users.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../../audit/audit.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { PermissionService } from '../../auth/services/permission.service';
 import { CaslAbilityFactory } from '../../auth/casl/casl-ability.factory';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -21,6 +23,9 @@ const allowAllGuard = { canActivate: () => true };
 
 // @ts-expect-error partial mock — only `can` is needed for controller delegation tests
 const mockAbility: AppAbility = { can: jest.fn().mockReturnValue(true) };
+
+// @ts-expect-error partial mock — only `can` is needed; returning false drives the deny path
+const denyAbility: AppAbility = { can: jest.fn().mockReturnValue(false) };
 
 function mockJwtRequest(
   userId = 'user-1',
@@ -49,7 +54,8 @@ describe('UsersController', () => {
     restore: jest.Mock;
   };
   let eventEmitterMock: { emit: jest.Mock };
-  let auditServiceMock: { log: jest.Mock };
+  let auditServiceMock: { log: jest.Mock; logFireAndForget: jest.Mock };
+  let metricsServiceMock: { recordPermissionDenied: jest.Mock };
   let permissionServiceMock: {
     getRolesForUser: jest.Mock;
     getPermissionsForUser: jest.Mock;
@@ -69,7 +75,12 @@ describe('UsersController', () => {
 
     eventEmitterMock = { emit: jest.fn() };
 
-    auditServiceMock = { log: jest.fn().mockResolvedValue(undefined) };
+    auditServiceMock = {
+      log: jest.fn().mockResolvedValue(undefined),
+      logFireAndForget: jest.fn()
+    };
+
+    metricsServiceMock = { recordPermissionDenied: jest.fn() };
 
     permissionServiceMock = {
       getRolesForUser: jest.fn(),
@@ -84,6 +95,7 @@ describe('UsersController', () => {
         { provide: UsersService, useValue: usersServiceMock },
         { provide: EventEmitter2, useValue: eventEmitterMock },
         { provide: AuditService, useValue: auditServiceMock },
+        { provide: MetricsService, useValue: metricsServiceMock },
         { provide: PermissionService, useValue: permissionServiceMock },
         { provide: CaslAbilityFactory, useValue: caslAbilityFactoryMock }
       ]
@@ -241,14 +253,44 @@ describe('UsersController', () => {
   // ── findOne ───────────────────────────────────────────────────────
 
   describe('findOne', () => {
-    it('should delegate to usersService.findOne with the correct id', async () => {
+    it('should load the user via usersService.findOne and return it when ability allows', async () => {
       const user = { id: 'user-5', email: 'user5@example.com' };
       usersServiceMock.findOne.mockResolvedValue(user);
+      const req = mockJwtRequest() as JwtAuthRequest;
 
-      const result = await controller.findOne('user-5');
+      const result = await controller.findOne('user-5', req, mockAbility);
 
       expect(usersServiceMock.findOne).toHaveBeenCalledWith('user-5');
       expect(result).toBe(user);
+    });
+
+    it('should throw ForbiddenException and audit when ability denies the loaded instance', async () => {
+      const user = { id: 'user-5', email: 'user5@example.com' };
+      usersServiceMock.findOne.mockResolvedValue(user);
+      const req = mockJwtRequest('actor-deny') as JwtAuthRequest;
+
+      await expect(
+        controller.findOne('user-5', req, denyAbility)
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.PERMISSION_CHECK_FAILURE,
+          actorId: 'actor-deny',
+          targetId: 'user-5',
+          targetType: 'User',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          details: expect.objectContaining({
+            instanceCheck: true,
+            deniedAction: 'read',
+            subject: 'User'
+          })
+        })
+      );
+      expect(metricsServiceMock.recordPermissionDenied).toHaveBeenCalledWith(
+        'instance',
+        'read',
+        'User'
+      );
     });
   });
 
@@ -553,8 +595,13 @@ describe('UsersController', () => {
         permissions
       );
       caslAbilityFactoryMock.createForUser.mockResolvedValue(ability);
+      const req = mockJwtRequest() as JwtAuthRequest;
 
-      const result = await controller.getPermissions('user-12');
+      const result = await controller.getPermissions(
+        'user-12',
+        req,
+        mockAbility
+      );
 
       expect(usersServiceMock.findOne).toHaveBeenCalledWith('user-12');
       expect(permissionServiceMock.getRolesForUser).toHaveBeenCalledWith(
@@ -576,14 +623,41 @@ describe('UsersController', () => {
 
     it('should propagate 404 from usersService.findOne when user does not exist', async () => {
       usersServiceMock.findOne.mockRejectedValue(new Error('User not found'));
+      const req = mockJwtRequest() as JwtAuthRequest;
 
-      await expect(controller.getPermissions('missing')).rejects.toThrow(
-        'User not found'
-      );
+      await expect(
+        controller.getPermissions('missing', req, mockAbility)
+      ).rejects.toThrow('User not found');
       expect(permissionServiceMock.getRolesForUser).not.toHaveBeenCalled();
       expect(
         permissionServiceMock.getPermissionsForUser
       ).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException before reading roles/permissions when ability denies', async () => {
+      const user = {
+        id: 'user-12',
+        email: 'target@example.com',
+        roles: []
+      };
+      usersServiceMock.findOne.mockResolvedValue(user);
+      const req = mockJwtRequest('actor-deny') as JwtAuthRequest;
+
+      await expect(
+        controller.getPermissions('user-12', req, denyAbility)
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(permissionServiceMock.getRolesForUser).not.toHaveBeenCalled();
+      expect(
+        permissionServiceMock.getPermissionsForUser
+      ).not.toHaveBeenCalled();
+      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.PERMISSION_CHECK_FAILURE,
+          actorId: 'actor-deny',
+          targetId: 'user-12',
+          targetType: 'User'
+        })
+      );
     });
   });
 });

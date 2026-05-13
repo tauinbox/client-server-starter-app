@@ -15,6 +15,7 @@ import {
   UseInterceptors
 } from '@nestjs/common';
 import { packRules } from '@casl/ability/extra';
+import { subject } from '@casl/ability';
 import { UsersService } from '../services/users.service';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
@@ -44,6 +45,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserDeletedEvent } from '../events/user-deleted.event';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { assertCan } from '../../../common/utils/assert-can.util';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { JwtAuthRequest } from '../../auth/types/auth.request';
 import { UserPasswordChangedByAdminEvent } from '../events/user-password-changed-by-admin.event';
@@ -64,6 +67,7 @@ export class UsersController {
     private readonly usersService: UsersService,
     private readonly eventEmitter: EventEmitter2,
     private readonly auditService: AuditService,
+    private readonly metricsService: MetricsService,
     private readonly permissionService: PermissionService,
     private readonly caslAbilityFactory: CaslAbilityFactory
   ) {}
@@ -183,8 +187,21 @@ export class UsersController {
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.findOne(id);
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
+  ) {
+    const user = await this.usersService.findOne(id);
+    assertCan(
+      ability,
+      'read',
+      subject('User', user),
+      this.auditService,
+      { actorId: req.user.userId, targetId: id, targetType: 'User' },
+      this.metricsService
+    );
+    return user;
   }
 
   @Get(':id/permissions')
@@ -199,8 +216,20 @@ export class UsersController {
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  async getPermissions(@Param('id', ParseUUIDPipe) id: string) {
+  async getPermissions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: JwtAuthRequest,
+    @CurrentAbility() callerAbility: AppAbility
+  ) {
     const user = await this.usersService.findOne(id);
+    assertCan(
+      callerAbility,
+      'read',
+      subject('User', user),
+      this.auditService,
+      { actorId: req.user.userId, targetId: id, targetType: 'User' },
+      this.metricsService
+    );
     const [roleInfos, permissions] = await Promise.all([
       this.permissionService.getRolesForUser(id),
       this.permissionService.getPermissionsForUser(id)

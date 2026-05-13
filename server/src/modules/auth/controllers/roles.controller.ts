@@ -25,6 +25,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
+import { subject } from '@casl/ability';
 import { RoleService } from '../services/role.service';
 import { CreateRoleDto } from '../dtos/create-role.dto';
 import { UpdateRoleDto } from '../dtos/update-role.dto';
@@ -39,6 +40,9 @@ import { RegisterResource } from '../decorators/register-resource.decorator';
 import type { AppAbility } from '../casl/app-ability';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { LogAudit } from '../../audit/decorators/log-audit.decorator';
+import { AuditService } from '../../audit/audit.service';
+import { assertCan } from '../../../common/utils/assert-can.util';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserRoleChangedEvent } from '../events/user-role-changed.event';
 import type { JwtAuthRequest } from '../types/auth.request';
@@ -54,7 +58,9 @@ import type { JwtAuthRequest } from '../types/auth.request';
 export class RolesController {
   constructor(
     private readonly roleService: RoleService,
-    private readonly eventEmitter: EventEmitter2
+    private readonly eventEmitter: EventEmitter2,
+    private readonly auditService: AuditService,
+    private readonly metricsService: MetricsService
   ) {}
 
   @Get()
@@ -84,8 +90,21 @@ export class RolesController {
   @ApiParam({ name: 'id', description: 'The role ID' })
   @ApiOkResponse({ description: 'The role' })
   @ApiNotFoundResponse({ description: 'Role not found' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.roleService.findOne(id);
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
+  ) {
+    const role = await this.roleService.findOne(id);
+    assertCan(
+      ability,
+      'read',
+      subject('Role', role),
+      this.auditService,
+      { actorId: req.user?.userId, targetId: id, targetType: 'Role' },
+      this.metricsService
+    );
+    return role;
   }
 
   @Get(':id/permissions')
@@ -95,7 +114,20 @@ export class RolesController {
   @ApiParam({ name: 'id', description: 'The role ID' })
   @ApiOkResponse({ description: 'List of role permissions' })
   @ApiNotFoundResponse({ description: 'Role not found' })
-  getPermissionsForRole(@Param('id', ParseUUIDPipe) id: string) {
+  async getPermissionsForRole(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
+  ) {
+    const role = await this.roleService.findOne(id);
+    assertCan(
+      ability,
+      'read',
+      subject('Role', role),
+      this.auditService,
+      { actorId: req.user?.userId, targetId: id, targetType: 'Role' },
+      this.metricsService
+    );
     return this.roleService.getPermissionsForRole(id);
   }
 
@@ -130,10 +162,21 @@ export class RolesController {
   @ApiBody({ type: UpdateRoleDto })
   @ApiOkResponse({ description: 'Role updated' })
   @ApiNotFoundResponse({ description: 'Role not found' })
-  update(
+  async update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateRoleDto: UpdateRoleDto
+    @Body() updateRoleDto: UpdateRoleDto,
+    @Req() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
+    const role = await this.roleService.findOne(id);
+    assertCan(
+      ability,
+      'update',
+      subject('Role', role),
+      this.auditService,
+      { actorId: req.user?.userId, targetId: id, targetType: 'Role' },
+      this.metricsService
+    );
     return this.roleService.update(id, updateRoleDto);
   }
 
@@ -148,7 +191,20 @@ export class RolesController {
   @ApiParam({ name: 'id', description: 'The role ID' })
   @ApiOkResponse({ description: 'Role deleted' })
   @ApiNotFoundResponse({ description: 'Role not found' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
+  ) {
+    const role = await this.roleService.findOne(id);
+    assertCan(
+      ability,
+      'delete',
+      subject('Role', role),
+      this.auditService,
+      { actorId: req.user?.userId, targetId: id, targetType: 'Role' },
+      this.metricsService
+    );
     return this.roleService.delete(id);
   }
 
