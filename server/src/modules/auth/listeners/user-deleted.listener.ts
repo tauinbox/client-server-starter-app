@@ -15,7 +15,16 @@ export class UserDeletedListener {
 
   @OnEvent(UserDeletedEvent.name)
   async handleUserDeleted(event: UserDeletedEvent): Promise<void> {
-    await this.invalidateSessions(event.userId);
+    await Promise.all([
+      this.invalidateSessions(event.userId),
+      // Defence in depth: UsersService.remove clears these too, but the
+      // listener covers any other deletion entrypoint that may be added later.
+      this.dataSource.getRepository(User).update(event.userId, {
+        pendingEmail: null,
+        pendingEmailToken: null,
+        pendingEmailExpiresAt: null
+      })
+    ]);
   }
 
   @OnEvent(UserPasswordChangedByAdminEvent.name)

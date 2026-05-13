@@ -133,7 +133,10 @@ describe('UsersService', () => {
       const result = await service.create(createUserDto);
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
-        where: { email: 'new@example.com' }
+        where: [
+          { email: 'new@example.com' },
+          { pendingEmail: 'new@example.com' }
+        ]
       });
       expect(bcrypt.hash).toHaveBeenCalledWith('Password1', BCRYPT_SALT_ROUNDS);
       expect(mockRepository.create).toHaveBeenCalledWith({

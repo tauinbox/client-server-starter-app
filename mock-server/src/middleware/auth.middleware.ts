@@ -4,7 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   MAX_FAILED_ATTEMPTS,
   LOCKOUT_DURATION_MS,
-  MAX_CONCURRENT_SESSIONS
+  MAX_CONCURRENT_SESSIONS,
+  EMAIL_CHANGE_TOKEN_EXPIRY_MS
 } from '@app/shared/constants/auth.constants';
 import {
   PASSWORD_REGEX,
@@ -32,6 +33,14 @@ import {
   trackAttemptAndSetHeader
 } from '../helpers/captcha.helpers';
 import type { AuthenticatedRequest, MockUser } from '../types';
+
+function findUserByPendingEmail(email: string): MockUser | undefined {
+  const state = getState();
+  for (const user of state.users.values()) {
+    if (user.pendingEmail === email && !user.deletedAt) return user;
+  }
+  return undefined;
+}
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
 const COOKIE_OPTIONS: CookieOptions = {
@@ -116,7 +125,7 @@ router.post('/register', (req, res) => {
     return;
   }
 
-  if (findUserByEmail(email)) {
+  if (findUserByEmail(email) || findUserByPendingEmail(email)) {
     res.status(409).json({
       message: 'User with this email already exists',
       statusCode: 409,
@@ -138,6 +147,9 @@ router.post('/register', (req, res) => {
     failedLoginAttempts: 0,
     lockedUntil: null,
     tokenRevokedAt: null,
+    pendingEmail: null,
+    pendingEmailToken: null,
+    pendingEmailExpiresAt: null,
     createdAt: now,
     updatedAt: now,
     deletedAt: null
@@ -502,6 +514,15 @@ router.post('/reset-password', (req, res) => {
   user.tokenRevokedAt = new Date().toISOString();
   user.updatedAt = new Date().toISOString();
 
+  // Cancel any in-flight self-service email change — proof of email ownership
+  // is invalidated when password ownership changes.
+  if (user.pendingEmailToken) {
+    state.pendingEmailTokens.delete(user.pendingEmailToken);
+  }
+  user.pendingEmail = null;
+  user.pendingEmailToken = null;
+  user.pendingEmailExpiresAt = null;
+
   // Clear the reset token
   state.passwordResetTokens.delete(token);
 
@@ -745,6 +766,226 @@ router.patch('/profile', authGuard, (req, res) => {
   user.updatedAt = new Date().toISOString();
 
   res.json(toUserResponse(user));
+});
+
+// POST /api/v1/auth/profile/email/initiate
+router.post('/profile/email/initiate', authGuard, (req, res) => {
+  const { user } = req as AuthenticatedRequest;
+  const { currentPassword } = req.body;
+  const newEmail = req.body.newEmail?.trim().toLowerCase();
+
+  const successMessage =
+    'If the new email is available, a confirmation link has been sent to it.';
+
+  if (!newEmail) {
+    res
+      .status(400)
+      .json({ message: 'newEmail must be an email', statusCode: 400 });
+    return;
+  }
+  if (!isValidEmail(newEmail)) {
+    res
+      .status(400)
+      .json({ message: 'newEmail must be an email', statusCode: 400 });
+    return;
+  }
+  const emailMaxErr = validateMaxLength(newEmail, 255, 'newEmail');
+  if (emailMaxErr) {
+    res.status(400).json({ message: emailMaxErr, statusCode: 400 });
+    return;
+  }
+  if (
+    typeof currentPassword !== 'string' ||
+    currentPassword.length === 0 ||
+    currentPassword.length > 128
+  ) {
+    res.status(400).json({
+      message: 'currentPassword is required',
+      statusCode: 400
+    });
+    return;
+  }
+
+  if (user.password === null) {
+    res.status(400).json({
+      message: 'Please set a password before changing your email',
+      statusCode: 400,
+      errorKey: ErrorKeys.AUTH.OAUTH_ONLY_SET_PASSWORD_FIRST
+    });
+    return;
+  }
+
+  // Plaintext comparison — mock only. Real server uses bcrypt.compare().
+  if (user.password !== currentPassword) {
+    res.status(400).json({
+      message: 'Current password is incorrect',
+      statusCode: 400,
+      errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
+    });
+    return;
+  }
+
+  if (newEmail === user.email) {
+    res.status(400).json({
+      message: 'New email is the same as the current email',
+      statusCode: 400,
+      errorKey: ErrorKeys.AUTH.SAME_EMAIL
+    });
+    return;
+  }
+
+  const state = getState();
+
+  // Uniqueness check: primary email OR pending email on any OTHER user.
+  let conflict = false;
+  for (const other of state.users.values()) {
+    if (other.id === user.id || other.deletedAt) continue;
+    if (other.email === newEmail || other.pendingEmail === newEmail) {
+      conflict = true;
+      break;
+    }
+  }
+
+  const domain = newEmail.slice(newEmail.indexOf('@') + 1);
+  logAudit('USER_EMAIL_CHANGE_REQUEST', {
+    actorId: user.id,
+    actorEmail: user.email,
+    targetId: user.id,
+    targetType: 'User',
+    details: { newEmailDomain: domain, conflict },
+    ip: req.ip
+  });
+
+  if (conflict) {
+    res.json({ message: successMessage });
+    return;
+  }
+
+  // Drop any previous pending token for this user (idempotent re-initiate)
+  if (user.pendingEmailToken) {
+    state.pendingEmailTokens.delete(user.pendingEmailToken);
+  }
+
+  // No hashing in the mock — store the raw token directly.
+  const token = uuidv4();
+  user.pendingEmail = newEmail;
+  user.pendingEmailToken = token;
+  user.pendingEmailExpiresAt = new Date(
+    Date.now() + EMAIL_CHANGE_TOKEN_EXPIRY_MS
+  ).toISOString();
+  state.pendingEmailTokens.set(token, user.id);
+
+  const confirmUrl = `http://localhost:4200/confirm-email-change?token=${token}`;
+  console.log(
+    `[EMAIL CHANGE CONFIRMATION] To: ${newEmail}\n  Confirm URL: ${confirmUrl}`
+  );
+  console.log(
+    `[EMAIL CHANGE NOTIFICATION] To: ${user.email}\n  Pending new address requested`
+  );
+
+  res.json({ message: successMessage });
+});
+
+// POST /api/v1/auth/profile/email/confirm
+router.post('/profile/email/confirm', (req, res) => {
+  const { token } = req.body;
+
+  if (!token || typeof token !== 'string') {
+    res.status(400).json({ message: 'Token is required', statusCode: 400 });
+    return;
+  }
+
+  const state = getState();
+  const userId = state.pendingEmailTokens.get(token);
+  if (!userId) {
+    res.status(400).json({
+      message: 'Invalid or expired email-change token',
+      errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
+      statusCode: 400
+    });
+    return;
+  }
+
+  const user = findUserById(userId);
+  if (!user || !user.pendingEmail) {
+    state.pendingEmailTokens.delete(token);
+    res.status(400).json({
+      message: 'Invalid or expired email-change token',
+      errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
+      statusCode: 400
+    });
+    return;
+  }
+
+  if (
+    user.pendingEmailExpiresAt &&
+    new Date(user.pendingEmailExpiresAt).getTime() < Date.now()
+  ) {
+    state.pendingEmailTokens.delete(token);
+    user.pendingEmail = null;
+    user.pendingEmailToken = null;
+    user.pendingEmailExpiresAt = null;
+    res.status(400).json({
+      message: 'Email-change token has expired. Please request a new one.',
+      errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
+      statusCode: 400
+    });
+    return;
+  }
+
+  // Race check: another user may have claimed the address since step 1.
+  for (const other of state.users.values()) {
+    if (other.id === user.id || other.deletedAt) continue;
+    if (other.email === user.pendingEmail) {
+      state.pendingEmailTokens.delete(token);
+      user.pendingEmail = null;
+      user.pendingEmailToken = null;
+      user.pendingEmailExpiresAt = null;
+      res.status(409).json({
+        message: 'User with this email already exists',
+        statusCode: 409,
+        errorKey: ErrorKeys.USERS.EMAIL_EXISTS
+      });
+      return;
+    }
+  }
+
+  const oldEmail = user.email;
+  const newEmail = user.pendingEmail;
+
+  user.email = newEmail;
+  user.isEmailVerified = true;
+  user.pendingEmail = null;
+  user.pendingEmailToken = null;
+  user.pendingEmailExpiresAt = null;
+  user.tokenRevokedAt = new Date().toISOString();
+  user.updatedAt = new Date().toISOString();
+  state.pendingEmailTokens.delete(token);
+
+  // Invalidate all refresh tokens — the JWT email claim is stale.
+  for (const [rt, uid] of state.refreshTokens.entries()) {
+    if (uid === user.id) state.refreshTokens.delete(rt);
+  }
+  for (const [rt, uid] of state.revokedRefreshTokens.entries()) {
+    if (uid === user.id) state.revokedRefreshTokens.delete(rt);
+  }
+
+  logAudit('USER_EMAIL_CHANGE_COMPLETE', {
+    actorId: user.id,
+    actorEmail: newEmail,
+    targetId: user.id,
+    targetType: 'User',
+    details: { oldEmail, newEmail },
+    ip: req.ip
+  });
+
+  console.log(
+    `[EMAIL CHANGE COMPLETE] To: ${oldEmail}\n  New address: ${newEmail}`
+  );
+
+  res.json({
+    message: 'Email has been updated. Please sign in again with your new email.'
+  });
 });
 
 export default router;

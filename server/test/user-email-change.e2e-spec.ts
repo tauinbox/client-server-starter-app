@@ -30,6 +30,11 @@ function buildSeedUser(): User {
   u.isEmailVerified = true;
   u.emailVerificationToken = null;
   u.emailVerificationExpiresAt = null;
+  u.passwordResetToken = null;
+  u.passwordResetExpiresAt = null;
+  u.pendingEmail = null;
+  u.pendingEmailToken = null;
+  u.pendingEmailExpiresAt = null;
   u.failedLoginAttempts = 0;
   u.lockedUntil = null;
   u.tokenRevokedAt = null;
@@ -37,17 +42,31 @@ function buildSeedUser(): User {
   return u;
 }
 
+type WhereClause = {
+  id?: string;
+  email?: string;
+  pendingEmail?: string;
+};
+
+function matchOne(row: User, where: WhereClause): boolean {
+  if (where.id !== undefined && row.id !== where.id) return false;
+  if (where.email !== undefined && row.email !== where.email) return false;
+  if (
+    where.pendingEmail !== undefined &&
+    row.pendingEmail !== where.pendingEmail
+  )
+    return false;
+  return true;
+}
+
 function makeUserRepoMock(store: UserStore) {
   return {
     findOne: jest.fn(
-      (opts: {
-        where: { id?: string; email?: string };
-      }): Promise<User | null> => {
-        const { where } = opts;
-        if (where.id) return Promise.resolve(store.rows.get(where.id) ?? null);
-        if (where.email) {
-          for (const row of store.rows.values()) {
-            if (row.email === where.email) return Promise.resolve(row);
+      (opts: { where: WhereClause | WhereClause[] }): Promise<User | null> => {
+        const clauses = Array.isArray(opts.where) ? opts.where : [opts.where];
+        for (const row of store.rows.values()) {
+          for (const where of clauses) {
+            if (matchOne(row, where)) return Promise.resolve(row);
           }
         }
         return Promise.resolve(null);
@@ -125,6 +144,37 @@ describe('UsersService.update — email change side effects (BKL-006b)', () => {
     expect(updated.isEmailVerified).toBe(true);
     expect(updated.emailVerificationToken).toBeNull();
     expect(mailService.sendEmailVerification).not.toHaveBeenCalled();
+  });
+
+  it('clears self-service pending email fields when admin sets a new email', async () => {
+    const u = store.rows.get('user-1')!;
+    u.pendingEmail = 'self-service@example.com';
+    u.pendingEmailToken = 'hashed-self-service-token';
+    u.pendingEmailExpiresAt = new Date(Date.now() + 3600_000);
+
+    await usersService.update('user-1', { email: 'admin-set@example.com' });
+
+    const persisted = store.rows.get('user-1');
+    expect(persisted?.pendingEmail).toBeNull();
+    expect(persisted?.pendingEmailToken).toBeNull();
+    expect(persisted?.pendingEmailExpiresAt).toBeNull();
+  });
+
+  it('rejects when another user holds the address as a pending email change', async () => {
+    const dupe = buildSeedUser();
+    dupe.id = 'user-3';
+    dupe.email = 'other@example.com';
+    dupe.pendingEmail = 'reserved@example.com';
+    store.rows.set('user-3', dupe);
+
+    let caught: unknown;
+    try {
+      await usersService.update('user-1', { email: 'reserved@example.com' });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(HttpException);
+    expect((caught as HttpException).getStatus()).toBe(HttpStatus.CONFLICT);
   });
 
   it('throws 409 with EMAIL_EXISTS errorKey + field=email on duplicate (no MailService side effect)', async () => {

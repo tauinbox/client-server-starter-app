@@ -20,6 +20,9 @@ export interface MockUser {
   failedLoginAttempts: number;
   lockedUntil: string | null;
   tokenRevokedAt: string | null;
+  pendingEmail: string | null;
+  pendingEmailToken: string | null;
+  pendingEmailExpiresAt: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -113,6 +116,7 @@ export interface State {
   revokedRefreshTokens: Map<string, string>; // token -> userId
   emailVerificationTokens: Map<string, string>; // token -> userId
   passwordResetTokens: Map<string, string>; // token -> userId
+  pendingEmailTokens: Map<string, string>; // token -> userId
   resources: Map<string, MockResource>;
   actions: Map<string, MockAction>;
   roles: Map<string, MockRole>;

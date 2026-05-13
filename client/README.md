@@ -92,6 +92,7 @@ src/app/
 | `/admin/roles` | RoleListComponent | permissionGuard('read', 'Role') |
 | `/admin/resources` | ResourceListComponent | permissionGuard('read', 'Permission') |
 | `/verify-email` | VerifyEmailComponent | - |
+| `/confirm-email-change` | ConfirmEmailChangeComponent | - |
 | `/forgot-password` | ForgotPasswordComponent | guestGuard |
 | `/reset-password` | ResetPasswordComponent | guestGuard |
 | `/oauth/callback` | OAuthCallbackComponent | - |
@@ -181,7 +182,7 @@ npm test
 - Test structure: organized by module in `e2e/auth/`, `e2e/users/`, and `e2e/admin/`
 - **Accessibility**: `e2e/a11y.spec.ts` runs `@axe-core/playwright` (WCAG 2.1 AA) against every major route; `e2e/keyboard-nav.spec.ts` verifies keyboard-only flows (login, sidenav, user-edit, dialog focus trap)
 - **Live RBAC + auth regression net** (BKL-027): refresh-token reuse detection (`refresh-token-reuse.spec.ts`), SSE-driven role revocation hides admin link (`role-revocation-via-sse.spec.ts`), admin-on-/admin auto-redirect to /forbidden (`admin/admin-panel-permission-loss.spec.ts`), reactive 401 → refresh → retry (`reactive-token-refresh.spec.ts`), logout + browser Back navigation (`logout-back-button.spec.ts`), OAuth unlink-last-provider safety (`oauth-unlink-last-provider.spec.ts`), wire-contract assertion that `auth_user.roles` is `RoleResponse[]` (`post-login-admin-badge.spec.ts`)
-- Coverage: 145 tests — unit test suite: 569 tests passing covering login, register, profile, session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search (including admin email-change confirmation dialog), admin roles/resources management, effective-permissions preview, admin-panel auto-redirect (BKL-013), a11y audit, keyboard navigation. Error translation tests verify `errorKey` → Transloco pipeline for login, register, and global interceptor snackbar.
+- Coverage: 145 tests — unit test suite: 593 tests passing covering login, register, profile (incl. self-service email change), session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search (including admin email-change confirmation dialog), admin roles/resources management, effective-permissions preview, admin-panel auto-redirect (BKL-013), a11y audit, keyboard navigation. Error translation tests verify `errorKey` → Transloco pipeline for login, register, and global interceptor snackbar.
 - Workers: 4 (fully parallel, per-worker mock-server instances on dynamic ports)
 
 ```bash

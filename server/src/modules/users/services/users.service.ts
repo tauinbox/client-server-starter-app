@@ -49,8 +49,10 @@ export class UsersService {
   async create(createUserDto: CreateUserDto): Promise<User> {
     const { email, password } = createUserDto;
 
+    // Reject if address is held by another user as primary email OR as a
+    // pending email-change request — both are reservations on the address.
     const existingUser = await this.userRepository.findOne({
-      where: { email }
+      where: [{ email }, { pendingEmail: email }]
     });
     if (existingUser) {
       throw new HttpException(
@@ -233,8 +235,10 @@ export class UsersService {
 
     let pendingVerificationRawToken: string | null = null;
     if (rest.email !== undefined && rest.email !== user.email) {
+      // Reject if another user holds this address as primary email OR as a
+      // pending email-change request in flight.
       const conflicting = await this.userRepository.findOne({
-        where: { email: rest.email }
+        where: [{ email: rest.email }, { pendingEmail: rest.email }]
       });
       if (conflicting && conflicting.id !== user.id) {
         throw new HttpException(
@@ -251,6 +255,10 @@ export class UsersService {
       changes.isEmailVerified = false;
       changes.emailVerificationToken = issued.hashedToken;
       changes.emailVerificationExpiresAt = issued.expiresAt;
+      // Admin-set email overrides any self-service change in flight.
+      changes.pendingEmail = null;
+      changes.pendingEmailToken = null;
+      changes.pendingEmailExpiresAt = null;
     }
 
     this.userRepository.merge(user, changes);
@@ -381,6 +389,13 @@ export class UsersService {
       );
     }
 
+    // Clear pending email-change fields BEFORE soft-delete so a stale token
+    // cannot outlive deletedAt and confirm against a soft-removed row.
+    await this.userRepository.update(id, {
+      pendingEmail: null,
+      pendingEmailToken: null,
+      pendingEmailExpiresAt: null
+    });
     await this.userRepository.softRemove(user);
   }
 

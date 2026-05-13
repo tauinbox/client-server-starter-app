@@ -1,0 +1,36 @@
+@use 'abstracts/variables' as vars;
+@use 'abstracts/functions' as func;
+@use 'abstracts/mixins' as mix;
+
+:host {
+  .confirm-email-change-container {
+    mat-card {
+      width: 100%;
+    }
+
+    @include mix.centered-container(vars.$card-width-sm);
+  }
+
+  .status-container {
+    display: flex;
+    flex-direction: column;
+    gap: vars.$spacing-md;
+    align-items: center;
+    padding: vars.$spacing-lg 0;
+    text-align: center;
+
+    mat-icon {
+      width: func.rem(48);
+      height: func.rem(48);
+      font-size: func.rem(48);
+    }
+
+    &.success mat-icon {
+      color: var(--mat-sys-primary);
+    }
+
+    &.error mat-icon {
+      color: var(--mat-sys-error);
+    }
+  }
+}

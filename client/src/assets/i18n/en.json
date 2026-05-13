@@ -95,7 +95,10 @@
       "unlinkLastProvider": "Cannot unlink the last OAuth provider without a password set. Please set a password first.",
       "invalidCurrentPassword": "Current password is incorrect",
       "captchaRequired": "Please complete the CAPTCHA challenge to continue.",
-      "captchaInvalid": "CAPTCHA verification failed. Please try again."
+      "captchaInvalid": "CAPTCHA verification failed. Please try again.",
+      "sameEmail": "New email is the same as your current email",
+      "pendingEmailTokenExpired": "Email-change confirmation token is invalid or expired",
+      "oauthOnlySetPasswordFirst": "Please set a password before changing your email"
     },
     "users": {
       "notFound": "User not found",

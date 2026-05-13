@@ -85,6 +85,13 @@ export const routes: Routes = [
       )
   },
   {
+    path: AppRouteSegmentEnum.ConfirmEmailChange,
+    loadComponent: () =>
+      import('./features/auth/components/confirm-email-change/confirm-email-change.component').then(
+        (c) => c.ConfirmEmailChangeComponent
+      )
+  },
+  {
     path: AppRouteSegmentEnum.ForgotPassword,
     loadComponent: () =>
       import('./features/auth/components/forgot-password/forgot-password.component').then(

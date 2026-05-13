@@ -79,6 +79,22 @@ export class User {
   @Exclude()
   passwordResetExpiresAt: Date | null;
 
+  @Column({ name: 'pending_email', type: 'varchar', nullable: true })
+  @Exclude()
+  pendingEmail: string | null;
+
+  @Column({ name: 'pending_email_token', type: 'varchar', nullable: true })
+  @Exclude()
+  pendingEmailToken: string | null;
+
+  @Column({
+    name: 'pending_email_expires_at',
+    type: 'timestamp',
+    nullable: true
+  })
+  @Exclude()
+  pendingEmailExpiresAt: Date | null;
+
   @Column({ name: 'token_revoked_at', type: 'timestamp', nullable: true })
   @Exclude()
   tokenRevokedAt: Date | null;

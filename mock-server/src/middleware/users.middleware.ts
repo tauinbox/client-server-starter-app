@@ -248,7 +248,12 @@ router.post('/', adminGuard, (req, res) => {
     return;
   }
 
-  if (findUserByEmail(email)) {
+  if (
+    findUserByEmail(email) ||
+    Array.from(getState().users.values()).some(
+      (u) => !u.deletedAt && u.pendingEmail === email
+    )
+  ) {
     res.status(409).json({
       message: 'User with this email already exists',
       statusCode: 409,
@@ -270,6 +275,9 @@ router.post('/', adminGuard, (req, res) => {
     failedLoginAttempts: 0,
     lockedUntil: null,
     tokenRevokedAt: null,
+    pendingEmail: null,
+    pendingEmailToken: null,
+    pendingEmailExpiresAt: null,
     createdAt: now,
     updatedAt: now,
     deletedAt: null
@@ -483,7 +491,10 @@ router.patch('/:id', adminGuard, (req, res) => {
 
   if (email !== undefined) {
     const existing = findUserByEmail(email);
-    if (existing && existing.id !== user.id) {
+    const pendingConflict = Array.from(getState().users.values()).find(
+      (u) => !u.deletedAt && u.pendingEmail === email && u.id !== user.id
+    );
+    if ((existing && existing.id !== user.id) || pendingConflict) {
       res.status(409).json({
         message: 'User with this email already exists',
         statusCode: 409,
@@ -494,6 +505,13 @@ router.patch('/:id', adminGuard, (req, res) => {
     }
     if (email !== user.email) {
       user.isEmailVerified = false;
+      // Admin-set email overrides any self-service change in flight.
+      if (user.pendingEmailToken) {
+        getState().pendingEmailTokens.delete(user.pendingEmailToken);
+      }
+      user.pendingEmail = null;
+      user.pendingEmailToken = null;
+      user.pendingEmailExpiresAt = null;
     }
     user.email = email;
   }
@@ -577,6 +595,15 @@ router.delete('/:id', adminGuard, (req, res) => {
   // Soft delete: set deletedAt timestamp
   targetUser.deletedAt = new Date().toISOString();
   targetUser.updatedAt = new Date().toISOString();
+
+  // Clear any in-flight self-service email change so a stale token cannot
+  // confirm against a soft-deleted row.
+  if (targetUser.pendingEmailToken) {
+    state.pendingEmailTokens.delete(targetUser.pendingEmailToken);
+  }
+  targetUser.pendingEmail = null;
+  targetUser.pendingEmailToken = null;
+  targetUser.pendingEmailExpiresAt = null;
 
   // Revoke all refresh tokens for this user (active + revoked)
   for (const [token, userId] of state.refreshTokens.entries()) {

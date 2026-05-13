@@ -62,6 +62,14 @@
               </div>
 
               <app-form-field
+                [field]="profileForm.email"
+                label="auth.profile.email"
+                type="email"
+                prefixIcon="email"
+                autocomplete="email"
+              />
+
+              <app-form-field
                 [field]="profileForm.password"
                 label="auth.profile.newPassword"
                 [type]="pwdToggle.show() ? 'text' : 'password'"
@@ -73,7 +81,7 @@
 
               <app-password-strength [password]="profileModel().password" />
 
-              @if (hasPassword()) {
+              @if (requiresCurrentPassword()) {
                 <app-form-field
                   [field]="profileForm.currentPassword"
                   label="auth.profile.currentPassword"
@@ -83,7 +91,9 @@
                 >
                   <app-password-toggle formFieldSuffix #currentPwdToggle />
                 </app-form-field>
+              }
 
+              @if (hasPassword()) {
                 <app-form-field
                   [field]="profileForm.confirmPassword"
                   label="auth.profile.confirmPassword"

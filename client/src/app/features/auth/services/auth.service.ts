@@ -198,6 +198,25 @@ export class AuthService {
     );
   }
 
+  initiateEmailChange(
+    newEmail: string,
+    currentPassword: string
+  ): Observable<{ message: string }> {
+    return this.#http.post<{ message: string }>(
+      AuthApiEnum.InitiateEmailChange,
+      { newEmail, currentPassword },
+      { context: silentContext() }
+    );
+  }
+
+  confirmEmailChange(token: string): Observable<{ message: string }> {
+    return this.#http.post<{ message: string }>(
+      AuthApiEnum.ConfirmEmailChange,
+      { token },
+      { context: silentContext() }
+    );
+  }
+
   fetchPermissions(): Promise<void> {
     return firstValueFrom(
       this.#http.get<UserPermissionsResponse>(AuthApiEnum.Permissions, {

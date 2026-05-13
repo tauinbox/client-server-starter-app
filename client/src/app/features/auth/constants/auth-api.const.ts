@@ -14,7 +14,9 @@ export enum AuthApiEnum {
   ForgotPassword = `${AUTH_API_V1}/forgot-password`,
   ResetPassword = `${AUTH_API_V1}/reset-password`,
   Permissions = `${AUTH_API_V1}/permissions`,
-  CaptchaConfig = `${AUTH_API_V1}/captcha-config`
+  CaptchaConfig = `${AUTH_API_V1}/captcha-config`,
+  InitiateEmailChange = `${AUTH_API_V1}/profile/email/initiate`,
+  ConfirmEmailChange = `${AUTH_API_V1}/profile/email/confirm`
 }
 
 export const OAUTH_URLS = {

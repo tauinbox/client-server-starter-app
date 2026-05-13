@@ -67,6 +67,9 @@ describe('AuthService', () => {
   let mockMailService: {
     sendEmailVerification: jest.Mock;
     sendPasswordReset: jest.Mock;
+    sendEmailChangeConfirmation: jest.Mock;
+    sendEmailChangeNotificationOld: jest.Mock;
+    sendEmailChangeCompletedNotification: jest.Mock;
   };
   let mockRoleService: {
     findRoleByName: jest.Mock;
@@ -105,6 +108,9 @@ describe('AuthService', () => {
     emailVerificationExpiresAt: null,
     passwordResetToken: null,
     passwordResetExpiresAt: null,
+    pendingEmail: null,
+    pendingEmailToken: null,
+    pendingEmailExpiresAt: null,
     tokenRevokedAt: null,
     roles: [mockUserRole],
     createdAt: new Date('2025-01-01'),
@@ -199,7 +205,12 @@ describe('AuthService', () => {
 
     mockMailService = {
       sendEmailVerification: jest.fn().mockResolvedValue(undefined),
-      sendPasswordReset: jest.fn().mockResolvedValue(undefined)
+      sendPasswordReset: jest.fn().mockResolvedValue(undefined),
+      sendEmailChangeConfirmation: jest.fn().mockResolvedValue(undefined),
+      sendEmailChangeNotificationOld: jest.fn().mockResolvedValue(undefined),
+      sendEmailChangeCompletedNotification: jest
+        .fn()
+        .mockResolvedValue(undefined)
     };
 
     mockRoleService = {
@@ -675,6 +686,9 @@ describe('AuthService', () => {
           password: expect.any(String), // bcrypt hash
           passwordResetToken: null,
           passwordResetExpiresAt: null,
+          pendingEmail: null,
+          pendingEmailToken: null,
+          pendingEmailExpiresAt: null,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           tokenRevokedAt: expect.any(Date)
         })
@@ -1025,6 +1039,256 @@ describe('AuthService', () => {
         service.verifyCurrentPassword(oauthOnlyUser.id, undefined)
       ).resolves.toBeUndefined();
       expect(compareSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('initiateEmailChange', () => {
+    // The service uses manager.createQueryBuilder(User, 'u').where(...).andWhere(...).getOne()
+    // to find any other user holding the address. Default: no conflict.
+    let getOneSpy: jest.Mock;
+    let userQb: {
+      where: jest.Mock;
+      andWhere: jest.Mock;
+      getOne: jest.Mock;
+    };
+
+    beforeEach(() => {
+      getOneSpy = jest.fn().mockResolvedValue(null);
+      userQb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: getOneSpy
+      };
+      // Differentiate between the relation builder (used in register: no args)
+      // and the entity builder (passes the User entity as first arg).
+      mockManager.createQueryBuilder = jest.fn((arg?: unknown) =>
+        arg ? userQb : mockRelationQb
+      ) as jest.Mock;
+    });
+
+    it('happy path: verifies password, stores token, sends both emails', async () => {
+      mockUsersService.findOne.mockResolvedValue({ ...mockUser });
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      const result = await service.initiateEmailChange('user-1', {
+        newEmail: 'new@example.com',
+        currentPassword: 'CorrectPassword1'
+      });
+
+      expect(mockManager.update).toHaveBeenCalledWith(
+        expect.anything(),
+        'user-1',
+        expect.objectContaining({
+          pendingEmail: 'new@example.com',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          pendingEmailToken: expect.any(String),
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          pendingEmailExpiresAt: expect.any(Date)
+        })
+      );
+      expect(mockMailService.sendEmailChangeConfirmation).toHaveBeenCalledWith(
+        'new@example.com',
+        expect.any(String)
+      );
+      expect(
+        mockMailService.sendEmailChangeNotificationOld
+      ).toHaveBeenCalledWith('test@example.com', 'new@example.com');
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_EMAIL_CHANGE_REQUEST,
+          details: { newEmailDomain: 'example.com', conflict: false }
+        })
+      );
+      expect(result.message).toMatch(/confirmation link/);
+    });
+
+    it('rejects OAuth-only users (no password)', async () => {
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        password: null
+      });
+
+      try {
+        await service.initiateEmailChange('user-1', {
+          newEmail: 'new@example.com',
+          currentPassword: 'anything'
+        });
+        fail('Expected HttpException');
+      } catch (err) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect((err as HttpException).getStatus()).toBe(HttpStatus.BAD_REQUEST);
+      }
+      expect(mockManager.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects when current password is wrong', async () => {
+      mockUsersService.findOne.mockResolvedValue({ ...mockUser });
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+
+      await expect(
+        service.initiateEmailChange('user-1', {
+          newEmail: 'new@example.com',
+          currentPassword: 'wrong'
+        })
+      ).rejects.toThrow(HttpException);
+      expect(mockManager.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects when new email equals current email', async () => {
+      mockUsersService.findOne.mockResolvedValue({ ...mockUser });
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      await expect(
+        service.initiateEmailChange('user-1', {
+          newEmail: 'test@example.com',
+          currentPassword: 'CorrectPassword1'
+        })
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('returns enumeration-safe success when address is already taken', async () => {
+      mockUsersService.findOne.mockResolvedValue({ ...mockUser });
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+      getOneSpy.mockResolvedValue({ id: 'other-user' }); // conflict
+
+      const result = await service.initiateEmailChange('user-1', {
+        newEmail: 'taken@example.com',
+        currentPassword: 'CorrectPassword1'
+      });
+
+      expect(mockManager.update).not.toHaveBeenCalled();
+      expect(
+        mockMailService.sendEmailChangeConfirmation
+      ).not.toHaveBeenCalled();
+      expect(
+        mockMailService.sendEmailChangeNotificationOld
+      ).not.toHaveBeenCalled();
+      expect(result.message).toMatch(/confirmation link/);
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          details: { newEmailDomain: 'example.com', conflict: true }
+        })
+      );
+    });
+  });
+
+  describe('confirmEmailChange', () => {
+    let userQb: {
+      where: jest.Mock;
+      andWhere: jest.Mock;
+      getOne: jest.Mock;
+    };
+
+    beforeEach(() => {
+      userQb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null) // no concurrent claim by default
+      };
+      mockManager.createQueryBuilder = jest.fn((arg?: unknown) =>
+        arg ? userQb : mockRelationQb
+      ) as jest.Mock;
+    });
+
+    it('applies email change, revokes sessions, sends notification', async () => {
+      const pendingUser = {
+        ...mockUser,
+        pendingEmail: 'new@example.com',
+        pendingEmailToken: 'hashed-token',
+        pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
+      };
+      mockManager.findOne.mockResolvedValue(pendingUser);
+
+      const result = await service.confirmEmailChange('raw-token');
+
+      expect(mockManager.update).toHaveBeenCalledWith(
+        expect.anything(),
+        'user-1',
+        expect.objectContaining({
+          email: 'new@example.com',
+          isEmailVerified: true,
+          pendingEmail: null,
+          pendingEmailToken: null,
+          pendingEmailExpiresAt: null,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          tokenRevokedAt: expect.any(Date)
+        })
+      );
+      expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), {
+        userId: 'user-1'
+      });
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_EMAIL_CHANGE_COMPLETE,
+          details: { oldEmail: 'test@example.com', newEmail: 'new@example.com' }
+        })
+      );
+      expect(
+        mockMailService.sendEmailChangeCompletedNotification
+      ).toHaveBeenCalledWith('test@example.com', 'new@example.com');
+      expect(result.message).toMatch(/sign in again/);
+    });
+
+    it('throws 400 when token not found', async () => {
+      mockManager.findOne.mockResolvedValue(null);
+
+      await expect(service.confirmEmailChange('invalid')).rejects.toThrow(
+        HttpException
+      );
+      expect(mockManager.update).not.toHaveBeenCalled();
+    });
+
+    it('clears state and throws 400 when token is expired', async () => {
+      const pendingUser = {
+        ...mockUser,
+        pendingEmail: 'new@example.com',
+        pendingEmailToken: 'hashed-token',
+        pendingEmailExpiresAt: new Date(Date.now() - 1000)
+      };
+      mockManager.findOne.mockResolvedValue(pendingUser);
+
+      await expect(service.confirmEmailChange('raw-token')).rejects.toThrow(
+        HttpException
+      );
+      expect(mockManager.update).toHaveBeenCalledWith(
+        expect.anything(),
+        'user-1',
+        expect.objectContaining({
+          pendingEmail: null,
+          pendingEmailToken: null,
+          pendingEmailExpiresAt: null
+        })
+      );
+    });
+
+    it('throws 409 and clears pending fields when another user claimed the address', async () => {
+      const pendingUser = {
+        ...mockUser,
+        pendingEmail: 'race@example.com',
+        pendingEmailToken: 'hashed-token',
+        pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
+      };
+      mockManager.findOne.mockResolvedValue(pendingUser);
+      // Conflicting other user under the same address
+      userQb.getOne.mockResolvedValue({ id: 'other-user' });
+
+      try {
+        await service.confirmEmailChange('raw-token');
+        fail('Expected HttpException');
+      } catch (err) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect((err as HttpException).getStatus()).toBe(HttpStatus.CONFLICT);
+      }
+      // The pending fields must be cleared so the user can re-initiate cleanly
+      expect(mockManager.update).toHaveBeenCalledWith(
+        expect.anything(),
+        'user-1',
+        expect.objectContaining({
+          pendingEmail: null,
+          pendingEmailToken: null,
+          pendingEmailExpiresAt: null
+        })
+      );
     });
   });
 });

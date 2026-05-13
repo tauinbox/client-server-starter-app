@@ -31,7 +31,10 @@ export const ErrorKeys = {
     UNLINK_LAST_PROVIDER: 'errors.auth.unlinkLastProvider',
     INVALID_CURRENT_PASSWORD: 'errors.auth.invalidCurrentPassword',
     CAPTCHA_REQUIRED: 'errors.auth.captchaRequired',
-    CAPTCHA_INVALID: 'errors.auth.captchaInvalid'
+    CAPTCHA_INVALID: 'errors.auth.captchaInvalid',
+    SAME_EMAIL: 'errors.auth.sameEmail',
+    PENDING_EMAIL_TOKEN_EXPIRED: 'errors.auth.pendingEmailTokenExpired',
+    OAUTH_ONLY_SET_PASSWORD_FIRST: 'errors.auth.oauthOnlySetPasswordFirst'
   },
   USERS: {
     NOT_FOUND: 'errors.users.notFound',
