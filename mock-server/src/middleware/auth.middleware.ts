@@ -4,7 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   MAX_FAILED_ATTEMPTS,
   LOCKOUT_DURATION_MS,
-  MAX_CONCURRENT_SESSIONS
+  MAX_CONCURRENT_SESSIONS,
+  EMAIL_CHANGE_TOKEN_EXPIRY_MS
 } from '@app/shared/constants/auth.constants';
 import {
   PASSWORD_REGEX,
@@ -25,16 +26,6 @@ import {
   logAudit,
   toUserResponse
 } from '../state';
-import { EMAIL_CHANGE_TOKEN_EXPIRY_MS } from '@app/shared/constants/auth.constants';
-import type { MockUser as MockUserType } from '../types';
-
-function findUserByPendingEmail(email: string): MockUserType | undefined {
-  const state = getState();
-  for (const user of state.users.values()) {
-    if (user.pendingEmail === email && !user.deletedAt) return user;
-  }
-  return undefined;
-}
 import { authGuard } from '../helpers/auth.helpers';
 import {
   CAPTCHA_ROUTE_LIMITS,
@@ -42,6 +33,14 @@ import {
   trackAttemptAndSetHeader
 } from '../helpers/captcha.helpers';
 import type { AuthenticatedRequest, MockUser } from '../types';
+
+function findUserByPendingEmail(email: string): MockUser | undefined {
+  const state = getState();
+  for (const user of state.users.values()) {
+    if (user.pendingEmail === email && !user.deletedAt) return user;
+  }
+  return undefined;
+}
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
 const COOKIE_OPTIONS: CookieOptions = {
