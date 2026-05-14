@@ -1,5 +1,18 @@
 <ng-container *transloco="let t">
-  <mat-form-field appearance="outline" class="full-width">
+  <!--
+    subscriptSizing="dynamic" — the error/hint area is not reserved while empty;
+    it expands into layout when validation fires. Trade-off: subsequent fields
+    shift down ~20-52px (1-line vs multi-line error) when the error appears.
+    The host below provides a deterministic 12px gap on the happy path; the
+    global default stays "fixed" via MAT_FORM_FIELD_DEFAULT_OPTIONS (see
+    app.config.ts) so other Material form fields outside this wrapper keep
+    stable layout. Per-instance dynamic mode is intentional here.
+  -->
+  <mat-form-field
+    appearance="outline"
+    class="full-width"
+    subscriptSizing="dynamic"
+  >
     <mat-label>{{ t(label()) }}</mat-label>
 
     @if (prefixIcon()) {
