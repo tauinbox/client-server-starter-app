@@ -32,6 +32,7 @@ export const ErrorKeys = {
     INVALID_CURRENT_PASSWORD: 'errors.auth.invalidCurrentPassword',
     CAPTCHA_REQUIRED: 'errors.auth.captchaRequired',
     CAPTCHA_INVALID: 'errors.auth.captchaInvalid',
+    CAPTCHA_GATE_FAILURE: 'errors.auth.captchaGateFailure',
     SAME_EMAIL: 'errors.auth.sameEmail',
     PENDING_EMAIL_TOKEN_EXPIRED: 'errors.auth.pendingEmailTokenExpired',
     OAUTH_ONLY_SET_PASSWORD_FIRST: 'errors.auth.oauthOnlySetPasswordFirst'

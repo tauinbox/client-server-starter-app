@@ -96,6 +96,7 @@
       "invalidCurrentPassword": "Текущий пароль неверен",
       "captchaRequired": "Пожалуйста, пройдите проверку CAPTCHA для продолжения.",
       "captchaInvalid": "Проверка CAPTCHA не пройдена. Попробуйте ещё раз.",
+      "captchaGateFailure": "Шлюз CAPTCHA не может оценить состояние ограничения частоты запросов. Попробуйте позже.",
       "sameEmail": "Новый email совпадает с текущим",
       "pendingEmailTokenExpired": "Токен подтверждения смены email недействителен или просрочен",
       "oauthOnlySetPasswordFirst": "Установите пароль перед сменой email"
