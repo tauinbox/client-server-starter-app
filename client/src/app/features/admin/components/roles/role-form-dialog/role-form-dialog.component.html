@@ -11,12 +11,12 @@
     }
 
     <form (submit)="$event.preventDefault(); submit()">
-      <app-form-field
+      <nxs-form-field
         [field]="roleForm.name"
         label="admin.roleForm.nameLabel"
       />
 
-      <app-form-field
+      <nxs-form-field
         [field]="roleForm.description"
         label="admin.roleForm.descriptionLabel"
         type="textarea"

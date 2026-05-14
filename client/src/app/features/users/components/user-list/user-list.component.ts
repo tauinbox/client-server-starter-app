@@ -38,7 +38,7 @@ import {
   UserTableComponent
 } from '../user-table/user-table.component';
 import { UserCardListComponent } from '../user-card-list/user-card-list.component';
-import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
+import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 
 type FilterModel = {
   email: string;
@@ -55,7 +55,7 @@ const INITIAL_FILTER: FilterModel = {
 };
 
 @Component({
-  selector: 'app-user-list',
+  selector: 'nxs-user-list',
   imports: [
     MatCard,
     MatCardHeader,

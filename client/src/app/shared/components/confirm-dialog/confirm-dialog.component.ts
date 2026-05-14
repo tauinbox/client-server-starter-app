@@ -22,7 +22,7 @@ export type ConfirmDialogData = {
 };
 
 @Component({
-  selector: 'app-confirm-dialog',
+  selector: 'nxs-confirm-dialog',
   imports: [
     MatDialogContent,
     MatDialogTitle,

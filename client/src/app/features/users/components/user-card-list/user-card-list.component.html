@@ -77,7 +77,7 @@
         <span>{{ t('users.table.actionViewDetails') }}</span>
       </a>
       <ng-container
-        *appRequirePermissions="{
+        *nxsRequirePermissions="{
           action: 'update',
           subject: 'User',
           instance: user
@@ -98,7 +98,7 @@
         </a>
       </ng-container>
       <ng-container
-        *appRequirePermissions="{
+        *nxsRequirePermissions="{
           action: 'delete',
           subject: 'User',
           instance: user

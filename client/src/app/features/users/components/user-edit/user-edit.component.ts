@@ -44,7 +44,7 @@ import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { UsersStore } from '../../store/users.store';
 import type { RoleAdminResponse } from '@app/shared/types/role.types';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
-import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
+import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 
 type UserFormData = {
   email: string;
@@ -61,7 +61,7 @@ const INITIAL_USER_FORM: UserFormData = {
 };
 
 @Component({
-  selector: 'app-user-edit',
+  selector: 'nxs-user-edit',
   imports: [
     MatCard,
     MatCardHeader,

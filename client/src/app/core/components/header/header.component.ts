@@ -22,7 +22,7 @@ import { environment } from '@environments/environment';
 import { SidenavStateService } from '@core/services/sidenav-state.service';
 
 @Component({
-  selector: 'app-header',
+  selector: 'nxs-header',
   imports: [
     MatToolbarModule,
     MatButtonModule,

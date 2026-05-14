@@ -7,19 +7,19 @@
     <mat-card-content>
       <form (submit)="$event.preventDefault(); onSubmit()">
         <div class="filter-fields">
-          <app-form-field
+          <nxs-form-field
             [field]="filterForm.firstName"
             label="users.list.filterFirstName"
             prefixIcon="person"
           />
 
-          <app-form-field
+          <nxs-form-field
             [field]="filterForm.lastName"
             label="users.list.filterLastName"
             prefixIcon="person"
           />
 
-          <app-form-field
+          <nxs-form-field
             [field]="filterForm.email"
             label="users.list.filterEmail"
             prefixIcon="email"
@@ -79,12 +79,12 @@
           <p>{{ t('users.list.noUsersMessage') }}</p>
         </div>
       } @else if (layout.isHandset()) {
-        <app-user-card-list
+        <nxs-user-card-list
           [users]="displayedUsers()"
           (deleteUser)="confirmDelete($event)"
         />
       } @else {
-        <app-user-table
+        <nxs-user-table
           [users]="displayedUsers()"
           (sortChange)="sortData($event)"
           (deleteUser)="confirmDelete($event)"

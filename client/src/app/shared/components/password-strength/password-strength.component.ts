@@ -28,7 +28,7 @@ export function calculatePasswordStrength(
 }
 
 @Component({
-  selector: 'app-password-strength',
+  selector: 'nxs-password-strength',
   imports: [TranslocoDirective],
   templateUrl: './password-strength.component.html',
   styleUrl: './password-strength.component.scss',

@@ -315,11 +315,11 @@
                       </mat-checkbox>
 
                       @if (hasCustom(permission.id)) {
-                        <app-condition-builder
+                        <nxs-condition-builder
                           [value]="getCustomText(permission.id)"
                           [readonly]="role.isSystem || isReadonly()"
                           (valueChange)="onCustomChange(permission.id, $event)"
-                        ></app-condition-builder>
+                        ></nxs-condition-builder>
                         @if (getCustomError(permission.id)) {
                           <mat-error class="custom-error">{{
                             getCustomError(permission.id)

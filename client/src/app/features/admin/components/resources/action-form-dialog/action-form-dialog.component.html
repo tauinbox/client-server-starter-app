@@ -7,7 +7,7 @@
 
   <mat-dialog-content>
     <form (submit)="$event.preventDefault(); submit()">
-      <app-form-field
+      <nxs-form-field
         [field]="actionForm.name"
         label="admin.actionForm.nameLabel"
       >
@@ -23,14 +23,14 @@
             <mat-icon>info_outline</mat-icon>
           </button>
         }
-      </app-form-field>
+      </nxs-form-field>
 
-      <app-form-field
+      <nxs-form-field
         [field]="actionForm.displayName"
         label="admin.actionForm.displayNameLabel"
       />
 
-      <app-form-field
+      <nxs-form-field
         [field]="actionForm.description"
         label="admin.actionForm.descriptionLabel"
         type="textarea"

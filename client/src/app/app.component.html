@@ -1,7 +1,7 @@
 <a *transloco="let t" class="skip-link" href="#main">{{
   t('common.skipToContent')
 }}</a>
-<app-header />
+<nxs-header />
 <mat-sidenav-container class="sidenav-container">
   @if (authStore.isAuthenticated()) {
     <mat-sidenav
@@ -10,7 +10,7 @@
       (closed)="sidenavState.closeMobile()"
       [style.width]="sidenavState.width()"
     >
-      <app-sidenav />
+      <nxs-sidenav />
     </mat-sidenav>
   }
   <mat-sidenav-content

@@ -9,7 +9,7 @@ import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { TranslocoDirective } from '@jsverse/transloco';
 
 @Component({
-  selector: 'app-oauth-callback',
+  selector: 'nxs-oauth-callback',
   imports: [MatProgressSpinner, TranslocoDirective],
   template: `
     <div class="oauth-callback-container" *transloco="let t; scope: 'auth'">

@@ -20,7 +20,7 @@ import { AriaErrorDirective } from './aria-error.directive';
   template: `
     <mat-form-field>
       <mat-label>Email</mat-label>
-      <input matInput appAriaError [formControl]="control" type="email" />
+      <input matInput nxsAriaError [formControl]="control" type="email" />
       @if (control.invalid && control.touched) {
         <mat-error>Email is required</mat-error>
       }
@@ -58,7 +58,7 @@ describe('AriaErrorDirective', () => {
 
   it('does not set aria-describedby while control is untouched', () => {
     const described = input().getAttribute('aria-describedby') ?? '';
-    expect(described).not.toMatch(/app-aria-err-/);
+    expect(described).not.toMatch(/nxs-aria-err-/);
   });
 
   it('links input to mat-error when control is invalid + touched', async () => {
@@ -86,7 +86,7 @@ describe('AriaErrorDirective', () => {
     fixture.detectChanges();
 
     const described = input().getAttribute('aria-describedby') ?? '';
-    expect(described).not.toMatch(/app-aria-err-/);
+    expect(described).not.toMatch(/nxs-aria-err-/);
   });
 
   it('keeps the linkage stable across multiple status updates', async () => {

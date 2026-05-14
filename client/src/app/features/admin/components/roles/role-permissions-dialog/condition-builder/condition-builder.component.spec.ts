@@ -10,7 +10,7 @@ import { resetIdCounter } from './condition-builder.types';
 
 @Component({
   imports: [ConditionBuilderComponent],
-  template: `<app-condition-builder
+  template: `<nxs-condition-builder
     [value]="value"
     [readonly]="readonly"
     (valueChange)="onValueChange($event)"

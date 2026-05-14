@@ -4,13 +4,13 @@ import { Component, signal, viewChild } from '@angular/core';
 import { form, required, email } from '@angular/forms/signals';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
-import { AppFormFieldComponent } from './app-form-field.component';
+import { AppFormFieldComponent } from './nxs-form-field.component';
 
 @Component({
-  selector: 'app-test-host',
+  selector: 'nxs-test-host',
   imports: [AppFormFieldComponent],
   template: `
-    <app-form-field
+    <nxs-form-field
       [field]="testForm.email"
       [label]="label"
       [type]="type"
@@ -19,7 +19,7 @@ import { AppFormFieldComponent } from './app-form-field.component';
       [autocomplete]="autocomplete"
     >
       <button formFieldSuffix type="button" class="test-suffix">Toggle</button>
-    </app-form-field>
+    </nxs-form-field>
   `
 })
 class TestHostComponent {
@@ -120,7 +120,7 @@ describe('AppFormFieldComponent', () => {
 
       const input = fixture.nativeElement.querySelector('input');
       const describedBy = input.getAttribute('aria-describedby') ?? '';
-      expect(describedBy).not.toContain('app-ff-err-');
+      expect(describedBy).not.toContain('nxs-ff-err-');
     });
   });
 

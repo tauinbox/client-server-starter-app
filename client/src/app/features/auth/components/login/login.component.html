@@ -13,7 +13,7 @@
       }
 
       <form (submit)="$event.preventDefault(); onSubmit()">
-        <app-form-field
+        <nxs-form-field
           [field]="loginForm.email"
           label="auth.login.email"
           type="email"
@@ -21,15 +21,15 @@
           autocomplete="on"
         />
 
-        <app-form-field
+        <nxs-form-field
           [field]="loginForm.password"
           label="auth.login.password"
           [type]="pwdToggle.show() ? 'text' : 'password'"
           prefixIcon="lock"
           autocomplete="off"
         >
-          <app-password-toggle formFieldSuffix #pwdToggle />
-        </app-form-field>
+          <nxs-password-toggle formFieldSuffix #pwdToggle />
+        </nxs-form-field>
 
         @if (error()) {
           <div class="error-message" role="alert">

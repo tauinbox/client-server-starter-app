@@ -37,7 +37,7 @@ export const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
 };
 
 @Component({
-  selector: 'app-user-table',
+  selector: 'nxs-user-table',
   imports: [
     MatTable,
     MatSort,

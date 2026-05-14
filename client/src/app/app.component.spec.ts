@@ -31,7 +31,7 @@ describe('AppComponent', () => {
   it('should render header component', () => {
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('app-header')).toBeTruthy();
+    expect(compiled.querySelector('nxs-header')).toBeTruthy();
   });
 
   it('renders a translated skip link as the first focusable element', () => {

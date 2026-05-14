@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
 @Component({
-  selector: 'app-page-not-found',
+  selector: 'nxs-page-not-found',
   imports: [MatIcon, MatButton, RouterLink, TranslocoDirective],
   templateUrl: './page-not-found.component.html',
   styleUrl: './page-not-found.component.scss',

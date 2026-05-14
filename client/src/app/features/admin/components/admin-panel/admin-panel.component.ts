@@ -19,7 +19,7 @@ import { AuthStore } from '@features/auth/store/auth.store';
 import { canAccessAdminPanel } from '../../utils/can-access-admin-panel';
 
 @Component({
-  selector: 'app-admin-panel',
+  selector: 'nxs-admin-panel',
   imports: [
     RouterOutlet,
     RouterLink,

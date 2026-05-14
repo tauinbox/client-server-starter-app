@@ -37,7 +37,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OAUTH_URLS } from '../../constants/auth-api.const';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
-import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
+import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
@@ -71,7 +71,7 @@ const INITIAL_PROFILE: ProfileData = {
 };
 
 @Component({
-  selector: 'app-profile',
+  selector: 'nxs-profile',
   imports: [
     MatCard,
     MatCardHeader,

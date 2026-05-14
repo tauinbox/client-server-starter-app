@@ -20,7 +20,7 @@
         </div>
       } @else if (u) {
         <form (submit)="$event.preventDefault(); onSubmit()">
-          <app-form-field
+          <nxs-form-field
             [field]="userForm.email"
             label="users.edit.email"
             type="email"
@@ -29,14 +29,14 @@
           />
 
           <div class="form-name-row">
-            <app-form-field
+            <nxs-form-field
               [field]="userForm.firstName"
               label="users.edit.firstName"
               prefixIcon="person"
               autocomplete="on"
             />
 
-            <app-form-field
+            <nxs-form-field
               [field]="userForm.lastName"
               label="users.edit.lastName"
               prefixIcon="person"
@@ -44,15 +44,15 @@
             />
           </div>
 
-          <app-form-field
+          <nxs-form-field
             [field]="userForm.password"
             label="users.edit.newPassword"
             [type]="pwdToggle.show() ? 'text' : 'password'"
             prefixIcon="lock"
             autocomplete="off"
           >
-            <app-password-toggle formFieldSuffix #pwdToggle />
-          </app-form-field>
+            <nxs-password-toggle formFieldSuffix #pwdToggle />
+          </nxs-form-field>
 
           @if (canAssignRoles() && availableRoles().length > 0) {
             <!--

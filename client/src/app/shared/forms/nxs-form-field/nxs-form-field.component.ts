@@ -34,7 +34,7 @@ let nextId = 0;
  * and suffix content projection for password toggles etc.
  */
 @Component({
-  selector: 'app-form-field',
+  selector: 'nxs-form-field',
   imports: [
     FormField,
     MatFormField,
@@ -46,8 +46,8 @@ let nextId = 0;
     MatIcon,
     TranslocoDirective
   ],
-  templateUrl: './app-form-field.component.html',
-  styleUrl: './app-form-field.component.scss',
+  templateUrl: './nxs-form-field.component.html',
+  styleUrl: './nxs-form-field.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AppFormFieldComponent {
@@ -73,7 +73,7 @@ export class AppFormFieldComponent {
   readonly rows = input<number>(3);
 
   /** Stable unique id for aria-describedby linkage. */
-  readonly errorId = `app-ff-err-${++nextId}`;
+  readonly errorId = `nxs-ff-err-${++nextId}`;
 
   /**
    * Resolves the first active validation error into an i18n key + params.

@@ -19,7 +19,7 @@ const LANGUAGES: LanguageOption[] = [
 ];
 
 @Component({
-  selector: 'app-language-switcher',
+  selector: 'nxs-language-switcher',
   imports: [
     MatIconButton,
     MatIcon,

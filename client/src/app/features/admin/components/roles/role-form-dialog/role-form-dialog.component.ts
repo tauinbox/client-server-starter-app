@@ -20,7 +20,7 @@ import {
 import { TranslocoDirective } from '@jsverse/transloco';
 import type { RoleAdminResponse } from '@app/shared/types/role.types';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
-import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
+import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 
 export type RoleFormDialogData = {
   role?: RoleAdminResponse;
@@ -37,7 +37,7 @@ type RoleFormData = {
 };
 
 @Component({
-  selector: 'app-role-form-dialog',
+  selector: 'nxs-role-form-dialog',
   imports: [
     MatDialogModule,
     MatButtonModule,

@@ -10,14 +10,14 @@ import { AuthStore } from '../store/auth.store';
 import type { PermissionCheck } from '../casl/app-ability';
 
 @Directive({
-  selector: '[appRequirePermissions]'
+  selector: '[nxsRequirePermissions]'
 })
 export class RequirePermissionsDirective {
-  readonly appRequirePermissions = input.required<
+  readonly nxsRequirePermissions = input.required<
     PermissionCheck | PermissionCheck[]
   >();
 
-  readonly appRequirePermissionsElse = input<TemplateRef<unknown> | null>(null);
+  readonly nxsRequirePermissionsElse = input<TemplateRef<unknown> | null>(null);
 
   readonly #templateRef = inject(TemplateRef<unknown>);
   readonly #viewContainer = inject(ViewContainerRef);
@@ -28,9 +28,9 @@ export class RequirePermissionsDirective {
   constructor() {
     effect(() => {
       const hasPermissions = this.#authStore.hasPermissions(
-        this.appRequirePermissions()
+        this.nxsRequirePermissions()
       );
-      const elseTemplate = this.appRequirePermissionsElse();
+      const elseTemplate = this.nxsRequirePermissionsElse();
 
       const nextBranch: 'then' | 'else' | null = hasPermissions
         ? 'then'

@@ -11,8 +11,8 @@
   <span [matTooltip]="appVersion">{{ appName }}</span>
   <span class="spacer"></span>
 
-  <app-language-switcher></app-language-switcher>
-  <app-theme-toggle></app-theme-toggle>
+  <nxs-language-switcher></nxs-language-switcher>
+  <nxs-theme-toggle></nxs-theme-toggle>
 
   @if (authStore.isAuthenticated()) {
     <button matButton="text" [matMenuTriggerFor]="menu">

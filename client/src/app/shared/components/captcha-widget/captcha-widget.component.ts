@@ -16,7 +16,7 @@ import { catchError, switchMap } from 'rxjs/operators';
 import { CaptchaService } from '@features/auth/services/captcha.service';
 
 @Component({
-  selector: 'app-captcha-widget',
+  selector: 'nxs-captcha-widget',
   imports: [MatProgressSpinner, TranslocoDirective],
   templateUrl: './captcha-widget.component.html',
   styleUrl: './captcha-widget.component.scss',

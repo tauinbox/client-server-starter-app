@@ -29,7 +29,7 @@ import type { UpdateResource } from '../../../services/rbac-admin.service';
 import { ResourcesStore } from '../../../store/resources.store';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NotifyService } from '@core/services/notify.service';
-import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
+import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 
 export type ResourceFormDialogData = {
   resource: ResourceResponse;
@@ -42,7 +42,7 @@ type ResourceFormData = {
 };
 
 @Component({
-  selector: 'app-resource-form-dialog',
+  selector: 'nxs-resource-form-dialog',
   imports: [
     MatDialogModule,
     MatButtonModule,

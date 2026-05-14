@@ -30,7 +30,7 @@ import { RequirePermissionsDirective } from '../../../auth/directives/require-pe
 import type { User } from '../../models/user.types';
 
 @Component({
-  selector: 'app-user-card-list',
+  selector: 'nxs-user-card-list',
   imports: [
     MatCard,
     MatCardAvatar,

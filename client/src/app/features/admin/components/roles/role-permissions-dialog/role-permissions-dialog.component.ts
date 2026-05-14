@@ -47,7 +47,7 @@ export type PermissionGroup = {
 };
 
 @Component({
-  selector: 'app-role-permissions-dialog',
+  selector: 'nxs-role-permissions-dialog',
   imports: [
     MatDialogModule,
     MatButtonModule,
