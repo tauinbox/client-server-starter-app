@@ -1,7 +1,7 @@
 <div class="admin-panel-container" *transloco="let t; scope: 'admin'">
   <nav mat-tab-nav-bar [tabPanel]="tabPanel">
     <ng-container
-      *appRequirePermissions="{ action: 'search', subject: 'User' }"
+      *nxsRequirePermissions="{ action: 'search', subject: 'User' }"
     >
       <a
         mat-tab-link
@@ -13,7 +13,7 @@
         {{ t('admin.panel.manageUsers') }}
       </a>
     </ng-container>
-    <ng-container *appRequirePermissions="{ action: 'read', subject: 'Role' }">
+    <ng-container *nxsRequirePermissions="{ action: 'read', subject: 'Role' }">
       <a
         mat-tab-link
         [routerLink]="routes.Roles"
@@ -25,7 +25,7 @@
       </a>
     </ng-container>
     <ng-container
-      *appRequirePermissions="{ action: 'read', subject: 'Permission' }"
+      *nxsRequirePermissions="{ action: 'read', subject: 'Permission' }"
     >
       <a
         mat-tab-link
@@ -38,7 +38,7 @@
       </a>
     </ng-container>
     <ng-container
-      *appRequirePermissions="{ action: 'read', subject: 'Permission' }"
+      *nxsRequirePermissions="{ action: 'read', subject: 'Permission' }"
     >
       <a
         mat-tab-link

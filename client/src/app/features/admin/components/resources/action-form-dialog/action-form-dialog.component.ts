@@ -32,7 +32,7 @@ import type {
 import { ResourcesStore } from '../../../store/resources.store';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NotifyService } from '@core/services/notify.service';
-import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
+import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 
 export type ActionFormDialogData = {
   action?: ActionResponse;
@@ -47,7 +47,7 @@ type ActionFormData = {
 const ACTION_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
 
 @Component({
-  selector: 'app-action-form-dialog',
+  selector: 'nxs-action-form-dialog',
   imports: [
     MatDialogModule,
     MatButtonModule,

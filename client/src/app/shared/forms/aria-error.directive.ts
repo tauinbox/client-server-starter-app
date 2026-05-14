@@ -11,19 +11,19 @@ let nextId = 0;
  * screen readers programmatically associate validation messages with the
  * field (WCAG 1.3.1 / 3.3.1).
  *
- * Interim helper until `<app-form-field>` (UI-10) lands and absorbs this
+ * Interim helper until `<nxs-form-field>` (UI-10) lands and absorbs this
  * behaviour. Apply to `<input matInput>` / `<textarea matInput>` inside a
  * `<mat-form-field>` that contains a `<mat-error>`.
  */
 @Directive({
-  selector: 'input[appAriaError], textarea[appAriaError]',
+  selector: 'input[nxsAriaError], textarea[nxsAriaError]',
   standalone: true
 })
 export class AriaErrorDirective implements OnInit, OnDestroy {
   private readonly host =
     inject<ElementRef<HTMLInputElement | HTMLTextAreaElement>>(ElementRef);
   private readonly ngControl = inject(NgControl, { optional: true });
-  private readonly errorId = `app-aria-err-${++nextId}`;
+  private readonly errorId = `nxs-aria-err-${++nextId}`;
   private sub?: Subscription;
 
   ngOnInit(): void {

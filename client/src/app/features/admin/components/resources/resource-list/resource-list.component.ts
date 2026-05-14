@@ -42,7 +42,7 @@ import type { ResourceFormDialogData } from '../resource-form-dialog/resource-fo
 import { ResourceFormDialogComponent } from '../resource-form-dialog/resource-form-dialog.component';
 
 @Component({
-  selector: 'app-resource-list',
+  selector: 'nxs-resource-list',
   imports: [
     MatCard,
     MatCardHeader,

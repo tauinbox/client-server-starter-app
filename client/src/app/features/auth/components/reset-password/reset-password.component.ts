@@ -23,7 +23,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
-import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
+import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 type ResetPasswordData = {
@@ -32,7 +32,7 @@ type ResetPasswordData = {
 };
 
 @Component({
-  selector: 'app-reset-password',
+  selector: 'nxs-reset-password',
   imports: [
     MatCard,
     MatCardHeader,

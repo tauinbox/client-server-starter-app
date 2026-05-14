@@ -18,7 +18,7 @@ import {
   minLength,
   required
 } from '@angular/forms/signals';
-import { AppFormFieldComponent } from '@shared/forms/app-form-field/app-form-field.component';
+import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { Router, RouterLink } from '@angular/router';
@@ -40,7 +40,7 @@ type RegisterData = {
 };
 
 @Component({
-  selector: 'app-register',
+  selector: 'nxs-register',
   imports: [
     MatCard,
     MatCardHeader,

@@ -8,7 +8,7 @@ import type { ThemeMode } from '@core/services/theme.service';
 import { ThemeService } from '@core/services/theme.service';
 
 @Component({
-  selector: 'app-theme-toggle',
+  selector: 'nxs-theme-toggle',
   imports: [MatIconButton, MatTooltip, MatIcon, TranslocoDirective],
   templateUrl: './theme-toggle.component.html',
   styleUrl: './theme-toggle.component.scss',

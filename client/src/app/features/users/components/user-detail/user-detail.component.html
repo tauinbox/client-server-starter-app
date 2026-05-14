@@ -5,7 +5,7 @@
       <mat-card-title>{{ t('users.detail.title') }}</mat-card-title>
       <div class="spacer"></div>
       <ng-container
-        *appRequirePermissions="{ action: 'search', subject: 'User' }"
+        *nxsRequirePermissions="{ action: 'search', subject: 'User' }"
       >
         <button
           matIconButton
@@ -97,7 +97,7 @@
 
         <div class="actions-container">
           <button
-            *appRequirePermissions="
+            *nxsRequirePermissions="
               { action: 'update', subject: 'User', instance: u };
               else editDenied
             "

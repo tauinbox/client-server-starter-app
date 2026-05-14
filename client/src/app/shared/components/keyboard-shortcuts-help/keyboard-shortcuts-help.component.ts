@@ -53,7 +53,7 @@ const WIN_LABELS: Record<string, string> = {
 };
 
 @Component({
-  selector: 'app-keyboard-shortcuts-help',
+  selector: 'nxs-keyboard-shortcuts-help',
   standalone: true,
   imports: [MatDialogModule, MatButtonModule, TranslocoDirective],
   templateUrl: './keyboard-shortcuts-help.component.html',

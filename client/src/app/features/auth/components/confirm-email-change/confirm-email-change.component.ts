@@ -22,7 +22,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 @Component({
-  selector: 'app-confirm-email-change',
+  selector: 'nxs-confirm-email-change',
   imports: [
     MatCard,
     MatCardHeader,

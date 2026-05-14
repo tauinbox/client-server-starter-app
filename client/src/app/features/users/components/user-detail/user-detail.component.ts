@@ -26,7 +26,7 @@ import { UsersStore } from '../../store/users.store';
 import { RequirePermissionsDirective } from '../../../auth/directives/require-permissions.directive';
 
 @Component({
-  selector: 'app-user-detail',
+  selector: 'nxs-user-detail',
   imports: [
     MatCard,
     MatCardHeader,

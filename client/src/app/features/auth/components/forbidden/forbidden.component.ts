@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
 @Component({
-  selector: 'app-forbidden',
+  selector: 'nxs-forbidden',
   imports: [MatIcon, MatButton, RouterLink, TranslocoDirective],
   templateUrl: './forbidden.component.html',
   styleUrl: './forbidden.component.scss',

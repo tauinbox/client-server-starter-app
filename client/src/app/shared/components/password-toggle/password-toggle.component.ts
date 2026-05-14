@@ -3,7 +3,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatIconButton } from '@angular/material/button';
 
 @Component({
-  selector: 'app-password-toggle',
+  selector: 'nxs-password-toggle',
   imports: [MatIcon, MatIconButton],
   template: `
     <button

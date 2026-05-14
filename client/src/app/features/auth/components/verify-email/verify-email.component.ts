@@ -22,7 +22,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 @Component({
-  selector: 'app-verify-email',
+  selector: 'nxs-verify-email',
   imports: [
     MatCard,
     MatCardHeader,

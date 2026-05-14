@@ -6,7 +6,7 @@
 
     <mat-card-content>
       <form (submit)="$event.preventDefault(); onSubmit()">
-        <app-form-field
+        <nxs-form-field
           [field]="registerForm.email"
           label="auth.register.email"
           type="email"
@@ -14,34 +14,34 @@
           autocomplete="on"
         />
 
-        <app-form-field
+        <nxs-form-field
           [field]="registerForm.firstName"
           label="auth.register.firstName"
           prefixIcon="person"
           autocomplete="on"
         />
 
-        <app-form-field
+        <nxs-form-field
           [field]="registerForm.lastName"
           label="auth.register.lastName"
           prefixIcon="person"
           autocomplete="on"
         />
 
-        <app-form-field
+        <nxs-form-field
           [field]="registerForm.password"
           label="auth.register.password"
           [type]="pwdToggle.show() ? 'text' : 'password'"
           prefixIcon="lock"
           autocomplete="off"
         >
-          <app-password-toggle formFieldSuffix #pwdToggle />
-        </app-form-field>
+          <nxs-password-toggle formFieldSuffix #pwdToggle />
+        </nxs-form-field>
 
-        <app-password-strength [password]="registerModel().password" />
+        <nxs-password-strength [password]="registerModel().password" />
 
         @if (captchaRequired()) {
-          <app-captcha-widget (tokenChange)="onCaptchaToken($event)" />
+          <nxs-captcha-widget (tokenChange)="onCaptchaToken($event)" />
         }
 
         @if (error()) {

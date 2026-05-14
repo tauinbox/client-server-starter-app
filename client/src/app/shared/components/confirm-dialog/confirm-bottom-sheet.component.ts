@@ -11,7 +11,7 @@ import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.serv
 import type { ConfirmDialogData } from './confirm-dialog.component';
 
 @Component({
-  selector: 'app-confirm-bottom-sheet',
+  selector: 'nxs-confirm-bottom-sheet',
   imports: [MatIcon, MatButton, TranslocoDirective],
   templateUrl: './confirm-bottom-sheet.component.html',
   styleUrl: './confirm-bottom-sheet.component.scss',

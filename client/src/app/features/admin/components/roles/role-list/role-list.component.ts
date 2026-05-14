@@ -49,7 +49,7 @@ import type { RolePermissionsDialogData } from '../role-permissions-dialog/role-
 import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-permissions-dialog.component';
 
 @Component({
-  selector: 'app-role-list',
+  selector: 'nxs-role-list',
   imports: [
     DatePipe,
     MatCard,

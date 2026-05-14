@@ -30,7 +30,7 @@ import {
 } from './condition-builder.types';
 
 @Component({
-  selector: 'app-condition-builder',
+  selector: 'nxs-condition-builder',
   imports: [
     NgTemplateOutlet,
     MatButtonModule,

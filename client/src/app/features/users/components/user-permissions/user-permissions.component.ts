@@ -49,7 +49,7 @@ type ResourceGroup = {
 };
 
 @Component({
-  selector: 'app-user-permissions',
+  selector: 'nxs-user-permissions',
   imports: [
     RouterLink,
     MatCard,

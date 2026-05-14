@@ -13,7 +13,7 @@ import { KeyboardShortcutsHelpComponent } from '@shared/components/keyboard-shor
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 
 @Component({
-  selector: 'app-root',
+  selector: 'nxs-root',
   imports: [
     RouterOutlet,
     HeaderComponent,

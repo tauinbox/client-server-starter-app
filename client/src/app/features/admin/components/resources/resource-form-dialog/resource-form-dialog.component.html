@@ -3,7 +3,7 @@
 
   <mat-dialog-content>
     <form (submit)="$event.preventDefault(); submit()">
-      <app-form-field
+      <nxs-form-field
         [field]="resourceForm.displayName"
         label="admin.resourceForm.displayNameLabel"
       >
@@ -25,9 +25,9 @@
         >
           <mat-icon>info_outline</mat-icon>
         </button>
-      </app-form-field>
+      </nxs-form-field>
 
-      <app-form-field
+      <nxs-form-field
         [field]="resourceForm.description"
         label="admin.resourceForm.descriptionLabel"
         type="textarea"

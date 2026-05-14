@@ -46,14 +46,14 @@
           <mat-card-content>
             <form (submit)="$event.preventDefault(); onSubmit()">
               <div class="form-name-row">
-                <app-form-field
+                <nxs-form-field
                   [field]="profileForm.firstName"
                   label="auth.profile.firstName"
                   prefixIcon="person"
                   autocomplete="on"
                 />
 
-                <app-form-field
+                <nxs-form-field
                   [field]="profileForm.lastName"
                   label="auth.profile.lastName"
                   prefixIcon="person"
@@ -61,7 +61,7 @@
                 />
               </div>
 
-              <app-form-field
+              <nxs-form-field
                 [field]="profileForm.email"
                 label="auth.profile.email"
                 type="email"
@@ -69,40 +69,40 @@
                 autocomplete="email"
               />
 
-              <app-form-field
+              <nxs-form-field
                 [field]="profileForm.password"
                 label="auth.profile.newPassword"
                 [type]="pwdToggle.show() ? 'text' : 'password'"
                 prefixIcon="lock"
                 autocomplete="off"
               >
-                <app-password-toggle formFieldSuffix #pwdToggle />
-              </app-form-field>
+                <nxs-password-toggle formFieldSuffix #pwdToggle />
+              </nxs-form-field>
 
-              <app-password-strength [password]="profileModel().password" />
+              <nxs-password-strength [password]="profileModel().password" />
 
               @if (requiresCurrentPassword()) {
-                <app-form-field
+                <nxs-form-field
                   [field]="profileForm.currentPassword"
                   label="auth.profile.currentPassword"
                   [type]="currentPwdToggle.show() ? 'text' : 'password'"
                   prefixIcon="lock"
                   autocomplete="current-password"
                 >
-                  <app-password-toggle formFieldSuffix #currentPwdToggle />
-                </app-form-field>
+                  <nxs-password-toggle formFieldSuffix #currentPwdToggle />
+                </nxs-form-field>
               }
 
               @if (hasPassword()) {
-                <app-form-field
+                <nxs-form-field
                   [field]="profileForm.confirmPassword"
                   label="auth.profile.confirmPassword"
                   [type]="confirmPwdToggle.show() ? 'text' : 'password'"
                   prefixIcon="lock"
                   autocomplete="off"
                 >
-                  <app-password-toggle formFieldSuffix #confirmPwdToggle />
-                </app-form-field>
+                  <nxs-password-toggle formFieldSuffix #confirmPwdToggle />
+                </nxs-form-field>
               }
 
               @if (error()) {

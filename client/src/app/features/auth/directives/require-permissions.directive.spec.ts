@@ -13,7 +13,7 @@ import type { PermissionCheck } from '../casl/app-ability';
     <ng-template #denied>
       <span data-testid="denied">NO ACCESS</span>
     </ng-template>
-    <span data-testid="granted" *appRequirePermissions="check(); else denied">
+    <span data-testid="granted" *nxsRequirePermissions="check(); else denied">
       ALLOWED
     </span>
   `
@@ -28,7 +28,7 @@ class HostWithElseComponent {
 @Component({
   imports: [RequirePermissionsDirective],
   template: `
-    <span data-testid="granted" *appRequirePermissions="check()">
+    <span data-testid="granted" *nxsRequirePermissions="check()">
       ALLOWED
     </span>
   `

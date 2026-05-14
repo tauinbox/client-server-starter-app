@@ -1,7 +1,7 @@
 /**
  * Default mapping from Angular validator error codes to Transloco i18n keys.
  *
- * `<app-form-field>` resolves an error key by checking:
+ * `<nxs-form-field>` resolves an error key by checking:
  * 1. per-field `[errors]` input override
  * 2. this registry
  * 3. fallback `forms.errors.unknown`

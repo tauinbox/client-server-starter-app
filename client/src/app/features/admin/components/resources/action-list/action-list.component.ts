@@ -44,7 +44,7 @@ import type { ActionFormDialogData } from '../action-form-dialog/action-form-dia
 import { ActionFormDialogComponent } from '../action-form-dialog/action-form-dialog.component';
 
 @Component({
-  selector: 'app-action-list',
+  selector: 'nxs-action-list',
   imports: [
     DatePipe,
     MatCard,

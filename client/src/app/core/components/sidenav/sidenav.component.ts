@@ -9,7 +9,7 @@ import { AuthStore } from '@features/auth/store/auth.store';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 
 @Component({
-  selector: 'app-sidenav',
+  selector: 'nxs-sidenav',
   imports: [
     RouterLink,
     RouterLinkActive,
