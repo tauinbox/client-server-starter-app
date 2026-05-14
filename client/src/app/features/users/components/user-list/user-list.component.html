@@ -8,12 +8,6 @@
       <form (submit)="$event.preventDefault(); onSubmit()">
         <div class="filter-fields">
           <app-form-field
-            [field]="filterForm.email"
-            label="users.list.filterEmail"
-            prefixIcon="email"
-          />
-
-          <app-form-field
             [field]="filterForm.firstName"
             label="users.list.filterFirstName"
             prefixIcon="person"
@@ -23,6 +17,12 @@
             [field]="filterForm.lastName"
             label="users.list.filterLastName"
             prefixIcon="person"
+          />
+
+          <app-form-field
+            [field]="filterForm.email"
+            label="users.list.filterEmail"
+            prefixIcon="email"
           />
 
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
