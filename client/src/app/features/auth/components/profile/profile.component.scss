@@ -83,7 +83,8 @@ form {
 .form-name-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: vars.$spacing-md;
+  gap: 0 vars.$spacing-md; // row-gap 0 + column-gap; AppFormFieldComponent host margin owns row rhythm
+  align-items: start;
 
   mat-form-field {
     width: 100%;

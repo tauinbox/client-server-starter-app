@@ -13,7 +13,8 @@
   .filter-fields {
     display: grid;
     grid-template-columns: minmax(func.rem(250), 1fr) minmax(func.rem(250), 1fr);
-    gap: vars.$spacing-md;
+    gap: 0 vars.$spacing-md; // row-gap 0 + column-gap; AppFormFieldComponent host margin owns row rhythm
+    align-items: start;
 
     @media (max-width: vars.$breakpoint-xs) {
       grid-template-columns: 1fr;

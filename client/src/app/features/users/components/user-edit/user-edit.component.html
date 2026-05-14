@@ -55,7 +55,17 @@
           </app-form-field>
 
           @if (canAssignRoles() && availableRoles().length > 0) {
-            <mat-form-field appearance="outline" class="full-width">
+            <!--
+              subscriptSizing="dynamic" — match the AppFormFieldComponent
+              siblings above; Material's fixed-subscript default would
+              reserve an unused 20px line below this select (no validation
+              on a multi-role chip, so dynamic mode never produces CLS).
+            -->
+            <mat-form-field
+              appearance="outline"
+              class="full-width"
+              subscriptSizing="dynamic"
+            >
               <mat-label>{{ t('users.edit.roles') }}</mat-label>
               <mat-select
                 [value]="selectedRoleIds()"
