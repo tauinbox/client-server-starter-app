@@ -96,6 +96,7 @@
       "invalidCurrentPassword": "Current password is incorrect",
       "captchaRequired": "Please complete the CAPTCHA challenge to continue.",
       "captchaInvalid": "CAPTCHA verification failed. Please try again.",
+      "captchaGateFailure": "CAPTCHA gate cannot evaluate rate-limit state. Please try again later.",
       "sameEmail": "New email is the same as your current email",
       "pendingEmailTokenExpired": "Email-change confirmation token is invalid or expired",
       "oauthOnlySetPasswordFirst": "Please set a password before changing your email"

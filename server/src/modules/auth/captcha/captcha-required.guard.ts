@@ -3,7 +3,8 @@ import {
   ExecutionContext,
   HttpException,
   HttpStatus,
-  Injectable
+  Injectable,
+  InternalServerErrorException
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ErrorKeys } from '@app/shared/constants';
@@ -33,8 +34,17 @@ export class CaptchaRequiredGuard implements CanActivate {
 
     const remainingHeader = res.getHeader('X-RateLimit-Remaining');
     if (remainingHeader === undefined || remainingHeader === null) {
-      // Throttler did not run for this route — nothing to gate on.
-      return true;
+      // Throttler did not run for this route — the captcha gate has no
+      // rate-limit signal to evaluate. Fail closed: the global ThrottlerGuard
+      // is registered as APP_GUARD in CoreModule and is expected to set this
+      // header on every captcha-protected route, so a missing header indicates
+      // configuration drift (guard removed, @SkipThrottle() applied, header
+      // renamed in a future Throttler version, etc.). Surfacing this at
+      // request time is preferable to silently weakening the captcha gate.
+      throw new InternalServerErrorException({
+        message: 'Captcha gate cannot evaluate rate-limit state',
+        errorKey: ErrorKeys.AUTH.CAPTCHA_GATE_FAILURE
+      });
     }
 
     const remaining = Number(remainingHeader);
