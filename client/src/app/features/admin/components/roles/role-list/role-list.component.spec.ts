@@ -24,6 +24,16 @@ const mockRole: RoleAdminResponse = {
   updatedAt: '2025-01-01T00:00:00.000Z'
 };
 
+const mockSuperSystemRole: RoleAdminResponse = {
+  id: 'role-admin',
+  name: 'admin',
+  description: 'System administrator with full access',
+  isSystem: true,
+  isSuper: true,
+  createdAt: '2025-01-01T00:00:00.000Z',
+  updatedAt: '2025-01-01T00:00:00.000Z'
+};
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('RoleListComponent — openPermissionsDialog', () => {
@@ -117,5 +127,40 @@ describe('RoleListComponent — openPermissionsDialog', () => {
         data: { role: mockRole, readonly: true }
       })
     );
+  });
+
+  it('renders a disabled locked-actions marker (and no action buttons) for super-system roles', async () => {
+    authStoreMock.hasPermissions.mockReturnValue(true);
+    rolesStoreMock.entities.set([mockSuperSystemRole]);
+
+    await TestBed.configureTestingModule({
+      imports: [RoleListComponent, TranslocoTestingModuleWithLangs],
+      providers: [
+        provideNoopAnimations(),
+        { provide: RolesStore, useValue: rolesStoreMock },
+        { provide: AuthStore, useValue: authStoreMock },
+        { provide: MatDialog, useValue: dialogMock },
+        { provide: NotifyService, useValue: notifyMock }
+      ]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(RoleListComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const marker = host.querySelector('.actions-locked-marker');
+    expect(marker).not.toBeNull();
+    const markerButton = marker?.querySelector('button');
+    expect(markerButton?.hasAttribute('disabled')).toBe(true);
+    expect(marker?.querySelector('mat-icon')?.textContent?.trim()).toBe('lock');
+
+    const actionsCellButtons = host.querySelectorAll(
+      'td.mat-column-actions button'
+    );
+    expect(actionsCellButtons.length).toBe(1);
+    expect(
+      actionsCellButtons[0].closest('.actions-locked-marker')
+    ).not.toBeNull();
   });
 });

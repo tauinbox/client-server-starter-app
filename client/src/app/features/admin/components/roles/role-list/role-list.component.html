@@ -107,6 +107,22 @@
                   <mat-icon>delete</mat-icon>
                 </button>
               }
+              @if (role.isSuper && role.isSystem) {
+                <span
+                  class="actions-locked-marker"
+                  [matTooltip]="t('admin.roles.actionsHiddenSuperReason')"
+                >
+                  <button
+                    matIconButton
+                    disabled
+                    [attr.aria-label]="
+                      t('admin.roles.actionsHiddenSuperReason')
+                    "
+                  >
+                    <mat-icon>lock</mat-icon>
+                  </button>
+                </span>
+              }
             </td>
           </ng-container>
 

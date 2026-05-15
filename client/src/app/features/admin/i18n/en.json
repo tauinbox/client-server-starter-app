@@ -18,6 +18,7 @@
     "managePermissions": "Manage Permissions",
     "editRole": "Edit Role",
     "deleteRole": "Delete Role",
+    "actionsHiddenSuperReason": "Super roles are managed at the system level and cannot be modified via the admin UI",
     "successCreated": "Role created successfully",
     "errorCreateFailed": "Failed to create role.",
     "successUpdated": "Role updated successfully",
