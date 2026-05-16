@@ -101,6 +101,95 @@ test.describe('User List page — handset layout', () => {
     await expect(page).toHaveURL(/.*\/users\/1$/);
   });
 
+  test('action trigger stays inside card and viewport even for very long names', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+
+    // Names long enough to push the trigger out of the card and beyond the
+    // viewport in pre-fix layout (Material's <mat-card-header> does not set
+    // min-width: 0 on its title-text wrapper, so a long title stretches the
+    // header beyond the card unless we constrain it explicitly).
+    const longNameUsers = [
+      {
+        id: '10',
+        email: 'claire.kerluke-shields@example.com',
+        firstName: 'Claire',
+        lastName: 'Kerluke-Shields-Williamson',
+        isActive: true,
+        roles: ['user'],
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z'
+      },
+      {
+        id: '11',
+        email: 'angel.runolfsdottir.with.a.really.long.address@example.com',
+        firstName: 'Angel',
+        lastName: 'Runolfsdottir-Hermiston',
+        isActive: true,
+        roles: ['user'],
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z'
+      }
+    ];
+    await page.route('**/api/v1/users?*', (route) => {
+      if (
+        route.request().method() === 'GET' &&
+        !route.request().url().includes('/search')
+      ) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: longNameUsers,
+            meta: { page: 1, limit: 10, total: 2, totalPages: 1 }
+          })
+        });
+      }
+      return route.fallback();
+    });
+    await page.goto('/users');
+
+    const cards = page.locator('mat-card.user-card');
+    await expect(cards.first()).toBeVisible();
+    await expect(cards).toHaveCount(2);
+
+    const viewportSize = page.viewportSize();
+    if (!viewportSize) throw new Error('viewportSize() returned null');
+    const viewportWidth = viewportSize.width;
+
+    const triggers = page.locator('button.user-card-menu-trigger');
+    const triggerCount = await triggers.count();
+    expect(triggerCount).toBe(2);
+
+    for (let i = 0; i < triggerCount; i++) {
+      const trigger = triggers.nth(i);
+      const card = cards.nth(i);
+      const triggerBox = await trigger.boundingBox();
+      const cardBox = await card.boundingBox();
+      if (!triggerBox || !cardBox) {
+        throw new Error(`boundingBox returned null at card ${i}`);
+      }
+      const triggerRight = triggerBox.x + triggerBox.width;
+      const cardRight = cardBox.x + cardBox.width;
+      expect(
+        triggerRight,
+        `Card ${i}: action trigger right edge (${triggerRight}px) must not exceed viewport width (${viewportWidth}px)`
+      ).toBeLessThanOrEqual(viewportWidth);
+      expect(
+        triggerRight,
+        `Card ${i}: action trigger right edge (${triggerRight}px) must not exceed card right edge (${cardRight}px)`
+      ).toBeLessThanOrEqual(cardRight);
+    }
+  });
+
   test('should show confirmation as bottom sheet when deleting from card menu', async ({
     _mockServer,
     page

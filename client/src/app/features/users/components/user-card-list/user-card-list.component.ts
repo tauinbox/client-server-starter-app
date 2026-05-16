@@ -8,7 +8,6 @@ import {
   MatCard,
   MatCardAvatar,
   MatCardContent,
-  MatCardHeader,
   MatCardSubtitle,
   MatCardTitle
 } from '@angular/material/card';
@@ -34,7 +33,6 @@ import type { User } from '../../models/user.types';
   imports: [
     MatCard,
     MatCardAvatar,
-    MatCardHeader,
     MatCardTitle,
     MatCardSubtitle,
     MatCardContent,

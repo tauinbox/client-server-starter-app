@@ -16,10 +16,23 @@
     width: 100%;
   }
 
-  // Position the menu trigger as the header suffix action.
-  // mat-card-header uses CSS grid; the icon button goes to the far right.
-  .user-card-menu-trigger {
-    margin-inline-start: auto;
+  .user-card-head {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: vars.$spacing-md;
+    align-items: center;
+    padding: vars.$spacing-md vars.$spacing-md 0;
+  }
+
+  .user-card-titles {
+    min-width: 0;
+
+    mat-card-title,
+    mat-card-subtitle {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   }
 
   .user-card-avatar {
@@ -34,12 +47,6 @@
       height: func.rem(24);
       font-size: func.rem(24);
     }
-  }
-
-  .user-card-email {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .user-card-fields {
