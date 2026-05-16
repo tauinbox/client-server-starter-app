@@ -7,7 +7,7 @@
   },
   "roles": {
     "title": "Roles management",
-    "newRole": "New Role",
+    "newRole": "Add",
     "tableHeaderName": "Name",
     "tableHeaderDescription": "Description",
     "tableHeaderType": "Type",
@@ -124,7 +124,7 @@
   },
   "actions": {
     "title": "Actions",
-    "addAction": "Add Action",
+    "addAction": "Add",
     "tableHeaderDisplayName": "Display Name",
     "tableHeaderName": "Name",
     "tableHeaderDescription": "Description",

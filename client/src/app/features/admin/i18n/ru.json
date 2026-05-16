@@ -7,7 +7,7 @@
   },
   "roles": {
     "title": "Управление ролями",
-    "newRole": "Новая роль",
+    "newRole": "Добавить",
     "tableHeaderName": "Название",
     "tableHeaderDescription": "Описание",
     "tableHeaderType": "Тип",
@@ -124,7 +124,7 @@
   },
   "actions": {
     "title": "Действия",
-    "addAction": "Добавить действие",
+    "addAction": "Добавить",
     "tableHeaderDisplayName": "Отображаемое имя",
     "tableHeaderName": "Название",
     "tableHeaderDescription": "Описание",

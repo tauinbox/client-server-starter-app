@@ -50,7 +50,7 @@
     "emailNotVerified": "Почта не подтверждена",
     "accountLocked": "Аккаунт заблокирован",
     "unlock": "Разблокировать",
-    "deleteButton": "Удалить пользователя",
+    "deleteButton": "Удалить",
     "saving": "Сохранение...",
     "notFoundTitle": "Пользователь не найден",
     "notFoundMessage": "Запрашиваемый пользователь не найден.",

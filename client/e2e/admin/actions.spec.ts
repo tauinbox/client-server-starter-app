@@ -31,14 +31,14 @@ test.describe('Admin Actions page', () => {
     ).toBeVisible();
   });
 
-  test('should open Add Action dialog when Add Action button is clicked', async ({
+  test('should open Add Action dialog when Add button is clicked', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/actions');
 
-    await page.getByRole('button', { name: 'Add Action' }).click();
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
 
     // Dialog must open — this would fail with NG0201 if viewContainerRef is missing
     await expect(page.getByRole('dialog')).toBeVisible();
@@ -54,7 +54,7 @@ test.describe('Admin Actions page', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/actions');
 
-    await page.getByRole('button', { name: 'Add Action' }).click();
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByRole('button', { name: 'Cancel' }).click();
@@ -91,13 +91,16 @@ test.describe('Admin Actions page', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/actions');
 
-    await page.getByRole('button', { name: 'Add Action' }).click();
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Internal Name').fill('publish');
     await page.getByLabel('Display Name').fill('Publish');
 
-    await page.getByRole('button', { name: 'Add Action' }).last().click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Add Action' })
+      .click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible();
     await expect(page.locator('mat-snack-bar-container')).toBeVisible();

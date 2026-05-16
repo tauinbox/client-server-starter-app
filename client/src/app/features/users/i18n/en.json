@@ -50,7 +50,7 @@
     "emailNotVerified": "Email not verified",
     "accountLocked": "Account locked",
     "unlock": "Unlock",
-    "deleteButton": "Delete User",
+    "deleteButton": "Delete",
     "saving": "Saving...",
     "notFoundTitle": "User Not Found",
     "notFoundMessage": "The requested user could not be found.",
