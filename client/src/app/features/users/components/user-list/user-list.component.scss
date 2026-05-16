@@ -25,6 +25,14 @@
     display: flex;
     gap: vars.$spacing-xs;
     justify-content: flex-end;
+
+    // On mobile the grid collapses to one column, so the raw <mat-form-field>
+    // Status filter sits last and contributes no margin-bottom (unlike the
+    // surrounding AppFormFieldComponent siblings). Add the row-rhythm gap
+    // here so the action row does not stick to it.
+    @media (max-width: vars.$breakpoint-xs) {
+      margin-top: vars.$space-form-row-gap;
+    }
   }
 
   // mat-divider host has its own margin: 0 with attribute-encapsulation
