@@ -120,7 +120,7 @@ test.describe('Keyboard navigation', () => {
     await page.goto('/users/3/edit');
 
     // Open the delete confirmation dialog
-    await page.getByRole('button', { name: 'Delete User' }).click();
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
 

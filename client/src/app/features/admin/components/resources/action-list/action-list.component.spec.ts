@@ -124,31 +124,25 @@ describe('ActionListComponent', () => {
   });
 
   describe('permission-based rendering', () => {
-    it('hides Add Action button when canCreate is false', async () => {
+    it('hides Add button when canCreate is false', async () => {
       authStoreMock.hasPermissions.mockReturnValue(false);
       await setupComponent();
       fixture.detectChanges();
 
-      const allBtns = Array.from<HTMLButtonElement>(
-        fixture.nativeElement.querySelectorAll('button')
-      );
-      const addActionBtn = allBtns.find((b) =>
-        b.textContent?.includes('Add Action')
-      );
-      expect(addActionBtn).toBeUndefined();
+      const addActionBtn = (
+        fixture.nativeElement as HTMLElement
+      ).querySelector<HTMLButtonElement>('mat-card-header button');
+      expect(addActionBtn).toBeNull();
     });
 
-    it('shows Add Action button when canCreate is true', async () => {
+    it('shows Add button when canCreate is true', async () => {
       authStoreMock.hasPermissions.mockReturnValue(true);
       await setupComponent();
       fixture.detectChanges();
 
-      const allBtns = Array.from<HTMLButtonElement>(
-        fixture.nativeElement.querySelectorAll('button')
-      );
-      const addActionBtn = allBtns.find((b) =>
-        b.textContent?.includes('Add Action')
-      );
+      const addActionBtn = (
+        fixture.nativeElement as HTMLElement
+      ).querySelector<HTMLButtonElement>('mat-card-header button');
       expect(addActionBtn).toBeTruthy();
     });
 

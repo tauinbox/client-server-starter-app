@@ -65,7 +65,7 @@ for (const theme of ['light', 'dark'] as const) {
       await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
       await page.goto('/users/3/edit');
       await expect(
-        page.getByRole('button', { name: 'Delete User' })
+        page.getByRole('button', { name: 'Delete', exact: true })
       ).toBeVisible();
 
       const errorToken = await resolveTokenColor(page, '--mat-sys-error');

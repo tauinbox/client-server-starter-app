@@ -42,7 +42,7 @@ test.describe('User Edit page', () => {
     await expect(page).toHaveURL(/.*\/forbidden$/);
   });
 
-  test('should show "Delete User" button for admin editing another user', async ({
+  test('should show "Delete" button for admin editing another user', async ({
     _mockServer,
     page
   }) => {
@@ -51,11 +51,11 @@ test.describe('User Edit page', () => {
     await page.goto('/users/3/edit');
 
     await expect(
-      page.getByRole('button', { name: 'Delete User' })
+      page.getByRole('button', { name: 'Delete', exact: true })
     ).toBeVisible();
   });
 
-  test('should not show "Delete User" button for admin editing self', async ({
+  test('should not show "Delete" button for admin editing self', async ({
     _mockServer,
     page
   }) => {
@@ -64,7 +64,7 @@ test.describe('User Edit page', () => {
     await page.goto('/users/100/edit');
 
     await expect(
-      page.getByRole('button', { name: 'Delete User' })
+      page.getByRole('button', { name: 'Delete', exact: true })
     ).toBeHidden();
   });
 
@@ -205,14 +205,14 @@ test.describe('User Edit page', () => {
     await expect(page).toHaveURL(/.*\/users\/3$/);
   });
 
-  test('should show confirmation dialog on "Delete User" click', async ({
+  test('should show confirmation dialog on "Delete" click', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/3/edit');
 
-    await page.getByRole('button', { name: 'Delete User' }).click();
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
 
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByText('Confirm Delete')).toBeVisible();
@@ -225,10 +225,10 @@ test.describe('User Edit page', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/3/edit');
 
-    await page.getByRole('button', { name: 'Delete User' }).click();
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
     await page
       .getByRole('dialog')
-      .getByRole('button', { name: 'Delete' })
+      .getByRole('button', { name: 'Delete', exact: true })
       .click();
 
     await expect(page.getByText('User deleted successfully')).toBeVisible();
@@ -244,7 +244,7 @@ test.describe('User Edit page', () => {
     await page.goto('/users/3/edit');
 
     await expect(
-      page.getByRole('button', { name: 'Delete User' })
+      page.getByRole('button', { name: 'Delete', exact: true })
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
     await expect(
