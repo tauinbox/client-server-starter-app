@@ -17,9 +17,13 @@
   margin-bottom: vars.$space-form-row-gap;
 }
 
-// Form actions container (usually for submit buttons)
+// Form actions container (usually for submit buttons).
+// `flex-wrap` + inline-control `gap` keep adjacent buttons from fusing
+// at narrow viewports (e.g. user-edit's three-button row at 375px wide).
 @mixin form-actions($justify: flex-end) {
   display: flex;
+  flex-wrap: wrap;
+  gap: vars.$space-component-gap;
   justify-content: $justify;
   margin-top: vars.$space-section-gap;
 }

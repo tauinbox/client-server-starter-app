@@ -234,4 +234,53 @@ test.describe('User Edit page', () => {
     await expect(page.getByText('User deleted successfully')).toBeVisible();
     await expect(page).toHaveURL(/.*\/users$/);
   });
+
+  test('action buttons do not fuse at 375px (gap or wrap)', async ({
+    _mockServer,
+    page
+  }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await page.goto('/users/3/edit');
+
+    await expect(
+      page.getByRole('button', { name: 'Delete User' })
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Save Changes' })
+    ).toBeVisible();
+
+    const layout = await page.evaluate(() => {
+      const fa = document.querySelector('.form-actions');
+      if (!fa) throw new Error('.form-actions not found');
+      const buttons = Array.from(fa.querySelectorAll('button'));
+      const rects = buttons.map((b) => {
+        const r = b.getBoundingClientRect();
+        return { top: r.top, left: r.left, right: r.right };
+      });
+      return { rects, viewportWidth: window.innerWidth };
+    });
+
+    expect(layout.rects.length).toBeGreaterThanOrEqual(3);
+
+    // No button may overflow the viewport horizontally.
+    for (const r of layout.rects) {
+      expect(r.right).toBeLessThanOrEqual(layout.viewportWidth + 0.5);
+    }
+
+    // For every pair of buttons that share a row (same top), there must be a
+    // horizontal gap > 0 between them — they must not fuse edge-to-edge.
+    for (let i = 0; i < layout.rects.length; i++) {
+      for (let j = i + 1; j < layout.rects.length; j++) {
+        const a = layout.rects[i];
+        const b = layout.rects[j];
+        const sameRow = Math.abs(a.top - b.top) < 1;
+        if (sameRow) {
+          const gap = Math.max(b.left - a.right, a.left - b.right);
+          expect(gap).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
 });
