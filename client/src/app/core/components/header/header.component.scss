@@ -1,10 +1,19 @@
 @use 'abstracts/functions' as func;
+@use 'abstracts/variables' as vars;
 
 :host {
   position: sticky;
   top: 0;
   z-index: 100;
   display: block;
+}
+
+// Hide brand text on handset widths so toolbar items (lang + theme +
+// auth controls) fit within 320px without overflow.
+.app-brand {
+  @media (max-width: vars.$breakpoint-xs) {
+    display: none;
+  }
 }
 
 // In M3 the color="primary" attribute on mat-toolbar is deprecated and ignored.
