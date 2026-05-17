@@ -7,7 +7,6 @@
   },
   "roles": {
     "title": "Управление ролями",
-    "newRole": "Добавить",
     "tableHeaderName": "Название",
     "tableHeaderDescription": "Описание",
     "tableHeaderType": "Тип",
@@ -124,7 +123,6 @@
   },
   "actions": {
     "title": "Действия",
-    "addAction": "Добавить",
     "tableHeaderDisplayName": "Отображаемое имя",
     "tableHeaderName": "Название",
     "tableHeaderDescription": "Описание",
@@ -158,8 +156,7 @@
     "displayNameMaxLength": "Отображаемое имя должно быть не более 100 символов",
     "descriptionLabel": "Описание",
     "descriptionPlaceholder": "Необязательное описание",
-    "descriptionMaxLength": "Описание должно быть не более 500 символов",
-    "addButton": "Добавить"
+    "descriptionMaxLength": "Описание должно быть не более 500 символов"
   },
   "store": {
     "errorLoadRolesFailed": "Не удалось загрузить роли. Попробуйте снова.",

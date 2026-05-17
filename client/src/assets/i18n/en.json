@@ -1,9 +1,11 @@
 {
   "common": {
+    "add": "Add",
     "cancel": "Cancel",
     "confirm": "Confirm",
     "close": "Close",
     "save": "Save",
+    "edit": "Edit",
     "delete": "Delete",
     "search": "Search",
     "clear": "Clear",

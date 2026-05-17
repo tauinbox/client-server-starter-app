@@ -103,7 +103,7 @@
           <button
             matIconButton
             [routerLink]="['/admin/users', user.id, 'edit']"
-            [matTooltip]="t('users.table.actionEdit')"
+            [matTooltip]="t('common.edit')"
             [attr.aria-label]="
               t('users.table.actionEditAria', {
                 firstName: user.firstName,
@@ -125,7 +125,7 @@
             matIconButton
             class="app-btn-danger"
             (click)="deleteUser.emit(user)"
-            [matTooltip]="t('users.table.actionDelete')"
+            [matTooltip]="t('common.delete')"
             [attr.aria-label]="
               t('users.table.actionDeleteAria', {
                 firstName: user.firstName,

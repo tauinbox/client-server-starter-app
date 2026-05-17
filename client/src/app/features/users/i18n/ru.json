@@ -26,7 +26,6 @@
     "userId": "ID пользователя",
     "createdOn": "Дата создания",
     "lastUpdated": "Последнее обновление",
-    "editButton": "Редактировать",
     "editNoPermission": "У вас нет прав на редактирование этого пользователя",
     "notFoundTitle": "Пользователь не найден",
     "notFoundMessage": "Запрашиваемый пользователь не найден."
@@ -49,7 +48,6 @@
     "emailNotVerified": "Почта не подтверждена",
     "accountLocked": "Аккаунт заблокирован",
     "unlock": "Разблокировать",
-    "deleteButton": "Удалить",
     "saving": "Сохранение...",
     "notFoundTitle": "Пользователь не найден",
     "notFoundMessage": "Запрашиваемый пользователь не найден.",
@@ -78,9 +76,7 @@
     "columnActions": "Действия",
     "actionViewDetails": "Подробнее",
     "actionViewDetailsAria": "Подробнее о {{ firstName }} {{ lastName }}",
-    "actionEdit": "Редактировать",
     "actionEditAria": "Редактировать {{ firstName }} {{ lastName }}",
-    "actionDelete": "Удалить",
     "actionDeleteAria": "Удалить {{ firstName }} {{ lastName }}"
   },
   "store": {

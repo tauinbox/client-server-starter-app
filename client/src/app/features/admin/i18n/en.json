@@ -7,7 +7,6 @@
   },
   "roles": {
     "title": "Roles management",
-    "newRole": "Add",
     "tableHeaderName": "Name",
     "tableHeaderDescription": "Description",
     "tableHeaderType": "Type",
@@ -124,7 +123,6 @@
   },
   "actions": {
     "title": "Actions",
-    "addAction": "Add",
     "tableHeaderDisplayName": "Display Name",
     "tableHeaderName": "Name",
     "tableHeaderDescription": "Description",
@@ -158,8 +156,7 @@
     "displayNameMaxLength": "Display name must be at most 100 characters",
     "descriptionLabel": "Description",
     "descriptionPlaceholder": "Optional description",
-    "descriptionMaxLength": "Description must be at most 500 characters",
-    "addButton": "Add"
+    "descriptionMaxLength": "Description must be at most 500 characters"
   },
   "store": {
     "errorLoadRolesFailed": "Failed to load roles. Please try again.",

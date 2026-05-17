@@ -105,13 +105,13 @@
             [routerLink]="['/admin/users', u.id, 'edit']"
           >
             <mat-icon>edit</mat-icon>
-            {{ t('users.detail.editButton') }}
+            {{ t('common.edit') }}
           </button>
           <ng-template #editDenied>
             <span [matTooltip]="t('users.detail.editNoPermission')">
               <button matButton="filled" disabled>
                 <mat-icon>edit</mat-icon>
-                {{ t('users.detail.editButton') }}
+                {{ t('common.edit') }}
               </button>
             </span>
           </ng-template>

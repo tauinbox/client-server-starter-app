@@ -26,7 +26,6 @@
     "userId": "User ID",
     "createdOn": "Created On",
     "lastUpdated": "Last Updated",
-    "editButton": "Edit",
     "editNoPermission": "You do not have permission to edit this user",
     "notFoundTitle": "User Not Found",
     "notFoundMessage": "The requested user could not be found."
@@ -49,7 +48,6 @@
     "emailNotVerified": "Email not verified",
     "accountLocked": "Account locked",
     "unlock": "Unlock",
-    "deleteButton": "Delete",
     "saving": "Saving...",
     "notFoundTitle": "User Not Found",
     "notFoundMessage": "The requested user could not be found.",
@@ -76,11 +74,9 @@
     "roleUser": "User",
     "columnCreated": "Created",
     "columnActions": "Actions",
-    "actionViewDetails": "View Details",
+    "actionViewDetails": "View",
     "actionViewDetailsAria": "View details for {{ firstName }} {{ lastName }}",
-    "actionEdit": "Edit User",
     "actionEditAria": "Edit {{ firstName }} {{ lastName }}",
-    "actionDelete": "Delete User",
     "actionDeleteAria": "Delete {{ firstName }} {{ lastName }}"
   },
   "store": {
