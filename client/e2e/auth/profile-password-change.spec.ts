@@ -17,7 +17,7 @@ test.describe('Profile password change', () => {
     // Submit with it left empty — form-level validation must keep submit disabled.
     await expect(page.getByLabel('Current Password')).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Update Profile' })
+      page.getByRole('button', { name: 'Save', exact: true })
     ).toBeDisabled();
   });
 
@@ -32,7 +32,7 @@ test.describe('Profile password change', () => {
     await page.getByLabel('Confirm New Password').fill('NewPassword1');
     await page.getByLabel('First Name').click(); // blur
 
-    await page.getByRole('button', { name: 'Update Profile' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     // mock-server returns 400 with errorKey errors.auth.invalidCurrentPassword,
     // which the error interceptor surfaces in the in-page error banner.
@@ -52,7 +52,7 @@ test.describe('Profile password change', () => {
     await page.getByLabel('New Password (Optional)').fill('NewPassword1');
     await page.getByLabel('Current Password').fill('Password1');
     await page.getByLabel('Confirm New Password').fill('NewPassword1');
-    await page.getByRole('button', { name: 'Update Profile' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByText('Profile updated successfully')).toBeVisible();
   });

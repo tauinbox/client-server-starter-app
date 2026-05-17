@@ -7,7 +7,7 @@ test.describe('Password reset', () => {
     await expect(page.getByText('Forgot Password')).toBeVisible();
     await expect(page.getByLabel('Email')).toBeVisible();
     await expect(
-      page.getByRole('button', { name: /send reset link/i })
+      page.getByRole('button', { name: /send link/i })
     ).toBeVisible();
   });
 
@@ -29,12 +29,12 @@ test.describe('Password reset', () => {
     await page.goto('/forgot-password');
 
     await page.getByLabel('Email').fill('user@example.com');
-    await page.getByRole('button', { name: /send reset link/i }).click();
+    await page.getByRole('button', { name: /send link/i }).click();
 
     // Should show success state
     await expect(page.getByText(/check your email/i)).toBeVisible();
     await expect(
-      page.getByRole('button', { name: /back to login/i })
+      page.getByRole('main').getByRole('button', { name: 'Login' })
     ).toBeVisible();
   });
 
@@ -45,7 +45,7 @@ test.describe('Password reset', () => {
     await page.goto('/forgot-password');
 
     await page.getByLabel('Email').fill('nonexistent@example.com');
-    await page.getByRole('button', { name: /send reset link/i }).click();
+    await page.getByRole('button', { name: /send link/i }).click();
 
     await expect(page.getByText(/check your email/i)).toBeVisible();
   });

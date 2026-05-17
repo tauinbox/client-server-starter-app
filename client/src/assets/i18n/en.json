@@ -1,9 +1,11 @@
 {
   "common": {
+    "add": "Add",
     "cancel": "Cancel",
     "confirm": "Confirm",
     "close": "Close",
     "save": "Save",
+    "edit": "Edit",
     "delete": "Delete",
     "search": "Search",
     "clear": "Clear",
@@ -14,7 +16,7 @@
     "description": "Description",
     "created": "Created",
     "actions": "Actions",
-    "saveChanges": "Save Changes",
+    "back": "Back",
     "skipToContent": "Skip to main content"
   },
   "header": {

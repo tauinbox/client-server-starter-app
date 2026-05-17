@@ -99,7 +99,7 @@ test.describe('Admin Actions page', () => {
 
     await page
       .getByRole('dialog')
-      .getByRole('button', { name: 'Add Action' })
+      .getByRole('button', { name: 'Add', exact: true })
       .click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible();
