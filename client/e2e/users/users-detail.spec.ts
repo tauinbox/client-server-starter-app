@@ -119,21 +119,23 @@ test.describe('User Detail page', () => {
     await expect(page.getByText('Last Updated')).toBeVisible();
   });
 
-  test('should show "Edit User" button', async ({ _mockServer, page }) => {
+  test('should show "Edit" button', async ({ _mockServer, page }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1');
 
-    await expect(page.getByRole('button', { name: 'Edit User' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Edit', exact: true })
+    ).toBeVisible();
   });
 
-  test('should navigate to edit page on "Edit User" button click', async ({
+  test('should navigate to edit page on "Edit" button click', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1');
 
-    await page.getByRole('button', { name: 'Edit User' }).click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
 
     await expect(page).toHaveURL(/.*\/users\/1\/edit$/);
   });

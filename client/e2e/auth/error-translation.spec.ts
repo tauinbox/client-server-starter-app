@@ -178,7 +178,7 @@ test.describe('Error translation: global error interceptor → snackbar', () => 
     // Make the form dirty and submit.
     await page.getByLabel('First Name').fill('Updated');
     await page.getByLabel('First Name').blur();
-    await page.getByRole('button', { name: 'Update Profile' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     const snackbar = page.locator('mat-snack-bar-container');
     await expect(snackbar).toBeVisible({ timeout: 5000 });

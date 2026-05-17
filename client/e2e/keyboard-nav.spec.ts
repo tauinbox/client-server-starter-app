@@ -104,7 +104,7 @@ test.describe('Keyboard navigation', () => {
     await firstNameInput.fill('Updated');
 
     // Tab forward to reach the Save button
-    const saveButton = page.getByRole('button', { name: 'Save Changes' });
+    const saveButton = page.getByRole('button', { name: 'Save', exact: true });
     await saveButton.focus();
     await expect(saveButton).toBeFocused();
     await page.keyboard.press('Enter');

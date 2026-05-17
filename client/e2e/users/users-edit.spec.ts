@@ -107,7 +107,7 @@ test.describe('User Edit page', () => {
 
     await page.getByLabel('First Name').fill('Updated');
     await page.getByLabel('First Name').blur();
-    await page.getByRole('button', { name: 'Save Changes' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByText('User updated successfully')).toBeVisible();
     await expect(page).toHaveURL(/.*\/users\/1$/);
@@ -136,7 +136,7 @@ test.describe('User Edit page', () => {
 
     await page.getByLabel('First Name').fill('Updated');
     await page.getByLabel('First Name').blur();
-    await page.getByRole('button', { name: 'Save Changes' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.locator('.error-message')).toBeVisible();
   });
@@ -150,7 +150,7 @@ test.describe('User Edit page', () => {
 
     await page.getByLabel('Email').fill('renamed@example.com');
     await page.getByLabel('Email').blur();
-    await page.getByRole('button', { name: 'Save Changes' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByText('Confirm email change')).toBeVisible();
@@ -174,7 +174,7 @@ test.describe('User Edit page', () => {
     await page.goto('/users/3/edit');
     await page.getByLabel('Email').fill('renamed@example.com');
     await page.getByLabel('Email').blur();
-    await page.getByRole('button', { name: 'Save Changes' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await page
       .getByRole('dialog')
@@ -194,7 +194,7 @@ test.describe('User Edit page', () => {
 
     await page.getByLabel('Email').fill('renamed@example.com');
     await page.getByLabel('Email').blur();
-    await page.getByRole('button', { name: 'Save Changes' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await page
       .getByRole('dialog')
@@ -248,7 +248,7 @@ test.describe('User Edit page', () => {
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Save Changes' })
+      page.getByRole('button', { name: 'Save', exact: true })
     ).toBeVisible();
 
     const layout = await page.evaluate(() => {

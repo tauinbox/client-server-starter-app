@@ -157,7 +157,7 @@
                 <mat-spinner diameter="24"></mat-spinner>
                 <span class="ml-2">{{ t('users.edit.saving') }}</span>
               } @else {
-                {{ t('common.saveChanges') }}
+                {{ t('common.save') }}
               }
             </button>
           </div>
@@ -168,7 +168,7 @@
           <h3>{{ t('users.edit.notFoundTitle') }}</h3>
           <p>{{ t('users.edit.notFoundMessage') }}</p>
           <button matButton="filled" routerLink="/admin/users">
-            {{ t('users.edit.backToUsers') }}
+            {{ t('common.back') }}
           </button>
         </div>
       }

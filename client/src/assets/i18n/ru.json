@@ -14,7 +14,7 @@
     "description": "Описание",
     "created": "Создан",
     "actions": "Действия",
-    "saveChanges": "Сохранить изменения",
+    "back": "Назад",
     "skipToContent": "Перейти к основному содержимому"
   },
   "header": {

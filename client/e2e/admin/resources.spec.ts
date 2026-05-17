@@ -110,7 +110,7 @@ test.describe('Admin Resources page', () => {
     await displayNameInput.clear();
     await displayNameInput.fill('Updated Resource Name');
 
-    await page.getByRole('button', { name: 'Save Changes' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible();
     await expect(page.locator('mat-snack-bar-container')).toBeVisible();

@@ -29,7 +29,7 @@ test.describe('Email verification', () => {
     // Should show success message
     await expect(page.getByText('Email Verified Successfully')).toBeVisible();
     await expect(
-      page.getByRole('button', { name: /go to login/i })
+      page.getByRole('main').getByRole('button', { name: 'Login', exact: true })
     ).toBeVisible();
   });
 
@@ -172,7 +172,10 @@ test.describe('Email verification', () => {
     await expect(page.getByText('Email Verified Successfully')).toBeVisible();
 
     // Navigate to login and log in
-    await page.getByRole('button', { name: /go to login/i }).click();
+    await page
+      .getByRole('main')
+      .getByRole('button', { name: 'Login', exact: true })
+      .click();
     await expect(page).toHaveURL(/.*\/login$/);
 
     const main = page.getByRole('main');

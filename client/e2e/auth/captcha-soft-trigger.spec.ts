@@ -54,14 +54,14 @@ test.describe('CAPTCHA soft-trigger', () => {
     // forgot-password limit is 2 and the threshold is 1, so the very first
     // post-increment remaining is ≤ 1.
     await page.getByLabel('Email').fill('user@example.com');
-    await page.getByRole('button', { name: /send reset link/i }).click();
+    await page.getByRole('button', { name: /send link/i }).click();
 
     // Widget appears
     const fake = page.getByTestId('fake-turnstile');
     await expect(fake).toBeVisible();
 
     // Submit button stays disabled until the callback fires
-    const submit = page.getByRole('button', { name: /send reset link/i });
+    const submit = page.getByRole('button', { name: /send link/i });
     await expect(submit).toBeDisabled();
 
     await fake.click();
@@ -80,7 +80,7 @@ test.describe('CAPTCHA soft-trigger', () => {
     await page.goto('/forgot-password');
 
     await page.getByLabel('Email').fill('user@example.com');
-    await page.getByRole('button', { name: /send reset link/i }).click();
+    await page.getByRole('button', { name: /send link/i }).click();
 
     await expect(page.getByText(/check your email/i)).toBeVisible();
     await expect(page.getByTestId('fake-turnstile')).not.toBeVisible();

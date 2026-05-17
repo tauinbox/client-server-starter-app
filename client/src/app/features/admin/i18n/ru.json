@@ -159,7 +159,7 @@
     "descriptionLabel": "Описание",
     "descriptionPlaceholder": "Необязательное описание",
     "descriptionMaxLength": "Описание должно быть не более 500 символов",
-    "addButton": "Добавить действие"
+    "addButton": "Добавить"
   },
   "store": {
     "errorLoadRolesFailed": "Не удалось загрузить роли. Попробуйте снова.",

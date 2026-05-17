@@ -159,7 +159,7 @@
     "descriptionLabel": "Description",
     "descriptionPlaceholder": "Optional description",
     "descriptionMaxLength": "Description must be at most 500 characters",
-    "addButton": "Add Action"
+    "addButton": "Add"
   },
   "store": {
     "errorLoadRolesFailed": "Failed to load roles. Please try again.",

@@ -35,9 +35,7 @@
         [disabled]="roleForm().invalid() || !formChanged"
         (click)="submit()"
       >
-        {{
-          isEdit ? t('common.saveChanges') : t('admin.roleForm.createButton')
-        }}
+        {{ isEdit ? t('common.save') : t('admin.roleForm.createButton') }}
       </button>
     }
   </mat-dialog-actions>

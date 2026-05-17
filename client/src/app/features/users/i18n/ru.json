@@ -29,8 +29,7 @@
     "editButton": "Редактировать",
     "editNoPermission": "У вас нет прав на редактирование этого пользователя",
     "notFoundTitle": "Пользователь не найден",
-    "notFoundMessage": "Запрашиваемый пользователь не найден.",
-    "backToUsers": "К пользователям"
+    "notFoundMessage": "Запрашиваемый пользователь не найден."
   },
   "edit": {
     "title": "Редактирование пользователя",
@@ -54,7 +53,6 @@
     "saving": "Сохранение...",
     "notFoundTitle": "Пользователь не найден",
     "notFoundMessage": "Запрашиваемый пользователь не найден.",
-    "backToUsers": "К пользователям",
     "confirmDeleteTitle": "Подтверждение удаления",
     "confirmDeleteMessage": "Вы уверены, что хотите удалить пользователя {{ firstName }} {{ lastName }}?",
     "confirmEmailChangeTitle": "Подтверждение смены email",
@@ -94,7 +92,7 @@
     "title": "Действующие разрешения",
     "subtitle": "{{ firstName }} {{ lastName }}",
     "backAriaLabel": "Назад к пользователю",
-    "viewButton": "Показать действующие разрешения",
+    "viewButton": "Показать разрешения",
     "rolesSection": "Роли",
     "noRoles": "Роли не назначены",
     "summarySection": "Итого",
