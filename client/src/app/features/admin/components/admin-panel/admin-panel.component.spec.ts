@@ -9,24 +9,21 @@ import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/trans
 import { AdminPanelComponent } from './admin-panel.component';
 import { AuthStore } from '@features/auth/store/auth.store';
 
-// Regression for BKL-013. The route guard checks the OR-of-three permission
-// set on navigation, but if an admin loses their privileges mid-session
-// (SSE-driven RBAC update), the guard never re-runs. This component owns the
-// "while inside /admin/*" check: the moment the live signal flips false, we
-// must redirect to /forbidden so the user is not left staring at admin UI
-// they can no longer act on.
-describe('AdminPanelComponent — auto-redirect on permission loss (BKL-013)', () => {
+describe('AdminPanelComponent — auto-redirect on permission loss', () => {
   let fixture: ComponentFixture<AdminPanelComponent>;
   let canAccessSignal: ReturnType<typeof signal<boolean>>;
+  let isAuthenticatedSignal: ReturnType<typeof signal<boolean>>;
   let navigateSpy: ReturnType<typeof vi.spyOn>;
 
-  async function setup(initialAccess: boolean): Promise<void> {
-    // The component's computed() reads `authStore.hasPermissions(...)` three
-    // times. Backing the mock with a signal makes the computed reactive: when
-    // the signal flips, the computed re-evaluates and the effect runs.
+  async function setup(
+    initialAccess: boolean,
+    initialAuthenticated = true
+  ): Promise<void> {
     canAccessSignal = signal(initialAccess);
+    isAuthenticatedSignal = signal(initialAuthenticated);
     const authStoreMock = {
-      hasPermissions: vi.fn(() => canAccessSignal())
+      hasPermissions: vi.fn(() => canAccessSignal()),
+      isAuthenticated: isAuthenticatedSignal
     };
 
     await TestBed.configureTestingModule({
@@ -46,6 +43,7 @@ describe('AdminPanelComponent — auto-redirect on permission loss (BKL-013)', (
 
   beforeEach(() => {
     canAccessSignal = signal(false);
+    isAuthenticatedSignal = signal(true);
   });
 
   it('does NOT redirect on initial render when user has access', async () => {
@@ -59,21 +57,35 @@ describe('AdminPanelComponent — auto-redirect on permission loss (BKL-013)', (
     fixture.detectChanges();
     expect(navigateSpy).not.toHaveBeenCalled();
 
-    // Simulate the live RBAC update — the underlying signal flips, the
-    // computed re-evaluates, the effect fires.
     canAccessSignal.set(false);
     fixture.detectChanges();
 
     expect(navigateSpy).toHaveBeenCalledWith(['/forbidden']);
   });
 
-  it('redirects when component mounts without access (defensive double-check)', async () => {
-    // The route guard would normally block this navigation, but if it ever
-    // races or is bypassed (e.g. signal not yet hydrated), the component
-    // should still self-correct.
+  it('redirects when component mounts without access', async () => {
     await setup(false);
     fixture.detectChanges();
 
     expect(navigateSpy).toHaveBeenCalledWith(['/forbidden']);
+  });
+
+  it('does NOT redirect to /forbidden during logout', async () => {
+    await setup(true);
+    fixture.detectChanges();
+    expect(navigateSpy).not.toHaveBeenCalled();
+
+    isAuthenticatedSignal.set(false);
+    canAccessSignal.set(false);
+    fixture.detectChanges();
+
+    expect(navigateSpy).not.toHaveBeenCalled();
+  });
+
+  it('does NOT redirect when component mounts unauthenticated without access', async () => {
+    await setup(false, false);
+    fixture.detectChanges();
+
+    expect(navigateSpy).not.toHaveBeenCalled();
   });
 });
