@@ -105,14 +105,15 @@ test.describe('Session restoration with expired access token', () => {
     _mockServer,
     page
   }) => {
+    await _mockServer.seedUsers([defaultUser]);
     await setExpiredAuthInStorage(page);
     await mockRefreshTokenWithNewTokens(page);
     await mockProfile(page);
 
-    // Navigate to root — should redirect to /profile via route config
+    // Regular user has no admin nav links, so the root route redirects to
+    // /profile via SidenavStateService.defaultRoute() fallback.
     await page.goto('/');
 
-    // Should end up at /profile, not /login
     await expect(page).toHaveURL(/.*\/profile$/);
     await expect(page.getByRole('heading', { name: 'John Doe' })).toBeVisible();
   });

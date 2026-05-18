@@ -42,10 +42,16 @@ export async function loginViaUi(
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByLabel('Password', { exact: true }).blur();
   await page.getByRole('main').getByRole('button', { name: 'Login' }).click();
-  await page.waitForURL(/.*\/profile$/);
-  // Wait for the permissions fetch to complete so CASL ability is set
-  // before tests navigate to permission-guarded routes or check guarded UI
+  // Post-login destination depends on permissions (admin → /admin/users via
+  // root redirect → defaultRoute(); user → /profile fallback).
+  await page.waitForURL((url) => !url.pathname.endsWith('/login'));
   await page.waitForLoadState('networkidle');
+  // Tests written before the dynamic landing page rely on /profile being the
+  // post-login URL; normalize so existing assertions keep working.
+  if (!page.url().endsWith('/profile')) {
+    await page.goto('/profile');
+    await page.waitForLoadState('networkidle');
+  }
 }
 
 export async function expectAuthRedirect(
@@ -122,7 +128,7 @@ export async function loginViaUiKeepSse(
     { timeout: 10_000 }
   );
   await page.getByRole('main').getByRole('button', { name: 'Login' }).click();
-  await page.waitForURL(/.*\/profile$/);
+  await page.waitForURL((url) => !url.pathname.endsWith('/login'));
   await permissionsResponse;
   await sseRequest;
 }
