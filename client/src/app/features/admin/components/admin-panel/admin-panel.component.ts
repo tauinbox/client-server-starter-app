@@ -40,16 +40,17 @@ export class AdminPanelComponent {
 
   protected readonly routes = AppRouteSegmentEnum;
 
-  // The guard runs once on navigation; this signal re-evaluates after live
-  // RBAC updates (e.g. an admin revokes one of the user's roles via SSE) so
-  // we can boot the user out of /admin/* without waiting for their next click.
+  // Route guard runs only on navigation; this re-evaluates after live RBAC
+  // updates so the user is booted from /admin/* the moment they lose access.
   protected readonly canAccessAdmin = computed(() =>
     canAccessAdminPanel(this.#authStore)
   );
 
   constructor() {
+    // isAuthenticated() gate avoids a /forbidden flash during logout, where
+    // accessToken and ability are nulled together.
     effect(() => {
-      if (!this.canAccessAdmin()) {
+      if (this.#authStore.isAuthenticated() && !this.canAccessAdmin()) {
         void this.#router.navigate([`/${AppRouteSegmentEnum.Forbidden}`]);
       }
     });

@@ -1,6 +1,14 @@
-import { computed, effect, inject, Injectable, signal } from '@angular/core';
+import {
+  computed,
+  effect,
+  inject,
+  Injectable,
+  signal,
+  type Signal
+} from '@angular/core';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { canAccessAdminPanel } from '@features/admin/utils/can-access-admin-panel';
+import { AppRouteSegmentEnum } from '../../app.route-segment.enum';
 import { LayoutService } from './layout.service';
 import { LocalStorageService } from './local-storage.service';
 
@@ -8,6 +16,13 @@ const WIDE_KEY = (userId: string) => `sidenav_wide_${userId}`;
 
 const NAV_WIDTH_NARROW = '4rem';
 const NAV_WIDTH_WIDE = '13.75rem';
+
+export type NavLink = {
+  readonly route: string;
+  readonly labelKey: string;
+  readonly icon: string;
+  readonly visible: Signal<boolean>;
+};
 
 @Injectable({ providedIn: 'root' })
 export class SidenavStateService {
@@ -33,8 +48,21 @@ export class SidenavStateService {
     this.#isWide() ? NAV_WIDTH_WIDE : NAV_WIDTH_NARROW
   );
 
-  readonly canAccessAdmin = computed(() =>
-    canAccessAdminPanel(this.#authStore)
+  readonly #navLinks: readonly NavLink[] = [
+    {
+      route: `/${AppRouteSegmentEnum.Admin}`,
+      labelKey: 'sidenav.adminPanel',
+      icon: 'admin_panel_settings',
+      visible: computed(() => canAccessAdminPanel(this.#authStore))
+    }
+  ];
+
+  readonly navLinks = computed(() =>
+    this.#navLinks.filter((link) => link.visible())
+  );
+
+  readonly defaultRoute = computed(
+    () => this.navLinks()[0]?.route ?? `/${AppRouteSegmentEnum.Profile}`
   );
 
   constructor() {

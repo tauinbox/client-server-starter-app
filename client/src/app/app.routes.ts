@@ -1,14 +1,25 @@
+import { inject } from '@angular/core';
 import type { Routes } from '@angular/router';
 import { authGuard } from '@features/auth/guards/auth.guard';
 import { permissionGuard } from '@features/auth/guards/permission.guard';
 import { guestGuard } from '@features/auth/guards/guest.guard';
+import { SidenavStateService } from '@core/services/sidenav-state.service';
+import { AuthStore } from '@features/auth/store/auth.store';
 import { AppRouteSegmentEnum } from './app.route-segment.enum';
 import { UsersStore } from '@features/users/store/users.store';
 
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: AppRouteSegmentEnum.Profile,
+    // Anonymous → /login without returnUrl, so post-login the root re-resolves
+    // with full permissions instead of baking /profile into the query string.
+    redirectTo: () => {
+      const authStore = inject(AuthStore);
+      if (!authStore.isAuthenticated()) {
+        return `/${AppRouteSegmentEnum.Login}`;
+      }
+      return inject(SidenavStateService).defaultRoute();
+    },
     pathMatch: 'full'
   },
   {

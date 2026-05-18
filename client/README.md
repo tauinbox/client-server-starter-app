@@ -50,7 +50,7 @@ src/app/
 │   └── admin/              # Admin panel (roles + resource + user management)
 │       ├── admin.routes.ts # Lazy-loaded child routes under /admin
 │       ├── components/
-│       │   ├── admin-panel/             # AdminPanelComponent — tabbed shell (Users / Roles / Resources); auto-redirects to /forbidden when admin permissions are revoked mid-session via `effect()` calling the shared `canAccessAdminPanel` helper (also used by adminPanelGuard and SidenavStateService.canAccessAdmin)
+│       │   ├── admin-panel/             # AdminPanelComponent — tabbed shell (Users / Roles / Resources); auto-redirects to /forbidden when admin permissions are revoked mid-session via `effect()` calling the shared `canAccessAdminPanel` helper (also used by adminPanelGuard and the admin entry in SidenavStateService.navLinks); the redirect effect is gated on `isAuthenticated()` so logout does not flash through /forbidden
 │       │   ├── roles/
 │       │   │   ├── role-list/           # RoleListComponent — data table with create/edit/delete actions
 │       │   │   ├── role-form-dialog/    # RoleFormDialogComponent — create and edit role (name, description)

@@ -1,22 +1,22 @@
 <ng-container *transloco="let t">
   <div class="nav-container" [class.wide]="sidenavState.isWide()">
     <nav class="nav-items">
-      @if (sidenavState.canAccessAdmin()) {
+      @for (link of sidenavState.navLinks(); track link.route) {
         <a
           class="nav-link"
           matRipple
-          #adminRla="routerLinkActive"
+          #rla="routerLinkActive"
           routerLinkActive
-          [class.active]="adminRla.isActive"
-          [routerLink]="'/' + routes.Admin"
-          [attr.aria-label]="t('sidenav.adminPanel')"
-          [attr.aria-current]="adminRla.isActive ? 'page' : null"
-          [matTooltip]="sidenavState.isWide() ? '' : t('sidenav.adminPanel')"
+          [class.active]="rla.isActive"
+          [routerLink]="link.route"
+          [attr.aria-label]="t(link.labelKey)"
+          [attr.aria-current]="rla.isActive ? 'page' : null"
+          [matTooltip]="sidenavState.isWide() ? '' : t(link.labelKey)"
           matTooltipPosition="after"
         >
-          <mat-icon aria-hidden="true">admin_panel_settings</mat-icon>
+          <mat-icon aria-hidden="true">{{ link.icon }}</mat-icon>
           @if (sidenavState.isWide()) {
-            <span>{{ t('sidenav.adminPanel') }}</span>
+            <span>{{ t(link.labelKey) }}</span>
           }
         </a>
       }
