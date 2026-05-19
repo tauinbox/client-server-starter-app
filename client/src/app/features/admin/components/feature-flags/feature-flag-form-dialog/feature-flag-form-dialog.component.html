@@ -1,0 +1,90 @@
+<ng-container *transloco="let t; scope: 'admin'">
+  <h2 mat-dialog-title>
+    {{
+      isEdit
+        ? t('admin.featureFlagForm.editTitle')
+        : t('admin.featureFlagForm.createTitle')
+    }}
+  </h2>
+
+  <mat-dialog-content>
+    <form (submit)="$event.preventDefault(); submit()">
+      <div class="form-grid">
+        <nxs-form-field
+          [field]="flagForm.key"
+          label="admin.featureFlagForm.keyLabel"
+        />
+        <nxs-form-field
+          [field]="flagForm.description"
+          label="admin.featureFlagForm.descriptionLabel"
+          type="textarea"
+        />
+        <nxs-form-field
+          [field]="flagForm.environments"
+          label="admin.featureFlagForm.environmentsLabel"
+        />
+        <div class="toggles">
+          <mat-checkbox
+            [checked]="enabled()"
+            (change)="onEnabledChange($event.checked)"
+          >
+            {{ t('admin.featureFlagForm.enabledLabel') }}
+          </mat-checkbox>
+          <mat-checkbox
+            [checked]="isPublic()"
+            (change)="onPublicChange($event.checked)"
+          >
+            {{ t('admin.featureFlagForm.publicLabel') }}
+          </mat-checkbox>
+        </div>
+      </div>
+
+      <section class="rules-section">
+        <header class="rules-header">
+          <h3 class="rules-title">
+            {{ t('admin.featureFlagForm.rulesTitle') }}
+          </h3>
+          <button matButton="outlined" type="button" (click)="addRule()">
+            <mat-icon>add</mat-icon>
+            {{ t('admin.featureFlagForm.addRule') }}
+          </button>
+        </header>
+
+        @if (rules().length === 0) {
+          <p class="rules-empty">
+            {{ t('admin.featureFlagForm.rulesEmpty') }}
+          </p>
+        } @else {
+          <div
+            class="rules-list"
+            cdkDropList
+            (cdkDropListDropped)="drop($event)"
+          >
+            @for (rule of rules(); track rule.id ?? $index; let i = $index) {
+              <nxs-feature-flag-rule-row
+                cdkDrag
+                [rule]="rule"
+                (ruleChange)="updateRule(i, $event)"
+                (remove)="removeRule(i)"
+              />
+            }
+          </div>
+        }
+      </section>
+    </form>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button matButton="text" type="button" (click)="cancel()">
+      {{ t('common.cancel') }}
+    </button>
+    <button
+      matButton="filled"
+      type="button"
+      [disabled]="flagForm().invalid()"
+      (click)="submit()"
+    >
+      {{ isEdit ? t('common.save') : t('admin.featureFlagForm.createButton') }}
+    </button>
+  </mat-dialog-actions>
+</ng-container>

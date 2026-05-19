@@ -1,0 +1,87 @@
+@use '../../../../../../styles/abstracts/functions' as func;
+@use '../../../../../../styles/abstracts/variables' as vars;
+
+:host {
+  display: block;
+}
+
+.rule-row {
+  display: flex;
+  gap: vars.$spacing-sm;
+  align-items: flex-start;
+  padding: vars.$spacing-sm;
+  background: var(--mat-sys-surface-container);
+  border: func.rem(1) solid var(--mat-sys-outline-variant);
+  border-radius: func.rem(8);
+}
+
+.drag-handle {
+  // ≥44×44 touch target per FF-005 mobile spec.
+  min-width: func.rem(44);
+  min-height: func.rem(44);
+  touch-action: none; // CDK drag requires this to override scrolling on touch.
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.rule-fields {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(func.rem(140), max-content) minmax(
+      func.rem(140),
+      max-content
+    ) 1fr;
+  column-gap: vars.$spacing-sm;
+  align-items: start;
+
+  &.vertical {
+    grid-template-columns: 1fr;
+  }
+}
+
+.rule-payload {
+  display: block;
+}
+
+.rule-payload-input {
+  width: 100%;
+}
+
+.rule-percentage {
+  display: flex;
+  gap: vars.$spacing-sm;
+  align-items: center;
+}
+
+.rule-slider {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rule-percent-input {
+  width: func.rem(96);
+}
+
+.rule-attribute {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(func.rem(140), 1fr));
+  column-gap: vars.$spacing-sm;
+  align-items: start;
+}
+
+.rule-remove {
+  flex: 0 0 auto;
+}
+
+// CDK drag preview / placeholder smoothing.
+.rule-row.cdk-drag-preview {
+  box-shadow: 0 5px 5px -3px rgb(0 0 0 / 20%),
+    0 8px 10px 1px rgb(0 0 0 / 14%), 0 3px 14px 2px rgb(0 0 0 / 12%);
+}
+
+.rule-row.cdk-drag-placeholder {
+  opacity: 0;
+}

@@ -50,6 +50,19 @@
         {{ t('admin.panel.manageActions') }}
       </a>
     </ng-container>
+    <ng-container
+      *nxsRequirePermissions="{ action: 'manage', subject: 'FeatureFlag' }"
+    >
+      <a
+        mat-tab-link
+        [routerLink]="routes.FeatureFlags"
+        routerLinkActive
+        #featureFlagsActive="routerLinkActive"
+        [active]="featureFlagsActive.isActive"
+      >
+        {{ t('admin.panel.manageFeatureFlags') }}
+      </a>
+    </ng-container>
   </nav>
 
   <mat-tab-nav-panel #tabPanel>

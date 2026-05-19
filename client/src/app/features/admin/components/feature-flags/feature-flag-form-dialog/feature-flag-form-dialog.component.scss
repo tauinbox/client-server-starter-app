@@ -1,0 +1,47 @@
+@use '../../../../../../styles/abstracts/functions' as func;
+@use '../../../../../../styles/abstracts/variables' as vars;
+
+.form-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: vars.$spacing-md;
+  margin-bottom: vars.$spacing-md;
+}
+
+.rules-section {
+  margin-top: vars.$spacing-sm;
+}
+
+.rules-header {
+  display: flex;
+  gap: vars.$spacing-sm;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: vars.$spacing-sm;
+}
+
+.rules-title {
+  margin: 0;
+  font-size: var(--mat-sys-title-medium-size);
+  font-weight: var(--mat-sys-title-medium-weight);
+}
+
+.rules-empty {
+  padding: vars.$spacing-md;
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+  text-align: center;
+  border: func.rem(1) dashed var(--mat-sys-outline-variant);
+  border-radius: func.rem(8);
+}
+
+.rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-sm;
+}

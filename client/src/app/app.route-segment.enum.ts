@@ -7,6 +7,7 @@ export enum AppRouteSegmentEnum {
   Roles = 'roles',
   Resources = 'resources',
   Actions = 'actions',
+  FeatureFlags = 'feature-flags',
   OAuthCallback = 'oauth/callback',
   Forbidden = 'forbidden',
   ForgotPassword = 'forgot-password',

@@ -1,0 +1,113 @@
+@use '../../../../../../styles/abstracts/functions' as func;
+@use '../../../../../../styles/abstracts/variables' as vars;
+
+:host {
+  position: relative;
+  display: block;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  padding: vars.$spacing-lg 0;
+}
+
+.empty-state {
+  padding: vars.$spacing-md 0;
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+  text-align: center;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.flags-table {
+  width: 100%;
+}
+
+.flag-key {
+  font-family: monospace;
+  font-weight: 500;
+}
+
+.env-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: vars.$spacing-xs;
+}
+
+.muted {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// ── Handset card list ──────────────────────────────────────────────────────
+
+.flag-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-sm;
+
+  // Bottom padding equal to FAB + breathing room so the last card can scroll
+  // fully above the fixed FAB on handset.
+  padding-bottom: func.rem(80);
+}
+
+.flag-card {
+  display: block;
+}
+
+.flag-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: vars.$spacing-sm vars.$spacing-md 0;
+}
+
+.flag-card-titles {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-xs;
+}
+
+.flag-description {
+  margin: 0 0 vars.$spacing-sm;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.flag-card-fields {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: vars.$spacing-xs vars.$spacing-md;
+  margin: 0 0 vars.$spacing-sm;
+
+  dt {
+    margin: 0;
+    font-weight: 500;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.flag-card-actions {
+  display: flex;
+  gap: vars.$spacing-xs;
+  margin-top: vars.$spacing-sm;
+}
+
+// ── Handset FAB ────────────────────────────────────────────────────────────
+
+.flag-fab {
+  position: fixed;
+  right: vars.$spacing-md;
+  bottom: vars.$spacing-md;
+  z-index: 5;
+}
