@@ -139,6 +139,73 @@ NgRx Signal Store (`@ngrx/signals`):
 | `@environments/*` | `src/environments/*` |
 | `@app/shared/*` | `../shared/src/*` (shared types/constants across all 3 workspaces) |
 
+## Feature flags — using the client primitives
+
+Server-side, a flag is an entity with optional rules (user / role / percentage / attribute, include or exclude). Clients only ever see **evaluated booleans** — never the raw rules — because the rule set is admin-only configuration and could leak segmentation strategy.
+
+The client core lives in `src/app/features/feature-flags/`:
+
+| Piece | Use it for |
+|-------|------------|
+| `FeatureFlagsStore` (`providedIn: 'root'`) | Read the evaluated flag map from anywhere. `flags()` → `Record<string, boolean>`; `loaded()` → `boolean`; `isEnabled(key)` → `Signal<boolean>` (per-key memoised computed, shared across consumers of the same key) |
+| `featureFlagGuard(key, redirectTo?)` | Route-level gating: `canActivate: [featureFlagGuard('new-dashboard')]`. Runs `ensureAuthenticated()` first, then `isEnabled(key)`; redirects to `redirectTo` (default `/forbidden`) on miss |
+| `HasFeatureDirective` — `*nxsHasFeature` | Template gating with an optional `nxsHasFeatureElse` fallback `<ng-template>`. Reactive to store updates via `effect()` |
+| `FeatureEnabledPipe` — `\| featureEnabled` | Attribute bindings. `pure: false` because the value is sourced from the store signal, not the pipe arg — single property lookup per CD cycle |
+
+### Typical patterns
+
+Route gate (lazy admin page hidden behind a flag):
+
+```ts
+// app.routes.ts
+{
+  path: 'new-dashboard',
+  loadComponent: () => import('./features/dashboard/new-dashboard.component')
+    .then((c) => c.NewDashboardComponent),
+  canActivate: [featureFlagGuard('new-dashboard')]
+}
+```
+
+Template gate with a "coming soon" placeholder:
+
+```html
+<ng-template #placeholder>
+  <p class="muted">{{ t('common.comingSoon') }}</p>
+</ng-template>
+
+<nxs-new-dashboard *nxsHasFeature="'new-dashboard'; else placeholder" />
+```
+
+Attribute binding (disable an action while the flag is off):
+
+```html
+<button matButton="filled"
+  [disabled]="!('beta-export' | featureEnabled)"
+  (click)="exportToCSV()">
+  {{ t('reports.exportButton') }}
+</button>
+```
+
+### Lifecycle
+
+`FeatureFlagsStore.load()` runs at bootstrap via `provideAppInitializer` for authenticated callers (alongside `fetchPermissions()` and `fetchRbacMetadata()`) AND for anonymous visitors (non-blocking, so public flags can gate first-paint placeholders). On logout the store is `clear()`-ed.
+
+Live reactivity: `NotificationsService.featureFlagsUpdated$` (a filter on the SSE stream) triggers `featureFlagsStore.reload()` whenever the server broadcasts `{ type: 'feature_flags_updated' }`. The store's per-key computed signals propagate the new value, and `*nxsHasFeature` / `featureEnabled` re-render without a page reload.
+
+Role-change is special-cased: `permissionsUpdated$` ALSO calls `reload()` because role-bound rules can flip for that user when their roles change.
+
+### Admin
+
+`/admin/feature-flags` is the management UI. Guarded by `permissionGuard('manage', 'FeatureFlag')` and exposed as the fifth tab in `AdminPanelComponent`. Components live under `features/admin/components/feature-flags/`:
+
+- **`FeatureFlagListComponent`** — `mat-table` on desktop, `mat-card` list with a pinned-bottom `mat-fab` on handset (switched via `LayoutService.isHandset()`). Per-row toggle / edit / delete.
+- **`FeatureFlagFormDialogComponent`** — top form (key, description, environments, enabled, public) + embedded `cdkDropList` rules editor. Opens at `DialogSize.Wide` on desktop, with the `.app-dialog-fullscreen-mobile` panel-class (in `_dialogs.scss`) on handset for a `100vw × 100dvh` edge-to-edge layout with sticky title + actions.
+- **`FeatureFlagRuleRowComponent`** — single rule editor with `cdkDrag` + explicit `cdkDragHandle` (≥44×44 px touch target). Payload editor per type: comma-separated IDs for `user` / `role`, `mat-slider` + numeric input pair for `percentage`, field + op + value (+ conditional `customKey`) for `attribute`.
+
+State + HTTP live in `features/admin/{store,services}`:
+- **`FeatureFlagsAdminStore`** — route-level `signalStore + withEntities<FeatureFlagResponse>`, mirrors `RolesStore`. `load()` via `rxMethod`; CRUD methods return `Observable` so callers can surface per-call notifications.
+- **`FeatureFlagsAdminService`** — HTTP wrapper around `/api/v1/admin/feature-flags/*`. `update()` sets `If-Match: <expectedVersion>` for optimistic locking; the server returns HTTP 409 (`errors.featureFlags.versionConflict`) when the version is stale.
+
 ## Styling
 
 - **Angular Material** + Angular CDK for UI components
@@ -192,8 +259,8 @@ npm test
   - `helpers.ts` — `loginViaUi()`, `loginViaUiKeepSse()` (variant that skips `networkidle` so tests can hold a real SSE stream open), `expectAuthRedirect()`, `expectForbiddenRedirect()`
 - Test structure: organized by module in `e2e/auth/`, `e2e/users/`, and `e2e/admin/`
 - **Accessibility**: `e2e/a11y.spec.ts` runs `@axe-core/playwright` (WCAG 2.1 AA) against every major route; `e2e/keyboard-nav.spec.ts` verifies keyboard-only flows (login, sidenav, user-edit, dialog focus trap)
-- **Live RBAC + auth regression net** (BKL-027): refresh-token reuse detection (`refresh-token-reuse.spec.ts`), SSE-driven role revocation hides admin link (`role-revocation-via-sse.spec.ts`), admin-on-/admin auto-redirect to /forbidden (`admin/admin-panel-permission-loss.spec.ts`), reactive 401 → refresh → retry (`reactive-token-refresh.spec.ts`), logout + browser Back navigation (`logout-back-button.spec.ts`), OAuth unlink-last-provider safety (`oauth-unlink-last-provider.spec.ts`), wire-contract assertion that `auth_user.roles` is `RoleResponse[]` (`post-login-admin-badge.spec.ts`)
-- Coverage: 145 tests — unit test suite: 593 tests passing covering login, register, profile (incl. self-service email change), session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search (including admin email-change confirmation dialog), admin roles/resources management, effective-permissions preview, admin-panel auto-redirect (BKL-013), a11y audit, keyboard navigation. Error translation tests verify `errorKey` → Transloco pipeline for login, register, and global interceptor snackbar.
+- **Live RBAC + auth regression net**: refresh-token reuse detection (`refresh-token-reuse.spec.ts`), SSE-driven role revocation hides admin link (`role-revocation-via-sse.spec.ts`), admin-on-/admin auto-redirect to /forbidden (`admin/admin-panel-permission-loss.spec.ts`), reactive 401 → refresh → retry (`reactive-token-refresh.spec.ts`), logout + browser Back navigation (`logout-back-button.spec.ts`), OAuth unlink-last-provider safety (`oauth-unlink-last-provider.spec.ts`), wire-contract assertion that `auth_user.roles` is `RoleResponse[]` (`post-login-admin-badge.spec.ts`), SSE-driven feature-flag toggle propagation (`admin/feature-flags.spec.ts`)
+- Coverage: 182 Playwright tests across auth/users/admin/a11y/keyboard suites; 644 Vitest unit tests covering login, register, profile (incl. self-service email change), session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search (including admin email-change confirmation dialog), admin roles/resources/feature-flags management, effective-permissions preview, admin-panel auto-redirect when permissions are revoked mid-session, a11y audit, keyboard navigation. Error translation tests verify `errorKey` → Transloco pipeline for login, register, and global interceptor snackbar.
 - Workers: 4 (fully parallel, per-worker mock-server instances on dynamic ports)
 
 ```bash
