@@ -107,7 +107,10 @@ describe('NotificationsService', () => {
   });
 
   it('should only process new content on subsequent chunks', () => {
-    const received: NotificationEvent[] = [];
+    const received: Extract<
+      NotificationEvent,
+      { type: 'permissions_updated' }
+    >[] = [];
     service.permissionsUpdated$.subscribe((e) => received.push(e));
 
     service.connect();
