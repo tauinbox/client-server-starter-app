@@ -36,6 +36,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - OAuth account management (link/unlink providers in profile)
 - Server-side token cleanup via cron jobs
 - **Audit logging** — security-sensitive operations recorded to `audit_logs` table (login, registration, password changes, user/role management, OAuth events); nightly cleanup removes entries older than `AUDIT_LOG_RETENTION_DAYS` days (default 90)
+- **Feature flags** — dedicated subsystem for hiding in-development functionality and progressively rolling it out (specific users, roles, percentages, attributes, environments). `GET /api/v1/feature-flags` evaluates the flag set for the caller (authenticated → all flags; anonymous → only `public: true` flags). Admin CRUD at `/api/v1/admin/feature-flags` with optimistic locking via the `If-Match` header. Anonymous-user bucketing via the `nxs_anon_id` cookie (set automatically by `AnonIdMiddleware`) so a 10 % rollout of a public flag converges on the same 10 % of anonymous browsers across reloads. `FeatureFlagChangedListener` invalidates the cache and broadcasts `{ type: 'feature_flags_updated' }` over SSE on every change; the per-user cache is keyed by a global version counter so changes orphan all per-user entries without needing Redis `SCAN MATCH`. The `AttributeRegistryService` is the extensibility seam — other modules call `registerAttribute('tenantId', resolver)` from `onModuleInit` to expose tenant / org / region / subscription-tier attributes to the evaluator. `@RequireFeature('key')` + `FeatureFlagGuard` is a convenience decorator for hiding routes entirely (returns HTTP 404 for anti-enumeration); RBAC remains the actual authorization gate
 
 ### Admin Panel
 - **Role management** — tabbed `/admin` shell (`AdminPanelComponent`) with "Users", "Roles", and "Resources" tabs. Role list with create/edit/delete dialogs; `RolePermissionsDialogComponent` assigns permissions to roles with optional CASL conditions (ownership, fieldMatch, userAttr, custom)
@@ -637,6 +638,8 @@ Nine tables managed via TypeORM migrations:
 - **permissions** — UUID PK, resource_id + action_id (unique constraint, FKs to resources and actions)
 - **role_permissions** — FK to roles + permissions, optional jsonb `conditions` column
 - **user_roles** — Join table (user_id, role_id), composite PK
+- **feature_flags** — UUID PK, key (unique), description, enabled, environments `text[]` (GIN-indexed), public, version int, updated_by_user_id, timestamps
+- **feature_flag_rules** — UUID PK, flag_id (FK CASCADE, btree-indexed), priority, type, effect, payload `jsonb`, timestamps
 - **feature** — Auto-increment ID, name, timestamps
 
 ## Code Quality

@@ -6,6 +6,10 @@ import rolesRouter from './roles.middleware';
 import rbacRouter from './rbac.middleware';
 import healthRouter from '../routes/health';
 import notificationsRouter from './notifications.middleware';
+import {
+  featureFlagsAdminRouter,
+  featureFlagsRouter
+} from './feature-flags.middleware';
 
 export function registerRoutes(app: Express): void {
   app.use('/api/health', healthRouter);
@@ -15,4 +19,6 @@ export function registerRoutes(app: Express): void {
   app.use('/api/v1/roles', rolesRouter);
   app.use('/api/v1/rbac', rbacRouter);
   app.use('/api/v1/notifications', notificationsRouter);
+  app.use('/api/v1/admin/feature-flags', featureFlagsAdminRouter);
+  app.use('/api/v1/feature-flags', featureFlagsRouter);
 }

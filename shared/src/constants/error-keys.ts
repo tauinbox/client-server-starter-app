@@ -60,6 +60,12 @@ export const ErrorKeys = {
     CANNOT_RESTORE: 'errors.resources.cannotRestore',
     SUBJECT_RESERVED: 'errors.resources.subjectReserved'
   },
+  FEATURE_FLAGS: {
+    NOT_FOUND: 'errors.featureFlags.notFound',
+    KEY_EXISTS: 'errors.featureFlags.keyExists',
+    VERSION_CONFLICT: 'errors.featureFlags.versionConflict',
+    IF_MATCH_REQUIRED: 'errors.featureFlags.ifMatchRequired'
+  },
   DB: {
     UNIQUE_VIOLATION: 'errors.db.uniqueViolation',
     FOREIGN_KEY_VIOLATION: 'errors.db.foreignKeyViolation',
