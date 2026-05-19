@@ -95,6 +95,30 @@ export interface MockAuditLog {
   createdAt: string;
 }
 
+export interface MockFeatureFlag {
+  id: string;
+  key: string;
+  description: string | null;
+  enabled: boolean;
+  environments: string[];
+  public: boolean;
+  version: number;
+  updatedByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MockFeatureFlagRule {
+  id: string;
+  flagId: string;
+  priority: number;
+  type: import('@app/shared/types').FeatureFlagRuleType;
+  effect: import('@app/shared/types').FeatureFlagRuleEffect;
+  payload: import('@app/shared/types').FeatureFlagRulePayload;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CaptchaConfig {
   enabled: boolean;
   siteKey: string | null;
@@ -123,6 +147,8 @@ export interface State {
   permissions: Map<string, MockPermission>;
   rolePermissions: MockRolePermission[];
   auditLogs: MockAuditLog[];
+  featureFlags: Map<string, MockFeatureFlag>;
+  featureFlagRules: MockFeatureFlagRule[];
   // CAPTCHA — public configuration advertised via /api/v1/auth/captcha-config.
   // Default: disabled. Tests can flip via /__control/captcha to exercise the
   // soft-trigger flow without an external Turnstile dependency.

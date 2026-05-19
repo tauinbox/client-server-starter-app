@@ -8,6 +8,8 @@ import { packRules } from '@casl/ability/extra';
 import type {
   AdminUserResponse,
   MockAuditLog,
+  MockFeatureFlag,
+  MockFeatureFlagRule,
   MockPermission,
   MockUser,
   OAuthAccount,
@@ -15,6 +17,8 @@ import type {
   UserResponse
 } from './types';
 import type {
+  FeatureFlagResponse,
+  FeatureFlagRuleResponse,
   PermissionResponse,
   ResolvedPermission,
   ResourceResponse,
@@ -30,7 +34,9 @@ import {
   seedActions,
   seedRoles,
   seedPermissions,
-  seedRolePermissions
+  seedRolePermissions,
+  seedFeatureFlags,
+  seedFeatureFlagRules
 } from './seed';
 
 // Each Playwright worker imports this module in its own process,
@@ -59,7 +65,12 @@ export function resetState(): void {
     rolePermissions: seedRolePermissions.map((rp) => ({ ...rp })),
     auditLogs: [],
     captchaConfig: { enabled: false, siteKey: null },
-    captchaAttempts: new Map()
+    captchaAttempts: new Map(),
+    featureFlags: new Map(seedFeatureFlags.map((f) => [f.id, { ...f }])),
+    featureFlagRules: seedFeatureFlagRules.map((r) => ({
+      ...r,
+      payload: { ...r.payload }
+    }))
   };
 }
 
@@ -390,6 +401,41 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
   }
 
   return packRules(build().rules);
+}
+
+export function toFeatureFlagRuleResponse(
+  rule: MockFeatureFlagRule
+): FeatureFlagRuleResponse {
+  return {
+    id: rule.id,
+    flagId: rule.flagId,
+    priority: rule.priority,
+    effect: rule.effect,
+    payload: rule.payload,
+    createdAt: rule.createdAt,
+    updatedAt: rule.updatedAt
+  };
+}
+
+export function toFeatureFlagResponse(
+  flag: MockFeatureFlag
+): FeatureFlagResponse {
+  const rules = state.featureFlagRules
+    .filter((r) => r.flagId === flag.id)
+    .map(toFeatureFlagRuleResponse);
+  return {
+    id: flag.id,
+    key: flag.key,
+    description: flag.description,
+    enabled: flag.enabled,
+    environments: flag.environments,
+    public: flag.public,
+    version: flag.version,
+    updatedByUserId: flag.updatedByUserId,
+    createdAt: flag.createdAt,
+    updatedAt: flag.updatedAt,
+    rules
+  };
 }
 
 // Initialize on import

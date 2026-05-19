@@ -7,7 +7,9 @@ import type {
   MockPermission,
   MockRolePermission,
   MockResource,
-  MockAction
+  MockAction,
+  MockFeatureFlag,
+  MockFeatureFlagRule
 } from './types';
 
 // Fixed seed for reproducible data across restarts
@@ -372,3 +374,53 @@ export const seedPermissions: MockPermission[] = generatePermissions(
 );
 export const seedRolePermissions: MockRolePermission[] =
   generateRolePermissions(seedRoles, seedPermissions, seedResources);
+
+function generateFeatureFlags(): MockFeatureFlag[] {
+  const now = '2025-01-01T00:00:00.000Z';
+  return [
+    {
+      id: 'flag-new-dashboard',
+      key: 'new-dashboard',
+      description: 'Hidden behind a flag while in development',
+      enabled: false,
+      environments: [],
+      public: false,
+      version: 1,
+      updatedByUserId: null,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: 'flag-beta-export',
+      key: 'beta-export',
+      description: 'Beta export rolled out to a 10% sample of users',
+      enabled: true,
+      environments: [],
+      public: false,
+      version: 1,
+      updatedByUserId: null,
+      createdAt: now,
+      updatedAt: now
+    }
+  ];
+}
+
+function generateFeatureFlagRules(): MockFeatureFlagRule[] {
+  const now = '2025-01-01T00:00:00.000Z';
+  return [
+    {
+      id: 'rule-beta-export-percent',
+      flagId: 'flag-beta-export',
+      priority: 0,
+      type: 'percentage',
+      effect: 'include',
+      payload: { type: 'percentage', percent: 10 },
+      createdAt: now,
+      updatedAt: now
+    }
+  ];
+}
+
+export const seedFeatureFlags: MockFeatureFlag[] = generateFeatureFlags();
+export const seedFeatureFlagRules: MockFeatureFlagRule[] =
+  generateFeatureFlagRules();
