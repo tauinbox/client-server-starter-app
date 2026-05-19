@@ -21,6 +21,7 @@ import { AuthService } from '@features/auth/services/auth.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { registerOAuthIcons } from '@features/auth/utils/register-oauth-icons';
 import { NotificationsService } from '@core/services/notifications.service';
+import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { TranslocoHttpLoader } from '@core/transloco-loader';
 import { LanguageService } from '@core/services/language.service';
 
@@ -48,11 +49,13 @@ export const appConfig: ApplicationConfig = {
       const authService = inject(AuthService);
       const authStore = inject(AuthStore);
       const notificationsService = inject(NotificationsService);
+      const featureFlagsStore = inject(FeatureFlagsStore);
       if (authService.isAuthenticated()) {
         authService.scheduleTokenRefresh();
         await Promise.all([
           authService.fetchPermissions(),
-          authService.fetchRbacMetadata()
+          authService.fetchRbacMetadata(),
+          featureFlagsStore.load()
         ]);
         notificationsService.connect();
       } else if (authStore.hasPersistedUser()) {
@@ -61,12 +64,17 @@ export const appConfig: ApplicationConfig = {
           await firstValueFrom(authService.refreshTokens());
           await Promise.all([
             authService.fetchPermissions(),
-            authService.fetchRbacMetadata()
+            authService.fetchRbacMetadata(),
+            featureFlagsStore.load()
           ]);
           notificationsService.connect();
         } catch {
           authStore.clearSession();
         }
+      } else {
+        // Anonymous bootstrap — still load public flags so the landing page
+        // can render `*nxsHasFeature` placeholders for public previews.
+        void featureFlagsStore.load();
       }
     }),
     provideTransloco({
