@@ -602,6 +602,10 @@ export class TenantModule implements OnModuleInit {
 ```
 Admin UIs can then write rules referencing `{ field: 'custom', customKey: 'tenantId', op: 'in', value: ['acme', 'globex'] }`. The write-time validator rejects any `customKey` not registered.
 
+**Audit trail.** Every mutating admin endpoint writes to `audit_logs` under one of the `FEATURE_FLAG_*` enum values (`FEATURE_FLAG_CREATE`, `_UPDATE`, `_DELETE`, `_TOGGLE`, `_RULES_REPLACE`). The `details` JSONB captures `key`, `changedFields`, `ruleCount`, or `enabled`, depending on the action — never the raw rule payload, so admin-only segmentation strategy never leaks into the audit log.
+
+**Adding a new flag from a feature module.** No code is needed at the flag site beyond `@RequireFeature('key')` on the handler. Configuration is purely runtime: create the flag through the admin UI / API, attach rules if you want partial roll-out, and verify with `GET /api/v1/feature-flags` as the target caller. The flag's `key` is a free-form string (lowercase letters, digits, hyphens) — pick one with the same name as the gate so a future reader can grep from code to config.
+
 ### Users (`/api/v1/users`)
 
 | Method | Path | Auth | Description |
