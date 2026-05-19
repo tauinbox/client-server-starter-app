@@ -198,6 +198,16 @@ export class FeatureFlagResolverService {
   }
 
   private async bumpVersion(): Promise<void> {
-    await this.cacheManager.set(VERSION_KEY, Date.now(), 0);
+    // Monotonically increasing — Date.now() alone has millisecond granularity,
+    // and two invalidations inside the same millisecond (fast CI hardware,
+    // multi-instance race) would re-emit the same version and leave stale
+    // per-user cache keys reachable. Guarding with max(prev + 1) keeps the
+    // suffix strictly fresh.
+    const previous = await this.cacheManager.get<number>(VERSION_KEY);
+    const next = Math.max(
+      Date.now(),
+      (typeof previous === 'number' ? previous : 0) + 1
+    );
+    await this.cacheManager.set(VERSION_KEY, next, 0);
   }
 }

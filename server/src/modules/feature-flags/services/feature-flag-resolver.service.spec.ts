@@ -146,6 +146,33 @@ describe('FeatureFlagResolverService', () => {
     expect(flagRepo.find).toHaveBeenCalled();
   });
 
+  it('invalidateAll stays monotonic when Date.now() does not advance', async () => {
+    seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
+    const realNow = Date.now;
+    const frozen = realNow();
+    Date.now = (() => frozen) as typeof Date.now;
+    try {
+      await service.evaluateForUser(
+        { userId: 'u1', email: null, createdAt: null, roles: [] },
+        fakeReq
+      );
+      // Two successive invalidations in the same millisecond (fast CI / clock
+      // skew across instances) must still produce a strictly newer version,
+      // otherwise per-user cache entries from before the first invalidation
+      // would be re-reachable after the second.
+      await service.invalidateAll();
+      await service.invalidateAll();
+      flagRepo.find.mockClear();
+      await service.evaluateForUser(
+        { userId: 'u1', email: null, createdAt: null, roles: [] },
+        fakeReq
+      );
+      expect(flagRepo.find).toHaveBeenCalled();
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
   it('invalidateUser deletes that user’s current cache key', async () => {
     seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
     await service.evaluateForUser(

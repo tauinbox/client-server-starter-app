@@ -16,7 +16,7 @@
 }
 
 .drag-handle {
-  // ≥44×44 touch target per FF-005 mobile spec.
+  // ≥44×44 touch target — WCAG / iOS HIG minimum for reliable finger taps.
   min-width: func.rem(44);
   min-height: func.rem(44);
   touch-action: none; // CDK drag requires this to override scrolling on touch.
