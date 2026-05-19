@@ -41,6 +41,12 @@ src/app/
 │   │   ├── interceptors/   # jwtInterceptor
 │   │   ├── services/       # AuthService (HTTP, refresh scheduling, fetchPermissions: Promise<void>), rbac-metadata.service.ts
 │   │   └── store/          # AuthStore (NgRx Signal Store — state: accessToken (memory) + user (auth_user localStorage) + ability: AppAbility|null), RbacMetadataStore
+│   ├── feature-flags/      # Client core for the feature-flags subsystem
+│   │   ├── services/       # FeatureFlagService — HttpClient.get('/api/v1/feature-flags', { withCredentials: true }); silent-error context so bootstrap failures don't toast
+│   │   ├── store/          # FeatureFlagsStore — NgRx Signal Store ({ providedIn: 'root' }) state: { flags: Record<string, boolean>; loaded: boolean }; methods: load() / reload() / clear() / isEnabled(key): Signal<boolean> (per-key memoized computed)
+│   │   ├── guards/         # featureFlagGuard(key, redirectTo = '/forbidden') — pipes through ensureAuthenticated() so an expired token gets refreshed before the flag check; redirects to /forbidden on miss
+│   │   ├── directives/     # HasFeatureDirective — *nxsHasFeature="'flag-key'"; effect()-based; optional nxsHasFeatureElse input for a TemplateRef fallback (zero-config "coming soon" placeholder)
+│   │   └── pipes/          # FeatureEnabledPipe — {{ 'flag-key' | featureEnabled }} for attribute bindings; pure: false because the value is sourced from the store signal (single property lookup, trivial per-CD cost)
 │   ├── users/              # User list (with inline filters), detail, edit, effective-permissions (admin)
 │   │   ├── components/
 │   │   │   ├── user-table/        # UserTableComponent (shared table; sorting + actions only, no paginator) — shown on tablet/desktop

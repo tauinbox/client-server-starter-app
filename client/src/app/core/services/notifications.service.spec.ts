@@ -138,6 +138,23 @@ describe('NotificationsService', () => {
     expect(forceLogoutSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('emits on featureFlagsUpdated$ when a feature_flags_updated event arrives', () => {
+    const received: Extract<
+      NotificationEvent,
+      { type: 'feature_flags_updated' }
+    >[] = [];
+    service.featureFlagsUpdated$.subscribe((e) => received.push(e));
+
+    service.connect();
+    const req = httpController.expectOne('/api/v1/notifications/stream');
+
+    const chunk = 'data: {"type":"feature_flags_updated"}\n\n';
+    req.event(makeProgressEvent(chunk, chunk.length));
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).toEqual({ type: 'feature_flags_updated' });
+  });
+
   it('should skip malformed SSE frames without throwing', () => {
     const received: NotificationEvent[] = [];
     service.sessionInvalidated$.subscribe((e) => received.push(e));

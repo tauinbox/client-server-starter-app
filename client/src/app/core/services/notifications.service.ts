@@ -47,6 +47,13 @@ export class NotificationsService {
     )
   );
 
+  readonly featureFlagsUpdated$ = this.#events$.pipe(
+    filter(
+      (e): e is Extract<NotificationEvent, { type: 'feature_flags_updated' }> =>
+        e.type === 'feature_flags_updated'
+    )
+  );
+
   constructor() {
     // Subscribe once — service is a root singleton, no need to unsubscribe
     this.sessionInvalidated$.subscribe(() => {

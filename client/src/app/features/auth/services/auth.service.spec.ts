@@ -12,6 +12,7 @@ import { TokenService } from './token.service';
 import { RbacMetadataService } from './rbac-metadata.service';
 import { RbacMetadataStore } from '../store/rbac-metadata.store';
 import { NotificationsService } from '@core/services/notifications.service';
+import { FeatureFlagsStore } from '../../feature-flags/store/feature-flags.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import type { AuthResponse } from '../models/auth.types';
 import type { RoleResponse } from '@app/shared/types';
@@ -124,7 +125,16 @@ describe('AuthService', () => {
           useValue: {
             connect: vi.fn(),
             disconnect: vi.fn(),
-            permissionsUpdated$: EMPTY
+            permissionsUpdated$: EMPTY,
+            featureFlagsUpdated$: EMPTY
+          }
+        },
+        {
+          provide: FeatureFlagsStore,
+          useValue: {
+            load: vi.fn().mockResolvedValue(undefined),
+            reload: vi.fn().mockResolvedValue(undefined),
+            clear: vi.fn()
           }
         }
       ]

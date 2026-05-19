@@ -22,6 +22,7 @@ import { TokenService } from './token.service';
 import { RbacMetadataService } from './rbac-metadata.service';
 import { RbacMetadataStore } from '../store/rbac-metadata.store';
 import { NotificationsService } from '@core/services/notifications.service';
+import { FeatureFlagsStore } from '../../feature-flags/store/feature-flags.store';
 
 const silentContext = () =>
   new HttpContext().set(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN, true);
@@ -35,6 +36,7 @@ export class AuthService {
   readonly #rbacMetadataService = inject(RbacMetadataService);
   readonly #rbacMetadataStore = inject(RbacMetadataStore);
   readonly #notificationsService = inject(NotificationsService);
+  readonly #featureFlagsStore = inject(FeatureFlagsStore);
   readonly #destroyRef = inject(DestroyRef);
 
   readonly isAuthenticated = this.#authStore.isAuthenticated;
@@ -44,6 +46,14 @@ export class AuthService {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe(() => {
         void this.fetchPermissions();
+        // Role change can flip role-bound feature flags for this user.
+        void this.#featureFlagsStore.reload();
+      });
+
+    this.#notificationsService.featureFlagsUpdated$
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe(() => {
+        void this.#featureFlagsStore.reload();
       });
   }
 
@@ -57,6 +67,7 @@ export class AuthService {
           this.#authStore.saveAuthResponse(response);
           this.scheduleTokenRefresh();
           void this.fetchRbacMetadata();
+          void this.#featureFlagsStore.load();
           return from(this.fetchPermissions()).pipe(
             tap(() => {
               this.#notificationsService.connect();
@@ -98,12 +109,14 @@ export class AuthService {
             this.#notificationsService.disconnect();
             this.#authStore.clearSession();
             this.#rbacMetadataStore.clear();
+            this.#featureFlagsStore.clear();
             completeLogout();
           })
         )
         .subscribe();
     } else {
       this.#rbacMetadataStore.clear();
+      this.#featureFlagsStore.clear();
       completeLogout();
     }
   }
@@ -252,6 +265,7 @@ export class AuthService {
     if (this.isAuthenticated()) {
       this.scheduleTokenRefresh();
       void this.fetchPermissions();
+      void this.#featureFlagsStore.load();
     }
   }
 }
