@@ -8,6 +8,7 @@ import { adminPanelGuard } from './guards/admin-panel.guard';
 import { UsersStore } from '@features/users/store/users.store';
 import { RolesStore } from './store/roles.store';
 import { ResourcesStore } from './store/resources.store';
+import { FeatureFlagsAdminStore } from './store/feature-flags-admin.store';
 import { AuthStore } from '@features/auth/store/auth.store';
 
 export const adminRoutes: Routes = [
@@ -18,7 +19,7 @@ export const adminRoutes: Routes = [
         (c) => c.AdminPanelComponent
       ),
     canActivate: [adminPanelGuard],
-    providers: [UsersStore, RolesStore, ResourcesStore],
+    providers: [UsersStore, RolesStore, ResourcesStore, FeatureFlagsAdminStore],
     children: [
       {
         path: '',
@@ -29,7 +30,11 @@ export const adminRoutes: Routes = [
             return 'users';
           if (authStore.hasPermissions({ action: 'read', subject: 'Role' }))
             return 'roles';
-          return 'resources';
+          if (
+            authStore.hasPermissions({ action: 'read', subject: 'Permission' })
+          )
+            return 'resources';
+          return 'feature-flags';
         }
       },
       {
@@ -96,6 +101,14 @@ export const adminRoutes: Routes = [
             (c) => c.ActionListComponent
           ),
         canActivate: [permissionGuard('read', 'Permission')]
+      },
+      {
+        path: 'feature-flags',
+        loadComponent: () =>
+          import('./components/feature-flags/feature-flag-list/feature-flag-list.component').then(
+            (c) => c.FeatureFlagListComponent
+          ),
+        canActivate: [permissionGuard('manage', 'FeatureFlag')]
       }
     ]
   }

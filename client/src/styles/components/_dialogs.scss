@@ -34,3 +34,38 @@
 .mat-mdc-dialog-container .mat-mdc-dialog-surface .mat-mdc-dialog-title + .mat-mdc-dialog-content {
   padding-top: func.rem(12);
 }
+
+// ── Fullscreen-mobile variant ──────────────────────────────────────────────
+// Opt-in panelClass for dialogs that should fill the screen on handset
+// (rich admin dialogs with embedded editors — feature-flag form-dialog, etc).
+// Uses 100dvh (dynamic viewport height) so the iOS soft keyboard does not
+// cover the focused input — chip-grid / textarea inputs stay reachable.
+@media (width <= 599px) {
+  .app-dialog-fullscreen-mobile .mat-mdc-dialog-container {
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+
+  .app-dialog-fullscreen-mobile .mat-mdc-dialog-surface {
+    border-radius: 0;
+  }
+
+  // Sticky header + footer so save/cancel are reachable while content scrolls.
+  .app-dialog-fullscreen-mobile .mat-mdc-dialog-title {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--mat-sys-surface);
+  }
+
+  .app-dialog-fullscreen-mobile .mat-mdc-dialog-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding-bottom: env(safe-area-inset-bottom, #{vars.$spacing-sm});
+    background: var(--mat-sys-surface);
+  }
+}

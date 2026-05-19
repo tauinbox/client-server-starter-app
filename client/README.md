@@ -65,8 +65,12 @@ src/app/
 │       │       ├── resource-list/       # ResourceListComponent — two-section page (Resources + Actions tables)
 │       │       ├── resource-form-dialog/ # ResourceFormDialogComponent — edit resource displayName/description
 │       │       └── action-form-dialog/  # ActionFormDialogComponent — create/edit action with name pattern validation
-│       ├── services/       # RoleService (HTTP → /api/v1/roles), RbacAdminService (HTTP → /api/v1/rbac/*)
-│       └── store/          # RolesStore (route-level), ResourcesStore (route-level: resources, actions, loading)
+│       │   └── feature-flags/
+│       │       ├── feature-flag-list/        # FeatureFlagListComponent — mat-table desktop / card-list handset (via LayoutService.isHandset()), per-row toggle/edit/delete, mat-fab on handset
+│       │       ├── feature-flag-form-dialog/ # FeatureFlagFormDialogComponent — top form (key, description, environments, enabled, public) + embedded rules editor with cdkDropList drag-reorder; uses Wide dialog size on desktop, .app-dialog-fullscreen-mobile panelClass on handset
+│       │       └── feature-flag-rule-row/    # FeatureFlagRuleRowComponent — single rule editor with cdkDrag + explicit cdkDragHandle (44×44 touch target), payload editor per type (user/role IDs CSV, percentage slider+input, attribute field+op+value+customKey), .vertical class on handset
+│       ├── services/       # RoleService (HTTP → /api/v1/roles), RbacAdminService (HTTP → /api/v1/rbac/*), FeatureFlagsAdminService (HTTP → /api/v1/admin/feature-flags/*; If-Match version on PATCH)
+│       └── store/          # RolesStore (route-level), ResourcesStore (route-level: resources, actions, loading), FeatureFlagsAdminStore (route-level: signalStore + withEntities<FeatureFlagResponse>)
 └── shared/
     ├── components/
     │   ├── confirm-dialog/            # ConfirmDialogComponent (desktop) + ConfirmBottomSheetComponent (handset)
@@ -97,6 +101,7 @@ src/app/
 | `/admin/users/:id/permissions` | UserPermissionsComponent | permissionGuard('read', 'User') |
 | `/admin/roles` | RoleListComponent | permissionGuard('read', 'Role') |
 | `/admin/resources` | ResourceListComponent | permissionGuard('read', 'Permission') |
+| `/admin/feature-flags` | FeatureFlagListComponent | permissionGuard('manage', 'FeatureFlag') |
 | `/verify-email` | VerifyEmailComponent | - |
 | `/confirm-email-change` | ConfirmEmailChangeComponent | - |
 | `/forgot-password` | ForgotPasswordComponent | guestGuard |

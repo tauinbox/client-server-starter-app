@@ -1,0 +1,165 @@
+<div class="rule-row" cdkDrag *transloco="let t; scope: 'admin'">
+  <button
+    matIconButton
+    cdkDragHandle
+    class="drag-handle"
+    type="button"
+    [attr.aria-label]="t('admin.featureFlagRule.dragHandle')"
+  >
+    <mat-icon>drag_indicator</mat-icon>
+  </button>
+
+  <div class="rule-fields" [class.vertical]="layout.isHandset()">
+    <mat-form-field class="rule-effect">
+      <mat-label>{{ t('admin.featureFlagRule.effect') }}</mat-label>
+      <mat-select
+        [value]="rule().effect"
+        (selectionChange)="onEffectChange($event.value)"
+      >
+        @for (effect of effects; track effect) {
+          <mat-option [value]="effect">
+            {{ t('admin.featureFlagRule.effect_' + effect) }}
+          </mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field class="rule-type">
+      <mat-label>{{ t('admin.featureFlagRule.type') }}</mat-label>
+      <mat-select
+        [value]="rule().type"
+        (selectionChange)="onTypeChange($event.value)"
+      >
+        @for (type of types; track type) {
+          <mat-option [value]="type">
+            {{ t('admin.featureFlagRule.type_' + type) }}
+          </mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <div class="rule-payload">
+      @switch (rule().type) {
+        @case ('user') {
+          <mat-form-field class="rule-payload-input">
+            <mat-label>{{ t('admin.featureFlagRule.userIds') }}</mat-label>
+            <input
+              matInput
+              [value]="userIdsValue"
+              (input)="onUserIdsChange($any($event.target).value)"
+              [placeholder]="t('admin.featureFlagRule.userIdsPlaceholder')"
+            />
+          </mat-form-field>
+        }
+        @case ('role') {
+          <mat-form-field class="rule-payload-input">
+            <mat-label>{{ t('admin.featureFlagRule.roleNames') }}</mat-label>
+            <input
+              matInput
+              [value]="roleNamesValue"
+              (input)="onRoleNamesChange($any($event.target).value)"
+              [placeholder]="t('admin.featureFlagRule.roleNamesPlaceholder')"
+            />
+          </mat-form-field>
+        }
+        @case ('percentage') {
+          <div class="rule-percentage">
+            <mat-slider min="0" max="100" step="1" class="rule-slider">
+              <input
+                matSliderThumb
+                [value]="percentValue"
+                (valueChange)="onPercentChange($event)"
+                [attr.aria-label]="t('admin.featureFlagRule.percent')"
+              />
+            </mat-slider>
+            <mat-form-field class="rule-percent-input">
+              <mat-label>{{ t('admin.featureFlagRule.percent') }}</mat-label>
+              <input
+                matInput
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                [value]="percentValue"
+                (input)="onPercentChange($any($event.target).value)"
+              />
+            </mat-form-field>
+          </div>
+        }
+        @case ('attribute') {
+          <div class="rule-attribute">
+            <mat-form-field>
+              <mat-label>{{
+                t('admin.featureFlagRule.attributeField')
+              }}</mat-label>
+              <mat-select
+                [value]="attributeField"
+                (selectionChange)="onAttributeFieldChange($event.value)"
+              >
+                @for (field of attributeFields; track field) {
+                  <mat-option [value]="field">
+                    {{ t('admin.featureFlagRule.field_' + field) }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field>
+              <mat-label>{{
+                t('admin.featureFlagRule.attributeOp')
+              }}</mat-label>
+              <mat-select
+                [value]="attributeOp"
+                (selectionChange)="onAttributeOpChange($event.value)"
+              >
+                @for (op of attributeOps; track op) {
+                  <mat-option [value]="op">
+                    {{ t('admin.featureFlagRule.op_' + op) }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            @if (attributeField === 'custom') {
+              <mat-form-field>
+                <mat-label>{{
+                  t('admin.featureFlagRule.customKey')
+                }}</mat-label>
+                <input
+                  matInput
+                  [value]="attributeCustomKey"
+                  (input)="
+                    onAttributeCustomKeyChange($any($event.target).value)
+                  "
+                />
+              </mat-form-field>
+            }
+            <mat-form-field>
+              <mat-label>{{
+                t('admin.featureFlagRule.attributeValue')
+              }}</mat-label>
+              <input
+                matInput
+                [value]="attributeValue"
+                (input)="onAttributeValueChange($any($event.target).value)"
+                [placeholder]="
+                  attributeOp === 'in'
+                    ? t('admin.featureFlagRule.valueListPlaceholder')
+                    : t('admin.featureFlagRule.valuePlaceholder')
+                "
+              />
+            </mat-form-field>
+          </div>
+        }
+      }
+    </div>
+  </div>
+
+  <button
+    matIconButton
+    type="button"
+    class="rule-remove app-btn-danger"
+    (click)="emitRemove()"
+    [attr.aria-label]="t('admin.featureFlagRule.remove')"
+  >
+    <mat-icon>delete</mat-icon>
+  </button>
+</div>
