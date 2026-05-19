@@ -30,6 +30,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MetricsModule } from './metrics/metrics.module';
 import { HttpMetricsInterceptor } from './interceptors/http-metrics.interceptor';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
 
 @Module({})
 export class CoreModule implements NestModule {
@@ -168,7 +169,8 @@ export class CoreModule implements NestModule {
         AuthModule,
         UsersModule,
         HealthModule,
-        NotificationsModule
+        NotificationsModule,
+        FeatureFlagsModule
       ],
       providers: [
         {

@@ -144,6 +144,20 @@ src/
 │   ├── notifications.service.ts    # Manages Map<userId, Map<connectionId, Subject>> — push(userId), pushToAll()
 │   ├── notifications.listener.ts   # @OnEvent() handlers: UserDeleted/PasswordChanged/Created/Updated/Restored/RoleChanged → push
 │   └── notifications.controller.ts # GET /stream — @Sse() returns Observable<MessageEvent> merged with 30s heartbeat
+├── feature-flags/
+│   ├── feature-flags.module.ts        # TypeOrmModule.forFeature([FeatureFlag, FeatureFlagRule]); registers AnonIdMiddleware globally via configure()
+│   ├── entities/                       # FeatureFlag + FeatureFlagRule (cascade) with entity-contract files
+│   ├── services/feature-flag.service.ts          # CRUD + optimistic-lock 409 on PATCH (If-Match); replaceRules in single tx
+│   ├── services/feature-flag-resolver.service.ts # Cached evaluation; per-user keys suffixed with featureflags:version counter so flag changes orphan all per-user entries without Redis SCAN
+│   ├── services/attribute-registry.service.ts    # Extensibility seam — registerAttribute(key, resolver) from other modules' onModuleInit
+│   ├── controllers/feature-flags-admin.controller.ts # 7 admin endpoints under /admin/feature-flags; @Authorize(['manage','FeatureFlag']) + @LogAudit
+│   ├── controllers/feature-flags.controller.ts       # GET /feature-flags — @Public(); authenticated → all flags; anon → public flags only
+│   ├── decorators/require-feature.decorator.ts       # @RequireFeature('key') convenience — RBAC remains the real gate
+│   ├── guards/feature-flag.guard.ts                  # Returns 404 (anti-enumeration) when the named flag is disabled for the caller
+│   ├── middleware/anon-id.middleware.ts              # Issues nxs_anon_id cookie (SameSite=Lax, Secure in prod, 1yr, httpOnly=false) on first request
+│   ├── events/feature-flag-changed.event.ts          # { flagKey, changeType: 'created'|'updated'|'deleted'|'toggled'|'rules-replaced' }
+│   ├── listeners/feature-flag-changed.listener.ts    # Invalidates cache + bumps version + pushToAll SSE on FeatureFlagChangedEvent; per-user invalidation on UserRoleChangedEvent / UserDeletedEvent
+│   └── utils/validate-rule-payload.util.ts           # Discriminated payload validation per rule type; rejects custom attribute keys not in the registry
 └── users/
     ├── controllers/        # UsersController (CRUD + search, all endpoints use @Authorize([action, 'User']))
     ├── services/           # UsersService
@@ -541,7 +555,52 @@ Base URL: `/api/v1`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/stream` | Bearer | SSE stream — pushes `session_invalidated`, `permissions_updated`, and `user_crud_events` events |
+| GET | `/stream` | Bearer | SSE stream — pushes `session_invalidated`, `permissions_updated`, `user_crud_events`, and `feature_flags_updated` events |
+
+### Feature Flags (`/api/v1`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/feature-flags` | Optional | Evaluated flags for the caller. Authenticated → all flags; anonymous → flags with `public: true`. Returns `{ flags: Record<string, boolean>, evaluatedAt: string }`. Sets `nxs_anon_id` cookie on first request |
+| GET | `/admin/feature-flags` | `manage:FeatureFlag` | List all flags with their rules |
+| GET | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Get a flag by ID |
+| POST | `/admin/feature-flags` | `manage:FeatureFlag` | Create a flag (audited as `FEATURE_FLAG_CREATE`) |
+| PATCH | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Update a flag. **Requires `If-Match: <version>` header**; HTTP 409 (`errorKey: errors.featureFlags.versionConflict`) on mismatch; HTTP 428 (`errors.featureFlags.ifMatchRequired`) when missing |
+| DELETE | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Cascade-delete a flag (audited as `FEATURE_FLAG_DELETE`) |
+| PUT | `/admin/feature-flags/:id/rules` | `manage:FeatureFlag` | Replace the full rule set in one transaction (audited as `FEATURE_FLAG_RULES_REPLACE`) |
+| POST | `/admin/feature-flags/:id/toggle` | `manage:FeatureFlag` | Flip `enabled` and increment version (audited as `FEATURE_FLAG_TOGGLE`) |
+
+**Caching:**
+- `featureflags:all` — full flag/rule set, TTL 300 s
+- `featureflags:version` — monotonic counter, bumped on any change; appended to per-user keys so old entries orphan naturally
+- `featureflags:user:<userId>:v<version>` — evaluated map, TTL 60 s. Anonymous callers are not cached
+
+**Real-time updates:** `FeatureFlagChangedListener` broadcasts `{ type: 'feature_flags_updated' }` over SSE on flag change. `UserRoleChangedEvent` and `UserDeletedEvent` invalidate just the affected user's cache. Cross-module communication via `EventEmitter2`, not `forwardRef`.
+
+**Anonymous bucketing:** `AnonIdMiddleware` issues the `nxs_anon_id` cookie on first request to any route (`SameSite=Lax`, `Secure` in production, 1-year `maxAge`, `httpOnly: false`). The cookie value seeds the percentage-bucket hash so a 10 % rollout of a public flag converges on the same 10 % of anonymous browsers across reloads.
+
+**`@RequireFeature('key')` decorator** (convenience):
+```ts
+@Get('/beta')
+@RequireFeature('new-dashboard')
+@Authorize(['read', 'Dashboard'])  // RBAC remains the real gate
+getBetaDashboard() { ... }
+```
+`FeatureFlagGuard` returns HTTP 404 (anti-enumeration) when the flag is disabled for the caller. **Never use as the sole authorization gate.**
+
+**Extending the attribute registry** for non-user-bound targeting (tenant, organization, region, subscription tier, ...):
+```ts
+@Injectable()
+export class TenantModule implements OnModuleInit {
+  constructor(private readonly registry: AttributeRegistryService) {}
+  onModuleInit() {
+    this.registry.registerAttribute('tenantId', (user, req) =>
+      (req.headers['x-tenant-id'] as string) ?? null
+    );
+  }
+}
+```
+Admin UIs can then write rules referencing `{ field: 'custom', customKey: 'tenantId', op: 'in', value: ['acme', 'globex'] }`. The write-time validator rejects any `customKey` not registered.
 
 ### Users (`/api/v1/users`)
 
