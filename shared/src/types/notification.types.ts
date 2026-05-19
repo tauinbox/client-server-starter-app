@@ -5,4 +5,5 @@ export type NotificationEvent =
       type: 'user_crud_events';
       action: 'created' | 'updated' | 'deleted' | 'restored';
       userId: string;
-    };
+    }
+  | { type: 'feature_flags_updated' };

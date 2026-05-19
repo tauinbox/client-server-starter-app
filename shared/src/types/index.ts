@@ -41,3 +41,14 @@ export type {
 } from './rbac.types';
 
 export type { NotificationEvent } from './notification.types';
+
+export type {
+  FeatureFlagRuleType,
+  FeatureFlagRuleEffect,
+  FeatureFlagAttributeField,
+  FeatureFlagAttributeOp,
+  FeatureFlagRulePayload,
+  FeatureFlagRuleResponse,
+  FeatureFlagResponse,
+  EvaluatedFeatureFlagsResponse
+} from './feature-flag.types';
