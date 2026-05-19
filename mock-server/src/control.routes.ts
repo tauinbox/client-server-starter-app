@@ -38,7 +38,9 @@ function buildStateSnapshot(state: State): StateSnapshot {
     rolePermissions: state.rolePermissions,
     auditLogs: state.auditLogs,
     captchaConfig: state.captchaConfig,
-    captchaAttempts: state.captchaAttempts.size
+    captchaAttempts: state.captchaAttempts.size,
+    featureFlags: Array.from(state.featureFlags.values()),
+    featureFlagRules: state.featureFlagRules
   };
 }
 
