@@ -15,6 +15,18 @@ import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AuthApiEnum } from '@features/auth/constants/auth-api.const';
 
+function parseRetryAfterSeconds(value: string | null): number | null {
+  if (!value) return null;
+  const asInt = Number.parseInt(value, 10);
+  if (Number.isFinite(asInt) && asInt > 0) return asInt;
+  const asDate = Date.parse(value);
+  if (Number.isFinite(asDate)) {
+    const diff = Math.ceil((asDate - Date.now()) / 1000);
+    return diff > 0 ? diff : null;
+  }
+  return null;
+}
+
 export const errorInterceptor: HttpInterceptorFn = (
   request: HttpRequest<unknown>,
   next: HttpHandlerFn
@@ -71,7 +83,23 @@ export const errorInterceptor: HttpInterceptorFn = (
 
       // 401 is handled by jwt interceptor (token refresh / logout)
       if (error.status !== 401 && !silentMode) {
-        notify.error(error);
+        if (error.status === 429) {
+          // Server's ThrottlerException payload has no errorKey/translated
+          // message; show a friendly localized one and surface the
+          // Retry-After header when present.
+          const retryAfter = parseRetryAfterSeconds(
+            error.headers?.get('Retry-After')
+          );
+          if (retryAfter !== null) {
+            notify.warn('errors.general.tooManyRequestsRetry', {
+              seconds: retryAfter
+            });
+          } else {
+            notify.warn('errors.general.tooManyRequests');
+          }
+        } else {
+          notify.error(error);
+        }
       }
 
       return throwError(() => error);

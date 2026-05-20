@@ -137,7 +137,9 @@
     },
     "general": {
       "resourceNotFound": "The requested resource was not found",
-      "internalServerError": "Internal server error"
+      "internalServerError": "Internal server error",
+      "tooManyRequests": "Too many requests. Please slow down and try again.",
+      "tooManyRequestsRetry": "Too many requests. Please try again in {{ seconds }} s."
     }
   }
 }
