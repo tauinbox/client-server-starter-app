@@ -2,9 +2,12 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { of } from 'rxjs';
 import type { FeatureFlagRuleResponse } from '@app/shared/types';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
+import { RoleService } from '../../../services/role.service';
+import { UserService } from '../../../../users/services/user.service';
 import type { FeatureFlagFormDialogResult } from './feature-flag-form-dialog.component';
 import { FeatureFlagFormDialogComponent } from './feature-flag-form-dialog.component';
 
@@ -30,6 +33,15 @@ describe('FeatureFlagFormDialogComponent', () => {
         {
           provide: KeyboardShortcutsService,
           useValue: { registerSave: vi.fn(() => () => undefined) }
+        },
+        { provide: RoleService, useValue: { getAll: vi.fn(() => of([])) } },
+        {
+          provide: UserService,
+          useValue: {
+            searchCursor: vi.fn(() =>
+              of({ data: [], meta: { nextCursor: null } })
+            )
+          }
         }
       ]
     }).compileComponents();
@@ -46,16 +58,17 @@ describe('FeatureFlagFormDialogComponent', () => {
     expect(title).toContain('Create');
     expect(fixture.componentInstance.model().key).toBe('');
     expect(fixture.componentInstance.enabled()).toBe(false);
+    expect(fixture.componentInstance.environments()).toEqual([]);
   });
 
-  it('opens in edit mode and hydrates rules from the flag', async () => {
+  it('opens in edit mode and hydrates environments + rules from the flag', async () => {
     const fixture = await setup({
       flag: {
         id: 'flag-1',
         key: 'new-dashboard',
         description: 'rollout',
         enabled: true,
-        environments: ['production'],
+        environments: ['production', 'staging'],
         public: false,
         version: 3,
         updatedByUserId: null,
@@ -79,8 +92,21 @@ describe('FeatureFlagFormDialogComponent', () => {
     expect(title).toContain('Edit');
     expect(fixture.componentInstance.model().key).toBe('new-dashboard');
     expect(fixture.componentInstance.enabled()).toBe(true);
+    expect(
+      fixture.componentInstance.environments().map((c) => c.value)
+    ).toEqual(['production', 'staging']);
     expect(fixture.componentInstance.rules().length).toBe(1);
     expect(fixture.componentInstance.rules()[0].type).toBe('percentage');
+  });
+
+  it('environmentOptions merges baseline suggestions with knownEnvironments', async () => {
+    const fixture = await setup({
+      knownEnvironments: ['qa', 'production']
+    });
+    const opts = fixture.componentInstance['environmentOptions']().map(
+      (c) => c.value
+    );
+    expect(opts).toEqual(['development', 'production', 'qa', 'staging'].sort());
   });
 
   it('addRule + removeRule mutate the rules signal', async () => {
@@ -94,31 +120,18 @@ describe('FeatureFlagFormDialogComponent', () => {
     expect(cmp.rules().length).toBe(1);
   });
 
-  it('submit serialises rules in render order', async () => {
+  it('submit serialises environments as a string array (not CSV)', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
-    cmp.model.set({
-      key: 'new-dashboard',
-      description: '',
-      environments: ''
-    });
-    cmp.addRule();
-    cmp.addRule();
+    cmp.model.set({ key: 'new-dashboard', description: '' });
+    cmp.environments.set([
+      { value: 'production', label: 'production' },
+      { value: 'staging', label: 'staging' }
+    ]);
     cmp.submit();
     expect(closeSpy).toHaveBeenCalledTimes(1);
     const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
-    expect(result.rules).toEqual([
-      {
-        effect: 'include',
-        type: 'percentage',
-        payload: { type: 'percentage', percent: 0 }
-      },
-      {
-        effect: 'include',
-        type: 'percentage',
-        payload: { type: 'percentage', percent: 0 }
-      }
-    ]);
+    expect(result.flag.environments).toEqual(['production', 'staging']);
   });
 
   it('renders rules without drag handles', async () => {
@@ -134,28 +147,20 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('submit() closes with the form result when the form is valid', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
-    cmp.model.set({
-      key: 'new-dashboard',
-      description: 'rollout',
-      environments: 'production, staging'
-    });
+    cmp.model.set({ key: 'new-dashboard', description: 'rollout' });
     cmp.onEnabledChange(true);
     cmp.submit();
     expect(closeSpy).toHaveBeenCalledTimes(1);
     const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
     expect(result.flag.key).toBe('new-dashboard');
     expect(result.flag.enabled).toBe(true);
-    expect(result.flag.environments).toEqual(['production', 'staging']);
+    expect(result.flag.environments).toEqual([]);
   });
 
   it('submit() is a no-op when the key fails validation', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
-    cmp.model.set({
-      key: 'INVALID_KEY',
-      description: '',
-      environments: ''
-    });
+    cmp.model.set({ key: 'INVALID_KEY', description: '' });
     cmp.submit();
     expect(closeSpy).not.toHaveBeenCalled();
   });

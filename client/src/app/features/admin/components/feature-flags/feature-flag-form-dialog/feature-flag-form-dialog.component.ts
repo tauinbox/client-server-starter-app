@@ -29,11 +29,19 @@ import type {
 import type { FeatureFlagResponse } from '@app/shared/types';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import type { ChipOption } from '@shared/forms';
+import { ChipsAutocompleteComponent } from '@shared/forms';
 import type { FeatureFlagRuleDraft } from '../feature-flag-rule-row/feature-flag-rule-row.component';
 import { FeatureFlagRuleRowComponent } from '../feature-flag-rule-row/feature-flag-rule-row.component';
 
 export type FeatureFlagFormDialogData = {
   flag?: FeatureFlagResponse;
+  /**
+   * Environment names already used by other flags in the list. The dialog merges
+   * these with a baseline (`development`, `staging`, `production`) to feed the
+   * Environments chip-autocomplete suggestions; free-text Enter still works.
+   */
+  knownEnvironments?: string[];
 };
 
 export type FeatureFlagFormDialogResult = {
@@ -45,10 +53,14 @@ export type FeatureFlagFormDialogResult = {
 type FlagFormData = {
   key: string;
   description: string;
-  environments: string;
 };
 
 const KEY_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+const BASELINE_ENVIRONMENTS = ['development', 'staging', 'production'];
+
+function envToChip(name: string): ChipOption {
+  return { value: name, label: name };
+}
 
 @Component({
   selector: 'nxs-feature-flag-form-dialog',
@@ -59,6 +71,7 @@ const KEY_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
     MatIcon,
     TranslocoDirective,
     AppFormFieldComponent,
+    ChipsAutocompleteComponent,
     FeatureFlagRuleRowComponent
   ],
   templateUrl: './feature-flag-form-dialog.component.html',
@@ -78,12 +91,23 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
 
   readonly model = signal<FlagFormData>({
     key: this.data.flag?.key ?? '',
-    description: this.data.flag?.description ?? '',
-    environments: (this.data.flag?.environments ?? []).join(', ')
+    description: this.data.flag?.description ?? ''
   });
 
   readonly enabled = signal(this.data.flag?.enabled ?? false);
   readonly isPublic = signal(this.data.flag?.public ?? false);
+
+  readonly environments = signal<ChipOption[]>(
+    (this.data.flag?.environments ?? []).map(envToChip)
+  );
+
+  protected readonly environmentOptions = computed<ChipOption[]>(() => {
+    const merged = new Set<string>([
+      ...BASELINE_ENVIRONMENTS,
+      ...(this.data.knownEnvironments ?? [])
+    ]);
+    return Array.from(merged).sort().map(envToChip);
+  });
 
   readonly rules = signal<FeatureFlagRuleDraft[]>(
     (this.data.flag?.rules ?? []).map((r) => ({
@@ -101,10 +125,6 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
     pattern(path.key, KEY_PATTERN);
     maxLength(path.description, 500);
   });
-
-  protected readonly rulesSnapshot = computed(() =>
-    JSON.stringify(this.rules())
-  );
 
   ngOnInit(): void {
     this.#cleanupSave = this.#shortcuts.registerSave(
@@ -124,6 +144,10 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
 
   onPublicChange(checked: boolean): void {
     this.isPublic.set(checked);
+  }
+
+  onEnvironmentsChange(next: ChipOption[]): void {
+    this.environments.set(next);
   }
 
   addRule(): void {
@@ -151,16 +175,12 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   submit(): void {
     if (this.flagForm().invalid()) return;
     const formData = this.model();
-    const environments = formData.environments
-      .split(',')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
     const result: FeatureFlagFormDialogResult = {
       flag: {
         key: formData.key.trim(),
         description: formData.description.trim() || null,
         enabled: this.enabled(),
-        environments,
+        environments: this.environments().map((c) => c.value),
         public: this.isPublic()
       },
       rules: this.rules().map((r) => ({

@@ -1,0 +1,21 @@
+@use '../../../../styles/abstracts/variables' as vars;
+
+:host {
+  display: block;
+  margin-bottom: vars.$space-form-row-gap;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.chip-opt-sub {
+  margin-left: vars.$spacing-xs;
+  font-size: var(--mat-sys-body-small-size);
+  color: var(--mat-sys-on-surface-variant);
+
+  &::before {
+    margin-right: vars.$spacing-xs;
+    content: '—';
+  }
+}

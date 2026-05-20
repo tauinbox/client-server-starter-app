@@ -67,8 +67,8 @@ src/app/
 │       │       └── action-form-dialog/  # ActionFormDialogComponent — create/edit action with name pattern validation
 │       │   └── feature-flags/
 │       │       ├── feature-flag-list/        # FeatureFlagListComponent — mat-table desktop / card-list handset (via LayoutService.isHandset()), per-row toggle/edit/delete, mat-fab on handset
-│       │       ├── feature-flag-form-dialog/ # FeatureFlagFormDialogComponent — top form (key, description, environments, enabled, public) + embedded rules editor; uses Wide dialog size on desktop, .app-dialog-fullscreen-mobile panelClass on handset
-│       │       └── feature-flag-rule-row/    # FeatureFlagRuleRowComponent — single rule editor, payload editor per type (user/role IDs CSV, percentage slider+input, attribute field+op+value+customKey), .vertical class on handset
+│       │       ├── feature-flag-form-dialog/ # FeatureFlagFormDialogComponent — top form (key, description, environments chip-grid, enabled, public) + embedded rules editor; uses Wide dialog size on desktop, .app-dialog-fullscreen-mobile panelClass on handset
+│       │       └── feature-flag-rule-row/    # FeatureFlagRuleRowComponent — single rule editor, payload editor per type (user chip+autocomplete via UserService.searchCursor with 250 ms debounce, role chip+autocomplete from RoleService.getAll(), percentage slider+input, attribute field+op+value+customKey with chips for op=in), .vertical class on handset
 │       ├── services/       # RoleService (HTTP → /api/v1/roles), RbacAdminService (HTTP → /api/v1/rbac/*), FeatureFlagsAdminService (HTTP → /api/v1/admin/feature-flags/*; If-Match version on PATCH)
 │       └── store/          # RolesStore (route-level), ResourcesStore (route-level: resources, actions, loading), FeatureFlagsAdminStore (route-level: signalStore + withEntities<FeatureFlagResponse>)
 └── shared/
@@ -78,7 +78,7 @@ src/app/
     │   ├── password-strength/         # PasswordStrengthComponent — 4-bar meter + aria-live label, score 0..4 mapped to PASSWORD_REGEX rules; used in register, profile, reset-password
     │   ├── password-toggle/           # PasswordToggleComponent (reusable password visibility toggle)
     │   └── captcha-widget/            # CaptchaWidgetComponent — Cloudflare Turnstile soft-trigger widget (renders only when register/forgot-password backend returns CAPTCHA_REQUIRED, fed by CaptchaService config + lazy script loader)
-    ├── forms/              # AppFormFieldComponent (Signal Forms wrapper), AriaErrorDirective, DEFAULT_ERROR_KEYS registry
+    ├── forms/              # AppFormFieldComponent (Signal Forms wrapper), ChipsAutocompleteComponent (mat-chip-grid + mat-autocomplete: free-text mode or static/async option lists), AriaErrorDirective, DEFAULT_ERROR_KEYS registry
     ├── models/             # user.types
     ├── services/           # AdaptiveDialogService — opens confirm dialogs as bottom sheets (handset) or dialogs (desktop)
     └── utils/              # css.utils, dialog.utils (DialogSize enum + dialogSizeConfig())

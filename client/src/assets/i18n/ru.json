@@ -66,6 +66,9 @@
       "passwordWeak": "Пароль слишком слабый",
       "passwordMismatch": "Пароли не совпадают",
       "unknown": "Поле заполнено некорректно"
+    },
+    "chips": {
+      "removeChip": "Удалить {{ label }}"
     }
   },
   "passwordStrength": {

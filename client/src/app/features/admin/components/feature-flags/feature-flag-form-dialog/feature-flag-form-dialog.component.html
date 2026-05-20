@@ -19,9 +19,14 @@
           label="admin.featureFlagForm.descriptionLabel"
           type="textarea"
         />
-        <nxs-form-field
-          [field]="flagForm.environments"
+        <nxs-chips-autocomplete
+          [selected]="environments()"
+          [options]="environmentOptions()"
+          [allowFreeText]="true"
           label="admin.featureFlagForm.environmentsLabel"
+          placeholder="admin.featureFlagForm.environmentsPlaceholder"
+          ariaLabel="admin.featureFlagForm.environmentsLabel"
+          (selectedChange)="onEnvironmentsChange($event)"
         />
         <div class="toggles">
           <mat-checkbox
