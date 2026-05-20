@@ -18,7 +18,7 @@ import { MatOption } from '@angular/material/core';
 import { MatSelect } from '@angular/material/select';
 import { MatSlider, MatSliderThumb } from '@angular/material/slider';
 import { TranslocoDirective } from '@jsverse/transloco';
-import { forkJoin, of, Subject } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import {
   debounceTime,
   distinctUntilChanged,
@@ -230,33 +230,16 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   #searchUsers(term: string) {
     const trimmed = term.trim();
     if (trimmed.length < USER_SEARCH_MIN_CHARS) return of([] as User[]);
-    const params = {
-      limit: USER_SEARCH_LIMIT,
-      sortBy: 'createdAt',
-      sortOrder: 'desc'
-    } as const;
-    // Server combines criteria with AND — send the term against email when
-    // it looks like one, otherwise probe first and last name in parallel and
-    // dedupe so the admin only has to know one piece of identifying info.
-    if (trimmed.includes('@')) {
-      return this.#userService
-        .searchCursor({ email: trimmed }, params)
-        .pipe(map((r) => r.data));
-    }
-    return forkJoin([
-      this.#userService
-        .searchCursor({ firstName: trimmed }, params)
-        .pipe(map((r) => r.data)),
-      this.#userService
-        .searchCursor({ lastName: trimmed }, params)
-        .pipe(map((r) => r.data))
-    ]).pipe(
-      map(([a, b]) => {
-        const dedup = new Map<string, User>();
-        for (const u of [...a, ...b]) dedup.set(u.id, u);
-        return Array.from(dedup.values()).slice(0, USER_SEARCH_LIMIT);
-      })
-    );
+    return this.#userService
+      .searchCursor(
+        { q: trimmed },
+        {
+          limit: USER_SEARCH_LIMIT,
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        }
+      )
+      .pipe(map((r) => r.data));
   }
 
   onTypeChange(type: FeatureFlagRuleType): void {
