@@ -21,6 +21,7 @@ import {
 import { Request as ExpressRequest, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { Throttle } from '@nestjs/throttler';
 import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
 import { GoogleOAuthGuard } from '../guards/google-oauth.guard';
@@ -242,6 +243,7 @@ export class OAuthController {
   // --- Common callback handler ---
 
   @Public()
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Post('exchange')
   @ApiOperation({ summary: 'Exchange OAuth data cookie for auth response' })
   @ApiOkResponse({ description: 'Auth response from OAuth login' })

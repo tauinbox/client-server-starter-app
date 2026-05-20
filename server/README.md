@@ -263,6 +263,35 @@ any source, which lets clients spoof their IP.
 See the Express [trust proxy docs](https://expressjs.com/en/guide/behind-proxies.html)
 for the full syntax.
 
+## Rate limiting
+
+Configured in `CoreModule` via `@nestjs/throttler`. Two throttlers run in parallel:
+
+| Throttler | Window | Limit | Notes |
+|-----------|--------|-------|-------|
+| `default` (unnamed) | 60 s | 120 req/IP | SPA-wide soft ceiling. Per-route `@Throttle({ default: { ttl, limit } })` decorators override this on sensitive endpoints. |
+| `login-long-window` | 15 min (`LOCKOUT_DURATION_MS`) | 4 999 (`MAX_FAILED_ATTEMPTS * 1000`) | Effectively disabled globally; tightened to `MAX_FAILED_ATTEMPTS - 1` on `/auth/login` so an IP cannot accumulate enough failed attempts to trip the account-lockout protection (SEC-6). |
+
+When `REDIS_URL` is set the throttler uses `RedisThrottlerStorage` so counters are shared across all instances; otherwise it falls back to the in-process memory store (single-instance only).
+
+Per-route overrides currently in use:
+
+| Endpoint | Window | Limit | Why |
+|----------|--------|-------|-----|
+| `POST /auth/register` | 1 h | 5 | Account creation flood control. CAPTCHA soft-trigger kicks in near the limit. |
+| `POST /auth/login` | 1 min | 3 (default) + `login-long-window` | Brute-force credentials + lockout protection. |
+| `POST /auth/refresh-token` | 1 min | 5 | Bound to a real session — abuse would mean stolen cookies. |
+| `POST /auth/profile/email/initiate` | 1 h | 3 | Confirmation email cost + enumeration mitigation. |
+| `POST /auth/profile/email/confirm` | 1 min | 10 | Token brute-force defense in depth (token entropy already infeasible). |
+| `POST /auth/verify-email` | 1 min | 10 | Same. |
+| `POST /auth/resend-verification` | 1 min | 3 | Email cost. |
+| `POST /auth/forgot-password` | 5 min | 2 | Email cost + enumeration mitigation. CAPTCHA soft-trigger near the limit. |
+| `POST /auth/reset-password` | 1 min | 10 | Token brute-force defense in depth. |
+| `POST /auth/oauth/exchange` | 1 min | 10 | State-token-bound; tight enough to neutralise replay attempts. |
+| `GET /rbac/metadata` | 1 min | 30 | Bumped because every admin route guard reads it. |
+
+When a request is rejected the response is the standard `429` with `{ statusCode, message, error, timestamp, path }`.
+
 ## Enabling CAPTCHA in production
 
 CAPTCHA on `/register` and `/forgot-password` is **disabled by default**. After
@@ -508,7 +537,7 @@ Base URL: `/api/v1`
 | GET | `/permissions` | Bearer | Get current user's resolved permissions |
 | POST | `/verify-email` | None | Verify email address using token |
 | POST | `/resend-verification` | None | Resend email verification (3/min) |
-| POST | `/forgot-password` | None | Request password reset email (3/min); CAPTCHA token required when near rate limit |
+| POST | `/forgot-password` | None | Request password reset email (2 per 5 min); CAPTCHA token required when near rate limit |
 | POST | `/reset-password` | None | Reset password using token |
 | GET | `/captcha-config` | None | Public CAPTCHA configuration (provider, site key, enabled flag) |
 
