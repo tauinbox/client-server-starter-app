@@ -653,7 +653,7 @@ adminRouter.put('/:id/rules', (req, res) => {
     state.featureFlagRules.push(rule);
   }
   flag.version += 1;
-  flag.updatedAt = now;
+  flag.updatedAt = updatedAt;
   flag.updatedByUserId = actorIdFromReq(req);
   logAudit('FEATURE_FLAG_RULES_REPLACE', {
     actorId: actorIdFromReq(req),
