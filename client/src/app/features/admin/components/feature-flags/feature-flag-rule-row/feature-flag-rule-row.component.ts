@@ -67,8 +67,8 @@ const ATTRIBUTE_OPS: FeatureFlagAttributeOp[] = [
   'after'
 ];
 
-const USER_SEARCH_DEBOUNCE_MS = 250;
-const USER_SEARCH_MIN_CHARS = 2;
+const USER_SEARCH_DEBOUNCE_MS = 350;
+const USER_SEARCH_MIN_CHARS = 3;
 const USER_SEARCH_LIMIT = 10;
 
 function userToChip(user: User): ChipOption {
@@ -77,6 +77,15 @@ function userToChip(user: User): ChipOption {
     label: `${user.firstName} ${user.lastName}`.trim() || user.email,
     sub: user.email
   };
+}
+
+function userMatchesTerm(user: User, lowered: string): boolean {
+  return (
+    user.email.toLowerCase().includes(lowered) ||
+    user.firstName.toLowerCase().includes(lowered) ||
+    user.lastName.toLowerCase().includes(lowered) ||
+    user.id.toLowerCase().includes(lowered)
+  );
 }
 
 @Component({
@@ -227,9 +236,42 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
     this.#userSearch$.complete();
   }
 
+  // Last completed server response — used to skip the network when the new
+  // term is a (case-insensitive) extension of the previous one AND the
+  // previous response was the full result set (length < page size). In that
+  // case the previous results are a strict superset of the new ones, so
+  // local filtering is exact.
+  #lastSearch: {
+    term: string;
+    results: User[];
+    isComplete: boolean;
+  } | null = null;
+
   #searchUsers(term: string) {
     const trimmed = term.trim();
-    if (trimmed.length < USER_SEARCH_MIN_CHARS) return of([] as User[]);
+    if (trimmed.length < USER_SEARCH_MIN_CHARS) {
+      this.#lastSearch = null;
+      return of([] as User[]);
+    }
+
+    const lowered = trimmed.toLowerCase();
+    const prev = this.#lastSearch;
+    if (
+      prev &&
+      prev.isComplete &&
+      lowered.startsWith(prev.term.toLowerCase())
+    ) {
+      const filtered = prev.results.filter((u) => userMatchesTerm(u, lowered));
+      // Refresh the cache anchor so successive narrowings keep working
+      // without ever hitting the network.
+      this.#lastSearch = {
+        term: trimmed,
+        results: filtered,
+        isComplete: true
+      };
+      return of(filtered);
+    }
+
     return this.#userService
       .searchCursor(
         { q: trimmed },
@@ -239,7 +281,16 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
           sortOrder: 'desc'
         }
       )
-      .pipe(map((r) => r.data));
+      .pipe(
+        map((r) => {
+          this.#lastSearch = {
+            term: trimmed,
+            results: r.data,
+            isComplete: r.data.length < USER_SEARCH_LIMIT
+          };
+          return r.data;
+        })
+      );
   }
 
   onTypeChange(type: FeatureFlagRuleType): void {

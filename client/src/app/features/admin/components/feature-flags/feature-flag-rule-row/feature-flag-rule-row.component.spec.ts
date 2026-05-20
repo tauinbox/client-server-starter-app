@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { RoleService } from '../../../services/role.service';
 import { UserService } from '../../../../users/services/user.service';
+import type { User } from '../../../../users/models/user.types';
 import type { FeatureFlagRuleDraft } from './feature-flag-rule-row.component';
 import { FeatureFlagRuleRowComponent } from './feature-flag-rule-row.component';
 
@@ -53,7 +54,9 @@ const roleServiceStub = {
 };
 
 const userServiceStub = {
-  searchCursor: vi.fn(() => of({ data: [], meta: { nextCursor: null } }))
+  searchCursor: vi.fn(() =>
+    of({ data: [] as User[], meta: { nextCursor: null as string | null } })
+  )
 };
 
 describe('FeatureFlagRuleRowComponent', () => {
@@ -219,14 +222,14 @@ describe('FeatureFlagRuleRowComponent', () => {
       const cmp = fixture.debugElement.children[0]
         .componentInstance as FeatureFlagRuleRowComponent;
 
-      cmp.onUserSearchTerm('us');
       cmp.onUserSearchTerm('use');
       cmp.onUserSearchTerm('user');
-      vi.advanceTimersByTime(300);
+      cmp.onUserSearchTerm('users');
+      vi.advanceTimersByTime(400);
 
       expect(userServiceStub.searchCursor).toHaveBeenCalledTimes(1);
       expect(userServiceStub.searchCursor).toHaveBeenCalledWith(
-        { q: 'user' },
+        { q: 'users' },
         expect.objectContaining({
           limit: 10,
           sortBy: 'createdAt',
@@ -251,10 +254,69 @@ describe('FeatureFlagRuleRowComponent', () => {
       const cmp = fixture.debugElement.children[0]
         .componentInstance as FeatureFlagRuleRowComponent;
 
-      cmp.onUserSearchTerm('a');
-      vi.advanceTimersByTime(300);
+      cmp.onUserSearchTerm('ab');
+      vi.advanceTimersByTime(400);
 
       expect(userServiceStub.searchCursor).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('skips the network when narrowing within a complete previous result set', async () => {
+    vi.useFakeTimers();
+    try {
+      const alice: User = {
+        id: '11111111-1111-1111-1111-111111111111',
+        email: 'alice@example.com',
+        firstName: 'Alice',
+        lastName: 'Wonder',
+        isActive: true,
+        roles: [],
+        isEmailVerified: true,
+        createdAt: '',
+        updatedAt: '',
+        deletedAt: null
+      };
+      const bob: User = {
+        id: '22222222-2222-2222-2222-222222222222',
+        email: 'bob@example.com',
+        firstName: 'Bob',
+        lastName: 'Marley',
+        isActive: true,
+        roles: [],
+        isEmailVerified: true,
+        createdAt: '',
+        updatedAt: '',
+        deletedAt: null
+      };
+      userServiceStub.searchCursor.mockReturnValueOnce(
+        of({ data: [alice, bob], meta: { nextCursor: null } })
+      );
+
+      const fixture = TestBed.createComponent(HostComponent);
+      fixture.componentInstance.rule.set({
+        effect: 'include',
+        type: 'user',
+        payload: { type: 'user', userIds: [] }
+      });
+      fixture.detectChanges();
+      const cmp = fixture.debugElement.children[0]
+        .componentInstance as FeatureFlagRuleRowComponent;
+
+      cmp.onUserSearchTerm('ali');
+      vi.advanceTimersByTime(400);
+      expect(userServiceStub.searchCursor).toHaveBeenCalledTimes(1);
+
+      cmp.onUserSearchTerm('alic');
+      vi.advanceTimersByTime(400);
+      cmp.onUserSearchTerm('alice');
+      vi.advanceTimersByTime(400);
+
+      // Narrowing within the cached complete result set must NOT hit
+      // the network — prevents the throttler-triggering request burst
+      // that occurred before the prefix-cache existed.
+      expect(userServiceStub.searchCursor).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }

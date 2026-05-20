@@ -137,7 +137,9 @@
     },
     "general": {
       "resourceNotFound": "Запрашиваемый ресурс не найден",
-      "internalServerError": "Внутренняя ошибка сервера"
+      "internalServerError": "Внутренняя ошибка сервера",
+      "tooManyRequests": "Слишком много запросов. Подождите немного и попробуйте снова.",
+      "tooManyRequestsRetry": "Слишком много запросов. Повторите через {{ seconds }} с."
     }
   }
 }

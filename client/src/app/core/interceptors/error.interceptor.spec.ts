@@ -129,6 +129,63 @@ describe('errorInterceptor', () => {
     expect(notifyMock.error).toHaveBeenCalledTimes(1);
   });
 
+  describe('429 throttled requests', () => {
+    it('shows a friendly warn message without Retry-After', () => {
+      http.get('/api/test').subscribe({ error: vi.fn() });
+
+      httpMock
+        .expectOne('/api/test')
+        .flush(
+          { message: 'ThrottlerException: Too Many Requests' },
+          { status: 429, statusText: 'Too Many Requests' }
+        );
+
+      expect(notifyMock.error).not.toHaveBeenCalled();
+      expect(notifyMock.warn).toHaveBeenCalledTimes(1);
+      expect(notifyMock.warn).toHaveBeenCalledWith(
+        'errors.general.tooManyRequests'
+      );
+    });
+
+    it('passes Retry-After seconds to the localized message', () => {
+      http.get('/api/test').subscribe({ error: vi.fn() });
+
+      httpMock.expectOne('/api/test').flush(
+        { message: 'ThrottlerException: Too Many Requests' },
+        {
+          status: 429,
+          statusText: 'Too Many Requests',
+          headers: { 'Retry-After': '42' }
+        }
+      );
+
+      expect(notifyMock.warn).toHaveBeenCalledTimes(1);
+      expect(notifyMock.warn).toHaveBeenCalledWith(
+        'errors.general.tooManyRequestsRetry',
+        { seconds: 42 }
+      );
+    });
+
+    it('honors the silent context for 429', () => {
+      const context = new HttpContext().set(
+        DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN,
+        true
+      );
+
+      http.get('/api/test', { context }).subscribe({ error: vi.fn() });
+
+      httpMock
+        .expectOne('/api/test')
+        .flush(
+          { message: 'ThrottlerException: Too Many Requests' },
+          { status: 429, statusText: 'Too Many Requests' }
+        );
+
+      expect(notifyMock.warn).not.toHaveBeenCalled();
+      expect(notifyMock.error).not.toHaveBeenCalled();
+    });
+  });
+
   it('should notify on network errors (no error body)', () => {
     http.get('/api/test').subscribe({ error: vi.fn() });
 
