@@ -1,6 +1,6 @@
 <div class="rule-row" *transloco="let t; scope: 'admin'">
   <div class="rule-fields" [class.vertical]="layout.isHandset()">
-    <mat-form-field class="rule-effect">
+    <mat-form-field class="rule-effect" subscriptSizing="dynamic">
       <mat-label>{{ t('admin.featureFlagRule.effect') }}</mat-label>
       <mat-select
         [value]="rule().effect"
@@ -14,7 +14,7 @@
       </mat-select>
     </mat-form-field>
 
-    <mat-form-field class="rule-type">
+    <mat-form-field class="rule-type" subscriptSizing="dynamic">
       <mat-label>{{ t('admin.featureFlagRule.type') }}</mat-label>
       <mat-select
         [value]="rule().type"
@@ -63,7 +63,10 @@
                 [attr.aria-label]="t('admin.featureFlagRule.percent')"
               />
             </mat-slider>
-            <mat-form-field class="rule-percent-input">
+            <mat-form-field
+              class="rule-percent-input"
+              subscriptSizing="dynamic"
+            >
               <mat-label>{{ t('admin.featureFlagRule.percent') }}</mat-label>
               <input
                 matInput
@@ -79,7 +82,7 @@
         }
         @case ('attribute') {
           <div class="rule-attribute">
-            <mat-form-field>
+            <mat-form-field subscriptSizing="dynamic">
               <mat-label>{{
                 t('admin.featureFlagRule.attributeField')
               }}</mat-label>
@@ -94,7 +97,7 @@
                 }
               </mat-select>
             </mat-form-field>
-            <mat-form-field>
+            <mat-form-field subscriptSizing="dynamic">
               <mat-label>{{
                 t('admin.featureFlagRule.attributeOp')
               }}</mat-label>
@@ -110,7 +113,7 @@
               </mat-select>
             </mat-form-field>
             @if (attributeField === 'custom') {
-              <mat-form-field>
+              <mat-form-field subscriptSizing="dynamic">
                 <mat-label>{{
                   t('admin.featureFlagRule.customKey')
                 }}</mat-label>
@@ -135,7 +138,7 @@
                 (selectedChange)="onAttributeChipsChange($event)"
               />
             } @else {
-              <mat-form-field>
+              <mat-form-field subscriptSizing="dynamic">
                 <mat-label>{{
                   t('admin.featureFlagRule.attributeValue')
                 }}</mat-label>

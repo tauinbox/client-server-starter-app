@@ -8,7 +8,7 @@
 .rule-row {
   display: flex;
   gap: vars.$spacing-sm;
-  align-items: flex-start;
+  align-items: center;
   padding: vars.$spacing-sm;
   background: var(--mat-sys-surface-container);
   border: func.rem(1) solid var(--mat-sys-outline-variant);
@@ -23,10 +23,11 @@
       max-content
     ) 1fr;
   column-gap: vars.$spacing-sm;
-  align-items: start;
+  align-items: center;
 
   &.vertical {
     grid-template-columns: 1fr;
+    row-gap: vars.$space-form-row-gap;
   }
 }
 
@@ -63,8 +64,8 @@ nxs-chips-autocomplete {
 .rule-attribute {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(func.rem(140), 1fr));
-  column-gap: vars.$spacing-sm;
-  align-items: start;
+  gap: vars.$space-form-row-gap vars.$spacing-sm;
+  align-items: center;
 }
 
 .rule-remove {
