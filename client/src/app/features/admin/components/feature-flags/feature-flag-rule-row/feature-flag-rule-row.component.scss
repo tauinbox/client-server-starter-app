@@ -15,18 +15,6 @@
   border-radius: func.rem(8);
 }
 
-.drag-handle {
-  // ≥44×44 touch target — WCAG / iOS HIG minimum for reliable finger taps.
-  min-width: func.rem(44);
-  min-height: func.rem(44);
-  touch-action: none; // CDK drag requires this to override scrolling on touch.
-  cursor: grab;
-
-  &:active {
-    cursor: grabbing;
-  }
-}
-
 .rule-fields {
   display: grid;
   flex: 1 1 auto;
@@ -74,14 +62,4 @@
 
 .rule-remove {
   flex: 0 0 auto;
-}
-
-// CDK drag preview / placeholder smoothing.
-.rule-row.cdk-drag-preview {
-  box-shadow: 0 5px 5px -3px rgb(0 0 0 / 20%),
-    0 8px 10px 1px rgb(0 0 0 / 14%), 0 3px 14px 2px rgb(0 0 0 / 12%);
-}
-
-.rule-row.cdk-drag-placeholder {
-  opacity: 0;
 }

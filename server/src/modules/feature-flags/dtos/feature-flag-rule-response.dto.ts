@@ -15,9 +15,6 @@ export class FeatureFlagRuleResponseDto {
   @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
   flagId: string;
 
-  @ApiProperty({ example: 0 })
-  priority: number;
-
   @ApiProperty({ enum: ['include', 'exclude'] })
   effect: FeatureFlagRuleEffect;
 

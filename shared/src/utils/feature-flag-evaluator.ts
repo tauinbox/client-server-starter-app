@@ -21,7 +21,6 @@ export type EvaluatorFlag = {
 };
 
 export type EvaluatorRule = {
-  priority: number;
   effect: FeatureFlagRuleEffect;
   payload: FeatureFlagRulePayload;
 };
@@ -36,22 +35,15 @@ export function evaluateFeatureFlag(
     return false;
   }
 
-  const sortedExcludes = rules
-    .filter((r) => r.effect === 'exclude')
-    .slice()
-    .sort((a, b) => a.priority - b.priority);
-  const sortedIncludes = rules
-    .filter((r) => r.effect === 'include')
-    .slice()
-    .sort((a, b) => a.priority - b.priority);
-
-  for (const rule of sortedExcludes) {
+  for (const rule of rules) {
+    if (rule.effect !== 'exclude') continue;
     if (matchesRule(rule.payload, flag.key, ctx)) return false;
   }
 
-  if (sortedIncludes.length === 0) return true;
+  const includes = rules.filter((r) => r.effect === 'include');
+  if (includes.length === 0) return true;
 
-  for (const rule of sortedIncludes) {
+  for (const rule of includes) {
     if (matchesRule(rule.payload, flag.key, ctx)) return true;
   }
   return false;

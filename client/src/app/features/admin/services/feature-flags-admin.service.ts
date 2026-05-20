@@ -21,7 +21,6 @@ export type CreateFeatureFlag = {
 export type UpdateFeatureFlag = Partial<CreateFeatureFlag>;
 
 export type FeatureFlagRuleInput = {
-  priority: number;
   type: FeatureFlagRuleType;
   effect: FeatureFlagRuleEffect;
   payload: FeatureFlagRulePayload;

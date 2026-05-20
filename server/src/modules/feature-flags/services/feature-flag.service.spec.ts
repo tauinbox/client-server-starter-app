@@ -35,7 +35,7 @@ describe('FeatureFlagService', () => {
     remove: jest.Mock;
     createQueryBuilder: jest.Mock;
   };
-  let ruleRepo: { manager: { transaction: jest.Mock } };
+  let ruleRepo: { find: jest.Mock; manager: { transaction: jest.Mock } };
   let dataSource: { transaction: jest.Mock };
   let attributeRegistry: AttributeRegistryService;
 
@@ -63,7 +63,10 @@ describe('FeatureFlagService', () => {
       remove: jest.fn(),
       createQueryBuilder: jest.fn()
     };
-    ruleRepo = { manager: { transaction: jest.fn() } };
+    ruleRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      manager: { transaction: jest.fn() }
+    };
     dataSource = { transaction: jest.fn() };
     attributeRegistry = new AttributeRegistryService();
 
@@ -81,13 +84,19 @@ describe('FeatureFlagService', () => {
   });
 
   describe('findOne', () => {
-    it('returns the flag with rules', async () => {
+    it('returns the flag with rules ordered by createdAt', async () => {
       flagRepo.findOne.mockResolvedValue(sampleFlag);
+      const rule = { id: 'r1', flagId: 'flag-1' };
+      ruleRepo.find.mockResolvedValueOnce([rule]);
       const result = await service.findOne('flag-1');
       expect(result).toBe(sampleFlag);
+      expect(result.rules).toEqual([rule]);
       expect(flagRepo.findOne).toHaveBeenCalledWith({
-        where: { id: 'flag-1' },
-        relations: ['rules']
+        where: { id: 'flag-1' }
+      });
+      expect(ruleRepo.find).toHaveBeenCalledWith({
+        where: { flagId: 'flag-1' },
+        order: { createdAt: 'ASC', id: 'ASC' }
       });
     });
 
@@ -206,7 +215,6 @@ describe('FeatureFlagService', () => {
           {
             type: 'percentage',
             effect: 'include',
-            priority: 0,
             payload: { type: 'percentage', percent: 25 }
           }
         ],
@@ -232,7 +240,6 @@ describe('FeatureFlagService', () => {
             {
               type: 'percentage',
               effect: 'include',
-              priority: 0,
               payload: { type: 'percentage', percent: 150 }
             }
           ],

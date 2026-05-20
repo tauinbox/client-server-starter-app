@@ -30,7 +30,6 @@ export type FeatureFlagRulePayload =
 export type FeatureFlagRuleResponse = {
   id: string;
   flagId: string;
-  priority: number;
   effect: FeatureFlagRuleEffect;
   payload: FeatureFlagRulePayload;
   createdAt: string;

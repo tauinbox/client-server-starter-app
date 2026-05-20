@@ -75,7 +75,6 @@ describe('FeatureFlagResolverService', () => {
       rules.map((r, i) => ({
         id: r.id ?? `rule-${i}`,
         flagId: r.flagId ?? 'flag-0',
-        priority: r.priority ?? 0,
         type: r.type ?? 'percentage',
         effect: r.effect ?? 'include',
         payload: r.payload ?? { type: 'percentage', percent: 100 },

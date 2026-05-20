@@ -206,7 +206,6 @@ function validateUpdate(
 }
 
 interface IncomingRule {
-  priority?: unknown;
   type?: unknown;
   effect?: unknown;
   payload?: unknown;
@@ -311,7 +310,6 @@ function validateRulePayload(
 }
 
 type ValidatedRule = {
-  priority: number;
   type: FeatureFlagRuleType;
   effect: FeatureFlagRuleEffect;
   payload: FeatureFlagRulePayload;
@@ -335,16 +333,6 @@ function validateRules(
         message: `rules[${i}].effect must be one of: ${RULE_EFFECTS.join(', ')}`
       };
     }
-    if (
-      typeof r.priority !== 'number' ||
-      !Number.isInteger(r.priority) ||
-      r.priority < 0
-    ) {
-      return {
-        ok: false,
-        message: `rules[${i}].priority must be a non-negative integer`
-      };
-    }
     if (!RULE_TYPES.includes(r.type as FeatureFlagRuleType)) {
       return {
         ok: false,
@@ -359,7 +347,6 @@ function validateRules(
       return { ok: false, message: `rules[${i}]: ${validated.message}` };
     }
     out.push({
-      priority: r.priority,
       type: r.type as FeatureFlagRuleType,
       effect: r.effect as FeatureFlagRuleEffect,
       payload: validated.payload
@@ -444,7 +431,6 @@ function evaluateAll(
     const rules: EvaluatorRule[] = state.featureFlagRules
       .filter((r) => r.flagId === flag.id)
       .map((r) => ({
-        priority: r.priority,
         effect: r.effect,
         payload: r.payload
       }));
@@ -648,17 +634,21 @@ adminRouter.put('/:id/rules', (req, res) => {
   state.featureFlagRules = state.featureFlagRules.filter(
     (r) => r.flagId !== flag.id
   );
-  const now = nowIso();
-  for (const r of validation.rules) {
+  const now = Date.now();
+  const updatedAt = new Date(now).toISOString();
+  for (let i = 0; i < validation.rules.length; i++) {
+    const r = validation.rules[i];
+    // Stagger createdAt per index so admin GET returns rules in insertion order
+    // (mirrors server-side clock_timestamp() default).
+    const createdAt = new Date(now + i).toISOString();
     const rule: MockFeatureFlagRule = {
       id: randomUUID(),
       flagId: flag.id,
-      priority: r.priority,
       type: r.type,
       effect: r.effect,
       payload: r.payload,
-      createdAt: now,
-      updatedAt: now
+      createdAt,
+      updatedAt
     };
     state.featureFlagRules.push(rule);
   }

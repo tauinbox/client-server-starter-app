@@ -1,6 +1,5 @@
 import {
   Column,
-  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
@@ -26,9 +25,6 @@ export class FeatureFlagRule {
   @JoinColumn({ name: 'flag_id' })
   flag: FeatureFlag;
 
-  @Column({ type: 'integer', default: 0 })
-  priority: number;
-
   @Column({ type: 'varchar', length: 32 })
   type: FeatureFlagRuleType;
 
@@ -38,7 +34,14 @@ export class FeatureFlagRule {
   @Column({ type: 'jsonb' })
   payload: FeatureFlagRulePayload;
 
-  @CreateDateColumn({ name: 'created_at' })
+  // Uses clock_timestamp() (not now()) so bulk inserts within one transaction
+  // get distinct microsecond timestamps — the basis for stable display order.
+  @Column({
+    name: 'created_at',
+    type: 'timestamp',
+    precision: 6,
+    default: () => 'clock_timestamp()'
+  })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })

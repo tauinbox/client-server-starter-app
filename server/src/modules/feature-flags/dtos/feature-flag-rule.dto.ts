@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsObject, Min } from 'class-validator';
+import { IsIn, IsObject } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import type {
   FeatureFlagRuleEffect,
@@ -19,11 +19,6 @@ export class FeatureFlagRuleDto {
   @ApiProperty({ enum: RULE_EFFECTS })
   @IsIn(RULE_EFFECTS)
   effect: FeatureFlagRuleEffect;
-
-  @ApiProperty({ minimum: 0, example: 0 })
-  @IsInt()
-  @Min(0)
-  priority: number;
 
   @ApiProperty({ enum: RULE_TYPES })
   @IsIn(RULE_TYPES)

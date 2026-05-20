@@ -55,14 +55,9 @@
             {{ t('admin.featureFlagForm.rulesEmpty') }}
           </p>
         } @else {
-          <div
-            class="rules-list"
-            cdkDropList
-            (cdkDropListDropped)="drop($event)"
-          >
+          <div class="rules-list">
             @for (rule of rules(); track rule.id ?? $index; let i = $index) {
               <nxs-feature-flag-rule-row
-                cdkDrag
                 [rule]="rule"
                 (ruleChange)="updateRule(i, $event)"
                 (remove)="removeRule(i)"

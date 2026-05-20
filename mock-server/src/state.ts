@@ -409,7 +409,6 @@ export function toFeatureFlagRuleResponse(
   return {
     id: rule.id,
     flagId: rule.flagId,
-    priority: rule.priority,
     effect: rule.effect,
     payload: rule.payload,
     createdAt: rule.createdAt,
@@ -422,6 +421,11 @@ export function toFeatureFlagResponse(
 ): FeatureFlagResponse {
   const rules = state.featureFlagRules
     .filter((r) => r.flagId === flag.id)
+    .sort((a, b) =>
+      a.createdAt === b.createdAt
+        ? a.id.localeCompare(b.id)
+        : a.createdAt.localeCompare(b.createdAt)
+    )
     .map(toFeatureFlagRuleResponse);
   return {
     id: flag.id,

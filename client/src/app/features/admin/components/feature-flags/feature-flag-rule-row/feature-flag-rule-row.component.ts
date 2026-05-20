@@ -6,7 +6,6 @@ import {
   model,
   output
 } from '@angular/core';
-import { CdkDrag, CdkDragHandle } from '@angular/cdk/drag-drop';
 import { MatIconButton } from '@angular/material/button';
 import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
@@ -26,7 +25,6 @@ import { LayoutService } from '@core/services/layout.service';
 
 export type FeatureFlagRuleDraft = {
   id?: string;
-  priority: number;
   type: FeatureFlagRuleType;
   effect: FeatureFlagRuleEffect;
   payload: FeatureFlagRulePayload;
@@ -56,8 +54,6 @@ const ATTRIBUTE_OPS: FeatureFlagAttributeOp[] = [
 @Component({
   selector: 'nxs-feature-flag-rule-row',
   imports: [
-    CdkDrag,
-    CdkDragHandle,
     MatIconButton,
     MatFormField,
     MatLabel,
