@@ -82,6 +82,37 @@ describe('FeatureFlagRuleRowComponent', () => {
     expect(sliderInput).not.toBeNull();
   });
 
+  it('every <mat-form-field> in the row uses subscriptSizing="dynamic"', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'custom',
+        op: 'eq',
+        value: '',
+        customKey: 'plan'
+      }
+    });
+    fixture.detectChanges();
+    const fields = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      'mat-form-field'
+    );
+    expect(fields.length).toBeGreaterThan(0);
+    for (const field of Array.from(fields)) {
+      const subscript = field.querySelector(
+        '.mat-mdc-form-field-subscript-wrapper'
+      );
+      expect(subscript).not.toBeNull();
+      expect(
+        subscript!.classList.contains(
+          'mat-mdc-form-field-subscript-dynamic-size'
+        )
+      ).toBe(true);
+    }
+  });
+
   it('emits remove when the trash button is clicked', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.detectChanges();
