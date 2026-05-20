@@ -29,7 +29,6 @@ export default class FeatureFlagsSeeder extends Seeder {
     await ruleRepo.save(
       ruleRepo.create({
         flagId: savedBeta.id,
-        priority: 0,
         type: 'percentage',
         effect: 'include',
         payload: { type: 'percentage', percent: 10 }

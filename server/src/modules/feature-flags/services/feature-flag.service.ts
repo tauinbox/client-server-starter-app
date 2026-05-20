@@ -5,7 +5,7 @@ import {
   NotFoundException
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
@@ -27,23 +27,34 @@ export class FeatureFlagService {
   ) {}
 
   async findAll(): Promise<FeatureFlag[]> {
-    return this.flagRepo.find({
-      relations: ['rules'],
-      order: { key: 'ASC' }
+    const flags = await this.flagRepo.find({ order: { key: 'ASC' } });
+    if (flags.length === 0) return flags;
+    const rules = await this.ruleRepo.find({
+      where: { flagId: In(flags.map((f) => f.id)) },
+      order: { createdAt: 'ASC', id: 'ASC' }
     });
+    const byFlag = new Map<string, FeatureFlagRule[]>();
+    for (const r of rules) {
+      const list = byFlag.get(r.flagId) ?? [];
+      list.push(r);
+      byFlag.set(r.flagId, list);
+    }
+    for (const f of flags) f.rules = byFlag.get(f.id) ?? [];
+    return flags;
   }
 
   async findOne(id: string): Promise<FeatureFlag> {
-    const flag = await this.flagRepo.findOne({
-      where: { id },
-      relations: ['rules']
-    });
+    const flag = await this.flagRepo.findOne({ where: { id } });
     if (!flag) {
       throw new NotFoundException({
         message: 'Feature flag not found',
         errorKey: ErrorKeys.FEATURE_FLAGS.NOT_FOUND
       });
     }
+    flag.rules = await this.ruleRepo.find({
+      where: { flagId: id },
+      order: { createdAt: 'ASC', id: 'ASC' }
+    });
     return flag;
   }
 
@@ -157,16 +168,18 @@ export class FeatureFlagService {
     await this.dataSource.transaction(async (em) => {
       await em.delete(FeatureFlagRule, { flagId: id });
       if (rules.length > 0) {
-        const records = rules.map((r, i) =>
-          em.create(FeatureFlagRule, {
+        // Insert sequentially so clock_timestamp() advances per row and
+        // preserves request-array order via the created_at column.
+        for (let i = 0; i < rules.length; i++) {
+          const r = rules[i];
+          const record = em.create(FeatureFlagRule, {
             flagId: id,
-            priority: r.priority,
             type: r.type,
             effect: r.effect,
             payload: validatedPayloads[i]
-          })
-        );
-        await em.save(FeatureFlagRule, records);
+          });
+          await em.save(FeatureFlagRule, record);
+        }
       }
       await em.update(
         FeatureFlag,

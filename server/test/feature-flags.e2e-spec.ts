@@ -211,15 +211,18 @@ function makeDataSourceMock(stores: Stores): DataSource {
           },
           save(
             _entity: unknown,
-            records: FeatureFlagRule[]
-          ): Promise<FeatureFlagRule[]> {
+            recordOrRecords: FeatureFlagRule | FeatureFlagRule[]
+          ): Promise<FeatureFlagRule | FeatureFlagRule[]> {
+            const records = Array.isArray(recordOrRecords)
+              ? recordOrRecords
+              : [recordOrRecords];
             for (const r of records) {
               if (!r.id) r.id = `rule-${stores.rules.size + 1}`;
               if (!r.createdAt) r.createdAt = nowDate();
               r.updatedAt = nowDate();
               stores.rules.set(r.id, r);
             }
-            return Promise.resolve(records);
+            return Promise.resolve(recordOrRecords);
           },
           update(
             _entity: unknown,
@@ -254,7 +257,10 @@ interface TransactionalEntityManager {
     where: { flagId: string }
   ): Promise<{ affected: number }>;
   create(entity: unknown, data: Partial<FeatureFlagRule>): FeatureFlagRule;
-  save(entity: unknown, records: FeatureFlagRule[]): Promise<FeatureFlagRule[]>;
+  save(
+    entity: unknown,
+    recordOrRecords: FeatureFlagRule | FeatureFlagRule[]
+  ): Promise<FeatureFlagRule | FeatureFlagRule[]>;
   update(
     entity: unknown,
     where: { id: string },
@@ -362,7 +368,6 @@ describe('Feature flags end-to-end', () => {
       flag.id,
       [
         {
-          priority: 0,
           type: 'percentage',
           effect: 'include',
           payload: { type: 'percentage', percent: 10 }
@@ -389,7 +394,6 @@ describe('Feature flags end-to-end', () => {
       flag.id,
       [
         {
-          priority: 0,
           type: 'percentage',
           effect: 'include',
           payload: { type: 'percentage', percent: 100 }
@@ -415,13 +419,11 @@ describe('Feature flags end-to-end', () => {
       flag.id,
       [
         {
-          priority: 10,
           type: 'role',
           effect: 'include',
           payload: { type: 'role', roleNames: ['beta'] }
         },
         {
-          priority: 0,
           type: 'role',
           effect: 'exclude',
           payload: { type: 'role', roleNames: ['banned'] }

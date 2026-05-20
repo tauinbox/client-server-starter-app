@@ -1,14 +1,4 @@
-<div class="rule-row" cdkDrag *transloco="let t; scope: 'admin'">
-  <button
-    matIconButton
-    cdkDragHandle
-    class="drag-handle"
-    type="button"
-    [attr.aria-label]="t('admin.featureFlagRule.dragHandle')"
-  >
-    <mat-icon>drag_indicator</mat-icon>
-  </button>
-
+<div class="rule-row" *transloco="let t; scope: 'admin'">
   <div class="rule-fields" [class.vertical]="layout.isHandset()">
     <mat-form-field class="rule-effect">
       <mat-label>{{ t('admin.featureFlagRule.effect') }}</mat-label>

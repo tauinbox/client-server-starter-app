@@ -411,7 +411,6 @@ function generateFeatureFlagRules(): MockFeatureFlagRule[] {
     {
       id: 'rule-beta-export-percent',
       flagId: 'flag-beta-export',
-      priority: 0,
       type: 'percentage',
       effect: 'include',
       payload: { type: 'percentage', percent: 10 },

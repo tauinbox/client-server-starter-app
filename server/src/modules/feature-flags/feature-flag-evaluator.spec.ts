@@ -28,9 +28,8 @@ const baseCtx = (
 
 const rule = (
   effect: 'include' | 'exclude',
-  payload: EvaluatorRule['payload'],
-  priority = 0
-): EvaluatorRule => ({ effect, priority, payload });
+  payload: EvaluatorRule['payload']
+): EvaluatorRule => ({ effect, payload });
 
 describe('evaluateFeatureFlag — short-circuits', () => {
   it('returns false when flag.enabled is false', () => {
@@ -359,13 +358,28 @@ describe('evaluateFeatureFlag — composition', () => {
     ).toBe(true);
   });
 
-  it('rules are sorted by priority ascending — lower priority first', () => {
-    const rules = [
-      rule('include', { type: 'user', userIds: ['alice'] }, 10),
-      rule('exclude', { type: 'user', userIds: ['alice'] }, 5)
+  it('excludes always win over includes regardless of array order', () => {
+    const rulesIncludeFirst = [
+      rule('include', { type: 'user', userIds: ['alice'] }),
+      rule('exclude', { type: 'user', userIds: ['alice'] })
+    ];
+    const rulesExcludeFirst = [
+      rule('exclude', { type: 'user', userIds: ['alice'] }),
+      rule('include', { type: 'user', userIds: ['alice'] })
     ];
     expect(
-      evaluateFeatureFlag(baseFlag(), rules, baseCtx({ userId: 'alice' }))
+      evaluateFeatureFlag(
+        baseFlag(),
+        rulesIncludeFirst,
+        baseCtx({ userId: 'alice' })
+      )
+    ).toBe(false);
+    expect(
+      evaluateFeatureFlag(
+        baseFlag(),
+        rulesExcludeFirst,
+        baseCtx({ userId: 'alice' })
+      )
     ).toBe(false);
   });
 });

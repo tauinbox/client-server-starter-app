@@ -30,7 +30,6 @@ interface CachedFlag {
   environments: string[];
   public: boolean;
   rules: {
-    priority: number;
     type: FeatureFlagRule['type'];
     effect: FeatureFlagRule['effect'];
     payload: FeatureFlagRule['payload'];
@@ -113,7 +112,8 @@ export class FeatureFlagResolverService {
       return [];
     }
     const rules = await this.ruleRepo.find({
-      where: { flagId: In(flags.map((f) => f.id)) }
+      where: { flagId: In(flags.map((f) => f.id)) },
+      order: { createdAt: 'ASC', id: 'ASC' }
     });
     const rulesByFlag = new Map<string, typeof rules>();
     for (const r of rules) {
@@ -128,7 +128,6 @@ export class FeatureFlagResolverService {
       environments: f.environments,
       public: f.public,
       rules: (rulesByFlag.get(f.id) ?? []).map((r) => ({
-        priority: r.priority,
         type: r.type,
         effect: r.effect,
         payload: r.payload
@@ -177,7 +176,6 @@ export class FeatureFlagResolverService {
         environments: flag.environments
       };
       const evalRules: EvaluatorRule[] = flag.rules.map((r) => ({
-        priority: r.priority,
         effect: r.effect,
         payload: r.payload
       }));

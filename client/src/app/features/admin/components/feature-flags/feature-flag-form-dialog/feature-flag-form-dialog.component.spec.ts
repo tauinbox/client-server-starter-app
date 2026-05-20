@@ -2,6 +2,7 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import type { FeatureFlagRuleResponse } from '@app/shared/types';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import type { FeatureFlagFormDialogResult } from './feature-flag-form-dialog.component';
@@ -64,13 +65,12 @@ describe('FeatureFlagFormDialogComponent', () => {
           {
             id: 'rule-1',
             flagId: 'flag-1',
-            priority: 0,
             effect: 'include',
             payload: { type: 'percentage', percent: 10 },
             createdAt: '2026-05-19T10:00:00Z',
             updatedAt: '2026-05-19T10:00:00Z'
           }
-        ]
+        ] satisfies FeatureFlagRuleResponse[]
       }
     });
     const title = (fixture.nativeElement as HTMLElement)
@@ -83,18 +83,52 @@ describe('FeatureFlagFormDialogComponent', () => {
     expect(fixture.componentInstance.rules()[0].type).toBe('percentage');
   });
 
-  it('addRule + removeRule mutate the rules signal and renumber priorities', async () => {
+  it('addRule + removeRule mutate the rules signal', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
     cmp.addRule();
     cmp.addRule();
     expect(cmp.rules().length).toBe(2);
-    expect(cmp.rules()[0].priority).toBe(0);
-    expect(cmp.rules()[1].priority).toBe(1);
 
     cmp.removeRule(0);
     expect(cmp.rules().length).toBe(1);
-    expect(cmp.rules()[0].priority).toBe(0);
+  });
+
+  it('submit serialises rules in render order', async () => {
+    const fixture = await setup({});
+    const cmp = fixture.componentInstance;
+    cmp.model.set({
+      key: 'new-dashboard',
+      description: '',
+      environments: ''
+    });
+    cmp.addRule();
+    cmp.addRule();
+    cmp.submit();
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+    const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
+    expect(result.rules).toEqual([
+      {
+        effect: 'include',
+        type: 'percentage',
+        payload: { type: 'percentage', percent: 0 }
+      },
+      {
+        effect: 'include',
+        type: 'percentage',
+        payload: { type: 'percentage', percent: 0 }
+      }
+    ]);
+  });
+
+  it('renders rules without drag handles', async () => {
+    const fixture = await setup({});
+    fixture.componentInstance.addRule();
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('[cdkDropList]')).toBeNull();
+    expect(root.querySelector('[cdkDrag]')).toBeNull();
+    expect(root.querySelector('.drag-handle')).toBeNull();
   });
 
   it('submit() closes with the form result when the form is valid', async () => {

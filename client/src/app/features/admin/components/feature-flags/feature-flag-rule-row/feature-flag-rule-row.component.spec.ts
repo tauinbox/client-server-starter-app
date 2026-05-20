@@ -14,7 +14,6 @@ import { FeatureFlagRuleRowComponent } from './feature-flag-rule-row.component';
 })
 class HostComponent {
   readonly rule = signal<FeatureFlagRuleDraft>({
-    priority: 0,
     effect: 'include',
     type: 'percentage',
     payload: { type: 'percentage', percent: 25 }

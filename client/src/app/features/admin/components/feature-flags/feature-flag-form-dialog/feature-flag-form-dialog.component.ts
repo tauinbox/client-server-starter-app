@@ -13,7 +13,6 @@ import {
   pattern,
   required
 } from '@angular/forms/signals';
-import { CdkDrag, CdkDropList, type CdkDragDrop } from '@angular/cdk/drag-drop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckbox } from '@angular/material/checkbox';
 import {
@@ -54,8 +53,6 @@ const KEY_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 @Component({
   selector: 'nxs-feature-flag-form-dialog',
   imports: [
-    CdkDropList,
-    CdkDrag,
     MatDialogModule,
     MatButtonModule,
     MatCheckbox,
@@ -91,7 +88,6 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   readonly rules = signal<FeatureFlagRuleDraft[]>(
     (this.data.flag?.rules ?? []).map((r) => ({
       id: r.id,
-      priority: r.priority,
       effect: r.effect,
       type: r.payload.type,
       payload: r.payload
@@ -133,7 +129,6 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   addRule(): void {
     const next = [...this.rules()];
     next.push({
-      priority: next.length,
       effect: 'include',
       type: 'percentage',
       payload: { type: 'percentage', percent: 0 }
@@ -150,15 +145,7 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   removeRule(index: number): void {
     const next = [...this.rules()];
     next.splice(index, 1);
-    this.rules.set(this.#renumber(next));
-  }
-
-  drop(event: CdkDragDrop<FeatureFlagRuleDraft[]>): void {
-    if (event.previousIndex === event.currentIndex) return;
-    const next = [...this.rules()];
-    const [moved] = next.splice(event.previousIndex, 1);
-    next.splice(event.currentIndex, 0, moved);
-    this.rules.set(this.#renumber(next));
+    this.rules.set(next);
   }
 
   submit(): void {
@@ -176,8 +163,7 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
         environments,
         public: this.isPublic()
       },
-      rules: this.rules().map((r, i) => ({
-        priority: i,
+      rules: this.rules().map((r) => ({
         effect: r.effect,
         type: r.type,
         payload: r.payload
@@ -191,19 +177,13 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
     this.#dialogRef.close();
   }
 
-  #renumber(rules: FeatureFlagRuleDraft[]): FeatureFlagRuleDraft[] {
-    return rules.map((r, i) => ({ ...r, priority: i }));
-  }
-
   #rulesChanged(): boolean {
     if (!this.data.flag) return this.rules().length > 0;
     const original = this.data.flag.rules.map((r) => ({
-      priority: r.priority,
       effect: r.effect,
       payload: r.payload
     }));
     const current = this.rules().map((r) => ({
-      priority: r.priority,
       effect: r.effect,
       payload: r.payload
     }));

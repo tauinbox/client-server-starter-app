@@ -67,8 +67,8 @@ src/app/
 │       │       └── action-form-dialog/  # ActionFormDialogComponent — create/edit action with name pattern validation
 │       │   └── feature-flags/
 │       │       ├── feature-flag-list/        # FeatureFlagListComponent — mat-table desktop / card-list handset (via LayoutService.isHandset()), per-row toggle/edit/delete, mat-fab on handset
-│       │       ├── feature-flag-form-dialog/ # FeatureFlagFormDialogComponent — top form (key, description, environments, enabled, public) + embedded rules editor with cdkDropList drag-reorder; uses Wide dialog size on desktop, .app-dialog-fullscreen-mobile panelClass on handset
-│       │       └── feature-flag-rule-row/    # FeatureFlagRuleRowComponent — single rule editor with cdkDrag + explicit cdkDragHandle (44×44 touch target), payload editor per type (user/role IDs CSV, percentage slider+input, attribute field+op+value+customKey), .vertical class on handset
+│       │       ├── feature-flag-form-dialog/ # FeatureFlagFormDialogComponent — top form (key, description, environments, enabled, public) + embedded rules editor; uses Wide dialog size on desktop, .app-dialog-fullscreen-mobile panelClass on handset
+│       │       └── feature-flag-rule-row/    # FeatureFlagRuleRowComponent — single rule editor, payload editor per type (user/role IDs CSV, percentage slider+input, attribute field+op+value+customKey), .vertical class on handset
 │       ├── services/       # RoleService (HTTP → /api/v1/roles), RbacAdminService (HTTP → /api/v1/rbac/*), FeatureFlagsAdminService (HTTP → /api/v1/admin/feature-flags/*; If-Match version on PATCH)
 │       └── store/          # RolesStore (route-level), ResourcesStore (route-level: resources, actions, loading), FeatureFlagsAdminStore (route-level: signalStore + withEntities<FeatureFlagResponse>)
 └── shared/
@@ -199,8 +199,8 @@ Role-change is special-cased: `permissionsUpdated$` ALSO calls `reload()` becaus
 `/admin/feature-flags` is the management UI. Guarded by `permissionGuard('manage', 'FeatureFlag')` and exposed as the fifth tab in `AdminPanelComponent`. Components live under `features/admin/components/feature-flags/`:
 
 - **`FeatureFlagListComponent`** — `mat-table` on desktop, `mat-card` list with a pinned-bottom `mat-fab` on handset (switched via `LayoutService.isHandset()`). Per-row toggle / edit / delete.
-- **`FeatureFlagFormDialogComponent`** — top form (key, description, environments, enabled, public) + embedded `cdkDropList` rules editor. Opens at `DialogSize.Wide` on desktop, with the `.app-dialog-fullscreen-mobile` panel-class (in `_dialogs.scss`) on handset for a `100vw × 100dvh` edge-to-edge layout with sticky title + actions.
-- **`FeatureFlagRuleRowComponent`** — single rule editor with `cdkDrag` + explicit `cdkDragHandle` (≥44×44 px touch target). Payload editor per type: comma-separated IDs for `user` / `role`, `mat-slider` + numeric input pair for `percentage`, field + op + value (+ conditional `customKey`) for `attribute`.
+- **`FeatureFlagFormDialogComponent`** — top form (key, description, environments, enabled, public) + embedded rules editor. Opens at `DialogSize.Wide` on desktop, with the `.app-dialog-fullscreen-mobile` panel-class (in `_dialogs.scss`) on handset for a `100vw × 100dvh` edge-to-edge layout with sticky title + actions. Rule order on save is the array order: `priority: i` is synthesized from the rendered index before send (server contract still requires `priority`).
+- **`FeatureFlagRuleRowComponent`** — single rule editor. Payload editor per type: comma-separated IDs for `user` / `role`, `mat-slider` + numeric input pair for `percentage`, field + op + value (+ conditional `customKey`) for `attribute`.
 
 State + HTTP live in `features/admin/{store,services}`:
 - **`FeatureFlagsAdminStore`** — route-level `signalStore + withEntities<FeatureFlagResponse>`, mirrors `RolesStore`. `load()` via `rxMethod`; CRUD methods return `Observable` so callers can surface per-call notifications.
