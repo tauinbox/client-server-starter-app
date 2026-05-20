@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { Brackets, DataSource, Repository } from 'typeorm';
 import { subject } from '@casl/ability';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import * as bcrypt from 'bcrypt';
@@ -143,12 +143,25 @@ export class UsersService {
   private applyUserFilters(
     qb: ReturnType<typeof this.userRepository.createQueryBuilder>,
     filters: {
+      q?: string;
       email?: string;
       firstName?: string;
       lastName?: string;
       isActive?: boolean;
     }
   ): void {
+    if (filters.q) {
+      const pattern = `%${escapeLikePattern(filters.q)}%`;
+      qb.andWhere(
+        new Brackets((sb) => {
+          sb.where('user.email ILIKE :q', { q: pattern })
+            .orWhere('user.firstName ILIKE :q', { q: pattern })
+            .orWhere('user.lastName ILIKE :q', { q: pattern })
+            .orWhere('CAST(user.id AS text) ILIKE :q', { q: pattern });
+        })
+      );
+    }
+
     if (filters.email) {
       qb.andWhere('user.email ILIKE :email', {
         email: `%${escapeLikePattern(filters.email)}%`

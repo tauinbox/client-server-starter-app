@@ -17,7 +17,9 @@ export type User = AdminUserResponse;
 export type UserSearch = Pick<
   Partial<User>,
   'email' | 'firstName' | 'lastName' | 'isActive'
->;
+> & {
+  q?: string;
+};
 
 export type CreateUser = Pick<User, 'email' | 'firstName' | 'lastName'> & {
   password: string;
