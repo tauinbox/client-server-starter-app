@@ -13,6 +13,13 @@ export class SearchUsersCursorQueryDto extends CursorPaginationQueryDto {
   @IsIn(ALLOWED_USER_SORT_COLUMNS)
   override sortBy: string = 'createdAt';
 
+  @ApiPropertyOptional({
+    description:
+      'Unified substring search across id, email, firstName, lastName (case-insensitive). Combined with the other filters via AND.'
+  })
+  @IsOptional()
+  q?: string;
+
   @ApiPropertyOptional({ description: 'Filter by email (partial match)' })
   @IsOptional()
   email?: string;

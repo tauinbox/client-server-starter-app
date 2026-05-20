@@ -411,6 +411,60 @@ describe('UsersService', () => {
       );
     });
 
+    it('applies unified q filter as OR across email/firstName/lastName/id', async () => {
+      mockQueryBuilder.getMany.mockResolvedValue([]);
+
+      await service.findCursorPaginated({
+        limit: 20,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        q: 'al_ice'
+      });
+
+      type BracketsLike = { whereFactory: (qb: SubRecorder) => void };
+      type SubRecorder = {
+        where: jest.Mock;
+        orWhere: jest.Mock;
+      };
+
+      const andWhereCalls = mockQueryBuilder.andWhere.mock.calls as unknown[][];
+      const bracketsCall = andWhereCalls.find((call) => {
+        const first = call[0];
+        return (
+          typeof first === 'object' &&
+          first !== null &&
+          'whereFactory' in (first as Record<string, unknown>)
+        );
+      });
+      expect(bracketsCall).toBeDefined();
+      const brackets = bracketsCall?.[0] as BracketsLike;
+
+      const subCalls: { sql: string; params: unknown }[] = [];
+      const sub: SubRecorder = {
+        where: jest.fn((sql: string, params: unknown) => {
+          subCalls.push({ sql, params });
+          return sub;
+        }),
+        orWhere: jest.fn((sql: string, params: unknown) => {
+          subCalls.push({ sql, params });
+          return sub;
+        })
+      };
+      brackets.whereFactory(sub);
+
+      // `_` is a LIKE wildcard and MUST be escaped in the bound parameter.
+      const expectedPattern = '%al\\_ice%';
+      expect(subCalls).toEqual([
+        { sql: 'user.email ILIKE :q', params: { q: expectedPattern } },
+        { sql: 'user.firstName ILIKE :q', params: { q: expectedPattern } },
+        { sql: 'user.lastName ILIKE :q', params: { q: expectedPattern } },
+        {
+          sql: 'CAST(user.id AS text) ILIKE :q',
+          params: { q: expectedPattern }
+        }
+      ]);
+    });
+
     it('should call withDeleted when includeDeleted is true', async () => {
       mockQueryBuilder.getMany.mockResolvedValue([]);
 

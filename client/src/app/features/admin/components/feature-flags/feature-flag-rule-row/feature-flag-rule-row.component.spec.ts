@@ -205,4 +205,58 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.detectChanges();
     expect(roleServiceStub.getAll).toHaveBeenCalledTimes(1);
   });
+
+  it('user search debounces and issues a single request with unified q', async () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = TestBed.createComponent(HostComponent);
+      fixture.componentInstance.rule.set({
+        effect: 'include',
+        type: 'user',
+        payload: { type: 'user', userIds: [] }
+      });
+      fixture.detectChanges();
+      const cmp = fixture.debugElement.children[0]
+        .componentInstance as FeatureFlagRuleRowComponent;
+
+      cmp.onUserSearchTerm('us');
+      cmp.onUserSearchTerm('use');
+      cmp.onUserSearchTerm('user');
+      vi.advanceTimersByTime(300);
+
+      expect(userServiceStub.searchCursor).toHaveBeenCalledTimes(1);
+      expect(userServiceStub.searchCursor).toHaveBeenCalledWith(
+        { q: 'user' },
+        expect.objectContaining({
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('skips user search when term is shorter than the min-chars threshold', async () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = TestBed.createComponent(HostComponent);
+      fixture.componentInstance.rule.set({
+        effect: 'include',
+        type: 'user',
+        payload: { type: 'user', userIds: [] }
+      });
+      fixture.detectChanges();
+      const cmp = fixture.debugElement.children[0]
+        .componentInstance as FeatureFlagRuleRowComponent;
+
+      cmp.onUserSearchTerm('a');
+      vi.advanceTimersByTime(300);
+
+      expect(userServiceStub.searchCursor).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

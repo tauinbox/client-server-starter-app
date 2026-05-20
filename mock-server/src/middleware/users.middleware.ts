@@ -313,7 +313,7 @@ router.get('/', adminGuard, (req, res) => {
 
 // GET /api/v1/users/search
 router.get('/search', adminGuard, (req, res) => {
-  const { email, firstName, lastName, isActive } = req.query;
+  const { q, email, firstName, lastName, isActive } = req.query;
   const includeDeleted = String(req.query['includeDeleted']) === 'true';
   let users = Array.from(getState().users.values());
 
@@ -321,6 +321,16 @@ router.get('/search', adminGuard, (req, res) => {
     users = users.filter((u) => !u.deletedAt);
   }
 
+  if (q) {
+    const qStr = String(q).toLowerCase();
+    users = users.filter(
+      (u) =>
+        u.email.toLowerCase().includes(qStr) ||
+        u.firstName.toLowerCase().includes(qStr) ||
+        u.lastName.toLowerCase().includes(qStr) ||
+        u.id.toLowerCase().includes(qStr)
+    );
+  }
   if (email) {
     const emailStr = String(email).toLowerCase();
     users = users.filter((u) => u.email.toLowerCase().includes(emailStr));
@@ -361,7 +371,7 @@ router.get('/cursor', adminGuard, (req, res) => {
 
 // GET /api/v1/users/search/cursor
 router.get('/search/cursor', adminGuard, (req, res) => {
-  const { email, firstName, lastName, isActive } = req.query;
+  const { q, email, firstName, lastName, isActive } = req.query;
   const includeDeleted = String(req.query['includeDeleted']) === 'true';
   let users = Array.from(getState().users.values());
 
@@ -369,6 +379,16 @@ router.get('/search/cursor', adminGuard, (req, res) => {
     users = users.filter((u) => !u.deletedAt);
   }
 
+  if (q) {
+    const qStr = String(q).toLowerCase();
+    users = users.filter(
+      (u) =>
+        u.email.toLowerCase().includes(qStr) ||
+        u.firstName.toLowerCase().includes(qStr) ||
+        u.lastName.toLowerCase().includes(qStr) ||
+        u.id.toLowerCase().includes(qStr)
+    );
+  }
   if (email) {
     const emailStr = String(email).toLowerCase();
     users = users.filter((u) => u.email.toLowerCase().includes(emailStr));

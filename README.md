@@ -532,9 +532,9 @@ API base URL: `/api/v1`
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink OAuth provider |
 | GET | `/auth/permissions` | Bearer | Get current user's resolved permissions |
 | GET | `/users` | `users:search` | List all users (paginated; `includeDeleted=true` to include soft-deleted) |
-| GET | `/users/search` | `users:search` | Search users (paginated + filters: email, firstName, lastName, isActive; `includeDeleted=true`) |
+| GET | `/users/search` | `users:search` | Search users (paginated + filters: `q` (unified substring across id/email/firstName/lastName), email, firstName, lastName, isActive; `includeDeleted=true`) |
 | GET | `/users/cursor` | `users:search` | List users with cursor-based (keyset) pagination |
-| GET | `/users/search/cursor` | `users:search` | Search users with cursor-based pagination + filters |
+| GET | `/users/search/cursor` | `users:search` | Search users with cursor-based pagination + same filters as `/users/search` |
 | GET | `/users/:id` | `users:read` | Get user by ID |
 | GET | `/users/:id/permissions` | `users:read` | Get effective permissions (roles + resolved permissions + packed CASL rules) |
 | POST | `/users` | `users:create` | Create user |

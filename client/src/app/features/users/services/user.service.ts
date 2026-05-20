@@ -64,23 +64,10 @@ export class UserService {
     criteria: UserSearch,
     params: UserCursorListParams
   ): Observable<CursorPaginatedResponse<User>> {
-    let httpParams = this.#buildCursorPaginationParams(params);
-
-    if (criteria.email) {
-      httpParams = httpParams.set('email', criteria.email);
-    }
-
-    if (criteria.firstName) {
-      httpParams = httpParams.set('firstName', criteria.firstName);
-    }
-
-    if (criteria.lastName) {
-      httpParams = httpParams.set('lastName', criteria.lastName);
-    }
-
-    if (criteria.isActive !== undefined) {
-      httpParams = httpParams.set('isActive', criteria.isActive.toString());
-    }
+    const httpParams = this.#applySearchCriteria(
+      this.#buildCursorPaginationParams(params),
+      criteria
+    );
 
     return this.#http.get<CursorPaginatedResponse<User>>(
       `${USERS_API_V1}/search/cursor`,
@@ -92,27 +79,43 @@ export class UserService {
     criteria: UserSearch,
     params: UserListParams
   ): Observable<PaginatedResponse<User>> {
-    let httpParams = this.#buildPaginationParams(params);
-
-    if (criteria.email) {
-      httpParams = httpParams.set('email', criteria.email);
-    }
-
-    if (criteria.firstName) {
-      httpParams = httpParams.set('firstName', criteria.firstName);
-    }
-
-    if (criteria.lastName) {
-      httpParams = httpParams.set('lastName', criteria.lastName);
-    }
-
-    if (criteria.isActive !== undefined) {
-      httpParams = httpParams.set('isActive', criteria.isActive.toString());
-    }
+    const httpParams = this.#applySearchCriteria(
+      this.#buildPaginationParams(params),
+      criteria
+    );
 
     return this.#http.get<PaginatedResponse<User>>(`${USERS_API_V1}/search`, {
       params: httpParams
     });
+  }
+
+  #applySearchCriteria(
+    httpParams: HttpParams,
+    criteria: UserSearch
+  ): HttpParams {
+    let next = httpParams;
+
+    if (criteria.q) {
+      next = next.set('q', criteria.q);
+    }
+
+    if (criteria.email) {
+      next = next.set('email', criteria.email);
+    }
+
+    if (criteria.firstName) {
+      next = next.set('firstName', criteria.firstName);
+    }
+
+    if (criteria.lastName) {
+      next = next.set('lastName', criteria.lastName);
+    }
+
+    if (criteria.isActive !== undefined) {
+      next = next.set('isActive', criteria.isActive.toString());
+    }
+
+    return next;
   }
 
   #buildCursorPaginationParams(params: UserCursorListParams): HttpParams {
