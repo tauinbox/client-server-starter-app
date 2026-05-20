@@ -131,7 +131,12 @@ export class CoreModule implements NestModule {
           useFactory: (config: ConfigService) => {
             const redisUrl = config.get<string>('REDIS_URL');
             const throttlers = [
-              { ttl: 60000, limit: 10 },
+              // SPA-wide soft ceiling — admin pages, autocompletes, infinite
+              // scrolling and SSE reconnect all fan out into a handful of
+              // requests per interaction. Per-route `@Throttle()` overrides
+              // tighten this down to a few requests per minute on sensitive
+              // public endpoints (login/register/reset-password/etc.).
+              { ttl: 60000, limit: 120 },
               {
                 // Applied globally but overridden on the login route to prevent a
                 // single IP from accumulating enough failed attempts to trigger
