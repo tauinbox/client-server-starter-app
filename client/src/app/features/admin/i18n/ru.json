@@ -59,6 +59,7 @@
     "type": "Тип",
     "effect_include": "Включить",
     "effect_exclude": "Исключить",
+    "effectHint": "«Включить» добавляет совпадающих пользователей; «Исключить» убирает их из флага.",
     "type_user": "Пользователь",
     "type_role": "Роль",
     "type_percentage": "Процент",
@@ -82,7 +83,8 @@
     "op_before": "до",
     "op_after": "после",
     "valuePlaceholder": "Значение для сравнения",
-    "valueListPlaceholder": "Добавьте значение, Enter"
+    "valueListPlaceholder": "Добавьте значение, Enter",
+    "datePickerToggle": "Открыть календарь"
   },
   "roles": {
     "title": "Управление ролями",

@@ -1,6 +1,14 @@
-<div class="rule-row" *transloco="let t; scope: 'admin'">
+<div
+  class="rule-row"
+  [attr.data-effect]="rule().effect"
+  *transloco="let t; scope: 'admin'"
+>
   <div class="rule-fields" [class.vertical]="layout.isHandset()">
-    <mat-form-field class="rule-effect" subscriptSizing="dynamic">
+    <mat-form-field
+      class="rule-effect"
+      subscriptSizing="dynamic"
+      [matTooltip]="t('admin.featureFlagRule.effectHint')"
+    >
       <mat-label>{{ t('admin.featureFlagRule.effect') }}</mat-label>
       <mat-select
         [value]="rule().effect"
@@ -55,7 +63,14 @@
         }
         @case ('percentage') {
           <div class="rule-percentage">
-            <mat-slider min="0" max="100" step="1" class="rule-slider">
+            <mat-slider
+              min="0"
+              max="100"
+              step="5"
+              discrete
+              showTickMarks
+              class="rule-slider"
+            >
               <input
                 matSliderThumb
                 [value]="percentValue"
@@ -63,21 +78,12 @@
                 [attr.aria-label]="t('admin.featureFlagRule.percent')"
               />
             </mat-slider>
-            <mat-form-field
-              class="rule-percent-input"
-              subscriptSizing="dynamic"
+            <span
+              class="rule-percent-value"
+              aria-live="polite"
+              [attr.aria-label]="t('admin.featureFlagRule.percent')"
+              >{{ percentValue }}%</span
             >
-              <mat-label>{{ t('admin.featureFlagRule.percent') }}</mat-label>
-              <input
-                matInput
-                type="number"
-                min="0"
-                max="100"
-                step="1"
-                [value]="percentValue"
-                (input)="onPercentChange($any($event.target).value)"
-              />
-            </mat-form-field>
           </div>
         }
         @case ('attribute') {
@@ -137,6 +143,26 @@
                 ariaLabel="admin.featureFlagRule.attributeValue"
                 (selectedChange)="onAttributeChipsChange($event)"
               />
+            } @else if (isDateOp()) {
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>{{
+                  t('admin.featureFlagRule.attributeValue')
+                }}</mat-label>
+                <input
+                  matInput
+                  [matDatepicker]="datepicker"
+                  [value]="attributeDateValue"
+                  (dateChange)="onAttributeDateChange($event.value)"
+                />
+                <mat-datepicker-toggle
+                  matIconSuffix
+                  [for]="datepicker"
+                  [attr.aria-label]="
+                    t('admin.featureFlagRule.datePickerToggle')
+                  "
+                />
+                <mat-datepicker #datepicker />
+              </mat-form-field>
             } @else {
               <mat-form-field subscriptSizing="dynamic">
                 <mat-label>{{

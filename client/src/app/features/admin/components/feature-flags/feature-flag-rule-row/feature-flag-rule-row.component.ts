@@ -11,12 +11,22 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatIconButton } from '@angular/material/button';
-import { MatFormField, MatLabel } from '@angular/material/form-field';
+import {
+  MatDatepicker,
+  MatDatepickerInput,
+  MatDatepickerToggle
+} from '@angular/material/datepicker';
+import {
+  MatFormField,
+  MatLabel,
+  MatSuffix
+} from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatOption } from '@angular/material/core';
 import { MatSelect } from '@angular/material/select';
 import { MatSlider, MatSliderThumb } from '@angular/material/slider';
+import { MatTooltip } from '@angular/material/tooltip';
 import { TranslocoDirective } from '@jsverse/transloco';
 import { of, Subject } from 'rxjs';
 import {
@@ -70,6 +80,7 @@ const ATTRIBUTE_OPS: FeatureFlagAttributeOp[] = [
 const USER_SEARCH_DEBOUNCE_MS = 350;
 const USER_SEARCH_MIN_CHARS = 3;
 const USER_SEARCH_LIMIT = 10;
+const PERCENT_STEP = 5;
 
 function userToChip(user: User): ChipOption {
   return {
@@ -92,14 +103,19 @@ function userMatchesTerm(user: User, lowered: string): boolean {
   selector: 'nxs-feature-flag-rule-row',
   imports: [
     MatIconButton,
+    MatDatepicker,
+    MatDatepickerInput,
+    MatDatepickerToggle,
     MatFormField,
     MatLabel,
+    MatSuffix,
     MatIcon,
     MatInput,
     MatOption,
     MatSelect,
     MatSlider,
     MatSliderThumb,
+    MatTooltip,
     ChipsAutocompleteComponent,
     TranslocoDirective
   ],
@@ -191,6 +207,20 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
     const p = this.rule().payload;
     return p.type === 'attribute' ? (p.customKey ?? '') : '';
   }
+
+  protected get attributeDateValue(): Date | null {
+    const p = this.rule().payload;
+    if (p.type !== 'attribute') return null;
+    if (p.op !== 'before' && p.op !== 'after') return null;
+    if (typeof p.value !== 'string' || p.value.length === 0) return null;
+    const d = new Date(p.value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  protected readonly isDateOp = computed(() => {
+    const p = this.rule().payload;
+    return p.type === 'attribute' && (p.op === 'before' || p.op === 'after');
+  });
 
   ngOnInit(): void {
     this.#userSearch$
@@ -330,7 +360,8 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
         : Number.isFinite(Number(value))
           ? Number(value)
           : 0;
-    const clamped = Math.max(0, Math.min(100, Math.round(num)));
+    const snapped = Math.round(num / PERCENT_STEP) * PERCENT_STEP;
+    const clamped = Math.max(0, Math.min(100, snapped));
     this.#updatePayload({ type: 'percentage', percent: clamped });
   }
 
@@ -391,6 +422,25 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
       field: current.field,
       op: current.op,
       value: raw,
+      ...(current.customKey !== undefined
+        ? { customKey: current.customKey }
+        : {})
+    });
+  }
+
+  onAttributeDateChange(date: Date | null): void {
+    const current = this.rule().payload;
+    if (current.type !== 'attribute') return;
+    if (current.op !== 'before' && current.op !== 'after') return;
+    const value =
+      date instanceof Date && !Number.isNaN(date.getTime())
+        ? date.toISOString()
+        : '';
+    this.#updatePayload({
+      type: 'attribute',
+      field: current.field,
+      op: current.op,
+      value,
       ...(current.customKey !== undefined
         ? { customKey: current.customKey }
         : {})
