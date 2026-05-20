@@ -38,6 +38,13 @@
   width: 100%;
 }
 
+// nxs-chips-autocomplete adds a 12px host margin to maintain form rhythm in
+// stacked layouts; inside the rule-row grid that would offset the chip cell
+// below the sibling select cells. Drop the margin locally.
+nxs-chips-autocomplete {
+  margin-bottom: 0;
+}
+
 .rule-percentage {
   display: flex;
   gap: vars.$spacing-sm;

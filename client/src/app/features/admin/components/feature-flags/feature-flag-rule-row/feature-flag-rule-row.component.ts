@@ -1,11 +1,15 @@
+import type { OnDestroy, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject,
   model,
-  output
+  output,
+  signal
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatIconButton } from '@angular/material/button';
 import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
@@ -14,6 +18,13 @@ import { MatOption } from '@angular/material/core';
 import { MatSelect } from '@angular/material/select';
 import { MatSlider, MatSliderThumb } from '@angular/material/slider';
 import { TranslocoDirective } from '@jsverse/transloco';
+import { forkJoin, of, Subject } from 'rxjs';
+import {
+  debounceTime,
+  distinctUntilChanged,
+  map,
+  switchMap
+} from 'rxjs/operators';
 import type {
   FeatureFlagAttributeField,
   FeatureFlagAttributeOp,
@@ -22,6 +33,11 @@ import type {
   FeatureFlagRuleType
 } from '@app/shared/types';
 import { LayoutService } from '@core/services/layout.service';
+import type { ChipOption } from '@shared/forms';
+import { ChipsAutocompleteComponent } from '@shared/forms';
+import { RoleService } from '../../../services/role.service';
+import { UserService } from '../../../../users/services/user.service';
+import type { User } from '../../../../users/models/user.types';
 
 export type FeatureFlagRuleDraft = {
   id?: string;
@@ -51,6 +67,18 @@ const ATTRIBUTE_OPS: FeatureFlagAttributeOp[] = [
   'after'
 ];
 
+const USER_SEARCH_DEBOUNCE_MS = 250;
+const USER_SEARCH_MIN_CHARS = 2;
+const USER_SEARCH_LIMIT = 10;
+
+function userToChip(user: User): ChipOption {
+  return {
+    value: user.id,
+    label: `${user.firstName} ${user.lastName}`.trim() || user.email,
+    sub: user.email
+  };
+}
+
 @Component({
   selector: 'nxs-feature-flag-rule-row',
   imports: [
@@ -63,34 +91,67 @@ const ATTRIBUTE_OPS: FeatureFlagAttributeOp[] = [
     MatSelect,
     MatSlider,
     MatSliderThumb,
+    ChipsAutocompleteComponent,
     TranslocoDirective
   ],
   templateUrl: './feature-flag-rule-row.component.html',
   styleUrl: './feature-flag-rule-row.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class FeatureFlagRuleRowComponent {
+export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   readonly rule = model.required<FeatureFlagRuleDraft>();
   readonly remove = output<void>();
 
   protected readonly layout = inject(LayoutService);
+  readonly #roleService = inject(RoleService);
+  readonly #userService = inject(UserService);
+  readonly #destroyRef = inject(DestroyRef);
 
   protected readonly types = RULE_TYPES;
   protected readonly effects = RULE_EFFECTS;
   protected readonly attributeFields = ATTRIBUTE_FIELDS;
   protected readonly attributeOps = ATTRIBUTE_OPS;
 
+  // Chip-label caches — keyed by the underlying API value (user UUID or role
+  // name) so subsequent edits keep the human-readable display even if the
+  // autocomplete list has churned to a different page of results.
+  readonly #userLabelCache = signal(new Map<string, ChipOption>());
+  readonly #roleLabelCache = signal(new Map<string, ChipOption>());
+
+  protected readonly userOptions = signal<ChipOption[]>([]);
+  protected readonly roleOptions = signal<ChipOption[]>([]);
+
+  protected readonly userChips = computed<ChipOption[]>(() => {
+    const payload = this.rule().payload;
+    if (payload.type !== 'user') return [];
+    const cache = this.#userLabelCache();
+    return payload.userIds.map(
+      (id) => cache.get(id) ?? { value: id, label: id }
+    );
+  });
+
+  protected readonly roleChips = computed<ChipOption[]>(() => {
+    const payload = this.rule().payload;
+    if (payload.type !== 'role') return [];
+    const cache = this.#roleLabelCache();
+    return payload.roleNames.map(
+      (name) => cache.get(name) ?? { value: name, label: name }
+    );
+  });
+
+  protected readonly attrValueChips = computed<ChipOption[]>(() => {
+    const payload = this.rule().payload;
+    if (payload.type !== 'attribute' || payload.op !== 'in') return [];
+    const v = payload.value;
+    const arr = Array.isArray(v) ? v : [];
+    return arr
+      .filter((x): x is string => typeof x === 'string' && x.length > 0)
+      .map((s) => ({ value: s, label: s }));
+  });
+
+  readonly #userSearch$ = new Subject<string>();
+
   protected readonly typeLabel = computed(() => this.rule().type);
-
-  protected get userIdsValue(): string {
-    const p = this.rule().payload;
-    return p.type === 'user' ? p.userIds.join(', ') : '';
-  }
-
-  protected get roleNamesValue(): string {
-    const p = this.rule().payload;
-    return p.type === 'role' ? p.roleNames.join(', ') : '';
-  }
 
   protected get percentValue(): number {
     const p = this.rule().payload;
@@ -107,11 +168,11 @@ export class FeatureFlagRuleRowComponent {
     return p.type === 'attribute' ? p.op : 'eq';
   }
 
-  protected get attributeValue(): string {
+  protected get attributeValueText(): string {
     const p = this.rule().payload;
     if (p.type !== 'attribute') return '';
     const v = p.value;
-    if (Array.isArray(v)) return v.join(', ');
+    if (Array.isArray(v)) return '';
     if (typeof v === 'string') return v;
     if (v === undefined || v === null) return '';
     return String(v);
@@ -120,6 +181,82 @@ export class FeatureFlagRuleRowComponent {
   protected get attributeCustomKey(): string {
     const p = this.rule().payload;
     return p.type === 'attribute' ? (p.customKey ?? '') : '';
+  }
+
+  ngOnInit(): void {
+    this.#userSearch$
+      .pipe(
+        debounceTime(USER_SEARCH_DEBOUNCE_MS),
+        distinctUntilChanged(),
+        switchMap((term) => this.#searchUsers(term)),
+        takeUntilDestroyed(this.#destroyRef)
+      )
+      .subscribe((users) => {
+        const next = new Map(this.#userLabelCache());
+        const chips: ChipOption[] = [];
+        for (const u of users) {
+          const chip = userToChip(u);
+          next.set(chip.value, chip);
+          chips.push(chip);
+        }
+        this.#userLabelCache.set(next);
+        this.userOptions.set(chips);
+      });
+
+    this.#roleService
+      .getAll()
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe((roles) => {
+        const cache = new Map(this.#roleLabelCache());
+        const opts: ChipOption[] = [];
+        for (const r of roles) {
+          const chip: ChipOption = {
+            value: r.name,
+            label: r.name,
+            sub: r.description ?? undefined
+          };
+          cache.set(chip.value, chip);
+          opts.push(chip);
+        }
+        this.#roleLabelCache.set(cache);
+        this.roleOptions.set(opts);
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.#userSearch$.complete();
+  }
+
+  #searchUsers(term: string) {
+    const trimmed = term.trim();
+    if (trimmed.length < USER_SEARCH_MIN_CHARS) return of([] as User[]);
+    const params = {
+      limit: USER_SEARCH_LIMIT,
+      sortBy: 'createdAt',
+      sortOrder: 'desc'
+    } as const;
+    // Server combines criteria with AND — send the term against email when
+    // it looks like one, otherwise probe first and last name in parallel and
+    // dedupe so the admin only has to know one piece of identifying info.
+    if (trimmed.includes('@')) {
+      return this.#userService
+        .searchCursor({ email: trimmed }, params)
+        .pipe(map((r) => r.data));
+    }
+    return forkJoin([
+      this.#userService
+        .searchCursor({ firstName: trimmed }, params)
+        .pipe(map((r) => r.data)),
+      this.#userService
+        .searchCursor({ lastName: trimmed }, params)
+        .pipe(map((r) => r.data))
+    ]).pipe(
+      map(([a, b]) => {
+        const dedup = new Map<string, User>();
+        for (const u of [...a, ...b]) dedup.set(u.id, u);
+        return Array.from(dedup.values()).slice(0, USER_SEARCH_LIMIT);
+      })
+    );
   }
 
   onTypeChange(type: FeatureFlagRuleType): void {
@@ -131,17 +268,24 @@ export class FeatureFlagRuleRowComponent {
     this.rule.set({ ...this.rule(), effect });
   }
 
-  onUserIdsChange(value: string): void {
+  onUserChipsChange(chips: ChipOption[]): void {
+    const cache = new Map(this.#userLabelCache());
+    for (const c of chips) cache.set(c.value, c);
+    this.#userLabelCache.set(cache);
     this.#updatePayload({
       type: 'user',
-      userIds: this.#splitCsv(value)
+      userIds: chips.map((c) => c.value)
     });
   }
 
-  onRoleNamesChange(value: string): void {
+  onUserSearchTerm(term: string): void {
+    this.#userSearch$.next(term);
+  }
+
+  onRoleChipsChange(chips: ChipOption[]): void {
     this.#updatePayload({
       type: 'role',
-      roleNames: this.#splitCsv(value)
+      roleNames: chips.map((c) => c.value)
     });
   }
 
@@ -178,11 +322,27 @@ export class FeatureFlagRuleRowComponent {
   onAttributeOpChange(op: FeatureFlagAttributeOp): void {
     const current = this.rule().payload;
     if (current.type !== 'attribute') return;
+    let nextValue: unknown;
+    if (op === 'in') {
+      // Switching INTO `in`: preserve any existing scalar as the first chip.
+      const existing = current.value;
+      if (Array.isArray(existing)) nextValue = existing;
+      else if (typeof existing === 'string' && existing.trim().length > 0)
+        nextValue = [existing.trim()];
+      else nextValue = [];
+    } else if (current.op === 'in') {
+      // Switching OUT of `in`: collapse first chip to a scalar so the new
+      // single-input field has a sensible starting value.
+      const arr = Array.isArray(current.value) ? current.value : [];
+      nextValue = arr.length > 0 ? String(arr[0]) : '';
+    } else {
+      nextValue = current.value;
+    }
     this.#updatePayload({
       type: 'attribute',
       field: current.field,
       op,
-      value: op === 'in' ? this.#splitCsv(this.attributeValue) : current.value,
+      value: nextValue,
       ...(current.customKey !== undefined
         ? { customKey: current.customKey }
         : {})
@@ -192,12 +352,25 @@ export class FeatureFlagRuleRowComponent {
   onAttributeValueChange(raw: string): void {
     const current = this.rule().payload;
     if (current.type !== 'attribute') return;
-    const parsed: unknown = current.op === 'in' ? this.#splitCsv(raw) : raw;
     this.#updatePayload({
       type: 'attribute',
       field: current.field,
       op: current.op,
-      value: parsed,
+      value: raw,
+      ...(current.customKey !== undefined
+        ? { customKey: current.customKey }
+        : {})
+    });
+  }
+
+  onAttributeChipsChange(chips: ChipOption[]): void {
+    const current = this.rule().payload;
+    if (current.type !== 'attribute' || current.op !== 'in') return;
+    this.#updatePayload({
+      type: 'attribute',
+      field: current.field,
+      op: current.op,
+      value: chips.map((c) => c.value),
       ...(current.customKey !== undefined
         ? { customKey: current.customKey }
         : {})
@@ -218,13 +391,6 @@ export class FeatureFlagRuleRowComponent {
 
   emitRemove(): void {
     this.remove.emit();
-  }
-
-  #splitCsv(value: string): string[] {
-    return value
-      .split(',')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
   }
 
   #updatePayload(payload: FeatureFlagRulePayload): void {

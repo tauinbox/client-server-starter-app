@@ -45,7 +45,8 @@
     "keyLabel": "Ключ",
     "keyHint": "Строчные буквы, цифры и дефисы. Пример: new-dashboard",
     "descriptionLabel": "Описание",
-    "environmentsLabel": "Окружения (через запятую; оставьте пустым для всех)",
+    "environmentsLabel": "Окружения (оставьте пустым для всех)",
+    "environmentsPlaceholder": "Добавьте окружение, Enter",
     "enabledLabel": "Включён",
     "publicLabel": "Виден анонимным пользователям",
     "rulesTitle": "Правила",
@@ -63,9 +64,9 @@
     "type_percentage": "Процент",
     "type_attribute": "Атрибут",
     "userIds": "ID пользователей",
-    "userIdsPlaceholder": "ID через запятую",
+    "userIdsPlaceholder": "Поиск по имени или email",
     "roleNames": "Имена ролей",
-    "roleNamesPlaceholder": "Имена через запятую",
+    "roleNamesPlaceholder": "Поиск по названию роли",
     "percent": "Процент",
     "attributeField": "Поле",
     "attributeOp": "Оператор",
@@ -81,7 +82,7 @@
     "op_before": "до",
     "op_after": "после",
     "valuePlaceholder": "Значение для сравнения",
-    "valueListPlaceholder": "Значения через запятую"
+    "valueListPlaceholder": "Добавьте значение, Enter"
   },
   "roles": {
     "title": "Управление ролями",

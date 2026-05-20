@@ -31,26 +31,27 @@
     <div class="rule-payload">
       @switch (rule().type) {
         @case ('user') {
-          <mat-form-field class="rule-payload-input">
-            <mat-label>{{ t('admin.featureFlagRule.userIds') }}</mat-label>
-            <input
-              matInput
-              [value]="userIdsValue"
-              (input)="onUserIdsChange($any($event.target).value)"
-              [placeholder]="t('admin.featureFlagRule.userIdsPlaceholder')"
-            />
-          </mat-form-field>
+          <nxs-chips-autocomplete
+            class="rule-payload-input"
+            [selected]="userChips()"
+            [options]="userOptions()"
+            label="admin.featureFlagRule.userIds"
+            placeholder="admin.featureFlagRule.userIdsPlaceholder"
+            ariaLabel="admin.featureFlagRule.userIds"
+            (selectedChange)="onUserChipsChange($event)"
+            (searchTermChange)="onUserSearchTerm($event)"
+          />
         }
         @case ('role') {
-          <mat-form-field class="rule-payload-input">
-            <mat-label>{{ t('admin.featureFlagRule.roleNames') }}</mat-label>
-            <input
-              matInput
-              [value]="roleNamesValue"
-              (input)="onRoleNamesChange($any($event.target).value)"
-              [placeholder]="t('admin.featureFlagRule.roleNamesPlaceholder')"
-            />
-          </mat-form-field>
+          <nxs-chips-autocomplete
+            class="rule-payload-input"
+            [selected]="roleChips()"
+            [options]="roleOptions()"
+            label="admin.featureFlagRule.roleNames"
+            placeholder="admin.featureFlagRule.roleNamesPlaceholder"
+            ariaLabel="admin.featureFlagRule.roleNames"
+            (selectedChange)="onRoleChipsChange($event)"
+          />
         }
         @case ('percentage') {
           <div class="rule-percentage">
@@ -122,21 +123,30 @@
                 />
               </mat-form-field>
             }
-            <mat-form-field>
-              <mat-label>{{
-                t('admin.featureFlagRule.attributeValue')
-              }}</mat-label>
-              <input
-                matInput
-                [value]="attributeValue"
-                (input)="onAttributeValueChange($any($event.target).value)"
-                [placeholder]="
-                  attributeOp === 'in'
-                    ? t('admin.featureFlagRule.valueListPlaceholder')
-                    : t('admin.featureFlagRule.valuePlaceholder')
-                "
+            @if (attributeOp === 'in') {
+              <nxs-chips-autocomplete
+                class="rule-payload-input"
+                [selected]="attrValueChips()"
+                [options]="[]"
+                [allowFreeText]="true"
+                label="admin.featureFlagRule.attributeValue"
+                placeholder="admin.featureFlagRule.valueListPlaceholder"
+                ariaLabel="admin.featureFlagRule.attributeValue"
+                (selectedChange)="onAttributeChipsChange($event)"
               />
-            </mat-form-field>
+            } @else {
+              <mat-form-field>
+                <mat-label>{{
+                  t('admin.featureFlagRule.attributeValue')
+                }}</mat-label>
+                <input
+                  matInput
+                  [value]="attributeValueText"
+                  (input)="onAttributeValueChange($any($event.target).value)"
+                  [placeholder]="t('admin.featureFlagRule.valuePlaceholder')"
+                />
+              </mat-form-field>
+            }
           </div>
         }
       }

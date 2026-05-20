@@ -66,6 +66,9 @@
       "passwordWeak": "Password is too weak",
       "passwordMismatch": "Passwords do not match",
       "unknown": "This field is invalid"
+    },
+    "chips": {
+      "removeChip": "Remove {{ label }}"
     }
   },
   "passwordStrength": {
