@@ -59,6 +59,7 @@
     "type": "Type",
     "effect_include": "Include",
     "effect_exclude": "Exclude",
+    "effectHint": "Include adds matching users; Exclude removes them from the flag.",
     "type_user": "User",
     "type_role": "Role",
     "type_percentage": "Percentage",
@@ -82,7 +83,8 @@
     "op_before": "before",
     "op_after": "after",
     "valuePlaceholder": "Value to compare against",
-    "valueListPlaceholder": "Add value, press Enter"
+    "valueListPlaceholder": "Add value, press Enter",
+    "datePickerToggle": "Open date picker"
   },
   "roles": {
     "title": "Roles management",

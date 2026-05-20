@@ -12,7 +12,21 @@
   padding: vars.$spacing-sm;
   background: var(--mat-sys-surface-container);
   border: func.rem(1) solid var(--mat-sys-outline-variant);
+  border-left-width: func.rem(4);
   border-radius: func.rem(8);
+
+  &[data-effect='include'] {
+    border-left-color: var(--mat-sys-tertiary);
+  }
+
+  &[data-effect='exclude'] {
+    background: color-mix(
+      in oklch,
+      var(--mat-sys-error-container) 25%,
+      var(--mat-sys-surface-container)
+    );
+    border-left-color: var(--mat-sys-error);
+  }
 }
 
 .rule-fields {
@@ -57,8 +71,11 @@ nxs-chips-autocomplete {
   min-width: 0;
 }
 
-.rule-percent-input {
-  width: func.rem(96);
+.rule-percent-value {
+  min-width: func.rem(48);
+  font-variant-numeric: tabular-nums;
+  color: var(--mat-sys-on-surface-variant);
+  text-align: end;
 }
 
 .rule-attribute {

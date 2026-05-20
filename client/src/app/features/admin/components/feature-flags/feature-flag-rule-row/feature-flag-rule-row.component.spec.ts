@@ -1,5 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideNativeDateAdapter } from '@angular/material/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
@@ -67,6 +68,7 @@ describe('FeatureFlagRuleRowComponent', () => {
       imports: [HostComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideNoopAnimations(),
+        provideNativeDateAdapter(),
         { provide: RoleService, useValue: roleServiceStub },
         { provide: UserService, useValue: userServiceStub }
       ]
@@ -80,6 +82,71 @@ describe('FeatureFlagRuleRowComponent', () => {
       'input[matSliderThumb]'
     );
     expect(sliderInput).not.toBeNull();
+  });
+
+  it('shows a static percent label that mirrors the slider value', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.detectChanges();
+    const label = (fixture.nativeElement as HTMLElement).querySelector(
+      '.rule-percent-value'
+    );
+    expect(label?.textContent?.trim()).toBe('25%');
+  });
+
+  it('drops the redundant number-input form-field from the percentage editor', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.detectChanges();
+    const numberInput = (fixture.nativeElement as HTMLElement).querySelector(
+      '.rule-percent-input'
+    );
+    expect(numberInput).toBeNull();
+  });
+
+  it('snaps percent change to the nearest multiple of 5', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.detectChanges();
+    const cmp = fixture.debugElement.children[0]
+      .componentInstance as FeatureFlagRuleRowComponent;
+
+    cmp.onPercentChange(47);
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'percentage',
+      percent: 45
+    });
+
+    cmp.onPercentChange(48);
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'percentage',
+      percent: 50
+    });
+
+    cmp.onPercentChange(102);
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'percentage',
+      percent: 100
+    });
+
+    cmp.onPercentChange(-5);
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'percentage',
+      percent: 0
+    });
+  });
+
+  it('reflects rule effect on the root .rule-row via data-effect', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.detectChanges();
+    const row = (fixture.nativeElement as HTMLElement).querySelector(
+      '.rule-row'
+    );
+    expect(row?.getAttribute('data-effect')).toBe('include');
+
+    fixture.componentInstance.rule.set({
+      ...fixture.componentInstance.rule(),
+      effect: 'exclude'
+    });
+    fixture.detectChanges();
+    expect(row?.getAttribute('data-effect')).toBe('exclude');
   });
 
   it('every <mat-form-field> in the row uses subscriptSizing="dynamic"', () => {
@@ -186,6 +253,117 @@ describe('FeatureFlagRuleRowComponent', () => {
       type: 'role',
       roleNames: ['beta-tester', 'admin']
     });
+  });
+
+  it('renders a datepicker for attribute op=before', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'createdAt',
+        op: 'before',
+        value: ''
+      }
+    });
+    fixture.detectChanges();
+    const toggle = (fixture.nativeElement as HTMLElement).querySelector(
+      'mat-datepicker-toggle'
+    );
+    expect(toggle).not.toBeNull();
+    const dateInput = (
+      fixture.nativeElement as HTMLElement
+    ).querySelector<HTMLInputElement>('input[matInput]');
+    expect(dateInput).not.toBeNull();
+  });
+
+  it('renders a datepicker for attribute op=after', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'createdAt',
+        op: 'after',
+        value: ''
+      }
+    });
+    fixture.detectChanges();
+    const toggle = (fixture.nativeElement as HTMLElement).querySelector(
+      'mat-datepicker-toggle'
+    );
+    expect(toggle).not.toBeNull();
+  });
+
+  it('onAttributeDateChange writes ISO string to payload.value', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'createdAt',
+        op: 'after',
+        value: ''
+      }
+    });
+    fixture.detectChanges();
+    const cmp = fixture.debugElement.children[0]
+      .componentInstance as FeatureFlagRuleRowComponent;
+
+    const d = new Date(Date.UTC(2026, 0, 15, 0, 0, 0));
+    cmp.onAttributeDateChange(d);
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'attribute',
+      field: 'createdAt',
+      op: 'after',
+      value: d.toISOString()
+    });
+  });
+
+  it('onAttributeDateChange with null blanks payload.value', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'createdAt',
+        op: 'before',
+        value: '2026-01-15T00:00:00.000Z'
+      }
+    });
+    fixture.detectChanges();
+    const cmp = fixture.debugElement.children[0]
+      .componentInstance as FeatureFlagRuleRowComponent;
+    cmp.onAttributeDateChange(null);
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'attribute',
+      field: 'createdAt',
+      op: 'before',
+      value: ''
+    });
+  });
+
+  it('keeps a plain text input for attribute op=eq', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'email',
+        op: 'eq',
+        value: 'demo@example.com'
+      }
+    });
+    fixture.detectChanges();
+    const toggle = (fixture.nativeElement as HTMLElement).querySelector(
+      'mat-datepicker-toggle'
+    );
+    expect(toggle).toBeNull();
   });
 
   it('attribute op=in stores chip array as payload.value', () => {
