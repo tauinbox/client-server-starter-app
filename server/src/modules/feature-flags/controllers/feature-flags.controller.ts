@@ -12,7 +12,7 @@ import {
   ApiTags
 } from '@nestjs/swagger';
 import type { Request } from 'express';
-import { Public } from '../../auth/decorators/public.decorator';
+import { OptionalAuth } from '../../auth/decorators/optional-auth.decorator';
 import { PermissionService } from '../../auth/services/permission.service';
 import { UsersService } from '../../users/services/users.service';
 import {
@@ -40,7 +40,7 @@ export class FeatureFlagsController {
   ) {}
 
   @Get()
-  @Public()
+  @OptionalAuth()
   @ApiBearerAuth()
   @ApiOperation({
     summary:
