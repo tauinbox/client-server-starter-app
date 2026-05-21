@@ -2,6 +2,7 @@ import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { IS_OPTIONAL_AUTH_KEY } from '../decorators/optional-auth.decorator';
 
 describe('JwtAuthGuard', () => {
   let guard: JwtAuthGuard;
@@ -38,7 +39,9 @@ describe('JwtAuthGuard', () => {
   });
 
   it('returns true and skips JWT validation when handler has @Public() metadata', () => {
-    getAllAndOverride.mockReturnValue(true);
+    getAllAndOverride.mockImplementation(
+      (key: string) => key === IS_PUBLIC_KEY
+    );
 
     const result = guard.canActivate(context);
 
@@ -60,7 +63,9 @@ describe('JwtAuthGuard', () => {
   });
 
   it('checks both handler and class metadata so @Public() on controller propagates', () => {
-    getAllAndOverride.mockReturnValue(true);
+    getAllAndOverride.mockImplementation(
+      (key: string) => key === IS_PUBLIC_KEY
+    );
 
     void guard.canActivate(context);
 
@@ -76,5 +81,40 @@ describe('JwtAuthGuard', () => {
     void guard.canActivate(context);
 
     expect(superCanActivate).toHaveBeenCalledWith(context);
+  });
+
+  describe('@OptionalAuth()', () => {
+    it('invokes the JWT strategy so req.user gets populated when the token is valid', async () => {
+      getAllAndOverride.mockImplementation(
+        (key: string) => key === IS_OPTIONAL_AUTH_KEY
+      );
+      superCanActivate.mockResolvedValue(true);
+
+      const result = await guard.canActivate(context);
+
+      expect(result).toBe(true);
+      expect(superCanActivate).toHaveBeenCalledWith(context);
+    });
+
+    it('swallows JWT failures and still returns true (no/invalid/expired/revoked token)', async () => {
+      getAllAndOverride.mockImplementation(
+        (key: string) => key === IS_OPTIONAL_AUTH_KEY
+      );
+      superCanActivate.mockRejectedValue(new Error('Unauthorized'));
+
+      const result = await guard.canActivate(context);
+
+      expect(result).toBe(true);
+      expect(superCanActivate).toHaveBeenCalledWith(context);
+    });
+
+    it('@Public() wins when combined with @OptionalAuth() — strategy is not invoked', () => {
+      getAllAndOverride.mockReturnValue(true); // both keys true
+
+      const result = guard.canActivate(context);
+
+      expect(result).toBe(true);
+      expect(superCanActivate).not.toHaveBeenCalled();
+    });
   });
 });
