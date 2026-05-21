@@ -23,7 +23,19 @@
           <mat-card appearance="outlined" class="flag-card">
             <div class="flag-card-head">
               <div class="flag-card-titles">
-                <div class="flag-key">{{ flag.key }}</div>
+                <div class="flag-key">
+                  {{ flag.key }}
+                  @if (rulesFailedFlagIds().has(flag.id)) {
+                    <mat-icon
+                      class="rules-warning"
+                      [matTooltip]="t('admin.featureFlags.rulesFailedTooltip')"
+                      [attr.aria-label]="
+                        t('admin.featureFlags.rulesFailedTooltip')
+                      "
+                      >warning_amber</mat-icon
+                    >
+                  }
+                </div>
                 @if (flag.enabled) {
                   <mat-chip highlighted>{{
                     t('admin.featureFlags.statusEnabled')
@@ -42,12 +54,18 @@
               }
 
               <dl class="flag-card-fields">
+                <dt>{{ t('admin.featureFlags.tableHeaderEnvironments') }}</dt>
                 @if (flag.environments.length > 0) {
-                  <dt>{{ t('admin.featureFlags.tableHeaderEnvironments') }}</dt>
                   <dd class="env-chips">
                     @for (env of flag.environments; track env) {
                       <mat-chip>{{ env }}</mat-chip>
                     }
+                  </dd>
+                } @else {
+                  <dd>
+                    <span class="muted">{{
+                      t('admin.featureFlags.environmentsAll')
+                    }}</span>
                   </dd>
                 }
                 <dt>{{ t('admin.featureFlags.tableHeaderPublic') }}</dt>
@@ -114,6 +132,14 @@
             </th>
             <td mat-cell *matCellDef="let flag">
               <span class="flag-key">{{ flag.key }}</span>
+              @if (rulesFailedFlagIds().has(flag.id)) {
+                <mat-icon
+                  class="rules-warning"
+                  [matTooltip]="t('admin.featureFlags.rulesFailedTooltip')"
+                  [attr.aria-label]="t('admin.featureFlags.rulesFailedTooltip')"
+                  >warning_amber</mat-icon
+                >
+              }
             </td>
           </ng-container>
 

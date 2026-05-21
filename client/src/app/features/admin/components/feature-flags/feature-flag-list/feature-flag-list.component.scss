@@ -36,6 +36,15 @@
   font-weight: 500;
 }
 
+.rules-warning {
+  width: func.rem(18);
+  height: func.rem(18);
+  margin-left: vars.$spacing-xs;
+  font-size: func.rem(18);
+  vertical-align: middle;
+  color: var(--mat-sys-error);
+}
+
 .env-chips {
   display: inline-flex;
   flex-wrap: wrap;
