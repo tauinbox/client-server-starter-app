@@ -64,6 +64,11 @@ nxs-chips-autocomplete {
   display: flex;
   gap: vars.$spacing-sm;
   align-items: center;
+
+  // Match the intrinsic height of the sibling outlined mat-form-field cells
+  // (Effect/Type) so a Percentage row aligns vertically with Role/User rows
+  // in the rules-list grid.
+  min-height: func.rem(56);
 }
 
 .rule-slider {

@@ -28,8 +28,9 @@ import { MatSelect } from '@angular/material/select';
 import { MatSlider, MatSliderThumb } from '@angular/material/slider';
 import { MatTooltip } from '@angular/material/tooltip';
 import { TranslocoDirective } from '@jsverse/transloco';
-import { of, Subject } from 'rxjs';
+import { forkJoin, of, Subject } from 'rxjs';
 import {
+  catchError,
   debounceTime,
   distinctUntilChanged,
   map,
@@ -223,6 +224,8 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    this.#preloadUserLabelsFromExistingRule();
+
     this.#userSearch$
       .pipe(
         debounceTime(USER_SEARCH_DEBOUNCE_MS),
@@ -264,6 +267,29 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.#userSearch$.complete();
+  }
+
+  #preloadUserLabelsFromExistingRule(): void {
+    const payload = this.rule().payload;
+    if (payload.type !== 'user' || payload.userIds.length === 0) return;
+    const cache = this.#userLabelCache();
+    const missing = payload.userIds.filter((id) => !cache.has(id));
+    if (missing.length === 0) return;
+    forkJoin(
+      missing.map((id) =>
+        this.#userService.getById(id).pipe(catchError(() => of(null)))
+      )
+    )
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe((users) => {
+        const next = new Map(this.#userLabelCache());
+        for (const u of users) {
+          if (u === null) continue;
+          const chip = userToChip(u);
+          next.set(chip.value, chip);
+        }
+        this.#userLabelCache.set(next);
+      });
   }
 
   // Last completed server response — used to skip the network when the new

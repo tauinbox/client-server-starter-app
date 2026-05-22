@@ -12,8 +12,8 @@ import { ChipsAutocompleteComponent } from './nxs-chips-autocomplete.component';
     [selected]="selected()"
     [options]="options()"
     [allowFreeText]="allowFreeText"
-    label="featureFlagRule.userIds"
-    placeholder="featureFlagRule.userIds"
+    label="featureFlagRule.users"
+    placeholder="featureFlagRule.users"
     (selectedChange)="onSelected($event)"
     (searchTermChange)="onTerm($event)"
   />`
