@@ -73,7 +73,11 @@
       </section>
 
       @if (isEdit && data.flag; as editFlag) {
-        <mat-expansion-panel class="preview-panel">
+        <mat-expansion-panel
+          #previewPanel
+          class="preview-panel"
+          (afterExpand)="onPreviewExpanded()"
+        >
           <mat-expansion-panel-header>
             <mat-panel-title>
               {{ t('admin.featureFlagPreview.title') }}

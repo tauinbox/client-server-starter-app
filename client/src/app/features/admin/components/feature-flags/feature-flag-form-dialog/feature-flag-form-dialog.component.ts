@@ -2,9 +2,11 @@ import type { OnDestroy, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   computed,
   inject,
-  signal
+  signal,
+  viewChild
 } from '@angular/core';
 import {
   form,
@@ -199,6 +201,16 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
 
   cancel(): void {
     this.#dialogRef.close();
+  }
+
+  readonly previewPanelEl = viewChild('previewPanel', { read: ElementRef });
+
+  onPreviewExpanded(): void {
+    // Inside mat-dialog-content the form scrolls separately from the page —
+    // expanding the panel adds ~400px of content below the visible fold, so
+    // we explicitly reveal the bottom of the panel where the Run button lives.
+    const el = this.previewPanelEl()?.nativeElement as HTMLElement | undefined;
+    el?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }
 
   #rulesChanged(): boolean {

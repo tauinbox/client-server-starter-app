@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { RoleService } from '../../../services/role.service';
 import { UserService } from '../../../../users/services/user.service';
@@ -54,16 +54,21 @@ const roleServiceStub = {
   )
 };
 
-const userServiceStub = {
+const userServiceStub: {
+  searchCursor: ReturnType<typeof vi.fn>;
+  getById: ReturnType<typeof vi.fn>;
+} = {
   searchCursor: vi.fn(() =>
     of({ data: [] as User[], meta: { nextCursor: null as string | null } })
-  )
+  ),
+  getById: vi.fn(() => of(null))
 };
 
 describe('FeatureFlagRuleRowComponent', () => {
   beforeEach(async () => {
     roleServiceStub.getAll.mockClear();
     userServiceStub.searchCursor.mockClear();
+    userServiceStub.getById.mockClear();
     await TestBed.configureTestingModule({
       imports: [HostComponent, TranslocoTestingModuleWithLangs],
       providers: [
@@ -213,6 +218,80 @@ describe('FeatureFlagRuleRowComponent', () => {
       op: 'eq',
       value: ''
     });
+  });
+
+  it('preloads user labels via getById when opening a user-rule with existing IDs', () => {
+    userServiceStub.getById.mockImplementation((id: string) =>
+      of({
+        id,
+        firstName: 'Alice',
+        lastName: 'Adams',
+        email: `alice+${id}@example.com`
+      } as Partial<User>)
+    );
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'user',
+      payload: { type: 'user', userIds: ['uuid-1', 'uuid-2'] }
+    });
+    fixture.detectChanges();
+    expect(userServiceStub.getById).toHaveBeenCalledTimes(2);
+    expect(userServiceStub.getById).toHaveBeenCalledWith('uuid-1');
+    expect(userServiceStub.getById).toHaveBeenCalledWith('uuid-2');
+
+    const chipLabels = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('mat-chip-row')
+    ).map((el) => el.textContent?.trim());
+    // Each chip should now display the user's name, not the raw UUID.
+    expect(chipLabels.some((t) => t?.includes('Alice Adams'))).toBe(true);
+  });
+
+  it('does not fetch user details for non-user rule types', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'role',
+      payload: { type: 'role', roleNames: ['admin'] }
+    });
+    fixture.detectChanges();
+    expect(userServiceStub.getById).not.toHaveBeenCalled();
+  });
+
+  it('skips getById when payload.userIds is empty', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'user',
+      payload: { type: 'user', userIds: [] }
+    });
+    fixture.detectChanges();
+    expect(userServiceStub.getById).not.toHaveBeenCalled();
+  });
+
+  it('falls back to UUID label when getById fails for an unknown user', () => {
+    userServiceStub.getById.mockImplementation((id: string) =>
+      id === 'uuid-known'
+        ? of({
+            id,
+            firstName: 'Carol',
+            lastName: 'Clark',
+            email: 'carol@example.com'
+          } as Partial<User>)
+        : throwError(() => new Error('not found'))
+    );
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'user',
+      payload: { type: 'user', userIds: ['uuid-known', 'uuid-missing'] }
+    });
+    expect(() => fixture.detectChanges()).not.toThrow();
+    const chipLabels = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('mat-chip-row')
+    ).map((el) => el.textContent?.trim());
+    expect(chipLabels.some((t) => t?.includes('Carol Clark'))).toBe(true);
+    expect(chipLabels.some((t) => t?.includes('uuid-missing'))).toBe(true);
   });
 
   it('user chip change writes UUIDs (not labels) into payload.userIds', () => {
