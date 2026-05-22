@@ -1,0 +1,132 @@
+<ng-container *transloco="let t; scope: 'admin'">
+  <p class="preview-description">
+    {{ t('admin.featureFlagPreview.description') }}
+  </p>
+
+  <mat-checkbox
+    class="advanced-toggle"
+    [checked]="useRawJson()"
+    (change)="toggleRawJson($event.checked)"
+  >
+    {{ t('admin.featureFlagPreview.advancedJsonToggle') }}
+  </mat-checkbox>
+
+  @if (useRawJson()) {
+    <mat-form-field appearance="outline" class="raw-json-field">
+      <textarea
+        matInput
+        rows="6"
+        spellcheck="false"
+        [placeholder]="t('admin.featureFlagPreview.advancedJsonPlaceholder')"
+        [value]="rawJson()"
+        (input)="rawJson.set($any($event.target).value)"
+      ></textarea>
+    </mat-form-field>
+  } @else {
+    <div class="structured-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ t('admin.featureFlagPreview.userLabel') }}</mat-label>
+        <input
+          matInput
+          [placeholder]="t('admin.featureFlagPreview.userPlaceholder')"
+          [value]="userId()"
+          (input)="userId.set($any($event.target).value)"
+        />
+      </mat-form-field>
+
+      <nxs-chips-autocomplete
+        [selected]="selectedRoles()"
+        [options]="roleOptions()"
+        [allowFreeText]="true"
+        label="admin.featureFlagPreview.rolesLabel"
+        placeholder="admin.featureFlagPreview.rolesPlaceholder"
+        ariaLabel="admin.featureFlagPreview.rolesLabel"
+        (selectedChange)="onRolesChange($event)"
+      />
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{
+          t('admin.featureFlagPreview.environmentLabel')
+        }}</mat-label>
+        <input
+          matInput
+          [placeholder]="t('admin.featureFlagPreview.environmentPlaceholder')"
+          [value]="env()"
+          (input)="env.set($any($event.target).value)"
+        />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="attributes-field">
+        <mat-label>{{
+          t('admin.featureFlagPreview.attributesLabel')
+        }}</mat-label>
+        <textarea
+          matInput
+          rows="4"
+          spellcheck="false"
+          [value]="attributesJson()"
+          (input)="attributesJson.set($any($event.target).value)"
+        ></textarea>
+      </mat-form-field>
+    </div>
+  }
+
+  @if (contextError()) {
+    <p class="preview-error" role="alert">{{ contextError() }}</p>
+  }
+
+  <div class="preview-actions">
+    <button
+      matButton="filled"
+      type="button"
+      [disabled]="loading()"
+      (click)="run()"
+    >
+      @if (loading()) {
+        <mat-spinner diameter="18" />
+      } @else {
+        <mat-icon>play_arrow</mat-icon>
+      }
+      {{ t('admin.featureFlagPreview.runButton') }}
+    </button>
+  </div>
+
+  @if (result(); as r) {
+    <div class="preview-result">
+      <mat-chip-set>
+        <mat-chip
+          class="result-chip"
+          [class.result-chip-on]="r.result"
+          [class.result-chip-off]="!r.result"
+        >
+          <mat-icon matChipAvatar>{{
+            r.result ? 'check_circle' : 'cancel'
+          }}</mat-icon>
+          {{
+            r.result
+              ? t('admin.featureFlagPreview.resultTrue')
+              : t('admin.featureFlagPreview.resultFalse')
+          }}
+        </mat-chip>
+        <mat-chip>
+          {{ t(reasonKey(r.reason)) }}
+        </mat-chip>
+        @if (r.matchedRule; as m) {
+          <mat-chip>
+            {{
+              t('admin.featureFlagPreview.matchedRule', {
+                index: m.index + 1,
+                effect: m.effect,
+                type: m.type
+              })
+            }}
+          </mat-chip>
+        } @else {
+          <mat-chip class="mute-chip">
+            {{ t('admin.featureFlagPreview.noMatch') }}
+          </mat-chip>
+        }
+      </mat-chip-set>
+    </div>
+  }
+</ng-container>

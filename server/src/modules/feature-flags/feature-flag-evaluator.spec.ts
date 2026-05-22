@@ -1,6 +1,7 @@
 import {
   evaluateFeatureFlag,
-  percentageBucket
+  percentageBucket,
+  previewFeatureFlag
 } from '@app/shared/utils/feature-flag-evaluator';
 import type {
   EvaluatorFlag,
@@ -381,6 +382,207 @@ describe('evaluateFeatureFlag — composition', () => {
         baseCtx({ userId: 'alice' })
       )
     ).toBe(false);
+  });
+});
+
+describe('previewFeatureFlag — reasons', () => {
+  it('reason "disabled" when flag.enabled is false', () => {
+    const result = previewFeatureFlag(
+      baseFlag({ enabled: false }),
+      [],
+      baseCtx()
+    );
+    expect(result).toEqual({
+      result: false,
+      reason: 'disabled',
+      matchedRule: null
+    });
+  });
+
+  it('reason "env-mismatch" when environments is non-empty and env does not match', () => {
+    const flag = baseFlag({ environments: ['production'] });
+    const result = previewFeatureFlag(flag, [], baseCtx({ env: 'staging' }));
+    expect(result).toEqual({
+      result: false,
+      reason: 'env-mismatch',
+      matchedRule: null
+    });
+  });
+
+  it('reason "no-rules-default-on" when enabled and no include rules', () => {
+    expect(previewFeatureFlag(baseFlag(), [], baseCtx())).toEqual({
+      result: true,
+      reason: 'no-rules-default-on',
+      matchedRule: null
+    });
+    const onlyExcludes = [
+      rule('exclude', { type: 'role', roleNames: ['banned'] })
+    ];
+    expect(
+      previewFeatureFlag(baseFlag(), onlyExcludes, baseCtx({ roles: ['ok'] }))
+    ).toEqual({
+      result: true,
+      reason: 'no-rules-default-on',
+      matchedRule: null
+    });
+  });
+
+  it('reason "excluded" with matchedRule when an exclude rule fires (user)', () => {
+    const rules = [
+      rule('include', { type: 'percentage', percent: 100 }),
+      rule('exclude', { type: 'user', userIds: ['alice'] })
+    ];
+    const result = previewFeatureFlag(
+      baseFlag(),
+      rules,
+      baseCtx({ userId: 'alice' })
+    );
+    expect(result).toEqual({
+      result: false,
+      reason: 'excluded',
+      matchedRule: { index: 1, type: 'user', effect: 'exclude' }
+    });
+  });
+
+  it('reason "excluded" with matchedRule when an exclude rule fires (role)', () => {
+    const rules = [
+      rule('include', { type: 'role', roleNames: ['beta'] }),
+      rule('exclude', { type: 'role', roleNames: ['banned'] })
+    ];
+    const result = previewFeatureFlag(
+      baseFlag(),
+      rules,
+      baseCtx({ roles: ['beta', 'banned'] })
+    );
+    expect(result.result).toBe(false);
+    expect(result.reason).toBe('excluded');
+    expect(result.matchedRule).toEqual({
+      index: 1,
+      type: 'role',
+      effect: 'exclude'
+    });
+  });
+
+  it('reason "excluded" with matchedRule when an exclude rule fires (attribute)', () => {
+    const rules = [
+      rule('exclude', {
+        type: 'attribute',
+        field: 'email',
+        op: 'endsWith',
+        value: '@contractor.com'
+      })
+    ];
+    const result = previewFeatureFlag(
+      baseFlag(),
+      rules,
+      baseCtx({ attributes: { email: 'bob@contractor.com' } })
+    );
+    expect(result).toEqual({
+      result: false,
+      reason: 'excluded',
+      matchedRule: { index: 0, type: 'attribute', effect: 'exclude' }
+    });
+  });
+
+  it('reason "excluded" with matchedRule when an exclude rule fires (percentage)', () => {
+    const rules = [rule('exclude', { type: 'percentage', percent: 100 })];
+    const result = previewFeatureFlag(
+      baseFlag(),
+      rules,
+      baseCtx({ userId: 'x' })
+    );
+    expect(result).toEqual({
+      result: false,
+      reason: 'excluded',
+      matchedRule: { index: 0, type: 'percentage', effect: 'exclude' }
+    });
+  });
+
+  it('reason "included-by-rule" with matchedRule when an include rule fires', () => {
+    const rules = [
+      rule('include', { type: 'role', roleNames: ['beta'] }),
+      rule('include', { type: 'user', userIds: ['alice'] })
+    ];
+    const result = previewFeatureFlag(
+      baseFlag(),
+      rules,
+      baseCtx({ userId: 'alice' })
+    );
+    expect(result).toEqual({
+      result: true,
+      reason: 'included-by-rule',
+      matchedRule: { index: 1, type: 'user', effect: 'include' }
+    });
+  });
+
+  it('reason "excluded" with null matchedRule when includes exist but none match', () => {
+    const rules = [rule('include', { type: 'user', userIds: ['alice'] })];
+    const result = previewFeatureFlag(
+      baseFlag(),
+      rules,
+      baseCtx({ userId: 'carol' })
+    );
+    expect(result).toEqual({
+      result: false,
+      reason: 'excluded',
+      matchedRule: null
+    });
+  });
+
+  it('returns the first matching exclude rule (excludes short-circuit before includes)', () => {
+    const rules = [
+      rule('include', { type: 'user', userIds: ['alice'] }),
+      rule('exclude', { type: 'role', roleNames: ['banned'] }),
+      rule('exclude', { type: 'user', userIds: ['alice'] })
+    ];
+    const result = previewFeatureFlag(
+      baseFlag(),
+      rules,
+      baseCtx({ userId: 'alice', roles: ['banned'] })
+    );
+    expect(result.matchedRule?.index).toBe(1);
+    expect(result.reason).toBe('excluded');
+  });
+
+  it('result.boolean matches evaluateFeatureFlag for the same input (consistency invariant)', () => {
+    const cases: Array<{
+      flag: EvaluatorFlag;
+      rules: EvaluatorRule[];
+      ctx: FeatureFlagEvaluationContext;
+    }> = [
+      { flag: baseFlag({ enabled: false }), rules: [], ctx: baseCtx() },
+      {
+        flag: baseFlag({ environments: ['production'] }),
+        rules: [],
+        ctx: baseCtx({ env: 'staging' })
+      },
+      {
+        flag: baseFlag(),
+        rules: [rule('include', { type: 'user', userIds: ['alice'] })],
+        ctx: baseCtx({ userId: 'alice' })
+      },
+      {
+        flag: baseFlag(),
+        rules: [rule('include', { type: 'user', userIds: ['alice'] })],
+        ctx: baseCtx({ userId: 'bob' })
+      },
+      {
+        flag: baseFlag(),
+        rules: [rule('exclude', { type: 'role', roleNames: ['banned'] })],
+        ctx: baseCtx({ roles: ['banned'] })
+      },
+      {
+        flag: baseFlag(),
+        rules: [rule('exclude', { type: 'role', roleNames: ['banned'] })],
+        ctx: baseCtx({ roles: ['member'] })
+      },
+      { flag: baseFlag(), rules: [], ctx: baseCtx() }
+    ];
+    for (const c of cases) {
+      const previewResult = previewFeatureFlag(c.flag, c.rules, c.ctx).result;
+      const evalResult = evaluateFeatureFlag(c.flag, c.rules, c.ctx);
+      expect(previewResult).toBe(evalResult);
+    }
   });
 });
 

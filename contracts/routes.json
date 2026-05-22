@@ -319,6 +319,11 @@
     },
     {
       "method": "POST",
+      "path": "/api/v1/admin/feature-flags/1/preview",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
       "path": "/api/v1/admin/feature-flags/1/toggle",
       "expectedStatus": 401
     },

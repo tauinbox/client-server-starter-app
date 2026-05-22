@@ -56,6 +56,36 @@
     "rulesEmpty": "No rules — the flag will use only its enabled state and environment list.",
     "addRule": "Add rule"
   },
+  "featureFlagPreview": {
+    "title": "Preview",
+    "description": "Run a dry evaluation against a synthetic context to verify rules before flipping the flag.",
+    "userLabel": "User ID",
+    "userPlaceholder": "Optional UUID — leave empty for guest",
+    "rolesLabel": "Roles",
+    "rolesPlaceholder": "Add role, press Enter",
+    "attributesLabel": "Attributes",
+    "attributesAddRow": "Add attribute",
+    "attributesKeyPlaceholder": "key",
+    "attributesValuePlaceholder": "value",
+    "environmentLabel": "Environment",
+    "environmentPlaceholder": "Defaults to the server environment",
+    "advancedJsonToggle": "Edit context as raw JSON",
+    "advancedJsonPlaceholder": "{ \"userId\": \"…\", \"roles\": [\"…\"], \"attributes\": { \"email\": \"…\" }, \"env\": \"…\" }",
+    "advancedJsonInvalid": "Context is not valid JSON",
+    "runButton": "Run preview",
+    "resultTrue": "Enabled",
+    "resultFalse": "Disabled",
+    "matchedRule": "Matched rule #{{ index }} ({{ effect }} / {{ type }})",
+    "noMatch": "No rule matched",
+    "reason": {
+      "disabled": "Flag is turned off",
+      "envMismatch": "Environment does not match",
+      "excluded": "Excluded by rule",
+      "includedByRule": "Included by rule",
+      "noRulesDefaultOn": "No include rules — defaults to on"
+    },
+    "errorPreviewFailed": "Preview request failed."
+  },
   "featureFlagRule": {
     "remove": "Remove rule",
     "effect": "Effect",

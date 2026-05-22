@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { HttpException } from '@nestjs/common';
 import { FeatureFlagService } from './feature-flag.service';
@@ -38,6 +39,7 @@ describe('FeatureFlagService', () => {
   let ruleRepo: { find: jest.Mock; manager: { transaction: jest.Mock } };
   let dataSource: { transaction: jest.Mock };
   let attributeRegistry: AttributeRegistryService;
+  let configService: { get: jest.Mock };
 
   const sampleFlag: FeatureFlag = {
     id: 'flag-1',
@@ -69,6 +71,11 @@ describe('FeatureFlagService', () => {
     };
     dataSource = { transaction: jest.fn() };
     attributeRegistry = new AttributeRegistryService();
+    configService = {
+      get: jest.fn((key: string) =>
+        key === 'ENVIRONMENT' ? 'production' : undefined
+      )
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -76,7 +83,8 @@ describe('FeatureFlagService', () => {
         { provide: getRepositoryToken(FeatureFlag), useValue: flagRepo },
         { provide: getRepositoryToken(FeatureFlagRule), useValue: ruleRepo },
         { provide: DataSource, useValue: dataSource },
-        { provide: AttributeRegistryService, useValue: attributeRegistry }
+        { provide: AttributeRegistryService, useValue: attributeRegistry },
+        { provide: ConfigService, useValue: configService }
       ]
     }).compile();
 
@@ -313,6 +321,85 @@ describe('FeatureFlagService', () => {
         )
       ).rejects.toBeInstanceOf(HttpException);
       expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('preview', () => {
+    const previewFlag = {
+      ...sampleFlag,
+      enabled: true,
+      environments: ['production']
+    };
+    const previewRule = {
+      id: 'r1',
+      flagId: 'flag-1',
+      type: 'role',
+      effect: 'include',
+      payload: { type: 'role', roleNames: ['beta'] }
+    };
+
+    it('evaluates against synthetic role context and returns included-by-rule', async () => {
+      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
+      ruleRepo.find.mockResolvedValueOnce([previewRule]);
+      const result = await service.preview('flag-1', { roles: ['beta'] });
+      expect(result.result).toBe(true);
+      expect(result.reason).toBe('included-by-rule');
+      expect(result.matchedRule).toEqual({
+        index: 0,
+        type: 'role',
+        effect: 'include'
+      });
+    });
+
+    it('returns env-mismatch when synthetic env does not match the flag', async () => {
+      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
+      ruleRepo.find.mockResolvedValueOnce([previewRule]);
+      const result = await service.preview('flag-1', {
+        roles: ['beta'],
+        env: 'staging'
+      });
+      expect(result).toEqual({
+        result: false,
+        reason: 'env-mismatch',
+        matchedRule: null
+      });
+    });
+
+    it('falls back to ConfigService ENVIRONMENT when ctx.env is omitted', async () => {
+      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
+      ruleRepo.find.mockResolvedValueOnce([previewRule]);
+      await service.preview('flag-1', { roles: ['beta'] });
+      expect(configService.get).toHaveBeenCalledWith('ENVIRONMENT');
+    });
+
+    it('throws 404 when the flag does not exist', async () => {
+      flagRepo.findOne.mockResolvedValueOnce(null);
+      await expect(service.preview('missing', {})).rejects.toMatchObject({
+        status: 404
+      });
+    });
+
+    it('does not call save/update/remove (non-mutating)', async () => {
+      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
+      ruleRepo.find.mockResolvedValueOnce([previewRule]);
+      await service.preview('flag-1', { roles: ['beta'] });
+      expect(flagRepo.save).not.toHaveBeenCalled();
+      expect(flagRepo.update).not.toHaveBeenCalled();
+      expect(flagRepo.remove).not.toHaveBeenCalled();
+      expect(flagRepo.createQueryBuilder).not.toHaveBeenCalled();
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('caps the attribute key set to bound DTO abuse', async () => {
+      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
+      ruleRepo.find.mockResolvedValueOnce([previewRule]);
+      const huge: Record<string, unknown> = {};
+      for (let i = 0; i < 100; i++) huge[`k${i}`] = i;
+      const result = await service.preview('flag-1', {
+        roles: ['beta'],
+        attributes: huge
+      });
+      expect(result.result).toBe(true);
     });
   });
 

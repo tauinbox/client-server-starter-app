@@ -56,6 +56,36 @@
     "rulesEmpty": "Правил нет — будет применяться только базовое состояние и список окружений.",
     "addRule": "Добавить правило"
   },
+  "featureFlagPreview": {
+    "title": "Предпросмотр",
+    "description": "Прогнать сухое вычисление с искусственным контекстом, чтобы проверить правила перед включением флага.",
+    "userLabel": "User ID",
+    "userPlaceholder": "Необязательный UUID — оставьте пустым для гостя",
+    "rolesLabel": "Роли",
+    "rolesPlaceholder": "Добавьте роль, Enter",
+    "attributesLabel": "Атрибуты",
+    "attributesAddRow": "Добавить атрибут",
+    "attributesKeyPlaceholder": "ключ",
+    "attributesValuePlaceholder": "значение",
+    "environmentLabel": "Окружение",
+    "environmentPlaceholder": "По умолчанию — окружение сервера",
+    "advancedJsonToggle": "Редактировать контекст как JSON",
+    "advancedJsonPlaceholder": "{ \"userId\": \"…\", \"roles\": [\"…\"], \"attributes\": { \"email\": \"…\" }, \"env\": \"…\" }",
+    "advancedJsonInvalid": "Некорректный JSON",
+    "runButton": "Выполнить",
+    "resultTrue": "Включён",
+    "resultFalse": "Выключен",
+    "matchedRule": "Сработало правило №{{ index }} ({{ effect }} / {{ type }})",
+    "noMatch": "Ни одно правило не сработало",
+    "reason": {
+      "disabled": "Флаг выключен",
+      "envMismatch": "Окружение не совпадает",
+      "excluded": "Исключён правилом",
+      "includedByRule": "Включён правилом",
+      "noRulesDefaultOn": "Нет include-правил — по умолчанию включён"
+    },
+    "errorPreviewFailed": "Не удалось выполнить предпросмотр."
+  },
   "featureFlagRule": {
     "remove": "Удалить правило",
     "effect": "Эффект",

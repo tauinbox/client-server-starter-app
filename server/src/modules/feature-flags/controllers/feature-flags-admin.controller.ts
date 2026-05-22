@@ -41,6 +41,8 @@ import { CreateFeatureFlagDto } from '../dtos/create-feature-flag.dto';
 import { UpdateFeatureFlagDto } from '../dtos/update-feature-flag.dto';
 import { ReplaceRulesDto } from '../dtos/replace-rules.dto';
 import { FeatureFlagResponseDto } from '../dtos/feature-flag-response.dto';
+import { PreviewFlagContextDto } from '../dtos/preview-flag-context.dto';
+import { PreviewFlagResponseDto } from '../dtos/preview-flag-response.dto';
 import { FeatureFlagChangedEvent } from '../events/feature-flag-changed.event';
 
 @ApiTags('Feature Flags Admin API')
@@ -191,6 +193,25 @@ export class FeatureFlagsAdminController {
       new FeatureFlagChangedEvent(flag.key, 'rules-replaced')
     );
     return flag;
+  }
+
+  @Post(':id/preview')
+  @Authorize(['manage', 'FeatureFlag'])
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Dry-run a feature flag against a synthetic context — non-mutating, no audit log'
+  })
+  @ApiParam({ name: 'id' })
+  @ApiBody({ type: PreviewFlagContextDto })
+  @ApiOkResponse({ type: PreviewFlagResponseDto })
+  @ApiNotFoundResponse({ description: 'Feature flag not found' })
+  preview(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: PreviewFlagContextDto
+  ) {
+    return this.flagService.preview(id, dto);
   }
 
   @Post(':id/toggle')

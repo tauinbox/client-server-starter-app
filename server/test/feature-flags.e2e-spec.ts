@@ -499,6 +499,87 @@ describe('Feature flags end-to-end', () => {
     expect(notifications.pushToAll).not.toHaveBeenCalled();
   });
 
+  it('preview() returns included-by-rule with matchedRule index for a synthetic role context', async () => {
+    const flag = await flagService.create(
+      { key: 'beta-preview', enabled: true },
+      'actor-1'
+    );
+    await flagService.replaceRules(
+      flag.id,
+      [
+        {
+          type: 'percentage',
+          effect: 'include',
+          payload: { type: 'percentage', percent: 0 }
+        },
+        {
+          type: 'role',
+          effect: 'include',
+          payload: { type: 'role', roleNames: ['beta-tester'] }
+        }
+      ],
+      'actor-1'
+    );
+
+    const result = await flagService.preview(flag.id, {
+      roles: ['beta-tester']
+    });
+    expect(result).toEqual({
+      result: true,
+      reason: 'included-by-rule',
+      matchedRule: { index: 1, type: 'role', effect: 'include' }
+    });
+  });
+
+  it('preview() returns excluded when an exclude rule fires before any include', async () => {
+    const flag = await flagService.create(
+      { key: 'gated-preview', enabled: true },
+      'actor-1'
+    );
+    await flagService.replaceRules(
+      flag.id,
+      [
+        {
+          type: 'role',
+          effect: 'include',
+          payload: { type: 'role', roleNames: ['beta'] }
+        },
+        {
+          type: 'role',
+          effect: 'exclude',
+          payload: { type: 'role', roleNames: ['banned'] }
+        }
+      ],
+      'actor-1'
+    );
+
+    const result = await flagService.preview(flag.id, {
+      roles: ['beta', 'banned']
+    });
+    expect(result.result).toBe(false);
+    expect(result.reason).toBe('excluded');
+    expect(result.matchedRule).toEqual({
+      index: 1,
+      type: 'role',
+      effect: 'exclude'
+    });
+  });
+
+  it('preview() reports disabled when the flag itself is off', async () => {
+    const flag = await flagService.create(
+      { key: 'off-preview', enabled: false },
+      'actor-1'
+    );
+    const result = await flagService.preview(flag.id, {
+      roles: ['anyone']
+    });
+    expect(result).toEqual({
+      result: false,
+      reason: 'disabled',
+      matchedRule: null
+    });
+  });
+
   it('anonymous evaluation filters to public flags only', async () => {
     await flagService.create(
       { key: 'public-banner', enabled: true, public: true },

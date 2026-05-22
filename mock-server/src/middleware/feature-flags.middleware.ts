@@ -3,6 +3,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import {
   evaluateFeatureFlag,
+  previewFeatureFlag,
   type EvaluatorRule,
   type FeatureFlagEvaluationContext
 } from '@app/shared/utils/feature-flag-evaluator';
@@ -663,6 +664,64 @@ adminRouter.put('/:id/rules', (req, res) => {
   });
   broadcastFlagsUpdated();
   res.json(toFeatureFlagResponse(flag));
+});
+
+adminRouter.post('/:id/preview', (req, res) => {
+  const flag = getState().featureFlags.get(req.params['id'] ?? '');
+  if (!flag) {
+    sendError(
+      res,
+      404,
+      'Feature flag not found',
+      ErrorKeys.FEATURE_FLAGS.NOT_FOUND
+    );
+    return;
+  }
+  const body = (req.body ?? {}) as {
+    userId?: unknown;
+    roles?: unknown;
+    attributes?: unknown;
+    env?: unknown;
+    anonId?: unknown;
+  };
+  const userId =
+    typeof body.userId === 'string' && body.userId.length <= 128
+      ? body.userId
+      : null;
+  const roles = isStringArray(body.roles)
+    ? body.roles.slice(0, 32).filter((r) => r.length <= 64)
+    : [];
+  const attributes: Record<string, unknown> = {};
+  if (body.attributes !== null && typeof body.attributes === 'object') {
+    let count = 0;
+    for (const [key, value] of Object.entries(
+      body.attributes as Record<string, unknown>
+    )) {
+      if (count >= 32) break;
+      if (typeof key !== 'string' || key.length === 0 || key.length > 64) {
+        continue;
+      }
+      attributes[key] = value;
+      count++;
+    }
+  }
+  const env =
+    typeof body.env === 'string' && body.env.length <= 32
+      ? body.env
+      : (process.env['ENVIRONMENT'] ?? 'production');
+  const anonId =
+    typeof body.anonId === 'string' && body.anonId.length <= 128
+      ? body.anonId
+      : null;
+  const rules: EvaluatorRule[] = getState()
+    .featureFlagRules.filter((r) => r.flagId === flag.id)
+    .map((r) => ({ effect: r.effect, payload: r.payload }));
+  const result = previewFeatureFlag(
+    { key: flag.key, enabled: flag.enabled, environments: flag.environments },
+    rules,
+    { userId, anonId, roles, attributes, env }
+  );
+  res.json(result);
 });
 
 adminRouter.post('/:id/toggle', (req, res) => {

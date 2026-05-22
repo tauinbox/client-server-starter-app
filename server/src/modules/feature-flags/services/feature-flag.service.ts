@@ -4,14 +4,26 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
+import type { FeatureFlagPreviewResult } from '@app/shared/types';
+import {
+  previewFeatureFlag,
+  type EvaluatorFlag,
+  type EvaluatorRule,
+  type FeatureFlagEvaluationContext
+} from '@app/shared/utils/feature-flag-evaluator';
 import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
 import { CreateFeatureFlagDto } from '../dtos/create-feature-flag.dto';
 import { UpdateFeatureFlagDto } from '../dtos/update-feature-flag.dto';
 import { FeatureFlagRuleDto } from '../dtos/feature-flag-rule.dto';
+import {
+  PreviewFlagContextDto,
+  sanitizeAttributes
+} from '../dtos/preview-flag-context.dto';
 import { validateRulePayload } from '../utils/validate-rule-payload.util';
 import { AttributeRegistryService } from './attribute-registry.service';
 
@@ -23,7 +35,8 @@ export class FeatureFlagService {
     @InjectRepository(FeatureFlagRule)
     private readonly ruleRepo: Repository<FeatureFlagRule>,
     private readonly dataSource: DataSource,
-    private readonly attributeRegistry: AttributeRegistryService
+    private readonly attributeRegistry: AttributeRegistryService,
+    private readonly configService: ConfigService
   ) {}
 
   async findAll(): Promise<FeatureFlag[]> {
@@ -162,6 +175,32 @@ export class FeatureFlagService {
   async delete(id: string): Promise<void> {
     const flag = await this.findOne(id);
     await this.flagRepo.remove(flag);
+  }
+
+  async preview(
+    id: string,
+    dto: PreviewFlagContextDto
+  ): Promise<FeatureFlagPreviewResult> {
+    const flag = await this.findOne(id);
+    const evalFlag: EvaluatorFlag = {
+      key: flag.key,
+      enabled: flag.enabled,
+      environments: flag.environments
+    };
+    const evalRules: EvaluatorRule[] = flag.rules.map((r) => ({
+      effect: r.effect,
+      payload: r.payload
+    }));
+    const env =
+      dto.env ?? this.configService.get<string>('ENVIRONMENT') ?? 'production';
+    const ctx: FeatureFlagEvaluationContext = {
+      userId: dto.userId ?? null,
+      anonId: dto.anonId ?? null,
+      roles: dto.roles ?? [],
+      attributes: sanitizeAttributes(dto.attributes),
+      env
+    };
+    return previewFeatureFlag(evalFlag, evalRules, ctx);
   }
 
   async replaceRules(
