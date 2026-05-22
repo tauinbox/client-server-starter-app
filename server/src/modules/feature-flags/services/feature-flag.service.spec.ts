@@ -174,18 +174,84 @@ describe('FeatureFlagService', () => {
     });
   });
 
-  describe('toggle', () => {
-    it('flips enabled and bumps version', async () => {
-      flagRepo.findOne
-        .mockResolvedValueOnce({ ...sampleFlag, enabled: false, version: 3 })
-        .mockResolvedValueOnce({ ...sampleFlag, enabled: true, version: 4 });
-      flagRepo.update.mockResolvedValue({});
+  describe('toggle — atomic flip', () => {
+    type ToggleSetArg = {
+      enabled: () => string;
+      version: () => string;
+      updatedByUserId: string | null;
+    };
+    const firstSetArg = (qb: QueryBuilderMock): ToggleSetArg => {
+      const calls = qb.set.mock.calls as Array<[ToggleSetArg]>;
+      return calls[0][0];
+    };
+
+    it('flips enabled and bumps version via a single SQL statement', async () => {
+      const qb = createQueryBuilder(1);
+      flagRepo.createQueryBuilder.mockReturnValue(qb);
+      flagRepo.findOne.mockResolvedValueOnce({
+        ...sampleFlag,
+        enabled: true,
+        version: 4
+      });
       const result = await service.toggle('flag-1', 'actor-1');
-      expect(flagRepo.update).toHaveBeenCalledWith(
-        'flag-1',
-        expect.objectContaining({ enabled: true, version: 4 })
-      );
+      expect(flagRepo.update).not.toHaveBeenCalled();
+      expect(qb.where).toHaveBeenCalledWith('id = :id', { id: 'flag-1' });
+      const setArg = firstSetArg(qb);
+      expect(typeof setArg.enabled).toBe('function');
+      expect(setArg.enabled()).toBe('NOT enabled');
+      expect(typeof setArg.version).toBe('function');
+      expect(setArg.version()).toBe('version + 1');
+      expect(setArg.updatedByUserId).toBe('actor-1');
       expect(result.enabled).toBe(true);
+      expect(result.version).toBe(4);
+    });
+
+    it('throws 404 when flag does not exist (affected = 0)', async () => {
+      const qb = createQueryBuilder(0);
+      flagRepo.createQueryBuilder.mockReturnValue(qb);
+      await expect(service.toggle('missing', 'actor-1')).rejects.toMatchObject({
+        status: 404
+      });
+      expect(flagRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('does not read flag.version into the app before writing (no stale read)', async () => {
+      const qb = createQueryBuilder(1);
+      flagRepo.createQueryBuilder.mockReturnValue(qb);
+      flagRepo.findOne.mockResolvedValueOnce({
+        ...sampleFlag,
+        enabled: true,
+        version: 99
+      });
+      await service.toggle('flag-1', 'actor-1');
+      expect(flagRepo.findOne.mock.calls).toHaveLength(1);
+      const setArg = firstSetArg(qb);
+      expect(typeof setArg.version).toBe('function');
+      expect(setArg.version()).toBe('version + 1');
+    });
+
+    it('two concurrent toggles each issue an atomic SQL flip (no lost update)', async () => {
+      const qb1 = createQueryBuilder(1);
+      const qb2 = createQueryBuilder(1);
+      flagRepo.createQueryBuilder
+        .mockReturnValueOnce(qb1)
+        .mockReturnValueOnce(qb2);
+      flagRepo.findOne
+        .mockResolvedValueOnce({ ...sampleFlag, enabled: true, version: 6 })
+        .mockResolvedValueOnce({ ...sampleFlag, enabled: false, version: 7 });
+      const [a, b] = await Promise.all([
+        service.toggle('flag-1', 'actor-A'),
+        service.toggle('flag-1', 'actor-B')
+      ]);
+      expect(qb1.execute).toHaveBeenCalledTimes(1);
+      expect(qb2.execute).toHaveBeenCalledTimes(1);
+      for (const qb of [qb1, qb2]) {
+        const setArg = firstSetArg(qb);
+        expect(setArg.enabled()).toBe('NOT enabled');
+        expect(setArg.version()).toBe('version + 1');
+      }
+      expect(a).toBeDefined();
+      expect(b).toBeDefined();
     });
   });
 
