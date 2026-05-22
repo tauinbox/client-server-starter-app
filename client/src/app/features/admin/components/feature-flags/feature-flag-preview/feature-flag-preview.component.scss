@@ -1,0 +1,70 @@
+@use '../../../../../../styles/abstracts/functions' as func;
+@use '../../../../../../styles/abstracts/variables' as vars;
+
+:host {
+  display: block;
+}
+
+.preview-description {
+  margin: 0 0 vars.$spacing-sm;
+  font-size: var(--mat-sys-body-small-size);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.advanced-toggle {
+  display: block;
+  margin-bottom: vars.$spacing-sm;
+}
+
+.structured-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: vars.$spacing-md;
+  align-items: start;
+
+  @media (width <= 599px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.attributes-field {
+  grid-column: 1 / -1;
+}
+
+.raw-json-field {
+  width: 100%;
+}
+
+.preview-error {
+  margin: 0 0 vars.$spacing-sm;
+  font-size: var(--mat-sys-body-small-size);
+  color: var(--mat-sys-error);
+}
+
+.preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: vars.$spacing-sm;
+}
+
+.preview-result {
+  margin-top: vars.$spacing-sm;
+
+  .result-chip mat-icon {
+    color: inherit;
+  }
+
+  .result-chip-on {
+    color: var(--mat-sys-on-tertiary-container);
+    background-color: var(--mat-sys-tertiary-container);
+  }
+
+  .result-chip-off {
+    color: var(--mat-sys-on-error-container);
+    background-color: var(--mat-sys-error-container);
+  }
+
+  .mute-chip {
+    color: var(--mat-sys-on-surface-variant);
+  }
+}

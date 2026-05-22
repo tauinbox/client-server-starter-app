@@ -54,3 +54,22 @@ export type EvaluatedFeatureFlagsResponse = {
   flags: Record<string, boolean>;
   evaluatedAt: string;
 };
+
+export type FeatureFlagPreviewReason =
+  | 'disabled'
+  | 'env-mismatch'
+  | 'excluded'
+  | 'included-by-rule'
+  | 'no-rules-default-on';
+
+export type FeatureFlagPreviewMatchedRule = {
+  index: number;
+  type: FeatureFlagRuleType;
+  effect: FeatureFlagRuleEffect;
+};
+
+export type FeatureFlagPreviewResult = {
+  result: boolean;
+  reason: FeatureFlagPreviewReason;
+  matchedRule: FeatureFlagPreviewMatchedRule | null;
+};

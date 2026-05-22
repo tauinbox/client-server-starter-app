@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import type {
   FeatureFlagAttributeOp,
+  FeatureFlagPreviewResult,
   FeatureFlagRuleEffect,
   FeatureFlagRulePayload
 } from '../types/feature-flag.types';
@@ -122,4 +123,48 @@ function toTimestamp(value: unknown): number | null {
 export function percentageBucket(id: string, flagKey: string): number {
   const digest = createHash('sha256').update(`${id}:${flagKey}`).digest();
   return digest.readUInt32BE(0) % 100;
+}
+
+export function previewFeatureFlag(
+  flag: EvaluatorFlag,
+  rules: readonly EvaluatorRule[],
+  ctx: FeatureFlagEvaluationContext
+): FeatureFlagPreviewResult {
+  if (!flag.enabled) {
+    return { result: false, reason: 'disabled', matchedRule: null };
+  }
+  if (flag.environments.length > 0 && !flag.environments.includes(ctx.env)) {
+    return { result: false, reason: 'env-mismatch', matchedRule: null };
+  }
+
+  for (let i = 0; i < rules.length; i++) {
+    const rule = rules[i];
+    if (rule.effect !== 'exclude') continue;
+    if (matchesRule(rule.payload, flag.key, ctx)) {
+      return {
+        result: false,
+        reason: 'excluded',
+        matchedRule: { index: i, type: rule.payload.type, effect: 'exclude' }
+      };
+    }
+  }
+
+  const hasIncludes = rules.some((r) => r.effect === 'include');
+  if (!hasIncludes) {
+    return { result: true, reason: 'no-rules-default-on', matchedRule: null };
+  }
+
+  for (let i = 0; i < rules.length; i++) {
+    const rule = rules[i];
+    if (rule.effect !== 'include') continue;
+    if (matchesRule(rule.payload, flag.key, ctx)) {
+      return {
+        result: true,
+        reason: 'included-by-rule',
+        matchedRule: { index: i, type: rule.payload.type, effect: 'include' }
+      };
+    }
+  }
+
+  return { result: false, reason: 'excluded', matchedRule: null };
 }

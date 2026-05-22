@@ -71,6 +71,19 @@
           </div>
         }
       </section>
+
+      @if (isEdit && data.flag; as editFlag) {
+        <mat-expansion-panel class="preview-panel">
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              {{ t('admin.featureFlagPreview.title') }}
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <ng-template matExpansionPanelContent>
+            <nxs-feature-flag-preview [flagId]="editFlag.id" />
+          </ng-template>
+        </mat-expansion-panel>
+      }
     </form>
   </mat-dialog-content>
 

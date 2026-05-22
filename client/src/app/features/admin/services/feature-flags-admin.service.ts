@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import type {
+  FeatureFlagPreviewResult,
   FeatureFlagResponse,
   FeatureFlagRuleEffect,
   FeatureFlagRulePayload,
@@ -24,6 +25,14 @@ export type FeatureFlagRuleInput = {
   type: FeatureFlagRuleType;
   effect: FeatureFlagRuleEffect;
   payload: FeatureFlagRulePayload;
+};
+
+export type PreviewFlagContext = {
+  userId?: string;
+  roles?: string[];
+  attributes?: Record<string, unknown>;
+  env?: string;
+  anonId?: string;
 };
 
 @Injectable({ providedIn: 'root' })
@@ -73,6 +82,16 @@ export class FeatureFlagsAdminService {
     return this.#http.post<FeatureFlagResponse>(
       `${ADMIN_API_V1}/${id}/toggle`,
       {}
+    );
+  }
+
+  preview(
+    id: string,
+    context: PreviewFlagContext
+  ): Observable<FeatureFlagPreviewResult> {
+    return this.#http.post<FeatureFlagPreviewResult>(
+      `${ADMIN_API_V1}/${id}/preview`,
+      context
     );
   }
 }

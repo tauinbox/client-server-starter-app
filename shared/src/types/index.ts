@@ -50,5 +50,8 @@ export type {
   FeatureFlagRulePayload,
   FeatureFlagRuleResponse,
   FeatureFlagResponse,
-  EvaluatedFeatureFlagsResponse
+  EvaluatedFeatureFlagsResponse,
+  FeatureFlagPreviewReason,
+  FeatureFlagPreviewMatchedRule,
+  FeatureFlagPreviewResult
 } from './feature-flag.types';

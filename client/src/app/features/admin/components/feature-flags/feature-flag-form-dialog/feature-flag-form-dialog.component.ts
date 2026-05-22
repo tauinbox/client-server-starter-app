@@ -20,6 +20,7 @@ import {
   MatDialogRef,
   MAT_DIALOG_DATA
 } from '@angular/material/dialog';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { MatIcon } from '@angular/material/icon';
 import { TranslocoDirective } from '@jsverse/transloco';
 import type {
@@ -33,6 +34,7 @@ import type { ChipOption } from '@shared/forms';
 import { ChipsAutocompleteComponent } from '@shared/forms';
 import type { FeatureFlagRuleDraft } from '../feature-flag-rule-row/feature-flag-rule-row.component';
 import { FeatureFlagRuleRowComponent } from '../feature-flag-rule-row/feature-flag-rule-row.component';
+import { FeatureFlagPreviewComponent } from '../feature-flag-preview/feature-flag-preview.component';
 
 export type FeatureFlagFormDialogData = {
   flag?: FeatureFlagResponse;
@@ -68,11 +70,13 @@ function envToChip(name: string): ChipOption {
     MatDialogModule,
     MatButtonModule,
     MatCheckbox,
+    MatExpansionModule,
     MatIcon,
     TranslocoDirective,
     AppFormFieldComponent,
     ChipsAutocompleteComponent,
-    FeatureFlagRuleRowComponent
+    FeatureFlagRuleRowComponent,
+    FeatureFlagPreviewComponent
   ],
   templateUrl: './feature-flag-form-dialog.component.html',
   styleUrl: './feature-flag-form-dialog.component.scss',
