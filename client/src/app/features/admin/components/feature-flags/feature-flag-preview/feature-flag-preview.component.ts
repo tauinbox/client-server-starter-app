@@ -1,4 +1,4 @@
-import type { OnInit } from '@angular/core';
+import type { OnDestroy, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -16,12 +16,33 @@ import { MatInput } from '@angular/material/input';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { of, Subject } from 'rxjs';
+import {
+  debounceTime,
+  distinctUntilChanged,
+  map,
+  switchMap
+} from 'rxjs/operators';
 import type { FeatureFlagPreviewResult } from '@app/shared/types';
 import { ChipsAutocompleteComponent, type ChipOption } from '@shared/forms';
 import { NotifyService } from '@core/services/notify.service';
 import { RoleService } from '../../../services/role.service';
+import { UserService } from '../../../../users/services/user.service';
+import type { User } from '../../../../users/models/user.types';
 import type { PreviewFlagContext } from '../../../services/feature-flags-admin.service';
 import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.service';
+
+const USER_SEARCH_DEBOUNCE_MS = 350;
+const USER_SEARCH_MIN_CHARS = 3;
+const USER_SEARCH_LIMIT = 10;
+
+function userToChip(user: User): ChipOption {
+  return {
+    value: user.id,
+    label: `${user.firstName} ${user.lastName}`.trim() || user.email,
+    sub: user.email
+  };
+}
 
 @Component({
   selector: 'nxs-feature-flag-preview',
@@ -40,16 +61,18 @@ import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.
   styleUrl: './feature-flag-preview.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class FeatureFlagPreviewComponent implements OnInit {
+export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
   readonly #adminService = inject(FeatureFlagsAdminService);
   readonly #roleService = inject(RoleService);
+  readonly #userService = inject(UserService);
   readonly #notify = inject(NotifyService);
   readonly #transloco = inject(TranslocoService);
   readonly #destroyRef = inject(DestroyRef);
 
   readonly flagId = input.required<string>();
 
-  protected readonly userId = signal('');
+  protected readonly selectedUser = signal<ChipOption[]>([]);
+  protected readonly userOptions = signal<ChipOption[]>([]);
   protected readonly env = signal('');
   protected readonly attributesJson = signal('{}');
   protected readonly selectedRoles = signal<ChipOption[]>([]);
@@ -61,6 +84,8 @@ export class FeatureFlagPreviewComponent implements OnInit {
   protected readonly loading = signal(false);
   protected readonly result = signal<FeatureFlagPreviewResult | null>(null);
   protected readonly contextError = signal<string | null>(null);
+
+  readonly #userSearch$ = new Subject<string>();
 
   protected reasonKey(reason: FeatureFlagPreviewResult['reason']): string {
     const map: Record<FeatureFlagPreviewResult['reason'], string> = {
@@ -91,6 +116,47 @@ export class FeatureFlagPreviewComponent implements OnInit {
           // Roles are optional for preview — silently degrade to free-text input.
         }
       });
+
+    this.#userSearch$
+      .pipe(
+        debounceTime(USER_SEARCH_DEBOUNCE_MS),
+        distinctUntilChanged(),
+        switchMap((term) => this.#searchUsers(term)),
+        takeUntilDestroyed(this.#destroyRef)
+      )
+      .subscribe((users) => {
+        this.userOptions.set(users.map(userToChip));
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.#userSearch$.complete();
+  }
+
+  // Preview accepts ONE synthetic user — newest chip wins; older ones are
+  // dropped to keep the picker a single-selection control without changing
+  // the shared ChipsAutocompleteComponent API.
+  onUserChipsChange(chips: ChipOption[]): void {
+    if (chips.length <= 1) {
+      this.selectedUser.set(chips);
+      return;
+    }
+    this.selectedUser.set([chips[chips.length - 1]]);
+  }
+
+  onUserSearchTerm(term: string): void {
+    this.#userSearch$.next(term);
+  }
+
+  #searchUsers(term: string) {
+    const trimmed = term.trim();
+    if (trimmed.length < USER_SEARCH_MIN_CHARS) return of([] as User[]);
+    return this.#userService
+      .searchCursor(
+        { q: trimmed },
+        { limit: USER_SEARCH_LIMIT, sortBy: 'createdAt', sortOrder: 'desc' }
+      )
+      .pipe(map((r) => r.data));
   }
 
   onRolesChange(next: ChipOption[]): void {
@@ -131,8 +197,8 @@ export class FeatureFlagPreviewComponent implements OnInit {
 
   #buildStructuredContext(): PreviewFlagContext | null {
     const ctx: PreviewFlagContext = {};
-    const trimmedUser = this.userId().trim();
-    if (trimmedUser.length > 0) ctx.userId = trimmedUser;
+    const user = this.selectedUser()[0];
+    if (user) ctx.userId = user.value;
     const roles = this.selectedRoles().map((c) => c.value);
     if (roles.length > 0) ctx.roles = roles;
     const trimmedEnv = this.env().trim();

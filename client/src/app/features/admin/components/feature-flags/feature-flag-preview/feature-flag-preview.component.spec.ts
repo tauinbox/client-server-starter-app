@@ -6,12 +6,15 @@ import type { FeatureFlagPreviewResult } from '@app/shared/types';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { NotifyService } from '@core/services/notify.service';
 import { RoleService } from '../../../services/role.service';
+import { UserService } from '../../../../users/services/user.service';
+import type { User } from '../../../../users/models/user.types';
 import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.service';
 import { FeatureFlagPreviewComponent } from './feature-flag-preview.component';
 
 describe('FeatureFlagPreviewComponent', () => {
   let previewSpy: ReturnType<typeof vi.fn>;
   let getAllRolesSpy: ReturnType<typeof vi.fn>;
+  let searchUsersSpy: ReturnType<typeof vi.fn>;
   let notifyError: ReturnType<typeof vi.fn>;
 
   const setup = async (
@@ -19,6 +22,11 @@ describe('FeatureFlagPreviewComponent', () => {
   ): Promise<ComponentFixture<FeatureFlagPreviewComponent>> => {
     previewSpy = vi.fn();
     getAllRolesSpy = vi.fn().mockReturnValue(of([]));
+    searchUsersSpy = vi
+      .fn()
+      .mockReturnValue(
+        of({ data: [] as User[], meta: { nextCursor: null as string | null } })
+      );
     notifyError = vi.fn();
 
     await TestBed.configureTestingModule({
@@ -30,6 +38,7 @@ describe('FeatureFlagPreviewComponent', () => {
           useValue: { preview: previewSpy }
         },
         { provide: RoleService, useValue: { getAll: getAllRolesSpy } },
+        { provide: UserService, useValue: { searchCursor: searchUsersSpy } },
         { provide: NotifyService, useValue: { error: notifyError } }
       ]
     }).compileComponents();
@@ -53,6 +62,17 @@ describe('FeatureFlagPreviewComponent', () => {
         provideNoopAnimations(),
         { provide: FeatureFlagsAdminService, useValue: { preview: vi.fn() } },
         { provide: RoleService, useValue: { getAll: getAllRolesSpy } },
+        {
+          provide: UserService,
+          useValue: {
+            searchCursor: vi.fn().mockReturnValue(
+              of({
+                data: [] as User[],
+                meta: { nextCursor: null as string | null }
+              })
+            )
+          }
+        },
         { provide: NotifyService, useValue: { error: vi.fn() } }
       ]
     }).compileComponents();
@@ -75,7 +95,13 @@ describe('FeatureFlagPreviewComponent', () => {
       } satisfies FeatureFlagPreviewResult)
     );
     const cmp = fixture.componentInstance;
-    cmp['userId'].set('123e4567-e89b-12d3-a456-426614174000');
+    cmp['selectedUser'].set([
+      {
+        value: '123e4567-e89b-12d3-a456-426614174000',
+        label: 'Alice Adams',
+        sub: 'alice@example.com'
+      }
+    ]);
     cmp['selectedRoles'].set([{ value: 'beta', label: 'beta' }]);
     cmp['env'].set('staging');
     cmp.run();
@@ -89,6 +115,39 @@ describe('FeatureFlagPreviewComponent', () => {
       reason: 'included-by-rule',
       matchedRule: { index: 0, type: 'role', effect: 'include' }
     });
+  });
+
+  it('debounces user search and queries UserService.searchCursor with q', async () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = await setup();
+      const cmp = fixture.componentInstance;
+
+      // Below the 3-char threshold — no request.
+      cmp.onUserSearchTerm('al');
+      vi.advanceTimersByTime(500);
+      expect(searchUsersSpy).not.toHaveBeenCalled();
+
+      cmp.onUserSearchTerm('alic');
+      vi.advanceTimersByTime(500);
+      expect(searchUsersSpy).toHaveBeenCalledTimes(1);
+      expect(searchUsersSpy).toHaveBeenCalledWith(
+        { q: 'alic' },
+        expect.objectContaining({ limit: 10 })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('caps user selection to at most one chip (newest wins)', async () => {
+    const fixture = await setup();
+    const cmp = fixture.componentInstance;
+    cmp.onUserChipsChange([
+      { value: 'u-1', label: 'Alice' },
+      { value: 'u-2', label: 'Bob' }
+    ]);
+    expect(cmp['selectedUser']()).toEqual([{ value: 'u-2', label: 'Bob' }]);
   });
 
   it('omits empty fields from the structured context', async () => {

@@ -59,8 +59,8 @@
   "featureFlagPreview": {
     "title": "Preview",
     "description": "Run a dry evaluation against a synthetic context to verify rules before flipping the flag.",
-    "userLabel": "User ID",
-    "userPlaceholder": "Optional UUID — leave empty for guest",
+    "userLabel": "User",
+    "userPlaceholder": "Search by name, email or ID — leave empty for guest",
     "rolesLabel": "Roles",
     "rolesPlaceholder": "Add role, press Enter",
     "attributesLabel": "Attributes",
