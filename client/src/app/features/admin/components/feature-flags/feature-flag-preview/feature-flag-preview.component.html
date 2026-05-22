@@ -24,15 +24,15 @@
     </mat-form-field>
   } @else {
     <div class="structured-grid">
-      <mat-form-field appearance="outline">
-        <mat-label>{{ t('admin.featureFlagPreview.userLabel') }}</mat-label>
-        <input
-          matInput
-          [placeholder]="t('admin.featureFlagPreview.userPlaceholder')"
-          [value]="userId()"
-          (input)="userId.set($any($event.target).value)"
-        />
-      </mat-form-field>
+      <nxs-chips-autocomplete
+        [selected]="selectedUser()"
+        [options]="userOptions()"
+        label="admin.featureFlagPreview.userLabel"
+        placeholder="admin.featureFlagPreview.userPlaceholder"
+        ariaLabel="admin.featureFlagPreview.userLabel"
+        (selectedChange)="onUserChipsChange($event)"
+        (searchTermChange)="onUserSearchTerm($event)"
+      />
 
       <nxs-chips-autocomplete
         [selected]="selectedRoles()"

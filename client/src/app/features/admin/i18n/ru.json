@@ -59,8 +59,8 @@
   "featureFlagPreview": {
     "title": "Предпросмотр",
     "description": "Прогнать сухое вычисление с искусственным контекстом, чтобы проверить правила перед включением флага.",
-    "userLabel": "User ID",
-    "userPlaceholder": "Необязательный UUID — оставьте пустым для гостя",
+    "userLabel": "Пользователь",
+    "userPlaceholder": "Поиск по имени, email или ID — оставьте пустым для гостя",
     "rolesLabel": "Роли",
     "rolesPlaceholder": "Добавьте роль, Enter",
     "attributesLabel": "Атрибуты",
