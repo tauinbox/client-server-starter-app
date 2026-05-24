@@ -50,7 +50,16 @@
   }
 
   .app-dialog-fullscreen-mobile .mat-mdc-dialog-surface {
+    overflow: hidden; // content scrolls, not the surface
     border-radius: 0;
+  }
+
+  // min-height:0 lets the content scroll instead of the surface; max-height:none
+  // overrides Material's structural 65vh cap.
+  .app-dialog-fullscreen-mobile .mat-mdc-dialog-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
   }
 
   // Sticky header + footer so save/cancel are reachable while content scrolls.
@@ -65,7 +74,9 @@
     position: sticky;
     bottom: 0;
     z-index: 2;
-    padding-bottom: env(safe-area-inset-bottom, #{vars.$spacing-sm});
+
+    // base inset (env() is 0, not the fallback, without a home indicator) + safe-area
+    padding-bottom: calc(#{vars.$spacing-md} + env(safe-area-inset-bottom, 0px));
     background: var(--mat-sys-surface);
   }
 }
