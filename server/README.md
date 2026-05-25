@@ -151,7 +151,7 @@ src/
 │   ├── services/feature-flag-resolver.service.ts # Cached evaluation; per-user keys suffixed with featureflags:version counter so flag changes orphan all per-user entries without Redis SCAN
 │   ├── services/attribute-registry.service.ts    # Extensibility seam — registerAttribute(key, resolver) from other modules' onModuleInit
 │   ├── controllers/feature-flags-admin.controller.ts # 7 admin endpoints under /admin/feature-flags; @Authorize(['manage','FeatureFlag']) + @LogAudit
-│   ├── controllers/feature-flags.controller.ts       # GET /feature-flags — @OptionalAuth(); authenticated → all flags; anon → public flags only
+│   ├── controllers/feature-flags.controller.ts       # GET /feature-flags — @OptionalAuth(); authenticated → flags resolving true + public flags (disabled non-public omitted); anon → public flags only
 │   ├── decorators/require-feature.decorator.ts       # @RequireFeature('key') convenience — RBAC remains the real gate
 │   ├── guards/feature-flag.guard.ts                  # Returns 404 (anti-enumeration) when the named flag is disabled for the caller
 │   ├── middleware/anon-id.middleware.ts              # Issues nxs_anon_id cookie (SameSite=Lax, Secure in prod, 1yr, httpOnly=false) on first request
@@ -591,7 +591,7 @@ Base URL: `/api/v1`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/feature-flags` | Optional | Evaluated flags for the caller. Authenticated → all flags; anonymous → flags with `public: true`. Returns `{ flags: Record<string, boolean>, evaluatedAt: string }`. Sets `nxs_anon_id` cookie on first request |
+| GET | `/feature-flags` | Optional | Evaluated flags for the caller. Authenticated → each flag resolving `true` plus any `public` flag (disabled non-public flags omitted); anonymous → flags with `public: true`. Returns `{ flags: Record<string, boolean>, evaluatedAt: string }`. Sets `nxs_anon_id` cookie on first request |
 | GET | `/admin/feature-flags` | `manage:FeatureFlag` | List all flags with their rules |
 | GET | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Get a flag by ID |
 | POST | `/admin/feature-flags` | `manage:FeatureFlag` | Create a flag (audited as `FEATURE_FLAG_CREATE`) |
