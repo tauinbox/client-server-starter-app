@@ -1,6 +1,6 @@
 {
   "name": "client",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "scripts": {
     "ng": "ng",
     "prestart": "node scripts/version.mjs",

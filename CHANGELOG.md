@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.21](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.20...v0.1.21) (2026-05-25)
+
+
+### Features
+
+* admin dry-run preview for feature flags ([#238](https://github.com/tauinbox/client-server-starter-app/issues/238)) ([479bc3c](https://github.com/tauinbox/client-server-starter-app/commit/479bc3c83502d8541fd4d91ab8bf9b740a5e4f1d))
+* **admin:** chip+autocomplete inputs for feature-flag CSV fields ([#229](https://github.com/tauinbox/client-server-starter-app/issues/229)) ([aa3f12d](https://github.com/tauinbox/client-server-starter-app/commit/aa3f12de607953881c54658ce5f316c318d05059))
+* **auth:** self-service email change with confirm-to-new flow ([#209](https://github.com/tauinbox/client-server-starter-app/issues/209)) ([9200552](https://github.com/tauinbox/client-server-starter-app/commit/920055222fbadab3ffb6ca84be65c0e57ab02b78))
+* **client:** add semantic spacing tokens layered on primitive scale ([#205](https://github.com/tauinbox/client-server-starter-app/issues/205)) ([a03d5cf](https://github.com/tauinbox/client-server-starter-app/commit/a03d5cf3abbc31a273e1f09ea62466f9215165aa))
+* **client:** dynamic sidenav nav links + post-login landing page ([#220](https://github.com/tauinbox/client-server-starter-app/issues/220)) ([e04032f](https://github.com/tauinbox/client-server-starter-app/commit/e04032f0f6125ea6f31795fca0d5c1eb45d81135))
+* **client:** feature flags admin UI — list, form, rule editor ([#225](https://github.com/tauinbox/client-server-starter-app/issues/225)) ([025bf6f](https://github.com/tauinbox/client-server-starter-app/commit/025bf6f41e67239637c1ab9f8f06ccf94e1c9fb6))
+* **client:** feature flags core — store + guard + directive + pipe + SSE wiring ([#224](https://github.com/tauinbox/client-server-starter-app/issues/224)) ([e6824be](https://github.com/tauinbox/client-server-starter-app/commit/e6824be9f7ea3962eebdcc3b6b501ff56d67735d))
+* **client:** handset "All environments" + composite flag-save with rules-failure marker ([#235](https://github.com/tauinbox/client-server-starter-app/issues/235)) ([3547c05](https://github.com/tauinbox/client-server-starter-app/commit/3547c0598edac19501e51258d22ac0dd99a427e2))
+* **client:** rule-row UX overhaul — discrete percentage slider, include/exclude markers, datepicker ([#234](https://github.com/tauinbox/client-server-starter-app/issues/234)) ([d00498c](https://github.com/tauinbox/client-server-starter-app/commit/d00498c359dedbf6aaf22d288c19c23ace9438fe))
+* **client:** user-picker in feature-flag preview ([#240](https://github.com/tauinbox/client-server-starter-app/issues/240)) ([a92db12](https://github.com/tauinbox/client-server-starter-app/commit/a92db1212a9210853ce63974092cdbcc8c67d967))
+* **client:** user-search prefix cache, longer debounce, friendly 429 snackbar ([#232](https://github.com/tauinbox/client-server-starter-app/issues/232)) ([2ab1ded](https://github.com/tauinbox/client-server-starter-app/commit/2ab1ded01f28ecafb6bfc04748e31bef04e495b3))
+* **mock-server:** feature-flags parity with server ([#223](https://github.com/tauinbox/client-server-starter-app/issues/223)) ([101e0c1](https://github.com/tauinbox/client-server-starter-app/commit/101e0c1dd3654e150b1df3bad75ff18270068b4b))
+* **server:** feature flags module — entities, services, controllers, guard ([#222](https://github.com/tauinbox/client-server-starter-app/issues/222)) ([86ead11](https://github.com/tauinbox/client-server-starter-app/commit/86ead11692e0c86e05c054b9c8eacee60b697c10))
+* **shared:** feature-flag evaluator, types, audit actions, SSE event ([#221](https://github.com/tauinbox/client-server-starter-app/issues/221)) ([efa66e0](https://github.com/tauinbox/client-server-starter-app/commit/efa66e08d3234203729905bb55b72e4131f2fe52))
+* **throttler:** raise SPA default to 120/min, decorate remaining auth routes ([#231](https://github.com/tauinbox/client-server-starter-app/issues/231)) ([b213db2](https://github.com/tauinbox/client-server-starter-app/commit/b213db2475b27a67799f12d8cf98a696cd2ab49b))
+* **users:** unified `q` substring search across id/email/firstName/lastName ([#230](https://github.com/tauinbox/client-server-starter-app/issues/230)) ([b4c41d3](https://github.com/tauinbox/client-server-starter-app/commit/b4c41d3237ce0ec5e9519d732bc30662b2d8ac28))
+
+
+### Bug Fixes
+
+* **admin:** add card spacing to feature flags list ([#247](https://github.com/tauinbox/client-server-starter-app/issues/247)) ([3f6b93b](https://github.com/tauinbox/client-server-starter-app/commit/3f6b93b386c3eef1544bda461815b8562db89f05))
+* **auth:** permissions guard fails closed with 401 on missing user ([#244](https://github.com/tauinbox/client-server-starter-app/issues/244)) ([8b2b75e](https://github.com/tauinbox/client-server-starter-app/commit/8b2b75ee98c294d8a232f8c6beb7371ff33f7091))
+* **client:** align rule-row elements vertically and collapse subscript reserve ([#233](https://github.com/tauinbox/client-server-starter-app/issues/233)) ([67e4940](https://github.com/tauinbox/client-server-starter-app/commit/67e4940018cc1c163635de8459aba9651a4e362a))
+* **client:** apply uniform form-field rhythm rule across grid layouts ([#212](https://github.com/tauinbox/client-server-starter-app/issues/212)) ([ac06ad4](https://github.com/tauinbox/client-server-starter-app/commit/ac06ad47be804321be6282b8364b2976b3ff778b))
+* **client:** compress form-field vertical gap via per-instance subscriptSizing="dynamic" ([#210](https://github.com/tauinbox/client-server-starter-app/issues/210)) ([d5571ec](https://github.com/tauinbox/client-server-starter-app/commit/d5571ecb786fcb307053cd0c53ad457e255327c7)), closes [#152](https://github.com/tauinbox/client-server-starter-app/issues/152)
+* **client:** drop redundant entity nouns from action-button labels ([#218](https://github.com/tauinbox/client-server-starter-app/issues/218)) ([c72b45e](https://github.com/tauinbox/client-server-starter-app/commit/c72b45e2dd5099eeec8bdbceccba2e89a6b08fab))
+* **client:** feature-flag editor UX polish ([#239](https://github.com/tauinbox/client-server-starter-app/issues/239)) ([4e986d3](https://github.com/tauinbox/client-server-starter-app/commit/4e986d36d1d0c346c6f9f466156d60b9e7e9a153))
+* **client:** fix handset feature-flag FAB and full-screen dialog layout ([#241](https://github.com/tauinbox/client-server-starter-app/issues/241)) ([e20832f](https://github.com/tauinbox/client-server-starter-app/commit/e20832f5152d7931d1df407a95c95098550f23f2))
+* **client:** form-actions row gains gap + flex-wrap so mobile buttons no longer fuse ([#216](https://github.com/tauinbox/client-server-starter-app/issues/216)) ([f98efdf](https://github.com/tauinbox/client-server-starter-app/commit/f98efdf1b0a016666a4e28184223efdcc9c6f271))
+* **client:** hide header brand text on handset to stop toolbar overflow ([#217](https://github.com/tauinbox/client-server-starter-app/issues/217)) ([ddc3bfc](https://github.com/tauinbox/client-server-starter-app/commit/ddc3bfc9bc3e4627ccdd8f13a533788939714a8b))
+* **client:** kebab action button no longer clipped on mobile user cards ([#215](https://github.com/tauinbox/client-server-starter-app/issues/215)) ([6e1602c](https://github.com/tauinbox/client-server-starter-app/commit/6e1602cd75dcb910df90fdce0f5dbc180f3f513a))
+* **client:** replace deprecated Sass slash division in rem() helper ([#245](https://github.com/tauinbox/client-server-starter-app/issues/245)) ([41521ff](https://github.com/tauinbox/client-server-starter-app/commit/41521ff7a0b14570307b085ead4db0a73fd0f961))
+* **client:** show locked-actions indicator for super-system roles on /admin/roles ([#214](https://github.com/tauinbox/client-server-starter-app/issues/214)) ([096a4a6](https://github.com/tauinbox/client-server-starter-app/commit/096a4a6d8e1a51ff8a7687c1eb0ef25da24f8aeb))
+* **client:** trim multi-word button labels and dedup overlapping keys ([#219](https://github.com/tauinbox/client-server-starter-app/issues/219)) ([6e2d72c](https://github.com/tauinbox/client-server-starter-app/commit/6e2d72c5603c3bcbe781d78e6870f930b7363e08))
+* **feature-flags:** hide disabled non-public flags from authenticated callers ([#242](https://github.com/tauinbox/client-server-starter-app/issues/242)) ([b1d2db0](https://github.com/tauinbox/client-server-starter-app/commit/b1d2db0837d10581343b497d244604852a2fc517))
+* **server:** captcha guard fails closed when throttler header missing ([#211](https://github.com/tauinbox/client-server-starter-app/issues/211)) ([8c699cd](https://github.com/tauinbox/client-server-starter-app/commit/8c699cdee8990e17830a65738e6de6c2ba178f69))
+* **server:** enforce instance-level CASL check on every single-entity endpoint ([#208](https://github.com/tauinbox/client-server-starter-app/issues/208)) ([2fb0679](https://github.com/tauinbox/client-server-starter-app/commit/2fb0679fe1e71e681c3d5608e4216a789ab5f269))
+* **server:** make feature-flag toggle atomic to prevent lost updates ([#237](https://github.com/tauinbox/client-server-starter-app/issues/237)) ([9e99c43](https://github.com/tauinbox/client-server-starter-app/commit/9e99c43581e77325ca790fb9b758501c525e10b9))
+* **server:** populate req.user on /feature-flags so role and userId rules apply ([#236](https://github.com/tauinbox/client-server-starter-app/issues/236)) ([a4c2236](https://github.com/tauinbox/client-server-starter-app/commit/a4c22368c35ae19d3cfb04c881bd2035f44d48b3))
+
 ## [0.1.20](https://github.com/tauinbox/client-server-starter-app/compare/v0.1.19...v0.1.20) (2026-05-09)
 
 
