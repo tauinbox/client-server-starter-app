@@ -94,6 +94,24 @@ describe('FeatureFlagResolverService', () => {
     expect(typeof result.evaluatedAt).toBe('string');
   });
 
+  it('omits disabled non-public flags from the authenticated response', async () => {
+    seedFlags([
+      { id: 'f1', key: 'disabled-private', enabled: false, public: false },
+      { id: 'f2', key: 'disabled-public', enabled: false, public: true },
+      { id: 'f3', key: 'enabled-private', enabled: true, public: false }
+    ]);
+    const result = await service.evaluateForUser(
+      { userId: 'u1', email: 'a@b.com', createdAt: null, roles: [] },
+      fakeReq
+    );
+    // Disabled non-public flag key must not leak to authenticated callers.
+    expect('disabled-private' in result.flags).toBe(false);
+    // Disabled-but-public stays present (its existence is intentionally visible).
+    expect(result.flags['disabled-public']).toBe(false);
+    // Any enabled flag stays present regardless of public.
+    expect(result.flags['enabled-private']).toBe(true);
+  });
+
   it('caches per user using the global version', async () => {
     seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
     await service.evaluateForUser(

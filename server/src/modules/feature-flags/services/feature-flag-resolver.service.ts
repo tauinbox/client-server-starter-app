@@ -179,7 +179,12 @@ export class FeatureFlagResolverService {
         effect: r.effect,
         payload: r.payload
       }));
-      result[flag.key] = evaluateFeatureFlag(evalFlag, evalRules, ctx);
+      const value = evaluateFeatureFlag(evalFlag, evalRules, ctx);
+      // Authenticated callers receive all flags, but a disabled non-public flag
+      // would leak an internal/unfinished feature key. Omit it: the client's
+      // isEnabled() treats an absent key as false, so this is transparent.
+      if (!publicOnly && !value && !flag.public) continue;
+      result[flag.key] = value;
     }
     return {
       flags: result,
