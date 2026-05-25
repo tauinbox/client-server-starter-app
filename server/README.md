@@ -609,6 +609,8 @@ Base URL: `/api/v1`
 
 **Anonymous bucketing:** `AnonIdMiddleware` issues the `nxs_anon_id` cookie on first request to any route (`SameSite=Lax`, `Secure` in production, 1-year `maxAge`, `httpOnly: false`). The cookie value seeds the percentage-bucket hash so a 10 % rollout of a public flag converges on the same 10 % of anonymous browsers across reloads.
 
+> **Anonymous percentage rollouts are deterministic but client-controllable, not a security boundary.** Because the bucket key for an anonymous caller is the `nxs_anon_id` cookie (`httpOnly: false`, so readable/writable from JavaScript), a client can rotate the cookie until it lands in a targeted percentage bucket. This is acceptable by design — anonymous callers only ever see `public: true` flags, and any sensitive feature must require authentication (where bucketing keys on the immutable `userId`, which is not client-controllable). Never rely on an anonymous percentage rollout for access control or data isolation; treat it purely as a gradual-exposure mechanism. If a future flag needs anonymous rollouts to resist grinding, HMAC-sign the `nxs_anon_id` value with a server secret so a client cannot forge buckets.
+
 **`@RequireFeature('key')` decorator** (convenience):
 ```ts
 @Get('/beta')

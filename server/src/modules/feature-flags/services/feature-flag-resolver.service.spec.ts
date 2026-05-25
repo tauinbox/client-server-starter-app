@@ -7,6 +7,8 @@ import { FeatureFlagResolverService } from './feature-flag-resolver.service';
 import { AttributeRegistryService } from './attribute-registry.service';
 import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
+import { PermissionService } from '../../auth/services/permission.service';
+import { UsersService } from '../../users/services/users.service';
 
 describe('FeatureFlagResolverService', () => {
   let service: FeatureFlagResolverService;
@@ -15,6 +17,8 @@ describe('FeatureFlagResolverService', () => {
   let cacheStore: Map<string, unknown>;
   let cacheManager: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
   let configService: { get: jest.Mock };
+  let permissionService: { getRoleNamesForUser: jest.Mock };
+  let usersService: { findOne: jest.Mock };
 
   const fakeReq = {} as Request;
 
@@ -34,6 +38,15 @@ describe('FeatureFlagResolverService', () => {
     flagRepo = { find: jest.fn() };
     ruleRepo = { find: jest.fn() };
     configService = { get: jest.fn().mockReturnValue('production') };
+    permissionService = {
+      getRoleNamesForUser: jest.fn().mockResolvedValue(['admin'])
+    };
+    usersService = {
+      findOne: jest.fn().mockResolvedValue({
+        email: 'a@b.com',
+        createdAt: new Date('2026-01-01T00:00:00Z')
+      })
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -45,7 +58,9 @@ describe('FeatureFlagResolverService', () => {
           provide: AttributeRegistryService,
           useValue: new AttributeRegistryService()
         },
-        { provide: ConfigService, useValue: configService }
+        { provide: ConfigService, useValue: configService },
+        { provide: PermissionService, useValue: permissionService },
+        { provide: UsersService, useValue: usersService }
       ]
     }).compile();
 
@@ -83,6 +98,29 @@ describe('FeatureFlagResolverService', () => {
       }))
     );
   }
+
+  it('buildResolverUser assembles the user record and roles', async () => {
+    const user = await service.buildResolverUser('u1');
+    expect(usersService.findOne).toHaveBeenCalledWith('u1');
+    expect(permissionService.getRoleNamesForUser).toHaveBeenCalledWith('u1');
+    expect(user).toEqual({
+      userId: 'u1',
+      email: 'a@b.com',
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      roles: ['admin']
+    });
+  });
+
+  it('buildResolverUser falls back to null email/createdAt when the user is gone', async () => {
+    usersService.findOne.mockRejectedValueOnce(new Error('orphaned token'));
+    const user = await service.buildResolverUser('u1');
+    expect(user).toEqual({
+      userId: 'u1',
+      email: null,
+      createdAt: null,
+      roles: ['admin']
+    });
+  });
 
   it('returns evaluated booleans for an authenticated user', async () => {
     seedFlags([{ id: 'f1', key: 'a', enabled: true, public: false }]);
