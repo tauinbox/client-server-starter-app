@@ -2,7 +2,8 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
-  Injectable
+  Injectable,
+  UnauthorizedException
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
@@ -35,6 +36,10 @@ export class PermissionsGuard implements CanActivate {
 
     const req = context.switchToHttp().getRequest<JwtAuthRequest>();
     const { user } = req;
+
+    if (!user) {
+      throw new UnauthorizedException();
+    }
 
     const [roles, userPermissions] = await Promise.all([
       this.permissionService.getRolesForUser(user.userId),
