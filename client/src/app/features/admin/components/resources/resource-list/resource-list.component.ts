@@ -120,6 +120,7 @@ export class ResourceListComponent implements OnInit {
     };
     this.#dialog.open(ResourceFormDialogComponent, {
       ...dialogSizeConfig(DialogSize.Form),
+      panelClass: 'app-dialog-tall',
       viewContainerRef: this.#viewContainerRef,
       data
     });

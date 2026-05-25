@@ -30,6 +30,11 @@ form {
     display: flex;
     flex-direction: column;
     gap: vars.$spacing-xs;
+
+    // The last checkbox's 48px touch target extends below its visual box;
+    // with the dialog content's zero bottom padding it overflows by ~4px and
+    // forces a scrollbar. Bottom padding lets the touch target clear the edge.
+    padding-bottom: vars.$spacing-xs;
   }
 
   &__hint {
