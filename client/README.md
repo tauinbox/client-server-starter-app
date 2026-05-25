@@ -223,7 +223,7 @@ src/styles/
 └── utilities/        # Flex, spacing, text, visibility helpers
 ```
 
-All size values use `func.rem(N)` (pixels → rem conversion) — never hardcoded `px`/`rem` literals. Global dialog styles live in `_dialogs.scss` (title padding, `::before` reset, bug #26352 fix). Dialog sizes are managed via `DialogSize` enum + `dialogSizeConfig()` in `shared/utils/dialog.utils.ts`.
+All size values use `func.rem(N)` (pixels → rem conversion) — never hardcoded `px`/`rem` literals. Global dialog styles live in `_dialogs.scss` (title padding, `::before` reset, bug #26352 fix, plus opt-in panel classes: `.app-dialog-fullscreen-mobile` for edge-to-edge handset dialogs and `.app-dialog-tall` which raises the content `max-height` cap from 65vh to 80vh). Dialog sizes are managed via `DialogSize` enum + `dialogSizeConfig()` in `shared/utils/dialog.utils.ts`.
 
 **Spacing tokens** — `_variables.scss` exposes both a primitive scale (`$spacing-xxs/xs/sm/md/lg/xl/xxl`) and a semantic layer on top (`$space-component-gap`, `$space-form-row-gap`, `$space-section-gap`). Mixins and shared component styles use the semantic tokens so the scale can be re-tuned in one place; primitives remain available for one-off / non-semantic spots.
 
