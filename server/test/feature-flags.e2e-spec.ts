@@ -323,6 +323,14 @@ describe('Feature flags end-to-end', () => {
         {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue('production') }
+        },
+        {
+          provide: PermissionService,
+          useValue: { getRoleNamesForUser: jest.fn().mockResolvedValue([]) }
+        },
+        {
+          provide: UsersService,
+          useValue: { findOne: jest.fn().mockResolvedValue(null) }
         }
       ]
     }).compile();
@@ -659,19 +667,14 @@ describe('@RequireFeature guard', () => {
         { provide: APP_GUARD, useClass: PassThroughJwtGuard },
         {
           provide: FeatureFlagResolverService,
-          useValue: { isEnabledForUser: resolverIsEnabled }
-        },
-        {
-          provide: PermissionService,
-          useValue: { getRoleNamesForUser: jest.fn().mockResolvedValue([]) }
-        },
-        {
-          provide: UsersService,
           useValue: {
-            findOne: jest.fn().mockResolvedValue({
+            buildResolverUser: jest.fn().mockResolvedValue({
+              userId: 'caller',
               email: 'caller@example.com',
-              createdAt: new Date()
-            })
+              createdAt: new Date(),
+              roles: []
+            }),
+            isEnabledForUser: resolverIsEnabled
           }
         }
       ]

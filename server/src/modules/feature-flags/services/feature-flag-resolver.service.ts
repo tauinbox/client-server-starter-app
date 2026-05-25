@@ -15,6 +15,8 @@ import type { EvaluatedFeatureFlagsResponse } from '@app/shared/types';
 import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
 import { AttributeRegistryService } from './attribute-registry.service';
+import { PermissionService } from '../../auth/services/permission.service';
+import { UsersService } from '../../users/services/users.service';
 
 export interface ResolverUser {
   userId: string;
@@ -50,8 +52,28 @@ export class FeatureFlagResolverService {
     private readonly ruleRepo: Repository<FeatureFlagRule>,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly attributeRegistry: AttributeRegistryService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly permissionService: PermissionService,
+    private readonly usersService: UsersService
   ) {}
+
+  /**
+   * Assembles the evaluation context for a user id: looks up the user record
+   * (tolerating an orphaned token whose user no longer exists) and their role
+   * names. Single source for the wiring shared by the controller and guard.
+   */
+  async buildResolverUser(userId: string): Promise<ResolverUser> {
+    const [user, roles] = await Promise.all([
+      this.usersService.findOne(userId).catch(() => null),
+      this.permissionService.getRoleNamesForUser(userId)
+    ]);
+    return {
+      userId,
+      email: user?.email ?? null,
+      createdAt: user?.createdAt ?? null,
+      roles
+    };
+  }
 
   async evaluateForUser(
     user: ResolverUser,

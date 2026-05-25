@@ -13,12 +13,7 @@ import {
 } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { OptionalAuth } from '../../auth/decorators/optional-auth.decorator';
-import { PermissionService } from '../../auth/services/permission.service';
-import { UsersService } from '../../users/services/users.service';
-import {
-  FeatureFlagResolverService,
-  type ResolverUser
-} from '../services/feature-flag-resolver.service';
+import { FeatureFlagResolverService } from '../services/feature-flag-resolver.service';
 import { EvaluateFlagsResponseDto } from '../dtos/evaluate-flags-response.dto';
 import { ANON_ID_COOKIE } from '../middleware/anon-id.middleware';
 
@@ -33,11 +28,7 @@ type RequestWithUser = Request & {
 })
 @UseInterceptors(ClassSerializerInterceptor)
 export class FeatureFlagsController {
-  constructor(
-    private readonly resolver: FeatureFlagResolverService,
-    private readonly permissionService: PermissionService,
-    private readonly usersService: UsersService
-  ) {}
+  constructor(private readonly resolver: FeatureFlagResolverService) {}
 
   @Get()
   @OptionalAuth()
@@ -50,16 +41,7 @@ export class FeatureFlagsController {
   async evaluate(@Req() req: RequestWithUser) {
     const userId = req.user?.userId;
     if (userId) {
-      const [user, roles] = await Promise.all([
-        this.usersService.findOne(userId).catch(() => null),
-        this.permissionService.getRoleNamesForUser(userId)
-      ]);
-      const resolverUser: ResolverUser = {
-        userId,
-        email: user?.email ?? null,
-        createdAt: user?.createdAt ?? null,
-        roles
-      };
+      const resolverUser = await this.resolver.buildResolverUser(userId);
       return this.resolver.evaluateForUser(resolverUser, req);
     }
     const cookies = (req.cookies ?? {}) as Record<string, unknown>;

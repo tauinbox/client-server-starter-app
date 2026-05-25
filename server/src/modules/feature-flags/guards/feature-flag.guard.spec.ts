@@ -2,8 +2,6 @@ import { Reflector } from '@nestjs/core';
 import { ExecutionContext, NotFoundException } from '@nestjs/common';
 import { FeatureFlagGuard } from './feature-flag.guard';
 import { FeatureFlagResolverService } from '../services/feature-flag-resolver.service';
-import { PermissionService } from '../../auth/services/permission.service';
-import { UsersService } from '../../users/services/users.service';
 
 function makeContext(userId: string | undefined): ExecutionContext {
   const handler = function handler() {};
@@ -21,27 +19,22 @@ function makeContext(userId: string | undefined): ExecutionContext {
 describe('FeatureFlagGuard', () => {
   let guard: FeatureFlagGuard;
   let reflector: { getAllAndOverride: jest.Mock };
-  let resolver: { isEnabledForUser: jest.Mock };
-  let permissionService: { getRoleNamesForUser: jest.Mock };
-  let usersService: { findOne: jest.Mock };
+  let resolver: { buildResolverUser: jest.Mock; isEnabledForUser: jest.Mock };
 
   beforeEach(() => {
     reflector = { getAllAndOverride: jest.fn() };
-    resolver = { isEnabledForUser: jest.fn() };
-    permissionService = {
-      getRoleNamesForUser: jest.fn().mockResolvedValue([])
-    };
-    usersService = {
-      findOne: jest.fn().mockResolvedValue({
+    resolver = {
+      buildResolverUser: jest.fn().mockResolvedValue({
+        userId: 'u-1',
         email: 'a@b.com',
-        createdAt: new Date()
-      })
+        createdAt: new Date(),
+        roles: []
+      }),
+      isEnabledForUser: jest.fn()
     };
     guard = new FeatureFlagGuard(
       reflector as unknown as Reflector,
-      resolver as unknown as FeatureFlagResolverService,
-      permissionService as unknown as PermissionService,
-      usersService as unknown as UsersService
+      resolver as unknown as FeatureFlagResolverService
     );
   });
 
@@ -54,6 +47,7 @@ describe('FeatureFlagGuard', () => {
     reflector.getAllAndOverride.mockReturnValue('new-dashboard');
     resolver.isEnabledForUser.mockResolvedValue(true);
     await expect(guard.canActivate(makeContext('u-1'))).resolves.toBe(true);
+    expect(resolver.buildResolverUser).toHaveBeenCalledWith('u-1');
   });
 
   it('throws NotFoundException when flag is disabled (anti-enumeration)', async () => {

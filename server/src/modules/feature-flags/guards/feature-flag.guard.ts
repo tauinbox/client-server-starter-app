@@ -6,18 +6,14 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { JwtAuthRequest } from '../../auth/types/auth.request';
-import { PermissionService } from '../../auth/services/permission.service';
 import { FEATURE_FLAG_KEY } from '../decorators/require-feature.decorator';
 import { FeatureFlagResolverService } from '../services/feature-flag-resolver.service';
-import { UsersService } from '../../users/services/users.service';
 
 @Injectable()
 export class FeatureFlagGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly resolver: FeatureFlagResolverService,
-    private readonly permissionService: PermissionService,
-    private readonly usersService: UsersService
+    private readonly resolver: FeatureFlagResolverService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -33,20 +29,8 @@ export class FeatureFlagGuard implements CanActivate {
       throw new NotFoundException();
     }
 
-    const [user, roles] = await Promise.all([
-      this.usersService.findOne(userId).catch(() => null),
-      this.permissionService.getRoleNamesForUser(userId)
-    ]);
-    const enabled = await this.resolver.isEnabledForUser(
-      {
-        userId,
-        email: user?.email ?? null,
-        createdAt: user?.createdAt ?? null,
-        roles
-      },
-      req,
-      key
-    );
+    const user = await this.resolver.buildResolverUser(userId);
+    const enabled = await this.resolver.isEnabledForUser(user, req, key);
     if (!enabled) {
       throw new NotFoundException();
     }
