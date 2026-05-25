@@ -387,7 +387,8 @@ describe('Feature flags end-to-end', () => {
       { ...user, userId: aboveBucketId },
       fakeReq
     );
-    expect(outsider.flags['beta-export']).toBe(false);
+    // Non-public flag that resolves false for this user is omitted (absent ⇒ off).
+    expect('beta-export' in outsider.flags).toBe(false);
 
     // Bump to 100% — everyone gets true.
     await flagService.replaceRules(
@@ -448,7 +449,8 @@ describe('Feature flags end-to-end', () => {
       },
       {} as Parameters<typeof resolver.evaluateForUser>[1]
     );
-    expect(banned.flags['risky-feature']).toBe(false);
+    // Excluded user resolves false on a non-public flag → key omitted (absent ⇒ off).
+    expect('risky-feature' in banned.flags).toBe(false);
   });
 
   it('PATCH /:id rejects a stale version with HTTP 409', async () => {
@@ -578,6 +580,25 @@ describe('Feature flags end-to-end', () => {
       reason: 'disabled',
       matchedRule: null
     });
+  });
+
+  it('authenticated evaluation omits disabled non-public flag keys', async () => {
+    await flagService.create(
+      { key: 'unreleased-internal', enabled: false, public: false },
+      'actor-1'
+    );
+    await flagService.create(
+      { key: 'shipped-internal', enabled: true, public: false },
+      'actor-1'
+    );
+
+    const evaluated = await resolver.evaluateForUser(
+      { userId: 'user-1', email: 'u1@example.com', createdAt: null, roles: [] },
+      {} as Parameters<typeof resolver.evaluateForUser>[1]
+    );
+    // A disabled non-public flag must not leak its key to a non-admin caller.
+    expect('unreleased-internal' in evaluated.flags).toBe(false);
+    expect(evaluated.flags['shipped-internal']).toBe(true);
   });
 
   it('anonymous evaluation filters to public flags only', async () => {

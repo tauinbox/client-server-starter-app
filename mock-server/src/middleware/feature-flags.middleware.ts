@@ -435,11 +435,15 @@ function evaluateAll(
         effect: r.effect,
         payload: r.payload
       }));
-    result[flag.key] = evaluateFeatureFlag(
+    const value = evaluateFeatureFlag(
       { key: flag.key, enabled: flag.enabled, environments: flag.environments },
       rules,
       ctx
     );
+    // Mirror server: omit disabled non-public flags from the authenticated
+    // response so internal/unfinished feature keys are not enumerable.
+    if (!publicOnly && !value && !flag.public) continue;
+    result[flag.key] = value;
   }
   return { flags: result, evaluatedAt: nowIso() };
 }
