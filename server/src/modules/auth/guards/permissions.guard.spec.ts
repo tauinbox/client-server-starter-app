@@ -1,4 +1,8 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  ExecutionContext,
+  ForbiddenException,
+  UnauthorizedException
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from './permissions.guard';
 import { createMongoAbility } from '@casl/ability';
@@ -193,6 +197,26 @@ describe('PermissionsGuard', () => {
       'delete',
       'User'
     );
+  });
+
+  it('should throw UnauthorizedException when req.user is absent', async () => {
+    jest
+      .spyOn(reflector, 'getAllAndOverride')
+      .mockReturnValue([['read', 'User']]);
+    const context: ExecutionContext = {
+      getHandler: jest.fn(),
+      getClass: jest.fn(),
+      switchToHttp: () => ({
+        // @ts-expect-error testing mock
+        getRequest: () => ({ ip: '127.0.0.1' })
+      })
+    };
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      UnauthorizedException
+    );
+    expect(permissionService.getRolesForUser).not.toHaveBeenCalled();
+    expect(permissionService.getPermissionsForUser).not.toHaveBeenCalled();
   });
 
   it('should require ALL permissions when multiple are specified', async () => {
