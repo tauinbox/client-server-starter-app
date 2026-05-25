@@ -35,6 +35,15 @@
   padding-top: func.rem(12);
 }
 
+// Opt-in panelClass that raises Material's structural 65vh content cap to 80vh.
+// On short windows (~767-840px tall) the resource-edit content exceeds 65vh and
+// the cap — not the dialog's natural height — forces a scrollbar; 80vh defers it.
+// .app-dialog-tall sits on the overlay pane (ancestor of the container), so
+// (0,2,0) beats Material's .mat-mdc-dialog-content (0,1,0) regardless of order.
+.app-dialog-tall .mat-mdc-dialog-content {
+  max-height: 80vh;
+}
+
 // ── Fullscreen-mobile variant ──────────────────────────────────────────────
 // Opt-in panelClass for dialogs that should fill the screen on handset
 // (rich admin dialogs with embedded editors — feature-flag form-dialog, etc).
