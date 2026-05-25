@@ -1,9 +1,12 @@
 @use '../../../../../../styles/abstracts/functions' as func;
 @use '../../../../../../styles/abstracts/variables' as vars;
+@use '../../../../../../styles/abstracts/mixins' as mix;
 
 :host {
   position: relative;
   display: block;
+
+  @include mix.card-container;
 }
 
 .spacer {
