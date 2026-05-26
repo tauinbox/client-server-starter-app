@@ -28,6 +28,7 @@ function buildSeedUser(): User {
   u.password = '$2b$10$hash';
   u.isActive = true;
   u.isEmailVerified = true;
+  u.locale = 'en';
   u.emailVerificationToken = null;
   u.emailVerificationExpiresAt = null;
   u.passwordResetToken = null;
@@ -131,7 +132,8 @@ describe('UsersService.update — email change side effects (BKL-006b)', () => {
     expect(mailService.sendEmailVerification).toHaveBeenCalledTimes(1);
     expect(mailService.sendEmailVerification).toHaveBeenCalledWith(
       'after@example.com',
-      expect.any(String)
+      expect.any(String),
+      'en'
     );
   });
 
