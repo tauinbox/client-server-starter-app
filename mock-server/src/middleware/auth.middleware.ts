@@ -14,6 +14,7 @@ import {
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import {
   isValidEmail,
+  validateLocale,
   validateMaxLength,
   validateMinLength
 } from '../utils/validation';
@@ -125,6 +126,13 @@ router.post('/register', (req, res) => {
     return;
   }
 
+  const locale: unknown = req.body.locale;
+  const localeErr = validateLocale(locale);
+  if (localeErr) {
+    res.status(400).json({ message: localeErr, statusCode: 400 });
+    return;
+  }
+
   if (findUserByEmail(email) || findUserByPendingEmail(email)) {
     res.status(409).json({
       message: 'User with this email already exists',
@@ -144,6 +152,7 @@ router.post('/register', (req, res) => {
     isActive: true,
     roles: ['user'],
     isEmailVerified: false,
+    locale: (locale as string) ?? 'en',
     failedLoginAttempts: 0,
     lockedUntil: null,
     tokenRevokedAt: null,
@@ -688,8 +697,14 @@ router.get('/permissions', authGuard, (req, res) => {
 
 // PATCH /api/v1/auth/profile
 router.patch('/profile', authGuard, (req, res) => {
-  const { firstName, lastName, password, currentPassword } = req.body;
+  const { firstName, lastName, password, currentPassword, locale } = req.body;
   const { user } = req as AuthenticatedRequest;
+
+  const localeErr = validateLocale(locale);
+  if (localeErr) {
+    res.status(400).json({ message: localeErr, statusCode: 400 });
+    return;
+  }
 
   if (firstName !== undefined) {
     const fnMaxErr = validateMaxLength(firstName, 255, 'firstName');
@@ -732,6 +747,7 @@ router.patch('/profile', authGuard, (req, res) => {
 
   if (firstName !== undefined) user.firstName = firstName;
   if (lastName !== undefined) user.lastName = lastName;
+  if (locale !== undefined) user.locale = locale as string;
   if (password !== undefined) {
     if (!PASSWORD_REGEX.test(password)) {
       res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });

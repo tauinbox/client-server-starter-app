@@ -15,6 +15,7 @@ export type UpdateProfile = {
   lastName?: string;
   password?: string;
   currentPassword?: string;
+  locale?: string;
 };
 
 export type CustomJwtPayload = JwtPayload & {

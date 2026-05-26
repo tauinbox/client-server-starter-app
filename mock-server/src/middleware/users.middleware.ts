@@ -7,6 +7,7 @@ import {
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import {
   isValidEmail,
+  validateLocale,
   validateMaxLength,
   validateMinLength
 } from '../utils/validation';
@@ -248,6 +249,13 @@ router.post('/', adminGuard, (req, res) => {
     return;
   }
 
+  const locale: unknown = req.body.locale;
+  const localeErr = validateLocale(locale);
+  if (localeErr) {
+    res.status(400).json({ message: localeErr, statusCode: 400 });
+    return;
+  }
+
   if (
     findUserByEmail(email) ||
     Array.from(getState().users.values()).some(
@@ -272,6 +280,7 @@ router.post('/', adminGuard, (req, res) => {
     isActive: true,
     roles: ['user'],
     isEmailVerified: true,
+    locale: (locale as string) ?? 'en',
     failedLoginAttempts: 0,
     lockedUntil: null,
     tokenRevokedAt: null,

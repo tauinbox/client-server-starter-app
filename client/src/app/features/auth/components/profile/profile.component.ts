@@ -40,6 +40,12 @@ import { PasswordStrengthComponent } from '@shared/components/password-strength/
 import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import {
+  MatButtonToggle,
+  MatButtonToggleGroup
+} from '@angular/material/button-toggle';
+import { LanguageService } from '@core/services/language.service';
+import type { AppLanguage } from '@core/services/language.service';
 
 type ProfileData = {
   email: string;
@@ -85,7 +91,9 @@ const INITIAL_PROFILE: ProfileData = {
     PasswordToggleComponent,
     PasswordStrengthComponent,
     AppFormFieldComponent,
-    TranslocoDirective
+    TranslocoDirective,
+    MatButtonToggle,
+    MatButtonToggleGroup
   ],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
@@ -102,6 +110,7 @@ export class ProfileComponent implements OnInit {
   readonly #authStore = inject(AuthStore);
   readonly #transloco = inject(TranslocoService);
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
+  readonly #languageService = inject(LanguageService);
 
   /**
    * Drives the role chip label. Based on the super-ability rather than a
@@ -123,6 +132,8 @@ export class ProfileComponent implements OnInit {
   protected readonly oauthAccounts = signal<OAuthAccountInfo[]>([]);
   protected readonly oauthLoading = signal(false);
   protected readonly allProviders = Object.keys(OAUTH_URLS);
+  protected readonly locale = signal<AppLanguage>('en');
+  protected readonly savingLocale = signal(false);
 
   readonly profileModel = signal<ProfileData>({ ...INITIAL_PROFILE });
 
@@ -223,6 +234,7 @@ export class ProfileComponent implements OnInit {
       .subscribe({
         next: (user) => {
           this.user.set(user);
+          this.locale.set(user.locale === 'ru' ? 'ru' : 'en');
           this.profileModel.set({
             email: user.email,
             firstName: user.firstName,
@@ -240,6 +252,35 @@ export class ProfileComponent implements OnInit {
             err.error?.message ||
             this.#transloco.translate('auth.profile.errorLoadFailed');
           this.error.set(errorMessage);
+        }
+      });
+  }
+
+  /**
+   * Persists the account's preferred locale (used for server-sent emails) and
+   * syncs the live UI language. Persistence is independent of the profile form.
+   */
+  onLocaleChange(value: AppLanguage): void {
+    const previous = this.locale();
+    if (value === previous) return;
+
+    this.locale.set(value);
+    this.savingLocale.set(true);
+
+    this.#authService
+      .updateProfile({ locale: value })
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.savingLocale.set(false);
+          this.user.set(updated);
+          void this.#languageService.setLanguage(value);
+          this.#notify.success('auth.profile.languageUpdated');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.savingLocale.set(false);
+          this.locale.set(previous);
+          this.#notify.error(err, 'auth.profile.errorUpdateFailed');
         }
       });
   }

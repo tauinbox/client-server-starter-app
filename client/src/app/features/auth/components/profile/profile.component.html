@@ -169,6 +169,26 @@
             </div>
           </mat-card-content>
         </mat-card>
+
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>{{ t('auth.profile.preferences') }}</mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            <p class="preference-label">{{ t('auth.profile.language') }}</p>
+            <mat-button-toggle-group
+              [value]="locale()"
+              [disabled]="savingLocale()"
+              [hideSingleSelectionIndicator]="true"
+              (change)="onLocaleChange($event.value)"
+              [attr.aria-label]="t('auth.profile.language')"
+            >
+              <mat-button-toggle value="en">English</mat-button-toggle>
+              <mat-button-toggle value="ru">Русский</mat-button-toggle>
+            </mat-button-toggle-group>
+          </mat-card-content>
+        </mat-card>
       </div>
     }
   }

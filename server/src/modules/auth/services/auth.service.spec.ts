@@ -102,6 +102,7 @@ describe('AuthService', () => {
     password: '$2b$10$hashedpassword',
     isActive: true,
     isEmailVerified: true,
+    locale: 'en',
     failedLoginAttempts: 0,
     lockedUntil: null,
     emailVerificationToken: null,
@@ -544,7 +545,8 @@ describe('AuthService', () => {
       );
       expect(mockMailService.sendEmailVerification).toHaveBeenCalledWith(
         'new@example.com',
-        expect.any(String)
+        expect.any(String),
+        'en'
       );
       expect(result.message).toContain('Registration successful');
     });
@@ -651,7 +653,8 @@ describe('AuthService', () => {
       );
       expect(mockMailService.sendPasswordReset).toHaveBeenCalledWith(
         'test@example.com',
-        expect.any(String)
+        expect.any(String),
+        'en'
       );
       expect(result.message).toBeDefined();
     });
@@ -1088,11 +1091,12 @@ describe('AuthService', () => {
       );
       expect(mockMailService.sendEmailChangeConfirmation).toHaveBeenCalledWith(
         'new@example.com',
-        expect.any(String)
+        expect.any(String),
+        'en'
       );
       expect(
         mockMailService.sendEmailChangeNotificationOld
-      ).toHaveBeenCalledWith('test@example.com', 'new@example.com');
+      ).toHaveBeenCalledWith('test@example.com', 'new@example.com', 'en');
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.USER_EMAIL_CHANGE_REQUEST,
@@ -1225,7 +1229,7 @@ describe('AuthService', () => {
       );
       expect(
         mockMailService.sendEmailChangeCompletedNotification
-      ).toHaveBeenCalledWith('test@example.com', 'new@example.com');
+      ).toHaveBeenCalledWith('test@example.com', 'new@example.com', 'en');
       expect(result.message).toMatch(/sign in again/);
     });
 

@@ -562,6 +562,7 @@ describe('FeatureFlagRuleRowComponent', () => {
         isActive: true,
         roles: [],
         isEmailVerified: true,
+        locale: 'en',
         createdAt: '',
         updatedAt: '',
         deletedAt: null
@@ -574,6 +575,7 @@ describe('FeatureFlagRuleRowComponent', () => {
         isActive: true,
         roles: [],
         isEmailVerified: true,
+        locale: 'en',
         createdAt: '',
         updatedAt: '',
         deletedAt: null

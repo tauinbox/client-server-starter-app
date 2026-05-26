@@ -25,6 +25,7 @@ export function createMockUser(options: MockUserOptions = {}): MockUser {
     isActive: options.isActive ?? faker.datatype.boolean({ probability: 0.8 }),
     roles: options.roles ?? ['user'],
     isEmailVerified: options.isEmailVerified ?? true,
+    locale: options.locale ?? 'en',
     failedLoginAttempts: options.failedLoginAttempts ?? 0,
     lockedUntil: options.lockedUntil ?? null,
     tokenRevokedAt: options.tokenRevokedAt ?? null,

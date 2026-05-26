@@ -260,7 +260,7 @@ export class AuthService {
 
     // Send verification email (fire-and-forget — delivery failure is non-fatal)
     this.mailService
-      .sendEmailVerification(user.email, rawToken)
+      .sendEmailVerification(user.email, rawToken, user.locale)
       .catch((err) =>
         this.logger.error('Failed to send verification email', err)
       );
@@ -324,7 +324,7 @@ export class AuthService {
     );
 
     this.mailService
-      .sendEmailVerification(user.email, rawToken)
+      .sendEmailVerification(user.email, rawToken, user.locale)
       .catch((err) =>
         this.logger.error('Failed to resend verification email', err)
       );
@@ -368,7 +368,7 @@ export class AuthService {
     });
 
     this.mailService
-      .sendPasswordReset(user.email, rawToken)
+      .sendPasswordReset(user.email, rawToken, user.locale)
       .catch((err) =>
         this.logger.error('Failed to send password reset email', err)
       );
@@ -663,12 +663,12 @@ export class AuthService {
     }
 
     this.mailService
-      .sendEmailChangeConfirmation(dto.newEmail, rawToken)
+      .sendEmailChangeConfirmation(dto.newEmail, rawToken, user.locale)
       .catch((err) =>
         this.logger.error('Failed to send email change confirmation', err)
       );
     this.mailService
-      .sendEmailChangeNotificationOld(user.email, dto.newEmail)
+      .sendEmailChangeNotificationOld(user.email, dto.newEmail, user.locale)
       .catch((err) =>
         this.logger.error('Failed to send email change OLD-address alert', err)
       );
@@ -754,7 +754,7 @@ export class AuthService {
       });
       await manager.delete(RefreshToken, { userId: user.id });
 
-      return { userId: user.id, oldEmail, newEmail };
+      return { userId: user.id, oldEmail, newEmail, locale: user.locale };
     });
 
     await this.auditService.log({
@@ -768,7 +768,11 @@ export class AuthService {
     });
 
     this.mailService
-      .sendEmailChangeCompletedNotification(result.oldEmail, result.newEmail)
+      .sendEmailChangeCompletedNotification(
+        result.oldEmail,
+        result.newEmail,
+        result.locale
+      )
       .catch((err) =>
         this.logger.error(
           'Failed to send email change completed notification',

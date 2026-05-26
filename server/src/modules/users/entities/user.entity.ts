@@ -9,6 +9,7 @@ import {
   UpdateDateColumn
 } from 'typeorm';
 import { Exclude, Expose } from 'class-transformer';
+import { DEFAULT_LOCALE } from '@app/shared/constants';
 import { Role } from '../../auth/entities/role.entity';
 
 @Entity('users')
@@ -50,6 +51,9 @@ export class User {
 
   @Column({ name: 'is_email_verified', default: false })
   isEmailVerified: boolean;
+
+  @Column({ default: DEFAULT_LOCALE })
+  locale: string;
 
   @Column({
     name: 'email_verification_token',

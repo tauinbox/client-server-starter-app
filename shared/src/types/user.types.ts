@@ -8,6 +8,7 @@ export type UserResponse = {
   isActive: boolean;
   roles: RoleResponse[];
   isEmailVerified: boolean;
+  locale: string;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
