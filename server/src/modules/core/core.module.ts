@@ -169,7 +169,7 @@ export class CoreModule implements NestModule {
           })
         }),
         MetricsModule,
-        MailModule,
+        MailModule.forRoot(),
         AuditModule,
         AuthModule,
         UsersModule,

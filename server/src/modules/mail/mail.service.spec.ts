@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { getQueueToken } from '@nestjs/bullmq';
 import { MailService } from './mail.service';
+import { MAIL_QUEUE, MAIL_SEND_JOB, MailJobData } from './mail-queue.constants';
 
 describe('MailService', () => {
   let service: MailService;
@@ -77,6 +79,38 @@ describe('MailService', () => {
       await expect(
         service.sendPasswordReset('user@example.com', 'test-token')
       ).resolves.not.toThrow();
+    });
+  });
+
+  describe('with a queue (Redis configured)', () => {
+    let queuedService: MailService;
+    const add = jest.fn().mockResolvedValue(undefined);
+
+    beforeEach(async () => {
+      add.mockClear();
+      const moduleRef: TestingModule = await Test.createTestingModule({
+        providers: [
+          MailService,
+          { provide: ConfigService, useValue: mockConfigService },
+          { provide: getQueueToken(MAIL_QUEUE), useValue: { add } }
+        ]
+      }).compile();
+      queuedService = moduleRef.get<MailService>(MailService);
+    });
+
+    it('enqueues a rendered send job instead of delivering inline', async () => {
+      await queuedService.sendEmailVerification(
+        'user@example.com',
+        'tok-123',
+        'en'
+      );
+
+      expect(add).toHaveBeenCalledTimes(1);
+      const [jobName, data] = add.mock.calls[0] as [string, MailJobData];
+      expect(jobName).toBe(MAIL_SEND_JOB);
+      expect(data.to).toBe('user@example.com');
+      expect(data.subject).toBe('Verify your email address');
+      expect(data.html).toContain('tok-123');
     });
   });
 });

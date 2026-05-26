@@ -1,3 +1,4 @@
+import * as dotenv from 'dotenv';
 import { NestFactory } from '@nestjs/core';
 import { CoreModule } from './modules/core/core.module';
 import { RequestMethod, ValidationPipe, VersioningType } from '@nestjs/common';
@@ -12,6 +13,10 @@ import { corsOptions } from './cors-options';
 import { applyTrustProxy } from './modules/core/trust-proxy.util';
 
 async function bootstrap() {
+  // Load .env eagerly so REDIS_URL is visible while the module graph is built
+  // (MailModule gates the BullMQ queue on it). ConfigModule re-reads it later.
+  dotenv.config();
+
   const app = await NestFactory.create<NestExpressApplication>(
     CoreModule.forRoot(),
     { bufferLogs: true }
@@ -116,6 +121,9 @@ async function bootstrap() {
   const port = process.env['APPLICATION_PORT']
     ? Number(process.env['APPLICATION_PORT'])
     : 3000;
+
+  // Allow BullMQ workers (and other lifecycle hooks) to close cleanly on SIGTERM
+  app.enableShutdownHooks();
 
   await app.listen(port);
   app.get(Logger).log(`Server started listening on port ${port}`, 'Bootstrap');

@@ -212,6 +212,7 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 - **SMTP transport** when `SMTP_HOST` env var is set
 - **Console transport** when `SMTP_HOST` is not set — logs clickable URLs
 - Email links use `CLIENT_URL` env var: `${clientUrl}/verify-email?token=xxx`, `${clientUrl}/reset-password?token=xxx`
+- **Async delivery**: when `REDIS_URL` is set, messages are rendered then enqueued on a BullMQ queue (`mail`) and delivered by `MailProcessor` with retries (3 attempts, exponential backoff). Without `REDIS_URL`, `MailService` delivers inline in the request (no retries). The queue is transparent to callers — `MailService.sendXxx(...)` is unchanged.
 
 #### Transport options
 
