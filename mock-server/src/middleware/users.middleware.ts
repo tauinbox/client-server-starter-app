@@ -7,6 +7,7 @@ import {
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import {
   isValidEmail,
+  validateLocale,
   validateMaxLength,
   validateMinLength
 } from '../utils/validation';
@@ -249,11 +250,9 @@ router.post('/', adminGuard, (req, res) => {
   }
 
   const locale: unknown = req.body.locale;
-  if (locale !== undefined && locale !== 'en' && locale !== 'ru') {
-    res.status(400).json({
-      message: 'locale must be one of the following values: en, ru',
-      statusCode: 400
-    });
+  const localeErr = validateLocale(locale);
+  if (localeErr) {
+    res.status(400).json({ message: localeErr, statusCode: 400 });
     return;
   }
 

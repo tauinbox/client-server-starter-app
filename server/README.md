@@ -253,13 +253,21 @@ http://localhost:8025.
 > **must** equal `SMTP_USER`, otherwise messages appear spoofed and get
 > filtered. Gmail's free sending limit is ~500 recipients/day.
 
+#### Localization
+
+All transactional emails are rendered from a shared, branded Handlebars layout
+(`mail/email.template.ts`) with locale-specific copy (`mail/mail-content.ts`).
+Each message is sent in the recipient's stored `users.locale` (EN/RU; defaults
+to `en`). The locale is captured at registration (optional `locale` field) and
+editable from the client profile.
+
 ### Database
 
 Ten tables managed via TypeORM migrations:
 
 | Table | Description |
 |-------|-------------|
-| `users` | UUID PK, email (unique), name, bcrypt password (nullable for OAuth-only), isActive, isEmailVerified, failedLoginAttempts, lockedUntil, verification/reset token fields, `deleted_at TIMESTAMPTZ NULL` (soft delete); ManyToMany to roles via user_roles |
+| `users` | UUID PK, email (unique), name, bcrypt password (nullable for OAuth-only), isActive, isEmailVerified, `locale` (email language, default `en`), failedLoginAttempts, lockedUntil, verification/reset token fields, `deleted_at TIMESTAMPTZ NULL` (soft delete); ManyToMany to roles via user_roles |
 | `oauth_accounts` | UUID PK, provider + provider_id (unique), FK to users (CASCADE) |
 | `refresh_tokens` | UUID PK, token (SHA-256 hashed), FK to users (CASCADE), expires_at, revoked |
 | `roles` | UUID PK, name (unique), description, isSystem flag, isSuper flag |

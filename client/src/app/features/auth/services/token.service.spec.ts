@@ -45,6 +45,7 @@ function createMockAuthResponse(): AuthResponse {
       isActive: true,
       roles: [mockUserRole],
       isEmailVerified: true,
+      locale: 'en',
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
       deletedAt: null

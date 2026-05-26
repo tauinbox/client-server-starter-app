@@ -47,6 +47,7 @@ describe('UsersService', () => {
     lastName: 'Doe',
     password: '$2b$10$hashedpassword',
     isActive: true,
+    locale: 'en',
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
     deletedAt: null
@@ -616,7 +617,8 @@ describe('UsersService', () => {
         expect(mockMailService.sendEmailVerification).toHaveBeenCalledTimes(1);
         expect(mockMailService.sendEmailVerification).toHaveBeenCalledWith(
           'changed@example.com',
-          expect.any(String)
+          expect.any(String),
+          'en'
         );
       });
 
