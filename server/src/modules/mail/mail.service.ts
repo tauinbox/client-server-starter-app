@@ -2,7 +2,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
-import { escapeHtml, maskEmail } from '../../common/utils/escape-html';
+import * as Handlebars from 'handlebars';
+import { DEFAULT_LOCALE, normalizeLocale } from '@app/shared/constants';
+import type { SupportedLocale } from '@app/shared/constants';
+import { maskEmail } from '../../common/utils/escape-html';
+import { EMAIL_TEMPLATE_SOURCE } from './email.template';
+import {
+  EmailMessage,
+  MAIL_APP_NAME,
+  MAIL_FOOTER,
+  mailMessages
+} from './mail-content';
 
 @Injectable()
 export class MailService {
@@ -11,6 +21,7 @@ export class MailService {
   private readonly clientUrl: string;
   private readonly from: string;
   private readonly useConsole: boolean;
+  private readonly template: Handlebars.TemplateDelegate;
 
   constructor(private configService: ConfigService) {
     const smtpHost = this.configService.get<string>('SMTP_HOST');
@@ -19,6 +30,7 @@ export class MailService {
     this.from =
       this.configService.get<string>('SMTP_FROM') || 'noreply@example.com';
     this.useConsole = !smtpHost;
+    this.template = Handlebars.compile(EMAIL_TEMPLATE_SOURCE);
 
     if (smtpHost) {
       this.transporter = nodemailer.createTransport({
@@ -47,98 +59,34 @@ export class MailService {
     await this.transporter.verify();
   }
 
-  async sendEmailVerification(email: string, rawToken: string): Promise<void> {
-    const verifyUrl = `${this.clientUrl}/verify-email?token=${rawToken}`;
-    const safeUrl = escapeHtml(verifyUrl);
-
-    if (this.useConsole) {
-      this.logger.log(
-        `[EMAIL VERIFICATION] To: ${email}\n  Verify URL: ${verifyUrl}`
-      );
-    }
-
-    try {
-      await this.transporter.sendMail({
-        from: this.from,
-        to: email,
-        subject: 'Verify your email address',
-        html: `
-          <h2>Email Verification</h2>
-          <p>Please click the link below to verify your email address:</p>
-          <p><a href="${safeUrl}">Verify Email</a></p>
-          <p>This link will expire in 24 hours.</p>
-          <p>If you did not create an account, please ignore this email.</p>
-        `
-      });
-    } catch (error) {
-      this.logger.error(`Failed to send verification email to ${email}`, error);
-    }
+  async sendEmailVerification(
+    email: string,
+    rawToken: string,
+    locale: string = DEFAULT_LOCALE
+  ): Promise<void> {
+    const loc = normalizeLocale(locale);
+    const url = `${this.clientUrl}/verify-email?token=${rawToken}`;
+    await this.send(email, mailMessages(loc).verification(url), loc);
   }
 
-  async sendPasswordReset(email: string, rawToken: string): Promise<void> {
-    const resetUrl = `${this.clientUrl}/reset-password?token=${rawToken}`;
-    const safeUrl = escapeHtml(resetUrl);
-
-    if (this.useConsole) {
-      this.logger.log(
-        `[PASSWORD RESET] To: ${email}\n  Reset URL: ${resetUrl}`
-      );
-    }
-
-    try {
-      await this.transporter.sendMail({
-        from: this.from,
-        to: email,
-        subject: 'Reset your password',
-        html: `
-          <h2>Password Reset</h2>
-          <p>You requested a password reset. Click the link below to set a new password:</p>
-          <p><a href="${safeUrl}">Reset Password</a></p>
-          <p>This link will expire in 1 hour.</p>
-          <p>If you did not request a password reset, please ignore this email.</p>
-        `
-      });
-    } catch (error) {
-      this.logger.error(
-        `Failed to send password reset email to ${email}`,
-        error
-      );
-    }
+  async sendPasswordReset(
+    email: string,
+    rawToken: string,
+    locale: string = DEFAULT_LOCALE
+  ): Promise<void> {
+    const loc = normalizeLocale(locale);
+    const url = `${this.clientUrl}/reset-password?token=${rawToken}`;
+    await this.send(email, mailMessages(loc).passwordReset(url), loc);
   }
 
   async sendEmailChangeConfirmation(
     newEmail: string,
-    rawToken: string
+    rawToken: string,
+    locale: string = DEFAULT_LOCALE
   ): Promise<void> {
-    const confirmUrl = `${this.clientUrl}/confirm-email-change?token=${rawToken}`;
-    const safeUrl = escapeHtml(confirmUrl);
-
-    if (this.useConsole) {
-      this.logger.log(
-        `[EMAIL CHANGE CONFIRMATION] To: ${newEmail}\n  Confirm URL: ${confirmUrl}`
-      );
-    }
-
-    try {
-      await this.transporter.sendMail({
-        from: this.from,
-        to: newEmail,
-        subject: 'Confirm your new email address',
-        html: `
-          <h2>Confirm Email Change</h2>
-          <p>You requested to change the email address on your account to this one.</p>
-          <p>Please click the link below to confirm:</p>
-          <p><a href="${safeUrl}">Confirm New Email</a></p>
-          <p>This link will expire in 1 hour. Your account email will not change until you click it.</p>
-          <p>If you did not request this change, please ignore this email.</p>
-        `
-      });
-    } catch (error) {
-      this.logger.error(
-        `Failed to send email change confirmation to ${newEmail}`,
-        error
-      );
-    }
+    const loc = normalizeLocale(locale);
+    const url = `${this.clientUrl}/confirm-email-change?token=${rawToken}`;
+    await this.send(newEmail, mailMessages(loc).emailChangeConfirm(url), loc);
   }
 
   /**
@@ -150,66 +98,55 @@ export class MailService {
    */
   async sendEmailChangeNotificationOld(
     oldEmail: string,
-    newEmail: string
+    newEmail: string,
+    locale: string = DEFAULT_LOCALE
   ): Promise<void> {
-    const masked = maskEmail(newEmail);
-    const safeMasked = escapeHtml(masked);
-
-    if (this.useConsole) {
-      this.logger.log(
-        `[EMAIL CHANGE NOTIFICATION] To: ${oldEmail}\n  Pending new address (masked): ${masked}`
-      );
-    }
-
-    try {
-      await this.transporter.sendMail({
-        from: this.from,
-        to: oldEmail,
-        subject: 'Email change requested on your account',
-        html: `
-          <h2>Email Change Requested</h2>
-          <p>Someone requested to change your account email to <strong>${safeMasked}</strong>.</p>
-          <p>If this was you, no action is needed — open the confirmation link sent to the new address.</p>
-          <p>If this was <strong>not</strong> you, change your password immediately and contact support.</p>
-          <p>This notification is sent for your security and does not contain any action links.</p>
-        `
-      });
-    } catch (error) {
-      this.logger.error(
-        `Failed to send email change notification to ${oldEmail}`,
-        error
-      );
-    }
+    const loc = normalizeLocale(locale);
+    const message = mailMessages(loc).emailChangeNotifyOld(maskEmail(newEmail));
+    await this.send(oldEmail, message, loc);
   }
 
   async sendEmailChangeCompletedNotification(
     oldEmail: string,
-    newEmail: string
+    newEmail: string,
+    locale: string = DEFAULT_LOCALE
   ): Promise<void> {
-    const safeNew = escapeHtml(newEmail);
+    const loc = normalizeLocale(locale);
+    const message = mailMessages(loc).emailChangeCompleted(newEmail);
+    await this.send(oldEmail, message, loc);
+  }
 
+  private renderHtml(message: EmailMessage, locale: SupportedLocale): string {
+    return this.template({
+      lang: locale,
+      appName: MAIL_APP_NAME,
+      subject: message.subject,
+      heading: message.heading,
+      paragraphs: message.paragraphs,
+      button: message.button,
+      footer: MAIL_FOOTER[locale]
+    });
+  }
+
+  private async send(
+    to: string,
+    message: EmailMessage,
+    locale: SupportedLocale
+  ): Promise<void> {
     if (this.useConsole) {
-      this.logger.log(
-        `[EMAIL CHANGE COMPLETE] To: ${oldEmail}\n  New address: ${newEmail}`
-      );
+      const link = message.button ? `\n  Link: ${message.button.url}` : '';
+      this.logger.log(`[MAIL] To: ${to} | ${message.subject}${link}`);
     }
 
     try {
       await this.transporter.sendMail({
         from: this.from,
-        to: oldEmail,
-        subject: 'Your account email has been changed',
-        html: `
-          <h2>Email Changed</h2>
-          <p>Your account email has been changed to <strong>${safeNew}</strong>.</p>
-          <p>If this was not you, contact support immediately.</p>
-        `
+        to,
+        subject: message.subject,
+        html: this.renderHtml(message, locale)
       });
     } catch (error) {
-      this.logger.error(
-        `Failed to send email change completed notification to ${oldEmail}`,
-        error
-      );
+      this.logger.error(`Failed to send "${message.subject}" to ${to}`, error);
     }
   }
 }

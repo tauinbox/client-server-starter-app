@@ -29,6 +29,9 @@ export class UserResponseDto {
   @ApiProperty({ example: true })
   isEmailVerified: boolean;
 
+  @ApiProperty({ example: 'en' })
+  locale: string;
+
   @ApiProperty({ example: '2023-01-01T00:00:00Z' })
   createdAt: Date;
 

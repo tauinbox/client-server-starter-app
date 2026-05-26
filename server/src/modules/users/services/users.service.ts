@@ -279,7 +279,11 @@ export class UsersService {
 
     if (pendingVerificationRawToken) {
       this.mailService
-        .sendEmailVerification(saved.email, pendingVerificationRawToken)
+        .sendEmailVerification(
+          saved.email,
+          pendingVerificationRawToken,
+          saved.locale
+        )
         .catch((err) =>
           this.logger.error(
             'Failed to send verification email after email change',

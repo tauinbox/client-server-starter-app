@@ -1,16 +1,19 @@
 import {
   IsEmail,
+  IsIn,
   IsNotEmpty,
+  IsOptional,
   Matches,
   MaxLength,
   MinLength
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   PASSWORD_REGEX,
   PASSWORD_ERROR
 } from '@app/shared/constants/password.constants';
+import { SUPPORTED_LOCALES } from '@app/shared/constants';
 
 export class CreateUserDto {
   @ApiProperty({
@@ -51,4 +54,13 @@ export class CreateUserDto {
   @MaxLength(128)
   @Matches(PASSWORD_REGEX, { message: PASSWORD_ERROR })
   password: string;
+
+  @ApiPropertyOptional({
+    description: 'Preferred locale for transactional emails',
+    enum: SUPPORTED_LOCALES,
+    example: 'en'
+  })
+  @IsOptional()
+  @IsIn([...SUPPORTED_LOCALES])
+  locale?: string;
 }

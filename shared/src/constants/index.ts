@@ -18,4 +18,11 @@ export {
 
 export { SYSTEM_ROLES, type SystemRole } from './permission.constants';
 
+export {
+  SUPPORTED_LOCALES,
+  DEFAULT_LOCALE,
+  normalizeLocale,
+  type SupportedLocale
+} from './locale.constants';
+
 export { ErrorKeys } from './error-keys';

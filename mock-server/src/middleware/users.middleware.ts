@@ -248,6 +248,15 @@ router.post('/', adminGuard, (req, res) => {
     return;
   }
 
+  const locale: unknown = req.body.locale;
+  if (locale !== undefined && locale !== 'en' && locale !== 'ru') {
+    res.status(400).json({
+      message: 'locale must be one of the following values: en, ru',
+      statusCode: 400
+    });
+    return;
+  }
+
   if (
     findUserByEmail(email) ||
     Array.from(getState().users.values()).some(
@@ -272,6 +281,7 @@ router.post('/', adminGuard, (req, res) => {
     isActive: true,
     roles: ['user'],
     isEmailVerified: true,
+    locale: (locale as string) ?? 'en',
     failedLoginAttempts: 0,
     lockedUntil: null,
     tokenRevokedAt: null,

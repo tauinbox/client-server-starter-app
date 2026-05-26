@@ -17,6 +17,7 @@ export interface MockUser {
   isActive: boolean;
   roles: string[];
   isEmailVerified: boolean;
+  locale: string;
   failedLoginAttempts: number;
   lockedUntil: string | null;
   tokenRevokedAt: string | null;
