@@ -208,10 +208,50 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 
 ### Email (MailModule)
 
-- Uses `nodemailer` for sending verification and password reset emails
-- **SMTP transport** when `SMTP_HOST` env var is set (production)
-- **Console transport** when `SMTP_HOST` is not set (development) — logs clickable URLs
+- Uses `nodemailer` for sending verification, password reset, and email-change messages
+- **SMTP transport** when `SMTP_HOST` env var is set
+- **Console transport** when `SMTP_HOST` is not set — logs clickable URLs
 - Email links use `CLIENT_URL` env var: `${clientUrl}/verify-email?token=xxx`, `${clientUrl}/reset-password?token=xxx`
+
+#### Transport options
+
+| Mode | When | Config |
+|------|------|--------|
+| Console | `SMTP_HOST` empty | none — links logged to server console |
+| Local Mailpit | local testing of real send | `SMTP_HOST=localhost`, `SMTP_PORT=1025` (no user/pass) |
+| Gmail SMTP | production (free, ~500/day) | `smtp.gmail.com:587` + App Password |
+
+**Local testing with Mailpit** — capture outgoing email in a local inbox without
+sending it externally:
+
+```sh
+cd server
+docker compose up -d mailpit   # SMTP on :1025, web UI on :8025
+```
+
+Set `SMTP_HOST=localhost` and `SMTP_PORT=1025` in `server/.env` (leave
+`SMTP_USER`/`SMTP_PASS` empty), restart the dev server, then trigger a flow
+(register, forgot-password, email change) and read the message at
+http://localhost:8025.
+
+**Production with Gmail SMTP** (no paid provider required):
+
+1. Enable 2-Step Verification on the Google account.
+2. Create an **App Password** (Google Account → Security → App passwords) — this
+   is a 16-character token, distinct from the login password.
+3. In the deployment's `server/.env`:
+   ```
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USER=your-account@gmail.com
+   SMTP_PASS=<16-char app password>
+   SMTP_FROM=your-account@gmail.com
+   ```
+4. Restart the server container so it re-reads `server/.env`.
+
+> Gmail rewrites the `From` header to the authenticated account — `SMTP_FROM`
+> **must** equal `SMTP_USER`, otherwise messages appear spoofed and get
+> filtered. Gmail's free sending limit is ~500 recipients/day.
 
 ### Database
 
