@@ -7,11 +7,19 @@ NestJS 11 REST API with JWT authentication, PostgreSQL via TypeORM, and Swagger 
 ```bash
 npm install
 cp .env.example .env      # Configure database and JWT settings
+docker compose up -d       # Start backing services (Postgres + Redis + Mailpit)
 npm run build
 npm run migrations:run     # Apply database schema
 npm run seed:run           # Optional: seed sample data
 npm run start:dev          # Dev server at http://localhost:3000
 ```
+
+`server/docker-compose.yml` is the local **dev** stack — Postgres (`:5432`),
+Redis (`:6379`), and Mailpit (SMTP `:1025`, UI `:8025`). It is separate from the
+repo-root `docker-compose.yml`, which is the **production** deployment file and
+should not be run locally. Redis and Mailpit are optional: set `REDIS_URL` to
+enable the queue/cache, and `SMTP_HOST`/`SMTP_PORT` to capture mail in Mailpit
+(see [Email](#email-mailmodule)).
 
 **Alternative for development**: Use the mock-server (no database required):
 
@@ -228,7 +236,7 @@ sending it externally:
 
 ```sh
 cd server
-docker compose up -d mailpit   # SMTP on :1025, web UI on :8025
+docker compose up -d mailpit   # or `docker compose up -d` for the whole dev stack
 ```
 
 Set `SMTP_HOST=localhost` and `SMTP_PORT=1025` in `server/.env` (leave
@@ -563,7 +571,7 @@ exec node dist/server/src/main       # Start NestJS
 
 The admin seeder (`src/seed-admin.ts`) reads `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_FIRST_NAME`, `ADMIN_LAST_NAME` from the environment. It is idempotent — skips if the user already exists or if `ADMIN_EMAIL` is not set.
 
-Use `docker-compose.yml` at the repo root to run the full stack (db + server + client).
+The repo-root `docker-compose.yml` is the **production** stack (db + redis + server + client + monitoring) deployed to the VPS — not for local use. For local development, run the API on the host (`npm run start:dev`) against the dev backing services in `server/docker-compose.yml`.
 
 ---
 
