@@ -213,6 +213,7 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 - **Console transport** when `SMTP_HOST` is not set — logs clickable URLs
 - Email links use `CLIENT_URL` env var: `${clientUrl}/verify-email?token=xxx`, `${clientUrl}/reset-password?token=xxx`
 - **Async delivery**: when `REDIS_URL` is set, messages are rendered then enqueued on a BullMQ queue (`mail`) and delivered by `MailProcessor` with retries (3 attempts, exponential backoff). Without `REDIS_URL`, `MailService` delivers inline in the request (no retries). The queue is transparent to callers — `MailService.sendXxx(...)` is unchanged.
+- **Delivery test**: `test/email-delivery.e2e-spec.ts` boots the full app and verifies register → email → verify → login against a Mailpit sink (reads the message via Mailpit's REST API). CI runs a `mailpit` service with `SMTP_HOST`/`SMTP_PORT` set; the test is gated on `DB_HOST` and skips on a bare local run.
 
 #### Transport options
 
