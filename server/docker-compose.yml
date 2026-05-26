@@ -1,22 +1,54 @@
+# Local development backing services (Postgres + Redis + Mailpit).
+#
+# This is the DEV stack — not production. The repo-root docker-compose.yml is the
+# production deployment file; do not run it locally (it would collide on these
+# ports and pin different settings). Run the API itself on the host with
+# `npm run start:dev`; it connects to these services on localhost.
+#
+#   docker compose up -d            # start all three
+#   docker compose down             # stop them (add -v to wipe the DB volume)
+#
+# Variable defaults below fall back to the values in server/.env.example, so the
+# stack works whether or not server/.env is present.
 services:
   postgres:
     container_name: postgres_container
-    image: postgres
+    # Pinned to the same major as production (root docker-compose.yml) — Postgres
+    # cannot read a data volume written by a different major version.
+    image: postgres:16-alpine
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      PGDATA: /data/postgres
+      POSTGRES_DB: ${DB_NAME:-my-db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      PGDATA: /var/lib/postgresql/data
     volumes:
-      - postgres_data:/data/postgres
+      - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-    networks:
-      - postgres_network
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-my-db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
-  # Local dev SMTP sink — captures all outgoing email instead of delivering it.
-  # Set SMTP_HOST=localhost / SMTP_PORT=1025 in server/.env to route mail here;
+  # Enables the distributed rate limiter, shared permission cache, and the BullMQ
+  # mail queue. Set REDIS_URL=redis://localhost:6379 in server/.env to use it.
+  redis:
+    container_name: redis_container
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # SMTP sink — captures all outgoing email instead of delivering it. Set
+  # SMTP_HOST=localhost / SMTP_PORT=1025 in server/.env to route mail here;
   # inspect captured messages at http://localhost:8025 (web UI + REST API).
   mailpit:
     container_name: mailpit_container
@@ -24,13 +56,7 @@ services:
     ports:
       - "1025:1025" # SMTP
       - "8025:8025" # Web UI + REST API
-    networks:
-      - postgres_network
     restart: unless-stopped
-
-networks:
-  postgres_network:
-    driver: bridge
 
 volumes:
   postgres_data:
