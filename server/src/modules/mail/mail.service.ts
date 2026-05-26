@@ -1,8 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
 import * as Handlebars from 'handlebars';
+import { MAIL_QUEUE, MAIL_SEND_JOB, MailJobData } from './mail-queue.constants';
 import { DEFAULT_LOCALE, normalizeLocale } from '@app/shared/constants';
 import type { SupportedLocale } from '@app/shared/constants';
 import { maskEmail } from '../../common/utils/escape-html';
@@ -23,7 +26,12 @@ export class MailService {
   private readonly useConsole: boolean;
   private readonly template: Handlebars.TemplateDelegate;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    @Optional()
+    @InjectQueue(MAIL_QUEUE)
+    private readonly queue?: Queue<MailJobData>
+  ) {
     const smtpHost = this.configService.get<string>('SMTP_HOST');
     this.clientUrl =
       this.configService.get<string>('CLIENT_URL') || 'http://localhost:4200';
@@ -128,6 +136,20 @@ export class MailService {
     });
   }
 
+  /**
+   * Sends a rendered payload over SMTP. Throws on failure so the queue worker
+   * can retry; the in-process fallback path (no Redis) catches it so delivery
+   * stays non-fatal. Public so MailProcessor can call it.
+   */
+  async deliver(data: MailJobData): Promise<void> {
+    await this.transporter.sendMail({
+      from: this.from,
+      to: data.to,
+      subject: data.subject,
+      html: data.html
+    });
+  }
+
   private async send(
     to: string,
     message: EmailMessage,
@@ -138,13 +160,24 @@ export class MailService {
       this.logger.log(`[MAIL] To: ${to} | ${message.subject}${link}`);
     }
 
-    try {
-      await this.transporter.sendMail({
-        from: this.from,
-        to,
-        subject: message.subject,
-        html: this.renderHtml(message, locale)
+    const data: MailJobData = {
+      to,
+      subject: message.subject,
+      html: this.renderHtml(message, locale)
+    };
+
+    if (this.queue) {
+      await this.queue.add(MAIL_SEND_JOB, data, {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 2000 },
+        removeOnComplete: true,
+        removeOnFail: 50
       });
+      return;
+    }
+
+    try {
+      await this.deliver(data);
     } catch (error) {
       this.logger.error(`Failed to send "${message.subject}" to ${to}`, error);
     }
