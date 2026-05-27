@@ -264,13 +264,11 @@ http://localhost:8025.
 > **must** equal `SMTP_USER`, otherwise messages appear spoofed and get
 > filtered. Gmail's free sending limit is ~500 recipients/day.
 
-> **CI-deployed VPS:** prefer storing `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
-> `SMTP_PASS`, `SMTP_FROM` as GitHub repository secrets rather than hand-editing
-> `server/.env`. `deploy.yml`/`rebuild.yml` rewrite those keys into the VPS
-> `server/.env` from the secrets on every run (only when `SMTP_HOST` is set;
-> other keys are preserved), so a from-scratch VPS rebuild restores email
-> delivery instead of dropping it. Hand-editing still works for one-off changes
-> but is overwritten on the next deploy.
+> **CI-deployed VPS:** SMTP creds (like all production secrets) are stored as GitHub repository
+> secrets and injected into the VPS `server/.env` by `scripts/sync-prod-env.sh` on every deploy —
+> hand-editing the secret-managed keys is overwritten on the next deploy. See the root README
+> ["Production credentials & secrets"](../README.md#production-credentials--secrets) for the full
+> inventory, the `DB_PASSWORD` caveat, and the from-scratch provisioning checklist.
 
 #### Localization
 

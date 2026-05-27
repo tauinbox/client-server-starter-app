@@ -503,7 +503,49 @@ Set `GRAFANA_ADMIN_PASSWORD` as a shell environment variable before running `doc
 
 All VPS-facing workflows share a `deploy-production` concurrency group to prevent race conditions.
 
-**SMTP credentials** are injected from GitHub repository secrets (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`) on every `deploy.yml`/`rebuild.yml` run: when `SMTP_HOST` is set, the workflow rewrites those keys in the VPS `server/.env` (preserving all other keys); when it is empty the existing file is left untouched. This keeps the secrets as the single source of truth so a from-scratch VPS rebuild restores email delivery instead of silently dropping it. Other `server/.env` values (DB, JWT, OAuth) remain provisioned directly on the VPS.
+### Production credentials & secrets
+
+**Model:** all production secrets live in **GitHub repository secrets** and are the single source of
+truth. On every `deploy.yml` / `rebuild.yml` run (after `git pull`), `scripts/sync-prod-env.sh` writes
+them into the VPS `server/.env` (and root `.env` for `DB_PASSWORD`), so the on-disk env files are a
+**derived artifact** — a from-scratch VPS rebuild restores credentials instead of silently dropping
+email / auth / DB access. Each key is written **only when its secret is non-empty**; an unset secret
+leaves the existing on-disk value untouched (safe to add a key before its secret is populated). Keys
+not in the script (e.g. `JWT_MIN_IAT`, `JWT_ALGORITHM`, and non-secret config) are never touched.
+
+**Secret inventory:**
+
+| GitHub secret | Used by | Injected into | Notes |
+|---|---|---|---|
+| `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` | all VPS workflows | — (SSH auth) | how Actions reaches the VPS |
+| `GITHUB_TOKEN` | all | — (GHCR login) | auto-provided by Actions |
+| `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_ROOT_URL` | deploy, rebuild | `docker-compose.yml` `${}` | Grafana container env |
+| `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` | deploy, rebuild, rotate-keys | `server/.env` | RS256 keypair (base64 PEM) |
+| `DB_PASSWORD` | deploy, rebuild | `server/.env` + root `.env` | must equal the postgres volume's password — see caveat below |
+| `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_SECRET`, `VK_CLIENT_SECRET` | deploy, rebuild | `server/.env` | OAuth client secrets |
+| `EXTERNAL_API_TOKEN` | deploy, rebuild | `server/.env` | external API token |
+| `ADMIN_PASSWORD` | deploy, rebuild | `server/.env` | initial-admin bootstrap password |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | deploy, rebuild | `server/.env` | outgoing email |
+| `CI_JWT_SECRET` | ci.yml | — (CI tests only) | not used in prod |
+
+> **`DB_PASSWORD` caveat:** postgres bakes the password into its data volume on first init. Changing
+> the `DB_PASSWORD` secret does **not** re-key an existing volume — the app would then fail to connect.
+> Keep the secret equal to the live password; to truly rotate it, change it inside postgres too.
+
+**Hand-maintained (not secrets, set directly in the VPS `server/.env`):** non-secret config —
+`CLIENT_URL`, `CORS_ORIGINS`, `TRUSTED_PROXIES`, OAuth client **IDs** (`GOOGLE_CLIENT_ID`, …),
+`ADMIN_EMAIL`, `JWT_ALGORITHM`, `JWT_MIN_IAT` (set by `rotate-keys.yml`), DB pool / logging settings.
+
+**From-scratch VPS provisioning checklist:**
+1. Install Docker + Compose; create the `deploy` user and `/home/deploy/nexus`; clone the repo there.
+2. Ensure the `shared-network` Docker network exists and Caddy routes `/api`→`server`, `/nexus`→`client`.
+3. Populate the GitHub secrets in the inventory above (all of them).
+4. Create `server/.env` from `server/.env.example` and fill the **hand-maintained** (non-secret) keys;
+   leave the secret-managed keys empty — the deploy will inject them.
+5. Create root `.env` from `.env.example` (`DB_NAME`, `DB_USER`, image names); leave `DB_PASSWORD`
+   empty (injected).
+6. Trigger `deploy.yml` (`workflow_dispatch`). The sync script fills the secret-managed keys, the stack
+   comes up, and `/api/health/ready` should report `database/redis/smtp: up`.
 
 ---
 
