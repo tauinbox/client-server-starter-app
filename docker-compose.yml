@@ -78,7 +78,12 @@ services:
       start_period: 10s
     depends_on:
       server:
-        condition: service_healthy
+        # The SPA is static files served by nginx and has no runtime dependency
+        # on backend health — only on start ordering. Gating on service_started
+        # (not service_healthy) keeps the frontend reachable during a backend
+        # outage; /api calls 502 until the server recovers, which interceptors
+        # already surface as API errors.
+        condition: service_started
     networks:
       # `shared` lets the host Caddy reverse-proxy reach this service by name
       # (Caddyfile: `/nexus/* -> client:8080`). Without it a recreate drops the

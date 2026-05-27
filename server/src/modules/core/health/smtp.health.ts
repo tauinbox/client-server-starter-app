@@ -1,9 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  HealthCheckError,
-  HealthIndicator,
-  HealthIndicatorResult
-} from '@nestjs/terminus';
+import { HealthIndicator, HealthIndicatorResult } from '@nestjs/terminus';
 import { MailService } from '../../mail/mail.service';
 
 @Injectable()
@@ -12,15 +8,18 @@ export class SmtpHealthIndicator extends HealthIndicator {
     super();
   }
 
+  // The API serves all traffic without working email, so a failed SMTP verify
+  // degrades to a healthy-with-warning entry (mirrors RedisHealthIndicator)
+  // rather than failing /health/ready and taking the whole container down.
   async isHealthy(key: string): Promise<HealthIndicatorResult> {
     try {
       await this.mailService.verifySmtp();
       return this.getStatus(key, true);
-    } catch {
-      throw new HealthCheckError(
-        'SMTP check failed',
-        this.getStatus(key, false)
-      );
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      return this.getStatus(key, true, {
+        warning: `SMTP verify failed: ${reason}`
+      });
     }
   }
 }
