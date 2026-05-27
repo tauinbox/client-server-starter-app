@@ -91,6 +91,7 @@ Copy `.env.example` to `.env` and configure:
 | `ADMIN_LAST_NAME` | `User` | Last name for the initial admin user |
 | `SMTP_HOST` | - | SMTP server host (if unset, emails logged to console) |
 | `SMTP_PORT` | `587` | SMTP server port |
+| `SMTP_SECURE` | - | `true` forces implicit TLS; unset = STARTTLS on 587, implicit TLS on 465 (TLS always required) |
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
 | `SMTP_FROM` | `noreply@example.com` | Sender email address |
@@ -217,7 +218,7 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 ### Email (MailModule)
 
 - Uses `nodemailer` for sending verification, password reset, and email-change messages
-- **SMTP transport** when `SMTP_HOST` env var is set
+- **SMTP transport** when `SMTP_HOST` env var is set — TLS is always required: STARTTLS is enforced on port 587 (`requireTLS`, so a downgrade aborts instead of leaking credentials), implicit TLS on 465 or when `SMTP_SECURE=true`, with `minVersion: TLSv1.2` and certificate validation kept on
 - **Console transport** when `SMTP_HOST` is not set — logs clickable URLs
 - Email links use `CLIENT_URL` env var: `${clientUrl}/verify-email?token=xxx`, `${clientUrl}/reset-password?token=xxx`
 - **Async delivery**: when `REDIS_URL` is set, messages are rendered then enqueued on a BullMQ queue (`mail`) and delivered by `MailProcessor` with retries (3 attempts, exponential backoff). Without `REDIS_URL`, `MailService` delivers inline in the request (no retries). The queue is transparent to callers — `MailService.sendXxx(...)` is unchanged.

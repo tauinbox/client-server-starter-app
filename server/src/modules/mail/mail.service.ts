@@ -41,12 +41,23 @@ export class MailService {
     this.template = Handlebars.compile(EMAIL_TEMPLATE_SOURCE);
 
     if (smtpHost) {
+      const port = parseInt(
+        this.configService.get<string>('SMTP_PORT') || '587',
+        10
+      );
+      // Implicit TLS on 465, or explicit opt-in; otherwise STARTTLS on 587 with
+      // requireTLS so a downgrade (STARTTLS stripping) aborts rather than
+      // sending credentials in cleartext. Certificate validation stays on
+      // (nodemailer default rejectUnauthorized:true) to guard against MITM.
+      const secure =
+        this.configService.get<string>('SMTP_SECURE') === 'true' ||
+        port === 465;
       this.transporter = nodemailer.createTransport({
         host: smtpHost,
-        port: parseInt(
-          this.configService.get<string>('SMTP_PORT') || '587',
-          10
-        ),
+        port,
+        secure,
+        requireTLS: !secure,
+        tls: { minVersion: 'TLSv1.2' },
         auth: {
           user: this.configService.get<string>('SMTP_USER'),
           pass: this.configService.get<string>('SMTP_PASS')
