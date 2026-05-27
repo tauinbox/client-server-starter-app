@@ -538,7 +538,6 @@ preserved byte-for-byte. The script's header comment is the authoritative refere
 | `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` | deploy, rebuild, rotate-keys | `server/.env` | RS256 keypair (base64 PEM) |
 | `DB_PASSWORD` | deploy, rebuild | `server/.env` + root `.env` | must equal the postgres volume's password — see caveat below |
 | `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_SECRET`, `VK_CLIENT_SECRET` | deploy, rebuild | `server/.env` | OAuth client secrets |
-| `EXTERNAL_API_TOKEN` | deploy, rebuild | `server/.env` | external API token |
 | `ADMIN_PASSWORD` | deploy, rebuild | `server/.env` | initial-admin bootstrap password |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | deploy, rebuild | `server/.env` | outgoing email |
 | `CI_JWT_SECRET` | ci.yml | — (CI tests only) | not used in prod |
@@ -580,6 +579,8 @@ API base URL: `/api/v1`
 | POST | `/auth/logout` | Bearer | Logout, revokes refresh tokens |
 | GET | `/auth/profile` | Bearer | Get current user profile |
 | PATCH | `/auth/profile` | Bearer | Update own profile (name, password); `currentPassword` required when changing password (OAuth-only users may omit) |
+| POST | `/auth/profile/email/initiate` | Bearer | Start self-service email change (throttled 3/h; requires current password; rejects OAuth-only accounts) |
+| POST | `/auth/profile/email/confirm` | None | Confirm email change with the token sent to the new address (applies change in a transaction, revokes all sessions) |
 | GET | `/auth/oauth/:provider` | None | Initiate OAuth login (google, facebook, vk) |
 | GET | `/auth/oauth/:provider/callback` | None | OAuth provider callback |
 | POST | `/auth/verify-email` | None | Verify email with token |
@@ -587,6 +588,8 @@ API base URL: `/api/v1`
 | POST | `/auth/forgot-password` | None | Request password reset email; CAPTCHA token required when near rate limit |
 | GET | `/auth/captcha-config` | None | Public CAPTCHA configuration (site key, enabled flag) |
 | POST | `/auth/reset-password` | None | Reset password with token |
+| POST | `/auth/oauth/link-init` | Bearer | Initiate OAuth account linking — sets a short-lived link cookie so the next OAuth flow attaches the provider to the current user |
+| POST | `/auth/oauth/exchange` | None | Exchange the post-callback OAuth-data cookie for the auth response (access token + refresh cookie) |
 | GET | `/auth/oauth/accounts` | Bearer | List linked OAuth accounts |
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink OAuth provider |
 | GET | `/auth/permissions` | Bearer | Get current user's resolved permissions |
@@ -621,6 +624,15 @@ API base URL: `/api/v1`
 | POST | `/rbac/actions` | `permissions:create` | Create a new action |
 | PATCH | `/rbac/actions/:id` | `permissions:update` | Update action |
 | DELETE | `/rbac/actions/:id` | `permissions:delete` | Delete custom action |
+| GET | `/feature-flags` | None (optional) | Evaluate the flag set for the caller (authenticated → flags they resolve true + `public` flags; anonymous → `public: true` only) |
+| GET | `/admin/feature-flags` | `feature-flags:manage` | List all feature flags (admin) |
+| GET | `/admin/feature-flags/:id` | `feature-flags:manage` | Get a feature flag by ID |
+| POST | `/admin/feature-flags` | `feature-flags:manage` | Create a feature flag |
+| PATCH | `/admin/feature-flags/:id` | `feature-flags:manage` | Update a feature flag (optimistic locking via `If-Match`) |
+| DELETE | `/admin/feature-flags/:id` | `feature-flags:manage` | Delete a feature flag |
+| PUT | `/admin/feature-flags/:id/rules` | `feature-flags:manage` | Bulk-replace a flag's targeting rules |
+| POST | `/admin/feature-flags/:id/preview` | `feature-flags:manage` | Preview how a flag evaluates for given attributes without saving |
+| POST | `/admin/feature-flags/:id/toggle` | `feature-flags:manage` | Enable/disable a flag |
 
 ## Available Commands
 
