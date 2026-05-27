@@ -134,7 +134,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: DEPLOY_SHA,OWNER,GRAFANA_ADMIN_PASSWORD,GRAFANA_ROOT_URL
+          envs: DEPLOY_SHA,OWNER,GRAFANA_ADMIN_PASSWORD,GRAFANA_ROOT_URL,SMTP_HOST,SMTP_PORT,SMTP_USER,SMTP_PASS,SMTP_FROM
           script: |
             set -euo pipefail
             cd /home/deploy/nexus
@@ -149,6 +149,28 @@ jobs:
             fi
 
             echo "Deploying sha-${DEPLOY_SHA} (previous: ${PREV_SHA:-none})"
+
+            # Source of truth for SMTP creds is GitHub Secrets, so a from-scratch
+            # VPS rebuild restores them instead of silently dropping email. Only
+            # rewrite when SMTP_HOST is provided — an empty secret leaves the
+            # existing server/.env untouched (no clobber). Non-SMTP keys (DB, JWT)
+            # are preserved.
+            if [ -n "${SMTP_HOST:-}" ]; then
+              echo "Refreshing SMTP_* in server/.env from secrets"
+              touch server/.env
+              grep -vE '^(SMTP_HOST|SMTP_PORT|SMTP_USER|SMTP_PASS|SMTP_FROM)=' server/.env > server/.env.tmp || true
+              {
+                echo "SMTP_HOST=${SMTP_HOST}"
+                echo "SMTP_PORT=${SMTP_PORT:-465}"
+                echo "SMTP_USER=${SMTP_USER:-}"
+                echo "SMTP_PASS=${SMTP_PASS:-}"
+                echo "SMTP_FROM=${SMTP_FROM:-}"
+              } >> server/.env.tmp
+              mv server/.env.tmp server/.env
+              chmod 600 server/.env
+            else
+              echo "SMTP_HOST secret empty — leaving existing server/.env untouched"
+            fi
 
             docker compose pull
             docker compose up -d --remove-orphans
@@ -234,3 +256,8 @@ jobs:
           OWNER: ${{ needs.build-push.outputs.owner }}
           GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
           GRAFANA_ROOT_URL: ${{ secrets.GRAFANA_ROOT_URL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}

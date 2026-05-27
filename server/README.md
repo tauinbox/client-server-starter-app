@@ -264,6 +264,14 @@ http://localhost:8025.
 > **must** equal `SMTP_USER`, otherwise messages appear spoofed and get
 > filtered. Gmail's free sending limit is ~500 recipients/day.
 
+> **CI-deployed VPS:** prefer storing `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
+> `SMTP_PASS`, `SMTP_FROM` as GitHub repository secrets rather than hand-editing
+> `server/.env`. `deploy.yml`/`rebuild.yml` rewrite those keys into the VPS
+> `server/.env` from the secrets on every run (only when `SMTP_HOST` is set;
+> other keys are preserved), so a from-scratch VPS rebuild restores email
+> delivery instead of dropping it. Hand-editing still works for one-off changes
+> but is overwritten on the next deploy.
+
 #### Localization
 
 All transactional emails are rendered from a shared, branded Handlebars layout

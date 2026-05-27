@@ -503,6 +503,8 @@ Set `GRAFANA_ADMIN_PASSWORD` as a shell environment variable before running `doc
 
 All VPS-facing workflows share a `deploy-production` concurrency group to prevent race conditions.
 
+**SMTP credentials** are injected from GitHub repository secrets (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`) on every `deploy.yml`/`rebuild.yml` run: when `SMTP_HOST` is set, the workflow rewrites those keys in the VPS `server/.env` (preserving all other keys); when it is empty the existing file is left untouched. This keeps the secrets as the single source of truth so a from-scratch VPS rebuild restores email delivery instead of silently dropping it. Other `server/.env` values (DB, JWT, OAuth) remain provisioned directly on the VPS.
+
 ---
 
 ## API Documentation
