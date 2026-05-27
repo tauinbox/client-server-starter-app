@@ -513,6 +513,21 @@ email / auth / DB access. Each key is written **only when its secret is non-empt
 leaves the existing on-disk value untouched (safe to add a key before its secret is populated). Keys
 not in the script (e.g. `JWT_MIN_IAT`, `JWT_ALGORITHM`, and non-secret config) are never touched.
 
+**How `scripts/sync-prod-env.sh` works:** the deploy workflow exports the managed keys as environment
+variables (from `${{ secrets.* }}`) and runs the script from the checkout root on the VPS. For each
+managed key it calls an `upsert KEY VALUE FILE` helper that:
+1. **skips empty values** — if the secret is unset/empty, the key is left exactly as it is on disk (no
+   clobber), which is why adding a new managed key before its secret exists is a safe no-op;
+2. **replaces or appends** — strips any existing `KEY=` line and writes the fresh `KEY=value`, so there
+   are never duplicate lines and the value is updated in place;
+3. **writes atomically** — builds a temp file and `mv`s it over the target, so a crash mid-write can't
+   leave a half-written env file.
+
+It targets `server/.env` for every managed key and additionally mirrors `DB_PASSWORD` into the root
+`.env` (consumed by the `db`/postgres service), then `chmod 600`s both files. It only ever touches the
+keys in its own list — any other line in `server/.env` (non-secret config, `JWT_MIN_IAT`, comments) is
+preserved byte-for-byte. The script's header comment is the authoritative reference for the key list.
+
 **Secret inventory:**
 
 | GitHub secret | Used by | Injected into | Notes |
