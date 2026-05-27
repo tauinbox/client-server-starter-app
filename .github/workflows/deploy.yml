@@ -150,6 +150,15 @@ jobs:
 
             echo "Deploying sha-${DEPLOY_SHA} (previous: ${PREV_SHA:-none})"
 
+            # Refuse to deploy with an empty Grafana admin password. The compose
+            # file defaults to "admin" for local-dev convenience, so an empty
+            # secret here would silently ship admin/admin on the public Grafana.
+            # Fail before touching any container — the running stack is untouched.
+            if [ -z "${GRAFANA_ADMIN_PASSWORD:-}" ]; then
+              echo "ERROR: GRAFANA_ADMIN_PASSWORD is empty — refusing to deploy with the default 'admin' password. Set the GRAFANA_ADMIN_PASSWORD repository secret." >&2
+              exit 1
+            fi
+
             # Sync managed credentials (SMTP, JWT keys, DB_PASSWORD, OAuth, etc.)
             # from GitHub Secrets into server/.env (and root .env for DB_PASSWORD).
             # Source of truth is the secrets, so a from-scratch rebuild restores
