@@ -55,6 +55,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      # `shared` lets the host Caddy reverse-proxy reach this service by name
+      # (Caddyfile: `/api/* -> server:3000`). Without it a recreate drops the
+      # container from shared-network and Caddy returns 502.
+      - default
+      - shared
     restart: unless-stopped
 
   client:
@@ -73,6 +79,12 @@ services:
     depends_on:
       server:
         condition: service_healthy
+    networks:
+      # `shared` lets the host Caddy reverse-proxy reach this service by name
+      # (Caddyfile: `/nexus/* -> client:8080`). Without it a recreate drops the
+      # container from shared-network and Caddy returns 502.
+      - default
+      - shared
     restart: unless-stopped
 
   prometheus:
