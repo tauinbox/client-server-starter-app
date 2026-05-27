@@ -41,16 +41,30 @@ export class MailService {
     this.template = Handlebars.compile(EMAIL_TEMPLATE_SOURCE);
 
     if (smtpHost) {
+      const port = parseInt(
+        this.configService.get<string>('SMTP_PORT') || '587',
+        10
+      );
+      const user = this.configService.get<string>('SMTP_USER');
+      const pass = this.configService.get<string>('SMTP_PASS');
+      // Implicit TLS on 465, or explicit opt-in; otherwise STARTTLS on 587.
+      const secure =
+        this.configService.get<string>('SMTP_SECURE') === 'true' ||
+        port === 465;
+      // requireTLS forces STARTTLS so a downgrade (STARTTLS stripping) aborts
+      // rather than sending credentials in cleartext. Gated on having auth:
+      // an unauthenticated local sink (e.g. Mailpit on 1025) has no credentials
+      // to protect and does not advertise STARTTLS, so forcing it there would
+      // only break plaintext delivery. Certificate validation stays on
+      // (nodemailer default rejectUnauthorized:true) to guard against MITM.
+      const requireTLS = !secure && !!(user && pass);
       this.transporter = nodemailer.createTransport({
         host: smtpHost,
-        port: parseInt(
-          this.configService.get<string>('SMTP_PORT') || '587',
-          10
-        ),
-        auth: {
-          user: this.configService.get<string>('SMTP_USER'),
-          pass: this.configService.get<string>('SMTP_PASS')
-        }
+        port,
+        secure,
+        requireTLS,
+        tls: { minVersion: 'TLSv1.2' },
+        auth: { user, pass }
       });
     } else {
       this.transporter = nodemailer.createTransport({

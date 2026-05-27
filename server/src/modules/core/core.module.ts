@@ -87,7 +87,11 @@ export class CoreModule implements NestModule {
             DB_POOL_CONNECTION_TIMEOUT: Joi.number().min(0).default(5000),
             TRUSTED_PROXIES: Joi.string().optional().allow(''),
             TURNSTILE_SITE_KEY: Joi.string().optional().allow(''),
-            TURNSTILE_SECRET_KEY: Joi.string().optional().allow('')
+            TURNSTILE_SECRET_KEY: Joi.string().optional().allow(''),
+            SMTP_SECURE: Joi.string()
+              .valid('true', 'false')
+              .optional()
+              .allow('')
           }),
           validationOptions: {
             allowUnknown: true,
