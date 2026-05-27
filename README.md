@@ -491,7 +491,7 @@ ADMIN_LAST_NAME=User
 
 The admin seeder is idempotent — it skips creation if the user already exists and does nothing if `ADMIN_EMAIL` is empty.
 
-Set `GRAFANA_ADMIN_PASSWORD` as a shell environment variable before running `docker-compose up` to control the Grafana admin password (defaults to `admin` — change in production). Grafana is available at http://your-host:3001.
+Set `GRAFANA_ADMIN_PASSWORD` as a shell environment variable before running `docker-compose up` to control the Grafana admin password (defaults to `admin` for local use only). Grafana is available at http://your-host:3001. In production this default never applies: the `deploy.yml` / `rebuild.yml` workflows abort before touching any container if the `GRAFANA_ADMIN_PASSWORD` secret is empty, so a cleared secret fails the deploy loudly instead of silently shipping `admin`/`admin`.
 
 ### Deploy pipeline
 
@@ -534,7 +534,7 @@ preserved byte-for-byte. The script's header comment is the authoritative refere
 |---|---|---|---|
 | `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` | all VPS workflows | — (SSH auth) | how Actions reaches the VPS |
 | `GITHUB_TOKEN` | all | — (GHCR login) | auto-provided by Actions |
-| `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_ROOT_URL` | deploy, rebuild | `docker-compose.yml` `${}` | Grafana container env |
+| `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_ROOT_URL` | deploy, rebuild | `docker-compose.yml` `${}` | Grafana container env. An empty `GRAFANA_ADMIN_PASSWORD` aborts the deploy (no silent `admin` default in prod). |
 | `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` | deploy, rebuild, rotate-keys | `server/.env` | RS256 keypair (base64 PEM) |
 | `DB_PASSWORD` | deploy, rebuild | `server/.env` + root `.env` | must equal the postgres volume's password — see caveat below |
 | `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_SECRET`, `VK_CLIENT_SECRET` | deploy, rebuild | `server/.env` | OAuth client secrets |
