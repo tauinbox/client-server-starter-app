@@ -262,7 +262,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: DEPLOY_SHA,OWNER,GRAFANA_ADMIN_PASSWORD,GRAFANA_ROOT_URL,SMTP_HOST,SMTP_PORT,SMTP_USER,SMTP_PASS,SMTP_FROM
+          envs: DEPLOY_SHA,OWNER,GRAFANA_ADMIN_PASSWORD,GRAFANA_ROOT_URL,JWT_PRIVATE_KEY,JWT_PUBLIC_KEY,DB_PASSWORD,GOOGLE_CLIENT_SECRET,FACEBOOK_CLIENT_SECRET,VK_CLIENT_SECRET,EXTERNAL_API_TOKEN,ADMIN_PASSWORD,SMTP_HOST,SMTP_PORT,SMTP_USER,SMTP_PASS,SMTP_FROM
           script: |
             set -euo pipefail
             cd /home/deploy/nexus
@@ -277,27 +277,12 @@ jobs:
 
             echo "Redeploying sha-${DEPLOY_SHA} with fresh OS packages (previous: ${PREV_SHA:-none})"
 
-            # Source of truth for SMTP creds is GitHub Secrets, so a from-scratch
-            # VPS rebuild restores them instead of silently dropping email. Only
-            # rewrite when SMTP_HOST is provided — an empty secret leaves the
-            # existing server/.env untouched (no clobber). Non-SMTP keys (DB, JWT)
-            # are preserved.
-            if [ -n "${SMTP_HOST:-}" ]; then
-              echo "Refreshing SMTP_* in server/.env from secrets"
-              touch server/.env
-              grep -vE '^(SMTP_HOST|SMTP_PORT|SMTP_USER|SMTP_PASS|SMTP_FROM)=' server/.env > server/.env.tmp || true
-              {
-                echo "SMTP_HOST=${SMTP_HOST}"
-                echo "SMTP_PORT=${SMTP_PORT:-465}"
-                echo "SMTP_USER=${SMTP_USER:-}"
-                echo "SMTP_PASS=${SMTP_PASS:-}"
-                echo "SMTP_FROM=${SMTP_FROM:-}"
-              } >> server/.env.tmp
-              mv server/.env.tmp server/.env
-              chmod 600 server/.env
-            else
-              echo "SMTP_HOST secret empty — leaving existing server/.env untouched"
-            fi
+            # Sync managed credentials (SMTP, JWT keys, DB_PASSWORD, OAuth, etc.)
+            # from GitHub Secrets into server/.env (and root .env for DB_PASSWORD).
+            # Source of truth is the secrets, so a from-scratch rebuild restores
+            # them; each key is written only when its secret is non-empty, so this
+            # is a safe no-op for any secret not yet populated. See the script.
+            bash scripts/sync-prod-env.sh
 
             docker compose pull
             docker compose up -d --remove-orphans
@@ -375,6 +360,14 @@ jobs:
           OWNER: ${{ needs.rebuild-push.outputs.owner }}
           GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
           GRAFANA_ROOT_URL: ${{ secrets.GRAFANA_ROOT_URL }}
+          JWT_PRIVATE_KEY: ${{ secrets.JWT_PRIVATE_KEY }}
+          JWT_PUBLIC_KEY: ${{ secrets.JWT_PUBLIC_KEY }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          FACEBOOK_CLIENT_SECRET: ${{ secrets.FACEBOOK_CLIENT_SECRET }}
+          VK_CLIENT_SECRET: ${{ secrets.VK_CLIENT_SECRET }}
+          EXTERNAL_API_TOKEN: ${{ secrets.EXTERNAL_API_TOKEN }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
