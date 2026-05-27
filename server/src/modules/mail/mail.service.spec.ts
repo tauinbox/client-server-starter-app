@@ -90,10 +90,12 @@ describe('MailService', () => {
       createTransportSpy.mockRestore();
     });
 
-    it('enforces STARTTLS (secure:false, requireTLS:true) on port 587', async () => {
+    it('enforces STARTTLS (secure:false, requireTLS:true) on port 587 with credentials', async () => {
       await buildWith({
         SMTP_HOST: 'smtp.example.com',
-        SMTP_PORT: '587'
+        SMTP_PORT: '587',
+        SMTP_USER: 'user@example.com',
+        SMTP_PASS: 'secret'
       });
 
       const [options] = createTransportSpy.mock.calls[0] as [
@@ -105,6 +107,22 @@ describe('MailService', () => {
         secure: false,
         requireTLS: true,
         tls: { minVersion: 'TLSv1.2' }
+      });
+    });
+
+    it('does NOT require TLS for an unauthenticated sink (e.g. Mailpit on 1025)', async () => {
+      await buildWith({
+        SMTP_HOST: 'localhost',
+        SMTP_PORT: '1025'
+      });
+
+      const [options] = createTransportSpy.mock.calls[0] as [
+        nodemailer.TransportOptions
+      ];
+      expect(options).toMatchObject({
+        port: 1025,
+        secure: false,
+        requireTLS: false
       });
     });
 

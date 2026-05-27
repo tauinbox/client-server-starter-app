@@ -218,7 +218,7 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 ### Email (MailModule)
 
 - Uses `nodemailer` for sending verification, password reset, and email-change messages
-- **SMTP transport** when `SMTP_HOST` env var is set — TLS is always required: STARTTLS is enforced on port 587 (`requireTLS`, so a downgrade aborts instead of leaking credentials), implicit TLS on 465 or when `SMTP_SECURE=true`, with `minVersion: TLSv1.2` and certificate validation kept on
+- **SMTP transport** when `SMTP_HOST` env var is set — STARTTLS is enforced on port 587 **when credentials are configured** (`requireTLS`, so a downgrade aborts instead of leaking them); implicit TLS on 465 or when `SMTP_SECURE=true`; `minVersion: TLSv1.2` with certificate validation kept on. An unauthenticated local sink (e.g. Mailpit, which has no credentials and no STARTTLS) is exempt so plaintext dev delivery still works
 - **Console transport** when `SMTP_HOST` is not set — logs clickable URLs
 - Email links use `CLIENT_URL` env var: `${clientUrl}/verify-email?token=xxx`, `${clientUrl}/reset-password?token=xxx`
 - **Async delivery**: when `REDIS_URL` is set, messages are rendered then enqueued on a BullMQ queue (`mail`) and delivered by `MailProcessor` with retries (3 attempts, exponential backoff). Without `REDIS_URL`, `MailService` delivers inline in the request (no retries). The queue is transparent to callers — `MailService.sendXxx(...)` is unchanged.
