@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HealthCheckError } from '@nestjs/terminus';
 import { SmtpHealthIndicator } from './smtp.health';
 import { MailService } from '../../mail/mail.service';
 
@@ -31,28 +30,37 @@ describe('SmtpHealthIndicator', () => {
       expect(result).toEqual({ smtp: { status: 'up' } });
     });
 
-    it('should throw HealthCheckError when SMTP connection fails', async () => {
+    it('should degrade to healthy-with-warning when SMTP connection fails', async () => {
       mockMailService.verifySmtp.mockRejectedValue(
         new Error('Connection refused')
       );
 
-      await expect(indicator.isHealthy('smtp')).rejects.toThrow(
-        HealthCheckError
-      );
+      const result = await indicator.isHealthy('smtp');
+
+      expect(result).toEqual({
+        smtp: {
+          status: 'up',
+          warning: 'SMTP verify failed: Connection refused'
+        }
+      });
     });
 
-    it('should include down status in HealthCheckError when SMTP fails', async () => {
+    it('should not throw when SMTP verify rejects', async () => {
       mockMailService.verifySmtp.mockRejectedValue(new Error('Timeout'));
 
-      try {
-        await indicator.isHealthy('smtp');
-        fail('Expected HealthCheckError to be thrown');
-      } catch (error) {
-        expect(error).toBeInstanceOf(HealthCheckError);
-        expect((error as HealthCheckError).causes).toEqual({
-          smtp: { status: 'down' }
-        });
-      }
+      await expect(indicator.isHealthy('smtp')).resolves.toEqual({
+        smtp: { status: 'up', warning: 'SMTP verify failed: Timeout' }
+      });
+    });
+
+    it('should stringify a non-Error rejection in the warning', async () => {
+      mockMailService.verifySmtp.mockRejectedValue('EAUTH');
+
+      const result = await indicator.isHealthy('smtp');
+
+      expect(result).toEqual({
+        smtp: { status: 'up', warning: 'SMTP verify failed: EAUTH' }
+      });
     });
   });
 });
