@@ -30,6 +30,7 @@ describe('UsersService', () => {
   let mockMailService: { sendEmailVerification: jest.Mock };
   let mockQueryBuilder: {
     leftJoinAndSelect: jest.Mock;
+    innerJoin: jest.Mock;
     withDeleted: jest.Mock;
     andWhere: jest.Mock;
     orderBy: jest.Mock;
@@ -56,6 +57,7 @@ describe('UsersService', () => {
   beforeEach(async () => {
     mockQueryBuilder = {
       leftJoinAndSelect: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
       withDeleted: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
@@ -288,6 +290,30 @@ describe('UsersService', () => {
       expect(mockQueryBuilder.orderBy).toHaveBeenCalled();
       expect(mockQueryBuilder.skip).toHaveBeenCalled();
       expect(mockQueryBuilder.take).toHaveBeenCalled();
+    });
+
+    it('should filter by role via a dedicated inner join (not trimming displayed roles)', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockUser], 1]);
+
+      await service.findPaginated({
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        role: 'admin'
+      });
+
+      expect(mockQueryBuilder.innerJoin).toHaveBeenCalledWith(
+        'user.roles',
+        'roleFilter',
+        'roleFilter.name = :role',
+        { role: 'admin' }
+      );
+      // The display join stays a leftJoinAndSelect so all roles are still loaded.
+      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+        'user.roles',
+        'role'
+      );
     });
 
     it('should return empty data with correct meta when no results', async () => {

@@ -11,6 +11,7 @@ import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/trans
 import { UserListComponent } from './user-list.component';
 import { UsersStore } from '../../store/users.store';
 import { NotifyService } from '@core/services/notify.service';
+import { RoleService } from '@features/admin/services/role.service';
 import type { User } from '../../models/user.types';
 import type { RoleAdminResponse } from '@app/shared/types';
 
@@ -63,6 +64,7 @@ describe('UserListComponent', () => {
     warn: ReturnType<typeof vi.fn>;
   };
   let dialogMock: { open: ReturnType<typeof vi.fn> };
+  let roleServiceMock: { getAll: ReturnType<typeof vi.fn> };
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -97,6 +99,7 @@ describe('UserListComponent', () => {
       warn: vi.fn()
     };
     dialogMock = { open: vi.fn() };
+    roleServiceMock = { getAll: vi.fn().mockReturnValue(of([mockUserRole])) };
 
     await TestBed.configureTestingModule({
       imports: [UserListComponent, TranslocoTestingModuleWithLangs],
@@ -105,7 +108,8 @@ describe('UserListComponent', () => {
         provideNoopAnimations(),
         { provide: UsersStore, useValue: usersStoreMock },
         { provide: NotifyService, useValue: notifyMock },
-        { provide: MatDialog, useValue: dialogMock }
+        { provide: MatDialog, useValue: dialogMock },
+        { provide: RoleService, useValue: roleServiceMock }
       ]
     }).compileComponents();
 
@@ -120,6 +124,11 @@ describe('UserListComponent', () => {
 
   it('should call load on init', () => {
     expect(usersStoreMock.load).toHaveBeenCalled();
+  });
+
+  it('should fetch roles on init and expose them for the filter select', () => {
+    expect(roleServiceMock.getAll).toHaveBeenCalled();
+    expect(component.roles()).toEqual([mockUserRole]);
   });
 
   describe('sortData', () => {
@@ -194,28 +203,56 @@ describe('UserListComponent', () => {
         expect.not.objectContaining({ isActive: expect.anything() })
       );
     });
+
+    it('should set q filter from the search field (trimmed)', () => {
+      component.filterModel.set({ q: '  alice  ' });
+      component.onSubmit();
+
+      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
+        expect.objectContaining({ q: 'alice' })
+      );
+    });
+
+    it('should exclude q when the search field is empty', () => {
+      component.filterModel.set({ q: '   ' });
+      component.onSubmit();
+
+      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
+        expect.not.objectContaining({ q: expect.anything() })
+      );
+    });
+
+    it('should set role filter when a role is selected', () => {
+      component.roleFilter.set('admin');
+      component.onSubmit();
+
+      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
+        expect.objectContaining({ role: 'admin' })
+      );
+    });
+
+    it('should exclude role when "All roles" is selected', () => {
+      component.roleFilter.set('');
+      component.onSubmit();
+
+      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
+        expect.not.objectContaining({ role: expect.anything() })
+      );
+    });
   });
 
   describe('resetForm', () => {
     it('should clear filters and reload', () => {
-      component.filterModel.set({
-        email: 'test@example.com',
-        firstName: '',
-        lastName: '',
-        isActive: ''
-      });
+      component.filterModel.set({ q: 'alice' });
       component.isActiveFilter.set('true');
+      component.roleFilter.set('admin');
       component.resetForm();
 
       expect(usersStoreMock.setFilters).toHaveBeenCalledWith({});
       expect(usersStoreMock.load).toHaveBeenCalledTimes(2);
-      expect(component.filterModel()).toEqual({
-        email: '',
-        firstName: '',
-        lastName: '',
-        isActive: ''
-      });
+      expect(component.filterModel()).toEqual({ q: '' });
       expect(component.isActiveFilter()).toBe('');
+      expect(component.roleFilter()).toBe('');
     });
   });
 

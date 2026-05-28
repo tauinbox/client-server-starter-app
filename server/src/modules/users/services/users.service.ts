@@ -147,6 +147,7 @@ export class UsersService {
       email?: string;
       firstName?: string;
       lastName?: string;
+      role?: string;
       isActive?: boolean;
     }
   ): void {
@@ -177,6 +178,14 @@ export class UsersService {
     if (filters.lastName) {
       qb.andWhere('user.lastName ILIKE :lastName', {
         lastName: `%${escapeLikePattern(filters.lastName)}%`
+      });
+    }
+
+    if (filters.role) {
+      // Separate inner join (not AndSelect) so the filter narrows the user set
+      // without trimming the roles loaded for display via leftJoinAndSelect.
+      qb.innerJoin('user.roles', 'roleFilter', 'roleFilter.name = :role', {
+        role: filters.role
       });
     }
 

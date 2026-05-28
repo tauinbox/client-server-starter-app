@@ -260,7 +260,7 @@ Example: if Role A grants `update:User` with `{ ownership: { userField: "id" } }
 To apply multiple restrictions simultaneously, either use `$and` in a single `custom` condition on one role, or move the extra restrictions to a separate role with `effect: 'deny'`.
 
 ### User Management (Admin)
-- **Unified Manage Users page** — inline filter form (email, first/last name, status) on the same page as the user list; empty filters load all users, filled filters trigger a search via `GET /users/search`
+- **Unified Manage Users page** — inline filter form (single unified search field, role select, status) on the same page as the user list; empty filters load all users, filled filters trigger a search via `GET /users/search`. The `q` search is OR-matched across id/email/firstName/lastName; the `role` filter narrows to users having a role with that exact name
 - **Infinite scroll** with column sorting — loads 20 users at a time; `IntersectionObserver` sentinel triggers additional pages automatically as the user scrolls
 - User detail, edit, and **soft delete** — records are preserved with a `deleted_at` timestamp; all active sessions are revoked on delete; count decremented inline (no reload)
 - **Restore** soft-deleted users via `POST /users/:id/restore` — reactivates the account
@@ -613,7 +613,7 @@ API base URL: `/api/v1`
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink OAuth provider |
 | GET | `/auth/permissions` | Bearer | Get current user's resolved permissions |
 | GET | `/users` | `users:search` | List all users (paginated; `includeDeleted=true` to include soft-deleted) |
-| GET | `/users/search` | `users:search` | Search users (paginated + filters: `q` (unified substring across id/email/firstName/lastName), email, firstName, lastName, isActive; `includeDeleted=true`) |
+| GET | `/users/search` | `users:search` | Search users (paginated + filters: `q` (unified substring across id/email/firstName/lastName), email, firstName, lastName, `role` (exact role name), isActive; `includeDeleted=true`) |
 | GET | `/users/cursor` | `users:search` | List users with cursor-based (keyset) pagination |
 | GET | `/users/search/cursor` | `users:search` | Search users with cursor-based pagination + same filters as `/users/search` |
 | GET | `/users/:id` | `users:read` | Get user by ID |

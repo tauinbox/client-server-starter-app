@@ -19,6 +19,7 @@ export type UserSearch = Pick<
   'email' | 'firstName' | 'lastName' | 'isActive'
 > & {
   q?: string;
+  role?: string;
 };
 
 export type CreateUser = Pick<User, 'email' | 'firstName' | 'lastName'> & {

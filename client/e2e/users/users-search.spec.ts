@@ -5,9 +5,8 @@ test.describe('Inline user search (User Management page)', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
-    await expect(page.getByLabel('Email')).toBeVisible();
-    await expect(page.getByLabel('First Name')).toBeVisible();
-    await expect(page.getByLabel('Last Name')).toBeVisible();
+    await expect(page.getByLabel('Search')).toBeVisible();
+    await expect(page.getByLabel('Role')).toBeVisible();
     await expect(page.getByLabel('Status')).toBeVisible();
   });
 
@@ -18,7 +17,7 @@ test.describe('Inline user search (User Management page)', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
-    await page.getByLabel('Email').fill('example');
+    await page.getByLabel('Search').fill('example');
     await page.getByRole('button', { name: 'Search' }).click();
 
     // Results are paginated — check that at least one example.com user appears
@@ -35,7 +34,7 @@ test.describe('Inline user search (User Management page)', () => {
     await page.goto('/users');
 
     // Search for a non-existent email
-    await page.getByLabel('Email').fill('nonexistent@nowhere.com');
+    await page.getByLabel('Search').fill('nonexistent@nowhere.com');
     await page.getByRole('button', { name: 'Search' }).click();
 
     await expect(page.getByText('No Users Found')).toBeVisible();
@@ -48,7 +47,7 @@ test.describe('Inline user search (User Management page)', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
-    await page.getByLabel('Email').fill('example');
+    await page.getByLabel('Search').fill('example');
     await page.getByRole('button', { name: 'Search' }).click();
 
     await expect(
@@ -57,7 +56,7 @@ test.describe('Inline user search (User Management page)', () => {
 
     await page.getByRole('button', { name: 'Clear' }).click();
 
-    await expect(page.getByLabel('Email')).toHaveValue('');
+    await expect(page.getByLabel('Search')).toHaveValue('');
   });
 
   test('should navigate to detail page on view button click', async ({
@@ -67,7 +66,7 @@ test.describe('Inline user search (User Management page)', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
-    await page.getByLabel('Email').fill('admin@example.com');
+    await page.getByLabel('Search').fill('admin@example.com');
     await page.getByRole('button', { name: 'Search' }).click();
 
     const row = page.getByRole('row', { name: /admin@example\.com/ });
@@ -87,7 +86,7 @@ test.describe('Inline user search (User Management page)', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
-    await page.getByLabel('Email').fill('admin@example.com');
+    await page.getByLabel('Search').fill('admin@example.com');
     await page.getByRole('button', { name: 'Search' }).click();
 
     const row = page.getByRole('row', { name: /admin@example\.com/ });
@@ -120,6 +119,26 @@ test.describe('Inline user search (User Management page)', () => {
     expect(capturedUrls[0]).toContain('isActive=true');
   });
 
+  test('should filter users by selected role', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await page.goto('/users');
+
+    await page.getByLabel('Role').click();
+    await page.getByRole('option', { name: 'admin', exact: true }).click();
+    await page.getByRole('button', { name: 'Search' }).click();
+
+    // Seeded admin appears; a user-only account is filtered out.
+    await expect(
+      page.getByRole('cell', { name: 'admin@example.com' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'user@example.com' })
+    ).toHaveCount(0);
+  });
+
   test('should delete user from results with confirmation', async ({
     _mockServer,
     page
@@ -127,7 +146,7 @@ test.describe('Inline user search (User Management page)', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
-    await page.getByLabel('Email').fill('john@example.com');
+    await page.getByLabel('Search').fill('john@example.com');
     await page.getByRole('button', { name: 'Search' }).click();
 
     const row = page.getByRole('row', { name: /john@example\.com/ });

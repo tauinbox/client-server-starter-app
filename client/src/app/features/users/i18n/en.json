@@ -1,12 +1,9 @@
 {
   "list": {
     "title": "User Management",
-    "filterEmail": "Email",
-    "filterEmailPlaceholder": "Filter by email",
-    "filterFirstName": "First Name",
-    "filterFirstNamePlaceholder": "Filter by first name",
-    "filterLastName": "Last Name",
-    "filterLastNamePlaceholder": "Filter by last name",
+    "filterSearch": "Search",
+    "filterRole": "Role",
+    "roleAll": "All roles",
     "filterStatus": "Status",
     "statusAll": "All",
     "noUsers": "No Users Found",

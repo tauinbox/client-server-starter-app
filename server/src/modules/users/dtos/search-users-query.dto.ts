@@ -32,6 +32,13 @@ export class SearchUsersQueryDto extends PaginationQueryDto {
   @IsOptional()
   lastName?: string;
 
+  @ApiPropertyOptional({
+    description:
+      'Filter by role name (users having a role with this exact name)'
+  })
+  @IsOptional()
+  role?: string;
+
   @ApiPropertyOptional({ description: 'Filter by active status' })
   @IsOptional()
   @Transform(({ value }: { value: unknown }) => {
