@@ -478,6 +478,25 @@ Services:
 - **prometheus** — prom/prometheus:v2.54.1, internal network only (no ports exposed); scrapes `/metrics` every 15s, 30d retention; config at `monitoring/prometheus.yml`
 - **grafana** — grafana/grafana:11.3.1, accessible at port 3001; provisioned datasource (Prometheus) and NestJS dashboard (18 panels: HTTP traffic, per-route p95 latency, auth events, SSE connections, Node.js runtime). See [`server/README.md` → "Observability"](server/README.md#observability) for the full metric list, Prometheus alert recipes for `rbac_permission_denied_total`, and an RBAC drill-down dashboard (`doc/grafana/rbac.json`)
 
+### Resource limits
+
+Each service declares a conservative `mem_limit` as defense-in-depth: a single leaking or runaway
+container can't starve the others of memory. Caps are derived from each service's own memory profile —
+they sit above the container's measured peak working set (startup/migration spikes included), not
+steady-state — so they hold regardless of the host the stack runs on:
+
+| Service | `mem_limit` | `mem_reservation` |
+|---|---|---|
+| server | 384m | 128m |
+| db | 256m | 96m |
+| grafana | 256m | — |
+| prometheus | 192m | — |
+| redis | 96m | — |
+| client | 64m | — |
+
+Limits are ceilings, not reservations, so their sum can exceed available RAM. Container swap is left at
+the default (no `memswap_limit`), giving a spill-to-swap safety valve before the kernel OOM-kills a process.
+
 ### Docker environment variables
 
 In addition to the standard server env vars, set these in `server/.env` to provision an initial admin account on first startup:
