@@ -497,6 +497,18 @@ steady-state — so they hold regardless of the host the stack runs on:
 Limits are ceilings, not reservations, so their sum can exceed available RAM. Container swap is left at
 the default (no `memswap_limit`), giving a spill-to-swap safety valve before the kernel OOM-kills a process.
 
+### Container hardening
+
+Every service runs with `security_opt: no-new-privileges:true` and `cap_drop: ALL`. The two images whose
+official entrypoints start as root and drop privileges via `gosu` re-add only the minimal capabilities
+that drop needs: `redis` keeps `SETUID`/`SETGID`; `db` keeps `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID`,
+`SETUID` (initdb + chown + the privilege drop). `server`, `client`, `prometheus`, and `grafana` already
+run as non-root users on high ports and need no capabilities.
+
+Every service also declares a `healthcheck`, so `restart: unless-stopped` recovers a hung-but-running
+container, not just a crashed one — `prometheus` (`/-/healthy`) and `grafana` (`/api/health`) join the
+existing checks on db/redis/server/client.
+
 ### Docker environment variables
 
 In addition to the standard server env vars, set these in `server/.env` to provision an initial admin account on first startup:
