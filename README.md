@@ -559,6 +559,7 @@ preserved byte-for-byte. The script's header comment is the authoritative refere
 | `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_SECRET`, `VK_CLIENT_SECRET` | deploy, rebuild | `server/.env` | OAuth client secrets |
 | `ADMIN_PASSWORD` | deploy, rebuild | `server/.env` | initial-admin bootstrap password |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | deploy, rebuild | `server/.env` | outgoing email |
+| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | deploy, rebuild | `server/.env` | Cloudflare Turnstile CAPTCHA on `/register` and `/forgot-password`. Site key is public but injected the same way for rebuild-safety; CAPTCHA stays disabled while either is empty — see [Enabling CAPTCHA in production](server/README.md#enabling-captcha-in-production) |
 | `CI_JWT_SECRET` | ci.yml | — (CI tests only) | not used in prod |
 
 > **`DB_PASSWORD` caveat:** postgres bakes the password into its data volume on first init. Changing

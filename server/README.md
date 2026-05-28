@@ -378,7 +378,19 @@ limit:
      based on risk score; recommended)
    - Save and copy the generated **Site Key** and **Secret Key**
 
-2. **Set the keys on the production host**:
+2. **Set the keys** — pick one of:
+
+   **Recommended (rebuild-safe):** add the two values as GitHub repository
+   secrets — `TURNSTILE_SITE_KEY` (the public site key) and
+   `TURNSTILE_SECRET_KEY` (the sensitive secret key). On the next
+   `deploy.yml` / `rebuild.yml` run, `scripts/sync-prod-env.sh` writes both
+   into the VPS `server/.env` automatically (they join the same managed
+   list as `SMTP_*`, `JWT_*`, `DB_PASSWORD`, etc. — see the root
+   `README.md` §"Production credentials & secrets"). A from-scratch VPS
+   rebuild restores them along with every other managed secret.
+
+   **Quick local edit (overwritten on next deploy if the GitHub secret
+   is set):**
    ```bash
    ssh user@your-vps
    cd /path/to/project
@@ -389,14 +401,16 @@ limit:
    chmod 600 server/.env
    ```
 
-3. **Restart the server container** (only the `server` service — client and
-   db stay up):
-   ```bash
-   docker compose up -d server
-   ```
-   Docker Compose re-reads `env_file: server/.env`. The client does **not**
-   need to be rebuilt — it fetches the public Site Key at runtime from
-   `GET /api/v1/auth/captcha-config`.
+3. **Apply the change:**
+   - **GitHub-secrets path:** trigger a deploy (push to master, or run
+     `deploy.yml` via `workflow_dispatch`). The sync script writes the
+     keys, then `docker compose up -d` picks them up.
+   - **Local-edit path:** restart only the `server` service:
+     ```bash
+     docker compose up -d server
+     ```
+   In both cases the client does **not** need to be rebuilt — it fetches
+   the public Site Key at runtime from `GET /api/v1/auth/captcha-config`.
 
 4. **Verify**:
    ```bash
@@ -408,13 +422,17 @@ limit:
    widget should appear; once solved, registration goes through.
 
 5. **Disable temporarily** (e.g. if Cloudflare has an outage and the
-   `Turnstile siteverify request failed` log starts spamming):
+   `Turnstile siteverify request failed` log starts spamming): clear
+   both `TURNSTILE_*` GitHub secrets (empty value) and trigger a deploy
+   — `sync-prod-env.sh` skips empty values, so this alone does **not**
+   clear `server/.env`; for an immediate fix, also comment the keys on
+   the VPS:
    ```bash
-   # On the VPS:
    sed -i 's/^TURNSTILE_/# TURNSTILE_/' server/.env
    docker compose up -d server
    ```
-   Re-enable by uncommenting the same lines.
+   Re-enable by restoring the secrets (and uncommenting the lines if you
+   used the manual path).
 
 ### Test keys vs production keys
 
