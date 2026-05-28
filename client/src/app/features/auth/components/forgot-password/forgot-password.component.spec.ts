@@ -197,5 +197,55 @@ describe('ForgotPasswordComponent', () => {
       );
       expect(component['success']()).toBe(true);
     });
+
+    it('clears stale captchaRequired error when widget emits a token', async () => {
+      const httpError = new HttpErrorResponse({
+        error: {
+          message: 'Captcha required',
+          errorKey: ErrorKeys.AUTH.CAPTCHA_REQUIRED
+        },
+        status: 400
+      });
+      authServiceMock.forgotPassword.mockReturnValueOnce(
+        throwError(() => httpError)
+      );
+
+      component.forgotPasswordModel.set(validEmail);
+      await fixture.whenStable();
+      component.onSubmit();
+
+      expect(component['error']()).toBe(
+        'Please complete the CAPTCHA challenge to continue.'
+      );
+
+      component['onCaptchaToken']('turnstile-token');
+
+      expect(component['error']()).toBeNull();
+      expect(component['captchaToken']()).toBe('turnstile-token');
+    });
+
+    it('keeps the error when widget emits null (expiry or error callback)', async () => {
+      const httpError = new HttpErrorResponse({
+        error: {
+          message: 'Captcha required',
+          errorKey: ErrorKeys.AUTH.CAPTCHA_REQUIRED
+        },
+        status: 400
+      });
+      authServiceMock.forgotPassword.mockReturnValueOnce(
+        throwError(() => httpError)
+      );
+
+      component.forgotPasswordModel.set(validEmail);
+      await fixture.whenStable();
+      component.onSubmit();
+
+      component['onCaptchaToken'](null);
+
+      expect(component['error']()).toBe(
+        'Please complete the CAPTCHA challenge to continue.'
+      );
+      expect(component['captchaToken']()).toBeNull();
+    });
   });
 });
