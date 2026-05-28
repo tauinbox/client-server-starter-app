@@ -434,6 +434,31 @@ limit:
    Re-enable by restoring the secrets (and uncommenting the lines if you
    used the manual path).
 
+### Content-Security-Policy requirements
+
+The Turnstile script and the challenge widget load from
+`https://challenges.cloudflare.com`. The client's CSP **must** allow it in
+both `script-src` (for `api.js?render=explicit`) and `frame-src` (for the
+embedded challenge iframe); otherwise the backend will keep returning
+`CAPTCHA_REQUIRED` while the browser silently blocks the widget, and users
+see only the "Please complete the CAPTCHA challenge to continue" error with
+no widget to solve.
+
+The shipped `client/nginx.conf` already includes both directives in every
+`add_header Content-Security-Policy` rule. If you front the client with a
+different reverse proxy / CDN (Caddy, Cloudflare, CloudFront, …) or
+customise the nginx config, ensure the served CSP contains:
+
+```
+script-src 'self' https://challenges.cloudflare.com
+frame-src https://challenges.cloudflare.com
+```
+
+Quick check from any environment:
+```bash
+curl -sI https://your-domain/ | grep -i content-security-policy
+```
+
 ### Test keys vs production keys
 
 | Key pair | Behaviour | Use case |
