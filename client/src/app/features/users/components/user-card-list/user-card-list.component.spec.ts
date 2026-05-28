@@ -96,17 +96,34 @@ describe('UserCardListComponent', () => {
     });
   });
 
-  describe('isAdmin', () => {
-    it('should return true for users with the admin role', () => {
-      expect(component.isAdmin(adminUser)).toBe(true);
+  describe('role chips', () => {
+    it('renders the admin role with its name and icon, highlighted', () => {
+      componentRef.setInput('users', [adminUser]);
+      fixture.detectChanges();
+
+      const chip = fixture.nativeElement.querySelector('.role-chips mat-chip');
+      expect(chip.querySelector('mat-icon')?.textContent?.trim()).toBe(
+        'admin_panel_settings'
+      );
+      expect(chip.textContent).toContain(SYSTEM_ROLES.ADMIN);
+      expect(chip.classList.contains('mat-mdc-chip-highlighted')).toBe(true);
     });
 
-    it('should return false for users without the admin role', () => {
-      expect(component.isAdmin(mockUser)).toBe(false);
-    });
+    it('renders every role as a chip, admin first', () => {
+      const multi: User = {
+        ...mockUser,
+        id: 'multi',
+        roles: [userRole, adminRole]
+      };
+      componentRef.setInput('users', [multi]);
+      fixture.detectChanges();
 
-    it('should handle users with no roles', () => {
-      expect(component.isAdmin({ ...mockUser, roles: [] })).toBe(false);
+      const chips = fixture.nativeElement.querySelectorAll(
+        '.role-chips mat-chip'
+      );
+      expect(chips.length).toBe(2);
+      expect(chips[0].textContent).toContain(SYSTEM_ROLES.ADMIN);
+      expect(chips[1].textContent).toContain(SYSTEM_ROLES.USER);
     });
   });
 

@@ -115,8 +115,6 @@
     "connect": "Привязать",
     "statusActive": "Активен",
     "statusInactive": "Неактивен",
-    "roleAdmin": "Администратор",
-    "roleUser": "Пользователь",
     "memberSince": "Участник с {{ date }}",
     "oauthConnected": "Аккаунт {{ provider }} успешно привязан",
     "oauthDisconnected": "Аккаунт {{ provider }} отвязан",

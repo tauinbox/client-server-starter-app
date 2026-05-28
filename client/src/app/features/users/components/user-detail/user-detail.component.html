@@ -40,12 +40,11 @@
                   }}</mat-chip>
                 }
 
-                @if (isAdmin()) {
-                  <mat-chip highlighted>{{
-                    t('users.table.roleAdmin')
-                  }}</mat-chip>
-                } @else {
-                  <mat-chip>{{ t('users.table.roleUser') }}</mat-chip>
+                @for (role of sortedRoles(); track role.id) {
+                  <mat-chip [highlighted]="isAdminRole(role)">
+                    <mat-icon matChipAvatar>{{ roleIcon(role.name) }}</mat-icon>
+                    {{ role.name }}
+                  </mat-chip>
                 }
 
                 @if (u.isEmailVerified) {

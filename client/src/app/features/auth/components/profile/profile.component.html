@@ -21,11 +21,12 @@
                 } @else {
                   <mat-chip>{{ t('auth.profile.statusInactive') }}</mat-chip>
                 }
-                <mat-chip>{{
-                  hasSuper()
-                    ? t('auth.profile.roleAdmin')
-                    : t('auth.profile.roleUser')
-                }}</mat-chip>
+                @for (role of roleChips(); track role.id) {
+                  <mat-chip [highlighted]="isAdminRole(role)">
+                    <mat-icon matChipAvatar>{{ roleIcon(role.name) }}</mat-icon>
+                    {{ role.name }}
+                  </mat-chip>
+                }
                 <span class="profile-since">{{
                   t('auth.profile.memberSince', {
                     date: (u.createdAt | date: 'mediumDate')

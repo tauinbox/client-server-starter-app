@@ -56,10 +56,26 @@
         {{ t('users.table.columnRole') }}
       </th>
       <td mat-cell *matCellDef="let user">
-        @if (isAdmin(user)) {
-          <mat-chip highlighted>{{ t('users.table.roleAdmin') }}</mat-chip>
-        } @else {
-          <mat-chip>{{ t('users.table.roleUser') }}</mat-chip>
+        @let roles = sortedRoles(user);
+        @if (roles.length) {
+          @let primary = roles[0];
+          <div class="role-chips">
+            <mat-chip [highlighted]="isAdminRole(primary)">
+              <mat-icon matChipAvatar>{{ roleIcon(primary.name) }}</mat-icon>
+              {{ primary.name }}
+            </mat-chip>
+            @if (roles.length > 1) {
+              <mat-chip
+                class="role-overflow-chip"
+                [matTooltip]="overflowRoleNames(roles)"
+                [attr.aria-label]="
+                  t('users.table.rolesMore', { count: roles.length - 1 })
+                "
+              >
+                +{{ roles.length - 1 }}
+              </mat-chip>
+            }
+          </div>
         }
       </td>
     </ng-container>

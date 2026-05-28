@@ -87,24 +87,34 @@ test.describe('User Detail page', () => {
     await expect(page.locator('.chips').getByText('Inactive')).toBeVisible();
   });
 
-  test('should display Administrator chip for admin user', async ({
+  test('should display the admin role chip for an admin user', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/1');
 
-    await expect(page.locator('.chips').getByText('Admin')).toBeVisible();
+    const roleChip = page
+      .locator('.chips mat-chip')
+      .filter({ hasText: 'admin' });
+    await expect(roleChip).toBeVisible();
+    await expect(roleChip.locator('mat-icon')).toHaveText(
+      'admin_panel_settings'
+    );
   });
 
-  test('should display User chip for non-admin user', async ({
+  test('should display the user role chip for a non-admin user', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/3');
 
-    await expect(page.locator('.chips').getByText('User')).toBeVisible();
+    const roleChip = page
+      .locator('.chips mat-chip')
+      .filter({ hasText: 'user' });
+    await expect(roleChip).toBeVisible();
+    await expect(roleChip.locator('mat-icon')).toHaveText('person');
   });
 
   test('should display User ID, Created On, Last Updated', async ({
