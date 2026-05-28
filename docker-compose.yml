@@ -9,6 +9,15 @@ services:
     # Conservative cap so a leaking/runaway container can't starve its neighbors.
     # Caps are sized from each service's own peak working set, not the host's RAM.
     mem_limit: 96m
+    cap_drop:
+      - ALL
+    cap_add:
+      # Entrypoint starts as root and drops to the redis user via gosu
+      # (setuid/setgid syscalls); without these it exits "operation not permitted".
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
   db:
@@ -30,6 +39,18 @@ services:
     # minimum under host contention.
     mem_limit: 256m
     mem_reservation: 96m
+    cap_drop:
+      - ALL
+    cap_add:
+      # Entrypoint runs initdb/chown as root then drops to the postgres user via
+      # gosu; this is the minimal set that lets init and the privilege drop succeed.
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
   server:
@@ -73,6 +94,12 @@ services:
     # server is never OOM-killed mid-migration; reservation keeps a floor.
     mem_limit: 384m
     mem_reservation: 128m
+    # Image runs as the non-root `node` user on port 3000 with no runtime privilege
+    # drop, so it needs no Linux capabilities.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
   client:
@@ -104,6 +131,11 @@ services:
       - shared
     # nginx serving static files — tiny, peak ~10 MiB.
     mem_limit: 64m
+    # nginx runs as the non-root `nginx` user on port 8080; no capabilities needed.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
   prometheus:
@@ -117,11 +149,21 @@ services:
       - '--storage.tsdb.retention.time=30d'
     expose:
       - "9090"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     depends_on:
       server:
         condition: service_healthy
     # Memory grows with active series and 30d TSDB retention (peak ~93 MiB).
     mem_limit: 192m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
   grafana:
@@ -134,6 +176,13 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    healthcheck:
+      # /api/health is served at the root even when serve_from_sub_path is on.
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     depends_on:
       - prometheus
     networks:
@@ -142,6 +191,10 @@ services:
     # Biggest observed spiker (peak ~216 MiB during provisioning/render); cap
     # leaves headroom above that. Raise toward 320m if it ever gets OOM-killed.
     mem_limit: 256m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
 networks:
