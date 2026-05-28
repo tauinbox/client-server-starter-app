@@ -93,6 +93,9 @@ export class RegisterComponent {
 
   protected onCaptchaToken(token: string | null): void {
     this.captchaToken.set(token);
+    if (token) {
+      this.error.set(null);
+    }
   }
 
   protected canSubmit(): boolean {
