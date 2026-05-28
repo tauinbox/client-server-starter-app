@@ -111,6 +111,10 @@ export class UserService {
       next = next.set('lastName', criteria.lastName);
     }
 
+    if (criteria.role) {
+      next = next.set('role', criteria.role);
+    }
+
     if (criteria.isActive !== undefined) {
       next = next.set('isActive', criteria.isActive.toString());
     }

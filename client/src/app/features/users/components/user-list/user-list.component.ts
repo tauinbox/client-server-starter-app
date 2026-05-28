@@ -39,19 +39,15 @@ import {
 } from '../user-table/user-table.component';
 import { UserCardListComponent } from '../user-card-list/user-card-list.component';
 import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { RoleService } from '@features/admin/services/role.service';
+import type { RoleAdminResponse } from '@app/shared/types';
 
 type FilterModel = {
-  email: string;
-  firstName: string;
-  lastName: string;
-  isActive: string;
+  q: string;
 };
 
 const INITIAL_FILTER: FilterModel = {
-  email: '',
-  firstName: '',
-  lastName: '',
-  isActive: ''
+  q: ''
 };
 
 @Component({
@@ -86,6 +82,7 @@ export class UserListComponent implements OnInit {
   readonly #injector = inject(Injector);
   readonly #notificationsService = inject(NotificationsService);
   readonly #translocoService = inject(TranslocoService);
+  readonly #roleService = inject(RoleService);
 
   readonly layout = inject(LayoutService);
 
@@ -93,6 +90,8 @@ export class UserListComponent implements OnInit {
   readonly filterForm = form(this.filterModel);
 
   readonly isActiveFilter = signal('');
+  readonly roleFilter = signal('');
+  readonly roles = signal<RoleAdminResponse[]>([]);
 
   readonly loading = this.#usersStore.loading;
   readonly totalUsers = this.#usersStore.totalUsers;
@@ -149,6 +148,10 @@ export class UserListComponent implements OnInit {
 
   ngOnInit(): void {
     this.#usersStore.load();
+    this.#roleService
+      .getAll()
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe((roles) => this.roles.set(roles));
     this.#notificationsService.userCrudEvents$
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe(() => {
@@ -168,11 +171,17 @@ export class UserListComponent implements OnInit {
   }
 
   onSubmit(): void {
-    const formValues = this.filterModel();
-    const filters = this.#buildFilters({
-      ...formValues,
-      isActive: this.isActiveFilter()
-    });
+    const filters: UserSearch = {};
+
+    const q = this.filterModel().q.trim();
+    if (q) filters.q = q;
+
+    const role = this.roleFilter();
+    if (role) filters.role = role;
+
+    const isActive = this.isActiveFilter();
+    if (isActive !== '') filters.isActive = isActive === 'true';
+
     this.#usersStore.setFilters(filters);
     this.#usersStore.load();
   }
@@ -180,6 +189,7 @@ export class UserListComponent implements OnInit {
   resetForm(): void {
     this.filterModel.set({ ...INITIAL_FILTER });
     this.isActiveFilter.set('');
+    this.roleFilter.set('');
     this.filterForm().reset();
     this.#usersStore.setFilters({});
     this.#usersStore.load();
@@ -218,19 +228,5 @@ export class UserListComponent implements OnInit {
           this.#notify.error('users.list.errorDeleteFailed');
         }
       });
-  }
-
-  #buildFilters(formValues: FilterModel): UserSearch {
-    const filters: UserSearch = {};
-
-    if (formValues.email?.trim()) filters.email = formValues.email;
-    if (formValues.firstName?.trim()) filters.firstName = formValues.firstName;
-    if (formValues.lastName?.trim()) filters.lastName = formValues.lastName;
-
-    if (formValues.isActive !== '') {
-      filters.isActive = formValues.isActive === 'true';
-    }
-
-    return filters;
   }
 }

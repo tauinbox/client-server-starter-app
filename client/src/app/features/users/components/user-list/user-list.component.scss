@@ -12,9 +12,30 @@
 
   .filter-fields {
     display: grid;
-    grid-template-columns: minmax(func.rem(250), 1fr) minmax(func.rem(250), 1fr);
+    grid-template-columns:
+      minmax(func.rem(250), 2fr)
+      minmax(func.rem(160), 1fr)
+      minmax(func.rem(160), 1fr);
     gap: 0 vars.$spacing-md; // row-gap 0 + column-gap; AppFormFieldComponent host margin owns row rhythm
     align-items: start;
+
+    // Raw <mat-form-field> selects (Role, Status) don't carry the
+    // AppFormFieldComponent :host margin-bottom, so they would stack flush
+    // against each other once the grid collapses to one column. Give the
+    // direct-child selects the same row rhythm; the `>` keeps this off the
+    // search field's mat-form-field nested inside <nxs-form-field>.
+    > mat-form-field {
+      margin-bottom: vars.$space-form-row-gap;
+    }
+
+    @media (max-width: vars.$breakpoint-sm) {
+      grid-template-columns: 1fr 1fr;
+
+      // Search takes the full width on its own row; role + status share row 2.
+      > nxs-form-field {
+        grid-column: 1 / -1;
+      }
+    }
 
     @media (max-width: vars.$breakpoint-xs) {
       grid-template-columns: 1fr;
@@ -25,14 +46,6 @@
     display: flex;
     gap: vars.$spacing-xs;
     justify-content: flex-end;
-
-    // On mobile the grid collapses to one column, so the raw <mat-form-field>
-    // Status filter sits last and contributes no margin-bottom (unlike the
-    // surrounding AppFormFieldComponent siblings). Add the row-rhythm gap
-    // here so the action row does not stick to it.
-    @media (max-width: vars.$breakpoint-xs) {
-      margin-top: vars.$space-form-row-gap;
-    }
   }
 
   // mat-divider host has its own margin: 0 with attribute-encapsulation

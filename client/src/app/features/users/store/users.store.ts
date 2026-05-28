@@ -80,9 +80,8 @@ export const UsersStore = signalStore(
       };
       const filters = store.filters();
       const hasFilters = !!(
-        filters.email ||
-        filters.firstName ||
-        filters.lastName ||
+        filters.q ||
+        filters.role ||
         filters.isActive !== undefined
       );
       return hasFilters

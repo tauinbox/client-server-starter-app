@@ -1,12 +1,9 @@
 {
   "list": {
     "title": "Управление пользователями",
-    "filterEmail": "Электронная почта",
-    "filterEmailPlaceholder": "Фильтр по email",
-    "filterFirstName": "Имя",
-    "filterFirstNamePlaceholder": "Фильтр по имени",
-    "filterLastName": "Фамилия",
-    "filterLastNamePlaceholder": "Фильтр по фамилии",
+    "filterSearch": "Поиск",
+    "filterRole": "Роль",
+    "roleAll": "Все роли",
     "filterStatus": "Статус",
     "statusAll": "Все",
     "noUsers": "Пользователи не найдены",

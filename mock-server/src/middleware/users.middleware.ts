@@ -322,7 +322,7 @@ router.get('/', adminGuard, (req, res) => {
 
 // GET /api/v1/users/search
 router.get('/search', adminGuard, (req, res) => {
-  const { q, email, firstName, lastName, isActive } = req.query;
+  const { q, email, firstName, lastName, role, isActive } = req.query;
   const includeDeleted = String(req.query['includeDeleted']) === 'true';
   let users = Array.from(getState().users.values());
 
@@ -351,6 +351,10 @@ router.get('/search', adminGuard, (req, res) => {
   if (lastName) {
     const lnStr = String(lastName).toLowerCase();
     users = users.filter((u) => u.lastName.toLowerCase().includes(lnStr));
+  }
+  if (role) {
+    const roleStr = String(role);
+    users = users.filter((u) => u.roles.includes(roleStr));
   }
   if (isActive !== undefined) {
     const activeBool = String(isActive) === 'true';
@@ -380,7 +384,7 @@ router.get('/cursor', adminGuard, (req, res) => {
 
 // GET /api/v1/users/search/cursor
 router.get('/search/cursor', adminGuard, (req, res) => {
-  const { q, email, firstName, lastName, isActive } = req.query;
+  const { q, email, firstName, lastName, role, isActive } = req.query;
   const includeDeleted = String(req.query['includeDeleted']) === 'true';
   let users = Array.from(getState().users.values());
 
@@ -409,6 +413,10 @@ router.get('/search/cursor', adminGuard, (req, res) => {
   if (lastName) {
     const lnStr = String(lastName).toLowerCase();
     users = users.filter((u) => u.lastName.toLowerCase().includes(lnStr));
+  }
+  if (role) {
+    const roleStr = String(role);
+    users = users.filter((u) => u.roles.includes(roleStr));
   }
   if (isActive !== undefined) {
     const activeBool = String(isActive) === 'true';

@@ -712,7 +712,7 @@ Admin UIs can then write rules referencing `{ field: 'custom', customKey: 'tenan
 |--------|------|------|-------------|
 | POST | `/` | `users:create` | Create user |
 | GET | `/` | `users:search` | List all users (paginated; `includeDeleted=true` to include soft-deleted) |
-| GET | `/search` | `users:search` | Search users (paginated + filters: `q` (unified substring across id/email/firstName/lastName), email, firstName, lastName, isActive; `includeDeleted=true`) |
+| GET | `/search` | `users:search` | Search users (paginated + filters: `q` (unified substring across id/email/firstName/lastName), email, firstName, lastName, `role` (exact role name), isActive; `includeDeleted=true`) |
 | GET | `/cursor` | `users:search` | List users with cursor-based (keyset) pagination |
 | GET | `/search/cursor` | `users:search` | Search users with cursor-based pagination + same filters as `/search` |
 | GET | `/:id` | `users:read` | Get user by ID |

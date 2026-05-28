@@ -8,22 +8,23 @@
       <form (submit)="$event.preventDefault(); onSubmit()">
         <div class="filter-fields">
           <nxs-form-field
-            [field]="filterForm.firstName"
-            label="users.list.filterFirstName"
-            prefixIcon="person"
+            [field]="filterForm.q"
+            label="users.list.filterSearch"
+            prefixIcon="search"
           />
 
-          <nxs-form-field
-            [field]="filterForm.lastName"
-            label="users.list.filterLastName"
-            prefixIcon="person"
-          />
-
-          <nxs-form-field
-            [field]="filterForm.email"
-            label="users.list.filterEmail"
-            prefixIcon="email"
-          />
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>{{ t('users.list.filterRole') }}</mat-label>
+            <mat-select
+              [value]="roleFilter()"
+              (selectionChange)="roleFilter.set($event.value)"
+            >
+              <mat-option value="">{{ t('users.list.roleAll') }}</mat-option>
+              @for (role of roles(); track role.id) {
+                <mat-option [value]="role.name">{{ role.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
 
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>{{ t('users.list.filterStatus') }}</mat-label>
@@ -78,7 +79,7 @@
           <h3>{{ t('users.list.noUsers') }}</h3>
           <p>{{ t('users.list.noUsersMessage') }}</p>
         </div>
-      } @else if (layout.isHandset()) {
+      } @else if (layout.isHandset() || layout.isTablet()) {
         <nxs-user-card-list
           [users]="displayedUsers()"
           (deleteUser)="confirmDelete($event)"
