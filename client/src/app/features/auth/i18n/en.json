@@ -115,8 +115,6 @@
     "connect": "Connect",
     "statusActive": "Active",
     "statusInactive": "Inactive",
-    "roleAdmin": "Administrator",
-    "roleUser": "User",
     "memberSince": "Member since {{ date }}",
     "oauthConnected": "{{ provider }} account connected successfully",
     "oauthDisconnected": "{{ provider }} account disconnected",

@@ -17,11 +17,15 @@ import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import { MatChip } from '@angular/material/chips';
+import { MatChip, MatChipAvatar } from '@angular/material/chips';
 import { MatDivider } from '@angular/material/divider';
 import { MatTooltip } from '@angular/material/tooltip';
 import { TranslocoDirective } from '@jsverse/transloco';
-import { SYSTEM_ROLES } from '@app/shared/constants';
+import {
+  isAdminRole,
+  roleIcon,
+  sortRolesForDisplay
+} from '@shared/utils/role-display.utils';
 import { UsersStore } from '../../store/users.store';
 import { RequirePermissionsDirective } from '../../../auth/directives/require-permissions.directive';
 
@@ -37,6 +41,7 @@ import { RequirePermissionsDirective } from '../../../auth/directives/require-pe
     MatCardContent,
     MatProgressSpinner,
     MatChip,
+    MatChipAvatar,
     MatDivider,
     MatButton,
     MatTooltip,
@@ -55,9 +60,11 @@ export class UserDetailComponent implements OnInit {
   readonly user = computed(
     () => this.#usersStore.entityMap()[this.id()] ?? null
   );
-  readonly isAdmin = computed(
-    () => this.user()?.roles.some((r) => r.name === SYSTEM_ROLES.ADMIN) ?? false
+  readonly sortedRoles = computed(() =>
+    sortRolesForDisplay(this.user()?.roles ?? [])
   );
+  protected readonly roleIcon = roleIcon;
+  protected readonly isAdminRole = isAdminRole;
   readonly loading = this.#usersStore.detailLoading;
 
   ngOnInit(): void {

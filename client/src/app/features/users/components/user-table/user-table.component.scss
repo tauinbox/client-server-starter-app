@@ -26,4 +26,13 @@
     min-height: func.rem(24);
     font-size: vars.$font-size-sm;
   }
+
+  // Keep the primary role chip and the "+N" overflow chip on a single row so
+  // the cell height stays uniform no matter how many roles a user has.
+  .role-chips {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: func.rem(4);
+    align-items: center;
+  }
 }

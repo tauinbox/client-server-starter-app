@@ -21,7 +21,11 @@ test.describe('Profile page', () => {
 
     await expect(page.getByRole('heading', { name: 'John Doe' })).toBeVisible();
     await expect(page.getByText('testlogin@example.com')).toBeVisible();
-    await expect(page.getByText('User', { exact: true })).toBeVisible();
+    const roleChip = page
+      .locator('.profile-badges mat-chip')
+      .filter({ hasText: 'user' });
+    await expect(roleChip).toBeVisible();
+    await expect(roleChip.locator('mat-icon')).toHaveText('person');
     await expect(page.getByText('Active', { exact: true })).toBeVisible();
     await expect(page.getByText(/Member since/)).toBeVisible();
   });
@@ -32,9 +36,13 @@ test.describe('Profile page', () => {
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
 
-    await expect(
-      page.getByText('Administrator', { exact: true })
-    ).toBeVisible();
+    const roleChip = page
+      .locator('.profile-badges mat-chip')
+      .filter({ hasText: 'admin' });
+    await expect(roleChip).toBeVisible();
+    await expect(roleChip.locator('mat-icon')).toHaveText(
+      'admin_panel_settings'
+    );
   });
 
   test('should display inactive status', async ({ _mockServer, page }) => {

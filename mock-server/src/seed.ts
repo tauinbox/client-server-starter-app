@@ -122,14 +122,29 @@ function generateUsers(): MockUser[] {
     }
   ];
 
+  // A spread of single- and multi-role combinations so the user list shows
+  // every chip variant: one role, two roles, and "+N" overflow with a tooltip.
+  // Custom roles only (plus the base "user") — the "admin" role stays limited
+  // to the every-20th user below so role-filter expectations don't shift.
+  const roleCombos: string[][] = [
+    ['user'],
+    ['user', 'editor'],
+    ['user', 'support'],
+    ['user', 'editor', 'moderator'],
+    ['user', 'support', 'auditor'],
+    ['user', 'moderator', 'auditor'],
+    ['editor', 'support'],
+    ['user', 'editor', 'moderator', 'auditor']
+  ];
+
   const generated: MockUser[] = [];
   for (let i = 0; i < 65; i++) {
-    const roles = i % 20 === 0 ? ['admin'] : ['user'];
+    const combo = i % 20 === 0 ? ['admin'] : roleCombos[i % roleCombos.length];
     generated.push(
       createMockUser({
         id: String(i + 6),
         isActive: i % 5 !== 0,
-        roles
+        roles: [...combo]
       })
     );
   }
@@ -298,6 +313,42 @@ function generateRoles(): MockRole[] {
       isSuper: false,
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z'
+    },
+    {
+      id: 'role-editor',
+      name: 'editor',
+      description: 'Can create and edit content',
+      isSystem: false,
+      isSuper: false,
+      createdAt: '2025-01-02T00:00:00.000Z',
+      updatedAt: '2025-01-02T00:00:00.000Z'
+    },
+    {
+      id: 'role-moderator',
+      name: 'moderator',
+      description: 'Moderates user-generated content',
+      isSystem: false,
+      isSuper: false,
+      createdAt: '2025-01-03T00:00:00.000Z',
+      updatedAt: '2025-01-03T00:00:00.000Z'
+    },
+    {
+      id: 'role-support',
+      name: 'support',
+      description: 'Handles customer support requests',
+      isSystem: false,
+      isSuper: false,
+      createdAt: '2025-01-04T00:00:00.000Z',
+      updatedAt: '2025-01-04T00:00:00.000Z'
+    },
+    {
+      id: 'role-auditor',
+      name: 'auditor',
+      description: 'Read-only access to audit logs',
+      isSystem: false,
+      isSuper: false,
+      createdAt: '2025-01-05T00:00:00.000Z',
+      updatedAt: '2025-01-05T00:00:00.000Z'
     }
   ];
 }

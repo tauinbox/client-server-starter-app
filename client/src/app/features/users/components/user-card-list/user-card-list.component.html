@@ -49,11 +49,14 @@
 
           <dt>{{ t('users.table.columnRole') }}</dt>
           <dd>
-            @if (isAdmin(user)) {
-              <mat-chip highlighted>{{ t('users.table.roleAdmin') }}</mat-chip>
-            } @else {
-              <mat-chip>{{ t('users.table.roleUser') }}</mat-chip>
-            }
+            <div class="role-chips">
+              @for (role of sortedRoles(user); track role.id) {
+                <mat-chip [highlighted]="isAdminRole(role)">
+                  <mat-icon matChipAvatar>{{ roleIcon(role.name) }}</mat-icon>
+                  {{ role.name }}
+                </mat-chip>
+              }
+            </div>
           </dd>
 
           <dt>{{ t('users.table.columnCreated') }}</dt>

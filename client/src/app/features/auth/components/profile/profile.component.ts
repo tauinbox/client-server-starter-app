@@ -14,7 +14,7 @@ import {
   MatCardHeader,
   MatCardTitle
 } from '@angular/material/card';
-import { MatChip } from '@angular/material/chips';
+import { MatChip, MatChipAvatar } from '@angular/material/chips';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import {
   email as emailValidator,
@@ -38,7 +38,11 @@ import { OAUTH_URLS } from '../../constants/auth-api.const';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
 import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
-import { AuthStore } from '@features/auth/store/auth.store';
+import {
+  isAdminRole,
+  roleIcon,
+  sortRolesForDisplay
+} from '@shared/utils/role-display.utils';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import {
   MatButtonToggle,
@@ -84,6 +88,7 @@ const INITIAL_PROFILE: ProfileData = {
     MatCardContent,
     MatCardTitle,
     MatChip,
+    MatChipAvatar,
     MatProgressSpinner,
     MatButton,
     MatIcon,
@@ -107,20 +112,16 @@ export class ProfileComponent implements OnInit {
   readonly #window = inject(DOCUMENT).defaultView;
   readonly #route = inject(ActivatedRoute);
   readonly #router = inject(Router);
-  readonly #authStore = inject(AuthStore);
   readonly #transloco = inject(TranslocoService);
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
   readonly #languageService = inject(LanguageService);
 
-  /**
-   * Drives the role chip label. Based on the super-ability rather than a
-   * role-name string so the label tracks the user's effective permissions
-   * even if the system role is renamed.
-   */
-  readonly hasSuper = computed(() =>
-    this.#authStore.hasPermissions({ action: 'manage', subject: 'all' })
-  );
   protected readonly user = signal<UserResponse | null>(null);
+  readonly roleChips = computed(() =>
+    sortRolesForDisplay(this.user()?.roles ?? [])
+  );
+  protected readonly roleIcon = roleIcon;
+  protected readonly isAdminRole = isAdminRole;
   readonly initials = computed(() => {
     const u = this.user();
     if (!u) return '';

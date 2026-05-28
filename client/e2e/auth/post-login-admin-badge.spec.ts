@@ -11,19 +11,23 @@ import { expect, loginViaUi, test } from '../fixtures/base.fixture';
  * must see the admin badge / chip on every relevant screen without reloading.
  */
 test.describe('Post-login admin badge', () => {
-  test('should show "Administrator" chip on profile immediately after login — no reload', async ({
+  test('should show the admin role chip on profile immediately after login — no reload', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
 
     // loginViaUi waits for /profile URL — no additional navigation or reload.
-    await expect(
-      page.getByText('Administrator', { exact: true })
-    ).toBeVisible();
+    const roleChip = page
+      .locator('.profile-badges mat-chip')
+      .filter({ hasText: 'admin' });
+    await expect(roleChip).toBeVisible();
+    await expect(roleChip.locator('mat-icon')).toHaveText(
+      'admin_panel_settings'
+    );
   });
 
-  test('should render Admin chip in users table for admin rows', async ({
+  test('should render the admin role chip in the users table for admin rows', async ({
     _mockServer,
     page
   }) => {
@@ -32,14 +36,17 @@ test.describe('Post-login admin badge', () => {
     await page.goto('/users');
 
     // The mock-server seed includes several admin users; the Role column must
-    // render at least one "Admin" chip because the server returns
-    // RoleResponse[] objects and the template detects admin via
-    // `.some(r => r.name === 'admin')`. Pre-fix (`.includes('admin')` against
-    // objects), the chip was never shown and all rows read "User".
-    const adminCell = page
-      .getByRole('cell', { name: 'Admin', exact: true })
+    // render at least one admin chip because the server returns RoleResponse[]
+    // objects and the chip is keyed on `r.name === 'admin'`. Pre-fix
+    // (`.includes('admin')` against objects), no admin chip was ever shown.
+    const adminChip = page
+      .locator('.role-chips mat-chip')
+      .filter({ hasText: 'admin' })
       .first();
-    await expect(adminCell).toBeVisible();
+    await expect(adminChip).toBeVisible();
+    await expect(adminChip.locator('mat-icon')).toHaveText(
+      'admin_panel_settings'
+    );
   });
 
   // Given an admin logs in, when the AuthStore persists the authenticated user

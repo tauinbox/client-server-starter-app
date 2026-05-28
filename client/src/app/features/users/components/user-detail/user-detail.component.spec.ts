@@ -121,6 +121,22 @@ describe('UserDetailComponent', () => {
     });
   });
 
+  describe('role chips', () => {
+    it('renders a chip per role with its name and icon', () => {
+      entityMapSignal.set({ 'user-1': mockUser });
+      fixture.detectChanges();
+
+      const chips = Array.from(
+        fixture.nativeElement.querySelectorAll('mat-chip')
+      ) as HTMLElement[];
+      const roleChip = chips.find(
+        (c) => c.querySelector('mat-icon')?.textContent?.trim() === 'person'
+      );
+      expect(roleChip).toBeTruthy();
+      expect(roleChip?.textContent).toContain('user');
+    });
+  });
+
   describe('loading state', () => {
     it('should expose detailLoading from store', () => {
       usersStoreMock.detailLoading.set(true);

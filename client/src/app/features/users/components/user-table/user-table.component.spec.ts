@@ -152,41 +152,23 @@ describe('UserTableComponent', () => {
     });
   });
 
-  describe('isAdmin', () => {
-    it('returns true when a role.name matches SYSTEM_ROLES.ADMIN', () => {
-      const adminUser: User = { ...mockUser, roles: [mockAdminRole] };
-      expect(component.isAdmin(adminUser)).toBe(true);
-    });
-
-    it('returns false when no role matches SYSTEM_ROLES.ADMIN', () => {
-      expect(component.isAdmin(mockUser)).toBe(false);
-    });
-
-    it('returns false when roles is empty', () => {
-      const userWithoutRoles: User = { ...mockUser, roles: [] };
-      expect(component.isAdmin(userWithoutRoles)).toBe(false);
-    });
-
-    // The detection used to use a hardcoded 'admin' literal, so renaming the
-    // system role would silently break the chip. By keying off
-    // SYSTEM_ROLES.ADMIN, an arbitrary role name like 'super' must NOT match —
-    // even if it was the previous super-admin role — until the constant changes.
-    it('does not match a role whose name differs from SYSTEM_ROLES.ADMIN', () => {
-      const renamed: User = {
+  describe('sortedRoles', () => {
+    it('moves the admin role to the front, keeping other roles in order', () => {
+      const editorRole = { ...mockUserRole, id: 'role-editor', name: 'editor' };
+      const multi: User = {
         ...mockUser,
-        roles: [{ ...mockAdminRole, name: 'super' }]
+        roles: [mockUserRole, editorRole, mockAdminRole]
       };
-      expect(SYSTEM_ROLES.ADMIN).not.toBe('super');
-      expect(component.isAdmin(renamed)).toBe(false);
+      expect(component.sortedRoles(multi).map((r) => r.name)).toEqual([
+        SYSTEM_ROLES.ADMIN,
+        SYSTEM_ROLES.USER,
+        'editor'
+      ]);
     });
   });
 
-  // The role column previously used user.roles?.includes('admin'), which
-  // always returned false when the server returned RoleAdminResponse[] objects
-  // (the true wire format). This test renders the table and verifies the
-  // admin chip appears for RoleAdminResponse[].
-  describe('role column rendering for RoleAdminResponse[]', () => {
-    it('should render the Admin chip for a user with a RoleAdminResponse admin role', () => {
+  describe('role column rendering', () => {
+    it('renders the admin role name with the admin icon, highlighted', () => {
       const adminUser: User = {
         ...mockUser,
         id: 'admin-user',
@@ -195,24 +177,55 @@ describe('UserTableComponent', () => {
       componentRef.setInput('users', [adminUser]);
       fixture.detectChanges();
 
-      const chips = fixture.nativeElement.querySelectorAll(
-        'mat-chip[highlighted]'
+      const chip = fixture.nativeElement.querySelector('.role-chips mat-chip');
+      expect(chip.querySelector('mat-icon')?.textContent?.trim()).toBe(
+        'admin_panel_settings'
       );
-      const adminChip = Array.from(chips).find(
-        (el) => (el as HTMLElement).textContent?.trim() === 'Admin'
-      );
-      expect(adminChip).toBeTruthy();
+      expect(chip.textContent).toContain(SYSTEM_ROLES.ADMIN);
+      expect(chip.classList.contains('mat-mdc-chip-highlighted')).toBe(true);
     });
 
-    it('should render the User chip when roles does not include admin', () => {
+    it('renders the user role name with the person icon, not highlighted', () => {
       componentRef.setInput('users', [mockUser]);
       fixture.detectChanges();
 
-      const userChips = fixture.nativeElement.querySelectorAll('mat-chip');
-      const plainChip = Array.from(userChips).find(
-        (el) => (el as HTMLElement).textContent?.trim() === 'User'
+      const chip = fixture.nativeElement.querySelector('.role-chips mat-chip');
+      expect(chip.querySelector('mat-icon')?.textContent?.trim()).toBe(
+        'person'
       );
-      expect(plainChip).toBeTruthy();
+      expect(chip.textContent).toContain(SYSTEM_ROLES.USER);
+      expect(chip.classList.contains('mat-mdc-chip-highlighted')).toBe(false);
+    });
+
+    it('shows the admin chip first and a "+N" overflow chip for multiple roles', () => {
+      const multi: User = {
+        ...mockUser,
+        id: 'multi',
+        roles: [mockUserRole, mockAdminRole]
+      };
+      componentRef.setInput('users', [multi]);
+      fixture.detectChanges();
+
+      const chips = fixture.nativeElement.querySelectorAll(
+        '.role-chips mat-chip'
+      );
+      expect(chips.length).toBe(2);
+      expect(chips[0].textContent).toContain(SYSTEM_ROLES.ADMIN);
+
+      const overflow = fixture.nativeElement.querySelector(
+        '.role-overflow-chip'
+      );
+      expect(overflow.textContent.trim()).toBe('+1');
+    });
+
+    it('renders no chips when the user has no roles', () => {
+      const noRoles: User = { ...mockUser, id: 'no-roles', roles: [] };
+      componentRef.setInput('users', [noRoles]);
+      fixture.detectChanges();
+
+      expect(
+        fixture.nativeElement.querySelectorAll('.role-chips mat-chip').length
+      ).toBe(0);
     });
   });
 
