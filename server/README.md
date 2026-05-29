@@ -601,10 +601,13 @@ Panels:
 - Distribution of denials by subject over 1 h — pie chart
 - Cumulative denials by (subject, action) over 24 h — table
 
-The provisioned NestJS dashboard
-(`monitoring/grafana/provisioning/dashboards/nestjs.json`) covers the
+The provisioned **Nexus** dashboard
+(`monitoring/grafana/provisioning/dashboards/nexus.json`) covers the
 remaining metrics (HTTP traffic, auth events, latency p95s, SSE, Node.js
-runtime). Use the RBAC dashboard alongside it for security drill-downs.
+runtime) plus an RBAC & Reliability section (permission denials by level
+and action/subject, process RSS memory, token-reuse-detected alarm,
+uptime, active handles/requests). Use the dedicated RBAC dashboard
+(`doc/grafana/rbac.json`) alongside it for deeper security drill-downs.
 
 ## Docker
 
