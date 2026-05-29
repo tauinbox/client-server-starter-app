@@ -6,6 +6,7 @@ import { of } from 'rxjs';
 import type { FeatureFlagRuleResponse } from '@app/shared/types';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
+import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { RoleService } from '../../../services/role.service';
 import { UserService } from '../../../../users/services/user.service';
 import type { FeatureFlagFormDialogResult } from './feature-flag-form-dialog.component';
@@ -13,11 +14,13 @@ import { FeatureFlagFormDialogComponent } from './feature-flag-form-dialog.compo
 
 describe('FeatureFlagFormDialogComponent', () => {
   let closeSpy: ReturnType<typeof vi.fn>;
+  let confirmSpy: ReturnType<typeof vi.fn>;
 
   const setup = async (
     data: Record<string, unknown> = {}
   ): Promise<ComponentFixture<FeatureFlagFormDialogComponent>> => {
     closeSpy = vi.fn();
+    confirmSpy = vi.fn(() => of(true));
     await TestBed.configureTestingModule({
       imports: [
         FeatureFlagFormDialogComponent,
@@ -33,6 +36,10 @@ describe('FeatureFlagFormDialogComponent', () => {
         {
           provide: KeyboardShortcutsService,
           useValue: { registerSave: vi.fn(() => () => undefined) }
+        },
+        {
+          provide: AdaptiveDialogService,
+          useValue: { openConfirm: confirmSpy }
         },
         { provide: RoleService, useValue: { getAll: vi.fn(() => of([])) } },
         {
@@ -163,5 +170,47 @@ describe('FeatureFlagFormDialogComponent', () => {
     cmp.model.set({ key: 'INVALID_KEY', description: '' });
     cmp.submit();
     expect(closeSpy).not.toHaveBeenCalled();
+  });
+
+  it('submit() confirms before saving an enabled flag with no include rules', async () => {
+    const fixture = await setup({});
+    const cmp = fixture.componentInstance;
+    cmp.model.set({ key: 'new-dashboard', description: '' });
+    cmp.onEnabledChange(true);
+    cmp.submit();
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('submit() does not close when the enable confirmation is cancelled', async () => {
+    const fixture = await setup({});
+    confirmSpy.mockReturnValue(of(false));
+    const cmp = fixture.componentInstance;
+    cmp.model.set({ key: 'new-dashboard', description: '' });
+    cmp.onEnabledChange(true);
+    cmp.submit();
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(closeSpy).not.toHaveBeenCalled();
+  });
+
+  it('submit() skips the confirmation when an include rule exists', async () => {
+    const fixture = await setup({});
+    const cmp = fixture.componentInstance;
+    cmp.model.set({ key: 'new-dashboard', description: '' });
+    cmp.onEnabledChange(true);
+    cmp.addRule(); // defaults to effect 'include'
+    cmp.submit();
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('submit() skips the confirmation when the flag is disabled', async () => {
+    const fixture = await setup({});
+    const cmp = fixture.componentInstance;
+    cmp.model.set({ key: 'new-dashboard', description: '' });
+    cmp.onEnabledChange(false);
+    cmp.submit();
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(closeSpy).toHaveBeenCalledTimes(1);
   });
 });

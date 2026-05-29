@@ -29,6 +29,7 @@ describe('FeatureFlagListComponent', () => {
   };
 
   let toggleSpy: ReturnType<typeof vi.fn>;
+  let confirmSpy: ReturnType<typeof vi.fn>;
   let layoutHandset: ReturnType<typeof signal<boolean>>;
   let notifySuccess: ReturnType<typeof vi.fn>;
   let notifyError: ReturnType<typeof vi.fn>;
@@ -46,6 +47,7 @@ describe('FeatureFlagListComponent', () => {
     toggleSpy = vi
       .fn()
       .mockReturnValue(of({ ...flag, enabled: true, version: 2 }));
+    confirmSpy = vi.fn().mockReturnValue(of(true));
     layoutHandset = signal(false);
     notifySuccess = vi.fn();
     notifyError = vi.fn();
@@ -73,7 +75,7 @@ describe('FeatureFlagListComponent', () => {
         },
         {
           provide: AdaptiveDialogService,
-          useValue: { openConfirm: vi.fn().mockReturnValue(of(false)) }
+          useValue: { openConfirm: confirmSpy }
         },
         {
           provide: MatDialog,
@@ -130,10 +132,73 @@ describe('FeatureFlagListComponent', () => {
   });
 
   it('toggleFlag() calls the store and notifies success', () => {
+    const includedFlag = {
+      ...flag,
+      rules: [
+        {
+          id: 'r1',
+          flagId: flag.id,
+          effect: 'include' as const,
+          payload: { type: 'percentage' as const, percent: 10 },
+          createdAt: flag.createdAt,
+          updatedAt: flag.updatedAt
+        }
+      ]
+    };
     const fixture = TestBed.createComponent(FeatureFlagListComponent);
     fixture.detectChanges();
-    fixture.componentInstance.toggleFlag(flag);
+    fixture.componentInstance.toggleFlag(includedFlag);
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(toggleSpy).toHaveBeenCalledWith('flag-1');
+  });
+
+  describe('enable-without-rules confirmation', () => {
+    it('confirms before enabling a disabled flag with no include rules', () => {
+      const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      fixture.componentInstance.toggleFlag(flag); // disabled, rules: []
+      expect(confirmSpy).toHaveBeenCalledTimes(1);
+      expect(toggleSpy).toHaveBeenCalledWith('flag-1');
+    });
+
+    it('does not toggle when the confirmation is cancelled', () => {
+      confirmSpy.mockReturnValue(of(false));
+      const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      fixture.componentInstance.toggleFlag(flag);
+      expect(confirmSpy).toHaveBeenCalledTimes(1);
+      expect(toggleSpy).not.toHaveBeenCalled();
+    });
+
+    it('skips the confirmation when an include rule exists', () => {
+      const includedFlag = {
+        ...flag,
+        rules: [
+          {
+            id: 'r1',
+            flagId: flag.id,
+            effect: 'include' as const,
+            payload: { type: 'percentage' as const, percent: 10 },
+            createdAt: flag.createdAt,
+            updatedAt: flag.updatedAt
+          }
+        ]
+      };
+      const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      fixture.componentInstance.toggleFlag(includedFlag);
+      expect(confirmSpy).not.toHaveBeenCalled();
+      expect(toggleSpy).toHaveBeenCalledWith('flag-1');
+    });
+
+    it('skips the confirmation when disabling an enabled flag', () => {
+      const enabledNoRules = { ...flag, enabled: true };
+      const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      fixture.componentInstance.toggleFlag(enabledNoRules);
+      expect(confirmSpy).not.toHaveBeenCalled();
+      expect(toggleSpy).toHaveBeenCalledWith('flag-1');
+    });
   });
 
   describe('FF-UX-007 — handset shows "All environments" when list is empty', () => {

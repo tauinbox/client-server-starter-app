@@ -128,6 +128,34 @@ export class FeatureFlagListComponent implements OnInit {
   }
 
   toggleFlag(flag: FeatureFlagResponse): void {
+    // Enabling a flag that has no include rules turns it on for every
+    // authenticated user (the evaluator defaults to "on" with no include
+    // rules), so confirm that intent before flipping it on. Disabling and
+    // flags that already target a subset via include rules flip silently.
+    const enabling = !flag.enabled;
+    if (enabling && !this.#hasIncludeRules(flag)) {
+      this.#adaptiveDialog
+        .openConfirm({
+          title: this.#transloco.translate(
+            'admin.featureFlags.confirmEnableNoRulesTitle'
+          ),
+          message: this.#transloco.translate(
+            'admin.featureFlags.confirmEnableNoRulesMessage',
+            { key: flag.key }
+          ),
+          confirmButton: this.#transloco.translate('common.confirm'),
+          cancelButton: this.#transloco.translate('common.cancel')
+        })
+        .pipe(takeUntilDestroyed(this.#destroyRef))
+        .subscribe((confirmed: boolean | undefined) => {
+          if (confirmed) this.#applyToggle(flag);
+        });
+      return;
+    }
+    this.#applyToggle(flag);
+  }
+
+  #applyToggle(flag: FeatureFlagResponse): void {
     this.#store
       .toggleFlag(flag.id)
       .pipe(takeUntilDestroyed(this.#destroyRef))
@@ -144,6 +172,10 @@ export class FeatureFlagListComponent implements OnInit {
           this.#notify.error(err, 'admin.featureFlags.errorToggleFailed');
         }
       });
+  }
+
+  #hasIncludeRules(flag: FeatureFlagResponse): boolean {
+    return flag.rules.some((r) => r.effect === 'include');
   }
 
   confirmDelete(flag: FeatureFlagResponse): void {

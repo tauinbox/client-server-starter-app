@@ -48,6 +48,12 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
 
     await toggleBtn.click();
 
+    // new-dashboard has no include rules, so enabling it prompts the
+    // "enable for everyone" confirmation before the toggle is sent.
+    await page
+      .getByRole('button', { name: 'Confirm' })
+      .click({ timeout: 5_000 });
+
     const response = await reloadResponse;
     const body = (await response.json()) as {
       flags: Record<string, boolean>;

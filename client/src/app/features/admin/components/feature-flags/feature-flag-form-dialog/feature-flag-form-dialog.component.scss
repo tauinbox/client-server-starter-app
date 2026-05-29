@@ -10,7 +10,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: vars.$spacing-md;
-  margin-bottom: vars.$spacing-md;
+}
+
+.field-hint {
+  margin: vars.$spacing-xs 0 vars.$spacing-md;
+  font-size: var(--mat-sys-body-small-size);
+  line-height: var(--mat-sys-body-small-line-height);
+  color: var(--mat-sys-on-surface-variant);
 }
 
 .rules-section {

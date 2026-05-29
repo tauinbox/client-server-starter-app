@@ -65,6 +65,12 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     await dialog.getByRole('button', { name: 'Remove rule' }).click();
     await dialog.getByRole('button', { name: 'Save' }).click();
 
+    // Removing the only include rule leaves an enabled flag with no include
+    // rules, so saving prompts the "enable for everyone" confirmation.
+    await page
+      .getByRole('button', { name: 'Confirm' })
+      .click({ timeout: 5_000 });
+
     // Composite outcome: NO "Feature flag updated" success snackbar, only the
     // distinct rules-failure message with the flag key interpolated in.
     await expect(
