@@ -2,7 +2,7 @@
   "__inputs": [],
   "__requires": [],
   "annotations": { "list": [] },
-  "description": "NestJS application metrics: HTTP traffic, authentication, SSE connections, and Node.js runtime",
+  "description": "Nexus application metrics: HTTP traffic, authentication, RBAC denials, SSE connections, and Node.js runtime",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -555,15 +555,217 @@
       "description": "Fraction of CPU time spent in garbage collection, by GC kind (major/minor/incremental)",
       "title": "GC CPU Time",
       "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 56 },
+      "id": 6,
+      "title": "RBAC & Reliability",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 57 },
+      "id": 60,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum(rate(rbac_permission_denied_total[5m])) by (level)",
+          "legendFormat": "{{level}}",
+          "refId": "A"
+        }
+      ],
+      "description": "Authorization denials per second by check level (guard = route-level @Authorize, instance = object-level assertCan). A sustained rise can indicate probing or a misconfigured role assignment.",
+      "title": "RBAC Permission Denials",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 57 },
+      "id": 61,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum(rate(rbac_permission_denied_total[5m])) by (action, subject)",
+          "legendFormat": "{{action}}:{{subject}}",
+          "refId": "A"
+        }
+      ],
+      "description": "Which action/subject pairs are being denied — surfaces the specific permission a caller is repeatedly hitting.",
+      "title": "RBAC Denials by Action/Subject",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 57 },
+      "id": 62,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes",
+          "legendFormat": "RSS (total process)",
+          "refId": "A"
+        },
+        {
+          "expr": "nodejs_heap_size_used_bytes",
+          "legendFormat": "heap used",
+          "refId": "B"
+        }
+      ],
+      "description": "Resident set size is the total memory the process holds (heap + native + buffers) — this is what counts against a container mem_limit, not heap alone.",
+      "title": "Process Memory (RSS)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 65 },
+      "id": 63,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(auth_events_total{event=\"token_reuse_detected\"}[1h]))",
+          "legendFormat": "reuse events (1h)",
+          "refId": "A"
+        }
+      ],
+      "description": "Refresh-token reuse detections in the last hour (RFC 6819 §4.13). Each event triggered a full session revocation for the affected user — this should normally be 0; any non-zero value warrants investigation.",
+      "title": "Token Reuse Detected (1h)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "blue" },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 65 },
+      "id": 64,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "expr": "time() - process_start_time_seconds",
+          "legendFormat": "uptime",
+          "refId": "A"
+        }
+      ],
+      "description": "Process uptime. A sudden drop to near zero indicates a restart or crash-loop.",
+      "title": "Uptime",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "purple" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 65 },
+      "id": 65,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "expr": "nodejs_active_handles_total",
+          "legendFormat": "handles",
+          "refId": "A"
+        }
+      ],
+      "description": "libuv active handles (open sockets, timers, etc.). Steady unbounded growth is a classic handle-leak signal.",
+      "title": "Active Handles",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "purple" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 65 },
+      "id": 66,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "expr": "nodejs_active_requests_total",
+          "legendFormat": "requests",
+          "refId": "A"
+        }
+      ],
+      "description": "libuv active requests in flight (pending async I/O).",
+      "title": "Active Requests",
+      "type": "stat"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["nestjs"],
+  "tags": ["nexus"],
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "NestJS Application",
-  "uid": "nestjs-app",
-  "version": 2
+  "title": "Nexus",
+  "uid": "nexus",
+  "version": 3
 }
