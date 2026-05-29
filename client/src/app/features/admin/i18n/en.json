@@ -26,6 +26,8 @@
     "environmentsAll": "All environments",
     "confirmDeleteTitle": "Delete feature flag",
     "confirmDeleteMessage": "Delete the feature flag \"{{ key }}\"? This also removes all its rules.",
+    "confirmEnableNoRulesTitle": "Enable for everyone?",
+    "confirmEnableNoRulesMessage": "The flag \"{{ key }}\" has no include rules, so enabling it turns the feature ON for every signed-in user (and all anonymous visitors when it is public). Continue?",
     "successCreated": "Feature flag \"{{ key }}\" created",
     "successUpdated": "Feature flag \"{{ key }}\" updated",
     "successEnabled": "Feature flag \"{{ key }}\" enabled",
@@ -52,6 +54,7 @@
     "environmentsPlaceholder": "Add environment, press Enter",
     "enabledLabel": "Enabled",
     "publicLabel": "Visible to anonymous callers",
+    "publicHint": "Visibility to anonymous (logged-out) visitors only. Targeting is controlled by rules. An enabled flag with no include rules is on for every signed-in user.",
     "rulesTitle": "Rules",
     "rulesEmpty": "No rules — the flag will use only its enabled state and environment list.",
     "addRule": "Add rule"

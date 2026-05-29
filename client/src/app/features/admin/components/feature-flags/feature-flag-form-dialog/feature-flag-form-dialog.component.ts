@@ -2,6 +2,7 @@ import type { OnDestroy, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   computed,
   inject,
@@ -24,13 +25,15 @@ import {
 } from '@angular/material/dialog';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatIcon } from '@angular/material/icon';
-import { TranslocoDirective } from '@jsverse/transloco';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type {
   CreateFeatureFlag,
   FeatureFlagRuleInput
 } from '../../../services/feature-flags-admin.service';
 import type { FeatureFlagResponse } from '@app/shared/types';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
+import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import type { ChipOption } from '@shared/forms';
 import { ChipsAutocompleteComponent } from '@shared/forms';
@@ -89,6 +92,9 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
     MatDialogRef<FeatureFlagFormDialogComponent, FeatureFlagFormDialogResult>
   );
   readonly #shortcuts = inject(KeyboardShortcutsService);
+  readonly #adaptiveDialog = inject(AdaptiveDialogService);
+  readonly #transloco = inject(TranslocoService);
+  readonly #destroyRef = inject(DestroyRef);
   protected readonly data = inject<FeatureFlagFormDialogData>(MAT_DIALOG_DATA);
 
   #cleanupSave: (() => void) | null = null;
@@ -180,6 +186,36 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
 
   submit(): void {
     if (this.flagForm().invalid()) return;
+    // An enabled flag with no include rules evaluates "on" for every
+    // authenticated user, so confirm that intent before saving. Disabled
+    // flags and flags that target a subset via include rules save directly.
+    if (this.enabled() && !this.#hasIncludeRules()) {
+      this.#adaptiveDialog
+        .openConfirm({
+          title: this.#transloco.translate(
+            'admin.featureFlags.confirmEnableNoRulesTitle'
+          ),
+          message: this.#transloco.translate(
+            'admin.featureFlags.confirmEnableNoRulesMessage',
+            { key: this.model().key.trim() }
+          ),
+          confirmButton: this.#transloco.translate('common.confirm'),
+          cancelButton: this.#transloco.translate('common.cancel')
+        })
+        .pipe(takeUntilDestroyed(this.#destroyRef))
+        .subscribe((confirmed: boolean | undefined) => {
+          if (confirmed) this.#close();
+        });
+      return;
+    }
+    this.#close();
+  }
+
+  #hasIncludeRules(): boolean {
+    return this.rules().some((r) => r.effect === 'include');
+  }
+
+  #close(): void {
     const formData = this.model();
     const result: FeatureFlagFormDialogResult = {
       flag: {
