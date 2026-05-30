@@ -1,7 +1,13 @@
 @use '@angular/material' as mat;
 
-// Compact density for admin tables — reduces row height and padding.
-// Apply via data-density="compact" attribute on a table wrapper.
-[data-density='compact'] {
-  @include mat.all-component-densities(-2);
+// Runtime UI density. Material density is normally a build-time mixin, so to let
+// the user pick layout compactness at runtime we pre-generate one class per
+// level the DisplayPreferencesService can set via data-ui-density on <html>
+// (level 0 = theme default, no class needed). All components — form fields,
+// buttons, tables, lists, etc. — follow the chosen level uniformly. The range
+// matches DENSITY_MIN/MAX in display-preferences.service.ts.
+@for $level from 1 through 5 {
+  [data-ui-density='#{$level}'] {
+    @include mat.all-component-densities(-$level);
+  }
 }

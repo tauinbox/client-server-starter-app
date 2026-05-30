@@ -25,6 +25,7 @@ import { NotificationsService } from '@core/services/notifications.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { TranslocoHttpLoader } from '@core/transloco-loader';
 import { LanguageService } from '@core/services/language.service';
+import { DisplayPreferencesService } from '@core/services/display-preferences.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -90,6 +91,11 @@ export const appConfig: ApplicationConfig = {
     }),
     provideAppInitializer(() => {
       inject(LanguageService);
+    }),
+    // Apply the saved display preference (text scale + control density) to
+    // <html> during bootstrap, before the first meaningful paint.
+    provideAppInitializer(() => {
+      inject(DisplayPreferencesService);
     }),
     {
       provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,

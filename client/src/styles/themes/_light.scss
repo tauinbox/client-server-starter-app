@@ -15,6 +15,9 @@
   // Sidenav uses a slightly elevated surface so it stands out from page content
   --mat-sidenav-container-background-color: var(--mat-sys-surface-container);
 
+  // Density is intentionally 0 here (Material default). The user's chosen
+  // density is layered on top at runtime via [data-ui-density] in _density.scss,
+  // set on <html> by DisplayPreferencesService.
   @include mat.theme((
     color: (
       primary: mat.$azure-palette,

@@ -54,4 +54,9 @@
 
 .preview-panel {
   margin-top: vars.$spacing-md;
+
+  // The dialog content is an overflow:auto scroll area; sitting flush at its
+  // bottom edge clips this panel's Material elevation shadow. A small bottom
+  // margin extends the content box so the shadow renders inside the clip.
+  margin-bottom: vars.$spacing-xs;
 }
