@@ -2,6 +2,7 @@ import type { OnDestroy, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   inject,
   signal
@@ -34,6 +35,8 @@ import { OAUTH_URLS } from '../../constants/auth-api.const';
 import type { LockoutErrorData } from '../../models/auth.types';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
+import { OAUTH_PROVIDER_FLAGS } from '@app/shared/constants';
 
 type LoginData = {
   email: string;
@@ -75,10 +78,25 @@ export class LoginComponent implements OnInit, OnDestroy {
   readonly #sessionStorage = inject(SessionStorageService);
   readonly #window = inject(DOCUMENT).defaultView;
   readonly #translocoService = inject(TranslocoService);
+  readonly #flagsStore = inject(FeatureFlagsStore);
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly oauthUrls = OAUTH_URLS;
+
+  // A provider button is shown only when its public feature flag resolves true,
+  // which the server gates on the provider being configured. The whole OAuth
+  // block is hidden when none resolve true.
+  protected readonly visibleOAuthProviders = computed(() => {
+    const flags = this.#flagsStore.flags();
+    return OAUTH_PROVIDER_FLAGS.filter((p) => flags[p.flagKey] === true).map(
+      (p) => ({
+        id: p.provider,
+        icon: p.provider,
+        labelKey: `auth.providers.${p.provider}`
+      })
+    );
+  });
 
   // Lockout
   protected readonly lockoutSeconds = signal(0);

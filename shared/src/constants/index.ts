@@ -26,3 +26,8 @@ export {
 } from './locale.constants';
 
 export { ErrorKeys } from './error-keys';
+
+export {
+  OAUTH_PROVIDER_FLAGS,
+  type OAuthProviderFlag
+} from './oauth-provider-flags.constants';

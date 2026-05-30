@@ -50,6 +50,8 @@ import {
 } from '@angular/material/button-toggle';
 import { LanguageService } from '@core/services/language.service';
 import type { AppLanguage } from '@core/services/language.service';
+import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
+import { OAUTH_PROVIDER_FLAGS } from '@app/shared/constants';
 
 type ProfileData = {
   email: string;
@@ -115,6 +117,7 @@ export class ProfileComponent implements OnInit {
   readonly #transloco = inject(TranslocoService);
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
   readonly #languageService = inject(LanguageService);
+  readonly #flagsStore = inject(FeatureFlagsStore);
 
   protected readonly user = signal<UserResponse | null>(null);
   readonly roleChips = computed(() =>
@@ -132,7 +135,18 @@ export class ProfileComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly oauthAccounts = signal<OAuthAccountInfo[]>([]);
   protected readonly oauthLoading = signal(false);
-  protected readonly allProviders = Object.keys(OAUTH_URLS);
+
+  // A provider is shown when its public flag resolves true (server-gated on the
+  // provider being configured) OR the user already has it linked — so a stale
+  // link to a now-unconfigured provider can still be removed. The whole
+  // "connected accounts" card is hidden when none qualify.
+  protected readonly visibleProviders = computed(() => {
+    const flags = this.#flagsStore.flags();
+    const linked = new Set(this.oauthAccounts().map((a) => a.provider));
+    return OAUTH_PROVIDER_FLAGS.filter(
+      (p) => flags[p.flagKey] === true || linked.has(p.provider)
+    ).map((p) => p.provider);
+  });
   protected readonly locale = signal<AppLanguage>('en');
   protected readonly savingLocale = signal(false);
 

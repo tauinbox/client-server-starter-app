@@ -132,44 +132,46 @@
           </mat-card-content>
         </mat-card>
 
-        <mat-card>
-          <mat-card-header>
-            <mat-card-title>{{
-              t('auth.profile.connectedAccounts')
-            }}</mat-card-title>
-          </mat-card-header>
+        @if (visibleProviders().length > 0) {
+          <mat-card>
+            <mat-card-header>
+              <mat-card-title>{{
+                t('auth.profile.connectedAccounts')
+              }}</mat-card-title>
+            </mat-card-header>
 
-          <mat-card-content>
-            <div class="oauth-providers">
-              @for (provider of allProviders; track provider) {
-                <div class="oauth-provider-row">
-                  <div class="oauth-provider-info">
-                    <mat-icon [svgIcon]="provider"></mat-icon>
-                    <span>{{ t('auth.providers.' + provider) }}</span>
+            <mat-card-content>
+              <div class="oauth-providers">
+                @for (provider of visibleProviders(); track provider) {
+                  <div class="oauth-provider-row">
+                    <div class="oauth-provider-info">
+                      <mat-icon [svgIcon]="provider"></mat-icon>
+                      <span>{{ t('auth.providers.' + provider) }}</span>
+                    </div>
+                    @if (isProviderLinked(provider)) {
+                      <button
+                        matButton="outlined"
+                        class="app-btn-danger"
+                        [disabled]="oauthLoading()"
+                        (click)="disconnectProvider(provider)"
+                      >
+                        {{ t('auth.profile.disconnect') }}
+                      </button>
+                    } @else {
+                      <button
+                        matButton="outlined"
+                        [disabled]="oauthLoading()"
+                        (click)="connectProvider(provider)"
+                      >
+                        {{ t('auth.profile.connect') }}
+                      </button>
+                    }
                   </div>
-                  @if (isProviderLinked(provider)) {
-                    <button
-                      matButton="outlined"
-                      class="app-btn-danger"
-                      [disabled]="oauthLoading()"
-                      (click)="disconnectProvider(provider)"
-                    >
-                      {{ t('auth.profile.disconnect') }}
-                    </button>
-                  } @else {
-                    <button
-                      matButton="outlined"
-                      [disabled]="oauthLoading()"
-                      (click)="connectProvider(provider)"
-                    >
-                      {{ t('auth.profile.connect') }}
-                    </button>
-                  }
-                </div>
-              }
-            </div>
-          </mat-card-content>
-        </mat-card>
+                }
+              </div>
+            </mat-card-content>
+          </mat-card>
+        }
 
         <mat-card>
           <mat-card-header>

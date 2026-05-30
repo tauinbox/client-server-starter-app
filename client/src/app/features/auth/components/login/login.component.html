@@ -94,49 +94,31 @@
         </div>
       </form>
 
-      <div class="oauth-divider">
-        <mat-divider></mat-divider>
-        <span class="oauth-divider-text">{{
-          t('auth.login.oauthDivider')
-        }}</span>
-        <mat-divider></mat-divider>
-      </div>
+      @if (visibleOAuthProviders().length > 0) {
+        <div class="oauth-divider">
+          <mat-divider></mat-divider>
+          <span class="oauth-divider-text">{{
+            t('auth.login.oauthDivider')
+          }}</span>
+          <mat-divider></mat-divider>
+        </div>
 
-      <div class="oauth-buttons">
-        <button
-          matButton="outlined"
-          type="button"
-          class="oauth-button"
-          (click)="onOAuthLogin('google')"
-        >
-          <span class="oauth-btn-content">
-            <mat-icon svgIcon="google"></mat-icon>
-            <span>{{ t('auth.providers.google') }}</span>
-          </span>
-        </button>
-        <button
-          matButton="outlined"
-          type="button"
-          class="oauth-button"
-          (click)="onOAuthLogin('facebook')"
-        >
-          <span class="oauth-btn-content">
-            <mat-icon svgIcon="facebook"></mat-icon>
-            <span>{{ t('auth.providers.facebook') }}</span>
-          </span>
-        </button>
-        <button
-          matButton="outlined"
-          type="button"
-          class="oauth-button"
-          (click)="onOAuthLogin('vk')"
-        >
-          <span class="oauth-btn-content">
-            <mat-icon svgIcon="vk"></mat-icon>
-            <span>{{ t('auth.providers.vk') }}</span>
-          </span>
-        </button>
-      </div>
+        <div class="oauth-buttons">
+          @for (provider of visibleOAuthProviders(); track provider.id) {
+            <button
+              matButton="outlined"
+              type="button"
+              class="oauth-button"
+              (click)="onOAuthLogin(provider.id)"
+            >
+              <span class="oauth-btn-content">
+                <mat-icon [svgIcon]="provider.icon"></mat-icon>
+                <span>{{ t(provider.labelKey) }}</span>
+              </span>
+            </button>
+          }
+        </div>
+      }
     </mat-card-content>
 
     <mat-card-actions>

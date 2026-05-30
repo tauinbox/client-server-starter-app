@@ -84,8 +84,14 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
     const firstBody = (await first.json()) as {
       flags: Record<string, boolean>;
     };
-    // Default seed flags are not public → anon sees an empty map.
-    expect(firstBody.flags).toEqual({});
+    // Private seed flags (new-dashboard, beta-export) are not public, so anon
+    // sees only the public OAuth provider flags — which resolve true because the
+    // mock environment marks every provider configured.
+    expect(firstBody.flags).toEqual({
+      'oauth-google': true,
+      'oauth-facebook': true,
+      'oauth-vk': true
+    });
 
     const setCookie = first.headers.get('set-cookie') ?? '';
     expect(setCookie).toContain('nxs_anon_id=');
