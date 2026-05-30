@@ -738,15 +738,20 @@ getBetaDashboard() { ... }
 ```ts
 @Injectable()
 export class TenantModule implements OnModuleInit {
-  constructor(private readonly registry: AttributeRegistryService) {}
+  constructor(
+    private readonly registry: AttributeRegistryService,
+    private readonly tenants: TenantLookupService
+  ) {}
   onModuleInit() {
-    this.registry.registerAttribute('tenantId', (user, req) =>
-      (req.headers['x-tenant-id'] as string) ?? null
+    this.registry.registerAttribute('tenantId', (user) =>
+      user ? this.tenants.tenantIdForUser(user.userId) : null
     );
   }
 }
 ```
 Admin UIs can then write rules referencing `{ field: 'custom', customKey: 'tenantId', op: 'in', value: ['acme', 'globex'] }`. The write-time validator rejects any `customKey` not registered.
+
+> **Request-stable contract.** A resolver MUST return a stable value for a given user across requests — it may use the `user` argument but MUST NOT branch on per-request data (IP, headers, query string, country, …). `evaluateForUser` caches the full evaluated set per user for 60s (`featureflags:user:<id>:v<version>`), so a request-derived attribute would freeze the first request's value for the whole TTL and make attribute rules non-deterministic per request. The resolver receives `req` only for stable, request-independent enrichment.
 
 **Audit trail.** Every mutating admin endpoint writes to `audit_logs` under one of the `FEATURE_FLAG_*` enum values (`FEATURE_FLAG_CREATE`, `_UPDATE`, `_DELETE`, `_TOGGLE`, `_RULES_REPLACE`). The `details` JSONB captures `key`, `changedFields`, `ruleCount`, or `enabled`, depending on the action — never the raw rule payload, so admin-only segmentation strategy never leaks into the audit log.
 

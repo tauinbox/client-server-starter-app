@@ -42,6 +42,16 @@ export class AttributeRegistryService {
    * Registers a resolver for a `custom` attribute key. Modules call this from
    * `onModuleInit` to expose tenant/org/region/etc. attributes to the feature
    * flag evaluator without modifying the evaluator itself.
+   *
+   * Request-stable contract: a resolver MUST return a stable value for a given
+   * user across requests — it may depend on the `user` argument but MUST NOT
+   * depend on per-request data (IP, headers, query string, country, etc.). The
+   * feature-flag evaluator caches the full evaluated set per user for 60s
+   * (`featureflags:user:<id>:v<version>` in `FeatureFlagResolverService`), so a
+   * request-derived attribute would freeze the first request's value for the
+   * whole TTL, making attribute rules non-deterministic per request. The `req`
+   * argument exists only for stable, request-independent enrichment; do not
+   * branch evaluation on volatile request state.
    */
   registerAttribute(key: string, resolver: AttributeResolver): void {
     if (this.resolvers.has(key)) {
