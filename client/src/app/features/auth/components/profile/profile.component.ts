@@ -50,6 +50,12 @@ import {
 } from '@angular/material/button-toggle';
 import { LanguageService } from '@core/services/language.service';
 import type { AppLanguage } from '@core/services/language.service';
+import { MatSlider, MatSliderThumb } from '@angular/material/slider';
+import { DisplayPreferencesService } from '@core/services/display-preferences.service';
+import {
+  DENSITY_MAX,
+  DENSITY_MIN
+} from '@core/services/display-preferences.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { OAUTH_PROVIDER_FLAGS } from '@app/shared/constants';
 
@@ -100,7 +106,9 @@ const INITIAL_PROFILE: ProfileData = {
     AppFormFieldComponent,
     TranslocoDirective,
     MatButtonToggle,
-    MatButtonToggleGroup
+    MatButtonToggleGroup,
+    MatSlider,
+    MatSliderThumb
   ],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
@@ -118,6 +126,11 @@ export class ProfileComponent implements OnInit {
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
   readonly #languageService = inject(LanguageService);
   readonly #flagsStore = inject(FeatureFlagsStore);
+  readonly #displayPreferences = inject(DisplayPreferencesService);
+
+  protected readonly displayDensity = this.#displayPreferences.density;
+  protected readonly densityMin = DENSITY_MIN;
+  protected readonly densityMax = DENSITY_MAX;
 
   protected readonly user = signal<UserResponse | null>(null);
   readonly roleChips = computed(() =>
@@ -298,6 +311,10 @@ export class ProfileComponent implements OnInit {
           this.#notify.error(err, 'auth.profile.errorUpdateFailed');
         }
       });
+  }
+
+  onDensityChange(level: number): void {
+    this.#displayPreferences.setDensity(level);
   }
 
   loadOAuthAccounts(): void {

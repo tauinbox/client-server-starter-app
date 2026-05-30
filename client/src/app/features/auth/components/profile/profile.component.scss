@@ -143,3 +143,32 @@ form {
   font-size: vars.$font-size-sm;
   color: var(--mat-sys-on-surface-variant);
 }
+
+.display-section {
+  padding-top: vars.$spacing-lg;
+  margin-top: vars.$spacing-lg;
+  border-top: func.rem(1) solid var(--mat-sys-outline-variant);
+}
+
+.preference-hint {
+  margin: 0 0 vars.$spacing-md;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.density-control {
+  display: flex;
+  gap: vars.$spacing-sm;
+  align-items: center;
+}
+
+.density-slider {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.density-end {
+  flex-shrink: 0;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-on-surface-variant);
+}
