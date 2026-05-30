@@ -12,8 +12,13 @@ import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/trans
 import { LoginComponent } from './login.component';
 import { AuthService } from '../../services/auth.service';
 import type { AuthResponse } from '../../models/auth.types';
-import type { RoleResponse } from '@app/shared/types';
+import type {
+  EvaluatedFeatureFlagsResponse,
+  RoleResponse
+} from '@app/shared/types';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
+import { FeatureFlagService } from '@features/feature-flags/services/feature-flag.service';
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
@@ -49,11 +54,21 @@ describe('LoginComponent', () => {
   let authServiceMock: {
     login: ReturnType<typeof vi.fn>;
   };
+  let featureFlagServiceMock: {
+    getEvaluatedFlags: ReturnType<typeof vi.fn>;
+  };
   let router: Router;
 
   beforeEach(async () => {
     authServiceMock = {
       login: vi.fn()
+    };
+    featureFlagServiceMock = {
+      getEvaluatedFlags: vi
+        .fn()
+        .mockReturnValue(
+          of<EvaluatedFeatureFlagsResponse>({ flags: {}, evaluatedAt: '' })
+        )
     };
 
     await TestBed.configureTestingModule({
@@ -64,6 +79,7 @@ describe('LoginComponent', () => {
         provideHttpClientTesting(),
         provideNoopAnimations(),
         { provide: AuthService, useValue: authServiceMock },
+        { provide: FeatureFlagService, useValue: featureFlagServiceMock },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -268,6 +284,47 @@ describe('LoginComponent', () => {
       expect(component['error']()).toBe(
         'Login failed. Please check your credentials.'
       );
+    });
+  });
+
+  describe('OAuth provider buttons', () => {
+    async function loadFlags(flags: Record<string, boolean>): Promise<void> {
+      featureFlagServiceMock.getEvaluatedFlags.mockReturnValue(
+        of<EvaluatedFeatureFlagsResponse>({ flags, evaluatedAt: '' })
+      );
+      await TestBed.inject(FeatureFlagsStore).load();
+      fixture.detectChanges();
+      await fixture.whenStable();
+    }
+
+    function oauthButtonCount(): number {
+      return fixture.nativeElement.querySelectorAll('.oauth-button').length;
+    }
+
+    it('hides the OAuth block when no provider flag is enabled', () => {
+      expect(fixture.nativeElement.querySelector('.oauth-divider')).toBeNull();
+      expect(oauthButtonCount()).toBe(0);
+    });
+
+    it('shows all three buttons when every provider flag is enabled', async () => {
+      await loadFlags({
+        'oauth-google': true,
+        'oauth-facebook': true,
+        'oauth-vk': true
+      });
+      expect(
+        fixture.nativeElement.querySelector('.oauth-divider')
+      ).not.toBeNull();
+      expect(oauthButtonCount()).toBe(3);
+    });
+
+    it('shows only the enabled subset, preserving provider order', async () => {
+      await loadFlags({ 'oauth-google': true, 'oauth-vk': true });
+      expect(component['visibleOAuthProviders']().map((p) => p.id)).toEqual([
+        'google',
+        'vk'
+      ]);
+      expect(oauthButtonCount()).toBe(2);
     });
   });
 });

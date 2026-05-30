@@ -16,6 +16,7 @@ import type {
   FeatureFlagRuleType
 } from '@app/shared/types';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { OAUTH_PROVIDER_FLAGS } from '@app/shared/constants';
 import { adminGuard, authenticateRequest } from '../helpers/auth.helpers';
 import { pushToAll } from '../sse-hub';
 import { getState, logAudit, toFeatureFlagResponse } from '../state';
@@ -45,10 +46,18 @@ const ATTRIBUTE_OPS: readonly FeatureFlagAttributeOp[] = [
 
 const KEY_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 
-// Mock-server has no DI-based attribute registry, so `field: 'custom'` rules
-// are always rejected at write time. Built-in fields (email, emailDomain,
-// createdAt) remain usable via their dedicated `field` values.
-const KNOWN_CUSTOM_KEYS: ReadonlySet<string> = new Set();
+// Mirrors the server's attribute registry. The only custom attributes are the
+// per-OAuth-provider "configured" signals registered by the server's
+// OAuthProviderFlagAttributesRegistrar; the mock environment treats every
+// provider as configured (see OAUTH_CONFIGURED_ATTRIBUTES) so the login UI
+// shows the OAuth buttons in dev / E2E.
+const KNOWN_CUSTOM_KEYS: ReadonlySet<string> = new Set(
+  OAUTH_PROVIDER_FLAGS.map((p) => p.attributeKey)
+);
+
+const OAUTH_CONFIGURED_ATTRIBUTES: Record<string, boolean> = Object.fromEntries(
+  OAUTH_PROVIDER_FLAGS.map((p) => [p.attributeKey, true])
+);
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -404,12 +413,21 @@ function buildEvaluationContext(req: Request): FeatureFlagEvaluationContext {
   const cookieValue = cookies[ANON_ID_COOKIE];
   const anonId = typeof cookieValue === 'string' ? cookieValue : null;
   if (!result) {
-    return { userId: null, anonId, roles: [], attributes: {}, env };
+    return {
+      userId: null,
+      anonId,
+      roles: [],
+      attributes: { ...OAUTH_CONFIGURED_ATTRIBUTES },
+      env
+    };
   }
   const { user } = result;
   const at = user.email.lastIndexOf('@');
   const emailDomain = at >= 0 ? user.email.slice(at + 1) : undefined;
-  const attributes: Record<string, unknown> = { email: user.email };
+  const attributes: Record<string, unknown> = {
+    ...OAUTH_CONFIGURED_ATTRIBUTES,
+    email: user.email
+  };
   if (emailDomain) attributes['emailDomain'] = emailDomain;
   if (user.createdAt) attributes['createdAt'] = user.createdAt;
   return {

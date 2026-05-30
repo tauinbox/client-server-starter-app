@@ -1,4 +1,5 @@
 import { faker } from '@faker-js/faker';
+import { OAUTH_PROVIDER_FLAGS } from '@app/shared/constants';
 import { createMockUser, createOAuthAccount } from './factories';
 import type {
   MockUser,
@@ -457,7 +458,22 @@ function generateFeatureFlags(): MockFeatureFlag[] {
       updatedByUserId: null,
       createdAt: now,
       updatedAt: now
-    }
+    },
+    // One public flag per OAuth provider, gated by an attribute rule (below) on
+    // the provider's "configured" signal. The mock environment marks every
+    // provider configured, so all three buttons show in dev / E2E.
+    ...OAUTH_PROVIDER_FLAGS.map(({ provider, flagKey }) => ({
+      id: `flag-${flagKey}`,
+      key: flagKey,
+      description: `Show the ${provider} OAuth login button (gated by provider configuration)`,
+      enabled: true,
+      environments: [],
+      public: true,
+      version: 1,
+      updatedByUserId: null,
+      createdAt: now,
+      updatedAt: now
+    }))
   ];
 }
 
@@ -472,7 +488,22 @@ function generateFeatureFlagRules(): MockFeatureFlagRule[] {
       payload: { type: 'percentage', percent: 10 },
       createdAt: now,
       updatedAt: now
-    }
+    },
+    ...OAUTH_PROVIDER_FLAGS.map(({ flagKey, attributeKey }) => ({
+      id: `rule-${flagKey}-configured`,
+      flagId: `flag-${flagKey}`,
+      type: 'attribute' as const,
+      effect: 'include' as const,
+      payload: {
+        type: 'attribute' as const,
+        field: 'custom' as const,
+        op: 'eq' as const,
+        value: true,
+        customKey: attributeKey
+      },
+      createdAt: now,
+      updatedAt: now
+    }))
   ];
 }
 

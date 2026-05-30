@@ -12,7 +12,13 @@ import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/trans
 import { ProfileComponent } from './profile.component';
 import { AuthService } from '../../services/auth.service';
 import { NotifyService } from '@core/services/notify.service';
-import type { RoleResponse, UserResponse } from '@app/shared/types';
+import type {
+  EvaluatedFeatureFlagsResponse,
+  RoleResponse,
+  UserResponse
+} from '@app/shared/types';
+import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
+import { FeatureFlagService } from '@features/feature-flags/services/feature-flag.service';
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
@@ -53,6 +59,9 @@ describe('ProfileComponent', () => {
     warn: ReturnType<typeof vi.fn>;
   };
   let activatedRouteMock: { snapshot: { queryParamMap: Map<string, string> } };
+  let featureFlagServiceMock: {
+    getEvaluatedFlags: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
     authServiceMock = {
@@ -61,6 +70,13 @@ describe('ProfileComponent', () => {
       getOAuthAccounts: vi.fn().mockReturnValue(of([])),
       unlinkOAuthAccount: vi.fn(),
       initOAuthLink: vi.fn().mockReturnValue(of({ message: 'Link initiated' }))
+    };
+    featureFlagServiceMock = {
+      getEvaluatedFlags: vi
+        .fn()
+        .mockReturnValue(
+          of<EvaluatedFeatureFlagsResponse>({ flags: {}, evaluatedAt: '' })
+        )
     };
 
     notifyMock = {
@@ -85,6 +101,7 @@ describe('ProfileComponent', () => {
         provideNoopAnimations(),
         { provide: AuthService, useValue: authServiceMock },
         { provide: NotifyService, useValue: notifyMock },
+        { provide: FeatureFlagService, useValue: featureFlagServiceMock },
         { provide: ActivatedRoute, useValue: activatedRouteMock }
       ]
     }).compileComponents();
@@ -427,6 +444,55 @@ describe('ProfileComponent', () => {
       expect(component['error']()).toBe(
         'Failed to update profile. Please try again.'
       );
+    });
+  });
+
+  describe('OAuth connected-accounts visibility', () => {
+    async function loadFlags(flags: Record<string, boolean>): Promise<void> {
+      featureFlagServiceMock.getEvaluatedFlags.mockReturnValue(
+        of<EvaluatedFeatureFlagsResponse>({ flags, evaluatedAt: '' })
+      );
+      await TestBed.inject(FeatureFlagsStore).load();
+      fixture.detectChanges();
+      await fixture.whenStable();
+    }
+
+    function providerRowCount(): number {
+      return fixture.nativeElement.querySelectorAll('.oauth-provider-row')
+        .length;
+    }
+
+    it('hides the card when no provider is configured and none are linked', () => {
+      fixture.detectChanges();
+      expect(providerRowCount()).toBe(0);
+      expect(component['visibleProviders']()).toEqual([]);
+    });
+
+    it('shows a row per provider when all flags are enabled', async () => {
+      fixture.detectChanges();
+      await loadFlags({
+        'oauth-google': true,
+        'oauth-facebook': true,
+        'oauth-vk': true
+      });
+      expect(providerRowCount()).toBe(3);
+    });
+
+    it('shows only the configured subset of providers', async () => {
+      fixture.detectChanges();
+      await loadFlags({ 'oauth-google': true, 'oauth-facebook': true });
+      expect(component['visibleProviders']()).toEqual(['google', 'facebook']);
+      expect(providerRowCount()).toBe(2);
+    });
+
+    it('keeps a linked provider visible even when its flag is off', async () => {
+      authServiceMock.getOAuthAccounts.mockReturnValue(
+        of([{ provider: 'vk', createdAt: '2025-01-01T00:00:00.000Z' }])
+      );
+      fixture.detectChanges();
+      await loadFlags({ 'oauth-google': true });
+      expect(component['visibleProviders']()).toEqual(['google', 'vk']);
+      expect(providerRowCount()).toBe(2);
     });
   });
 });
