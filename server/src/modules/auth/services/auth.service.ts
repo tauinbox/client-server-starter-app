@@ -815,15 +815,14 @@ export class AuthService {
   }
 
   async logout(userId: string): Promise<void> {
-    await Promise.all([
-      this.refreshTokenService.deleteByUserId(userId),
-      this.dataSource
-        .getRepository(User)
-        .update(userId, { tokenRevokedAt: new Date() })
-    ]);
+    await this.invalidateAllSessions(userId);
   }
 
   async revokeAllUserSessions(userId: string): Promise<void> {
+    await this.invalidateAllSessions(userId);
+  }
+
+  private async invalidateAllSessions(userId: string): Promise<void> {
     await Promise.all([
       this.refreshTokenService.deleteByUserId(userId),
       this.dataSource
