@@ -1,16 +1,51 @@
 #!/usr/bin/env python3
 """
-patch-dockerfile.py <dockerfile> <pkg1> [<pkg2> ...]
+patch-dockerfile.py [--channel {stable,edge}] <dockerfile> <pkg1> [<pkg2> ...]
 
-Adds or updates an EDGE_PATCHES_START/END block in a Dockerfile's
-runtime stage (identified by `FROM ... AS runner`) to install the
-given packages from the Alpine edge/main channel.
+Adds or updates a CVE_PATCHES_START/END block in a Dockerfile's runtime stage
+(identified by `FROM ... AS runner`) to upgrade the given packages.
+
+The block uses `apk add --no-cache --upgrade`, which rewrites any exact-version
+pin in /etc/apk/world so a pinned package can actually move (plain `apk upgrade`
+honours the pin and no-ops).
+
+Channels:
+  stable (default) — upgrade from the repositories already configured in the
+                     image (security fixes are normally backported to stable).
+  edge             — also expose the Alpine edge/main and edge/community
+                     repositories, for the rare fix not yet in stable.
 """
-import sys
+import argparse
 import re
 
+START = '# CVE_PATCHES_START'
+END = '# CVE_PATCHES_END'
+# Match the current marker and the legacy EDGE_PATCHES name so an old block is
+# transparently replaced with the new format.
+BLOCK_RE = re.compile(
+    r'# (?:CVE|EDGE)_PATCHES_START\n.*?# (?:CVE|EDGE)_PATCHES_END\n',
+    re.DOTALL,
+)
 
-def find_insert_after(lines: list) -> object:
+EDGE_REPOS = (
+    '    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \\\n'
+    '    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community \\\n'
+)
+
+
+def build_block(packages: list, channel: str) -> str:
+    pkg_list = ' '.join(packages)
+    repos = EDGE_REPOS if channel == 'edge' else ''
+    return (
+        f'{START}\n'
+        'RUN apk add --no-cache --upgrade \\\n'
+        f'{repos}'
+        f'    {pkg_list}\n'
+        f'{END}\n'
+    )
+
+
+def find_insert_after(lines: list):
     """Return the line index to insert after the first RUN apk upgrade in the runner stage."""
     in_runner = False
     in_run = False
@@ -23,7 +58,7 @@ def find_insert_after(lines: list) -> object:
             continue
         if re.match(r'FROM\s+', stripped):  # next stage starts
             break
-        if not in_run and re.match(r'RUN\s+apk\s+upgrade', stripped):
+        if not in_run and re.match(r'RUN\s+apk\s+(?:upgrade|add)', stripped):
             in_run = True
         if in_run and not stripped.endswith('\\'):
             return i + 1
@@ -31,48 +66,34 @@ def find_insert_after(lines: list) -> object:
 
 
 def main():
-    if len(sys.argv) < 3:
-        print(f'Usage: {sys.argv[0]} <dockerfile> <pkg1> [<pkg2> ...]', file=sys.stderr)
-        sys.exit(1)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--channel', choices=('stable', 'edge'), default='stable')
+    parser.add_argument('dockerfile')
+    parser.add_argument('packages', nargs='+')
+    args = parser.parse_args()
 
-    dockerfile_path = sys.argv[1]
-    packages = sys.argv[2:]
-    pkg_list = ' '.join(packages)
+    pkg_list = ' '.join(args.packages)
+    block = build_block(args.packages, args.channel)
 
-    with open(dockerfile_path) as f:
+    with open(args.dockerfile) as f:
         content = f.read()
 
-    block = (
-        '# EDGE_PATCHES_START\n'
-        'RUN apk upgrade --no-cache \\\n'
-        '    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \\\n'
-        f'    {pkg_list}\n'
-        '# EDGE_PATCHES_END\n'
-    )
-
-    if 'EDGE_PATCHES_START' in content:
-        content = re.sub(
-            r'# EDGE_PATCHES_START\n.*?# EDGE_PATCHES_END\n',
-            block,
-            content,
-            flags=re.DOTALL,
-        )
-        print(f'Updated EDGE_PATCHES block in {dockerfile_path}: {pkg_list}')
+    if BLOCK_RE.search(content):
+        content = BLOCK_RE.sub(block, content)
+        action = 'Updated'
     else:
         lines = content.splitlines(keepends=True)
         idx = find_insert_after(lines)
         if idx is None:
-            print(
-                f'ERROR: could not find insertion point in {dockerfile_path}',
-                file=sys.stderr,
-            )
-            sys.exit(1)
+            parser.error(f'could not find insertion point in {args.dockerfile}')
         lines.insert(idx, block)
         content = ''.join(lines)
-        print(f'Added EDGE_PATCHES block to {dockerfile_path}: {pkg_list}')
+        action = 'Added'
 
-    with open(dockerfile_path, 'w') as f:
+    with open(args.dockerfile, 'w') as f:
         f.write(content)
+
+    print(f'{action} CVE_PATCHES block in {args.dockerfile} [{args.channel}]: {pkg_list}')
 
 
 if __name__ == '__main__':

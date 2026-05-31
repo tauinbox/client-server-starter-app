@@ -530,9 +530,11 @@ Set `GRAFANA_ADMIN_PASSWORD` as a shell environment variable before running `doc
 
 `.github/workflows/deploy.yml` — triggered manually (`workflow_dispatch`) or on push to `master`. Builds Docker images locally, scans with Trivy (HIGH/CRITICAL), pushes to GHCR only after both scans pass, and deploys to VPS with health checks and automatic rollback.
 
-`.github/workflows/rebuild.yml` — weekly scheduled rebuild (Sundays 03:00 UTC) to pick up OS security patches. Rebuilds images with `no-cache`, scans, and deploys. Snapshots current images as `:pre-rebuild` for safe rollback.
+`.github/workflows/rebuild.yml` — weekly scheduled rebuild (Sundays 03:00 UTC) to pick up OS security patches. Rebuilds images with `no-cache`, scans, and deploys. Snapshots current images as `:pre-rebuild` for safe rollback. On a HIGH/CRITICAL finding it hands off to `scripts/auto-patch-cves.sh`, which upgrades the vulnerable Alpine packages (stable repositories first, edge as fallback) via a `CVE_PATCHES` block in the Dockerfile, re-scans, and opens a patch PR. If a CVE cannot be resolved (e.g. the fix conflicts with pinned sibling packages), it opens a tracking issue (label `auto-patch-blocked`) with the `apk` resolver conflict. The deploy stays blocked until a human acts.
 
-`.github/workflows/edge-patch-cleanup.yml` — quarterly check that creates a PR to remove Dockerfile edge/main patches when fixes reach stable Alpine.
+`.github/workflows/edge-patch-cleanup.yml` — quarterly check that creates a PR to remove the Dockerfile `CVE_PATCHES` blocks once the fixes are present in the base image.
+
+`.github/dependabot.yml` — keeps the `@sha256` base-image digests pinned in `server/Dockerfile` and `client/Dockerfile` current (docker ecosystem, weekly; major `node`/`nginx` bumps ignored), so builds are reproducible while still receiving reviewed upstream base updates.
 
 All VPS-facing workflows share a `deploy-production` concurrency group to prevent race conditions.
 
