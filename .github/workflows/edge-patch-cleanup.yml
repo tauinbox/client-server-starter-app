@@ -1,4 +1,4 @@
-name: Quarterly Edge Patch Cleanup
+name: Quarterly CVE Patch Cleanup
 
 on:
   schedule:
@@ -6,12 +6,12 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: edge-patch-cleanup
+  group: cve-patch-cleanup
   cancel-in-progress: false
 
 jobs:
   cleanup:
-    name: Check & Clean Edge Patches
+    name: Check & Clean CVE Patches
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -21,24 +21,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Check for edge patch markers
+      - name: Check for CVE patch markers
         id: check
         run: |
-          FILES=$(grep -rl 'EDGE_PATCHES_START' client/Dockerfile server/Dockerfile 2>/dev/null || true)
+          FILES=$(grep -rl 'CVE_PATCHES_START' client/Dockerfile server/Dockerfile 2>/dev/null || true)
           if [ -z "$FILES" ]; then
-            echo "No edge patch markers found — nothing to clean"
+            echo "No CVE patch markers found — nothing to clean"
             echo "found=false" >> $GITHUB_OUTPUT
           else
-            echo "Edge patches found in: $FILES"
+            echo "CVE patches found in: $FILES"
             echo "found=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Remove edge patch blocks
+      - name: Remove CVE patch blocks
         if: steps.check.outputs.found == 'true'
         run: |
           for f in client/Dockerfile server/Dockerfile; do
-            if grep -q 'EDGE_PATCHES_START' "$f" 2>/dev/null; then
-              sed -i '/^# EDGE_PATCHES_START/,/^# EDGE_PATCHES_END/d' "$f"
+            if grep -q 'CVE_PATCHES_START' "$f" 2>/dev/null; then
+              sed -i '/^# CVE_PATCHES_START/,/^# CVE_PATCHES_END/d' "$f"
               echo "Cleaned: $f"
             fi
           done
@@ -106,20 +106,20 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_BODY: |
             ## Summary
-            Quarterly automated check confirmed that all packages previously pulled from
-            Alpine edge/main are now available in the stable repository. The explicit
-            edge/main upgrade blocks are no longer needed.
+            Quarterly automated check confirmed that the packages previously pinned in the
+            explicit CVE patch blocks are now fixed in the base image (or its stable Alpine
+            repositories). The explicit upgrade blocks are no longer needed.
 
             ## Test plan
-            - [ ] Images built and scanned without edge patches — Trivy passed
+            - [ ] Images built and scanned without the CVE patch blocks — Trivy passed
             - [ ] Verify next deploy succeeds after merge
         run: |
-          BRANCH="chore/remove-edge-patches"
+          BRANCH="chore/remove-cve-patches"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
           git add client/Dockerfile server/Dockerfile
-          git commit -m "chore(docker): remove edge/main patches — fixes now in stable Alpine"
+          git commit -m "chore(docker): remove CVE patch blocks — fixes now in base image"
           git push --force origin "$BRANCH"
 
           EXISTING=$(gh pr list --head "$BRANCH" --json number -q '.[0].number' 2>/dev/null || true)
@@ -127,10 +127,10 @@ jobs:
             echo "PR #$EXISTING updated with latest changes"
           else
             gh pr create \
-              --title "Remove edge/main patches (now in stable Alpine)" \
+              --title "Remove CVE patch blocks (now fixed in base image)" \
               --body "$PR_BODY"
           fi
 
       - name: Report — patches still needed
         if: steps.check.outputs.found == 'true' && (steps.scan-server.outcome == 'failure' || steps.scan-client.outcome == 'failure')
-        run: echo "Edge patches still needed — CVE fixes not yet in stable Alpine. Will check again next quarter."
+        run: echo "CVE patch blocks still needed — fixes not yet in the base image. Will check again next quarter."

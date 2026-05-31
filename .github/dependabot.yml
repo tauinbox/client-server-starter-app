@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # Maintain pinned base-image digests in the Dockerfiles. Tags stay pinned to a
+  # major (node 22, nginx 1.28); Dependabot bumps the @sha256 digest (and patch
+  # tags) so builds stay reproducible while still receiving upstream base fixes.
+  # Major bumps are ignored to avoid noisy node/nginx upgrade PRs.
+  - package-ecosystem: docker
+    directory: /server
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: docker
+    directory: /client
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+      - dependency-name: nginx
+        update-types: ["version-update:semver-major"]
