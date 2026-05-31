@@ -17,6 +17,7 @@ jobs:
       contents: write
       packages: write
       pull-requests: write
+      issues: write
     outputs:
       sha: ${{ steps.short-sha.outputs.sha }}
       owner: ${{ steps.lowercase-owner.outputs.owner }}
