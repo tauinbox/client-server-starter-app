@@ -14,6 +14,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "lint": "ng lint && npm run lint:styles && npm run lint:no-mat-color",
+    "lint:fix": "ng lint --fix && npm run lint:styles -- --fix",
     "lint:styles": "stylelint \"src/**/*.scss\"",
     "lint:no-mat-color": "node scripts/lint-no-mat-color.mjs",
     "check:form-fields": "node scripts/check-form-fields.mjs",

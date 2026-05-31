@@ -704,6 +704,7 @@ npm run seed:run           # Run seeders (build first)
 npm start                  # Dev server (port 4200, proxy to backend)
 npm run build              # Production build
 npm run lint               # Lint check
+npm run lint:fix           # Lint and auto-fix (TS + SCSS)
 npm test                   # Unit tests (Vitest)
 npm run test:e2e           # E2E tests (Playwright, uses mock-server)
 npm run test:e2e:ui        # E2E tests (interactive UI)
