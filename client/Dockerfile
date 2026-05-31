@@ -10,15 +10,9 @@ ARG BASE_HREF=/nexus/
 RUN cd client && COMMIT_HASH=$COMMIT_HASH NODE_OPTIONS="--max-old-space-size=2048" npm run build -- --base-href $BASE_HREF
 
 # Stage 2: runtime
-FROM nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236 AS runner
-# The stock image pins nginx and its dynamic modules to an exact revision; the modules
-# (none are loaded for static SPA serving) require cmd:nginx=<exact> and lag the core
-# security revision, blocking nginx upgrades. Drop them so apk can move nginx to the
-# latest patched revision from the stable repo.
-RUN apk del nginx-module-acme nginx-module-geoip nginx-module-image-filter nginx-module-njs nginx-module-xslt && \
-    apk upgrade --no-cache && \
-    apk add --no-cache --upgrade nginx && \
-    mkdir -p /var/cache/nginx /tmp/nginx /usr/share/nginx/html && \
+FROM nginx:1.31-alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a AS runner
+RUN apk upgrade --no-cache && \
+    mkdir -p /var/cache/nginx /tmp/nginx && \
     chown -R nginx:nginx /var/cache/nginx /tmp/nginx /usr/share/nginx/html && \
     sed -i 's|/run/nginx.pid|/tmp/nginx/nginx.pid|' /etc/nginx/nginx.conf
 # CVE_PATCHES_START
