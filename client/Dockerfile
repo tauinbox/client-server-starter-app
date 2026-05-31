@@ -10,7 +10,7 @@ ARG BASE_HREF=/nexus/
 RUN cd client && COMMIT_HASH=$COMMIT_HASH NODE_OPTIONS="--max-old-space-size=2048" npm run build -- --base-href $BASE_HREF
 
 # Stage 2: runtime
-FROM nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236 AS runner
+FROM nginx:1.31-alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a AS runner
 # The stock image pins nginx and its dynamic modules to an exact revision; the modules
 # (none are loaded for static SPA serving) require cmd:nginx=<exact> and lag the core
 # security revision, blocking nginx upgrades. Drop them so apk can move nginx to the
