@@ -9,6 +9,12 @@ The block uses `apk add --no-cache --upgrade`, which rewrites any exact-version
 pin in /etc/apk/world so a pinned package can actually move (plain `apk upgrade`
 honours the pin and no-ops).
 
+When a block already exists, the given packages are MERGED with the ones already
+listed (union, de-duplicated) rather than replacing them — a later, unrelated CVE
+must not silently drop a still-needed earlier patch. Accumulation is bounded by the
+quarterly edge-patch-cleanup workflow, which removes the whole block and rebuilds to
+check whether the fixes have reached the base image.
+
 Channels:
   stable (default) — upgrade from the repositories already configured in the
                      image (security fixes are normally backported to stable).
@@ -17,6 +23,9 @@ Channels:
 """
 import argparse
 import re
+
+# Tokens that appear inside a block but are not package names.
+_NON_PKG_TOKENS = {'RUN', 'apk', 'add', 'upgrade', '--no-cache', '--upgrade', '\\'}
 
 START = '# CVE_PATCHES_START'
 END = '# CVE_PATCHES_END'
@@ -43,6 +52,20 @@ def build_block(packages: list, channel: str) -> str:
         f'    {pkg_list}\n'
         f'{END}\n'
     )
+
+
+def existing_packages(block_text: str) -> list:
+    """Extract package names from an existing block (handles old and new formats)."""
+    pkgs = []
+    for line in block_text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith('#'):
+            continue
+        for tok in stripped.split():
+            if tok in _NON_PKG_TOKENS or tok.startswith('--repository'):
+                continue
+            pkgs.append(tok)
+    return pkgs
 
 
 def find_insert_after(lines: list):
@@ -72,16 +95,19 @@ def main():
     parser.add_argument('packages', nargs='+')
     args = parser.parse_args()
 
-    pkg_list = ' '.join(args.packages)
-    block = build_block(args.packages, args.channel)
-
     with open(args.dockerfile) as f:
         content = f.read()
 
-    if BLOCK_RE.search(content):
-        content = BLOCK_RE.sub(block, content)
+    match = BLOCK_RE.search(content)
+    if match:
+        packages = sorted(set(existing_packages(match.group(0))) | set(args.packages))
+        block = build_block(packages, args.channel)
+        # Function replacement avoids re interpreting backslashes in the block.
+        content = BLOCK_RE.sub(lambda _m: block, content, count=1)
         action = 'Updated'
     else:
+        packages = sorted(set(args.packages))
+        block = build_block(packages, args.channel)
         lines = content.splitlines(keepends=True)
         idx = find_insert_after(lines)
         if idx is None:
@@ -93,7 +119,7 @@ def main():
     with open(args.dockerfile, 'w') as f:
         f.write(content)
 
-    print(f'{action} CVE_PATCHES block in {args.dockerfile} [{args.channel}]: {pkg_list}')
+    print(f'{action} CVE_PATCHES block in {args.dockerfile} [{args.channel}]: {" ".join(packages)}')
 
 
 if __name__ == '__main__':
