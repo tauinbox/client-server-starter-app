@@ -11,8 +11,14 @@ RUN cd client && COMMIT_HASH=$COMMIT_HASH NODE_OPTIONS="--max-old-space-size=204
 
 # Stage 2: runtime
 FROM nginx:1.28-alpine AS runner
-RUN apk upgrade --no-cache && \
-    mkdir -p /var/cache/nginx /tmp/nginx && \
+# The stock image pins nginx and its dynamic modules to an exact revision; the modules
+# (none are loaded for static SPA serving) require cmd:nginx=<exact> and lag the core
+# security revision, blocking nginx upgrades. Drop them so apk can move nginx to the
+# latest patched revision from the stable repo.
+RUN apk del nginx-module-acme nginx-module-geoip nginx-module-image-filter nginx-module-njs nginx-module-xslt && \
+    apk upgrade --no-cache && \
+    apk add --no-cache --upgrade nginx && \
+    mkdir -p /var/cache/nginx /tmp/nginx /usr/share/nginx/html && \
     chown -R nginx:nginx /var/cache/nginx /tmp/nginx /usr/share/nginx/html && \
     sed -i 's|/run/nginx.pid|/tmp/nginx/nginx.pid|' /etc/nginx/nginx.conf
 # EDGE_PATCHES_START
