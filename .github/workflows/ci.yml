@@ -74,7 +74,10 @@ jobs:
       DB_PASSWORD: postgres
       DB_NAME: testdb
       DB_SCHEMA: public
-      JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+      # Fallback literal keeps CI green on Dependabot/fork PRs, which don't receive
+      # repo secrets. This is a throwaway HS256 test value (>=16 chars); production
+      # uses RS256 JWT_PRIVATE_KEY/JWT_PUBLIC_KEY, never this.
+      JWT_SECRET: ${{ secrets.CI_JWT_SECRET || 'ci-e2e-only-not-a-real-secret' }}
       JWT_EXPIRATION: 3600
       JWT_REFRESH_EXPIRATION: 604800
       CLIENT_URL: http://localhost:4200
