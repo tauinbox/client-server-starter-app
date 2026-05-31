@@ -155,6 +155,37 @@ describe('NotificationsService', () => {
     expect(received[0]).toEqual({ type: 'feature_flags_updated' });
   });
 
+  it('routes a mixed stream so each typed stream only forwards its own type', () => {
+    const session: NotificationEvent[] = [];
+    const permissions: NotificationEvent[] = [];
+    const userCrud: NotificationEvent[] = [];
+    const featureFlags: NotificationEvent[] = [];
+
+    service.sessionInvalidated$.subscribe((e) => session.push(e));
+    service.permissionsUpdated$.subscribe((e) => permissions.push(e));
+    service.userCrudEvents$.subscribe((e) => userCrud.push(e));
+    service.featureFlagsUpdated$.subscribe((e) => featureFlags.push(e));
+
+    service.connect();
+    const req = httpController.expectOne('/api/v1/notifications/stream');
+
+    const chunk =
+      'data: {"type":"session_invalidated","userId":"u-1"}\n\n' +
+      'data: {"type":"permissions_updated","userId":"u-2"}\n\n' +
+      'data: {"type":"user_crud_events","action":"created","userId":"u-3"}\n\n' +
+      'data: {"type":"feature_flags_updated"}\n\n';
+    req.event(makeProgressEvent(chunk, chunk.length));
+
+    expect(session).toEqual([{ type: 'session_invalidated', userId: 'u-1' }]);
+    expect(permissions).toEqual([
+      { type: 'permissions_updated', userId: 'u-2' }
+    ]);
+    expect(userCrud).toEqual([
+      { type: 'user_crud_events', action: 'created', userId: 'u-3' }
+    ]);
+    expect(featureFlags).toEqual([{ type: 'feature_flags_updated' }]);
+  });
+
   it('should skip malformed SSE frames without throwing', () => {
     const received: NotificationEvent[] = [];
     service.sessionInvalidated$.subscribe((e) => received.push(e));

@@ -2,7 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpContext, HttpEventType } from '@angular/common/http';
 import type { HttpDownloadProgressEvent } from '@angular/common/http';
 import { filter, retry, Subject, tap, timer } from 'rxjs';
-import type { Subscription } from 'rxjs';
+import type { Observable, OperatorFunction, Subscription } from 'rxjs';
 import type { NotificationEvent } from '@app/shared/types';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { TokenService } from '@features/auth/services/token.service';
@@ -27,31 +27,19 @@ export class NotificationsService {
   #subscription: Subscription | null = null;
 
   readonly sessionInvalidated$ = this.#events$.pipe(
-    filter(
-      (e): e is Extract<NotificationEvent, { type: 'session_invalidated' }> =>
-        e.type === 'session_invalidated'
-    )
+    this.#ofType('session_invalidated')
   );
 
   readonly permissionsUpdated$ = this.#events$.pipe(
-    filter(
-      (e): e is Extract<NotificationEvent, { type: 'permissions_updated' }> =>
-        e.type === 'permissions_updated'
-    )
+    this.#ofType('permissions_updated')
   );
 
   readonly userCrudEvents$ = this.#events$.pipe(
-    filter(
-      (e): e is Extract<NotificationEvent, { type: 'user_crud_events' }> =>
-        e.type === 'user_crud_events'
-    )
+    this.#ofType('user_crud_events')
   );
 
   readonly featureFlagsUpdated$ = this.#events$.pipe(
-    filter(
-      (e): e is Extract<NotificationEvent, { type: 'feature_flags_updated' }> =>
-        e.type === 'feature_flags_updated'
-    )
+    this.#ofType('feature_flags_updated')
   );
 
   constructor() {
@@ -128,6 +116,20 @@ export class NotificationsService {
     if (this.#authStore.isAuthenticated()) {
       setTimeout(() => this.connect(), RECONNECT_DELAY_MS);
     }
+  }
+
+  #ofType<T extends NotificationEvent['type']>(
+    type: T
+  ): OperatorFunction<
+    NotificationEvent,
+    Extract<NotificationEvent, { type: T }>
+  > {
+    return (source: Observable<NotificationEvent>) =>
+      source.pipe(
+        filter(
+          (e): e is Extract<NotificationEvent, { type: T }> => e.type === type
+        )
+      );
   }
 
   #parseAndEmit(chunk: string): void {
