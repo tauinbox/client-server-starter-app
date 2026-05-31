@@ -140,6 +140,18 @@ describe('AuthStore', () => {
       expect(store.isAccessTokenExpired()).toBe(true);
     });
 
+    it('should report isAccessTokenExpired true for a token with no exp claim (fail closed)', () => {
+      const store = createStore(null);
+      const response = createMockAuthResponse();
+      response.tokens.access_token = createJwt({
+        sub: '1',
+        email: 'test@example.com'
+      });
+      store.saveAuthResponse(response);
+
+      expect(store.isAccessTokenExpired()).toBe(true);
+    });
+
     it('should expose roles from user', () => {
       const store = createStore(null);
       store.saveAuthResponse(createMockAuthResponse());

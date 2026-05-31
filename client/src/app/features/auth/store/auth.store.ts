@@ -55,7 +55,7 @@ export const AuthStore = signalStore(
 
       try {
         const decoded = jwtDecode<CustomJwtPayload>(token);
-        return decoded.exp ? decoded.exp < Date.now() / 1000 : false;
+        return decoded.exp ? decoded.exp < Date.now() / 1000 : true;
       } catch {
         return true;
       }
