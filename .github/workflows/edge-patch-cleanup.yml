@@ -71,7 +71,7 @@ jobs:
         if: steps.check.outputs.found == 'true'
         id: scan-server
         continue-on-error: true
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/nexus-server:patch-check
           format: table
@@ -93,7 +93,7 @@ jobs:
         if: steps.check.outputs.found == 'true'
         id: scan-client
         continue-on-error: true
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/nexus-client:patch-check
           format: table

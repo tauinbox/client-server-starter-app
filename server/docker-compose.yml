@@ -39,7 +39,7 @@ services:
   # mail queue. Set REDIS_URL=redis://localhost:6379 in server/.env to use it.
   redis:
     container_name: redis_container
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     ports:
       - "6379:6379"
     healthcheck:
