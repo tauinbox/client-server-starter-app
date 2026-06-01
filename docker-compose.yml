@@ -144,7 +144,7 @@ services:
     restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus:v2.54.1
+    image: prom/prometheus:v3.12.0
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
