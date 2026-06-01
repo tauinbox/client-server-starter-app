@@ -30,6 +30,10 @@ describe('MetricsService', () => {
         {
           provide: getToken('rbac_permission_denied_total'),
           useValue: mockCounter
+        },
+        {
+          provide: getToken('mail_jobs_processed_total'),
+          useValue: mockCounter
         }
       ]
     }).compile();
@@ -85,6 +89,20 @@ describe('MetricsService', () => {
         subject: 'User',
         level: 'instance'
       });
+    });
+  });
+
+  describe('recordMailJob', () => {
+    it('increments the counter for completed jobs', () => {
+      service.recordMailJob('completed');
+
+      expect(mockCounter.inc).toHaveBeenCalledWith({ outcome: 'completed' });
+    });
+
+    it('increments the counter for failed jobs', () => {
+      service.recordMailJob('failed');
+
+      expect(mockCounter.inc).toHaveBeenCalledWith({ outcome: 'failed' });
     });
   });
 });

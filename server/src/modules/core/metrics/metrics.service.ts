@@ -13,6 +13,8 @@ export type AuthEvent =
 
 export type PermissionDenialLevel = 'guard' | 'instance';
 
+export type MailJobOutcome = 'completed' | 'failed';
+
 @Injectable()
 export class MetricsService {
   constructor(
@@ -23,7 +25,9 @@ export class MetricsService {
     @InjectMetric('auth_events_total')
     private readonly authEventsCounter: Counter<string>,
     @InjectMetric('rbac_permission_denied_total')
-    private readonly permissionDeniedCounter: Counter<string>
+    private readonly permissionDeniedCounter: Counter<string>,
+    @InjectMetric('mail_jobs_processed_total')
+    private readonly mailJobsCounter: Counter<string>
   ) {}
 
   recordHttpRequest(
@@ -47,5 +51,9 @@ export class MetricsService {
     subject: string
   ): void {
     this.permissionDeniedCounter.inc({ action, subject, level });
+  }
+
+  recordMailJob(outcome: MailJobOutcome): void {
+    this.mailJobsCounter.inc({ outcome });
   }
 }
