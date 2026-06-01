@@ -208,7 +208,6 @@ networks:
     name: shared-network
 
 volumes:
-  # External: created by the upgrade runbook (not Compose); also shields it from `down -v`.
   postgres_data_18:
     external: true
     name: nexus_postgres_data_18
