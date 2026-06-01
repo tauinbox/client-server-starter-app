@@ -21,14 +21,19 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+      # Pinned explicitly: the postgres:18 image moved its default PGDATA to a
+      # version-specific path (/var/lib/postgresql/18/docker).
       PGDATA: /var/lib/postgresql/data
+      # Applies only on first init of an empty volume.
+      POSTGRES_INITDB_ARGS: "--data-checksums"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # Migrated from the PG16 volume via scripts/pg-upgrade-16-to-18.sh.
+      - postgres_data_18:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
@@ -203,7 +208,7 @@ networks:
     name: shared-network
 
 volumes:
-  postgres_data:
+  postgres_data_18:
   uploads:
   prometheus_data:
   grafana_data:
