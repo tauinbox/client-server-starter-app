@@ -15,6 +15,14 @@ export interface SseConnectionsRef {
 
 export const SSE_CONNECTIONS_REF = Symbol('SSE_CONNECTIONS_REF');
 
+export interface MailQueueRef {
+  // Returns BullMQ job counts by state, or null when no queue is configured
+  // (REDIS_URL unset → MailService sends in-process, MailProcessor not registered).
+  getJobCounts: () => Promise<Record<string, number>> | null;
+}
+
+export const MAIL_QUEUE_REF = Symbol('MAIL_QUEUE_REF');
+
 @Global()
 @Module({
   imports: [
@@ -47,9 +55,47 @@ export const SSE_CONNECTIONS_REF = Symbol('SSE_CONNECTIONS_REF');
       help: 'Total number of RBAC/ABAC permission denials',
       labelNames: ['action', 'subject', 'level']
     }),
+    makeCounterProvider({
+      name: 'mail_jobs_processed_total',
+      help: 'Total number of mail jobs processed by the queue worker',
+      labelNames: ['outcome']
+    }),
     {
       provide: SSE_CONNECTIONS_REF,
       useFactory: (): SseConnectionsRef => ({ getCount: () => 0 })
+    },
+    {
+      provide: MAIL_QUEUE_REF,
+      useFactory: (): MailQueueRef => ({ getJobCounts: () => null })
+    },
+    {
+      provide: getToken('mail_queue_jobs'),
+      useFactory: (ref: MailQueueRef): Gauge<string> => {
+        const existing = register.getSingleMetric('mail_queue_jobs');
+        if (existing) {
+          return existing as Gauge<string>;
+        }
+        return new Gauge<string>({
+          name: 'mail_queue_jobs',
+          help: 'Number of mail-queue jobs by state',
+          labelNames: ['state'],
+          async collect() {
+            try {
+              const counts = await ref.getJobCounts();
+              if (!counts) {
+                return;
+              }
+              for (const [state, value] of Object.entries(counts)) {
+                this.set({ state }, value);
+              }
+            } catch {
+              // Scraping must never fail because Redis is briefly unreachable;
+              // leave the previous sample in place and try again next scrape.
+            }
+          }
+        });
+      },
+      inject: [MAIL_QUEUE_REF]
     },
     {
       provide: getToken('sse_connections_active'),
@@ -71,6 +117,6 @@ export const SSE_CONNECTIONS_REF = Symbol('SSE_CONNECTIONS_REF');
       inject: [SSE_CONNECTIONS_REF]
     }
   ],
-  exports: [MetricsService, SSE_CONNECTIONS_REF]
+  exports: [MetricsService, SSE_CONNECTIONS_REF, MAIL_QUEUE_REF]
 })
 export class MetricsModule {}

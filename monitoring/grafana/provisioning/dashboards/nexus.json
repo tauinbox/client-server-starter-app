@@ -757,6 +757,101 @@
       "description": "libuv active requests in flight (pending async I/O).",
       "title": "Active Requests",
       "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 69 },
+      "id": 7,
+      "title": "Mail Queue",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 70 },
+      "id": 70,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr": "mail_queue_jobs",
+          "legendFormat": "{{state}}",
+          "refId": "A"
+        }
+      ],
+      "description": "BullMQ mail-queue depth by job state. A growing waiting/active backlog or a climbing failed count means the worker is falling behind or SMTP delivery is failing. Flat at zero when no queue is configured (REDIS_URL unset).",
+      "title": "Mail Queue Depth by State",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 70 },
+      "id": 71,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(mail_jobs_processed_total{outcome=\"failed\"}[1h]))",
+          "legendFormat": "failed (1h)",
+          "refId": "A"
+        }
+      ],
+      "description": "Mail jobs that failed delivery in the last hour (counts each failed attempt, including retries). Sustained non-zero values indicate an SMTP or template problem.",
+      "title": "Mail Jobs Failed (1h)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "green" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 74 },
+      "id": 72,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(mail_jobs_processed_total{outcome=\"completed\"}[1h]))",
+          "legendFormat": "completed (1h)",
+          "refId": "A"
+        }
+      ],
+      "description": "Mail jobs delivered successfully in the last hour.",
+      "title": "Mail Jobs Completed (1h)",
+      "type": "stat"
     }
   ],
   "refresh": "30s",

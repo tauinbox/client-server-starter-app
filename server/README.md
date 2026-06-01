@@ -126,7 +126,8 @@ src/
 │   ├── metrics/            # MetricsModule (@Global) — Prometheus metrics via @willsoto/nestjs-prometheus
 │   │                       #   GET /metrics (excluded from /api prefix); http_requests_total,
 │   │                       #   http_request_duration_seconds, auth_events_total,
-│   │                       #   rbac_permission_denied_total{action,subject,level}; HttpMetricsInterceptor
+│   │                       #   rbac_permission_denied_total{action,subject,level},
+│   │                       #   mail_queue_jobs{state}, mail_jobs_processed_total{outcome}; HttpMetricsInterceptor
 │   └── schedule/           # @nestjs/schedule for cron jobs
 ├── auth/
 │   ├── controllers/        # AuthController (includes GET /permissions), OAuthController, RbacController
@@ -502,6 +503,8 @@ The `MetricsModule` (`src/modules/core/metrics/metrics.module.ts`) exposes
 | `auth_events_total` | counter | `event` ∈ `login_success`, `login_failure`, `token_refresh_success`, `token_refresh_failure`, `token_reuse_detected`, `logout`, `register` | Authentication events |
 | `rbac_permission_denied_total` | counter | `action`, `subject`, `level` ∈ `guard`, `instance` | RBAC/ABAC denials. `level=guard` is an `@Authorize` decorator rejection; `level=instance` is an `ability.can(action, entity)` rejection after the record was loaded |
 | `sse_connections_active` | gauge | — | Currently open SSE notification streams |
+| `mail_queue_jobs` | gauge | `state` ∈ `waiting`, `active`, `completed`, `failed`, `delayed` | BullMQ mail-queue depth by job state. No-ops (stays absent) when no queue is configured — i.e. `REDIS_URL` unset, so `MailService` sends in-process |
+| `mail_jobs_processed_total` | counter | `outcome` ∈ `completed`, `failed` | Mail jobs processed by the queue worker. `failed` counts each failed attempt, including retries |
 
 Plus the default Node.js process metrics (heap, GC, event-loop lag, file
 descriptors, ...) provided by `prom-client`.
@@ -606,7 +609,8 @@ The provisioned **App Metrics** dashboard
 remaining metrics (HTTP traffic, auth events, latency p95s, SSE, Node.js
 runtime) plus an RBAC & Reliability section (permission denials by level
 and action/subject, process RSS memory, token-reuse-detected alarm,
-uptime, active handles/requests). Use the dedicated RBAC dashboard
+uptime, active handles/requests) and a Mail Queue section (BullMQ depth by
+state, failed/completed job counts over 1 h). Use the dedicated RBAC dashboard
 (`doc/grafana/rbac.json`) alongside it for deeper security drill-downs.
 
 ## Docker
