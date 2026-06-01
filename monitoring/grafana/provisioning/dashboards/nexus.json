@@ -765,7 +765,7 @@
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Nexus",
+  "title": "App Metrics",
   "uid": "nexus",
   "version": 3
 }
