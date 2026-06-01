@@ -1,7 +1,7 @@
 version: 2
 updates:
   # Maintain pinned base-image digests in the Dockerfiles. Tags stay pinned to a
-  # major (node 22, nginx 1.28); Dependabot bumps the @sha256 digest (and patch
+  # major (node 24, nginx 1.28); Dependabot bumps the @sha256 digest (and patch
   # tags) so builds stay reproducible while still receiving upstream base fixes.
   # Major bumps are ignored to avoid noisy node/nginx upgrade PRs.
   - package-ecosystem: docker

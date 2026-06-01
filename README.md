@@ -349,7 +349,7 @@ All three workspaces import from `@app/shared/*` path alias (maps to `../shared/
 
 ## Prerequisites
 
-- **Node.js 22** (pinned via `.nvmrc`)
+- **Node.js 24** (pinned via `.nvmrc`)
 - **PostgreSQL** running locally or remotely
 - **npm**
 
