@@ -601,7 +601,7 @@ Panels:
 - Distribution of denials by subject over 1 h — pie chart
 - Cumulative denials by (subject, action) over 24 h — table
 
-The provisioned **Nexus** dashboard
+The provisioned **App Metrics** dashboard
 (`monitoring/grafana/provisioning/dashboards/nexus.json`) covers the
 remaining metrics (HTTP traffic, auth events, latency p95s, SSE, Node.js
 runtime) plus an RBAC & Reliability section (permission denials by level
