@@ -84,7 +84,7 @@ jobs:
       # Block deploy on CRITICAL CVEs; HIGH is enforced zero by the weekly Scheduled Rebuild
       # (which uses no-cache to avoid stale apk layers).
       - name: Scan server image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/nexus-server:sha-${{ env.COMMIT_HASH }}
           format: table
@@ -105,7 +105,7 @@ jobs:
 
       # Block deploy on CRITICAL CVEs — see note on server scan above
       - name: Scan client image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/${{ env.OWNER }}/nexus-client:sha-${{ env.COMMIT_HASH }}
           format: table
