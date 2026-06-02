@@ -63,6 +63,11 @@ export const MAIL_QUEUE_REF = Symbol('MAIL_QUEUE_REF');
       help: 'Total number of mail jobs processed by the queue worker',
       labelNames: ['outcome']
     }),
+    makeCounterProvider({
+      name: 'cache_requests_total',
+      help: 'Total cache lookups by logical cache and hit/miss outcome',
+      labelNames: ['cache', 'outcome']
+    }),
     {
       provide: SSE_CONNECTIONS_REF,
       useFactory: (): SseConnectionsRef => ({ getCount: () => 0 })

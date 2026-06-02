@@ -38,6 +38,7 @@ import { RequireFeature } from '../src/modules/feature-flags/decorators/require-
 import { NotificationsService } from '../src/modules/notifications/notifications.service';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { UsersService } from '../src/modules/users/services/users.service';
+import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { percentageBucket } from '@app/shared/utils/feature-flag-evaluator';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
@@ -331,6 +332,10 @@ describe('Feature flags end-to-end', () => {
         {
           provide: UsersService,
           useValue: { findOne: jest.fn().mockResolvedValue(null) }
+        },
+        {
+          provide: MetricsService,
+          useValue: { recordCacheAccess: jest.fn() }
         }
       ]
     }).compile();

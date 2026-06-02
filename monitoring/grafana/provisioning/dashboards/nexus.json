@@ -2,7 +2,7 @@
   "__inputs": [],
   "__requires": [],
   "annotations": { "list": [] },
-  "description": "Nexus application metrics: HTTP traffic, authentication, RBAC denials, SSE connections, mail queue, database connection pool, and Node.js runtime",
+  "description": "Nexus application metrics: HTTP traffic, authentication, RBAC denials, SSE connections, mail queue, database connection pool, cache hit ratio, and Node.js runtime",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -920,6 +920,76 @@
       "description": "Requests currently blocked waiting for a free DB connection. Anything sustained above 0 indicates pool exhaustion.",
       "title": "DB Pool Waiting",
       "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 87 },
+      "id": 9,
+      "title": "Cache",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "percentunit",
+          "max": 1,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 88 },
+      "id": 90,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum(rate(cache_requests_total{outcome=\"hit\"}[5m])) by (cache) / sum(rate(cache_requests_total[5m])) by (cache)",
+          "legendFormat": "{{cache}}",
+          "refId": "A"
+        }
+      ],
+      "description": "Hit ratio (hits / total lookups) per logical Redis-backed cache over a 5-min window: permissions, roles, resources (RBAC subject map), feature_flags (per-user evaluated set), feature_flags_all (shared flag list). A persistently low ratio means the cache is being invalidated faster than it can serve hits — check TTLs and invalidation frequency. A series is absent while its cache sees no traffic.",
+      "title": "Cache Hit Ratio by Cache",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "green", "value": 0.8 }
+            ]
+          },
+          "unit": "percentunit",
+          "max": 1,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 88 },
+      "id": 91,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "expr": "(sum(rate(cache_requests_total{outcome=\"hit\"}[5m])) or vector(0)) / (sum(rate(cache_requests_total[5m])) or vector(1))",
+          "legendFormat": "overall",
+          "refId": "A"
+        }
+      ],
+      "description": "Aggregate hit ratio across all caches (5-min window). Reads 0 when there is no cache traffic.",
+      "title": "Overall Cache Hit Ratio",
+      "type": "stat"
     }
   ],
   "refresh": "30s",
@@ -930,5 +1000,5 @@
   "timezone": "browser",
   "title": "App Metrics",
   "uid": "nexus",
-  "version": 4
+  "version": 5
 }

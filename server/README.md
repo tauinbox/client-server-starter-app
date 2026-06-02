@@ -128,7 +128,8 @@ src/
 │   │                       #   http_request_duration_seconds, auth_events_total,
 │   │                       #   rbac_permission_denied_total{action,subject,level},
 │   │                       #   mail_queue_jobs{state}, mail_jobs_processed_total{outcome},
-│   │                       #   db_pool_connections{state}; HttpMetricsInterceptor
+│   │                       #   db_pool_connections{state}, cache_requests_total{cache,outcome};
+│   │                       #   HttpMetricsInterceptor
 │   └── schedule/           # @nestjs/schedule for cron jobs
 ├── auth/
 │   ├── controllers/        # AuthController (includes GET /permissions), OAuthController, RbacController
@@ -507,6 +508,7 @@ The `MetricsModule` (`src/modules/core/metrics/metrics.module.ts`) exposes
 | `mail_queue_jobs` | gauge | `state` ∈ `waiting`, `active`, `completed`, `failed`, `delayed` | BullMQ mail-queue depth by job state. No-ops (stays absent) when no queue is configured — i.e. `REDIS_URL` unset, so `MailService` sends in-process |
 | `mail_jobs_processed_total` | counter | `outcome` ∈ `completed`, `failed` | Mail jobs processed by the queue worker. `failed` counts each failed attempt, including retries |
 | `db_pool_connections` | gauge | `state` ∈ `total`, `idle`, `waiting` | PostgreSQL connection-pool size by state, read from the pg pool on the injected `DataSource`. A sustained `waiting` > 0 means the pool is exhausted and requests are queuing |
+| `cache_requests_total` | counter | `cache` ∈ `permissions`, `roles`, `resources`, `feature_flags`, `feature_flags_all`, `outcome` ∈ `hit`, `miss` | Redis-backed cache lookups by logical cache and outcome. Hit ratio = `hit / (hit + miss)` per `cache`; a persistently low ratio means the cache is invalidated faster than it serves hits |
 
 Plus the default Node.js process metrics (heap, GC, event-loop lag, file
 descriptors, ...) provided by `prom-client`.

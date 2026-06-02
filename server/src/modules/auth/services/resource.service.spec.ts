@@ -5,6 +5,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ResourceService } from './resource.service';
 import { ResourceRegistryService } from './resource-registry.service';
 import { Resource } from '../entities/resource.entity';
+import { MetricsService } from '../../core/metrics/metrics.service';
 
 describe('ResourceService', () => {
   let service: ResourceService;
@@ -23,6 +24,7 @@ describe('ResourceService', () => {
     isRegistered: jest.Mock;
     register: jest.Mock;
   };
+  let mockMetrics: { recordCacheAccess: jest.Mock };
 
   const resource1: Resource = {
     id: 'res-1',
@@ -91,6 +93,8 @@ describe('ResourceService', () => {
       register: jest.fn()
     };
 
+    mockMetrics = { recordCacheAccess: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourceService,
@@ -99,7 +103,8 @@ describe('ResourceService', () => {
           useValue: mockResourceRepo
         },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
-        { provide: ResourceRegistryService, useValue: mockRegistry }
+        { provide: ResourceRegistryService, useValue: mockRegistry },
+        { provide: MetricsService, useValue: mockMetrics }
       ]
     }).compile();
 
@@ -210,6 +215,10 @@ describe('ResourceService', () => {
 
       expect(result).toEqual(cachedMap);
       expect(mockResourceRepo.find).not.toHaveBeenCalled();
+      expect(mockMetrics.recordCacheAccess).toHaveBeenCalledWith(
+        'resources',
+        'hit'
+      );
     });
 
     it('should build map from DB on cache miss and store in cache', async () => {
@@ -224,6 +233,10 @@ describe('ResourceService', () => {
         'rbac:subject_map',
         { users: 'User', articles: 'Article' },
         300_000
+      );
+      expect(mockMetrics.recordCacheAccess).toHaveBeenCalledWith(
+        'resources',
+        'miss'
       );
     });
 

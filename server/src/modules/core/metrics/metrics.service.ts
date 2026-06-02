@@ -15,6 +15,15 @@ export type PermissionDenialLevel = 'guard' | 'instance';
 
 export type MailJobOutcome = 'completed' | 'failed';
 
+export type CacheName =
+  | 'permissions'
+  | 'roles'
+  | 'resources'
+  | 'feature_flags'
+  | 'feature_flags_all';
+
+export type CacheOutcome = 'hit' | 'miss';
+
 @Injectable()
 export class MetricsService {
   constructor(
@@ -27,7 +36,9 @@ export class MetricsService {
     @InjectMetric('rbac_permission_denied_total')
     private readonly permissionDeniedCounter: Counter<string>,
     @InjectMetric('mail_jobs_processed_total')
-    private readonly mailJobsCounter: Counter<string>
+    private readonly mailJobsCounter: Counter<string>,
+    @InjectMetric('cache_requests_total')
+    private readonly cacheRequestsCounter: Counter<string>
   ) {}
 
   recordHttpRequest(
@@ -55,5 +66,9 @@ export class MetricsService {
 
   recordMailJob(outcome: MailJobOutcome): void {
     this.mailJobsCounter.inc({ outcome });
+  }
+
+  recordCacheAccess(cache: CacheName, outcome: CacheOutcome): void {
+    this.cacheRequestsCounter.inc({ cache, outcome });
   }
 }
