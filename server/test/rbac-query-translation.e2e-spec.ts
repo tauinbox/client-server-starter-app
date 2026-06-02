@@ -1,9 +1,9 @@
 // Integration regression for BKL-008: end-to-end CASL ability → SQL query
-// translation. Wires the real CaslAbilityFactory with all built-in resolvers,
-// builds abilities for several scenarios (custom $or, $ne, mixed translatable
-// + untranslatable), and asserts the translator produces SQL that filters
-// users to the expected subset — including the fail-closed path where any
-// untranslatable fragment causes the entire rule to be dropped.
+// translation. Wires the real CaslAbilityFactory, builds abilities for several
+// scenarios (custom $or, $ne, mixed translatable + untranslatable), and asserts
+// the translator produces SQL that filters users to the expected subset —
+// including the fail-closed path where any untranslatable fragment causes the
+// entire rule to be dropped.
 
 import { Logger } from '@nestjs/common';
 import type { ResolvedPermission } from '@app/shared/types';
@@ -12,12 +12,6 @@ import {
   CaslAbilityFactory,
   RoleInfo
 } from '../src/modules/auth/casl/casl-ability.factory';
-import {
-  CustomResolver,
-  FieldMatchResolver,
-  OwnershipResolver,
-  UserAttrResolver
-} from '../src/modules/auth/casl/condition-resolvers';
 import type { User } from '../src/modules/users/entities/user.entity';
 import { applyAbilityToUserQuery } from '../src/modules/users/utils/apply-ability.util';
 
@@ -123,13 +117,7 @@ function matches(
 function buildFactory(): CaslAbilityFactory {
   return new CaslAbilityFactory(
     // @ts-expect-error partial mock — only getSubjectMap exercised
-    { getSubjectMap: jest.fn().mockResolvedValue(SUBJECT_MAP) },
-    [
-      new OwnershipResolver(),
-      new FieldMatchResolver(),
-      new UserAttrResolver(),
-      new CustomResolver()
-    ]
+    { getSubjectMap: jest.fn().mockResolvedValue(SUBJECT_MAP) }
   );
 }
 

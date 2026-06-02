@@ -1,1 +1,0 @@
-export const CONDITION_RESOLVERS = Symbol('CONDITION_RESOLVERS');
