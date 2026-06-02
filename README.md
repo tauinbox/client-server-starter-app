@@ -488,7 +488,7 @@ steady-state — so they hold regardless of the host the stack runs on:
 |---|---|---|
 | server | 384m | 128m |
 | db | 256m | 96m |
-| grafana | 256m | — |
+| grafana | 384m | 192m |
 | prometheus | 192m | — |
 | redis | 96m | — |
 | client | 64m | — |

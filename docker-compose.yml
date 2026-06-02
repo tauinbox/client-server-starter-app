@@ -178,6 +178,11 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000}
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      # Grafana 13 preinstalls the Elasticsearch data source as a standalone
+      # plugin and tries to auto-update it on every boot, which fails with
+      # "permission denied" against the read-only bundled-plugin path and adds
+      # startup churn. We don't use Elasticsearch, so opt out of the update.
+      GF_PLUGINS_PREINSTALL_AUTO_UPDATE: "false"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -193,9 +198,13 @@ services:
     networks:
       - default
       - shared
-    # Biggest observed spiker (peak ~216 MiB during provisioning/render); cap
-    # leaves headroom above that. Raise toward 320m if it ever gets OOM-killed.
-    mem_limit: 256m
+    # Grafana 13's unified-storage/apiserver working set exceeds the old 256m
+    # cap: it pegged memory.max (peak == cap, 1600+ cgroup "max" reclaim events),
+    # and the resulting reclaim/swap stalls made its internal apiserver time out
+    # ("context deadline exceeded") and the process self-exit — surfacing as
+    # repeated Caddy 502s on the dashboard. 384m gives the working set headroom.
+    mem_limit: 384m
+    mem_reservation: 192m
     cap_drop:
       - ALL
     security_opt:
