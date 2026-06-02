@@ -16,6 +16,7 @@ import type {
 } from './types';
 import type { NotificationEvent } from '@app/shared/types';
 import { pushToAll, pushToUser } from './sse-hub';
+import { notifyRoleHolders } from './middleware/roles.middleware';
 
 const router = Router();
 
@@ -189,6 +190,41 @@ router.post('/change-user-roles', (req, res) => {
   user.roles = newRoles;
   pushToUser(userId, { type: 'permissions_updated', userId });
   res.json({ message: `roles updated for user ${userId}` });
+});
+
+// POST /__control/change-role-permissions — replace a role's permission set and
+// push SSE to every holder without revoking tokens. Verifies live RBAC
+// reactivity when a role's effective permissions change (gated controls
+// appearing/disappearing) — distinct from change-user-roles, which mutates a
+// single user's role membership.
+router.post('/change-role-permissions', (req, res) => {
+  const { roleName, permissionIds } = req.body as {
+    roleName?: string;
+    permissionIds?: string[];
+  };
+  if (!roleName || !Array.isArray(permissionIds)) {
+    res.status(400).json({ message: 'roleName and permissionIds[] required' });
+    return;
+  }
+  const state = getState();
+  const role = Array.from(state.roles.values()).find(
+    (r) => r.name === roleName
+  );
+  if (!role) {
+    res.status(404).json({ message: 'role not found' });
+    return;
+  }
+  state.rolePermissions = [
+    ...state.rolePermissions.filter((rp) => rp.roleId !== role.id),
+    ...permissionIds.map((permissionId) => ({
+      id: `rp-test-${role.id}-${permissionId}`,
+      roleId: role.id,
+      permissionId,
+      conditions: null
+    }))
+  ];
+  notifyRoleHolders(roleName);
+  res.json({ message: `permissions updated for role ${roleName}` });
 });
 
 // POST /__control/revoke-user-sessions — full simulation of the server's

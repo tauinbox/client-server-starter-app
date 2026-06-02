@@ -10,6 +10,8 @@ import type { AppAbility } from '../casl/app-ability';
 import { User } from '../../users/entities/user.entity';
 import { AuditService } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { RolePermissionsChangedEvent } from '../events/role-permissions-changed.event';
 
 describe('RoleService', () => {
   let service: RoleService;
@@ -42,6 +44,7 @@ describe('RoleService', () => {
   let mockPermissionService: { invalidateUserCache: jest.Mock };
   let mockAuditService: { log: jest.Mock; logFireAndForget: jest.Mock };
   let mockMetricsService: { recordPermissionDenied: jest.Mock };
+  let mockEventEmitter: { emit: jest.Mock };
   let mockRelationQueryBuilder: {
     relation: jest.Mock;
     of: jest.Mock;
@@ -172,6 +175,10 @@ describe('RoleService', () => {
       recordPermissionDenied: jest.fn()
     };
 
+    mockEventEmitter = {
+      emit: jest.fn()
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RoleService,
@@ -186,7 +193,8 @@ describe('RoleService', () => {
         },
         { provide: PermissionService, useValue: mockPermissionService },
         { provide: AuditService, useValue: mockAuditService },
-        { provide: MetricsService, useValue: mockMetricsService }
+        { provide: MetricsService, useValue: mockMetricsService },
+        { provide: EventEmitter2, useValue: mockEventEmitter }
       ]
     }).compile();
 
@@ -867,6 +875,86 @@ describe('RoleService', () => {
       await expect(
         service.removePermissionFromRole('role-1', 'perm-1')
       ).rejects.toMatchObject({ status: 400 });
+    });
+  });
+
+  // ── Permission-change SSE fan-out to role holders ─────────────────
+
+  describe('RolePermissionsChangedEvent fan-out', () => {
+    function expectFannedOutTo(userIds: string[]): void {
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        RolePermissionsChangedEvent.name,
+        new RolePermissionsChangedEvent(userIds)
+      );
+    }
+
+    beforeEach(() => {
+      mockUserQueryBuilder.getMany.mockResolvedValue([
+        { id: 'u-1' },
+        { id: 'u-2' }
+      ]);
+    });
+
+    it('emits once with all holders on setPermissionsForRole', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+
+      await service.setPermissionsForRole('role-2', [
+        { permissionId: 'perm-1' }
+      ]);
+
+      expectFannedOutTo(['u-1', 'u-2']);
+      expect(mockEventEmitter.emit).toHaveBeenCalledTimes(1);
+    });
+
+    it('emits once with all holders on assignPermissionsToRole', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRolePermissionRepo.save.mockResolvedValue([]);
+
+      await service.assignPermissionsToRole('role-2', ['perm-1']);
+
+      expectFannedOutTo(['u-1', 'u-2']);
+    });
+
+    it('emits once with all holders on removePermissionFromRole', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
+
+      await service.removePermissionFromRole('role-2', 'perm-1');
+
+      expectFannedOutTo(['u-1', 'u-2']);
+    });
+
+    it('captures holders before deletion on delete', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+
+      await service.delete('role-2');
+
+      expectFannedOutTo(['u-1', 'u-2']);
+      // Holder query must run before the role is removed.
+      const emitOrder = mockEventEmitter.emit.mock.invocationCallOrder[0];
+      const removeOrder = mockRoleRepo.remove.mock.invocationCallOrder[0];
+      expect(emitOrder).toBeLessThan(removeOrder);
+    });
+
+    it('does not emit when the role has no holders', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockUserQueryBuilder.getMany.mockResolvedValue([]);
+      mockRolePermissionRepo.save.mockResolvedValue([]);
+
+      await service.assignPermissionsToRole('role-2', ['perm-1']);
+
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('never emits the token-revoking UserRoleChangedEvent on a permission change', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+
+      await service.removePermissionFromRole('role-2', 'perm-1');
+
+      expect(mockEventEmitter.emit).not.toHaveBeenCalledWith(
+        'UserRoleChangedEvent',
+        expect.anything()
+      );
     });
   });
 });

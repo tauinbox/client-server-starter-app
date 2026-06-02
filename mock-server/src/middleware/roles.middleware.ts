@@ -26,6 +26,17 @@ function validateCustomCondition(custom: string | undefined): string | null {
   }
 }
 
+// Notify every connected holder of a role that its effective permission set
+// changed, so their client refreshes abilities without a reload. Mirrors the
+// server's RolePermissionsChangedEvent fan-out (no token revocation).
+export function notifyRoleHolders(roleName: string): void {
+  for (const user of getState().users.values()) {
+    if (user.roles.includes(roleName)) {
+      pushToUser(user.id, { type: 'permissions_updated', userId: user.id });
+    }
+  }
+}
+
 function isActorSuper(req: unknown): boolean {
   const actor = (req as AuthenticatedRequest).user;
   if (!actor) return false;
@@ -255,6 +266,11 @@ router.delete('/:id', adminGuard, (req, res) => {
     return;
   }
 
+  // Capture holders before unassigning — the loop below clears user.roles.
+  const holderIds = Array.from(state.users.values())
+    .filter((u) => u.roles.includes(role.name))
+    .map((u) => u.id);
+
   // Remove role-permission associations
   state.rolePermissions = state.rolePermissions.filter(
     (rp) => rp.roleId !== id
@@ -266,6 +282,10 @@ router.delete('/:id', adminGuard, (req, res) => {
   }
 
   state.roles.delete(id);
+
+  for (const userId of holderIds) {
+    pushToUser(userId, { type: 'permissions_updated', userId });
+  }
 
   const actor = (req as AuthenticatedRequest).user;
   logAudit('ROLE_DELETE', {
@@ -346,6 +366,8 @@ router.put('/:id/permissions', adminGuard, (req, res) => {
     });
   }
 
+  notifyRoleHolders(role.name);
+
   const actor = (req as AuthenticatedRequest).user;
   logAudit('PERMISSION_ASSIGN', {
     actorId: actor.id,
@@ -424,6 +446,8 @@ router.post('/:id/permissions', adminGuard, (req, res) => {
     });
   }
 
+  notifyRoleHolders(role.name);
+
   const actor = (req as AuthenticatedRequest).user;
   logAudit('PERMISSION_ASSIGN', {
     actorId: actor.id,
@@ -456,6 +480,8 @@ router.delete('/:id/permissions/:permissionId', adminGuard, (req, res) => {
   state.rolePermissions = state.rolePermissions.filter(
     (rp) => !(rp.roleId === id && rp.permissionId === permissionId)
   );
+
+  if (role) notifyRoleHolders(role.name);
 
   const actor = (req as AuthenticatedRequest).user;
   logAudit('PERMISSION_UNASSIGN', {

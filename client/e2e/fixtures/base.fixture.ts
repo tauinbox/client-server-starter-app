@@ -132,6 +132,13 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           body: JSON.stringify({ userId, newRoles })
         });
       },
+      async changeRolePermissions(roleName, permissionIds) {
+        await fetch(`${baseUrl}/__control/change-role-permissions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roleName, permissionIds })
+        });
+      },
       async revokeUserSessions(userId, newRoles) {
         await fetch(`${baseUrl}/__control/revoke-user-sessions`, {
           method: 'POST',

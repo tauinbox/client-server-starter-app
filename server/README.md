@@ -157,7 +157,7 @@ src/
 │                           # CaslAbilityFactory (builds AppAbility, used by AuthController /permissions)
 ├── notifications/
 │   ├── notifications.service.ts    # Manages Map<userId, Map<connectionId, Subject>> — push(userId), pushToAll()
-│   ├── notifications.listener.ts   # @OnEvent() handlers: UserDeleted/PasswordChanged/Created/Updated/Restored/RoleChanged → push
+│   ├── notifications.listener.ts   # @OnEvent() handlers: UserDeleted/PasswordChanged/Created/Updated/Restored/RoleChanged/RolePermissionsChanged → push
 │   └── notifications.controller.ts # GET /stream — @Sse() returns Observable<MessageEvent> merged with 30s heartbeat
 ├── feature-flags/
 │   ├── feature-flags.module.ts        # TypeOrmModule.forFeature([FeatureFlag, FeatureFlagRule]); registers AnonIdMiddleware globally via configure()
