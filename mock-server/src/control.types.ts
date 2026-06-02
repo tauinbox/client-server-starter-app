@@ -39,6 +39,15 @@ export type ControlApi = {
   // client (sidenav admin link disappearing, AdminPanelComponent redirecting
   // to /forbidden).
   changeUserRoles(userId: string, newRoles: string[]): Promise<void>;
+  // Replaces a role's permission set with `permissionIds` (empty to revoke all)
+  // and pushes a `permissions_updated` SSE event to every connected holder of
+  // that role — mirrors the server's RolePermissionsChangedEvent fan-out (no
+  // token revocation). Use to verify that a role-permission change refreshes a
+  // holder's abilities live, without a reload.
+  changeRolePermissions(
+    roleName: string,
+    permissionIds: string[]
+  ): Promise<void>;
   // Heavy hammer: deletes ALL refresh tokens for the user, sets
   // tokenRevokedAt, optionally swaps roles, and pushes a `permissions_updated`
   // SSE event. Use when testing forced-logout semantics (mirrors the server's

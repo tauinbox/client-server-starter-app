@@ -7,6 +7,7 @@ import { UserCreatedEvent } from '../users/events/user-created.event';
 import { UserUpdatedEvent } from '../users/events/user-updated.event';
 import { UserRestoredEvent } from '../users/events/user-restored.event';
 import { UserRoleChangedEvent } from '../auth/events/user-role-changed.event';
+import { RolePermissionsChangedEvent } from '../auth/events/role-permissions-changed.event';
 
 describe('NotificationsListener', () => {
   let listener: NotificationsListener;
@@ -91,5 +92,27 @@ describe('NotificationsListener', () => {
       type: 'permissions_updated',
       userId: 'user-6'
     });
+  });
+
+  it('should push permissions_updated to every holder on RolePermissionsChangedEvent', () => {
+    listener.handleRolePermissionsChanged(
+      new RolePermissionsChangedEvent(['user-7', 'user-8'])
+    );
+
+    expect(service.push).toHaveBeenCalledWith('user-7', {
+      type: 'permissions_updated',
+      userId: 'user-7'
+    });
+    expect(service.push).toHaveBeenCalledWith('user-8', {
+      type: 'permissions_updated',
+      userId: 'user-8'
+    });
+    expect(service.push).toHaveBeenCalledTimes(2);
+  });
+
+  it('should push nothing when no holders on RolePermissionsChangedEvent', () => {
+    listener.handleRolePermissionsChanged(new RolePermissionsChangedEvent([]));
+
+    expect(service.push).not.toHaveBeenCalled();
   });
 });

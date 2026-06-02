@@ -7,6 +7,7 @@ import { UserCreatedEvent } from '../users/events/user-created.event';
 import { UserUpdatedEvent } from '../users/events/user-updated.event';
 import { UserRestoredEvent } from '../users/events/user-restored.event';
 import { UserRoleChangedEvent } from '../auth/events/user-role-changed.event';
+import { RolePermissionsChangedEvent } from '../auth/events/role-permissions-changed.event';
 
 @Injectable()
 export class NotificationsListener {
@@ -66,5 +67,15 @@ export class NotificationsListener {
       type: 'permissions_updated',
       userId: event.userId
     });
+  }
+
+  @OnEvent(RolePermissionsChangedEvent.name)
+  handleRolePermissionsChanged(event: RolePermissionsChangedEvent): void {
+    for (const userId of event.userIds) {
+      this.notificationsService.push(userId, {
+        type: 'permissions_updated',
+        userId
+      });
+    }
   }
 }

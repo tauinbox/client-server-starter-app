@@ -24,6 +24,8 @@ import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { assertCan } from '../../../common/utils/assert-can.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { RolePermissionsChangedEvent } from '../events/role-permissions-changed.event';
 
 @Injectable()
 export class RoleService {
@@ -36,7 +38,8 @@ export class RoleService {
     private readonly rolePermissionRepository: Repository<RolePermission>,
     private readonly permissionService: PermissionService,
     private readonly auditService: AuditService,
-    private readonly metricsService: MetricsService
+    private readonly metricsService: MetricsService,
+    private readonly eventEmitter: EventEmitter2
   ) {}
 
   private async resolveGrantItems(
@@ -420,8 +423,17 @@ export class RoleService {
       .select('user.id')
       .innerJoin('user.roles', 'role', 'role.id = :roleId', { roleId })
       .getMany();
+    if (users.length === 0) return;
+    const userIds = users.map((u) => u.id);
     await Promise.all(
-      users.map((u) => this.permissionService.invalidateUserCache(u.id))
+      userIds.map((id) => this.permissionService.invalidateUserCache(id))
+    );
+    // Notify every connected holder so their client-side abilities refresh
+    // without a reload. A separate event from UserRoleChangedEvent: this must
+    // NOT revoke tokens — abilities are re-derived from the DB per request.
+    this.eventEmitter.emit(
+      RolePermissionsChangedEvent.name,
+      new RolePermissionsChangedEvent(userIds)
     );
   }
 }
