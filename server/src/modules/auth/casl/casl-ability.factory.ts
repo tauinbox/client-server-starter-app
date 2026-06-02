@@ -1,5 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { PermissionCondition, ResolvedPermission } from '@app/shared/types';
+import { Injectable, Logger } from '@nestjs/common';
+import { ResolvedPermission } from '@app/shared/types';
 import {
   AbilityBuilder,
   AppAbility,
@@ -7,11 +7,7 @@ import {
   Subjects
 } from './app-ability';
 import { ResourceService } from '../services/resource.service';
-import {
-  CONDITION_RESOLVERS,
-  ConditionResolver,
-  ResolverContext
-} from './condition-resolvers';
+import { resolveConditions } from './resolve-conditions';
 
 export interface RoleInfo {
   name: string;
@@ -22,11 +18,7 @@ export interface RoleInfo {
 export class CaslAbilityFactory {
   private readonly logger = new Logger(CaslAbilityFactory.name);
 
-  constructor(
-    private readonly resourceService: ResourceService,
-    @Inject(CONDITION_RESOLVERS)
-    private readonly resolvers: ConditionResolver[]
-  ) {}
+  constructor(private readonly resourceService: ResourceService) {}
 
   async createForUser(
     userId: string,
@@ -75,7 +67,7 @@ export class CaslAbilityFactory {
         continue;
       }
 
-      const queryResult = this.resolveConditions(p.conditions, {
+      const queryResult = resolveConditions(p.conditions, {
         userId,
         permissionLabel: p.permission,
         logger: this.logger
@@ -91,29 +83,5 @@ export class CaslAbilityFactory {
     }
 
     return build();
-  }
-
-  /**
-   * Iterates registered resolvers, merging their MongoQuery fragments into a
-   * single conditions object. A resolver may veto the entire permission
-   * (e.g. unsafe custom operator) by returning `skipPermission`.
-   */
-  private resolveConditions(
-    conditions: PermissionCondition,
-    ctx: ResolverContext
-  ): { query: Record<string, unknown>; skipPermission: boolean } {
-    const query: Record<string, unknown> = {};
-    for (const resolver of this.resolvers) {
-      const value = conditions[resolver.key];
-      if (value === undefined || value === null) continue;
-      const outcome = resolver.resolve(value as never, ctx);
-      if (outcome.skipPermission) {
-        return { query, skipPermission: true };
-      }
-      if (outcome.fragment) {
-        Object.assign(query, outcome.fragment);
-      }
-    }
-    return { query, skipPermission: false };
   }
 }

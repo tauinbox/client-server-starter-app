@@ -12,7 +12,6 @@ import { ResourceService } from '../services/resource.service';
 import { ActionService } from '../services/action.service';
 import { ResourceSyncService } from '../services/resource-sync.service';
 import { ResourceRegistryService } from '../services/resource-registry.service';
-import { CONDITION_RESOLVER_PROVIDERS } from './condition-resolvers';
 
 /**
  * Shared CASL module — provides PermissionService, CaslAbilityFactory,
@@ -38,8 +37,7 @@ import { CONDITION_RESOLVER_PROVIDERS } from './condition-resolvers';
     ResourceService,
     ActionService,
     ResourceSyncService,
-    ResourceRegistryService,
-    ...CONDITION_RESOLVER_PROVIDERS
+    ResourceRegistryService
   ],
   exports: [
     PermissionService,
