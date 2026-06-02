@@ -140,18 +140,6 @@ describe('condition-builder types', () => {
       expect(group).not.toBeNull();
       expect(group!.children).toHaveLength(0);
     });
-
-    it('parses $exists operator', () => {
-      const group = jsonToModel({ deletedAt: { $exists: false } });
-      const rule = (
-        group!.children[0] as {
-          type: 'rule';
-          rule: { field: string; operator: string; value: string };
-        }
-      ).rule;
-      expect(rule.operator).toBe('$exists');
-      expect(rule.value).toBe('false');
-    });
   });
 
   describe('modelToJson', () => {
@@ -176,13 +164,6 @@ describe('condition-builder types', () => {
       expect(modelToJson(group)).toEqual({
         role: { $in: ['admin', 'editor'] }
       });
-    });
-
-    it('serializes $exists as boolean', () => {
-      const group = createGroup('$and', [
-        { type: 'rule', rule: createRule('field', '$exists', 'true') }
-      ]);
-      expect(modelToJson(group)).toEqual({ field: { $exists: true } });
     });
 
     it('serializes $or group', () => {

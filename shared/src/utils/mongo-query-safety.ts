@@ -5,8 +5,16 @@
  * 1. DTO validation (input) — rejects requests with dangerous operators
  * 2. Ability factory (runtime) — defense-in-depth for pre-existing DB data
  *
- * Operator list derived from @ucast/mongo v2 allParsingInstructions.
- * $where is the critical one: ucast/js `where` interpreter calls
+ * The allowed set is exactly the operators the SQL list-filter translator
+ * (`applyAbilityToUserQuery`) can honour. Accepting an operator here that the
+ * translator drops makes a permission grant a single record yet return zero
+ * rows in list/search — so this set is the single source of truth and the
+ * translator's own operator maps are asserted to equal it (drift-guard test).
+ * Operators the translator cannot faithfully reproduce in SQL ($regex/$options
+ * — POSIX vs ECMAScript regex; $exists/$all/$size/$mod/$elemMatch — no
+ * applicable column) are intentionally excluded, not merely unimplemented.
+ *
+ * $where is the critical denied one: ucast/js `where` interpreter calls
  * `condition.value.call(object)` — arbitrary code execution.
  */
 
@@ -22,14 +30,7 @@ export const ALLOWED_MONGO_OPERATORS = new Set([
   '$and',
   '$or',
   '$nor',
-  '$not',
-  '$exists',
-  '$regex',
-  '$options',
-  '$all',
-  '$size',
-  '$mod',
-  '$elemMatch'
+  '$not'
 ]);
 
 export const DENIED_MONGO_OPERATORS = new Set([

@@ -5,6 +5,10 @@ import type { User } from '../entities/user.entity';
 
 const logger = new Logger('applyAbilityToUserQuery');
 
+// All mapped columns are NOT NULL, so SQL three-valued logic cannot diverge
+// from ucast's in-memory can() for $ne/$nin. If a NULLABLE column is ever added
+// here, `<>` / `NOT IN` will silently exclude NULL rows that can() includes —
+// add a NULL-parity test (instance-check vs list-filter) at that point.
 const USER_FIELD_MAP: Record<string, string> = {
   id: 'user.id',
   email: 'user.email',
@@ -13,7 +17,12 @@ const USER_FIELD_MAP: Record<string, string> = {
   isActive: 'user.isActive'
 };
 
-const COMPARISON_OPERATORS = {
+// These three maps are the SQL-side representation of the operators accepted by
+// the shared ALLOWED_MONGO_OPERATORS whitelist. Their union of keys MUST equal
+// that set (asserted by the drift-guard test in apply-ability.util.spec.ts) —
+// adding an operator to the whitelist without a translation here would make a
+// permission grant a single record yet return zero rows in list/search.
+export const COMPARISON_OPERATORS = {
   $eq: '=',
   $ne: '<>',
   $gt: '>',
@@ -22,12 +31,12 @@ const COMPARISON_OPERATORS = {
   $lte: '<='
 } as const;
 
-const LIST_OPERATORS = {
+export const LIST_OPERATORS = {
   $in: 'IN',
   $nin: 'NOT IN'
 } as const;
 
-const LOGICAL_OPERATORS = new Set(['$and', '$or', '$nor', '$not']);
+export const LOGICAL_OPERATORS = new Set(['$and', '$or', '$nor', '$not']);
 
 interface TranslationContext {
   paramIdx: { value: number };

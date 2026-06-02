@@ -1,3 +1,8 @@
+// Field operators the visual builder offers. Kept in lockstep with the
+// server's ALLOWED_MONGO_OPERATORS field set: the SQL list-filter translator
+// cannot honour $exists/$regex, so offering them here would build conditions
+// that silently return zero rows in list/search. Logical $and/$or are the
+// group-logic selector, not field operators, so they are not listed here.
 export const CONDITION_OPERATORS = [
   '$eq',
   '$ne',
@@ -6,9 +11,7 @@ export const CONDITION_OPERATORS = [
   '$lt',
   '$lte',
   '$in',
-  '$nin',
-  '$exists',
-  '$regex'
+  '$nin'
 ] as const;
 
 export type ConditionOperator = (typeof CONDITION_OPERATORS)[number];
@@ -198,9 +201,6 @@ function ruleToValue(rule: ConditionRule): unknown {
   if (operator === '$eq') return parseValue(value);
   if (operator === '$in' || operator === '$nin') {
     return { [operator]: parseArrayValue(value) };
-  }
-  if (operator === '$exists') {
-    return { [operator]: value.trim().toLowerCase() !== 'false' };
   }
   return { [operator]: parseValue(value) };
 }
