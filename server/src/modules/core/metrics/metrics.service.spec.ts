@@ -34,6 +34,10 @@ describe('MetricsService', () => {
         {
           provide: getToken('mail_jobs_processed_total'),
           useValue: mockCounter
+        },
+        {
+          provide: getToken('cache_requests_total'),
+          useValue: mockCounter
         }
       ]
     }).compile();
@@ -103,6 +107,26 @@ describe('MetricsService', () => {
       service.recordMailJob('failed');
 
       expect(mockCounter.inc).toHaveBeenCalledWith({ outcome: 'failed' });
+    });
+  });
+
+  describe('recordCacheAccess', () => {
+    it('increments the counter for a cache hit', () => {
+      service.recordCacheAccess('permissions', 'hit');
+
+      expect(mockCounter.inc).toHaveBeenCalledWith({
+        cache: 'permissions',
+        outcome: 'hit'
+      });
+    });
+
+    it('increments the counter for a cache miss', () => {
+      service.recordCacheAccess('feature_flags', 'miss');
+
+      expect(mockCounter.inc).toHaveBeenCalledWith({
+        cache: 'feature_flags',
+        outcome: 'miss'
+      });
     });
   });
 });

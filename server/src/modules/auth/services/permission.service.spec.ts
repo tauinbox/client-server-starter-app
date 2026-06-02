@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { PermissionService } from './permission.service';
 import { User } from '../../users/entities/user.entity';
+import { MetricsService } from '../../core/metrics/metrics.service';
 
 describe('PermissionService', () => {
   let service: PermissionService;
@@ -12,6 +13,7 @@ describe('PermissionService', () => {
     set: jest.Mock;
     del: jest.Mock;
   };
+  let mockMetrics: { recordCacheAccess: jest.Mock };
 
   const mockResource = { id: 'res-1', name: 'users', subject: 'User' };
   const mockAction = { id: 'act-1', name: 'read', displayName: 'Read' };
@@ -53,6 +55,8 @@ describe('PermissionService', () => {
       del: jest.fn().mockResolvedValue(undefined)
     };
 
+    mockMetrics = { recordCacheAccess: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PermissionService,
@@ -63,6 +67,10 @@ describe('PermissionService', () => {
         {
           provide: CACHE_MANAGER,
           useValue: mockCacheManager
+        },
+        {
+          provide: MetricsService,
+          useValue: mockMetrics
         }
       ]
     }).compile();
@@ -90,6 +98,10 @@ describe('PermissionService', () => {
 
       expect(result).toEqual(cachedPermissions);
       expect(mockUserRepository.findOne).not.toHaveBeenCalled();
+      expect(mockMetrics.recordCacheAccess).toHaveBeenCalledWith(
+        'permissions',
+        'hit'
+      );
     });
 
     it('should query and cache permissions when not cached', async () => {
@@ -109,6 +121,10 @@ describe('PermissionService', () => {
         'permissions:user-1',
         result,
         120_000
+      );
+      expect(mockMetrics.recordCacheAccess).toHaveBeenCalledWith(
+        'permissions',
+        'miss'
       );
     });
 
@@ -204,6 +220,10 @@ describe('PermissionService', () => {
 
       expect(result).toEqual(cachedRoles);
       expect(mockUserRepository.findOne).not.toHaveBeenCalled();
+      expect(mockMetrics.recordCacheAccess).toHaveBeenCalledWith(
+        'roles',
+        'hit'
+      );
     });
 
     it('should query and cache roles when not cached', async () => {
@@ -224,6 +244,10 @@ describe('PermissionService', () => {
         'roles:user-1',
         result,
         120_000
+      );
+      expect(mockMetrics.recordCacheAccess).toHaveBeenCalledWith(
+        'roles',
+        'miss'
       );
     });
 

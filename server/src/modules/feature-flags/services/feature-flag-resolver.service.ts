@@ -17,6 +17,7 @@ import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
 import { AttributeRegistryService } from './attribute-registry.service';
 import { PermissionService } from '../../auth/services/permission.service';
 import { UsersService } from '../../users/services/users.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 
 export interface ResolverUser {
   userId: string;
@@ -54,7 +55,8 @@ export class FeatureFlagResolverService {
     private readonly attributeRegistry: AttributeRegistryService,
     private readonly configService: ConfigService,
     private readonly permissionService: PermissionService,
-    private readonly usersService: UsersService
+    private readonly usersService: UsersService,
+    private readonly metrics: MetricsService
   ) {}
 
   /**
@@ -83,6 +85,7 @@ export class FeatureFlagResolverService {
     const cacheKey = `featureflags:user:${user.userId}:v${version}`;
     const cached =
       await this.cacheManager.get<EvaluatedFeatureFlagsResponse>(cacheKey);
+    this.metrics.recordCacheAccess('feature_flags', cached ? 'hit' : 'miss');
     if (cached) return cached;
 
     const flags = await this.loadAllFlags();
@@ -126,6 +129,10 @@ export class FeatureFlagResolverService {
 
   private async loadAllFlags(): Promise<CachedFlag[]> {
     const cached = await this.cacheManager.get<CachedFlag[]>(ALL_FLAGS_KEY);
+    this.metrics.recordCacheAccess(
+      'feature_flags_all',
+      cached ? 'hit' : 'miss'
+    );
     if (cached) return cached;
 
     const flags = await this.flagRepo.find({ order: { key: 'ASC' } });

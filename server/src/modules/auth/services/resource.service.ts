@@ -13,6 +13,7 @@ import { Resource } from '../entities/resource.entity';
 import { CASL_RESERVED_SUBJECT_NAMES } from '../casl/constants';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { ResourceRegistryService } from './resource-registry.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 
 const SUBJECT_MAP_CACHE_KEY = 'rbac:subject_map';
 const SUBJECT_MAP_CACHE_TTL = 300_000; // 5 minutes
@@ -26,7 +27,8 @@ export class ResourceService {
     private readonly resourceRepository: Repository<Resource>,
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
-    private readonly registry: ResourceRegistryService
+    private readonly registry: ResourceRegistryService,
+    private readonly metrics: MetricsService
   ) {}
 
   async findAll(): Promise<Resource[]> {
@@ -71,6 +73,7 @@ export class ResourceService {
     const cached = await this.cacheManager.get<Record<string, string>>(
       SUBJECT_MAP_CACHE_KEY
     );
+    this.metrics.recordCacheAccess('resources', cached ? 'hit' : 'miss');
     if (cached) {
       return cached;
     }

@@ -9,6 +9,7 @@ import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
 import { PermissionService } from '../../auth/services/permission.service';
 import { UsersService } from '../../users/services/users.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 
 describe('FeatureFlagResolverService', () => {
   let service: FeatureFlagResolverService;
@@ -19,6 +20,7 @@ describe('FeatureFlagResolverService', () => {
   let configService: { get: jest.Mock };
   let permissionService: { getRoleNamesForUser: jest.Mock };
   let usersService: { findOne: jest.Mock };
+  let metrics: { recordCacheAccess: jest.Mock };
 
   const fakeReq = {} as Request;
 
@@ -47,6 +49,7 @@ describe('FeatureFlagResolverService', () => {
         createdAt: new Date('2026-01-01T00:00:00Z')
       })
     };
+    metrics = { recordCacheAccess: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -60,7 +63,8 @@ describe('FeatureFlagResolverService', () => {
         },
         { provide: ConfigService, useValue: configService },
         { provide: PermissionService, useValue: permissionService },
-        { provide: UsersService, useValue: usersService }
+        { provide: UsersService, useValue: usersService },
+        { provide: MetricsService, useValue: metrics }
       ]
     }).compile();
 
@@ -163,6 +167,31 @@ describe('FeatureFlagResolverService', () => {
     );
     // Second call should hit the user cache, not re-load.
     expect(flagRepo.find).not.toHaveBeenCalled();
+  });
+
+  it('records a feature_flags miss then hit across two evaluations', async () => {
+    seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
+    const user = { userId: 'u1', email: null, createdAt: null, roles: [] };
+
+    // First evaluation: user cache miss + all-flags cache miss.
+    await service.evaluateForUser(user, fakeReq);
+    expect(metrics.recordCacheAccess).toHaveBeenCalledWith(
+      'feature_flags',
+      'miss'
+    );
+    expect(metrics.recordCacheAccess).toHaveBeenCalledWith(
+      'feature_flags_all',
+      'miss'
+    );
+
+    metrics.recordCacheAccess.mockClear();
+
+    // Second evaluation: served from the per-user cache.
+    await service.evaluateForUser(user, fakeReq);
+    expect(metrics.recordCacheAccess).toHaveBeenCalledWith(
+      'feature_flags',
+      'hit'
+    );
   });
 
   it('anonymous evaluation returns only public flags', async () => {

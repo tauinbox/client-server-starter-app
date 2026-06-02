@@ -6,6 +6,7 @@ import { Cache } from 'cache-manager';
 import { User } from '../../users/entities/user.entity';
 import { ResolvedPermission } from '@app/shared/types';
 import type { RoleInfo } from '../casl/casl-ability.factory';
+import { MetricsService } from '../../core/metrics/metrics.service';
 
 const CACHE_TTL = 120_000; // 2 minutes
 const CACHE_PREFIX = 'permissions:';
@@ -17,12 +18,14 @@ export class PermissionService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     @Inject(CACHE_MANAGER)
-    private readonly cacheManager: Cache
+    private readonly cacheManager: Cache,
+    private readonly metrics: MetricsService
   ) {}
 
   async getPermissionsForUser(userId: string): Promise<ResolvedPermission[]> {
     const cacheKey = `${CACHE_PREFIX}${userId}`;
     const cached = await this.cacheManager.get<ResolvedPermission[]>(cacheKey);
+    this.metrics.recordCacheAccess('permissions', cached ? 'hit' : 'miss');
     if (cached) {
       return cached;
     }
@@ -74,6 +77,7 @@ export class PermissionService {
   async getRolesForUser(userId: string): Promise<RoleInfo[]> {
     const cacheKey = `${ROLES_CACHE_PREFIX}${userId}`;
     const cached = await this.cacheManager.get<RoleInfo[]>(cacheKey);
+    this.metrics.recordCacheAccess('roles', cached ? 'hit' : 'miss');
     if (cached) {
       return cached;
     }
