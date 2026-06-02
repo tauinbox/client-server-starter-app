@@ -69,7 +69,7 @@
       },
       "targets": [
         {
-          "expr": "(sum(rate(http_requests_total{status_code=~\"[45]..\"}[5m])) or vector(0)) / (sum(rate(http_requests_total[5m])) or vector(1)) * 100",
+          "expr": "(sum(rate(http_requests_total{status_code=~\"[45]..\"}[5m])) or vector(0)) / (sum(rate(http_requests_total[5m])) > 0 or vector(1)) * 100",
           "legendFormat": "Error %",
           "refId": "A"
         }
@@ -277,12 +277,12 @@
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
         {
-          "expr": "(sum(rate(http_requests_total{status_code=~\"5..\"}[5m])) or vector(0)) / (sum(rate(http_requests_total[5m])) or vector(1))",
+          "expr": "(sum(rate(http_requests_total{status_code=~\"5..\"}[5m])) or vector(0)) / (sum(rate(http_requests_total[5m])) > 0 or vector(1))",
           "legendFormat": "5xx rate",
           "refId": "A"
         },
         {
-          "expr": "(sum(rate(http_requests_total{status_code=~\"4..\"}[5m])) or vector(0)) / (sum(rate(http_requests_total[5m])) or vector(1))",
+          "expr": "(sum(rate(http_requests_total{status_code=~\"4..\"}[5m])) or vector(0)) / (sum(rate(http_requests_total[5m])) > 0 or vector(1))",
           "legendFormat": "4xx rate",
           "refId": "B"
         }
@@ -982,12 +982,12 @@
       },
       "targets": [
         {
-          "expr": "(sum(rate(cache_requests_total{outcome=\"hit\"}[5m])) or vector(0)) / (sum(rate(cache_requests_total[5m])) or vector(1))",
+          "expr": "(sum(cache_requests_total{outcome=\"hit\"}) or vector(0)) / (sum(cache_requests_total) > 0 or vector(1))",
           "legendFormat": "overall",
           "refId": "A"
         }
       ],
-      "description": "Aggregate hit ratio across all caches (5-min window). Reads 0 when there is no cache traffic.",
+      "description": "Aggregate hit ratio across all caches since the server started (counters reset on restart) — a stable headline figure that doesn't drop to red just because the last few minutes were idle. The 'Cache Hit Ratio by Cache' panel shows the recent (5-min) trend. Reads 0 only when no cache lookups have been recorded.",
       "title": "Overall Cache Hit Ratio",
       "type": "stat"
     }
