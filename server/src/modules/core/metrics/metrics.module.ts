@@ -5,9 +5,12 @@ import {
   makeHistogramProvider,
   getToken
 } from '@willsoto/nestjs-prometheus';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import type { DataSource } from 'typeorm';
 import { Gauge, register } from 'prom-client';
 import { MetricsService } from './metrics.service';
 import { MetricsController } from './metrics.controller';
+import { DB_POOL_METRIC_NAME, createDbPoolGauge } from './db-pool.gauge';
 
 export interface SseConnectionsRef {
   getCount: () => number;
@@ -115,6 +118,12 @@ export const MAIL_QUEUE_REF = Symbol('MAIL_QUEUE_REF');
         });
       },
       inject: [SSE_CONNECTIONS_REF]
+    },
+    {
+      provide: getToken(DB_POOL_METRIC_NAME),
+      useFactory: (dataSource: DataSource): Gauge<string> =>
+        createDbPoolGauge(dataSource),
+      inject: [getDataSourceToken()]
     }
   ],
   exports: [MetricsService, SSE_CONNECTIONS_REF, MAIL_QUEUE_REF]

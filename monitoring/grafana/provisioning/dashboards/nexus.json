@@ -2,7 +2,7 @@
   "__inputs": [],
   "__requires": [],
   "annotations": { "list": [] },
-  "description": "Nexus application metrics: HTTP traffic, authentication, RBAC denials, SSE connections, and Node.js runtime",
+  "description": "Nexus application metrics: HTTP traffic, authentication, RBAC denials, SSE connections, mail queue, database connection pool, and Node.js runtime",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -852,6 +852,74 @@
       "description": "Mail jobs delivered successfully in the last hour.",
       "title": "Mail Jobs Completed (1h)",
       "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 78 },
+      "id": 8,
+      "title": "Database",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 79 },
+      "id": 80,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr": "db_pool_connections",
+          "legendFormat": "{{state}}",
+          "refId": "A"
+        }
+      ],
+      "description": "PostgreSQL connection-pool size by state (total = open connections, idle = free, waiting = requests blocked waiting for a free connection). A sustained non-zero waiting count means the pool is exhausted and requests are queuing — raise DB_POOL_MAX or investigate slow queries.",
+      "title": "DB Connection Pool",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 79 },
+      "id": 81,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "expr": "db_pool_connections{state=\"waiting\"}",
+          "legendFormat": "waiting",
+          "refId": "A"
+        }
+      ],
+      "description": "Requests currently blocked waiting for a free DB connection. Anything sustained above 0 indicates pool exhaustion.",
+      "title": "DB Pool Waiting",
+      "type": "stat"
     }
   ],
   "refresh": "30s",
@@ -862,5 +930,5 @@
   "timezone": "browser",
   "title": "App Metrics",
   "uid": "nexus",
-  "version": 3
+  "version": 4
 }

@@ -127,7 +127,8 @@ src/
 │   │                       #   GET /metrics (excluded from /api prefix); http_requests_total,
 │   │                       #   http_request_duration_seconds, auth_events_total,
 │   │                       #   rbac_permission_denied_total{action,subject,level},
-│   │                       #   mail_queue_jobs{state}, mail_jobs_processed_total{outcome}; HttpMetricsInterceptor
+│   │                       #   mail_queue_jobs{state}, mail_jobs_processed_total{outcome},
+│   │                       #   db_pool_connections{state}; HttpMetricsInterceptor
 │   └── schedule/           # @nestjs/schedule for cron jobs
 ├── auth/
 │   ├── controllers/        # AuthController (includes GET /permissions), OAuthController, RbacController
@@ -505,6 +506,7 @@ The `MetricsModule` (`src/modules/core/metrics/metrics.module.ts`) exposes
 | `sse_connections_active` | gauge | — | Currently open SSE notification streams |
 | `mail_queue_jobs` | gauge | `state` ∈ `waiting`, `active`, `completed`, `failed`, `delayed` | BullMQ mail-queue depth by job state. No-ops (stays absent) when no queue is configured — i.e. `REDIS_URL` unset, so `MailService` sends in-process |
 | `mail_jobs_processed_total` | counter | `outcome` ∈ `completed`, `failed` | Mail jobs processed by the queue worker. `failed` counts each failed attempt, including retries |
+| `db_pool_connections` | gauge | `state` ∈ `total`, `idle`, `waiting` | PostgreSQL connection-pool size by state, read from the pg pool on the injected `DataSource`. A sustained `waiting` > 0 means the pool is exhausted and requests are queuing |
 
 Plus the default Node.js process metrics (heap, GC, event-loop lag, file
 descriptors, ...) provided by `prom-client`.
@@ -609,8 +611,9 @@ The provisioned **App Metrics** dashboard
 remaining metrics (HTTP traffic, auth events, latency p95s, SSE, Node.js
 runtime) plus an RBAC & Reliability section (permission denials by level
 and action/subject, process RSS memory, token-reuse-detected alarm,
-uptime, active handles/requests) and a Mail Queue section (BullMQ depth by
-state, failed/completed job counts over 1 h). Use the dedicated RBAC dashboard
+uptime, active handles/requests), a Mail Queue section (BullMQ depth by
+state, failed/completed job counts over 1 h), and a Database section (connection-pool
+size by state with a waiting-connections alarm). Use the dedicated RBAC dashboard
 (`doc/grafana/rbac.json`) alongside it for deeper security drill-downs.
 
 ## Docker
