@@ -42,7 +42,7 @@ export class PermissionConditionDto {
 
   @ApiPropertyOptional({
     description:
-      'Raw MongoQuery JSON. Only safe operators allowed ($eq, $ne, $gt, $gte, $lt, $lte, $in, $nin, $and, $or, $nor, $not, $exists, $regex, $options, $all, $size, $mod, $elemMatch). $where, $function, $expr are banned.',
+      'Raw MongoQuery JSON. Only operators the SQL list-filter can honour are allowed ($eq, $ne, $gt, $gte, $lt, $lte, $in, $nin, $and, $or, $nor, $not). $where, $function, $expr are banned.',
     example: '{"status":{"$in":["active","pending"]}}'
   })
   @IsOptional()

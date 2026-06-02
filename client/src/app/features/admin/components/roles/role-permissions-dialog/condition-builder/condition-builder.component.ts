@@ -171,10 +171,6 @@ export class ConditionBuilderComponent implements OnChanges, OnInit {
   setOperator(node: ConditionNode, op: ConditionOperator): void {
     if (node.type === 'rule') {
       node.rule.operator = op;
-      // Reset value for $exists
-      if (op === '$exists') {
-        node.rule.value = 'true';
-      }
       this.#emitFromModel();
     }
   }
@@ -191,10 +187,6 @@ export class ConditionBuilderComponent implements OnChanges, OnInit {
       case '$in':
       case '$nin':
         return 'val1, val2, val3';
-      case '$exists':
-        return 'true';
-      case '$regex':
-        return '^pattern$';
       default:
         return '';
     }

@@ -49,7 +49,19 @@ describe('IsSafeMongoQueryConstraint', () => {
       '{"$and":[{"a":1},{"b":2}]}',
       '{"$or":[{"a":1},{"b":2}]}',
       '{"$nor":[{"a":1}]}',
-      '{"field":{"$not":{"$eq":"x"}}}',
+      '{"field":{"$not":{"$eq":"x"}}}'
+    ];
+
+    for (const query of allowed) {
+      expect(validator.validate(query)).toBe(true);
+    }
+  });
+
+  // These operators pass ucast's in-memory can() but the SQL list-filter
+  // translator cannot honour them, so they are excluded from the allowed set
+  // to keep instance-check and list-filter behaviour consistent.
+  it('should reject operators the SQL translator cannot honour', () => {
+    const rejected = [
       '{"field":{"$exists":true}}',
       '{"name":{"$regex":"^test","$options":"i"}}',
       '{"tags":{"$all":["a","b"]}}',
@@ -58,9 +70,19 @@ describe('IsSafeMongoQueryConstraint', () => {
       '{"items":{"$elemMatch":{"price":{"$gt":5}}}}'
     ];
 
-    for (const query of allowed) {
-      expect(validator.validate(query)).toBe(true);
+    for (const query of rejected) {
+      expect(validator.validate(query)).toBe(false);
+      expect(validator.defaultMessage()).toContain('Unknown operator');
     }
+  });
+
+  // $regex is excluded on the merits (not merely unimplemented): PostgreSQL
+  // POSIX regex (~) differs from ucast's ECMAScript regex used by in-memory
+  // can(), so a translated $regex would diverge between instance-check and
+  // list-filter. Documented here so it is not "helpfully" re-added later.
+  it('should reject $regex (no faithful SQL equivalent)', () => {
+    expect(validator.validate('{"email":{"$regex":"^admin"}}')).toBe(false);
+    expect(validator.defaultMessage()).toContain('$regex');
   });
 
   it('should reject $where operator', () => {
@@ -89,8 +111,7 @@ describe('IsSafeMongoQueryConstraint', () => {
   });
 
   it('should reject $where deeply nested', () => {
-    const deep =
-      '{"$or":[{"$and":[{"field":{"$elemMatch":{"$where":"hack"}}}]}]}';
+    const deep = '{"$or":[{"$and":[{"field":{"$where":"hack"}}]}]}';
     expect(validator.validate(deep)).toBe(false);
     expect(validator.defaultMessage()).toContain('$where');
   });

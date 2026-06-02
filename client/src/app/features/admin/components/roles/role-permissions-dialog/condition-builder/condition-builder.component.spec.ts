@@ -164,21 +164,6 @@ describe('ConditionBuilderComponent', () => {
       ).rule;
       expect(rule.value).toBe('inactive');
     });
-
-    it('sets $exists default value to "true"', () => {
-      const { component } = setup('{"status": "active"}');
-      const child = component.rootGroup().children[0];
-
-      component.setOperator(child, '$exists');
-
-      const rule = (
-        component.rootGroup().children[0] as {
-          type: 'rule';
-          rule: { value: string };
-        }
-      ).rule;
-      expect(rule.value).toBe('true');
-    });
   });
 
   describe('mode toggle', () => {

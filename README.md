@@ -137,7 +137,7 @@ The value is a **JSON string** (stringified MongoDB query). It is parsed and mer
 |----------|-------------|---------------------|
 | JSON textarea with validation | `{ "custom": "{\"price\":{\"$lt\":100}}" }` | `can('update', 'Product', { price: { $lt: 100 } })` |
 
-**Supported MongoDB operators** (evaluated by `@ucast/mongo2js` inside CASL):
+**Supported MongoDB operators** — the only operators accepted in `custom` conditions. The set is deliberately limited to operators the server-side SQL list-filter can reproduce faithfully (see the note below), so a condition behaves the same whether it is checked against a single record or used to filter a list:
 
 | Operator | Meaning | Example |
 |----------|---------|---------|
@@ -149,9 +149,6 @@ The value is a **JSON string** (stringified MongoDB query). It is parsed and mer
 | `$gte` | Greater than or equal | `{ "rating": { "$gte": 4 } }` |
 | `$in` | In array | `{ "status": { "$in": ["active", "pending"] } }` |
 | `$nin` | Not in array | `{ "role": { "$nin": ["admin", "super"] } }` |
-| `$all` | Array contains all | `{ "tags": { "$all": ["urgent", "billing"] } }` |
-| `$exists` | Field exists/absent | `{ "deletedAt": { "$exists": false } }` |
-| `$regex` | Regex match | `{ "email": { "$regex": "@company\\.com$" } }` |
 
 **Logical operators** (combine multiple conditions):
 
@@ -164,7 +161,7 @@ The value is a **JSON string** (stringified MongoDB query). It is parsed and mer
 
 Security: prototype pollution keys (`__proto__`, `constructor`, `prototype`) are silently skipped during parsing.
 
-> **Server-side SQL translation (`apply-ability.util.ts`)** — when CASL conditions are translated into SQL `WHERE` fragments for the `GET /users` listing, the translator supports a strict subset: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$and`, `$or`, `$nor`, `$not`, against the user fields `id`, `email`, `firstName`, `lastName`, `isActive`. Any rule that uses other operators (e.g. `$regex`, `$exists`, `$all`) or other fields is **dropped entirely** (fail-closed) and a warning is logged. Run `npm run check:role-conditions` (in `server/`) against a staging dump to surface any existing rows that will be affected.
+> **Server-side SQL translation (`apply-ability.util.ts`)** — when CASL conditions are translated into SQL `WHERE` fragments for the `GET /users` listing, the translator supports exactly the operators above (`$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$and`, `$or`, `$nor`, `$not`) against the user fields `id`, `email`, `firstName`, `lastName`, `isActive`. Input validation rejects any other operator up front, so the accepted set and the translatable set are identical (a drift-guard test enforces this). As defense-in-depth for pre-existing data, any rule using an unsupported operator or field is still **dropped entirely** (fail-closed) and a warning is logged. Run `npm run check:role-conditions` (in `server/`) against a staging dump to surface any existing rows that would be affected.
 
 #### Combining Multiple Condition Types
 
@@ -174,16 +171,16 @@ Multiple types on the same permission are merged into one query (AND):
 {
   "ownership": { "userField": "id" },
   "fieldMatch": { "isActive": [true] },
-  "custom": "{\"email\":{\"$regex\":\"@company\\\\.com$\"}}"
+  "custom": "{\"email\":{\"$in\":[\"a@company.com\",\"b@company.com\"]}}"
 }
 ```
 
 Produces:
 ```
 can('update', 'User', {
-  id: '<userId>',                      // from ownership
-  isActive: { $in: [true] },           // from fieldMatch
-  email: { $regex: '@company\\.com$' } // from custom
+  id: '<userId>',                              // from ownership
+  isActive: { $in: [true] },                   // from fieldMatch
+  email: { $in: ['a@company.com', ...] }       // from custom
 })
 ```
 

@@ -1,5 +1,11 @@
 import { Logger } from '@nestjs/common';
-import { applyAbilityToUserQuery } from './apply-ability.util';
+import {
+  applyAbilityToUserQuery,
+  COMPARISON_OPERATORS,
+  LIST_OPERATORS,
+  LOGICAL_OPERATORS
+} from './apply-ability.util';
+import { ALLOWED_MONGO_OPERATORS } from '@app/shared/utils/mongo-query-safety';
 import type { AppAbility } from '../../auth/casl/app-ability';
 import type { SelectQueryBuilder } from 'typeorm';
 import type { User } from '../entities/user.entity';
@@ -433,5 +439,24 @@ describe('applyAbilityToUserQuery', () => {
     );
     expect(calls[0].sql).toBe('(1 = 0)');
     expect(warnSpy).toHaveBeenCalled();
+  });
+});
+
+describe('operator whitelist drift-guard', () => {
+  // The SQL translator's operator maps and the shared input whitelist are two
+  // representations of the same set. If they ever diverge, a condition could
+  // pass DTO validation yet be silently dropped by the list-filter translator
+  // (single record visible, zero rows in list/search). This test fails CI the
+  // moment anyone adds an operator to one side but not the other.
+  it('translator operator maps exactly equal ALLOWED_MONGO_OPERATORS', () => {
+    const translatorOperators = new Set<string>([
+      ...Object.keys(COMPARISON_OPERATORS),
+      ...Object.keys(LIST_OPERATORS),
+      ...LOGICAL_OPERATORS
+    ]);
+
+    expect([...translatorOperators].sort()).toEqual(
+      [...ALLOWED_MONGO_OPERATORS].sort()
+    );
   });
 });
