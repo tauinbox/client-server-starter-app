@@ -174,10 +174,13 @@ src/
 │   ├── listeners/feature-flag-changed.listener.ts    # Invalidates cache + bumps version + pushToAll SSE on FeatureFlagChangedEvent; per-user invalidation on UserRoleChangedEvent / UserDeletedEvent
 │   └── utils/validate-rule-payload.util.ts           # Discriminated payload validation per rule type; rejects custom attribute keys not in the registry
 ├── billing/                # Subscriptions/billing foundation (registered in CoreModule.forRoot())
-│   ├── billing.module.ts   # imports FeatureFlagsModule; BILLING_PROVIDERS factory; exports BillingService
+│   ├── billing.module.ts   # imports FeatureFlagsModule + TypeOrmModule.forFeature([Customer, Plan, Subscription]); BILLING_PROVIDERS factory; exports BillingService + EntitlementService + EntitlementGuard
 │   ├── billing.service.ts  # resolveProvider() geo-router: providerOverride ?? geoDefault(country); 503 when provider disabled/unconfigured
 │   ├── entities/           # 7 entities (Plan, Customer, PaymentMethod, Subscription, Invoice, UsageRecord, WebhookEvent) + entity-contract + serialization specs
 │   ├── dtos/               # 6 response DTOs with WireType/StructuralDiff contract checks
+│   ├── entitlements/       # EntitlementService.capabilitiesFor(userId) (active/trialing/past_due-in-grace → plan.entitlements, else Free), monotonic-version per-user cache; @RequireEntitlement('<cap>') decorator + EntitlementGuard (403)
+│   ├── events/             # billing.events.ts — SubscriptionActivated/Renewed/PastDue/Canceled, PlanChanged, InvoicePaid, PaymentFailed (each carries userId)
+│   ├── listeners/          # entitlement-cache.listener (invalidate user on any entitlement-changing event) + billing-user-deleted.listener (cancel subscription at provider on UserDeletedEvent; best-effort)
 │   ├── providers/          # PaymentProvider interface + NormalizedEvent + Paddle/YooKassa stubs (M1) behind the BILLING_PROVIDERS token
 │   ├── rating/             # RatingStrategy interface + FixedRating (real) + UsageRating (M2 stub)
 │   └── config/             # BillingConfigService — env-derived paddle/yookassa "configured" booleans

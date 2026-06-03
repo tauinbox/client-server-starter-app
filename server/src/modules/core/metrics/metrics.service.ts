@@ -20,7 +20,8 @@ export type CacheName =
   | 'roles'
   | 'resources'
   | 'feature_flags'
-  | 'feature_flags_all';
+  | 'feature_flags_all'
+  | 'entitlements';
 
 export type CacheOutcome = 'hit' | 'miss';
 
