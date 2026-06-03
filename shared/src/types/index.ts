@@ -55,3 +55,20 @@ export type {
   FeatureFlagPreviewMatchedRule,
   FeatureFlagPreviewResult
 } from './feature-flag.types';
+
+export type {
+  BillingProviderId,
+  PlanInterval,
+  BillingMode,
+  SubscriptionStatus,
+  InvoiceStatus,
+  BillingRegion,
+  PlanPrice,
+  PlanResponse,
+  CustomerResponse,
+  PaymentMethodResponse,
+  SubscriptionResponse,
+  InvoiceResponse,
+  UsageResponse,
+  CheckoutSessionResponse
+} from './billing.types';
