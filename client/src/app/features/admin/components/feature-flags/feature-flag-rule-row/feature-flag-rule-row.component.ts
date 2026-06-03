@@ -57,6 +57,8 @@ export type FeatureFlagRuleDraft = {
   payload: FeatureFlagRulePayload;
 };
 
+type AttributePayload = Extract<FeatureFlagRulePayload, { type: 'attribute' }>;
+
 const RULE_TYPES: FeatureFlagRuleType[] = [
   'user',
   'role',
@@ -429,29 +431,11 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
     } else {
       nextValue = current.value;
     }
-    this.#updatePayload({
-      type: 'attribute',
-      field: current.field,
-      op,
-      value: nextValue,
-      ...(current.customKey !== undefined
-        ? { customKey: current.customKey }
-        : {})
-    });
+    this.#patchAttributePayload({ op, value: nextValue });
   }
 
   onAttributeValueChange(raw: string): void {
-    const current = this.rule().payload;
-    if (current.type !== 'attribute') return;
-    this.#updatePayload({
-      type: 'attribute',
-      field: current.field,
-      op: current.op,
-      value: raw,
-      ...(current.customKey !== undefined
-        ? { customKey: current.customKey }
-        : {})
-    });
+    this.#patchAttributePayload({ value: raw });
   }
 
   onAttributeDateChange(date: Date | null): void {
@@ -462,41 +446,17 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
       date instanceof Date && !Number.isNaN(date.getTime())
         ? date.toISOString()
         : '';
-    this.#updatePayload({
-      type: 'attribute',
-      field: current.field,
-      op: current.op,
-      value,
-      ...(current.customKey !== undefined
-        ? { customKey: current.customKey }
-        : {})
-    });
+    this.#patchAttributePayload({ value });
   }
 
   onAttributeChipsChange(chips: ChipOption[]): void {
     const current = this.rule().payload;
     if (current.type !== 'attribute' || current.op !== 'in') return;
-    this.#updatePayload({
-      type: 'attribute',
-      field: current.field,
-      op: current.op,
-      value: chips.map((c) => c.value),
-      ...(current.customKey !== undefined
-        ? { customKey: current.customKey }
-        : {})
-    });
+    this.#patchAttributePayload({ value: chips.map((c) => c.value) });
   }
 
   onAttributeCustomKeyChange(customKey: string): void {
-    const current = this.rule().payload;
-    if (current.type !== 'attribute') return;
-    this.#updatePayload({
-      type: 'attribute',
-      field: current.field,
-      op: current.op,
-      value: current.value,
-      customKey
-    });
+    this.#patchAttributePayload({ customKey });
   }
 
   emitRemove(): void {
@@ -505,6 +465,26 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
   #updatePayload(payload: FeatureFlagRulePayload): void {
     this.rule.set({ ...this.rule(), payload });
+  }
+
+  // Rebuilds the attribute payload, preserving `field` and `customKey` unless
+  // the caller overrides them. `customKey` is kept only when present in the
+  // current payload; pass it explicitly to set or (with `undefined`) drop it.
+  // No-op when the current payload is not an attribute rule.
+  #patchAttributePayload(
+    partial: Partial<Pick<AttributePayload, 'op' | 'value' | 'customKey'>>
+  ): void {
+    const current = this.rule().payload;
+    if (current.type !== 'attribute') return;
+    const customKey =
+      'customKey' in partial ? partial.customKey : current.customKey;
+    this.#updatePayload({
+      type: 'attribute',
+      field: current.field,
+      op: partial.op ?? current.op,
+      value: 'value' in partial ? partial.value : current.value,
+      ...(customKey !== undefined ? { customKey } : {})
+    });
   }
 
   #defaultPayloadFor(type: FeatureFlagRuleType): FeatureFlagRulePayload {
