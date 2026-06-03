@@ -491,6 +491,148 @@ describe('FeatureFlagRuleRowComponent', () => {
     });
   });
 
+  it('switching attribute op from eq to in preserves the scalar as the first chip', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: { type: 'attribute', field: 'email', op: 'eq', value: 'a@x.com' }
+    });
+    fixture.detectChanges();
+    const cmp = fixture.debugElement.children[0]
+      .componentInstance as FeatureFlagRuleRowComponent;
+    cmp.onAttributeOpChange('in');
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'attribute',
+      field: 'email',
+      op: 'in',
+      value: ['a@x.com']
+    });
+  });
+
+  it('preserves customKey when the attribute value changes', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'custom',
+        op: 'eq',
+        value: '',
+        customKey: 'plan'
+      }
+    });
+    fixture.detectChanges();
+    const cmp = fixture.debugElement.children[0]
+      .componentInstance as FeatureFlagRuleRowComponent;
+    cmp.onAttributeValueChange('pro');
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'attribute',
+      field: 'custom',
+      op: 'eq',
+      value: 'pro',
+      customKey: 'plan'
+    });
+  });
+
+  it('preserves customKey when the attribute op changes', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'custom',
+        op: 'eq',
+        value: 'pro',
+        customKey: 'plan'
+      }
+    });
+    fixture.detectChanges();
+    const cmp = fixture.debugElement.children[0]
+      .componentInstance as FeatureFlagRuleRowComponent;
+    cmp.onAttributeOpChange('endsWith');
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'attribute',
+      field: 'custom',
+      op: 'endsWith',
+      value: 'pro',
+      customKey: 'plan'
+    });
+  });
+
+  it('onAttributeCustomKeyChange updates only customKey', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'custom',
+        op: 'eq',
+        value: 'pro',
+        customKey: 'plan'
+      }
+    });
+    fixture.detectChanges();
+    const cmp = fixture.debugElement.children[0]
+      .componentInstance as FeatureFlagRuleRowComponent;
+    cmp.onAttributeCustomKeyChange('tier');
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'attribute',
+      field: 'custom',
+      op: 'eq',
+      value: 'pro',
+      customKey: 'tier'
+    });
+  });
+
+  it('onAttributeFieldChange to custom initializes an empty customKey', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: { type: 'attribute', field: 'email', op: 'eq', value: 'x' }
+    });
+    fixture.detectChanges();
+    const cmp = fixture.debugElement.children[0]
+      .componentInstance as FeatureFlagRuleRowComponent;
+    cmp.onAttributeFieldChange('custom');
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'attribute',
+      field: 'custom',
+      op: 'eq',
+      value: 'x',
+      customKey: ''
+    });
+  });
+
+  it('onAttributeFieldChange away from custom drops customKey', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'custom',
+        op: 'eq',
+        value: 'x',
+        customKey: 'plan'
+      }
+    });
+    fixture.detectChanges();
+    const cmp = fixture.debugElement.children[0]
+      .componentInstance as FeatureFlagRuleRowComponent;
+    cmp.onAttributeFieldChange('email');
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'attribute',
+      field: 'email',
+      op: 'eq',
+      value: 'x'
+    });
+  });
+
   it('loads roles into the autocomplete options on init', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.detectChanges();
