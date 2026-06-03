@@ -286,7 +286,7 @@ editable from the client profile.
 
 ### Database
 
-Ten tables managed via TypeORM migrations:
+Core tables managed via TypeORM migrations:
 
 | Table | Description |
 |-------|-------------|
@@ -300,6 +300,18 @@ Ten tables managed via TypeORM migrations:
 | `role_permissions` | FK to roles + permissions, optional jsonb `conditions` |
 | `user_roles` | Join table: user_id + role_id (composite PK) |
 | `audit_logs` | UUID PK, action (enum), actorId (nullable), actorEmail (nullable), targetId (nullable), targetType (nullable), details (jsonb), ipAddress, requestId, createdAt |
+
+Billing tables (subscriptions foundation; money is always stored in integer minor units):
+
+| Table | Description |
+|-------|-------------|
+| `plans` | UUID PK, key (unique), name, `billing_mode` (`fixed`/`usage`), `interval`, `meter_key` (usage), `entitlements text[]` (GIN-indexed), `limits jsonb`, `trial_days`, `active`, `prices jsonb` (per-provider `{ currency, amountMinor, unitPriceMinor?, includedUnits? }`) |
+| `billing_customers` | UUID PK, `user_id` (unique FK to users, CASCADE), `provider`, `provider_override` (manual region override), `provider_customer_id`, `country`, `currency`, `default_payment_method_id` (FK to billing_payment_methods, SET NULL) |
+| `billing_payment_methods` | UUID PK, `customer_id` (FK, CASCADE), `provider`, `provider_method_ref`, `brand`, `last4`, `is_default` |
+| `subscriptions` | UUID PK, `customer_id` (FK, CASCADE), `plan_key`, `provider`, `billing_mode`, `status`, `lifecycle_owner` (`provider`/`self`), current-period bounds, `cancel_at_period_end`, `trial_end`, `provider_subscription_id`, `payment_method_id` (FK, SET NULL) |
+| `billing_invoices` | UUID PK, `customer_id` (FK, CASCADE), `subscription_id` (FK, SET NULL), `provider`, `provider_event_id` (unique, webhook idempotency), `provider_invoice_ref`, `amount_minor`, `currency`, `status`, `billing_mode`, period bounds, `paid_at`, `receipt_ref` (54-FZ) |
+| `billing_usage_records` | UUID PK, `customer_id` (FK, CASCADE), `subscription_id` (FK, CASCADE), `meter_key`, `quantity`, `occurred_at`, `idempotency_key` (unique), `recorded_at` |
+| `billing_webhook_events` | UUID PK, `provider`, `provider_event_id`, `type`, `payload_hash`, `status`, `received_at`, `processed_at`; unique `(provider, provider_event_id)` makes replays a no-op |
 
 Migration and seed commands operate on compiled JS in `dist/` — always run `npm run build` first.
 
