@@ -182,7 +182,7 @@ export class CoreModule implements NestModule {
         HealthModule,
         NotificationsModule,
         FeatureFlagsModule,
-        BillingModule
+        BillingModule.forRoot()
       ],
       providers: [
         OAuthProviderFlagAttributesRegistrar,

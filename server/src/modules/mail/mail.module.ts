@@ -1,23 +1,9 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
-import type { RedisOptions } from 'ioredis';
 import { MailService } from './mail.service';
 import { MailProcessor } from './mail.processor';
 import { MAIL_QUEUE } from './mail-queue.constants';
-
-function parseRedisConnection(url: string): RedisOptions {
-  const parsed = new URL(url);
-  return {
-    host: parsed.hostname,
-    port: parsed.port ? Number(parsed.port) : 6379,
-    ...(parsed.username
-      ? { username: decodeURIComponent(parsed.username) }
-      : {}),
-    ...(parsed.password
-      ? { password: decodeURIComponent(parsed.password) }
-      : {})
-  };
-}
+import { parseRedisConnection } from '../../common/utils/parse-redis-connection';
 
 @Module({})
 export class MailModule {
