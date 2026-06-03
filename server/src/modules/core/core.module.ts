@@ -31,6 +31,7 @@ import { MetricsModule } from './metrics/metrics.module';
 import { HttpMetricsInterceptor } from './interceptors/http-metrics.interceptor';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
+import { BillingModule } from '../billing/billing.module';
 import { OAuthProviderFlagAttributesRegistrar } from '../auth/registrars/oauth-provider-flag-attributes.registrar';
 
 @Module({})
@@ -180,7 +181,8 @@ export class CoreModule implements NestModule {
         UsersModule,
         HealthModule,
         NotificationsModule,
-        FeatureFlagsModule
+        FeatureFlagsModule,
+        BillingModule
       ],
       providers: [
         OAuthProviderFlagAttributesRegistrar,
