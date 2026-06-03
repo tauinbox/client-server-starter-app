@@ -53,7 +53,6 @@ export type CustomerResponse = {
   userId: string;
   provider: BillingProviderId;
   providerOverride: BillingProviderId | null;
-  providerCustomerId: string | null;
   country: string;
   currency: string;
   defaultPaymentMethodId: string | null;
