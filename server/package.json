@@ -126,6 +126,9 @@
     "lodash": "^4.18.1",
     "micromatch": {
       "picomatch": "2.3.2"
+    },
+    "@a2seven/yoo-checkout": {
+      "axios": "$axios"
     }
   },
   "jest": {
