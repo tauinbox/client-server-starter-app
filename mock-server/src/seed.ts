@@ -1,5 +1,10 @@
 import { faker } from '@faker-js/faker';
-import { OAUTH_PROVIDER_FLAGS } from '@app/shared/constants';
+import {
+  BILLING_CONFIGURED_ATTRIBUTE,
+  BILLING_FLAG_KEY,
+  BILLING_PROVIDER_FLAGS,
+  OAUTH_PROVIDER_FLAGS
+} from '@app/shared/constants';
 import { createMockUser, createOAuthAccount } from './factories';
 import type {
   MockUser,
@@ -473,6 +478,37 @@ function generateFeatureFlags(): MockFeatureFlag[] {
       updatedByUserId: null,
       createdAt: now,
       updatedAt: now
+    })),
+    // Public `billing` flag gated (rule below) on the `billingConfigured`
+    // signal — the mock marks every provider configured, so billing UI shows in
+    // dev / E2E.
+    {
+      id: `flag-${BILLING_FLAG_KEY}`,
+      key: BILLING_FLAG_KEY,
+      description:
+        'Show billing (gated by at least one provider being configured)',
+      enabled: true,
+      environments: [],
+      public: true,
+      version: 1,
+      updatedByUserId: null,
+      createdAt: now,
+      updatedAt: now
+    },
+    // Per-provider admin kill-switches consumed by the geo-router. Enabled here
+    // (unlike the real server's disabled default) so checkout flows resolve a
+    // provider in E2E.
+    ...BILLING_PROVIDER_FLAGS.map(({ provider, enabledFlagKey }) => ({
+      id: `flag-${enabledFlagKey}`,
+      key: enabledFlagKey,
+      description: `Admin kill-switch enabling the ${provider} billing provider`,
+      enabled: true,
+      environments: [],
+      public: false,
+      version: 1,
+      updatedByUserId: null,
+      createdAt: now,
+      updatedAt: now
     }))
   ];
 }
@@ -503,7 +539,22 @@ function generateFeatureFlagRules(): MockFeatureFlagRule[] {
       },
       createdAt: now,
       updatedAt: now
-    }))
+    })),
+    {
+      id: `rule-${BILLING_FLAG_KEY}-configured`,
+      flagId: `flag-${BILLING_FLAG_KEY}`,
+      type: 'attribute' as const,
+      effect: 'include' as const,
+      payload: {
+        type: 'attribute' as const,
+        field: 'custom' as const,
+        op: 'eq' as const,
+        value: true,
+        customKey: BILLING_CONFIGURED_ATTRIBUTE
+      },
+      createdAt: now,
+      updatedAt: now
+    }
   ];
 }
 

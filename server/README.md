@@ -105,6 +105,11 @@ Copy `.env.example` to `.env` and configure:
 | `DB_POOL_CONNECTION_TIMEOUT` | `5000` | Milliseconds to wait for a connection before erroring |
 | `CORS_ORIGINS` | - | Comma-separated allowed origins (e.g. `https://app.example.com,https://admin.example.com`); `*` is rejected in production |
 | `TRUSTED_PROXIES` | - (local), `loopback,uniquelocal` (docker-compose) | Express `trust proxy` setting. Required behind a reverse proxy so `req.ip` resolves to the real client (see [Deployment behind a reverse proxy](#deployment-behind-a-reverse-proxy)). Accepts `loopback` / `linklocal` / `uniquelocal`, a comma-separated IP/CIDR list, a hop count (e.g. `1`), or `true`. The application has no built-in default — leave the env var empty to disable. The repo's `docker-compose.yml` overrides this to `loopback,uniquelocal` for prod deployments behind a host-local reverse proxy or a docker-bridge sidecar; export `TRUSTED_PROXIES` in the shell to override. |
+| `PADDLE_API_KEY` | - | Paddle server API key. Paired with `PADDLE_WEBHOOK_SECRET`; both must be set for Paddle to count as configured |
+| `PADDLE_WEBHOOK_SECRET` | - | Paddle webhook HMAC secret for signature verification |
+| `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Paired with `YOOKASSA_SECRET_KEY`; both must be set for YooKassa to count as configured |
+| `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
+| `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency for new customers (`USD` or `RUB`). Billing UI stays hidden until at least one provider is configured |
 
 ## Architecture
 
@@ -184,7 +189,8 @@ src/
 │   ├── providers/          # PaymentProvider interface + NormalizedEvent + Paddle/YooKassa stubs (M1) behind the BILLING_PROVIDERS token
 │   ├── rating/             # RatingStrategy interface + FixedRating (real) + UsageRating (M2 stub)
 │   ├── webhooks/           # @Public() POST webhooks/{paddle,yookassa} (RawBodyRequest) → WebhookIngestionService: verify via provider seam, idempotent insert on unique (provider, provider_event_id), enqueue reduction on BullMQ (inline without Redis); reducer lands in M1
-│   └── config/             # BillingConfigService — env-derived paddle/yookassa "configured" booleans
+│   ├── config/             # BillingConfigService — env-derived paddle/yookassa "configured" booleans
+│   └── registrars/         # BillingConfiguredAttributesRegistrar — registers paddleConfigured/yookassaConfigured + combined billingConfigured feature-flag attributes; public `billing` flag gates the UI on configuration, per-provider billing.provider.*.enabled admin kill-switches gate the geo-router
 └── users/
     ├── controllers/        # UsersController (CRUD + search, all endpoints use @Authorize([action, 'User']))
     ├── services/           # UsersService

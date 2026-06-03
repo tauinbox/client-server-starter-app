@@ -1,6 +1,11 @@
 import { Seeder } from '@jorgebodega/typeorm-seeding';
 import { DataSource } from 'typeorm';
-import { OAUTH_PROVIDER_FLAGS } from '@app/shared/constants';
+import {
+  BILLING_CONFIGURED_ATTRIBUTE,
+  BILLING_FLAG_KEY,
+  BILLING_PROVIDER_FLAGS,
+  OAUTH_PROVIDER_FLAGS
+} from '@app/shared/constants';
 import { FeatureFlag } from '../modules/feature-flags/entities/feature-flag.entity';
 import { FeatureFlagRule } from '../modules/feature-flags/entities/feature-flag-rule.entity';
 
@@ -71,6 +76,51 @@ export default class FeatureFlagsSeeder extends Seeder {
           }
         })
       )
+    );
+
+    // Public `billing` flag (UI availability): enabled by default and gated by
+    // an attribute rule on `billingConfigured` — so billing stays hidden until
+    // at least one provider is env-configured. The per-provider admin
+    // kill-switch flags (consumed by the geo-router) are seeded off; an admin
+    // enables each provider explicitly.
+    const billingFlag = flagRepo.create({
+      key: BILLING_FLAG_KEY,
+      description:
+        'Show billing (gated by at least one provider being configured)',
+      enabled: true,
+      environments: [],
+      public: true,
+      version: 1
+    });
+    const providerFlags = BILLING_PROVIDER_FLAGS.map(
+      ({ provider, enabledFlagKey }) =>
+        flagRepo.create({
+          key: enabledFlagKey,
+          description: `Admin kill-switch enabling the ${provider} billing provider`,
+          enabled: false,
+          environments: [],
+          public: false,
+          version: 1
+        })
+    );
+    const [savedBillingFlag] = await flagRepo.save([
+      billingFlag,
+      ...providerFlags
+    ]);
+
+    await ruleRepo.save(
+      ruleRepo.create({
+        flagId: savedBillingFlag.id,
+        type: 'attribute',
+        effect: 'include',
+        payload: {
+          type: 'attribute',
+          field: 'custom',
+          op: 'eq',
+          value: true,
+          customKey: BILLING_CONFIGURED_ATTRIBUTE
+        }
+      })
     );
   }
 }

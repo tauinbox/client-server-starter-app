@@ -413,6 +413,11 @@ Edit `.env` with your database credentials and settings:
 | `ADMIN_LAST_NAME` | `User` | Last name for the initial admin user |
 | `TURNSTILE_SITE_KEY` | - | Cloudflare Turnstile public site key. CAPTCHA on `/register` and `/forgot-password` is disabled while either key is empty. Get a real pair from `dash.cloudflare.com → Turnstile → Add site` (free). Test keys (`1x00000000000000000000AA` / `1x0000000000000000000000000000000AA`) work for local dev and CI but are public — provide zero protection in production. See [`server/README.md` → "Enabling CAPTCHA in production"](server/README.md#enabling-captcha-in-production) |
 | `TURNSTILE_SECRET_KEY` | - | Cloudflare Turnstile secret key for server-side `siteverify` calls. Paired with `TURNSTILE_SITE_KEY` |
+| `PADDLE_API_KEY` | - | Paddle server API key. Paired with `PADDLE_WEBHOOK_SECRET`; both must be set for Paddle to count as configured |
+| `PADDLE_WEBHOOK_SECRET` | - | Paddle webhook HMAC secret for signature verification |
+| `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Paired with `YOOKASSA_SECRET_KEY`; both must be set for YooKassa to count as configured |
+| `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
+| `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency for new customers (`USD` or `RUB`) |
 
 ### 3. Set up the database
 
@@ -573,6 +578,7 @@ preserved byte-for-byte. The script's header comment is the authoritative refere
 | `ADMIN_PASSWORD` | deploy, rebuild | `server/.env` | initial-admin bootstrap password |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | deploy, rebuild | `server/.env` | outgoing email |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | deploy, rebuild | `server/.env` | Cloudflare Turnstile CAPTCHA on `/register` and `/forgot-password`. Site key is public but injected the same way for rebuild-safety; CAPTCHA stays disabled while either is empty — see [Enabling CAPTCHA in production](server/README.md#enabling-captcha-in-production) |
+| `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` | deploy, rebuild | `server/.env` | Billing provider credentials. Billing stays hidden until a provider's full pair is set; left empty until a provider is connected |
 | `CI_JWT_SECRET` | ci.yml | — (CI tests only) | not used in prod |
 
 > **`DB_PASSWORD` caveat:** postgres bakes the password into its data volume on first init. Changing
@@ -581,7 +587,8 @@ preserved byte-for-byte. The script's header comment is the authoritative refere
 
 **Hand-maintained (not secrets, set directly in the VPS `server/.env`):** non-secret config —
 `CLIENT_URL`, `CORS_ORIGINS`, `TRUSTED_PROXIES`, OAuth client **IDs** (`GOOGLE_CLIENT_ID`, …),
-`ADMIN_EMAIL`, `JWT_ALGORITHM`, `JWT_MIN_IAT` (set by `rotate-keys.yml`), DB pool / logging settings.
+`ADMIN_EMAIL`, `JWT_ALGORITHM`, `JWT_MIN_IAT` (set by `rotate-keys.yml`), `BILLING_DEFAULT_CURRENCY`,
+DB pool / logging settings.
 
 **From-scratch VPS provisioning checklist:**
 1. Install Docker + Compose; create the `deploy` user and `/home/deploy/nexus`; clone the repo there.
