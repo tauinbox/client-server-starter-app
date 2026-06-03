@@ -284,22 +284,4 @@ describe('PermissionService', () => {
       expect(mockCacheManager.del).toHaveBeenCalledTimes(2);
     });
   });
-
-  describe('hasPermission', () => {
-    it('should return true if user has the permission', async () => {
-      mockUserRepository.findOne.mockResolvedValue(mockUser);
-
-      const result = await service.hasPermission('user-1', 'users:read');
-
-      expect(result).toBe(true);
-    });
-
-    it('should return false if user lacks the permission', async () => {
-      mockUserRepository.findOne.mockResolvedValue(mockUser);
-
-      const result = await service.hasPermission('user-1', 'users:delete');
-
-      expect(result).toBe(false);
-    });
-  });
 });

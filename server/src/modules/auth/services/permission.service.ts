@@ -102,9 +102,4 @@ export class PermissionService {
     await this.cacheManager.del(`${CACHE_PREFIX}${userId}`);
     await this.cacheManager.del(`${ROLES_CACHE_PREFIX}${userId}`);
   }
-
-  async hasPermission(userId: string, permission: string): Promise<boolean> {
-    const permissions = await this.getPermissionsForUser(userId);
-    return permissions.some((p) => p.permission === permission);
-  }
 }
