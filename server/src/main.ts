@@ -19,7 +19,11 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(
     CoreModule.forRoot(),
-    { bufferLogs: true }
+    // rawBody: true makes the body parsers also retain the unparsed bytes on
+    // req.rawBody — required for billing webhook signature verification. The
+    // explicit useBodyParser('json'|'urlencoded', { limit }) calls below keep
+    // their limits and gain raw-body capture (Nest forwards the rawBody flag).
+    { bufferLogs: true, rawBody: true }
   );
   app.useLogger(app.get(Logger));
 

@@ -173,8 +173,8 @@ src/
 │   ├── events/feature-flag-changed.event.ts          # { flagKey, changeType: 'created'|'updated'|'deleted'|'toggled'|'rules-replaced' }
 │   ├── listeners/feature-flag-changed.listener.ts    # Invalidates cache + bumps version + pushToAll SSE on FeatureFlagChangedEvent; per-user invalidation on UserRoleChangedEvent / UserDeletedEvent
 │   └── utils/validate-rule-payload.util.ts           # Discriminated payload validation per rule type; rejects custom attribute keys not in the registry
-├── billing/                # Subscriptions/billing foundation (registered in CoreModule.forRoot())
-│   ├── billing.module.ts   # imports FeatureFlagsModule + TypeOrmModule.forFeature([Customer, Plan, Subscription]); BILLING_PROVIDERS factory; exports BillingService + EntitlementService + EntitlementGuard
+├── billing/                # Subscriptions/billing foundation (BillingModule.forRoot() in CoreModule.forRoot())
+│   ├── billing.module.ts   # forRoot() dynamic module: FeatureFlagsModule + TypeOrmModule.forFeature([Customer, Plan, Subscription, WebhookEvent]); BILLING_PROVIDERS factory; registers the billing-webhook BullMQ queue + processor only when REDIS_URL is set; exports BillingService + EntitlementService + EntitlementGuard
 │   ├── billing.service.ts  # resolveProvider() geo-router: providerOverride ?? geoDefault(country); 503 when provider disabled/unconfigured
 │   ├── entities/           # 7 entities (Plan, Customer, PaymentMethod, Subscription, Invoice, UsageRecord, WebhookEvent) + entity-contract + serialization specs
 │   ├── dtos/               # 6 response DTOs with WireType/StructuralDiff contract checks
@@ -183,6 +183,7 @@ src/
 │   ├── listeners/          # entitlement-cache.listener (invalidate user on any entitlement-changing event) + billing-user-deleted.listener (cancel subscription at provider on UserDeletedEvent; best-effort)
 │   ├── providers/          # PaymentProvider interface + NormalizedEvent + Paddle/YooKassa stubs (M1) behind the BILLING_PROVIDERS token
 │   ├── rating/             # RatingStrategy interface + FixedRating (real) + UsageRating (M2 stub)
+│   ├── webhooks/           # @Public() POST webhooks/{paddle,yookassa} (RawBodyRequest) → WebhookIngestionService: verify via provider seam, idempotent insert on unique (provider, provider_event_id), enqueue reduction on BullMQ (inline without Redis); reducer lands in M1
 │   └── config/             # BillingConfigService — env-derived paddle/yookassa "configured" booleans
 └── users/
     ├── controllers/        # UsersController (CRUD + search, all endpoints use @Authorize([action, 'User']))

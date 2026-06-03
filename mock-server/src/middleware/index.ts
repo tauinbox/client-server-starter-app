@@ -10,6 +10,7 @@ import {
   featureFlagsAdminRouter,
   featureFlagsRouter
 } from './feature-flags.middleware';
+import billingWebhooksRouter from './billing.middleware';
 
 export function registerRoutes(app: Express): void {
   app.use('/api/health', healthRouter);
@@ -21,4 +22,5 @@ export function registerRoutes(app: Express): void {
   app.use('/api/v1/notifications', notificationsRouter);
   app.use('/api/v1/admin/feature-flags', featureFlagsAdminRouter);
   app.use('/api/v1/feature-flags', featureFlagsRouter);
+  app.use('/api/v1/billing/webhooks', billingWebhooksRouter);
 }
