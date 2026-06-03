@@ -31,3 +31,10 @@ export {
   OAUTH_PROVIDER_FLAGS,
   type OAuthProviderFlag
 } from './oauth-provider-flags.constants';
+
+export {
+  BILLING_FLAG_KEY,
+  BILLING_CONFIGURED_ATTRIBUTE,
+  BILLING_PROVIDER_FLAGS,
+  type BillingProviderFlag
+} from './billing-flags.constants';

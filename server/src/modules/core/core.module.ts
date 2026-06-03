@@ -93,7 +93,17 @@ export class CoreModule implements NestModule {
             SMTP_SECURE: Joi.string()
               .valid('true', 'false')
               .optional()
-              .allow('')
+              .allow(''),
+            // Billing provider credentials — optional/empty by default so an
+            // unconfigured provider simply makes billing unavailable. A provider
+            // counts as configured only when both of its vars are set.
+            PADDLE_API_KEY: Joi.string().optional().allow(''),
+            PADDLE_WEBHOOK_SECRET: Joi.string().optional().allow(''),
+            YOOKASSA_SHOP_ID: Joi.string().optional().allow(''),
+            YOOKASSA_SECRET_KEY: Joi.string().optional().allow(''),
+            BILLING_DEFAULT_CURRENCY: Joi.string()
+              .valid('USD', 'RUB')
+              .default('USD')
           }),
           validationOptions: {
             allowUnknown: true,

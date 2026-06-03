@@ -5,6 +5,7 @@ import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
 import { parseRedisConnection } from '../../common/utils/parse-redis-connection';
 import { BillingService } from './billing.service';
 import { BillingConfigService } from './config/billing-config.service';
+import { BillingConfiguredAttributesRegistrar } from './registrars/billing-configured-attributes.registrar';
 import { Customer } from './entities/customer.entity';
 import { Plan } from './entities/plan.entity';
 import { Subscription } from './entities/subscription.entity';
@@ -54,6 +55,7 @@ export class BillingModule {
       providers: [
         BillingService,
         BillingConfigService,
+        BillingConfiguredAttributesRegistrar,
         EntitlementService,
         EntitlementGuard,
         EntitlementCacheListener,

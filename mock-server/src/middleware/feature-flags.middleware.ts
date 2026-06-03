@@ -16,7 +16,11 @@ import type {
   FeatureFlagRuleType
 } from '@app/shared/types';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
-import { OAUTH_PROVIDER_FLAGS } from '@app/shared/constants';
+import {
+  BILLING_CONFIGURED_ATTRIBUTE,
+  BILLING_PROVIDER_FLAGS,
+  OAUTH_PROVIDER_FLAGS
+} from '@app/shared/constants';
 import { adminGuard, authenticateRequest } from '../helpers/auth.helpers';
 import { pushToAll } from '../sse-hub';
 import { getState, logAudit, toFeatureFlagResponse } from '../state';
@@ -46,18 +50,26 @@ const ATTRIBUTE_OPS: readonly FeatureFlagAttributeOp[] = [
 
 const KEY_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 
-// Mirrors the server's attribute registry. The only custom attributes are the
-// per-OAuth-provider "configured" signals registered by the server's
-// OAuthProviderFlagAttributesRegistrar; the mock environment treats every
-// provider as configured (see OAUTH_CONFIGURED_ATTRIBUTES) so the login UI
-// shows the OAuth buttons in dev / E2E.
-const KNOWN_CUSTOM_KEYS: ReadonlySet<string> = new Set(
-  OAUTH_PROVIDER_FLAGS.map((p) => p.attributeKey)
-);
+// Mirrors the server's attribute registry. The custom attributes are the
+// per-OAuth-provider "configured" signals (registered by the server's
+// OAuthProviderFlagAttributesRegistrar) plus the billing per-provider and
+// combined "configured" signals (BillingConfiguredAttributesRegistrar). The
+// mock environment treats every provider as configured (see
+// CONFIGURED_ATTRIBUTES) so the OAuth buttons and billing UI show in dev / E2E.
+const BILLING_CONFIGURED_KEYS: readonly string[] = [
+  ...BILLING_PROVIDER_FLAGS.map((p) => p.configuredAttribute),
+  BILLING_CONFIGURED_ATTRIBUTE
+];
 
-const OAUTH_CONFIGURED_ATTRIBUTES: Record<string, boolean> = Object.fromEntries(
-  OAUTH_PROVIDER_FLAGS.map((p) => [p.attributeKey, true])
-);
+const KNOWN_CUSTOM_KEYS: ReadonlySet<string> = new Set([
+  ...OAUTH_PROVIDER_FLAGS.map((p) => p.attributeKey),
+  ...BILLING_CONFIGURED_KEYS
+]);
+
+const CONFIGURED_ATTRIBUTES: Record<string, boolean> = Object.fromEntries([
+  ...OAUTH_PROVIDER_FLAGS.map((p) => [p.attributeKey, true]),
+  ...BILLING_CONFIGURED_KEYS.map((k) => [k, true])
+]);
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -417,7 +429,7 @@ function buildEvaluationContext(req: Request): FeatureFlagEvaluationContext {
       userId: null,
       anonId,
       roles: [],
-      attributes: { ...OAUTH_CONFIGURED_ATTRIBUTES },
+      attributes: { ...CONFIGURED_ATTRIBUTES },
       env
     };
   }
@@ -425,7 +437,7 @@ function buildEvaluationContext(req: Request): FeatureFlagEvaluationContext {
   const at = user.email.lastIndexOf('@');
   const emailDomain = at >= 0 ? user.email.slice(at + 1) : undefined;
   const attributes: Record<string, unknown> = {
-    ...OAUTH_CONFIGURED_ATTRIBUTES,
+    ...CONFIGURED_ATTRIBUTES,
     email: user.email
   };
   if (emailDomain) attributes['emailDomain'] = emailDomain;

@@ -4,6 +4,7 @@ import {
   ServiceUnavailableException
 } from '@nestjs/common';
 import type { BillingProviderId } from '@app/shared/types';
+import { BILLING_PROVIDER_FLAGS } from '@app/shared/constants';
 import { FeatureFlagService } from '../feature-flags/services/feature-flag.service';
 import type { Customer } from './entities/customer.entity';
 import {
@@ -12,13 +13,13 @@ import {
 } from './providers/payment-provider.interface';
 import { BillingConfigService } from './config/billing-config.service';
 
-/** Admin kill-switch flag per provider (seeded in M0.6, default off). */
-const PROVIDER_ENABLED_FLAG: Record<BillingProviderId, string> = {
-  paddle: 'billing.provider.paddle.enabled',
-  yookassa: 'billing.provider.yookassa.enabled'
-};
+/** Admin kill-switch flag per provider (seeded disabled by default). */
+const PROVIDER_ENABLED_FLAG: Record<BillingProviderId, string> =
+  Object.fromEntries(
+    BILLING_PROVIDER_FLAGS.map((p) => [p.provider, p.enabledFlagKey])
+  ) as Record<BillingProviderId, string>;
 
-/** Geo default: Russia → YooKassa (54-FZ), everywhere else → Paddle (MoR). */
+/** Geo default: country code 'RU' → YooKassa, everywhere else → Paddle. */
 function geoDefault(country: string): BillingProviderId {
   return country.toUpperCase() === 'RU' ? 'yookassa' : 'paddle';
 }
@@ -34,10 +35,10 @@ export class BillingService {
 
   /**
    * Selects the effective provider for a customer: a manual override wins over
-   * the geo default (§19). The effective provider must be both enabled (admin
+   * the geo default. The effective provider must be both enabled (admin
    * kill-switch flag) and configured (env credentials present), else billing is
    * unavailable for that geo — a `503`, the server-side enforcement behind the
-   * UI availability gating (§18.4).
+   * UI availability gating.
    */
   async resolveProvider(
     customer: Pick<Customer, 'providerOverride' | 'country'>

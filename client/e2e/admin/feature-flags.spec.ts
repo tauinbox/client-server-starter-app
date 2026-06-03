@@ -85,12 +85,14 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
       flags: Record<string, boolean>;
     };
     // Private seed flags (new-dashboard, beta-export) are not public, so anon
-    // sees only the public OAuth provider flags — which resolve true because the
-    // mock environment marks every provider configured.
+    // sees only the public OAuth provider flags and the billing flag — all of
+    // which resolve true because the mock environment marks every provider
+    // configured.
     expect(firstBody.flags).toEqual({
       'oauth-google': true,
       'oauth-facebook': true,
-      'oauth-vk': true
+      'oauth-vk': true,
+      billing: true
     });
 
     const setCookie = first.headers.get('set-cookie') ?? '';

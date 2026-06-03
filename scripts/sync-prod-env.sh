@@ -52,6 +52,10 @@ upsert SMTP_PASS              "${SMTP_PASS:-}"              "$SERVER_ENV"
 upsert SMTP_FROM              "${SMTP_FROM:-}"              "$SERVER_ENV"
 upsert TURNSTILE_SITE_KEY     "${TURNSTILE_SITE_KEY:-}"     "$SERVER_ENV"
 upsert TURNSTILE_SECRET_KEY   "${TURNSTILE_SECRET_KEY:-}"   "$SERVER_ENV"
+upsert PADDLE_API_KEY         "${PADDLE_API_KEY:-}"         "$SERVER_ENV"
+upsert PADDLE_WEBHOOK_SECRET  "${PADDLE_WEBHOOK_SECRET:-}"  "$SERVER_ENV"
+upsert YOOKASSA_SHOP_ID       "${YOOKASSA_SHOP_ID:-}"       "$SERVER_ENV"
+upsert YOOKASSA_SECRET_KEY    "${YOOKASSA_SECRET_KEY:-}"    "$SERVER_ENV"
 
 # DB_PASSWORD also feeds the postgres `db` service via root .env — keep in sync.
 upsert DB_PASSWORD            "${DB_PASSWORD:-}"            "$ROOT_ENV"
