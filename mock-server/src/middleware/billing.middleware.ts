@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
+import type { PlanResponse } from '@app/shared/types';
+import { getState, toPlanResponse } from '../state';
 
 const router = Router();
 
@@ -19,4 +21,19 @@ function handleWebhook(req: Request, res: Response): void {
 router.post('/paddle', handleWebhook);
 router.post('/yookassa', handleWebhook);
 
+// Public plan catalog. Mirrors the server's @Public() GET /billing/plans:
+// active plans only, oldest first (seed order), each carrying the per-provider
+// prices map. No auth.
+const billingRouter = Router();
+
+billingRouter.get('/plans', (_req: Request, res: Response) => {
+  const plans: PlanResponse[] = [];
+  for (const plan of getState().plans.values()) {
+    if (plan.active) plans.push(toPlanResponse(plan));
+  }
+  plans.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  res.json(plans);
+});
+
 export default router;
+export { billingRouter };

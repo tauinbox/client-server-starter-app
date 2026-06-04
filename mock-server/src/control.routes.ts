@@ -41,7 +41,8 @@ function buildStateSnapshot(state: State): StateSnapshot {
     captchaConfig: state.captchaConfig,
     captchaAttempts: state.captchaAttempts.size,
     featureFlags: Array.from(state.featureFlags.values()),
-    featureFlagRules: state.featureFlagRules
+    featureFlagRules: state.featureFlagRules,
+    plans: Array.from(state.plans.values())
   };
 }
 

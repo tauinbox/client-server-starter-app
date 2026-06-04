@@ -119,6 +119,28 @@ export interface MockFeatureFlagRule {
   updatedAt: string;
 }
 
+export interface MockPlan {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  billingMode: import('@app/shared/types').BillingMode;
+  interval: import('@app/shared/types').PlanInterval;
+  meterKey: string | null;
+  entitlements: string[];
+  limits: Record<string, number> | null;
+  trialDays: number;
+  active: boolean;
+  prices: Partial<
+    Record<
+      import('@app/shared/types').BillingProviderId,
+      import('@app/shared/types').PlanPrice
+    >
+  >;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CaptchaConfig {
   enabled: boolean;
   siteKey: string | null;
@@ -149,6 +171,9 @@ export interface State {
   auditLogs: MockAuditLog[];
   featureFlags: Map<string, MockFeatureFlag>;
   featureFlagRules: MockFeatureFlagRule[];
+  // Billing plan catalog — mirrors the server's plan seeder. The `usage` plan is
+  // seeded inactive (hidden from GET /billing/plans until the usage subsystem).
+  plans: Map<string, MockPlan>;
   // CAPTCHA — public configuration advertised via /api/v1/auth/captcha-config.
   // Default: disabled. Tests can flip via /__control/captcha to exercise the
   // soft-trigger flow without an external Turnstile dependency.
