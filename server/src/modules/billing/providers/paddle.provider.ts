@@ -1,41 +1,316 @@
-import { Injectable, NotImplementedException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  NotImplementedException,
+  ServiceUnavailableException
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import {
+  EventName,
+  Paddle,
+  type SubscriptionNotification,
+  type TransactionNotification
+} from '@paddle/paddle-node-sdk';
+import type { SubscriptionStatus } from '@app/shared/types';
+import type { Customer } from '../entities/customer.entity';
+import type { Plan } from '../entities/plan.entity';
+import { PADDLE_CLIENT } from './paddle.client';
 import type {
-  CheckoutSession,
+  CancelMode,
   ChargeResult,
+  CheckoutSession,
+  CheckoutUrls,
+  NormalizedCustomerRef,
   NormalizedEvent,
+  NormalizedInvoicePayload,
+  NormalizedPaymentFailedPayload,
+  NormalizedSubscriptionPayload,
   PaymentProvider
 } from './payment-provider.interface';
 
+/** First header value (Paddle sends a single `paddle-signature`). */
+function firstHeader(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/** Maps a Paddle subscription status onto our `SubscriptionStatus`. */
+function mapSubscriptionStatus(status: string): SubscriptionStatus {
+  switch (status) {
+    case 'trialing':
+      return 'trialing';
+    case 'active':
+      return 'active';
+    case 'past_due':
+      return 'past_due';
+    case 'canceled':
+    case 'paused':
+      return 'canceled';
+    default:
+      return 'incomplete';
+  }
+}
+
+/** Reads our `customerId`/`userId` echoed back through Paddle custom data. */
+function refFromCustomData(
+  customData: Record<string, unknown> | null | undefined
+): NormalizedCustomerRef {
+  const customerId = customData?.['customerId'];
+  const userId = customData?.['userId'];
+  return {
+    customerId: typeof customerId === 'string' ? customerId : undefined,
+    userId: typeof userId === 'string' ? userId : undefined
+  };
+}
+
 /**
- * Paddle (Merchant-of-Record, rest-of-world). Provider-managed lifecycle.
- * Stub for M0 — real checkout/webhook/cancel/refund land in M1.
+ * Paddle (Merchant-of-Record, rest-of-world). Provider-managed lifecycle:
+ * checkout opens a hosted Paddle transaction; renewals/dunning/proration happen
+ * at Paddle and arrive as webhooks, which `verifyAndParseWebhook` (HMAC via
+ * `webhooks.unmarshal`) turns into a provider-agnostic `NormalizedEvent` for the
+ * core reducer. Cancel/refund proxy the Paddle subscription/adjustment APIs.
  */
 @Injectable()
 export class PaddleProvider implements PaymentProvider {
   readonly id = 'paddle' as const;
   readonly managesLifecycle = true;
 
-  ensureCustomer(): Promise<string> {
-    throw new NotImplementedException('PaddleProvider.ensureCustomer (M1)');
+  private readonly logger = new Logger(PaddleProvider.name);
+  private readonly webhookSecret: string | undefined;
+
+  constructor(
+    @Inject(PADDLE_CLIENT) private readonly paddle: Paddle | null,
+    config: ConfigService
+  ) {
+    this.webhookSecret = config.get<string>('PADDLE_WEBHOOK_SECRET');
   }
 
-  startCheckout(): Promise<CheckoutSession> {
-    throw new NotImplementedException('PaddleProvider.startCheckout (M1)');
+  private requireClient(): Paddle {
+    if (!this.paddle) {
+      throw new ServiceUnavailableException('Paddle is not configured');
+    }
+    return this.paddle;
+  }
+
+  ensureCustomer(customer: Customer): Promise<string> {
+    if (customer.providerCustomerId) {
+      return Promise.resolve(customer.providerCustomerId);
+    }
+    // Paddle creates/links the customer during hosted checkout (it collects the
+    // email there) and we correlate back via custom data, so a standalone
+    // create — which needs an email the billing Customer doesn't carry — is not
+    // part of the M1 flow.
+    throw new NotImplementedException(
+      'Paddle links the customer during checkout; ensureCustomer is unused in M1'
+    );
+  }
+
+  async startCheckout(
+    customer: Customer,
+    plan: Plan,
+    urls: CheckoutUrls
+  ): Promise<CheckoutSession> {
+    const paddle = this.requireClient();
+    const priceId = plan.prices.paddle?.providerPriceId;
+    if (!priceId) {
+      throw new ServiceUnavailableException(
+        `Plan "${plan.key}" has no Paddle price configured`
+      );
+    }
+
+    const transaction = await paddle.transactions.create({
+      items: [{ priceId, quantity: 1 }],
+      ...(customer.providerCustomerId
+        ? { customerId: customer.providerCustomerId }
+        : {}),
+      customData: {
+        customerId: customer.id,
+        userId: customer.userId,
+        planKey: plan.key
+      },
+      checkout: { url: urls.successUrl }
+    });
+
+    const url = transaction.checkout?.url;
+    if (!url) {
+      throw new ServiceUnavailableException(
+        'Paddle did not return a checkout URL'
+      );
+    }
+    return { url, sessionRef: transaction.id };
   }
 
   chargeOffSession(): Promise<ChargeResult> {
-    throw new NotImplementedException('PaddleProvider.chargeOffSession (M1)');
+    // Paddle owns renewals; off-session charging is the self-managed (YooKassa)
+    // path. Paddle usage charges (createOneTimeCharge) land in M2.
+    throw new NotImplementedException(
+      'PaddleProvider.chargeOffSession is not applicable (provider-managed lifecycle)'
+    );
   }
 
-  cancel(): Promise<void> {
-    throw new NotImplementedException('PaddleProvider.cancel (M1)');
+  async cancel(
+    providerSubscriptionId: string,
+    mode: CancelMode
+  ): Promise<void> {
+    const paddle = this.requireClient();
+    await paddle.subscriptions.cancel(providerSubscriptionId, {
+      effectiveFrom:
+        mode === 'immediate' ? 'immediately' : 'next_billing_period'
+    });
   }
 
-  refund(): Promise<void> {
-    throw new NotImplementedException('PaddleProvider.refund (M1)');
+  async refund(providerInvoiceRef: string, amountMinor: number): Promise<void> {
+    const paddle = this.requireClient();
+    const transaction = await paddle.transactions.get(providerInvoiceRef);
+    const total = Number(transaction.details?.totals?.total ?? '0');
+
+    if (!amountMinor || amountMinor >= total) {
+      await paddle.adjustments.create({
+        transactionId: providerInvoiceRef,
+        action: 'refund',
+        type: 'full',
+        reason: 'Refund'
+      });
+      return;
+    }
+
+    // Our subscription transactions carry a single line item (one plan price),
+    // so a partial refund applies the amount to that item.
+    const lineItem = transaction.details?.lineItems?.[0];
+    if (!lineItem) {
+      throw new ServiceUnavailableException(
+        `Transaction ${providerInvoiceRef} has no line item to refund`
+      );
+    }
+    await paddle.adjustments.create({
+      transactionId: providerInvoiceRef,
+      action: 'refund',
+      type: 'partial',
+      reason: 'Refund',
+      items: [
+        { itemId: lineItem.id, type: 'partial', amount: String(amountMinor) }
+      ]
+    });
   }
 
-  verifyAndParseWebhook(): Promise<NormalizedEvent | null> {
-    return Promise.resolve(null);
+  async verifyAndParseWebhook(
+    rawBody: Buffer,
+    headers: Record<string, string | string[] | undefined>
+  ): Promise<NormalizedEvent | null> {
+    if (!this.paddle || !this.webhookSecret) {
+      return null;
+    }
+    const signature = firstHeader(headers['paddle-signature']);
+    if (!signature) {
+      return null;
+    }
+
+    try {
+      const event = await this.paddle.webhooks.unmarshal(
+        rawBody.toString('utf8'),
+        this.webhookSecret,
+        signature
+      );
+      return event ? this.normalize(event) : null;
+    } catch (error) {
+      this.logger.warn(
+        `Paddle webhook verification failed: ${(error as Error).message}`
+      );
+      return null;
+    }
+  }
+
+  /** Maps a verified Paddle event onto a provider-agnostic `NormalizedEvent`. */
+  private normalize(event: {
+    eventId: string;
+    eventType: string;
+    data: object;
+  }): NormalizedEvent | null {
+    const base = { provider: this.id, providerEventId: event.eventId };
+
+    switch (event.eventType as EventName) {
+      case EventName.SubscriptionActivated:
+      case EventName.SubscriptionCreated:
+        return {
+          ...base,
+          type: 'subscription.activated',
+          payload: this.subscriptionPayload(
+            event.data as SubscriptionNotification
+          )
+        };
+      case EventName.SubscriptionUpdated:
+        return {
+          ...base,
+          type: 'subscription.renewed',
+          payload: this.subscriptionPayload(
+            event.data as SubscriptionNotification
+          )
+        };
+      case EventName.SubscriptionPastDue:
+        return {
+          ...base,
+          type: 'subscription.past_due',
+          payload: this.subscriptionPayload(
+            event.data as SubscriptionNotification
+          )
+        };
+      case EventName.SubscriptionCanceled:
+        return {
+          ...base,
+          type: 'subscription.canceled',
+          payload: this.subscriptionPayload(
+            event.data as SubscriptionNotification
+          )
+        };
+      case EventName.TransactionCompleted:
+        return {
+          ...base,
+          type: 'invoice.paid',
+          payload: this.invoicePayload(event.data as TransactionNotification)
+        };
+      case EventName.TransactionPaymentFailed: {
+        const txn = event.data as TransactionNotification;
+        const payload: NormalizedPaymentFailedPayload = {
+          ref: refFromCustomData(txn.customData),
+          providerSubscriptionId: txn.subscriptionId
+        };
+        return { ...base, type: 'payment.failed', payload };
+      }
+      default:
+        // An event type we don't reduce — ignore it (no idempotency row).
+        return null;
+    }
+  }
+
+  private subscriptionPayload(
+    sub: SubscriptionNotification
+  ): NormalizedSubscriptionPayload {
+    const planKey: unknown = sub.customData?.['planKey'];
+    return {
+      ref: refFromCustomData(sub.customData),
+      providerSubscriptionId: sub.id,
+      status: mapSubscriptionStatus(sub.status),
+      planKey: typeof planKey === 'string' ? planKey : null,
+      currentPeriodStart: sub.currentBillingPeriod?.startsAt ?? null,
+      currentPeriodEnd: sub.currentBillingPeriod?.endsAt ?? null,
+      cancelAtPeriodEnd: sub.scheduledChange?.action === 'cancel',
+      trialEnd:
+        sub.items.find((item) => item.trialDates)?.trialDates?.endsAt ?? null
+    };
+  }
+
+  private invoicePayload(
+    txn: TransactionNotification
+  ): NormalizedInvoicePayload {
+    return {
+      ref: refFromCustomData(txn.customData),
+      providerInvoiceRef: txn.id,
+      providerSubscriptionId: txn.subscriptionId,
+      amountMinor: Number(txn.details?.totals?.total ?? '0'),
+      currency: txn.currencyCode,
+      periodStart: txn.billingPeriod?.startsAt ?? null,
+      periodEnd: txn.billingPeriod?.endsAt ?? null,
+      paidAt: txn.billedAt
+    };
   }
 }

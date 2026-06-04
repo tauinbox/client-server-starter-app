@@ -99,6 +99,9 @@ export class CoreModule implements NestModule {
             // counts as configured only when both of its vars are set.
             PADDLE_API_KEY: Joi.string().optional().allow(''),
             PADDLE_WEBHOOK_SECRET: Joi.string().optional().allow(''),
+            PADDLE_ENVIRONMENT: Joi.string()
+              .valid('sandbox', 'production')
+              .default('sandbox'),
             YOOKASSA_SHOP_ID: Joi.string().optional().allow(''),
             YOOKASSA_SECRET_KEY: Joi.string().optional().allow(''),
             BILLING_DEFAULT_CURRENCY: Joi.string()

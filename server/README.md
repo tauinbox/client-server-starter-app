@@ -107,6 +107,7 @@ Copy `.env.example` to `.env` and configure:
 | `TRUSTED_PROXIES` | - (local), `loopback,uniquelocal` (docker-compose) | Express `trust proxy` setting. Required behind a reverse proxy so `req.ip` resolves to the real client (see [Deployment behind a reverse proxy](#deployment-behind-a-reverse-proxy)). Accepts `loopback` / `linklocal` / `uniquelocal`, a comma-separated IP/CIDR list, a hop count (e.g. `1`), or `true`. The application has no built-in default — leave the env var empty to disable. The repo's `docker-compose.yml` overrides this to `loopback,uniquelocal` for prod deployments behind a host-local reverse proxy or a docker-bridge sidecar; export `TRUSTED_PROXIES` in the shell to override. |
 | `PADDLE_API_KEY` | - | Paddle server API key. Paired with `PADDLE_WEBHOOK_SECRET`; both must be set for Paddle to count as configured |
 | `PADDLE_WEBHOOK_SECRET` | - | Paddle webhook HMAC secret for signature verification |
+| `PADDLE_ENVIRONMENT` | `sandbox` | Paddle API host: `sandbox` or `production` |
 | `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Paired with `YOOKASSA_SECRET_KEY`; both must be set for YooKassa to count as configured |
 | `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
 | `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency for new customers (`USD` or `RUB`). Billing UI stays hidden until at least one provider is configured |
@@ -179,16 +180,16 @@ src/
 │   ├── listeners/feature-flag-changed.listener.ts    # Invalidates cache + bumps version + pushToAll SSE on FeatureFlagChangedEvent; per-user invalidation on UserRoleChangedEvent / UserDeletedEvent
 │   └── utils/validate-rule-payload.util.ts           # Discriminated payload validation per rule type; rejects custom attribute keys not in the registry
 ├── billing/                # Subscriptions/billing foundation (BillingModule.forRoot() in CoreModule.forRoot())
-│   ├── billing.module.ts   # forRoot() dynamic module: FeatureFlagsModule + TypeOrmModule.forFeature([Customer, Plan, Subscription, WebhookEvent]); BILLING_PROVIDERS factory; registers the billing-webhook BullMQ queue + processor only when REDIS_URL is set; exports BillingService + EntitlementService + EntitlementGuard
+│   ├── billing.module.ts   # forRoot() dynamic module: FeatureFlagsModule + TypeOrmModule.forFeature([Customer, Plan, Subscription, Invoice, WebhookEvent]); BILLING_PROVIDERS + PADDLE_CLIENT factories; registers the billing-webhook BullMQ queue + processor only when REDIS_URL is set; exports BillingService + EntitlementService + EntitlementGuard
 │   ├── billing.service.ts  # resolveProvider() geo-router: providerOverride ?? geoDefault(country); 503 when provider disabled/unconfigured
 │   ├── entities/           # 7 entities (Plan, Customer, PaymentMethod, Subscription, Invoice, UsageRecord, WebhookEvent) + entity-contract + serialization specs
 │   ├── dtos/               # 6 response DTOs with WireType/StructuralDiff contract checks
 │   ├── entitlements/       # EntitlementService.capabilitiesFor(userId) (active/trialing/past_due-in-grace → plan.entitlements, else Free), monotonic-version per-user cache; @RequireEntitlement('<cap>') decorator + EntitlementGuard (403)
 │   ├── events/             # billing.events.ts — SubscriptionActivated/Renewed/PastDue/Canceled, PlanChanged, InvoicePaid, PaymentFailed (each carries userId)
 │   ├── listeners/          # entitlement-cache.listener (invalidate user on any entitlement-changing event) + billing-user-deleted.listener (cancel subscription at provider on UserDeletedEvent; best-effort)
-│   ├── providers/          # PaymentProvider interface + NormalizedEvent + Paddle/YooKassa stubs (M1) behind the BILLING_PROVIDERS token
+│   ├── providers/          # PaymentProvider interface + NormalizedEvent behind the BILLING_PROVIDERS token; PaddleProvider (real: webhooks.unmarshal HMAC verify → NormalizedEvent, startCheckout, cancel, refund) + YooKassaProvider stub (M1); paddle.client.ts builds the SDK from env (sandbox/production) or null when unconfigured
 │   ├── rating/             # RatingStrategy interface + FixedRating (real) + UsageRating (M2 stub)
-│   ├── webhooks/           # @Public() POST webhooks/{paddle,yookassa} (RawBodyRequest) → WebhookIngestionService: verify via provider seam, idempotent insert on unique (provider, provider_event_id), enqueue reduction on BullMQ (inline without Redis); reducer lands in M1
+│   ├── webhooks/           # @Public() POST webhooks/{paddle,yookassa} (RawBodyRequest) → WebhookIngestionService: verify via provider seam, idempotent insert on unique (provider, provider_event_id), enqueue reduction on BullMQ (inline without Redis); BillingEventReducer applies the NormalizedEvent onto Subscription/Invoice in a transaction (idempotent) and emits the matching domain event
 │   ├── config/             # BillingConfigService — env-derived paddle/yookassa "configured" booleans
 │   └── registrars/         # BillingConfiguredAttributesRegistrar — registers paddleConfigured/yookassaConfigured + combined billingConfigured feature-flag attributes; public `billing` flag gates the UI on configuration, per-provider billing.provider.*.enabled admin kill-switches gate the geo-router
 └── users/

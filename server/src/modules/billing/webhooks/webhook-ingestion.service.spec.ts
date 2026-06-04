@@ -6,6 +6,7 @@ import { createHash } from 'crypto';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import { BILLING_PROVIDERS } from '../providers/payment-provider.interface';
 import type { NormalizedEvent } from '../providers/payment-provider.interface';
+import { BillingEventReducer } from './billing-event-reducer.service';
 import { WebhookIngestionService } from './webhook-ingestion.service';
 import {
   BILLING_WEBHOOK_QUEUE,
@@ -26,6 +27,7 @@ interface Harness {
   update: jest.Mock;
   add: jest.Mock;
   verify: jest.Mock;
+  reduce: jest.Mock;
 }
 
 async function buildHarness(opts: {
@@ -50,12 +52,14 @@ async function buildHarness(opts: {
   const paddle = { id: 'paddle', verifyAndParseWebhook: verify };
   const yookassa = { id: 'yookassa', verifyAndParseWebhook: jest.fn() };
   const add = jest.fn().mockResolvedValue(undefined);
+  const reduce = jest.fn().mockResolvedValue(undefined);
 
   const module: TestingModule = await Test.createTestingModule({
     providers: [
       WebhookIngestionService,
       { provide: getRepositoryToken(WebhookEvent), useValue: repo },
       { provide: BILLING_PROVIDERS, useValue: [paddle, yookassa] },
+      { provide: BillingEventReducer, useValue: { reduce } },
       ...(opts.withQueue
         ? [{ provide: getQueueToken(BILLING_WEBHOOK_QUEUE), useValue: { add } }]
         : [])
@@ -68,7 +72,8 @@ async function buildHarness(opts: {
     execute,
     update: repo.update,
     add,
-    verify
+    verify,
+    reduce
   };
 }
 
@@ -109,7 +114,7 @@ describe('WebhookIngestionService', () => {
   });
 
   it('processes a verified event once and no-ops the replay', async () => {
-    const { service, execute, update } = await buildHarness({
+    const { service, execute, update, reduce } = await buildHarness({
       withQueue: false
     });
     // First delivery inserts a row; replay hits the unique constraint (no row).
@@ -121,6 +126,9 @@ describe('WebhookIngestionService', () => {
     await service.ingest('paddle', Buffer.from('{}'), {});
 
     expect(execute).toHaveBeenCalledTimes(2);
+    // Reduce + mark-processed run once (first delivery); the replay no-ops.
+    expect(reduce).toHaveBeenCalledTimes(1);
+    expect(reduce).toHaveBeenCalledWith(event);
     expect(update).toHaveBeenCalledTimes(1);
     expect(update).toHaveBeenCalledWith(
       { id: 'wh-1' },
@@ -129,7 +137,9 @@ describe('WebhookIngestionService', () => {
   });
 
   it('enqueues reduction when a queue is configured', async () => {
-    const { service, add, update } = await buildHarness({ withQueue: true });
+    const { service, add, update, reduce } = await buildHarness({
+      withQueue: true
+    });
 
     await service.ingest('paddle', Buffer.from('{}'), {});
 
@@ -139,6 +149,7 @@ describe('WebhookIngestionService', () => {
       expect.objectContaining({ attempts: expect.any(Number) as unknown })
     );
     // With a queue the reduction is deferred to the worker, not run inline.
+    expect(reduce).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
   });
 });
