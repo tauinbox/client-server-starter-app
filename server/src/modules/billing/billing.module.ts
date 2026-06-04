@@ -3,12 +3,14 @@ import { DynamicModule, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
+import { User } from '../users/entities/user.entity';
 import { parseRedisConnection } from '../../common/utils/parse-redis-connection';
 import { BillingService } from './billing.service';
 import { BillingConfigService } from './config/billing-config.service';
 import { BillingConfiguredAttributesRegistrar } from './registrars/billing-configured-attributes.registrar';
 import { Customer } from './entities/customer.entity';
 import { Invoice } from './entities/invoice.entity';
+import { PaymentMethod } from './entities/payment-method.entity';
 import { Plan } from './entities/plan.entity';
 import { Subscription } from './entities/subscription.entity';
 import { WebhookEvent } from './entities/webhook-event.entity';
@@ -19,6 +21,10 @@ import { BillingUserDeletedListener } from './listeners/billing-user-deleted.lis
 import { PaddleProvider } from './providers/paddle.provider';
 import { PADDLE_CLIENT, createPaddleClient } from './providers/paddle.client';
 import { YooKassaProvider } from './providers/yookassa.provider';
+import {
+  YOOKASSA_CLIENT,
+  createYooKassaClient
+} from './providers/yookassa.client';
 import {
   BILLING_PROVIDERS,
   type PaymentProvider
@@ -50,7 +56,11 @@ export class BillingModule {
           Plan,
           Subscription,
           Invoice,
-          WebhookEvent
+          PaymentMethod,
+          WebhookEvent,
+          // Read-only: the YooKassa provider resolves the buyer email from the
+          // user record to fiscalize 54-FZ receipts.
+          User
         ]),
         ...(redisUrl
           ? [
@@ -80,6 +90,11 @@ export class BillingModule {
         {
           provide: PADDLE_CLIENT,
           useFactory: createPaddleClient,
+          inject: [ConfigService]
+        },
+        {
+          provide: YOOKASSA_CLIENT,
+          useFactory: createYooKassaClient,
           inject: [ConfigService]
         },
         {

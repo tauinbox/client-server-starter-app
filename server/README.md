@@ -110,6 +110,7 @@ Copy `.env.example` to `.env` and configure:
 | `PADDLE_ENVIRONMENT` | `sandbox` | Paddle API host: `sandbox` or `production` |
 | `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Paired with `YOOKASSA_SECRET_KEY`; both must be set for YooKassa to count as configured |
 | `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
+| `YOOKASSA_VAT_CODE` | `1` | VAT code on every 54-FZ receipt line (1–6, tax-regime specific; `1` = "без НДС") |
 | `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency for new customers (`USD` or `RUB`). Billing UI stays hidden until at least one provider is configured |
 
 ## Architecture
@@ -180,14 +181,14 @@ src/
 │   ├── listeners/feature-flag-changed.listener.ts    # Invalidates cache + bumps version + pushToAll SSE on FeatureFlagChangedEvent; per-user invalidation on UserRoleChangedEvent / UserDeletedEvent
 │   └── utils/validate-rule-payload.util.ts           # Discriminated payload validation per rule type; rejects custom attribute keys not in the registry
 ├── billing/                # Subscriptions/billing foundation (BillingModule.forRoot() in CoreModule.forRoot())
-│   ├── billing.module.ts   # forRoot() dynamic module: FeatureFlagsModule + TypeOrmModule.forFeature([Customer, Plan, Subscription, Invoice, WebhookEvent]); BILLING_PROVIDERS + PADDLE_CLIENT factories; registers the billing-webhook BullMQ queue + processor only when REDIS_URL is set; exports BillingService + EntitlementService + EntitlementGuard
+│   ├── billing.module.ts   # forRoot() dynamic module: FeatureFlagsModule + TypeOrmModule.forFeature([Customer, Plan, Subscription, Invoice, PaymentMethod, WebhookEvent, User (read-only, for YooKassa 54-FZ receipt email)]); BILLING_PROVIDERS + PADDLE_CLIENT + YOOKASSA_CLIENT factories; registers the billing-webhook BullMQ queue + processor only when REDIS_URL is set; exports BillingService + EntitlementService + EntitlementGuard
 │   ├── billing.service.ts  # resolveProvider() geo-router: providerOverride ?? geoDefault(country); 503 when provider disabled/unconfigured
 │   ├── entities/           # 7 entities (Plan, Customer, PaymentMethod, Subscription, Invoice, UsageRecord, WebhookEvent) + entity-contract + serialization specs
 │   ├── dtos/               # 6 response DTOs with WireType/StructuralDiff contract checks
 │   ├── entitlements/       # EntitlementService.capabilitiesFor(userId) (active/trialing/past_due-in-grace → plan.entitlements, else Free), monotonic-version per-user cache; @RequireEntitlement('<cap>') decorator + EntitlementGuard (403)
 │   ├── events/             # billing.events.ts — SubscriptionActivated/Renewed/PastDue/Canceled, PlanChanged, InvoicePaid, PaymentFailed (each carries userId)
 │   ├── listeners/          # entitlement-cache.listener (invalidate user on any entitlement-changing event) + billing-user-deleted.listener (cancel subscription at provider on UserDeletedEvent; best-effort)
-│   ├── providers/          # PaymentProvider interface + NormalizedEvent behind the BILLING_PROVIDERS token; PaddleProvider (real: webhooks.unmarshal HMAC verify → NormalizedEvent, startCheckout, cancel, refund) + YooKassaProvider stub (M1); paddle.client.ts builds the SDK from env (sandbox/production) or null when unconfigured
+│   ├── providers/          # PaymentProvider interface + NormalizedEvent behind the BILLING_PROVIDERS token; PaddleProvider (real: webhooks.unmarshal HMAC verify → NormalizedEvent, startCheckout, cancel, refund) + YooKassaProvider (real, self-managed: startCheckout = createPayment save_payment_method + redirect [zero-amount binding for trials], chargeOffSession via the saved PaymentMethod token with 54-FZ receipt + Idempotence-Key, refund with refund receipt, verifyAndParseWebhook = GET-refetch by id → NormalizedEvent; cancel is a no-op); {paddle,yookassa}.client.ts build each SDK from env or null when unconfigured
 │   ├── rating/             # RatingStrategy interface + FixedRating (real) + UsageRating (M2 stub)
 │   ├── webhooks/           # @Public() POST webhooks/{paddle,yookassa} (RawBodyRequest) → WebhookIngestionService: verify via provider seam, idempotent insert on unique (provider, provider_event_id), enqueue reduction on BullMQ (inline without Redis); BillingEventReducer applies the NormalizedEvent onto Subscription/Invoice in a transaction (idempotent) and emits the matching domain event
 │   ├── config/             # BillingConfigService — env-derived paddle/yookassa "configured" booleans

@@ -109,10 +109,15 @@ export interface PaymentProvider {
   chargeOffSession(
     customer: Customer,
     amountMinor: number,
-    receiptItems: ReceiptItem[]
+    receiptItems: ReceiptItem[],
+    idempotencyKey?: string
   ): Promise<ChargeResult>;
   cancel(providerSubscriptionId: string, mode: CancelMode): Promise<void>;
-  refund(providerInvoiceRef: string, amountMinor: number): Promise<void>;
+  refund(
+    providerInvoiceRef: string,
+    amountMinor: number,
+    idempotencyKey?: string
+  ): Promise<void>;
   verifyAndParseWebhook(
     rawBody: Buffer,
     headers: Record<string, string | string[] | undefined>
