@@ -104,6 +104,7 @@ export class CoreModule implements NestModule {
               .default('sandbox'),
             YOOKASSA_SHOP_ID: Joi.string().optional().allow(''),
             YOOKASSA_SECRET_KEY: Joi.string().optional().allow(''),
+            YOOKASSA_VAT_CODE: Joi.number().integer().min(1).max(6).default(1),
             BILLING_DEFAULT_CURRENCY: Joi.string()
               .valid('USD', 'RUB')
               .default('USD')

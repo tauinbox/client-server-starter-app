@@ -418,6 +418,7 @@ Edit `.env` with your database credentials and settings:
 | `PADDLE_ENVIRONMENT` | `sandbox` | Paddle API host: `sandbox` or `production` |
 | `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Paired with `YOOKASSA_SECRET_KEY`; both must be set for YooKassa to count as configured |
 | `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
+| `YOOKASSA_VAT_CODE` | `1` | VAT code on every 54-FZ receipt line (1–6, tax-regime specific; `1` = "без НДС") |
 | `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency for new customers (`USD` or `RUB`) |
 
 ### 3. Set up the database
