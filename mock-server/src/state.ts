@@ -11,6 +11,7 @@ import type {
   MockFeatureFlag,
   MockFeatureFlagRule,
   MockPermission,
+  MockPlan,
   MockUser,
   OAuthAccount,
   State,
@@ -20,6 +21,7 @@ import type {
   FeatureFlagResponse,
   FeatureFlagRuleResponse,
   PermissionResponse,
+  PlanResponse,
   ResolvedPermission,
   ResourceResponse,
   ActionResponse,
@@ -36,7 +38,8 @@ import {
   seedPermissions,
   seedRolePermissions,
   seedFeatureFlags,
-  seedFeatureFlagRules
+  seedFeatureFlagRules,
+  seedPlans
 } from './seed';
 
 // Each Playwright worker imports this module in its own process,
@@ -70,7 +73,8 @@ export function resetState(): void {
     featureFlagRules: seedFeatureFlagRules.map((r) => ({
       ...r,
       payload: { ...r.payload }
-    }))
+    })),
+    plans: new Map(seedPlans.map((p) => [p.id, { ...p }]))
   };
 }
 
@@ -439,6 +443,25 @@ export function toFeatureFlagResponse(
     createdAt: flag.createdAt,
     updatedAt: flag.updatedAt,
     rules
+  };
+}
+
+export function toPlanResponse(plan: MockPlan): PlanResponse {
+  return {
+    id: plan.id,
+    key: plan.key,
+    name: plan.name,
+    description: plan.description,
+    billingMode: plan.billingMode,
+    interval: plan.interval,
+    meterKey: plan.meterKey,
+    entitlements: plan.entitlements,
+    limits: plan.limits,
+    trialDays: plan.trialDays,
+    active: plan.active,
+    prices: plan.prices,
+    createdAt: plan.createdAt,
+    updatedAt: plan.updatedAt
   };
 }
 

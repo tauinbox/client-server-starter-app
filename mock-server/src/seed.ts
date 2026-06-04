@@ -15,7 +15,8 @@ import type {
   MockResource,
   MockAction,
   MockFeatureFlag,
-  MockFeatureFlagRule
+  MockFeatureFlagRule,
+  MockPlan
 } from './types';
 
 // Fixed seed for reproducible data across restarts
@@ -561,3 +562,99 @@ function generateFeatureFlagRules(): MockFeatureFlagRule[] {
 export const seedFeatureFlags: MockFeatureFlag[] = generateFeatureFlags();
 export const seedFeatureFlagRules: MockFeatureFlagRule[] =
   generateFeatureFlagRules();
+
+// Billing plan catalog — mirrors server/src/seeders/billing-plans.seeder.ts:
+// Free/Pro/Business (fixed) + an inactive `usage` tier. Two prices per tier
+// (RUB via YooKassa, USD via Paddle) in minor units.
+function generatePlans(): MockPlan[] {
+  const now = '2025-01-01T00:00:00.000Z';
+  const base = {
+    interval: 'month' as const,
+    trialDays: 0,
+    createdAt: now,
+    updatedAt: now
+  };
+  return [
+    {
+      ...base,
+      id: 'plan-free',
+      key: 'free',
+      name: 'Free',
+      description: 'Core access at no cost',
+      billingMode: 'fixed',
+      meterKey: null,
+      entitlements: [],
+      limits: null,
+      active: true,
+      prices: {
+        yookassa: { currency: 'RUB', amountMinor: 0 },
+        paddle: { currency: 'USD', amountMinor: 0 }
+      }
+    },
+    {
+      ...base,
+      id: 'plan-pro',
+      key: 'pro',
+      name: 'Pro',
+      description: 'For growing teams',
+      billingMode: 'fixed',
+      meterKey: null,
+      entitlements: ['reports', 'api-access', 'data-export'],
+      limits: { records: 10000 },
+      active: true,
+      prices: {
+        yookassa: { currency: 'RUB', amountMinor: 99000 },
+        paddle: { currency: 'USD', amountMinor: 1200 }
+      }
+    },
+    {
+      ...base,
+      id: 'plan-business',
+      key: 'business',
+      name: 'Business',
+      description: 'Advanced limits and priority support',
+      billingMode: 'fixed',
+      meterKey: null,
+      entitlements: [
+        'reports',
+        'api-access',
+        'data-export',
+        'priority-support'
+      ],
+      limits: { records: 100000 },
+      active: true,
+      prices: {
+        yookassa: { currency: 'RUB', amountMinor: 290000 },
+        paddle: { currency: 'USD', amountMinor: 2900 }
+      }
+    },
+    {
+      ...base,
+      id: 'plan-usage',
+      key: 'usage',
+      name: 'Pay as you go',
+      description: 'Pay only for what you use',
+      billingMode: 'usage',
+      meterKey: 'api_calls',
+      entitlements: ['reports', 'api-access'],
+      limits: null,
+      active: false,
+      prices: {
+        yookassa: {
+          currency: 'RUB',
+          amountMinor: 0,
+          unitPriceMinor: 200,
+          includedUnits: 0
+        },
+        paddle: {
+          currency: 'USD',
+          amountMinor: 0,
+          unitPriceMinor: 2,
+          includedUnits: 0
+        }
+      }
+    }
+  ];
+}
+
+export const seedPlans: MockPlan[] = generatePlans();

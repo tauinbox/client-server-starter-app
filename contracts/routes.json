@@ -333,6 +333,11 @@
       "expectedStatus": 200
     },
     {
+      "method": "GET",
+      "path": "/api/v1/billing/plans",
+      "expectedStatus": 200
+    },
+    {
       "method": "POST",
       "path": "/api/v1/billing/webhooks/paddle",
       "expectedStatus": 400

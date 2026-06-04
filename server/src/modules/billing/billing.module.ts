@@ -31,6 +31,8 @@ import {
 } from './providers/payment-provider.interface';
 import { FixedRating } from './rating/fixed-rating.strategy';
 import { UsageRating } from './rating/usage-rating.strategy';
+import { PlanService } from './services/plan.service';
+import { BillingPlansController } from './controllers/billing-plans.controller';
 import { BillingWebhooksController } from './webhooks/billing-webhooks.controller';
 import { WebhookIngestionService } from './webhooks/webhook-ingestion.service';
 import { BillingEventReducer } from './webhooks/billing-event-reducer.service';
@@ -71,10 +73,11 @@ export class BillingModule {
             ]
           : [])
       ],
-      controllers: [BillingWebhooksController],
+      controllers: [BillingPlansController, BillingWebhooksController],
       providers: [
         BillingService,
         BillingConfigService,
+        PlanService,
         BillingConfiguredAttributesRegistrar,
         EntitlementService,
         EntitlementGuard,

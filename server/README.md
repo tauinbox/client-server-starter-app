@@ -183,6 +183,8 @@ src/
 ├── billing/                # Subscriptions/billing foundation (BillingModule.forRoot() in CoreModule.forRoot())
 │   ├── billing.module.ts   # forRoot() dynamic module: FeatureFlagsModule + TypeOrmModule.forFeature([Customer, Plan, Subscription, Invoice, PaymentMethod, WebhookEvent, User (read-only, for YooKassa 54-FZ receipt email)]); BILLING_PROVIDERS + PADDLE_CLIENT + YOOKASSA_CLIENT factories; registers the billing-webhook BullMQ queue + processor only when REDIS_URL is set; exports BillingService + EntitlementService + EntitlementGuard
 │   ├── billing.service.ts  # resolveProvider() geo-router: providerOverride ?? geoDefault(country); 503 when provider disabled/unconfigured
+│   ├── controllers/        # BillingPlansController — @Public() GET /api/v1/billing/plans returns active plans (each carries the per-provider prices map; the client shows the price for the resolved region)
+│   ├── services/           # PlanService — findActive() (active plans, oldest first)
 │   ├── entities/           # 7 entities (Plan, Customer, PaymentMethod, Subscription, Invoice, UsageRecord, WebhookEvent) + entity-contract + serialization specs
 │   ├── dtos/               # 6 response DTOs with WireType/StructuralDiff contract checks
 │   ├── entitlements/       # EntitlementService.capabilitiesFor(userId) (active/trialing/past_due-in-grace → plan.entitlements, else Free), monotonic-version per-user cache; @RequireEntitlement('<cap>') decorator + EntitlementGuard (403)
