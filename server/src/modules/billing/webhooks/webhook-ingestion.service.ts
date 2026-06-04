@@ -17,6 +17,7 @@ import {
   BILLING_PROVIDERS,
   type PaymentProvider
 } from '../providers/payment-provider.interface';
+import { BillingEventReducer } from './billing-event-reducer.service';
 import {
   BILLING_WEBHOOK_QUEUE,
   BILLING_WEBHOOK_REDUCE_JOB,
@@ -40,6 +41,7 @@ export class WebhookIngestionService {
     private readonly webhookEvents: Repository<WebhookEvent>,
     @Inject(BILLING_PROVIDERS)
     private readonly providers: PaymentProvider[],
+    private readonly reducer: BillingEventReducer,
     @Optional()
     @InjectQueue(BILLING_WEBHOOK_QUEUE)
     private readonly queue?: Queue<BillingWebhookJobData>
@@ -108,11 +110,13 @@ export class WebhookIngestionService {
   }
 
   /**
-   * Applies a verified event. M0: marks the ledger row processed. M1 reduces
-   * `data.event` onto Subscription/Invoice in a transaction. Public so the
-   * BullMQ processor can call it; errors propagate so the worker retries.
+   * Applies a verified event: reduces it onto Subscription/Invoice in a
+   * transaction, then marks the ledger row processed. Public so the BullMQ
+   * processor can call it; errors propagate (the row stays `received`) so the
+   * worker — or the next delivery — retries.
    */
   async processEvent(data: BillingWebhookJobData): Promise<void> {
+    await this.reducer.reduce(data.event);
     await this.webhookEvents.update(
       { id: data.webhookEventId },
       { status: 'processed', processedAt: new Date() }

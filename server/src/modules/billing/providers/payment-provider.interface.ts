@@ -1,4 +1,4 @@
-import type { BillingProviderId } from '@app/shared/types';
+import type { BillingProviderId, SubscriptionStatus } from '@app/shared/types';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
 
@@ -21,6 +21,50 @@ export interface NormalizedEvent {
   providerEventId: string;
   type: NormalizedEventType;
   payload: unknown;
+}
+
+/**
+ * Identifies the affected user/customer on a normalized event. Providers echo
+ * our `customerId`/`userId` through their custom-data field at checkout so the
+ * reducer resolves the local rows without a provider-id reverse lookup.
+ */
+export interface NormalizedCustomerRef {
+  customerId?: string;
+  userId?: string;
+}
+
+/**
+ * Subscription state carried by a `subscription.*` normalized event. The reducer
+ * upserts our `Subscription` row to match this snapshot (provider is the source
+ * of truth for a `managesLifecycle` provider). Timestamps are ISO strings.
+ */
+export interface NormalizedSubscriptionPayload {
+  ref: NormalizedCustomerRef;
+  providerSubscriptionId: string;
+  status: SubscriptionStatus;
+  planKey: string | null;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  trialEnd: string | null;
+}
+
+/** Invoice state carried by an `invoice.paid` normalized event. */
+export interface NormalizedInvoicePayload {
+  ref: NormalizedCustomerRef;
+  providerInvoiceRef: string;
+  providerSubscriptionId: string | null;
+  amountMinor: number;
+  currency: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  paidAt: string | null;
+}
+
+/** Failure context carried by a `payment.failed` normalized event. */
+export interface NormalizedPaymentFailedPayload {
+  ref: NormalizedCustomerRef;
+  providerSubscriptionId: string | null;
 }
 
 export type CancelMode = 'period_end' | 'immediate';

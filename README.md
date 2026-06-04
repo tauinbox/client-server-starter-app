@@ -415,6 +415,7 @@ Edit `.env` with your database credentials and settings:
 | `TURNSTILE_SECRET_KEY` | - | Cloudflare Turnstile secret key for server-side `siteverify` calls. Paired with `TURNSTILE_SITE_KEY` |
 | `PADDLE_API_KEY` | - | Paddle server API key. Paired with `PADDLE_WEBHOOK_SECRET`; both must be set for Paddle to count as configured |
 | `PADDLE_WEBHOOK_SECRET` | - | Paddle webhook HMAC secret for signature verification |
+| `PADDLE_ENVIRONMENT` | `sandbox` | Paddle API host: `sandbox` or `production` |
 | `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Paired with `YOOKASSA_SECRET_KEY`; both must be set for YooKassa to count as configured |
 | `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
 | `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency for new customers (`USD` or `RUB`) |

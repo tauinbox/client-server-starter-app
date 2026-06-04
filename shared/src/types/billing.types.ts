@@ -23,12 +23,16 @@ export type BillingRegion = 'auto' | 'ru' | 'world';
  * One provider's price for a plan. Two prices per tier (RUB via YooKassa, USD
  * via Paddle) live keyed by provider — the resolved provider selects which is
  * charged/shown. `unitPriceMinor`/`includedUnits` apply to usage plans only.
+ * `providerPriceId` is the provider's catalog price identifier (Paddle requires
+ * a catalog `priceId` to open a subscription checkout); YooKassa charges by
+ * amount and leaves it unset.
  */
 export type PlanPrice = {
   currency: string;
   amountMinor: number;
   unitPriceMinor?: number;
   includedUnits?: number;
+  providerPriceId?: string;
 };
 
 export type PlanResponse = {
