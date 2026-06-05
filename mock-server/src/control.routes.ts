@@ -42,7 +42,11 @@ function buildStateSnapshot(state: State): StateSnapshot {
     captchaAttempts: state.captchaAttempts.size,
     featureFlags: Array.from(state.featureFlags.values()),
     featureFlagRules: state.featureFlagRules,
-    plans: Array.from(state.plans.values())
+    plans: Array.from(state.plans.values()),
+    billingCustomers: Array.from(state.billingCustomers.values()),
+    billingSubscriptions: Array.from(state.billingSubscriptions.values()),
+    billingInvoices: Array.from(state.billingInvoices.values()),
+    billingPaymentMethods: Array.from(state.billingPaymentMethods.values())
   };
 }
 

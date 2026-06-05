@@ -31,6 +31,7 @@ function buildManager(stubs: ManagerStubs) {
     Promise.resolve({ ...entity, id: entity.id ?? 'sub-new' })
   );
   const create = jest.fn((_entity: unknown, data: object) => ({ ...data }));
+  const update = jest.fn().mockResolvedValue(undefined);
   const findOne = jest.fn((entity: unknown, _opts: unknown) => {
     if (entity === Subscription) return Promise.resolve(stubs.subscription);
     if (entity === Plan) return Promise.resolve(stubs.plan);
@@ -46,7 +47,7 @@ function buildManager(stubs: ManagerStubs) {
     returning: jest.fn().mockReturnThis(),
     execute
   }));
-  return { save, create, findOne, createQueryBuilder, execute };
+  return { save, create, update, findOne, createQueryBuilder, execute };
 }
 
 async function build(stubs: Partial<ManagerStubs> = {}) {
@@ -90,9 +91,10 @@ const subPayload = (
 
 const event = (
   type: NormalizedEvent['type'],
-  payload: unknown
+  payload: unknown,
+  provider: NormalizedEvent['provider'] = 'paddle'
 ): NormalizedEvent => ({
-  provider: 'paddle',
+  provider,
   providerEventId: 'evt_1',
   type,
   payload
@@ -121,6 +123,24 @@ describe('BillingEventReducer', () => {
       expect(emit).toHaveBeenCalledWith(
         SubscriptionActivatedEvent.name,
         expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-new' })
+      );
+    });
+
+    it('stamps the event provider and derives the lifecycle owner (YooKassa = self)', async () => {
+      const { reducer, manager } = await build({
+        plan: { billingMode: 'fixed' } as Plan
+      });
+
+      await reducer.reduce(
+        event('subscription.activated', subPayload(), 'yookassa')
+      );
+
+      expect(manager.create).toHaveBeenCalledWith(
+        Subscription,
+        expect.objectContaining({
+          provider: 'yookassa',
+          lifecycleOwner: 'self'
+        })
       );
     });
 
@@ -244,6 +264,88 @@ describe('BillingEventReducer', () => {
 
       await reducer.reduce(event('invoice.paid', invoicePayload));
 
+      expect(emit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('invoice.paid — self-managed (YooKassa) activation', () => {
+    const selfManagedPayload: NormalizedInvoicePayload = {
+      ref: { customerId: 'cust-1', userId: 'user-1' },
+      providerInvoiceRef: 'pay_123',
+      providerSubscriptionId: null,
+      amountMinor: 99000,
+      currency: 'RUB',
+      periodStart: null,
+      periodEnd: null,
+      paidAt: '2026-06-01T00:05:00Z',
+      savedPaymentMethod: {
+        providerMethodRef: 'pm_tok',
+        brand: 'Visa',
+        last4: '4242'
+      }
+    };
+
+    it('persists the saved card, activates the incomplete subscription, and emits both events', async () => {
+      const { reducer, manager, emit } = await build({
+        subscription: {
+          id: 'sub-1',
+          customerId: 'cust-1',
+          provider: 'yookassa',
+          billingMode: 'fixed',
+          status: 'incomplete',
+          trialEnd: null
+        } as Subscription,
+        invoiceInsertRows: [{ id: 'inv-1' }]
+      });
+
+      await reducer.reduce(
+        event('invoice.paid', selfManagedPayload, 'yookassa')
+      );
+
+      expect(manager.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          providerMethodRef: 'pm_tok',
+          brand: 'Visa',
+          last4: '4242',
+          isDefault: true
+        })
+      );
+      expect(manager.update).toHaveBeenCalledWith(
+        Customer,
+        { id: 'cust-1' },
+        { defaultPaymentMethodId: 'sub-new' }
+      );
+      expect(manager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'sub-1', status: 'active' })
+      );
+      expect(emit).toHaveBeenCalledWith(
+        InvoicePaidEvent.name,
+        expect.objectContaining({ userId: 'user-1', invoiceId: 'inv-1' })
+      );
+      expect(emit).toHaveBeenCalledWith(
+        SubscriptionActivatedEvent.name,
+        expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
+      );
+    });
+
+    it('does not re-activate on a replayed webhook (duplicate invoice insert)', async () => {
+      const { reducer, manager, emit } = await build({
+        subscription: {
+          id: 'sub-1',
+          customerId: 'cust-1',
+          provider: 'yookassa',
+          billingMode: 'fixed',
+          status: 'incomplete',
+          trialEnd: null
+        } as Subscription,
+        invoiceInsertRows: []
+      });
+
+      await reducer.reduce(
+        event('invoice.paid', selfManagedPayload, 'yookassa')
+      );
+
+      expect(manager.update).not.toHaveBeenCalled();
       expect(emit).not.toHaveBeenCalled();
     });
   });

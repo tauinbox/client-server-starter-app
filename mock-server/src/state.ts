@@ -12,6 +12,9 @@ import type {
   MockFeatureFlagRule,
   MockPermission,
   MockPlan,
+  MockSubscription,
+  MockInvoice,
+  MockPaymentMethod,
   MockUser,
   OAuthAccount,
   State,
@@ -22,6 +25,9 @@ import type {
   FeatureFlagRuleResponse,
   PermissionResponse,
   PlanResponse,
+  SubscriptionResponse,
+  InvoiceResponse,
+  PaymentMethodResponse,
   ResolvedPermission,
   ResourceResponse,
   ActionResponse,
@@ -74,7 +80,11 @@ export function resetState(): void {
       ...r,
       payload: { ...r.payload }
     })),
-    plans: new Map(seedPlans.map((p) => [p.id, { ...p }]))
+    plans: new Map(seedPlans.map((p) => [p.id, { ...p }])),
+    billingCustomers: new Map(),
+    billingSubscriptions: new Map(),
+    billingInvoices: new Map(),
+    billingPaymentMethods: new Map()
   };
 }
 
@@ -462,6 +472,62 @@ export function toPlanResponse(plan: MockPlan): PlanResponse {
     prices: plan.prices,
     createdAt: plan.createdAt,
     updatedAt: plan.updatedAt
+  };
+}
+
+export function toSubscriptionResponse(
+  sub: MockSubscription
+): SubscriptionResponse {
+  return {
+    id: sub.id,
+    customerId: sub.customerId,
+    planKey: sub.planKey,
+    provider: sub.provider,
+    billingMode: sub.billingMode,
+    status: sub.status,
+    lifecycleOwner: sub.lifecycleOwner,
+    currentPeriodStart: sub.currentPeriodStart,
+    currentPeriodEnd: sub.currentPeriodEnd,
+    cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+    trialEnd: sub.trialEnd,
+    paymentMethodId: sub.paymentMethodId,
+    createdAt: sub.createdAt,
+    updatedAt: sub.updatedAt
+  };
+}
+
+export function toInvoiceResponse(invoice: MockInvoice): InvoiceResponse {
+  return {
+    id: invoice.id,
+    customerId: invoice.customerId,
+    subscriptionId: invoice.subscriptionId,
+    provider: invoice.provider,
+    providerInvoiceRef: invoice.providerInvoiceRef,
+    amountMinor: invoice.amountMinor,
+    currency: invoice.currency,
+    status: invoice.status,
+    billingMode: invoice.billingMode,
+    periodStart: invoice.periodStart,
+    periodEnd: invoice.periodEnd,
+    paidAt: invoice.paidAt,
+    receiptRef: invoice.receiptRef,
+    createdAt: invoice.createdAt,
+    updatedAt: invoice.updatedAt
+  };
+}
+
+export function toPaymentMethodResponse(
+  method: MockPaymentMethod
+): PaymentMethodResponse {
+  return {
+    id: method.id,
+    customerId: method.customerId,
+    provider: method.provider,
+    brand: method.brand,
+    last4: method.last4,
+    isDefault: method.isDefault,
+    createdAt: method.createdAt,
+    updatedAt: method.updatedAt
   };
 }
 

@@ -295,6 +295,15 @@ export class YooKassaProvider implements PaymentProvider {
     const ref = refFromMetadata(payment.metadata);
 
     if (payment.status === 'succeeded') {
+      const method = payment.payment_method;
+      const savedPaymentMethod =
+        method?.saved && method.id
+          ? {
+              providerMethodRef: method.id,
+              brand: method.card?.card_type ?? 'card',
+              last4: method.card?.last4 ?? '0000'
+            }
+          : null;
       const payload: NormalizedInvoicePayload = {
         ref,
         providerInvoiceRef: payment.id,
@@ -303,7 +312,8 @@ export class YooKassaProvider implements PaymentProvider {
         currency: payment.amount.currency,
         periodStart: null,
         periodEnd: null,
-        paidAt: payment.captured_at ?? payment.created_at ?? null
+        paidAt: payment.captured_at ?? payment.created_at ?? null,
+        savedPaymentMethod
       };
       return { ...base, type: 'invoice.paid', payload };
     }
