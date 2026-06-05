@@ -62,6 +62,27 @@ export class BillingService {
     return provider;
   }
 
+  /** Geo default provider for a country (no enabled/configured check). */
+  geoDefaultFor(country: string): BillingProviderId {
+    return geoDefault(country);
+  }
+
+  /**
+   * The provider the next checkout would use — a manual override wins over the
+   * geo default. Informational (the `GET /billing/region` view); unlike
+   * `resolveProvider` it does not assert availability.
+   */
+  effectiveProviderId(
+    customer: Pick<Customer, 'providerOverride' | 'country'>
+  ): BillingProviderId {
+    return customer.providerOverride ?? geoDefault(customer.country);
+  }
+
+  /** Looks up a registered provider instance by id (cancel/refund dispatch). */
+  getProviderById(id: BillingProviderId): PaymentProvider | undefined {
+    return this.providers.find((p) => p.id === id);
+  }
+
   private async isProviderEnabled(
     provider: BillingProviderId
   ): Promise<boolean> {

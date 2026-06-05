@@ -49,6 +49,17 @@ export interface NormalizedSubscriptionPayload {
   trialEnd: string | null;
 }
 
+/**
+ * A card saved during a self-managed (YooKassa) first payment — the off-session
+ * autopay reference the reducer persists as a `PaymentMethod`. Absent for
+ * provider-managed (Paddle) invoices, where the provider holds the method.
+ */
+export interface NormalizedSavedPaymentMethod {
+  providerMethodRef: string;
+  brand: string;
+  last4: string;
+}
+
 /** Invoice state carried by an `invoice.paid` normalized event. */
 export interface NormalizedInvoicePayload {
   ref: NormalizedCustomerRef;
@@ -59,6 +70,11 @@ export interface NormalizedInvoicePayload {
   periodStart: string | null;
   periodEnd: string | null;
   paidAt: string | null;
+  /**
+   * Present only on the self-managed first payment (`save_payment_method`): the
+   * reducer stores it and activates the local subscription keyed by customer id.
+   */
+  savedPaymentMethod?: NormalizedSavedPaymentMethod | null;
 }
 
 /** Failure context carried by a `payment.failed` normalized event. */

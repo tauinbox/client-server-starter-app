@@ -338,6 +338,46 @@
       "expectedStatus": 200
     },
     {
+      "method": "GET",
+      "path": "/api/v1/billing/subscription",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/billing/invoices",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/billing/payment-method",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/billing/checkout",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/billing/subscription/cancel",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/billing/region",
+      "expectedStatus": 401
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/billing/region",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/billing/premium-content",
+      "expectedStatus": 401
+    },
+    {
       "method": "POST",
       "path": "/api/v1/billing/webhooks/paddle",
       "expectedStatus": 400

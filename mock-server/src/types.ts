@@ -141,6 +141,66 @@ export interface MockPlan {
   updatedAt: string;
 }
 
+export interface MockCustomer {
+  id: string;
+  userId: string;
+  provider: import('@app/shared/types').BillingProviderId;
+  providerOverride: import('@app/shared/types').BillingProviderId | null;
+  country: string;
+  currency: string;
+  defaultPaymentMethodId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MockSubscription {
+  id: string;
+  customerId: string;
+  planKey: string;
+  provider: import('@app/shared/types').BillingProviderId;
+  billingMode: import('@app/shared/types').BillingMode;
+  status: import('@app/shared/types').SubscriptionStatus;
+  lifecycleOwner: 'provider' | 'self';
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelAtPeriodEnd: boolean;
+  trialEnd: string | null;
+  paymentMethodId: string | null;
+  providerSubscriptionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MockInvoice {
+  id: string;
+  customerId: string;
+  subscriptionId: string | null;
+  provider: import('@app/shared/types').BillingProviderId;
+  providerInvoiceRef: string;
+  amountMinor: number;
+  currency: string;
+  status: import('@app/shared/types').InvoiceStatus;
+  billingMode: import('@app/shared/types').BillingMode;
+  periodStart: string;
+  periodEnd: string;
+  paidAt: string | null;
+  receiptRef: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MockPaymentMethod {
+  id: string;
+  customerId: string;
+  provider: import('@app/shared/types').BillingProviderId;
+  providerMethodRef: string;
+  brand: string;
+  last4: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CaptchaConfig {
   enabled: boolean;
   siteKey: string | null;
@@ -174,6 +234,12 @@ export interface State {
   // Billing plan catalog — mirrors the server's plan seeder. The `usage` plan is
   // seeded inactive (hidden from GET /billing/plans until the usage subsystem).
   plans: Map<string, MockPlan>;
+  // Billing customers/subscriptions/invoices/payment methods — created on demand
+  // by checkout / region changes, mirroring the server's per-user scoping.
+  billingCustomers: Map<string, MockCustomer>;
+  billingSubscriptions: Map<string, MockSubscription>;
+  billingInvoices: Map<string, MockInvoice>;
+  billingPaymentMethods: Map<string, MockPaymentMethod>;
   // CAPTCHA — public configuration advertised via /api/v1/auth/captcha-config.
   // Default: disabled. Tests can flip via /__control/captcha to exercise the
   // soft-trigger flow without an external Turnstile dependency.
