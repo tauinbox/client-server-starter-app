@@ -18,6 +18,8 @@ function createSubscription(
     trialEnd: null,
     providerSubscriptionId: 'sub_secret_ref',
     paymentMethodId: null,
+    dunningAttempts: 0,
+    nextRenewalAttemptAt: null,
     createdAt: new Date('2025-01-01T00:00:00Z'),
     updatedAt: new Date('2025-01-01T00:00:00Z'),
     ...overrides
@@ -28,6 +30,12 @@ describe('Subscription entity serialization', () => {
   it('hides providerSubscriptionId (provider reference)', () => {
     const plain = instanceToPlain(createSubscription());
     expect(plain).not.toHaveProperty('providerSubscriptionId');
+  });
+
+  it('hides internal dunning state', () => {
+    const plain = instanceToPlain(createSubscription());
+    expect(plain).not.toHaveProperty('dunningAttempts');
+    expect(plain).not.toHaveProperty('nextRenewalAttemptAt');
   });
 
   it('keeps the public wire fields', () => {

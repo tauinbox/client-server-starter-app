@@ -10,8 +10,7 @@ import { In, Repository } from 'typeorm';
 import type {
   BillingProviderId,
   BillingRegion,
-  CheckoutSessionResponse,
-  PlanInterval
+  CheckoutSessionResponse
 } from '@app/shared/types';
 import { User } from '../../users/entities/user.entity';
 import { Customer } from '../entities/customer.entity';
@@ -21,6 +20,7 @@ import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import type { CancelMode } from '../providers/payment-provider.interface';
+import { addInterval } from '../utils/period.util';
 import { BillingService } from '../billing.service';
 
 /** Subscriptions that grant access — re-checkout while one exists is blocked. */
@@ -47,17 +47,6 @@ function regionForOverride(override: BillingProviderId | null): BillingRegion {
   if (override === 'yookassa') return 'ru';
   if (override === 'paddle') return 'world';
   return 'auto';
-}
-
-/** Advances `from` by one plan interval — the local period end seed at checkout. */
-function addInterval(from: Date, interval: PlanInterval): Date {
-  const end = new Date(from);
-  if (interval === 'year') {
-    end.setFullYear(end.getFullYear() + 1);
-  } else {
-    end.setMonth(end.getMonth() + 1);
-  }
-  return end;
 }
 
 /**

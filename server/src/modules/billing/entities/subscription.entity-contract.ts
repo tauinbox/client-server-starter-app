@@ -1,8 +1,11 @@
 import type { Subscription } from './subscription.entity';
 import type { SubscriptionResponse, _AssertNever } from '@app/shared/types';
 
-/** Provider subscription reference, @Exclude()-d from the wire format. */
-type _ExcludedFields = 'providerSubscriptionId';
+/** Provider reference + internal dunning state, @Exclude()-d from the wire. */
+type _ExcludedFields =
+  | 'providerSubscriptionId'
+  | 'dunningAttempts'
+  | 'nextRenewalAttemptAt';
 
 type _EntityFieldCoverage = _AssertNever<
   Exclude<keyof Subscription, keyof SubscriptionResponse | _ExcludedFields>

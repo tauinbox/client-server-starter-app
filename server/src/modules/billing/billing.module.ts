@@ -40,6 +40,9 @@ import { WebhookIngestionService } from './webhooks/webhook-ingestion.service';
 import { BillingEventReducer } from './webhooks/billing-event-reducer.service';
 import { BillingWebhookProcessor } from './webhooks/billing-webhook.processor';
 import { BILLING_WEBHOOK_QUEUE } from './webhooks/billing-webhook-queue.constants';
+import { RenewalService } from './renewals/renewal.service';
+import { RenewalProcessor } from './renewals/renewal.processor';
+import { BILLING_RENEWAL_QUEUE } from './renewals/renewal-queue.constants';
 
 @Module({})
 export class BillingModule {
@@ -50,6 +53,13 @@ export class BillingModule {
    */
   static forRoot(): DynamicModule {
     const redisUrl = process.env['REDIS_URL'];
+    // The renewal scheduler self-registers a repeatable scan on bootstrap, so —
+    // unlike the on-demand webhook processor — it would fire in every booted app.
+    // Skip it under Jest: the short-lived test apps would otherwise pollute Redis
+    // with schedulers and race the scan against DataSource teardown. RenewalService
+    // is still provided and exercised directly in tests.
+    const renewalEnabled =
+      Boolean(redisUrl) && process.env['NODE_ENV'] !== 'test';
 
     return {
       module: BillingModule,
@@ -71,6 +81,14 @@ export class BillingModule {
               BullModule.registerQueue({
                 name: BILLING_WEBHOOK_QUEUE,
                 connection: parseRedisConnection(redisUrl)
+              })
+            ]
+          : []),
+        ...(renewalEnabled
+          ? [
+              BullModule.registerQueue({
+                name: BILLING_RENEWAL_QUEUE,
+                connection: parseRedisConnection(redisUrl as string)
               })
             ]
           : [])
@@ -96,7 +114,9 @@ export class BillingModule {
         UsageRating,
         WebhookIngestionService,
         BillingEventReducer,
+        RenewalService,
         ...(redisUrl ? [BillingWebhookProcessor] : []),
+        ...(renewalEnabled ? [RenewalProcessor] : []),
         {
           provide: PADDLE_CLIENT,
           useFactory: createPaddleClient,

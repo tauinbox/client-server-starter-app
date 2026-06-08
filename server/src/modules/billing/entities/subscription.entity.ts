@@ -54,6 +54,20 @@ export class Subscription {
   @Column({ name: 'payment_method_id', type: 'uuid', nullable: true })
   paymentMethodId: string | null;
 
+  /** Consecutive failed self-managed charges; resets to 0 on a successful one. */
+  @Column({ name: 'dunning_attempts', type: 'integer', default: 0 })
+  @Exclude()
+  dunningAttempts: number;
+
+  /** When the renewal scheduler next retries a `past_due` self-managed charge. */
+  @Column({
+    name: 'next_renewal_attempt_at',
+    type: 'timestamp',
+    nullable: true
+  })
+  @Exclude()
+  nextRenewalAttemptAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
