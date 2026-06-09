@@ -1,0 +1,14 @@
+{
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/health/live",
+      "expectedStatus": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/health/ready",
+      "expectedStatus": 200
+    }
+  ]
+}

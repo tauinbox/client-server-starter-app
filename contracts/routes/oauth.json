@@ -1,0 +1,54 @@
+{
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oauth/accounts",
+      "expectedStatus": 401
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/auth/oauth/accounts/google",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oauth/google",
+      "expectedStatus": 501
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oauth/google/callback",
+      "expectedStatus": 501
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oauth/facebook",
+      "expectedStatus": 501
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oauth/facebook/callback",
+      "expectedStatus": 501
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oauth/vk",
+      "expectedStatus": 501
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oauth/vk/callback",
+      "expectedStatus": 501
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/oauth/exchange",
+      "expectedStatus": 501
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/oauth/link-init",
+      "expectedStatus": 401
+    }
+  ]
+}
