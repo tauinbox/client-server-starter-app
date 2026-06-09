@@ -13,7 +13,7 @@ import {
   toPlanResponse,
   toSubscriptionResponse
 } from '../state';
-import { authGuard } from '../helpers/auth.helpers';
+import { adminGuard, authGuard } from '../helpers/auth.helpers';
 import type {
   AuthenticatedRequest,
   MockCustomer,
@@ -372,5 +372,111 @@ billingRouter.get(
   }
 );
 
+// ---------------------------------------------------------------------------
+// Admin billing (design §11). CASL `manage Billing` is mirrored by adminGuard:
+// 401 unauthenticated, 403 non-admin. Reads and mutations are addressed by
+// entity id across all customers (no per-caller scoping).
+// ---------------------------------------------------------------------------
+const billingAdminRouter = Router();
+
+billingAdminRouter.get(
+  '/subscriptions',
+  adminGuard,
+  (_req: Request, res: Response) => {
+    const subs = [...getState().billingSubscriptions.values()]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map(toSubscriptionResponse);
+    res.json(subs);
+  }
+);
+
+billingAdminRouter.get(
+  '/invoices',
+  adminGuard,
+  (_req: Request, res: Response) => {
+    const invoices = [...getState().billingInvoices.values()]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map(toInvoiceResponse);
+    res.json(invoices);
+  }
+);
+
+billingAdminRouter.post(
+  '/subscriptions/:id/cancel',
+  adminGuard,
+  (req: Request, res: Response) => {
+    const mode = req.body?.mode ?? 'period_end';
+    if (mode !== 'period_end' && mode !== 'immediate') {
+      res.status(400).json({
+        message: 'mode must be one of: period_end, immediate',
+        statusCode: 400
+      });
+      return;
+    }
+
+    const sub = getState().billingSubscriptions.get(
+      (req.params['id'] as string) ?? ''
+    );
+    if (!sub) {
+      res
+        .status(404)
+        .json({ message: 'Subscription not found', statusCode: 404 });
+      return;
+    }
+
+    if (mode === 'immediate') {
+      sub.status = 'canceled';
+      sub.cancelAtPeriodEnd = false;
+    } else {
+      sub.cancelAtPeriodEnd = true;
+    }
+    sub.updatedAt = new Date().toISOString();
+    res.json(toSubscriptionResponse(sub));
+  }
+);
+
+billingAdminRouter.post(
+  '/invoices/:id/refund',
+  adminGuard,
+  (req: Request, res: Response) => {
+    const invoice = getState().billingInvoices.get(
+      (req.params['id'] as string) ?? ''
+    );
+    if (!invoice) {
+      res.status(404).json({ message: 'Invoice not found', statusCode: 404 });
+      return;
+    }
+    if (invoice.status !== 'paid') {
+      res.status(409).json({
+        message: 'Only paid invoices can be refunded',
+        statusCode: 409
+      });
+      return;
+    }
+
+    const amountMinor = req.body?.amountMinor;
+    if (amountMinor !== undefined) {
+      if (
+        !Number.isInteger(amountMinor) ||
+        amountMinor <= 0 ||
+        amountMinor > invoice.amountMinor
+      ) {
+        res.status(400).json({
+          message: 'Refund amount must be between 1 and the invoice total',
+          statusCode: 400
+        });
+        return;
+      }
+    }
+
+    const refundAmount = amountMinor ?? invoice.amountMinor;
+    if (refundAmount === invoice.amountMinor) {
+      invoice.status = 'refunded';
+    }
+    invoice.updatedAt = new Date().toISOString();
+    res.json(toInvoiceResponse(invoice));
+  }
+);
+
 export default router;
-export { billingRouter };
+export { billingRouter, billingAdminRouter };

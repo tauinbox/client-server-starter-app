@@ -2,6 +2,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { DynamicModule, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuthModule } from '../auth/auth.module';
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
 import { User } from '../users/entities/user.entity';
 import { parseRedisConnection } from '../../common/utils/parse-redis-connection';
@@ -33,8 +34,10 @@ import { FixedRating } from './rating/fixed-rating.strategy';
 import { UsageRating } from './rating/usage-rating.strategy';
 import { PlanService } from './services/plan.service';
 import { BillingUserService } from './services/billing-user.service';
+import { BillingAdminService } from './services/billing-admin.service';
 import { BillingPlansController } from './controllers/billing-plans.controller';
 import { BillingUserController } from './controllers/billing-user.controller';
+import { BillingAdminController } from './controllers/billing-admin.controller';
 import { BillingWebhooksController } from './webhooks/billing-webhooks.controller';
 import { WebhookIngestionService } from './webhooks/webhook-ingestion.service';
 import { BillingEventReducer } from './webhooks/billing-event-reducer.service';
@@ -64,6 +67,7 @@ export class BillingModule {
     return {
       module: BillingModule,
       imports: [
+        AuthModule,
         FeatureFlagsModule,
         TypeOrmModule.forFeature([
           Customer,
@@ -96,6 +100,7 @@ export class BillingModule {
       controllers: [
         BillingPlansController,
         BillingUserController,
+        BillingAdminController,
         BillingWebhooksController
       ],
       providers: [
@@ -103,6 +108,7 @@ export class BillingModule {
         BillingConfigService,
         PlanService,
         BillingUserService,
+        BillingAdminService,
         BillingConfiguredAttributesRegistrar,
         EntitlementService,
         EntitlementGuard,
