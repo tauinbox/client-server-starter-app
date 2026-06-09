@@ -201,6 +201,18 @@ export interface MockPaymentMethod {
   updatedAt: string;
 }
 
+export interface MockUsageRecord {
+  id: string;
+  customerId: string;
+  subscriptionId: string;
+  meterKey: string;
+  quantity: number;
+  occurredAt: string;
+  // Idempotency anchor (server: unique column). Never serialized to the wire.
+  idempotencyKey: string;
+  recordedAt: string;
+}
+
 export interface CaptchaConfig {
   enabled: boolean;
   siteKey: string | null;
@@ -240,6 +252,7 @@ export interface State {
   billingSubscriptions: Map<string, MockSubscription>;
   billingInvoices: Map<string, MockInvoice>;
   billingPaymentMethods: Map<string, MockPaymentMethod>;
+  billingUsageRecords: Map<string, MockUsageRecord>;
   // CAPTCHA — public configuration advertised via /api/v1/auth/captcha-config.
   // Default: disabled. Tests can flip via /__control/captcha to exercise the
   // soft-trigger flow without an external Turnstile dependency.

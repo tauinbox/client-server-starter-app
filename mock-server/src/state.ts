@@ -15,6 +15,7 @@ import type {
   MockSubscription,
   MockInvoice,
   MockPaymentMethod,
+  MockUsageRecord,
   MockUser,
   OAuthAccount,
   State,
@@ -28,6 +29,7 @@ import type {
   SubscriptionResponse,
   InvoiceResponse,
   PaymentMethodResponse,
+  UsageResponse,
   ResolvedPermission,
   ResourceResponse,
   ActionResponse,
@@ -83,6 +85,7 @@ export function resetState(): void {
     plans: new Map(seedPlans.map((p) => [p.id, { ...p }])),
     billingCustomers: new Map(),
     billingSubscriptions: new Map(),
+    billingUsageRecords: new Map(),
     billingInvoices: new Map(),
     billingPaymentMethods: new Map()
   };
@@ -513,6 +516,18 @@ export function toInvoiceResponse(invoice: MockInvoice): InvoiceResponse {
     receiptRef: invoice.receiptRef,
     createdAt: invoice.createdAt,
     updatedAt: invoice.updatedAt
+  };
+}
+
+export function toUsageResponse(record: MockUsageRecord): UsageResponse {
+  return {
+    id: record.id,
+    customerId: record.customerId,
+    subscriptionId: record.subscriptionId,
+    meterKey: record.meterKey,
+    quantity: record.quantity,
+    occurredAt: record.occurredAt,
+    recordedAt: record.recordedAt
   };
 }
 

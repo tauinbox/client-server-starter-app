@@ -20,8 +20,10 @@ import * as request from 'supertest';
 import type { Server } from 'http';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
+import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
 import { BillingAdminService } from '../src/modules/billing/services/billing-admin.service';
+import { UsageService } from '../src/modules/billing/services/usage.service';
 import { BillingAdminController } from '../src/modules/billing/controllers/billing-admin.controller';
 
 class TestPermissionsGuard implements CanActivate {
@@ -86,6 +88,9 @@ describe('Billing admin (e2e)', () => {
     cancelSubscription: jest.fn(),
     refundInvoice: jest.fn()
   };
+  const usage = {
+    record: jest.fn()
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -94,6 +99,7 @@ describe('Billing admin (e2e)', () => {
       controllers: [BillingAdminController],
       providers: [
         { provide: BillingAdminService, useValue: billingAdmin },
+        { provide: UsageService, useValue: usage },
         Reflector
       ]
     })
@@ -200,5 +206,64 @@ describe('Billing admin (e2e)', () => {
       .send({ amountMinor: -5 })
       .expect(400);
     expect(billingAdmin.refundInvoice).not.toHaveBeenCalled();
+  });
+
+  it('records a usage event for an admin and hides the idempotency key', async () => {
+    usage.record.mockResolvedValue(
+      Object.assign(new UsageRecord(), {
+        id: 'usage-1',
+        customerId: uuid,
+        subscriptionId: 'sub-1',
+        meterKey: 'api_calls',
+        quantity: 42,
+        occurredAt: new Date('2026-06-01T00:00:00Z'),
+        idempotencyKey: 'evt-secret',
+        recordedAt: new Date('2026-06-01T00:00:01Z')
+      })
+    );
+
+    const res = await request(server)
+      .post('/api/v1/admin/billing/usage')
+      .set('x-test-role', 'admin')
+      .send({
+        customerId: uuid,
+        meterKey: 'api_calls',
+        quantity: 42,
+        idempotencyKey: 'evt-secret'
+      })
+      .expect(201);
+
+    expect(usage.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customerId: uuid,
+        meterKey: 'api_calls',
+        quantity: 42,
+        idempotencyKey: 'evt-secret'
+      })
+    );
+    expect(res.body).not.toHaveProperty('idempotencyKey');
+    expect((res.body as { quantity: number }).quantity).toBe(42);
+  });
+
+  it('denies a non-admin recording usage (403)', async () => {
+    await request(server)
+      .post('/api/v1/admin/billing/usage')
+      .send({
+        customerId: uuid,
+        meterKey: 'api_calls',
+        quantity: 1,
+        idempotencyKey: 'evt-1'
+      })
+      .expect(403);
+    expect(usage.record).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid usage payload via DTO validation (400)', async () => {
+    await request(server)
+      .post('/api/v1/admin/billing/usage')
+      .set('x-test-role', 'admin')
+      .send({ customerId: 'not-a-uuid', meterKey: '', quantity: 0 })
+      .expect(400);
+    expect(usage.record).not.toHaveBeenCalled();
   });
 });
