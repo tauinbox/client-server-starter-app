@@ -1,0 +1,179 @@
+<section class="billing-settings" *transloco="let t; scope: 'billing'">
+  <h1 class="settings-title">{{ t('billing.settings.title') }}</h1>
+
+  @if (store.loading()) {
+    <div class="settings-loading">
+      <mat-spinner diameter="40" />
+    </div>
+  } @else {
+    <div class="settings-grid">
+      <!-- Current plan -->
+      <mat-card appearance="outlined" class="settings-card plan-summary">
+        <mat-card-content>
+          <h2 class="card-heading">{{ t('billing.settings.currentPlan') }}</h2>
+
+          @if (store.hasActiveSubscription() && store.currentPlan(); as plan) {
+            <div class="plan-line">
+              <span class="plan-name">{{ plan.name }}</span>
+              <span
+                class="status-chip"
+                [class]="statusClass(store.subscription()!.status)"
+              >
+                {{ t('billing.status.' + store.subscription()!.status) }}
+              </span>
+            </div>
+
+            <p class="plan-meta">
+              <span class="price">{{ currentPriceLabel() }}</span>
+              @if (store.subscription()!.cancelAtPeriodEnd) {
+                <span class="renewal cancels">
+                  {{
+                    t('billing.settings.cancelsOn', {
+                      date:
+                        store.subscription()!.currentPeriodEnd
+                        | date: 'mediumDate'
+                    })
+                  }}
+                </span>
+              } @else {
+                <span class="renewal">
+                  {{
+                    t('billing.settings.renewsOn', {
+                      date:
+                        store.subscription()!.currentPeriodEnd
+                        | date: 'mediumDate'
+                    })
+                  }}
+                </span>
+              }
+            </p>
+
+            <div class="card-actions">
+              <a matButton="outlined" [routerLink]="billingRoute">
+                {{ t('billing.settings.changePlan') }}
+              </a>
+              @if (canCancel()) {
+                <button
+                  matButton="text"
+                  type="button"
+                  class="cancel-btn"
+                  [disabled]="store.working()"
+                  (click)="onCancel()"
+                >
+                  {{ t('billing.settings.cancel') }}
+                </button>
+              }
+            </div>
+          } @else {
+            <div class="empty-state">
+              <mat-icon aria-hidden="true">workspace_premium</mat-icon>
+              <p>{{ t('billing.settings.noSubscription') }}</p>
+              <a matButton="filled" [routerLink]="billingRoute">
+                {{ t('billing.settings.explorePlans') }}
+              </a>
+            </div>
+          }
+        </mat-card-content>
+      </mat-card>
+
+      <!-- Payment method -->
+      @if (store.paymentMethod(); as method) {
+        <mat-card appearance="outlined" class="settings-card">
+          <mat-card-content>
+            <h2 class="card-heading">
+              {{ t('billing.settings.paymentMethod') }}
+            </h2>
+            <p class="payment-method">
+              <mat-icon aria-hidden="true">credit_card</mat-icon>
+              <span class="card-brand">{{ method.brand }}</span>
+              <span class="card-digits">•••• {{ method.last4 }}</span>
+            </p>
+          </mat-card-content>
+        </mat-card>
+      }
+    </div>
+
+    <!-- Invoices -->
+    <mat-card appearance="outlined" class="settings-card invoices-card">
+      <mat-card-content>
+        <h2 class="card-heading">{{ t('billing.settings.invoices') }}</h2>
+
+        @if (store.invoices().length === 0) {
+          <p class="invoices-empty">{{ t('billing.settings.noInvoices') }}</p>
+        } @else if (isHandset()) {
+          <ul class="invoice-cards">
+            @for (invoice of store.invoices(); track invoice.id) {
+              <li class="invoice-card">
+                <div class="invoice-card-row">
+                  <span>{{
+                    invoice.paidAt ?? invoice.createdAt | date: 'mediumDate'
+                  }}</span>
+                  <span class="amount">{{ invoiceAmount(invoice) }}</span>
+                </div>
+                <div class="invoice-card-row">
+                  <span
+                    class="status-chip"
+                    [class]="statusClass(invoice.status)"
+                    >{{ t('billing.invoiceStatus.' + invoice.status) }}</span
+                  >
+                  @if (invoice.receiptRef) {
+                    <a
+                      matButton="text"
+                      [href]="invoice.receiptRef"
+                      target="_blank"
+                      rel="noopener"
+                      >{{ t('billing.settings.receipt') }}</a
+                    >
+                  }
+                </div>
+              </li>
+            }
+          </ul>
+        } @else {
+          <table class="invoice-table">
+            <thead>
+              <tr>
+                <th scope="col">{{ t('billing.settings.invoiceDate') }}</th>
+                <th scope="col">{{ t('billing.settings.invoiceStatus') }}</th>
+                <th scope="col" class="num">
+                  {{ t('billing.settings.invoiceAmount') }}
+                </th>
+                <th scope="col"></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (invoice of store.invoices(); track invoice.id) {
+                <tr>
+                  <td>
+                    {{
+                      invoice.paidAt ?? invoice.createdAt | date: 'mediumDate'
+                    }}
+                  </td>
+                  <td>
+                    <span
+                      class="status-chip"
+                      [class]="'status-' + invoice.status"
+                      >{{ t('billing.invoiceStatus.' + invoice.status) }}</span
+                    >
+                  </td>
+                  <td class="num amount">{{ invoiceAmount(invoice) }}</td>
+                  <td class="num">
+                    @if (invoice.receiptRef) {
+                      <a
+                        matButton="text"
+                        [href]="invoice.receiptRef"
+                        target="_blank"
+                        rel="noopener"
+                        >{{ t('billing.settings.receipt') }}</a
+                      >
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+</section>

@@ -26,6 +26,7 @@
   },
   "sidenav": {
     "adminPanel": "Панель администратора",
+    "billing": "Оплата",
     "profile": "Профиль",
     "collapse": "Свернуть",
     "expand": "Развернуть",

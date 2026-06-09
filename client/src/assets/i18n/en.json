@@ -26,6 +26,7 @@
   },
   "sidenav": {
     "adminPanel": "Admin Panel",
+    "billing": "Billing",
     "profile": "Profile",
     "collapse": "Collapse",
     "expand": "Expand",

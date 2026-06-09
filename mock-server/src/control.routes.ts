@@ -1,19 +1,26 @@
+import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import {
   addOAuthAccounts,
   getState,
   resetState,
+  toSubscriptionResponse,
   toUserResponse
 } from './state';
 import type { StateSnapshot } from './control.types';
 import type {
+  MockCustomer,
+  MockInvoice,
+  MockPaymentMethod,
   MockPermission,
   MockRole,
   MockRolePermission,
+  MockSubscription,
   MockUser,
   OAuthAccount,
   State
 } from './types';
+import type { BillingProviderId } from '@app/shared/types';
 import type { NotificationEvent } from '@app/shared/types';
 import { pushToAll, pushToUser } from './sse-hub';
 import { notifyRoleHolders } from './middleware/roles.middleware';
@@ -304,6 +311,138 @@ router.post('/notify', (req, res) => {
     pushToAll(event);
   }
   res.json({ ok: true });
+});
+
+// POST /__control/billing/activate-subscription — simulate a successful
+// checkout + provider webhook for E2E (the real flow redirects to an external
+// hosted-checkout page Playwright can't visit). Idempotently brings a user's
+// subscription to an active state, attaching a default payment method and a
+// paid invoice so the settings/checkout-return pages render a complete state.
+router.post('/billing/activate-subscription', (req, res) => {
+  const {
+    userId,
+    planKey = 'pro',
+    status = 'active'
+  } = req.body as {
+    userId?: string;
+    planKey?: string;
+    status?: MockSubscription['status'];
+  };
+  if (!userId) {
+    res.status(400).json({ message: 'userId is required' });
+    return;
+  }
+
+  const state = getState();
+  const user = state.users.get(userId);
+  if (!user) {
+    res.status(404).json({ message: 'user not found' });
+    return;
+  }
+
+  const plan = [...state.plans.values()].find((p) => p.key === planKey);
+  if (!plan) {
+    res.status(404).json({ message: `plan "${planKey}" not found` });
+    return;
+  }
+
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const periodEnd = new Date(now);
+  if (plan.interval === 'year') periodEnd.setFullYear(now.getFullYear() + 1);
+  else periodEnd.setMonth(now.getMonth() + 1);
+
+  const isRu = (user.locale ?? 'en').toLowerCase().startsWith('ru');
+  const country = isRu ? 'RU' : 'US';
+  const provider: BillingProviderId = isRu ? 'yookassa' : 'paddle';
+
+  let customer = [...state.billingCustomers.values()].find(
+    (c) => c.userId === userId
+  );
+  if (!customer) {
+    customer = {
+      id: randomUUID(),
+      userId,
+      provider,
+      providerOverride: null,
+      country,
+      currency: isRu ? 'RUB' : 'USD',
+      defaultPaymentMethodId: null,
+      createdAt: nowIso,
+      updatedAt: nowIso
+    } satisfies MockCustomer;
+    state.billingCustomers.set(customer.id, customer);
+  }
+
+  // Default payment method (created once).
+  if (!customer.defaultPaymentMethodId) {
+    const method: MockPaymentMethod = {
+      id: randomUUID(),
+      customerId: customer.id,
+      provider: customer.provider,
+      providerMethodRef: `pm_${randomUUID()}`,
+      brand: 'visa',
+      last4: '4242',
+      isDefault: true,
+      createdAt: nowIso,
+      updatedAt: nowIso
+    };
+    state.billingPaymentMethods.set(method.id, method);
+    customer.defaultPaymentMethodId = method.id;
+  }
+
+  // Reuse the latest open subscription if present, else create one.
+  const existing = [...state.billingSubscriptions.values()]
+    .filter((s) => s.customerId === customer.id && s.status !== 'canceled')
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+
+  const subscription: MockSubscription = existing ?? {
+    id: randomUUID(),
+    customerId: customer.id,
+    planKey: plan.key,
+    provider: customer.provider,
+    billingMode: plan.billingMode,
+    status,
+    lifecycleOwner: customer.provider === 'yookassa' ? 'self' : 'provider',
+    currentPeriodStart: nowIso,
+    currentPeriodEnd: periodEnd.toISOString(),
+    cancelAtPeriodEnd: false,
+    trialEnd: null,
+    paymentMethodId: customer.defaultPaymentMethodId,
+    providerSubscriptionId: null,
+    createdAt: nowIso,
+    updatedAt: nowIso
+  };
+  subscription.planKey = plan.key;
+  subscription.billingMode = plan.billingMode;
+  subscription.status = status;
+  subscription.paymentMethodId = customer.defaultPaymentMethodId;
+  subscription.currentPeriodEnd = periodEnd.toISOString();
+  subscription.updatedAt = nowIso;
+  state.billingSubscriptions.set(subscription.id, subscription);
+
+  // A paid invoice for the plan price on the resolved provider.
+  const price = plan.prices[customer.provider] ?? Object.values(plan.prices)[0];
+  const invoice: MockInvoice = {
+    id: randomUUID(),
+    customerId: customer.id,
+    subscriptionId: subscription.id,
+    provider: customer.provider,
+    providerInvoiceRef: `in_${randomUUID()}`,
+    amountMinor: price?.amountMinor ?? 0,
+    currency: price?.currency ?? 'USD',
+    status: 'paid',
+    billingMode: plan.billingMode,
+    periodStart: nowIso,
+    periodEnd: periodEnd.toISOString(),
+    paidAt: nowIso,
+    receiptRef: null,
+    createdAt: nowIso,
+    updatedAt: nowIso
+  };
+  state.billingInvoices.set(invoice.id, invoice);
+
+  res.json(toSubscriptionResponse(subscription));
 });
 
 export default router;

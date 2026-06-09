@@ -1,0 +1,76 @@
+{
+  "pricing": {
+    "title": "Plans",
+    "subtitle": "Pick what fits — switch anytime.",
+    "mostPopular": "Most popular",
+    "perMonth": "/mo",
+    "choose": "Choose",
+    "current": "Current",
+    "usageTeaser": "Pay as you go · {{ price }} / unit — only pay for what you use"
+  },
+  "region": {
+    "label": "Billing region",
+    "auto": "Auto",
+    "ru": "Russia",
+    "world": "International"
+  },
+  "entitlements": {
+    "base": "Base access",
+    "reports": "Reports",
+    "api-access": "API access",
+    "data-export": "Data export",
+    "priority-support": "Priority support"
+  },
+  "status": {
+    "incomplete": "Incomplete",
+    "trialing": "Trial",
+    "active": "Active",
+    "past_due": "Past due",
+    "canceled": "Canceled"
+  },
+  "invoiceStatus": {
+    "pending": "Pending",
+    "paid": "Paid",
+    "failed": "Failed",
+    "refunded": "Refunded"
+  },
+  "settings": {
+    "title": "Billing",
+    "currentPlan": "Current plan",
+    "renewsOn": "Renews {{ date }}",
+    "cancelsOn": "Cancels on {{ date }}",
+    "changePlan": "Change plan",
+    "cancel": "Cancel",
+    "cancelTitle": "Cancel subscription?",
+    "cancelMessage": "Your plan stays active until the end of the current billing period, then reverts to Free.",
+    "cancelConfirm": "Cancel subscription",
+    "cancelSuccess": "Subscription canceled — active until the period ends.",
+    "noSubscription": "No subscription yet — explore plans.",
+    "explorePlans": "Explore plans",
+    "paymentMethod": "Payment method",
+    "invoices": "Invoices",
+    "noInvoices": "No invoices yet.",
+    "invoiceDate": "Date",
+    "invoiceStatus": "Status",
+    "invoiceAmount": "Amount",
+    "receipt": "Receipt"
+  },
+  "checkout": {
+    "processingTitle": "Confirming your subscription…",
+    "processingMessage": "This only takes a moment.",
+    "successTitle": "You're on {{ plan }}",
+    "successRenews": "Next billing on {{ date }}.",
+    "goToSettings": "Go to billing settings",
+    "pendingTitle": "Payment received",
+    "pendingMessage": "We're still confirming your subscription. It will appear in your billing settings shortly.",
+    "canceledTitle": "Checkout canceled",
+    "canceledMessage": "No charge was made. You can pick a plan whenever you're ready.",
+    "backToPlans": "Back to plans"
+  },
+  "errors": {
+    "loadFailed": "Could not load billing information.",
+    "checkoutFailed": "Could not start checkout. Please try again.",
+    "cancelFailed": "Could not cancel the subscription. Please try again.",
+    "regionFailed": "Could not change the billing region."
+  }
+}

@@ -26,6 +26,7 @@ export async function loginViaUi(
     isEmailVerified: overrides.isEmailVerified ?? true,
     failedLoginAttempts: overrides.failedLoginAttempts ?? 0,
     lockedUntil: overrides.lockedUntil ?? null,
+    locale: overrides.locale ?? 'en',
     createdAt: overrides.createdAt ?? '2025-01-01T00:00:00.000Z',
     updatedAt: overrides.updatedAt ?? '2025-01-01T00:00:00.000Z'
   };
@@ -99,6 +100,7 @@ export async function loginViaUiKeepSse(
     isEmailVerified: overrides.isEmailVerified ?? true,
     failedLoginAttempts: overrides.failedLoginAttempts ?? 0,
     lockedUntil: overrides.lockedUntil ?? null,
+    locale: overrides.locale ?? 'en',
     createdAt: overrides.createdAt ?? '2025-01-01T00:00:00.000Z',
     updatedAt: overrides.updatedAt ?? '2025-01-01T00:00:00.000Z'
   };

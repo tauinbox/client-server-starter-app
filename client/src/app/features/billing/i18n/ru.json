@@ -1,0 +1,76 @@
+{
+  "pricing": {
+    "title": "Тарифы",
+    "subtitle": "Выберите подходящий — менять можно в любой момент.",
+    "mostPopular": "Популярный",
+    "perMonth": "/мес",
+    "choose": "Выбрать",
+    "current": "Текущий",
+    "usageTeaser": "Оплата по факту · {{ price }} / единицу — платите только за использованное"
+  },
+  "region": {
+    "label": "Регион оплаты",
+    "auto": "Авто",
+    "ru": "Россия",
+    "world": "Международный"
+  },
+  "entitlements": {
+    "base": "Базовый доступ",
+    "reports": "Отчёты",
+    "api-access": "Доступ к API",
+    "data-export": "Экспорт данных",
+    "priority-support": "Приоритетная поддержка"
+  },
+  "status": {
+    "incomplete": "Не завершена",
+    "trialing": "Пробный период",
+    "active": "Активна",
+    "past_due": "Просрочена",
+    "canceled": "Отменена"
+  },
+  "invoiceStatus": {
+    "pending": "В обработке",
+    "paid": "Оплачен",
+    "failed": "Ошибка",
+    "refunded": "Возвращён"
+  },
+  "settings": {
+    "title": "Оплата",
+    "currentPlan": "Текущий тариф",
+    "renewsOn": "Продление {{ date }}",
+    "cancelsOn": "Отмена {{ date }}",
+    "changePlan": "Сменить тариф",
+    "cancel": "Отменить",
+    "cancelTitle": "Отменить подписку?",
+    "cancelMessage": "Тариф останется активным до конца текущего расчётного периода, затем перейдёт на Free.",
+    "cancelConfirm": "Отменить подписку",
+    "cancelSuccess": "Подписка отменена — активна до конца периода.",
+    "noSubscription": "Подписки пока нет — посмотрите тарифы.",
+    "explorePlans": "Смотреть тарифы",
+    "paymentMethod": "Способ оплаты",
+    "invoices": "Счета",
+    "noInvoices": "Счетов пока нет.",
+    "invoiceDate": "Дата",
+    "invoiceStatus": "Статус",
+    "invoiceAmount": "Сумма",
+    "receipt": "Чек"
+  },
+  "checkout": {
+    "processingTitle": "Подтверждаем подписку…",
+    "processingMessage": "Это займёт несколько секунд.",
+    "successTitle": "Вы на тарифе {{ plan }}",
+    "successRenews": "Следующее списание {{ date }}.",
+    "goToSettings": "Перейти к настройкам оплаты",
+    "pendingTitle": "Платёж получен",
+    "pendingMessage": "Мы всё ещё подтверждаем подписку. Она скоро появится в настройках оплаты.",
+    "canceledTitle": "Оплата отменена",
+    "canceledMessage": "Списание не произведено. Вы можете выбрать тариф в любой момент.",
+    "backToPlans": "Назад к тарифам"
+  },
+  "errors": {
+    "loadFailed": "Не удалось загрузить информацию об оплате.",
+    "checkoutFailed": "Не удалось начать оплату. Попробуйте ещё раз.",
+    "cancelFailed": "Не удалось отменить подписку. Попробуйте ещё раз.",
+    "regionFailed": "Не удалось изменить регион оплаты."
+  }
+}

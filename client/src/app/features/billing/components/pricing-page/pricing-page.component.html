@@ -1,0 +1,57 @@
+<section class="pricing" *transloco="let t; scope: 'billing'">
+  <header class="pricing-header">
+    <div class="pricing-intro">
+      <h1>{{ t('billing.pricing.title') }}</h1>
+      <p>{{ t('billing.pricing.subtitle') }}</p>
+    </div>
+
+    @if (showRegionControl()) {
+      <div class="region-control">
+        <span class="region-label" id="region-label">
+          <mat-icon aria-hidden="true">public</mat-icon>
+          {{ t('billing.region.label') }}
+        </span>
+        <mat-button-toggle-group
+          aria-labelledby="region-label"
+          [value]="store.region()?.region"
+          [disabled]="store.working()"
+          (change)="onRegionChange($event.value)"
+        >
+          @for (option of regionOptions; track option) {
+            <mat-button-toggle [value]="option">
+              {{ t('billing.region.' + option) }}
+            </mat-button-toggle>
+          }
+        </mat-button-toggle-group>
+      </div>
+    }
+  </header>
+
+  @if (store.loading()) {
+    <div class="pricing-loading">
+      <mat-spinner diameter="40" />
+    </div>
+  } @else {
+    <div class="plan-grid">
+      @for (item of pricedPlans(); track item.key) {
+        <nxs-plan-card
+          [plan]="item.plan"
+          [price]="item.price"
+          [featured]="item.featured"
+          [current]="item.current"
+          [disabled]="store.working()"
+          (choose)="onChoose($event)"
+        />
+      }
+    </div>
+
+    @if (usagePlan()) {
+      <div class="usage-teaser">
+        <mat-icon aria-hidden="true">bolt</mat-icon>
+        <span>{{
+          t('billing.pricing.usageTeaser', { price: usagePrice() })
+        }}</span>
+      </div>
+    }
+  }
+</section>

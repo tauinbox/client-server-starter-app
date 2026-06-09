@@ -8,6 +8,8 @@ import {
 } from '@angular/core';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { canAccessAdminPanel } from '@features/admin/utils/can-access-admin-panel';
+import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
+import { BILLING_FLAG_KEY } from '@app/shared/constants';
 import { AppRouteSegmentEnum } from '../../app.route-segment.enum';
 import { LayoutService } from './layout.service';
 import { LocalStorageService } from './local-storage.service';
@@ -29,6 +31,7 @@ export class SidenavStateService {
   readonly #storage = inject(LocalStorageService);
   readonly #authStore = inject(AuthStore);
   readonly #layout = inject(LayoutService);
+  readonly #flagsStore = inject(FeatureFlagsStore);
 
   readonly #isWide = signal(false);
   readonly #mobileOpen = signal(false);
@@ -48,12 +51,20 @@ export class SidenavStateService {
     this.#isWide() ? NAV_WIDTH_WIDE : NAV_WIDTH_NARROW
   );
 
+  readonly #billingEnabled = this.#flagsStore.isEnabled(BILLING_FLAG_KEY);
+
   readonly #navLinks: readonly NavLink[] = [
     {
       route: `/${AppRouteSegmentEnum.Admin}`,
       labelKey: 'sidenav.adminPanel',
       icon: 'admin_panel_settings',
       visible: computed(() => canAccessAdminPanel(this.#authStore))
+    },
+    {
+      route: `/${AppRouteSegmentEnum.Billing}`,
+      labelKey: 'sidenav.billing',
+      icon: 'credit_card',
+      visible: this.#billingEnabled
     }
   ];
 
@@ -61,9 +72,14 @@ export class SidenavStateService {
     this.#navLinks.filter((link) => link.visible())
   );
 
-  readonly defaultRoute = computed(
-    () => this.navLinks()[0]?.route ?? `/${AppRouteSegmentEnum.Profile}`
-  );
+  // Default post-login landing. Billing is a self-service entry, never the
+  // implicit landing target — fall back to the first non-billing nav link
+  // (admin panel for admins), else the profile.
+  readonly defaultRoute = computed(() => {
+    const billingRoute = `/${AppRouteSegmentEnum.Billing}`;
+    const target = this.navLinks().find((link) => link.route !== billingRoute);
+    return target?.route ?? `/${AppRouteSegmentEnum.Profile}`;
+  });
 
   constructor() {
     effect(() => {

@@ -1,0 +1,207 @@
+@use '../../../../../styles/abstracts/functions' as func;
+@use '../../../../../styles/abstracts/variables' as vars;
+@use '../../../../../styles/abstracts/mixins' as mix;
+
+:host {
+  display: block;
+}
+
+.billing-settings {
+  max-width: vars.$container-max-width;
+  margin: 0 auto;
+}
+
+.settings-title {
+  margin: 0 0 vars.$spacing-lg;
+  font-size: vars.$font-size-xxl;
+  font-weight: vars.$font-weight-bold;
+}
+
+.settings-loading {
+  @include mix.loading-container;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: vars.$spacing-lg;
+  align-items: start;
+  margin-bottom: vars.$spacing-lg;
+
+  @media (max-width: vars.$breakpoint-sm) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.settings-card {
+  width: 100%;
+}
+
+.card-heading {
+  margin: 0 0 vars.$spacing-md;
+  font-size: vars.$font-size-sm;
+  font-weight: vars.$font-weight-medium;
+  color: var(--mat-sys-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: func.rem(0.5);
+}
+
+.plan-line {
+  display: flex;
+  gap: vars.$spacing-sm;
+  align-items: center;
+  margin-bottom: vars.$spacing-xs;
+
+  .plan-name {
+    font-size: vars.$font-size-lg;
+    font-weight: vars.$font-weight-medium;
+  }
+}
+
+.plan-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: vars.$spacing-xs vars.$spacing-sm;
+  align-items: baseline;
+  margin: 0 0 vars.$spacing-lg;
+
+  .price {
+    font-weight: vars.$font-weight-medium;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .renewal {
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+
+    &.cancels {
+      color: var(--mat-sys-error);
+    }
+  }
+}
+
+.card-actions {
+  margin-top: 0;
+
+  @include mix.form-actions(flex-start);
+}
+
+.empty-state {
+  @include mix.empty-state;
+}
+
+.payment-method {
+  display: flex;
+  gap: vars.$spacing-xs;
+  align-items: center;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+
+  .card-brand {
+    font-weight: vars.$font-weight-medium;
+    text-transform: capitalize;
+  }
+
+  .card-digits {
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.invoices-card {
+  width: 100%;
+}
+
+.invoices-empty {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    padding: vars.$spacing-sm vars.$spacing-xs;
+    text-align: start;
+    border-bottom: func.rem(1) solid var(--mat-sys-outline-variant);
+  }
+
+  th {
+    font-size: vars.$font-size-sm;
+    font-weight: vars.$font-weight-medium;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .num {
+    text-align: end;
+  }
+
+  .amount {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.invoice-cards {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-sm;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.invoice-card {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-xs;
+  padding: vars.$spacing-sm;
+  border: func.rem(1) solid var(--mat-sys-outline-variant);
+  border-radius: vars.$border-radius-md;
+
+  .invoice-card-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    .amount {
+      font-weight: vars.$font-weight-medium;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+}
+
+// Semantic status pills (design §21). Tinted background derived from the
+// semantic token so they read in light and dark.
+.status-chip {
+  display: inline-block;
+  padding: func.rem(2) vars.$spacing-xs;
+  font-size: vars.$font-size-sm;
+  font-weight: vars.$font-weight-medium;
+  border-radius: vars.$border-radius-lg;
+}
+
+.status-active,
+.status-paid {
+  color: var(--mat-sys-primary);
+  background: color-mix(in srgb, var(--mat-sys-primary) 14%, transparent);
+}
+
+.status-trialing,
+.status-pending {
+  color: var(--mat-sys-secondary);
+  background: color-mix(in srgb, var(--mat-sys-secondary) 14%, transparent);
+}
+
+.status-past-due,
+.status-failed {
+  color: var(--mat-sys-error);
+  background: color-mix(in srgb, var(--mat-sys-error) 14%, transparent);
+}
+
+.status-incomplete,
+.status-canceled,
+.status-refunded {
+  color: var(--mat-sys-on-surface-variant);
+  background: color-mix(in srgb, var(--mat-sys-on-surface-variant) 12%, transparent);
+}

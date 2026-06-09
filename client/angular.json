@@ -51,6 +51,11 @@
                 "glob": "**/*.json",
                 "input": "src/app/features/admin/i18n",
                 "output": "app/features/admin/i18n"
+              },
+              {
+                "glob": "**/*.json",
+                "input": "src/app/features/billing/i18n",
+                "output": "app/features/billing/i18n"
               }
             ],
             "styles": [

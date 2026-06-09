@@ -54,7 +54,7 @@ src/app/
 │   │   │   ├── user-card-list/    # UserCardListComponent — mat-card grid with per-user action menu; shown on handset (via LayoutService.isHandset())
 │   │   │   └── user-permissions/  # UserPermissionsComponent — read-only effective-permissions preview grouped by resource (mat-accordion + deny indicators)
 │   │   └── store/          # UsersStore (NgRx Signal Store, route-level)
-│   └── admin/              # Admin panel (roles + resource + user management)
+│   ├── admin/              # Admin panel (roles + resource + user management)
 │       ├── admin.routes.ts # Lazy-loaded child routes under /admin
 │       ├── components/
 │       │   ├── admin-panel/             # AdminPanelComponent — tabbed shell (Users / Roles / Resources); auto-redirects to /forbidden when admin permissions are revoked mid-session via `effect()` calling the shared `canAccessAdminPanel` helper (also used by adminPanelGuard and the admin entry in SidenavStateService.navLinks); the redirect effect is gated on `isAuthenticated()` so logout does not flash through /forbidden
@@ -72,6 +72,17 @@ src/app/
 │       │       └── feature-flag-rule-row/    # FeatureFlagRuleRowComponent — single rule editor, payload editor per type (user chip+autocomplete via UserService.searchCursor with 250 ms debounce, role chip+autocomplete from RoleService.getAll(), percentage discrete slider with 5% step + static value label, attribute field+op+value+customKey with chips for op=in and mat-datepicker for op=before/after), include/exclude effect surfaced via [data-effect] colored left-border + tinted background on exclude, .vertical class on handset
 │       ├── services/       # RoleService (HTTP → /api/v1/roles), RbacAdminService (HTTP → /api/v1/rbac/*), FeatureFlagsAdminService (HTTP → /api/v1/admin/feature-flags/*; If-Match version on PATCH)
 │       └── store/          # RolesStore (route-level), ResourcesStore (route-level: resources, actions, loading), FeatureFlagsAdminStore (route-level: signalStore + withEntities<FeatureFlagResponse>)
+│   └── billing/            # Self-service billing (pricing, checkout return, settings); routes/nav gated on the public `billing` flag (hidden until a provider is configured)
+│       ├── billing.routes.ts # Lazy child routes under /billing; billingAvailableGuard on the parent (flag check, no auth), authGuard on settings/success/cancel; provides BillingStore
+│       ├── components/
+│       │   ├── pricing-page/      # PricingPageComponent — plan cards (featured Pro), region control (Auto/Russia/International, authed only), Choose → checkout (anonymous → /login)
+│       │   ├── plan-card/         # PlanCardComponent — presentational tier card; featured = raised + accent + "Most popular" chip; emits choose
+│       │   ├── billing-settings/  # BillingSettingsComponent — current plan + status chip, cancel (confirm dialog), payment method, invoices (table desktop / cards handset)
+│       │   └── checkout-return/   # CheckoutReturnComponent — /billing/success polls the subscription until active; /billing/cancel neutral state (mode via route data)
+│       ├── services/       # BillingService (HTTP → /api/v1/billing/*: plans, subscription, invoices, payment-method, checkout, subscription/cancel, region)
+│       ├── store/          # BillingStore — route-level signalStore (plans, subscription, invoices, paymentMethod, region); loadPricing/loadSettings/checkout/cancel/setRegion
+│       ├── guards/         # billingAvailableGuard — awaits flag load, allows when the `billing` flag resolves true, else redirects home (no auth requirement → public pricing)
+│       └── utils/          # billing-format — formatMoney (minor units → Intl currency), resolveDisplayProvider (region or language heuristic), planPriceFor
 └── shared/
     ├── components/
     │   ├── confirm-dialog/            # ConfirmDialogComponent (desktop) + ConfirmBottomSheetComponent (handset)
@@ -103,6 +114,10 @@ src/app/
 | `/admin/roles` | RoleListComponent | permissionGuard('read', 'Role') |
 | `/admin/resources` | ResourceListComponent | permissionGuard('read', 'Permission') |
 | `/admin/feature-flags` | FeatureFlagListComponent | permissionGuard('manage', 'FeatureFlag') |
+| `/billing` | PricingPageComponent | billingAvailableGuard (public — anonymous pricing) |
+| `/billing/settings` | BillingSettingsComponent | billingAvailableGuard + authGuard |
+| `/billing/success` | CheckoutReturnComponent | billingAvailableGuard + authGuard |
+| `/billing/cancel` | CheckoutReturnComponent | billingAvailableGuard + authGuard |
 | `/verify-email` | VerifyEmailComponent | - |
 | `/confirm-email-change` | ConfirmEmailChangeComponent | - |
 | `/forgot-password` | ForgotPasswordComponent | guestGuard |

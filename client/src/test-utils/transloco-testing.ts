@@ -3,6 +3,7 @@ import enBase from '../assets/i18n/en.json';
 import enAuth from '../app/features/auth/i18n/en.json';
 import enUsers from '../app/features/users/i18n/en.json';
 import enAdmin from '../app/features/admin/i18n/en.json';
+import enBilling from '../app/features/billing/i18n/en.json';
 
 /**
  * Pre-configured TranslocoTestingModule that includes all feature translations.
@@ -20,7 +21,8 @@ export const TranslocoTestingModuleWithLangs = TranslocoTestingModule.forRoot({
     ru: {},
     'auth/en': enAuth,
     'users/en': enUsers,
-    'admin/en': enAdmin
+    'admin/en': enAdmin,
+    'billing/en': enBilling
   },
   translocoConfig: {
     availableLangs: ['en', 'ru'],

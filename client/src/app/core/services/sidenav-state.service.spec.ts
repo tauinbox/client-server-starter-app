@@ -6,13 +6,16 @@ import { SidenavStateService } from './sidenav-state.service';
 import { LayoutService } from './layout.service';
 import { LocalStorageService } from './local-storage.service';
 import { AuthStore } from '@features/auth/store/auth.store';
+import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 
 describe('SidenavStateService — nav-link source and defaultRoute', () => {
   let adminAccessSignal: ReturnType<typeof signal<boolean>>;
+  let billingSignal: ReturnType<typeof signal<boolean>>;
   let userSignal: ReturnType<typeof signal<{ id: string } | null>>;
 
   function setup(): SidenavStateService {
     adminAccessSignal = signal(false);
+    billingSignal = signal(false);
     userSignal = signal<{ id: string } | null>(null);
 
     const authStoreMock = {
@@ -32,11 +35,18 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
       isWeb: signal(true)
     };
 
+    const flagsStoreMock = {
+      isEnabled: vi.fn((key: string) =>
+        key === 'billing' ? billingSignal : signal(false)
+      )
+    };
+
     TestBed.configureTestingModule({
       providers: [
         { provide: AuthStore, useValue: authStoreMock },
         { provide: LocalStorageService, useValue: storageMock },
-        { provide: LayoutService, useValue: layoutMock }
+        { provide: LayoutService, useValue: layoutMock },
+        { provide: FeatureFlagsStore, useValue: flagsStoreMock }
       ]
     });
 
@@ -45,6 +55,7 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
 
   beforeEach(() => {
     adminAccessSignal = signal(false);
+    billingSignal = signal(false);
   });
 
   describe('navLinks', () => {
@@ -75,6 +86,30 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
       adminAccessSignal.set(false);
       expect(service.navLinks()).toEqual([]);
     });
+
+    it('contains the billing link only when the billing flag is enabled', () => {
+      const service = setup();
+      expect(service.navLinks()).toEqual([]);
+
+      billingSignal.set(true);
+      expect(service.navLinks()).toHaveLength(1);
+      expect(service.navLinks()[0]).toMatchObject({
+        route: '/billing',
+        labelKey: 'sidenav.billing',
+        icon: 'credit_card'
+      });
+    });
+
+    it('orders admin before billing when both are visible', () => {
+      const service = setup();
+      adminAccessSignal.set(true);
+      billingSignal.set(true);
+
+      expect(service.navLinks().map((l) => l.route)).toEqual([
+        '/admin',
+        '/billing'
+      ]);
+    });
   });
 
   describe('defaultRoute', () => {
@@ -97,6 +132,13 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
       expect(service.defaultRoute()).toBe('/admin');
 
       adminAccessSignal.set(false);
+      expect(service.defaultRoute()).toBe('/profile');
+    });
+
+    it('never lands on billing — falls back to /profile when only billing is visible', () => {
+      const service = setup();
+      billingSignal.set(true);
+      expect(service.navLinks()).toHaveLength(1);
       expect(service.defaultRoute()).toBe('/profile');
     });
   });
