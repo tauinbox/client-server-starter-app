@@ -70,8 +70,10 @@ src/app/
 │       │       ├── feature-flag-list/        # FeatureFlagListComponent — mat-table desktop / card-list handset (via LayoutService.isHandset()), per-row toggle/edit/delete, mat-fab on handset
 │       │       ├── feature-flag-form-dialog/ # FeatureFlagFormDialogComponent — top form (key, description, environments chip-grid, enabled, public) + embedded rules editor; uses Wide dialog size on desktop, .app-dialog-fullscreen-mobile panelClass on handset
 │       │       └── feature-flag-rule-row/    # FeatureFlagRuleRowComponent — single rule editor, payload editor per type (user chip+autocomplete via UserService.searchCursor with 250 ms debounce, role chip+autocomplete from RoleService.getAll(), percentage discrete slider with 5% step + static value label, attribute field+op+value+customKey with chips for op=in and mat-datepicker for op=before/after), include/exclude effect surfaced via [data-effect] colored left-border + tinted background on exclude, .vertical class on handset
-│       ├── services/       # RoleService (HTTP → /api/v1/roles), RbacAdminService (HTTP → /api/v1/rbac/*), FeatureFlagsAdminService (HTTP → /api/v1/admin/feature-flags/*; If-Match version on PATCH)
-│       └── store/          # RolesStore (route-level), ResourcesStore (route-level: resources, actions, loading), FeatureFlagsAdminStore (route-level: signalStore + withEntities<FeatureFlagResponse>)
+│       │   └── billing/
+│       │       └── billing-admin-list/        # BillingAdminListComponent — read-only Subscriptions + Invoices tables (mat-table desktop / card-list handset), per-row cancel (period-end/immediate menu + confirm) and refund (confirm); shared status-chip mixin with billing settings
+│       ├── services/       # RoleService (HTTP → /api/v1/roles), RbacAdminService (HTTP → /api/v1/rbac/*), FeatureFlagsAdminService (HTTP → /api/v1/admin/feature-flags/*; If-Match version on PATCH), BillingAdminService (HTTP → /api/v1/admin/billing/*: subscriptions, invoices, cancel, refund)
+│       └── store/          # RolesStore (route-level), ResourcesStore (route-level: resources, actions, loading), FeatureFlagsAdminStore (route-level: signalStore + withEntities<FeatureFlagResponse>), BillingAdminStore (route-level: subscriptions, invoices, cancel, refund)
 │   └── billing/            # Self-service billing (pricing, checkout return, settings); routes/nav gated on the public `billing` flag (hidden until a provider is configured)
 │       ├── billing.routes.ts # Lazy child routes under /billing; billingAvailableGuard on the parent (flag check, no auth), authGuard on settings/success/cancel; provides BillingStore
 │       ├── components/
@@ -114,6 +116,7 @@ src/app/
 | `/admin/roles` | RoleListComponent | permissionGuard('read', 'Role') |
 | `/admin/resources` | ResourceListComponent | permissionGuard('read', 'Permission') |
 | `/admin/feature-flags` | FeatureFlagListComponent | permissionGuard('manage', 'FeatureFlag') |
+| `/admin/billing` | BillingAdminListComponent | permissionGuard('manage', 'Billing') |
 | `/billing` | PricingPageComponent | billingAvailableGuard (public — anonymous pricing) |
 | `/billing/settings` | BillingSettingsComponent | billingAvailableGuard + authGuard |
 | `/billing/success` | CheckoutReturnComponent | billingAvailableGuard + authGuard |

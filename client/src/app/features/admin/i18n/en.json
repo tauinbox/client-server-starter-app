@@ -4,7 +4,8 @@
     "manageRoles": "Roles",
     "manageResources": "Resources",
     "manageActions": "Actions",
-    "manageFeatureFlags": "Feature Flags"
+    "manageFeatureFlags": "Feature Flags",
+    "manageBilling": "Billing"
   },
   "featureFlags": {
     "title": "Feature flags",
@@ -279,5 +280,58 @@
     "errorLoadRolesFailed": "Failed to load roles. Please try again.",
     "errorLoadResourcesFailed": "Failed to load resources. Please try again.",
     "errorLoadActionsFailed": "Failed to load actions. Please try again."
+  },
+  "billing": {
+    "subscriptionsTitle": "Subscriptions",
+    "subscriptionsEmpty": "No subscriptions yet.",
+    "invoicesTitle": "Invoices",
+    "invoicesEmpty": "No invoices yet.",
+    "colCustomer": "Customer",
+    "colPlan": "Plan",
+    "colProvider": "Provider",
+    "colMode": "Mode",
+    "colStatus": "Status",
+    "colRenews": "Renews",
+    "colReference": "Reference",
+    "colAmount": "Amount",
+    "colPeriod": "Period",
+    "colActions": "Actions",
+    "actions": "Actions",
+    "refund": "Refund",
+    "cancelPeriodEnd": "Cancel at period end",
+    "cancelImmediate": "Cancel immediately",
+    "cancelTitle": "Cancel subscription",
+    "cancelPeriodEndMessage": "The subscription stays active until the end of the current period, then will not renew.",
+    "cancelImmediateMessage": "The subscription is canceled immediately and access is revoked now. This cannot be undone.",
+    "cancelConfirm": "Cancel subscription",
+    "cancelSuccess": "Subscription canceled.",
+    "refundTitle": "Refund invoice",
+    "refundMessage": "Refund the full amount ({{ amount }}) for this invoice? This cannot be undone.",
+    "refundConfirm": "Refund",
+    "refundSuccess": "Invoice refunded.",
+    "provider": {
+      "paddle": "Paddle",
+      "yookassa": "YooKassa"
+    },
+    "mode": {
+      "fixed": "Fixed",
+      "usage": "Usage"
+    },
+    "status": {
+      "incomplete": "Incomplete",
+      "trialing": "Trial",
+      "active": "Active",
+      "past_due": "Past due",
+      "canceled": "Canceled",
+      "pending": "Pending",
+      "paid": "Paid",
+      "failed": "Failed",
+      "refunded": "Refunded"
+    },
+    "errors": {
+      "loadFailed": "Failed to load billing data. Please try again.",
+      "cancelFailed": "Failed to cancel the subscription. Please try again.",
+      "refundFailed": "Failed to refund the invoice. Please try again."
+    }
   }
 }

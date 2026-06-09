@@ -9,6 +9,7 @@ import { UsersStore } from '@features/users/store/users.store';
 import { RolesStore } from './store/roles.store';
 import { ResourcesStore } from './store/resources.store';
 import { FeatureFlagsAdminStore } from './store/feature-flags-admin.store';
+import { BillingAdminStore } from './store/billing-admin.store';
 import { AuthStore } from '@features/auth/store/auth.store';
 
 export const adminRoutes: Routes = [
@@ -19,7 +20,13 @@ export const adminRoutes: Routes = [
         (c) => c.AdminPanelComponent
       ),
     canActivate: [adminPanelGuard],
-    providers: [UsersStore, RolesStore, ResourcesStore, FeatureFlagsAdminStore],
+    providers: [
+      UsersStore,
+      RolesStore,
+      ResourcesStore,
+      FeatureFlagsAdminStore,
+      BillingAdminStore
+    ],
     children: [
       {
         path: '',
@@ -109,6 +116,14 @@ export const adminRoutes: Routes = [
             (c) => c.FeatureFlagListComponent
           ),
         canActivate: [permissionGuard('manage', 'FeatureFlag')]
+      },
+      {
+        path: 'billing',
+        loadComponent: () =>
+          import('./components/billing/billing-admin-list.component').then(
+            (c) => c.BillingAdminListComponent
+          ),
+        canActivate: [permissionGuard('manage', 'Billing')]
       }
     ]
   }

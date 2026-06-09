@@ -4,7 +4,8 @@
     "manageRoles": "Роли",
     "manageResources": "Ресурсы",
     "manageActions": "Действия",
-    "manageFeatureFlags": "Фича-флаги"
+    "manageFeatureFlags": "Фича-флаги",
+    "manageBilling": "Биллинг"
   },
   "featureFlags": {
     "title": "Фича-флаги",
@@ -279,5 +280,58 @@
     "errorLoadRolesFailed": "Не удалось загрузить роли. Попробуйте снова.",
     "errorLoadResourcesFailed": "Не удалось загрузить ресурсы. Попробуйте снова.",
     "errorLoadActionsFailed": "Не удалось загрузить действия. Попробуйте снова."
+  },
+  "billing": {
+    "subscriptionsTitle": "Подписки",
+    "subscriptionsEmpty": "Пока нет подписок.",
+    "invoicesTitle": "Счета",
+    "invoicesEmpty": "Пока нет счетов.",
+    "colCustomer": "Клиент",
+    "colPlan": "План",
+    "colProvider": "Провайдер",
+    "colMode": "Режим",
+    "colStatus": "Статус",
+    "colRenews": "Продление",
+    "colReference": "Идентификатор",
+    "colAmount": "Сумма",
+    "colPeriod": "Период",
+    "colActions": "Действия",
+    "actions": "Действия",
+    "refund": "Возврат",
+    "cancelPeriodEnd": "Отменить в конце периода",
+    "cancelImmediate": "Отменить немедленно",
+    "cancelTitle": "Отмена подписки",
+    "cancelPeriodEndMessage": "Подписка останется активной до конца текущего периода, после чего не будет продлена.",
+    "cancelImmediateMessage": "Подписка отменяется немедленно, доступ отзывается сразу. Это действие необратимо.",
+    "cancelConfirm": "Отменить подписку",
+    "cancelSuccess": "Подписка отменена.",
+    "refundTitle": "Возврат по счёту",
+    "refundMessage": "Вернуть полную сумму ({{ amount }}) по этому счёту? Это действие необратимо.",
+    "refundConfirm": "Вернуть",
+    "refundSuccess": "Возврат по счёту выполнен.",
+    "provider": {
+      "paddle": "Paddle",
+      "yookassa": "ЮKassa"
+    },
+    "mode": {
+      "fixed": "Фиксированный",
+      "usage": "По использованию"
+    },
+    "status": {
+      "incomplete": "Не завершено",
+      "trialing": "Пробный период",
+      "active": "Активна",
+      "past_due": "Просрочена",
+      "canceled": "Отменена",
+      "pending": "Ожидание",
+      "paid": "Оплачен",
+      "failed": "Ошибка",
+      "refunded": "Возвращён"
+    },
+    "errors": {
+      "loadFailed": "Не удалось загрузить данные биллинга. Попробуйте снова.",
+      "cancelFailed": "Не удалось отменить подписку. Попробуйте снова.",
+      "refundFailed": "Не удалось выполнить возврат. Попробуйте снова."
+    }
   }
 }
