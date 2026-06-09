@@ -5,7 +5,8 @@ import type { Translation, TranslocoLoader } from '@jsverse/transloco';
 const SCOPE_PATH_MAP: Record<string, string> = {
   auth: 'app/features/auth/i18n',
   users: 'app/features/users/i18n',
-  admin: 'app/features/admin/i18n'
+  admin: 'app/features/admin/i18n',
+  billing: 'app/features/billing/i18n'
 };
 
 @Injectable({ providedIn: 'root' })

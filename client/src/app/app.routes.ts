@@ -82,6 +82,11 @@ export const routes: Routes = [
       import('./features/admin/admin.routes').then((r) => r.adminRoutes)
   },
   {
+    path: AppRouteSegmentEnum.Billing,
+    loadChildren: () =>
+      import('./features/billing/billing.routes').then((r) => r.billingRoutes)
+  },
+  {
     path: AppRouteSegmentEnum.OAuthCallback,
     loadComponent: () =>
       import('./features/auth/components/oauth-callback/oauth-callback.component').then(

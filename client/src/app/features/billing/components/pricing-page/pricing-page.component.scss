@@ -1,0 +1,114 @@
+@use '../../../../../styles/abstracts/functions' as func;
+@use '../../../../../styles/abstracts/variables' as vars;
+@use '../../../../../styles/abstracts/mixins' as mix;
+
+:host {
+  display: block;
+}
+
+.pricing {
+  max-width: vars.$container-max-width;
+  margin: 0 auto;
+}
+
+.pricing-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: vars.$spacing-md;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: vars.$spacing-xl;
+}
+
+.pricing-intro {
+  h1 {
+    margin: 0;
+    font-size: vars.$font-size-xxl;
+    font-weight: vars.$font-weight-bold;
+  }
+
+  p {
+    margin: vars.$spacing-xs 0 0;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.region-control {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-xs;
+
+  .region-label {
+    display: inline-flex;
+    gap: vars.$spacing-xxs;
+    align-items: center;
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+
+    mat-icon {
+      width: func.rem(18);
+      height: func.rem(18);
+      font-size: func.rem(18);
+    }
+  }
+}
+
+.pricing-loading {
+  @include mix.loading-container;
+}
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: vars.$spacing-lg;
+  align-items: stretch;
+
+  // 3-up → 1-up below tablet-portrait (design §21).
+  @media (max-width: vars.$breakpoint-sm) {
+    grid-template-columns: 1fr;
+    gap: vars.$spacing-xl;
+  }
+}
+
+.usage-teaser {
+  display: flex;
+  gap: vars.$spacing-xs;
+  align-items: center;
+  justify-content: center;
+  padding: vars.$spacing-md;
+  margin-top: vars.$spacing-xl;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-on-surface-variant);
+  background: var(--mat-sys-surface-container-low);
+  border-radius: vars.$border-radius-md;
+
+  mat-icon {
+    color: var(--mat-sys-primary);
+  }
+}
+
+// Staggered reveal of plan cards on load (design §21, one restrained motion).
+@media (prefers-reduced-motion: no-preference) {
+  .plan-grid nxs-plan-card {
+    opacity: 0;
+    animation: plan-reveal vars.$transition-medium ease forwards;
+  }
+
+  @for $i from 1 through 4 {
+    .plan-grid nxs-plan-card:nth-child(#{$i}) {
+      animation-delay: #{$i * 80}ms;
+    }
+  }
+}
+
+@keyframes plan-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(func.rem(12));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

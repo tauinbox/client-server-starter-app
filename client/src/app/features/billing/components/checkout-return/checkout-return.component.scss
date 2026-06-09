@@ -1,0 +1,55 @@
+@use '../../../../../styles/abstracts/functions' as func;
+@use '../../../../../styles/abstracts/variables' as vars;
+
+:host {
+  display: block;
+}
+
+.checkout-return {
+  display: flex;
+  justify-content: center;
+  padding: vars.$spacing-xl 0;
+}
+
+.return-card {
+  width: 100%;
+  max-width: vars.$card-width-sm;
+  text-align: center;
+
+  mat-card-content {
+    display: flex;
+    flex-direction: column;
+    gap: vars.$spacing-sm;
+    align-items: center;
+    padding: vars.$spacing-lg;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: vars.$font-size-xl;
+    font-weight: vars.$font-weight-bold;
+  }
+
+  p {
+    margin: 0;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  a {
+    margin-top: vars.$spacing-sm;
+  }
+}
+
+.return-icon {
+  width: func.rem(56);
+  height: func.rem(56);
+  font-size: func.rem(56);
+
+  &.success {
+    color: var(--mat-sys-primary);
+  }
+
+  &.neutral {
+    color: var(--mat-sys-on-surface-variant);
+  }
+}

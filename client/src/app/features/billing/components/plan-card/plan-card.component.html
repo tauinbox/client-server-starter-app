@@ -1,0 +1,62 @@
+<mat-card
+  *transloco="let t; scope: 'billing'"
+  class="plan-card"
+  [class.featured]="featured()"
+  [attr.aria-current]="current() ? 'true' : null"
+  [appearance]="featured() ? 'raised' : 'outlined'"
+  tabindex="0"
+>
+  @if (featured()) {
+    <span class="popular-chip">
+      <mat-icon aria-hidden="true">star</mat-icon>
+      {{ t('billing.pricing.mostPopular') }}
+    </span>
+  }
+
+  <mat-card-content class="plan-body">
+    <h2 class="plan-name">{{ plan().name }}</h2>
+
+    <p class="plan-price">
+      <span class="amount">{{ price() }}</span>
+      <span class="interval">{{ t('billing.pricing.perMonth') }}</span>
+    </p>
+
+    @if (plan().description) {
+      <p class="plan-description">{{ plan().description }}</p>
+    }
+
+    <ul class="plan-features">
+      @if (plan().entitlements.length === 0) {
+        <li>
+          <mat-icon aria-hidden="true">check</mat-icon>
+          {{ t('billing.entitlements.base') }}
+        </li>
+      } @else {
+        @for (entitlement of plan().entitlements; track entitlement) {
+          <li>
+            <mat-icon aria-hidden="true">check</mat-icon>
+            {{ t('billing.entitlements.' + entitlement) }}
+          </li>
+        }
+      }
+    </ul>
+
+    <div class="plan-action">
+      @if (current()) {
+        <span class="current-badge">
+          <mat-icon aria-hidden="true">check_circle</mat-icon>
+          {{ t('billing.pricing.current') }}
+        </span>
+      } @else {
+        <button
+          [matButton]="featured() ? 'filled' : 'outlined'"
+          type="button"
+          [disabled]="disabled()"
+          (click)="onChoose()"
+        >
+          {{ t('billing.pricing.choose') }}
+        </button>
+      }
+    </div>
+  </mat-card-content>
+</mat-card>

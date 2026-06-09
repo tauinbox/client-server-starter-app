@@ -1,0 +1,173 @@
+import { TestBed } from '@angular/core/testing';
+import { of, throwError } from 'rxjs';
+import type {
+  InvoiceResponse,
+  PlanResponse,
+  SubscriptionResponse
+} from '@app/shared/types';
+import { NotifyService } from '@core/services/notify.service';
+import { BillingService } from '../services/billing.service';
+import { BillingStore } from './billing.store';
+
+const proPlan: PlanResponse = {
+  id: 'plan-pro',
+  key: 'pro',
+  name: 'Pro',
+  description: 'For growing teams',
+  billingMode: 'fixed',
+  interval: 'month',
+  meterKey: null,
+  entitlements: ['reports'],
+  limits: null,
+  trialDays: 0,
+  active: true,
+  prices: { paddle: { currency: 'USD', amountMinor: 1200 } },
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z'
+};
+
+const activeSub: SubscriptionResponse = {
+  id: 'sub-1',
+  customerId: 'cust-1',
+  planKey: 'pro',
+  provider: 'paddle',
+  billingMode: 'fixed',
+  status: 'active',
+  lifecycleOwner: 'provider',
+  currentPeriodStart: '2026-06-01T00:00:00.000Z',
+  currentPeriodEnd: '2026-07-01T00:00:00.000Z',
+  cancelAtPeriodEnd: false,
+  trialEnd: null,
+  paymentMethodId: 'pm-1',
+  createdAt: '2026-06-01T00:00:00.000Z',
+  updatedAt: '2026-06-01T00:00:00.000Z'
+};
+
+const invoice: InvoiceResponse = {
+  id: 'inv-1',
+  customerId: 'cust-1',
+  subscriptionId: 'sub-1',
+  provider: 'paddle',
+  providerInvoiceRef: 'in_1',
+  amountMinor: 1200,
+  currency: 'USD',
+  status: 'paid',
+  billingMode: 'fixed',
+  periodStart: '2026-06-01T00:00:00.000Z',
+  periodEnd: '2026-07-01T00:00:00.000Z',
+  paidAt: '2026-06-01T00:00:00.000Z',
+  receiptRef: null,
+  createdAt: '2026-06-01T00:00:00.000Z',
+  updatedAt: '2026-06-01T00:00:00.000Z'
+};
+
+describe('BillingStore', () => {
+  let billingMock: {
+    getPlans: ReturnType<typeof vi.fn>;
+    getSubscription: ReturnType<typeof vi.fn>;
+    getInvoices: ReturnType<typeof vi.fn>;
+    getPaymentMethod: ReturnType<typeof vi.fn>;
+    getRegion: ReturnType<typeof vi.fn>;
+    checkout: ReturnType<typeof vi.fn>;
+    cancel: ReturnType<typeof vi.fn>;
+    setRegion: ReturnType<typeof vi.fn>;
+  };
+  let notifyMock: {
+    success: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+  };
+
+  function createStore() {
+    return TestBed.inject(BillingStore);
+  }
+
+  beforeEach(() => {
+    billingMock = {
+      getPlans: vi.fn().mockReturnValue(of([proPlan])),
+      getSubscription: vi.fn().mockReturnValue(of(activeSub)),
+      getInvoices: vi.fn().mockReturnValue(of([invoice])),
+      getPaymentMethod: vi.fn().mockReturnValue(of(null)),
+      getRegion: vi.fn().mockReturnValue(
+        of({
+          region: 'auto',
+          detectedProvider: 'paddle',
+          effectiveProvider: 'paddle'
+        })
+      ),
+      checkout: vi
+        .fn()
+        .mockReturnValue(
+          of({ provider: 'paddle', url: 'https://x', sessionRef: 's' })
+        ),
+      cancel: vi
+        .fn()
+        .mockReturnValue(of({ ...activeSub, cancelAtPeriodEnd: true })),
+      setRegion: vi.fn().mockReturnValue(
+        of({
+          region: 'ru',
+          detectedProvider: 'paddle',
+          effectiveProvider: 'yookassa'
+        })
+      )
+    };
+    notifyMock = { success: vi.fn(), error: vi.fn() };
+
+    TestBed.configureTestingModule({
+      providers: [
+        BillingStore,
+        { provide: BillingService, useValue: billingMock },
+        { provide: NotifyService, useValue: notifyMock }
+      ]
+    });
+  });
+
+  it('loadSettings populates state and derives the current plan', async () => {
+    const store = createStore();
+    await store.loadSettings();
+
+    expect(store.plans()).toHaveLength(1);
+    expect(store.subscription()).toEqual(activeSub);
+    expect(store.invoices()).toHaveLength(1);
+    expect(store.currentPlan()?.key).toBe('pro');
+    expect(store.hasActiveSubscription()).toBe(true);
+    expect(store.loading()).toBe(false);
+  });
+
+  it('loadPricing skips authed-only calls for anonymous visitors', async () => {
+    const store = createStore();
+    await store.loadPricing(false);
+
+    expect(billingMock.getPlans).toHaveBeenCalled();
+    expect(billingMock.getRegion).not.toHaveBeenCalled();
+    expect(billingMock.getSubscription).not.toHaveBeenCalled();
+  });
+
+  it('checkout returns the provider session', async () => {
+    const store = createStore();
+    const session = await store.checkout('pro');
+    expect(session?.url).toBe('https://x');
+    expect(store.working()).toBe(false);
+  });
+
+  it('cancel updates the subscription and notifies success', async () => {
+    const store = createStore();
+    const ok = await store.cancel('period_end');
+    expect(ok).toBe(true);
+    expect(store.subscription()?.cancelAtPeriodEnd).toBe(true);
+    expect(notifyMock.success).toHaveBeenCalled();
+  });
+
+  it('surfaces a checkout error and returns null', async () => {
+    billingMock.checkout.mockReturnValue(throwError(() => new Error('boom')));
+    const store = createStore();
+    const session = await store.checkout('pro');
+    expect(session).toBeNull();
+    expect(notifyMock.error).toHaveBeenCalled();
+  });
+
+  it('setRegion stores the updated region', async () => {
+    const store = createStore();
+    await store.setRegion('ru');
+    expect(store.region()?.effectiveProvider).toBe('yookassa');
+  });
+});

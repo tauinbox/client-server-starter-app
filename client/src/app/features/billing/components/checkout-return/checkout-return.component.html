@@ -1,0 +1,52 @@
+<section class="checkout-return" *transloco="let t; scope: 'billing'">
+  <mat-card appearance="outlined" class="return-card">
+    <mat-card-content>
+      @if (mode() === 'cancel') {
+        <mat-icon class="return-icon neutral" aria-hidden="true">info</mat-icon>
+        <h1>{{ t('billing.checkout.canceledTitle') }}</h1>
+        <p>{{ t('billing.checkout.canceledMessage') }}</p>
+        <a matButton="filled" [routerLink]="pricingRoute">
+          {{ t('billing.checkout.backToPlans') }}
+        </a>
+      } @else {
+        @switch (pollState()) {
+          @case ('pending') {
+            <mat-spinner diameter="48" />
+            <h1>{{ t('billing.checkout.processingTitle') }}</h1>
+            <p>{{ t('billing.checkout.processingMessage') }}</p>
+          }
+          @case ('confirmed') {
+            <mat-icon class="return-icon success" aria-hidden="true"
+              >check_circle</mat-icon
+            >
+            <h1>
+              {{ t('billing.checkout.successTitle', { plan: planName() }) }}
+            </h1>
+            @if (periodEnd()) {
+              <p>
+                {{
+                  t('billing.checkout.successRenews', {
+                    date: periodEnd() | date: 'mediumDate'
+                  })
+                }}
+              </p>
+            }
+            <a matButton="filled" [routerLink]="settingsRoute">
+              {{ t('billing.checkout.goToSettings') }}
+            </a>
+          }
+          @case ('unconfirmed') {
+            <mat-icon class="return-icon neutral" aria-hidden="true"
+              >hourglass_top</mat-icon
+            >
+            <h1>{{ t('billing.checkout.pendingTitle') }}</h1>
+            <p>{{ t('billing.checkout.pendingMessage') }}</p>
+            <a matButton="filled" [routerLink]="settingsRoute">
+              {{ t('billing.checkout.goToSettings') }}
+            </a>
+          }
+        }
+      }
+    </mat-card-content>
+  </mat-card>
+</section>

@@ -1,0 +1,147 @@
+@use '../../../../../styles/abstracts/functions' as func;
+@use '../../../../../styles/abstracts/variables' as vars;
+
+:host {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.plan-card {
+  position: relative;
+  display: flex;
+  width: 100%;
+  padding: vars.$spacing-lg;
+  overflow: visible;
+  border-radius: vars.$border-radius-lg;
+  transition:
+    transform vars.$transition-fast ease,
+    box-shadow vars.$transition-fast ease;
+
+  &:focus-visible {
+    outline: func.rem(2) solid var(--mat-sys-primary);
+    outline-offset: func.rem(2);
+  }
+
+  // Featured tier: lifted with a primary-color top accent (design §21).
+  &.featured {
+    border-top: func.rem(4) solid var(--mat-sys-primary);
+    transform: translateY(func.rem(-8));
+
+    @media (max-width: vars.$breakpoint-xs) {
+      transform: none;
+    }
+  }
+}
+
+.popular-chip {
+  position: absolute;
+  inset-block-start: func.rem(-14);
+  inset-inline-start: 50%;
+  display: inline-flex;
+  gap: vars.$spacing-xxs;
+  align-items: center;
+  padding: vars.$spacing-xxs vars.$spacing-sm;
+  font-size: vars.$font-size-sm;
+  font-weight: vars.$font-weight-medium;
+  color: var(--mat-sys-on-primary);
+  white-space: nowrap;
+  background: var(--mat-sys-primary);
+  border-radius: vars.$border-radius-lg;
+  transform: translateX(-50%);
+
+  mat-icon {
+    width: func.rem(16);
+    height: func.rem(16);
+    font-size: func.rem(16);
+  }
+}
+
+.plan-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+}
+
+.plan-name {
+  margin: 0;
+  font-size: vars.$font-size-lg;
+  font-weight: vars.$font-weight-medium;
+  text-transform: uppercase;
+  letter-spacing: func.rem(0.5);
+}
+
+.plan-price {
+  display: flex;
+  align-items: baseline;
+  margin: vars.$spacing-sm 0 vars.$spacing-md;
+
+  .amount {
+    font-size: vars.$font-size-xxl;
+    font-weight: vars.$font-weight-bold;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .interval {
+    margin-inline-start: vars.$spacing-xxs;
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.plan-description {
+  margin: 0 0 vars.$spacing-md;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.plan-features {
+  flex: 1;
+  padding: 0;
+  margin: 0 0 vars.$spacing-lg;
+  list-style: none;
+
+  li {
+    display: flex;
+    gap: vars.$spacing-xs;
+    align-items: center;
+    padding: vars.$spacing-xxs 0;
+    font-size: vars.$font-size-sm;
+  }
+
+  mat-icon {
+    flex-shrink: 0;
+    width: func.rem(18);
+    height: func.rem(18);
+    font-size: func.rem(18);
+    color: var(--mat-sys-primary);
+  }
+}
+
+.plan-action {
+  margin-top: auto;
+
+  button {
+    width: 100%;
+  }
+}
+
+.current-badge {
+  display: inline-flex;
+  gap: vars.$spacing-xs;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: vars.$spacing-xs 0;
+  font-weight: vars.$font-weight-medium;
+  color: var(--mat-sys-primary);
+
+  mat-icon {
+    width: func.rem(20);
+    height: func.rem(20);
+    font-size: func.rem(20);
+  }
+}

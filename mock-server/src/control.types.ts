@@ -1,4 +1,8 @@
 import type {
+  SubscriptionResponse,
+  SubscriptionStatus
+} from '@app/shared/types';
+import type {
   MockPermission,
   MockRole,
   MockRolePermission,
@@ -57,4 +61,13 @@ export type ControlApi = {
   // `siteKey: null` (or omit) to use the public Turnstile test site key
   // (1x00000000000000000000AA), which always passes the visible challenge.
   setCaptcha(enabled: boolean, siteKey?: string | null): Promise<void>;
+  // Simulates a successful checkout + provider webhook for billing E2E: brings
+  // the user's subscription to `status` (default 'active') on `planKey` (default
+  // 'pro'), attaching a default payment method and a paid invoice. The real flow
+  // redirects to an external hosted-checkout page Playwright can't visit.
+  activateBillingSubscription(args: {
+    userId: string;
+    planKey?: string;
+    status?: SubscriptionStatus;
+  }): Promise<SubscriptionResponse>;
 };
