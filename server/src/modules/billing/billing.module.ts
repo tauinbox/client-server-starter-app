@@ -14,6 +14,7 @@ import { Invoice } from './entities/invoice.entity';
 import { PaymentMethod } from './entities/payment-method.entity';
 import { Plan } from './entities/plan.entity';
 import { Subscription } from './entities/subscription.entity';
+import { UsageRecord } from './entities/usage-record.entity';
 import { WebhookEvent } from './entities/webhook-event.entity';
 import { EntitlementService } from './entitlements/entitlement.service';
 import { EntitlementGuard } from './entitlements/entitlement.guard';
@@ -35,6 +36,7 @@ import { UsageRating } from './rating/usage-rating.strategy';
 import { PlanService } from './services/plan.service';
 import { BillingUserService } from './services/billing-user.service';
 import { BillingAdminService } from './services/billing-admin.service';
+import { UsageService } from './services/usage.service';
 import { BillingPlansController } from './controllers/billing-plans.controller';
 import { BillingUserController } from './controllers/billing-user.controller';
 import { BillingAdminController } from './controllers/billing-admin.controller';
@@ -75,6 +77,7 @@ export class BillingModule {
           Subscription,
           Invoice,
           PaymentMethod,
+          UsageRecord,
           WebhookEvent,
           // Read-only: the YooKassa provider resolves the buyer email from the
           // user record to fiscalize 54-FZ receipts.
@@ -109,6 +112,7 @@ export class BillingModule {
         PlanService,
         BillingUserService,
         BillingAdminService,
+        UsageService,
         BillingConfiguredAttributesRegistrar,
         EntitlementService,
         EntitlementGuard,
@@ -147,6 +151,7 @@ export class BillingModule {
         BillingConfigService,
         EntitlementService,
         EntitlementGuard,
+        UsageService,
         BILLING_PROVIDERS
       ]
     };

@@ -12,6 +12,7 @@ import {
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -24,10 +25,13 @@ import { Authorize } from '../../auth/decorators/authorize.decorator';
 import { RegisterResource } from '../../auth/decorators/register-resource.decorator';
 import { LogAudit } from '../../audit/decorators/log-audit.decorator';
 import { BillingAdminService } from '../services/billing-admin.service';
+import { UsageService } from '../services/usage.service';
 import { CancelSubscriptionRequestDto } from '../dtos/cancel-subscription-request.dto';
 import { RefundInvoiceRequestDto } from '../dtos/refund-invoice-request.dto';
+import { RecordUsageRequestDto } from '../dtos/record-usage-request.dto';
 import { SubscriptionResponseDto } from '../dtos/subscription-response.dto';
 import { InvoiceResponseDto } from '../dtos/invoice-response.dto';
+import { UsageResponseDto } from '../dtos/usage-response.dto';
 
 @ApiTags('Billing Admin API')
 @ApiBearerAuth()
@@ -43,7 +47,10 @@ import { InvoiceResponseDto } from '../dtos/invoice-response.dto';
 })
 @UseInterceptors(ClassSerializerInterceptor)
 export class BillingAdminController {
-  constructor(private readonly billingAdmin: BillingAdminService) {}
+  constructor(
+    private readonly billingAdmin: BillingAdminService,
+    private readonly usage: UsageService
+  ) {}
 
   @Get('subscriptions')
   @Authorize(['manage', 'Billing'])
@@ -108,5 +115,24 @@ export class BillingAdminController {
     @Body() body: RefundInvoiceRequestDto
   ) {
     return this.billingAdmin.refundInvoice(id, body.amountMinor);
+  }
+
+  @Post('usage')
+  @Authorize(['manage', 'Billing'])
+  @ApiOperation({
+    summary:
+      'Record a metering usage event against a customer’s active subscription (idempotent).'
+  })
+  @ApiBody({ type: RecordUsageRequestDto })
+  @ApiCreatedResponse({ type: UsageResponseDto })
+  @ApiNotFoundResponse({ description: 'No active subscription for customer' })
+  recordUsage(@Body() body: RecordUsageRequestDto) {
+    return this.usage.record({
+      customerId: body.customerId,
+      meterKey: body.meterKey,
+      quantity: body.quantity,
+      idempotencyKey: body.idempotencyKey,
+      occurredAt: body.occurredAt ? new Date(body.occurredAt) : undefined
+    });
   }
 }

@@ -5,6 +5,7 @@ import {
   getState,
   resetState,
   toSubscriptionResponse,
+  toUsageResponse,
   toUserResponse
 } from './state';
 import type { StateSnapshot } from './control.types';
@@ -16,6 +17,7 @@ import type {
   MockRole,
   MockRolePermission,
   MockSubscription,
+  MockUsageRecord,
   MockUser,
   OAuthAccount,
   State
@@ -53,7 +55,10 @@ function buildStateSnapshot(state: State): StateSnapshot {
     billingCustomers: Array.from(state.billingCustomers.values()),
     billingSubscriptions: Array.from(state.billingSubscriptions.values()),
     billingInvoices: Array.from(state.billingInvoices.values()),
-    billingPaymentMethods: Array.from(state.billingPaymentMethods.values())
+    billingPaymentMethods: Array.from(state.billingPaymentMethods.values()),
+    billingUsageRecords: Array.from(state.billingUsageRecords.values()).map(
+      toUsageResponse
+    )
   };
 }
 
@@ -443,6 +448,56 @@ router.post('/billing/activate-subscription', (req, res) => {
   state.billingInvoices.set(invoice.id, invoice);
 
   res.json(toSubscriptionResponse(subscription));
+});
+
+// POST /__control/billing/seed-usage — pre-seed a usage record for E2E without
+// going through the admin ingest endpoint. Attaches to the customer's active
+// subscription (or an explicit subscriptionId) so usage views/rating have data.
+router.post('/billing/seed-usage', (req, res) => {
+  const {
+    customerId,
+    meterKey = 'api_calls',
+    quantity = 1,
+    occurredAt,
+    subscriptionId,
+    idempotencyKey
+  } = req.body as {
+    customerId?: string;
+    meterKey?: string;
+    quantity?: number;
+    occurredAt?: string;
+    subscriptionId?: string;
+    idempotencyKey?: string;
+  };
+  if (!customerId) {
+    res.status(400).json({ message: 'customerId is required' });
+    return;
+  }
+
+  const state = getState();
+  const subId =
+    subscriptionId ??
+    [...state.billingSubscriptions.values()].find(
+      (s) => s.customerId === customerId
+    )?.id;
+  if (!subId) {
+    res.status(404).json({ message: 'no subscription for customer' });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const record: MockUsageRecord = {
+    id: randomUUID(),
+    customerId,
+    subscriptionId: subId,
+    meterKey,
+    quantity,
+    occurredAt: occurredAt ?? now,
+    idempotencyKey: idempotencyKey ?? `seed-${randomUUID()}`,
+    recordedAt: now
+  };
+  state.billingUsageRecords.set(record.id, record);
+  res.json(toUsageResponse(record));
 });
 
 export default router;

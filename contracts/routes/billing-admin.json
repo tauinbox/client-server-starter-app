@@ -19,6 +19,11 @@
       "method": "POST",
       "path": "/api/v1/admin/billing/invoices/1/refund",
       "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/billing/usage",
+      "expectedStatus": 401
     }
   ]
 }

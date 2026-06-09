@@ -11,13 +11,15 @@ import {
   toInvoiceResponse,
   toPaymentMethodResponse,
   toPlanResponse,
-  toSubscriptionResponse
+  toSubscriptionResponse,
+  toUsageResponse
 } from '../state';
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
 import type {
   AuthenticatedRequest,
   MockCustomer,
-  MockSubscription
+  MockSubscription,
+  MockUsageRecord
 } from '../types';
 
 const router = Router();
@@ -477,6 +479,81 @@ billingAdminRouter.post(
     res.json(toInvoiceResponse(invoice));
   }
 );
+
+// Metering ingest (design §3, §5). Mirrors RecordUsageRequestDto validation, the
+// active-subscription requirement, and idempotency on `idempotencyKey`. There is
+// no public meter endpoint — this lives under the `manage Billing` admin guard.
+const USAGE_ACTIVE_STATUSES = ['trialing', 'active', 'past_due'];
+
+billingAdminRouter.post('/usage', adminGuard, (req: Request, res: Response) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const customerId =
+    typeof body['customerId'] === 'string' ? body['customerId'].trim() : '';
+  const meterKey =
+    typeof body['meterKey'] === 'string' ? body['meterKey'].trim() : '';
+  const quantity = body['quantity'];
+  const idempotencyKey =
+    typeof body['idempotencyKey'] === 'string'
+      ? body['idempotencyKey'].trim()
+      : '';
+  const occurredAtRaw = body['occurredAt'];
+
+  if (
+    !customerId ||
+    !meterKey ||
+    meterKey.length > 100 ||
+    !idempotencyKey ||
+    idempotencyKey.length > 255 ||
+    !Number.isInteger(quantity) ||
+    (quantity as number) < 1 ||
+    (occurredAtRaw !== undefined &&
+      (typeof occurredAtRaw !== 'string' ||
+        Number.isNaN(Date.parse(occurredAtRaw))))
+  ) {
+    res.status(400).json({ message: 'Invalid usage payload', statusCode: 400 });
+    return;
+  }
+
+  const state = getState();
+
+  // Idempotent replay: a record already exists for this key — return it as-is.
+  const existing = [...state.billingUsageRecords.values()].find(
+    (r) => r.idempotencyKey === idempotencyKey
+  );
+  if (existing) {
+    res.status(201).json(toUsageResponse(existing));
+    return;
+  }
+
+  const subscription = [...state.billingSubscriptions.values()].find(
+    (s) =>
+      s.customerId === customerId && USAGE_ACTIVE_STATUSES.includes(s.status)
+  );
+  if (!subscription) {
+    res.status(404).json({
+      message: 'No active subscription for customer to record usage against',
+      statusCode: 404
+    });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const record: MockUsageRecord = {
+    id: uuidv4(),
+    customerId,
+    subscriptionId: subscription.id,
+    meterKey,
+    quantity: quantity as number,
+    occurredAt:
+      typeof occurredAtRaw === 'string'
+        ? new Date(occurredAtRaw).toISOString()
+        : now,
+    idempotencyKey,
+    recordedAt: now
+  };
+  state.billingUsageRecords.set(record.id, record);
+  res.status(201).json(toUsageResponse(record));
+});
 
 export default router;
 export { billingRouter, billingAdminRouter };
