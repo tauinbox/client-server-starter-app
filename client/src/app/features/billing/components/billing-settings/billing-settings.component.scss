@@ -172,36 +172,6 @@
 }
 
 // Semantic status pills (design §21). Tinted background derived from the
-// semantic token so they read in light and dark.
-.status-chip {
-  display: inline-block;
-  padding: func.rem(2) vars.$spacing-xs;
-  font-size: vars.$font-size-sm;
-  font-weight: vars.$font-weight-medium;
-  border-radius: vars.$border-radius-lg;
-}
-
-.status-active,
-.status-paid {
-  color: var(--mat-sys-primary);
-  background: color-mix(in srgb, var(--mat-sys-primary) 14%, transparent);
-}
-
-.status-trialing,
-.status-pending {
-  color: var(--mat-sys-secondary);
-  background: color-mix(in srgb, var(--mat-sys-secondary) 14%, transparent);
-}
-
-.status-past-due,
-.status-failed {
-  color: var(--mat-sys-error);
-  background: color-mix(in srgb, var(--mat-sys-error) 14%, transparent);
-}
-
-.status-incomplete,
-.status-canceled,
-.status-refunded {
-  color: var(--mat-sys-on-surface-variant);
-  background: color-mix(in srgb, var(--mat-sys-on-surface-variant) 12%, transparent);
-}
+// semantic token so they read in light and dark. Shared with the admin billing
+// list via the mixin.
+@include mix.billing-status-chips;

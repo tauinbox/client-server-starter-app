@@ -132,3 +132,46 @@
     margin-bottom: vars.$spacing-lg;
   }
 }
+
+// Billing status pill (subscription + invoice lifecycle states). Emits the base
+// chip plus one color class per status; the CSS-safe class is derived from the
+// enum value (`past_due` → `status-past-due`). Shared by billing settings and
+// the admin billing list so the color semantics stay in one place.
+@mixin billing-status-chips {
+  .status-chip {
+    display: inline-block;
+    padding: func.rem(2) vars.$spacing-xs;
+    font-size: vars.$font-size-sm;
+    font-weight: vars.$font-weight-medium;
+    border-radius: vars.$border-radius-lg;
+  }
+
+  .status-active,
+  .status-paid {
+    color: var(--mat-sys-primary);
+    background: color-mix(in srgb, var(--mat-sys-primary) 14%, transparent);
+  }
+
+  .status-trialing,
+  .status-pending {
+    color: var(--mat-sys-secondary);
+    background: color-mix(in srgb, var(--mat-sys-secondary) 14%, transparent);
+  }
+
+  .status-past-due,
+  .status-failed {
+    color: var(--mat-sys-error);
+    background: color-mix(in srgb, var(--mat-sys-error) 14%, transparent);
+  }
+
+  .status-incomplete,
+  .status-canceled,
+  .status-refunded {
+    color: var(--mat-sys-on-surface-variant);
+    background: color-mix(
+      in srgb,
+      var(--mat-sys-on-surface-variant) 12%,
+      transparent
+    );
+  }
+}

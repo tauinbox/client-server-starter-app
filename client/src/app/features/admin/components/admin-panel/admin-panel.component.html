@@ -63,6 +63,21 @@
         {{ t('admin.panel.manageFeatureFlags') }}
       </a>
     </ng-container>
+    @if (billingAvailable()) {
+      <ng-container
+        *nxsRequirePermissions="{ action: 'manage', subject: 'Billing' }"
+      >
+        <a
+          mat-tab-link
+          [routerLink]="routes.Billing"
+          routerLinkActive
+          #billingActive="routerLinkActive"
+          [active]="billingActive.isActive"
+        >
+          {{ t('admin.panel.manageBilling') }}
+        </a>
+      </ng-container>
+    }
   </nav>
 
   <mat-tab-nav-panel #tabPanel>
