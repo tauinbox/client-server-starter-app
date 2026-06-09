@@ -378,6 +378,26 @@
       "expectedStatus": 401
     },
     {
+      "method": "GET",
+      "path": "/api/v1/admin/billing/subscriptions",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/billing/invoices",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/billing/subscriptions/1/cancel",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/billing/invoices/1/refund",
+      "expectedStatus": 401
+    },
+    {
       "method": "POST",
       "path": "/api/v1/billing/webhooks/paddle",
       "expectedStatus": 400

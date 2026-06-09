@@ -3,6 +3,7 @@
 
 // prettier-ignore
 export type KnownSubjects =
+  | 'Billing'
   | 'FeatureFlag'
   | 'Permission'
   | 'Profile'
