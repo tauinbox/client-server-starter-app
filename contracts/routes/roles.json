@@ -1,0 +1,64 @@
+{
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/v1/roles",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/roles/permissions",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/roles/role-admin",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/roles",
+      "expectedStatus": 401
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/roles/role-admin",
+      "expectedStatus": 401
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/roles/role-admin",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/roles/role-admin/permissions",
+      "expectedStatus": 401
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/roles/role-admin/permissions",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/roles/role-admin/permissions",
+      "expectedStatus": 401
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/roles/role-admin/permissions/perm-1",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/roles/assign/1",
+      "expectedStatus": 401
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/roles/assign/1/role-admin",
+      "expectedStatus": 401
+    }
+  ]
+}

@@ -16,7 +16,9 @@ import * as ts from 'typescript';
 
 const GLOBAL_PREFIX = 'api';
 const CONTROLLERS_ROOT = path.resolve(__dirname, '../src/modules');
-const ROUTES_MANIFEST = path.resolve(__dirname, '../../contracts/routes.json');
+const CONTRACTS_ROOT = path.resolve(__dirname, '../../contracts');
+const ROUTES_INDEX = path.join(CONTRACTS_ROOT, 'routes.json');
+const ROUTES_DIR = path.join(CONTRACTS_ROOT, 'routes');
 const SERVER_PKG = path.resolve(__dirname, '../package.json');
 
 /** Controller subdirectories to skip entirely. */
@@ -213,14 +215,35 @@ function routeKey(r: RouteEntry): string {
   return `${r.method} ${r.path}`;
 }
 
+/**
+ * Loads all manifest routes by flattening every per-feature file under
+ * contracts/routes/. Adding a new feature means dropping a new JSON file there —
+ * no edit to routes.json or this loader is required.
+ */
+function loadManifestRoutes(): RouteEntry[] {
+  return fs
+    .readdirSync(ROUTES_DIR)
+    .filter((f) => f.endsWith('.json'))
+    .sort()
+    .flatMap((f) => {
+      const { routes } = JSON.parse(
+        fs.readFileSync(path.join(ROUTES_DIR, f), 'utf-8')
+      ) as { routes: RouteEntry[] };
+      return routes;
+    });
+}
+
 function main(): void {
   const controllerFiles = findControllers(CONTROLLERS_ROOT);
   const serverRoutes = controllerFiles.flatMap(extractRoutes);
   const serverSet = new Set(serverRoutes.map(routeKey));
 
-  const manifest = JSON.parse(
-    fs.readFileSync(ROUTES_MANIFEST, 'utf-8')
-  ) as { version: string; routes: RouteEntry[] };
+  const manifest = {
+    version: (
+      JSON.parse(fs.readFileSync(ROUTES_INDEX, 'utf-8')) as { version: string }
+    ).version,
+    routes: loadManifestRoutes()
+  };
   const serverVersion = (
     JSON.parse(fs.readFileSync(SERVER_PKG, 'utf-8')) as { version: string }
   ).version;

@@ -1,0 +1,44 @@
+{
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/v1/rbac/metadata",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/rbac/resources",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/rbac/resources/1/restore",
+      "expectedStatus": 401
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/rbac/resources/1",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/rbac/actions",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/rbac/actions",
+      "expectedStatus": 401
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/rbac/actions/1",
+      "expectedStatus": 401
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/rbac/actions/1",
+      "expectedStatus": 401
+    }
+  ]
+}

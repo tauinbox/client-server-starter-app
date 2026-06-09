@@ -1,0 +1,9 @@
+{
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/v1/notifications/stream",
+      "expectedStatus": 401
+    }
+  ]
+}

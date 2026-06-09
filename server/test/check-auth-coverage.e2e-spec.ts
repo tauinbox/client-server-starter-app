@@ -18,18 +18,22 @@ interface RouteEntry {
   expectedStatus: number;
 }
 
-interface RouteManifest {
-  version: string;
-  routes: RouteEntry[];
-}
+const ROUTES_DIR = path.resolve(__dirname, '..', '..', 'contracts', 'routes');
 
-const MANIFEST_PATH = path.resolve(
-  __dirname,
-  '..',
-  '..',
-  'contracts',
-  'routes.json'
-);
+// Flattens every per-feature file under contracts/routes/. New features add a
+// JSON file there, no edit to this loader is required.
+function loadManifestRoutes(): RouteEntry[] {
+  return fs
+    .readdirSync(ROUTES_DIR)
+    .filter((f) => f.endsWith('.json'))
+    .sort()
+    .flatMap((f) => {
+      const { routes } = JSON.parse(
+        fs.readFileSync(path.join(ROUTES_DIR, f), 'utf-8')
+      ) as { routes: RouteEntry[] };
+      return routes;
+    });
+}
 
 // Iterates over contracts/routes.json — for every route declared as
 // expectedStatus=401 (i.e. requires authentication), confirms the running
@@ -78,11 +82,7 @@ describe('Auth coverage — every protected route rejects unauthenticated access
     jest.restoreAllMocks();
   });
 
-  const manifest = JSON.parse(
-    fs.readFileSync(MANIFEST_PATH, 'utf-8')
-  ) as RouteManifest;
-
-  const protectedRoutes = manifest.routes.filter(
+  const protectedRoutes = loadManifestRoutes().filter(
     (r) => r.expectedStatus === 401
   );
 
