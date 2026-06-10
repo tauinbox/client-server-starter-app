@@ -194,6 +194,60 @@ describe('YooKassaProvider', () => {
     });
   });
 
+  describe('updatePaymentMethod', () => {
+    it('re-binds the card with a zero-amount payment, no receipt, and the method-update marker', async () => {
+      const { provider, client } = await build();
+      client!.createPayment.mockResolvedValue({
+        id: 'pay-mu',
+        status: 'pending',
+        confirmation: { confirmation_url: 'https://yoomoney/checkout/pay-mu' }
+      });
+
+      const session = await provider.updatePaymentMethod(null, customer, urls);
+
+      const [payload, idempotencyKey] = client!.createPayment.mock.calls[0] as [
+        ICreatePayment,
+        string
+      ];
+      expect(payload).toMatchObject({
+        amount: { value: '0.00', currency: 'RUB' },
+        capture: true,
+        save_payment_method: true,
+        confirmation: { type: 'redirect', return_url: urls.successUrl },
+        metadata: {
+          customerId: 'cust-1',
+          userId: 'user-1',
+          purpose: 'method_update'
+        },
+        merchant_customer_id: 'cust-1'
+      });
+      expect(payload.receipt).toBeUndefined();
+      expect(typeof idempotencyKey).toBe('string');
+      expect(session).toEqual({
+        url: 'https://yoomoney/checkout/pay-mu',
+        sessionRef: 'pay-mu'
+      });
+    });
+
+    it('throws when YooKassa returns no confirmation url', async () => {
+      const { provider, client } = await build();
+      client!.createPayment.mockResolvedValue({
+        id: 'pay-mu',
+        confirmation: {}
+      });
+      await expect(
+        provider.updatePaymentMethod(null, customer, urls)
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+
+    it('throws when YooKassa is not configured', async () => {
+      const { provider } = await build({ client: null });
+      await expect(
+        provider.updatePaymentMethod(null, customer, urls)
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+  });
+
   describe('chargeOffSession', () => {
     const savedCustomer = {
       ...customer,
@@ -421,6 +475,59 @@ describe('YooKassaProvider', () => {
         currency: 'RUB',
         paidAt: '2026-06-01T00:05:00Z'
       });
+    });
+
+    it('maps a succeeded method-update re-bind to payment_method.updated', async () => {
+      const { provider, client } = await build();
+      client!.getPayment.mockResolvedValue({
+        id: 'pay-mu',
+        status: 'succeeded',
+        amount: { value: '0.00', currency: 'RUB' },
+        payment_method: {
+          id: 'tok-new',
+          saved: true,
+          card: { card_type: 'MasterCard', last4: '4444' }
+        },
+        metadata: {
+          customerId: 'cust-1',
+          userId: 'user-1',
+          purpose: 'method_update'
+        }
+      });
+
+      const result = await provider.verifyAndParseWebhook(
+        notification('payment.succeeded', 'pay-mu')
+      );
+
+      expect(result).toMatchObject({
+        provider: 'yookassa',
+        providerEventId: 'payment.succeeded:pay-mu',
+        type: 'payment_method.updated',
+        payload: {
+          ref: { customerId: 'cust-1', userId: 'user-1' },
+          savedPaymentMethod: {
+            providerMethodRef: 'tok-new',
+            brand: 'MasterCard',
+            last4: '4444'
+          }
+        }
+      });
+    });
+
+    it('ignores a canceled method-update re-bind (no payment.failed)', async () => {
+      const { provider, client } = await build();
+      client!.getPayment.mockResolvedValue({
+        id: 'pay-mu',
+        status: 'canceled',
+        amount: { value: '0.00', currency: 'RUB' },
+        metadata: { customerId: 'cust-1', purpose: 'method_update' }
+      });
+
+      expect(
+        await provider.verifyAndParseWebhook(
+          notification('payment.canceled', 'pay-mu')
+        )
+      ).toBeNull();
     });
 
     it('maps a canceled payment to payment.failed', async () => {

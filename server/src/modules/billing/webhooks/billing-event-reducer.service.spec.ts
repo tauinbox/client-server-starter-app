@@ -17,8 +17,10 @@ import type {
   NormalizedEvent,
   NormalizedInvoicePayload,
   NormalizedPaymentFailedPayload,
+  NormalizedPaymentMethodPayload,
   NormalizedSubscriptionPayload
 } from '../providers/payment-provider.interface';
+import { PaymentMethod } from '../entities/payment-method.entity';
 import { BillingEventReducer } from './billing-event-reducer.service';
 
 interface ManagerStubs {
@@ -503,6 +505,103 @@ describe('BillingEventReducer', () => {
 
       expect(manager.update).not.toHaveBeenCalled();
       expect(emit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('payment_method.updated', () => {
+    const methodPayload: NormalizedPaymentMethodPayload = {
+      ref: { customerId: 'cust-1', userId: 'user-1' },
+      savedPaymentMethod: {
+        providerMethodRef: 'tok-new',
+        brand: 'MasterCard',
+        last4: '4444'
+      }
+    };
+
+    it('demotes the old default, saves the new card as default, and re-points the customer + subscription', async () => {
+      const subscription = {
+        id: 'sub-1',
+        customerId: 'cust-1',
+        paymentMethodId: 'pm-old'
+      } as Subscription;
+      const { reducer, manager, emit } = await build({ subscription });
+
+      await reducer.reduce(
+        event('payment_method.updated', methodPayload, 'yookassa')
+      );
+
+      expect(manager.update).toHaveBeenCalledWith(
+        PaymentMethod,
+        { customerId: 'cust-1', isDefault: true },
+        { isDefault: false }
+      );
+      expect(manager.create).toHaveBeenCalledWith(
+        PaymentMethod,
+        expect.objectContaining({
+          customerId: 'cust-1',
+          provider: 'yookassa',
+          providerMethodRef: 'tok-new',
+          brand: 'MasterCard',
+          last4: '4444',
+          isDefault: true
+        })
+      );
+      expect(manager.update).toHaveBeenCalledWith(
+        Customer,
+        { id: 'cust-1' },
+        { defaultPaymentMethodId: 'sub-new' }
+      );
+      expect(manager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'sub-1', paymentMethodId: 'sub-new' })
+      );
+      // No money moved: no invoice insert, no status change, no domain event.
+      expect(manager.execute).not.toHaveBeenCalled();
+      expect(emit).not.toHaveBeenCalled();
+    });
+
+    it('leaves the subscription untouched when the customer has none open', async () => {
+      const { reducer, manager } = await build({ subscription: null });
+
+      await reducer.reduce(
+        event('payment_method.updated', methodPayload, 'yookassa')
+      );
+
+      expect(manager.update).toHaveBeenCalledWith(
+        Customer,
+        { id: 'cust-1' },
+        { defaultPaymentMethodId: 'sub-new' }
+      );
+      expect(manager.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips when the event carries no saved method', async () => {
+      const { reducer, manager } = await build();
+
+      await reducer.reduce(
+        event(
+          'payment_method.updated',
+          { ...methodPayload, savedPaymentMethod: null },
+          'yookassa'
+        )
+      );
+
+      expect(manager.update).not.toHaveBeenCalled();
+      expect(manager.save).not.toHaveBeenCalled();
+    });
+
+    it('skips when the event carries no customer reference', async () => {
+      const { reducer, manager } = await build();
+
+      await reducer.reduce(
+        event(
+          'payment_method.updated',
+          { ...methodPayload, ref: {} },
+          'yookassa'
+        )
+      );
+
+      expect(manager.update).not.toHaveBeenCalled();
+      expect(manager.save).not.toHaveBeenCalled();
     });
   });
 

@@ -14,7 +14,8 @@ export type NormalizedEventType =
   | 'subscription.canceled'
   | 'subscription.plan_changed'
   | 'invoice.paid'
-  | 'payment.failed';
+  | 'payment.failed'
+  | 'payment_method.updated';
 
 export interface NormalizedEvent {
   provider: BillingProviderId;
@@ -82,6 +83,16 @@ export interface NormalizedInvoicePayload {
    * usage invoice instead of inserting a new row.
    */
   usageChargeKey?: string | null;
+}
+
+/**
+ * Carried by a `payment_method.updated` normalized event: the card a
+ * self-managed (YooKassa) zero-amount re-bind saved. The reducer replaces the
+ * customer's default `PaymentMethod` with it — no money moved, no invoice.
+ */
+export interface NormalizedPaymentMethodPayload {
+  ref: NormalizedCustomerRef;
+  savedPaymentMethod: NormalizedSavedPaymentMethod | null;
 }
 
 /** Failure context carried by a `payment.failed` normalized event. */
@@ -176,6 +187,18 @@ export interface PaymentProvider {
     providerSubscriptionId: string,
     plan: Plan
   ): Promise<ChangePreview>;
+  /**
+   * Starts the flow that replaces the payment instrument behind the
+   * subscription (design §11). Paddle returns its hosted payment-method-change
+   * checkout for the provider-side subscription (`providerSubscriptionId`
+   * required); YooKassa creates a zero-amount card re-bind whose success
+   * webhook (`payment_method.updated`) swaps the default saved method.
+   */
+  updatePaymentMethod(
+    providerSubscriptionId: string | null,
+    customer: Customer,
+    urls: CheckoutUrls
+  ): Promise<CheckoutSession>;
   cancel(providerSubscriptionId: string, mode: CancelMode): Promise<void>;
   refund(
     providerInvoiceRef: string,

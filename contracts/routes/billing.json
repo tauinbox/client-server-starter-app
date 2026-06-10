@@ -27,6 +27,11 @@
     },
     {
       "method": "POST",
+      "path": "/api/v1/billing/payment-method",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
       "path": "/api/v1/billing/checkout",
       "expectedStatus": 401
     },

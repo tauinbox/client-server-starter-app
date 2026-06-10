@@ -87,6 +87,7 @@ describe('Billing user self-service (e2e)', () => {
     listInvoices: jest.fn(),
     getDefaultPaymentMethod: jest.fn(),
     getUsageSummary: jest.fn(),
+    startPaymentMethodUpdate: jest.fn(),
     checkout: jest.fn(),
     changePlan: jest.fn(),
     previewChange: jest.fn(),
@@ -229,6 +230,26 @@ describe('Billing user self-service (e2e)', () => {
       provider: 'yookassa',
       url: 'https://checkout/x',
       sessionRef: 'sess-1'
+    });
+  });
+
+  it('starts the payment-method update flow for the caller', async () => {
+    billingUser.startPaymentMethodUpdate.mockResolvedValue({
+      provider: 'yookassa',
+      url: 'https://checkout/method',
+      sessionRef: 'mu-1'
+    });
+
+    const res = await request(server)
+      .post('/api/v1/billing/payment-method')
+      .set('x-test-user', 'user-7')
+      .expect(200);
+
+    expect(billingUser.startPaymentMethodUpdate).toHaveBeenCalledWith('user-7');
+    expect(res.body).toEqual({
+      provider: 'yookassa',
+      url: 'https://checkout/method',
+      sessionRef: 'mu-1'
     });
   });
 

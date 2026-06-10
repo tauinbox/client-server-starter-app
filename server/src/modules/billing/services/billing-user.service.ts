@@ -236,6 +236,54 @@ export class BillingUserService {
     };
   }
 
+  /**
+   * Starts the payment-method update flow for the caller's open subscription
+   * (design §11). Dispatched on the subscription's provider (like cancel) —
+   * not the region-resolved one, which may differ after an override change.
+   * Paddle hosts the change on its zero-amount checkout; YooKassa re-binds the
+   * card with a zero-amount payment whose success webhook swaps the default.
+   * `past_due` is deliberately allowed: fixing the card is how dunning recovers.
+   */
+  async startPaymentMethodUpdate(
+    userId: string
+  ): Promise<CheckoutSessionResponse> {
+    const customer = await this.customers.findOne({ where: { userId } });
+    const subscription = customer
+      ? await this.findCurrentSubscription(customer.id)
+      : null;
+    if (!customer || !subscription) {
+      throw new NotFoundException(
+        'No active subscription to update the payment method for'
+      );
+    }
+
+    const provider = this.billing.getProviderById(subscription.provider);
+    if (!provider) {
+      throw new ServiceUnavailableException(
+        `Billing provider "${subscription.provider}" is not registered`
+      );
+    }
+    if (provider.managesLifecycle && !subscription.providerSubscriptionId) {
+      throw new ConflictException(
+        'The subscription is not linked to the provider yet. Try again shortly.'
+      );
+    }
+
+    const session = await provider.updatePaymentMethod(
+      subscription.providerSubscriptionId,
+      customer,
+      {
+        successUrl: this.settingsUrl(),
+        cancelUrl: this.settingsUrl()
+      }
+    );
+    return {
+      provider: provider.id,
+      url: session.url,
+      sessionRef: session.sessionRef
+    };
+  }
+
   async cancelSubscription(
     userId: string,
     mode: CancelMode = 'period_end'
@@ -678,8 +726,17 @@ export class BillingUserService {
   }
 
   private checkoutUrl(outcome: 'success' | 'cancel'): string {
+    return `${this.clientBaseUrl()}/billing/checkout/${outcome}`;
+  }
+
+  /** Where a method-update flow returns to — the billing settings page. */
+  private settingsUrl(): string {
+    return `${this.clientBaseUrl()}/billing/settings`;
+  }
+
+  private clientBaseUrl(): string {
     const base =
       this.config.get<string>('CLIENT_URL') ?? 'http://localhost:4200';
-    return `${base.replace(/\/$/, '')}/billing/checkout/${outcome}`;
+    return base.replace(/\/$/, '');
   }
 }

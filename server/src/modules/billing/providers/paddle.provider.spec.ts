@@ -24,7 +24,8 @@ function paddleMock() {
       cancel: jest.fn(),
       createOneTimeCharge: jest.fn(),
       update: jest.fn(),
-      previewUpdate: jest.fn()
+      previewUpdate: jest.fn(),
+      getPaymentMethodChangeTransaction: jest.fn()
     },
     adjustments: { create: jest.fn() }
   };
@@ -243,6 +244,43 @@ describe('PaddleProvider', () => {
       ).toBeNull();
     });
 
+    it('drops a completed payment-method-change transaction (no invoice to reduce)', async () => {
+      const { provider, client } = await build({});
+      client!.webhooks.unmarshal.mockResolvedValue({
+        eventId: 'evt_pmc_1',
+        eventType: EventName.TransactionCompleted,
+        data: {
+          ...transactionData,
+          origin: 'subscription_payment_method_change',
+          details: { totals: { total: '0' }, lineItems: [] }
+        }
+      });
+
+      const result = await provider.verifyAndParseWebhook(Buffer.from('{}'), {
+        'paddle-signature': 'sig'
+      });
+
+      expect(result).toBeNull();
+    });
+
+    it('drops a failed payment-method-change transaction (no dunning signal)', async () => {
+      const { provider, client } = await build({});
+      client!.webhooks.unmarshal.mockResolvedValue({
+        eventId: 'evt_pmc_2',
+        eventType: EventName.TransactionPaymentFailed,
+        data: {
+          ...transactionData,
+          origin: 'subscription_payment_method_change'
+        }
+      });
+
+      const result = await provider.verifyAndParseWebhook(Buffer.from('{}'), {
+        'paddle-signature': 'sig'
+      });
+
+      expect(result).toBeNull();
+    });
+
     it('maps transaction.payment_failed to payment.failed', async () => {
       const { provider, client } = await build({});
       client!.webhooks.unmarshal.mockResolvedValue({
@@ -322,6 +360,52 @@ describe('PaddleProvider', () => {
           successUrl: 'https://app/return',
           cancelUrl: 'https://app/cancel'
         })
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+  });
+
+  describe('updatePaymentMethod', () => {
+    it("returns the subscription's payment-method-change checkout", async () => {
+      const { provider, client } = await build({});
+      client!.subscriptions.getPaymentMethodChangeTransaction.mockResolvedValue(
+        {
+          id: 'txn_pmc',
+          checkout: { url: 'https://pay.paddle.com/checkout/txn_pmc' }
+        }
+      );
+
+      const session = await provider.updatePaymentMethod('sub_123');
+
+      expect(
+        client!.subscriptions.getPaymentMethodChangeTransaction
+      ).toHaveBeenCalledWith('sub_123');
+      expect(session).toEqual({
+        url: 'https://pay.paddle.com/checkout/txn_pmc',
+        sessionRef: 'txn_pmc'
+      });
+    });
+
+    it('throws when the subscription is not linked to Paddle', async () => {
+      const { provider } = await build({});
+      await expect(provider.updatePaymentMethod(null)).rejects.toBeInstanceOf(
+        ServiceUnavailableException
+      );
+    });
+
+    it('throws when Paddle returns no checkout url (default payment link unset)', async () => {
+      const { provider, client } = await build({});
+      client!.subscriptions.getPaymentMethodChangeTransaction.mockResolvedValue(
+        { id: 'txn_pmc', checkout: null }
+      );
+      await expect(
+        provider.updatePaymentMethod('sub_123')
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+
+    it('throws when Paddle is not configured', async () => {
+      const { provider } = await build({ client: null });
+      await expect(
+        provider.updatePaymentMethod('sub_123')
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
   });
