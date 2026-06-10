@@ -79,11 +79,12 @@ src/app/
 │       ├── components/
 │       │   ├── pricing-page/      # PricingPageComponent — plan cards (featured Pro), region control (Auto/Russia/International, authed only), Choose → checkout (anonymous → /login)
 │       │   ├── plan-card/         # PlanCardComponent — presentational tier card; featured = raised + accent + "Most popular" chip; emits choose
-│       │   ├── billing-settings/  # BillingSettingsComponent — current plan + status chip, cancel (confirm dialog), payment method, usage meter (usage-mode subs), invoices (table desktop / cards handset)
+│       │   ├── billing-settings/  # BillingSettingsComponent — current plan + status chip, change-plan dialog (hidden for past_due / pending cancellation), cancel (confirm dialog), payment method + update action (provider-hosted redirect), usage meter (usage-mode subs), invoices (table desktop / cards handset)
+│       │   ├── change-plan-dialog/ # ChangePlanDialogComponent — billing-mode toggle (fixed / pay-as-you-go), same-mode plan targets priced for the sub's provider, live proration mini-ledger from /change/preview (split credit/charge for YooKassa, net-only for Paddle, "Refund due" on negative net, trial note); closes with the chosen plan key, settings applies
 │       │   ├── usage-meter/       # UsageMeterComponent — current-period usage card: unit readout, quota gauge (included = primary, overage = error tone; hidden when the plan includes no units), money mini-ledger ending in the accrued amount
 │       │   └── checkout-return/   # CheckoutReturnComponent — /billing/success polls the subscription until active; /billing/cancel neutral state (mode via route data)
-│       ├── services/       # BillingService (HTTP → /api/v1/billing/*: plans, subscription, invoices, payment-method, usage, checkout, subscription/cancel, region)
-│       ├── store/          # BillingStore — route-level signalStore (plans, subscription, invoices, paymentMethod, usage, region); loadPricing/loadSettings/checkout/cancel/setRegion
+│       ├── services/       # BillingService (HTTP → /api/v1/billing/*: plans, subscription, invoices, payment-method (GET/POST), usage, checkout, subscription/change (+ /preview), subscription/cancel, region)
+│       ├── store/          # BillingStore — route-level signalStore (plans, subscription, invoices, paymentMethod, usage, region); loadPricing/loadSettings/checkout/changePlan/startPaymentMethodUpdate/cancel/setRegion
 │       ├── guards/         # billingAvailableGuard — awaits flag load, allows when the `billing` flag resolves true, else redirects home (no auth requirement → public pricing)
 │       └── utils/          # billing-format — formatMoney (minor units → Intl currency), resolveDisplayProvider (region or language heuristic), planPriceFor
 └── shared/

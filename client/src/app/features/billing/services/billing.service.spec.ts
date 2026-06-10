@@ -57,6 +57,40 @@ describe('BillingService', () => {
     req.flush({ provider: 'paddle', url: 'https://x', sessionRef: 's' });
   });
 
+  it('POSTs a plan change with the target plan key', () => {
+    service.changePlan('business').subscribe();
+    const req = httpMock.expectOne(`${BILLING_API_V1}/subscription/change`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ planKey: 'business' });
+    req.flush({});
+  });
+
+  it('POSTs a proration preview without applying the change', () => {
+    service.previewChange('business').subscribe();
+    const req = httpMock.expectOne(
+      `${BILLING_API_V1}/subscription/change/preview`
+    );
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ planKey: 'business' });
+    req.flush({
+      provider: 'yookassa',
+      fromPlanKey: 'pro',
+      toPlanKey: 'business',
+      currency: 'RUB',
+      creditMinor: 43000,
+      chargeMinor: 129000,
+      dueNowMinor: 86000
+    });
+  });
+
+  it('POSTs a payment-method update with an empty body', () => {
+    service.updatePaymentMethod().subscribe();
+    const req = httpMock.expectOne(`${BILLING_API_V1}/payment-method`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({});
+    req.flush({ provider: 'paddle', url: 'https://x', sessionRef: 's' });
+  });
+
   it('POSTs a cancel with the default period_end mode', () => {
     service.cancel().subscribe();
     const req = httpMock.expectOne(`${BILLING_API_V1}/subscription/cancel`);

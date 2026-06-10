@@ -48,6 +48,8 @@
     "noSubscription": "No subscription yet — explore plans.",
     "explorePlans": "Explore plans",
     "paymentMethod": "Payment method",
+    "noPaymentMethod": "No payment method on file.",
+    "updatePaymentMethod": "Update",
     "invoices": "Invoices",
     "noInvoices": "No invoices yet.",
     "invoiceDate": "Date",
@@ -78,10 +80,33 @@
     "canceledMessage": "No charge was made. You can pick a plan whenever you're ready.",
     "backToPlans": "Back to plans"
   },
+  "changePlan": {
+    "title": "Change plan",
+    "modeLabel": "Billing",
+    "modeFixed": "Fixed",
+    "modeUsage": "Pay as you go",
+    "targetLabel": "New plan",
+    "pickTarget": "Pick a plan",
+    "perUnit": "/ unit",
+    "noTargets": "No other plans are available for your billing provider.",
+    "prorationTitle": "Proration (today)",
+    "unusedCredit": "Unused {{ plan }} credit",
+    "chargeUntil": "{{ plan }} until {{ date }}",
+    "dueNow": "Due now",
+    "refundDue": "Refund due",
+    "trialNote": "You're on a trial — switching plans moves no money.",
+    "providerSettles": "The exact split is settled by the payment provider; this is the net amount.",
+    "selectHint": "Select a plan to see what you'd pay today.",
+    "previewFailed": "Could not calculate the proration. Pick the plan again to retry.",
+    "confirm": "Confirm",
+    "success": "Plan changed — the proration receipts are in your invoices."
+  },
   "errors": {
     "loadFailed": "Could not load billing information.",
     "checkoutFailed": "Could not start checkout. Please try again.",
     "cancelFailed": "Could not cancel the subscription. Please try again.",
-    "regionFailed": "Could not change the billing region."
+    "regionFailed": "Could not change the billing region.",
+    "changeFailed": "Could not change the plan. Please try again.",
+    "paymentMethodFailed": "Could not start the payment-method update. Please try again."
   }
 }

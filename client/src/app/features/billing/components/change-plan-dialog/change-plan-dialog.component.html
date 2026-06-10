@@ -1,0 +1,138 @@
+<ng-container *transloco="let t; scope: 'billing'">
+  <h2 mat-dialog-title>{{ t('billing.changePlan.title') }}</h2>
+
+  <mat-dialog-content>
+    <p class="plan-transition">
+      <span class="plan-pill">{{ currentPlanName }}</span>
+      <mat-icon aria-hidden="true">arrow_forward</mat-icon>
+      <span class="plan-pill to" [class.placeholder]="!selectedPlanName()">
+        {{ selectedPlanName() ?? t('billing.changePlan.pickTarget') }}
+      </span>
+    </p>
+
+    <div class="mode-row">
+      <span class="mode-label" id="change-plan-mode-label">
+        {{ t('billing.changePlan.modeLabel') }}
+      </span>
+      <mat-button-toggle-group
+        aria-labelledby="change-plan-mode-label"
+        [value]="mode()"
+        (change)="setMode($event.value)"
+      >
+        <mat-button-toggle value="fixed">
+          {{ t('billing.changePlan.modeFixed') }}
+        </mat-button-toggle>
+        <mat-button-toggle value="usage">
+          {{ t('billing.changePlan.modeUsage') }}
+        </mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+
+    <div
+      class="plan-options"
+      role="radiogroup"
+      [attr.aria-label]="t('billing.changePlan.targetLabel')"
+    >
+      @for (option of options(); track option.key) {
+        <button
+          type="button"
+          class="plan-option"
+          role="radio"
+          [attr.aria-checked]="option.key === selectedKey()"
+          [class.selected]="option.key === selectedKey()"
+          (click)="select(option.key)"
+        >
+          <span class="option-main">
+            <span class="option-name">{{ option.name }}</span>
+            @if (option.description) {
+              <span class="option-description">{{ option.description }}</span>
+            }
+          </span>
+          <span class="option-price">
+            {{ option.price
+            }}<span class="per">{{ t(option.priceSuffixKey) }}</span>
+          </span>
+        </button>
+      } @empty {
+        <p class="no-options">{{ t('billing.changePlan.noTargets') }}</p>
+      }
+    </div>
+
+    <section class="proration" aria-live="polite">
+      <h3 class="proration-heading">
+        {{ t('billing.changePlan.prorationTitle') }}
+      </h3>
+
+      @if (previewLoading()) {
+        <div class="proration-loading">
+          <mat-spinner diameter="24" />
+        </div>
+      } @else if (previewError()) {
+        <p class="proration-error">
+          {{ t('billing.changePlan.previewFailed') }}
+        </p>
+      } @else if (ledger(); as ledger) {
+        <dl class="ledger">
+          @if (ledger.split) {
+            <div class="ledger-row">
+              <dt>
+                {{
+                  t('billing.changePlan.unusedCredit', {
+                    plan: currentPlanName
+                  })
+                }}
+              </dt>
+              <dd class="credit">{{ ledger.credit }}</dd>
+            </div>
+            <div class="ledger-row">
+              <dt>
+                {{
+                  t('billing.changePlan.chargeUntil', {
+                    plan: selectedPlanName(),
+                    date: periodEnd | date: 'mediumDate'
+                  })
+                }}
+              </dt>
+              <dd class="charge">{{ ledger.charge }}</dd>
+            </div>
+          }
+          <div class="ledger-row due-now">
+            <dt>
+              {{
+                t(
+                  ledger.refundDue
+                    ? 'billing.changePlan.refundDue'
+                    : 'billing.changePlan.dueNow'
+                )
+              }}
+            </dt>
+            <dd>{{ ledger.dueNow }}</dd>
+          </div>
+        </dl>
+        @if (isTrial) {
+          <p class="proration-note">{{ t('billing.changePlan.trialNote') }}</p>
+        } @else if (!ledger.split) {
+          <p class="proration-note">
+            {{ t('billing.changePlan.providerSettles') }}
+          </p>
+        }
+      } @else {
+        <p class="proration-hint">{{ t('billing.changePlan.selectHint') }}</p>
+      }
+    </section>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button matButton="text" type="button" (click)="cancel()">
+      {{ t('common.cancel') }}
+    </button>
+    <button
+      matButton="filled"
+      type="button"
+      [disabled]="!canConfirm()"
+      (click)="confirm()"
+    >
+      {{ t('billing.changePlan.confirm') }}
+    </button>
+  </mat-dialog-actions>
+</ng-container>

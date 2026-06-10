@@ -1,0 +1,178 @@
+@use '../../../../../styles/abstracts/functions' as func;
+@use '../../../../../styles/abstracts/variables' as vars;
+
+.plan-transition {
+  display: flex;
+  gap: vars.$spacing-sm;
+  align-items: center;
+  margin: 0 0 vars.$spacing-md;
+
+  mat-icon {
+    color: var(--mat-sys-primary);
+  }
+
+  .plan-pill {
+    padding: func.rem(2) vars.$spacing-sm;
+    font-weight: vars.$font-weight-medium;
+    background: var(--mat-sys-surface-container-high);
+    border-radius: vars.$border-radius-lg;
+
+    &.to {
+      color: var(--mat-sys-on-primary-container);
+      background: var(--mat-sys-primary-container);
+    }
+
+    &.placeholder {
+      font-weight: vars.$font-weight-regular;
+      color: var(--mat-sys-on-surface-variant);
+      background: transparent;
+      border: func.rem(1) dashed var(--mat-sys-outline-variant);
+    }
+  }
+}
+
+.mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: vars.$spacing-sm;
+  align-items: center;
+  margin-bottom: vars.$spacing-md;
+
+  .mode-label {
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.plan-options {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-sm;
+}
+
+.plan-option {
+  display: flex;
+  gap: vars.$spacing-md;
+  align-items: center;
+  justify-content: space-between;
+  padding: vars.$spacing-sm vars.$spacing-md;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+  background: transparent;
+  border: func.rem(1) solid var(--mat-sys-outline-variant);
+  border-radius: vars.$border-radius-md;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+
+  &:hover {
+    background: var(--mat-sys-surface-container-low);
+  }
+
+  &.selected {
+    background: color-mix(in srgb, var(--mat-sys-primary) 8%, transparent);
+    border-color: var(--mat-sys-primary);
+    box-shadow: inset 0 0 0 func.rem(1) var(--mat-sys-primary);
+  }
+
+  .option-main {
+    display: flex;
+    flex-direction: column;
+    gap: func.rem(2);
+  }
+
+  .option-name {
+    font-weight: vars.$font-weight-medium;
+  }
+
+  .option-description {
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .option-price {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+
+    .per {
+      font-size: vars.$font-size-sm;
+      color: var(--mat-sys-on-surface-variant);
+    }
+  }
+}
+
+.no-options {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// Receipt-style proration block: dashed tear-off separator, tabular figures.
+.proration {
+  padding-top: vars.$spacing-md;
+  margin-top: vars.$spacing-md;
+  border-top: func.rem(1) dashed var(--mat-sys-outline-variant);
+}
+
+.proration-heading {
+  margin: 0 0 vars.$spacing-sm;
+  font-size: vars.$font-size-sm;
+  font-weight: vars.$font-weight-medium;
+  color: var(--mat-sys-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: func.rem(0.5);
+}
+
+.proration-loading {
+  display: flex;
+  justify-content: center;
+  padding: vars.$spacing-sm 0;
+}
+
+.ledger {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-xs;
+  margin: 0;
+
+  .ledger-row {
+    display: flex;
+    gap: vars.$spacing-md;
+    align-items: baseline;
+    justify-content: space-between;
+
+    dt {
+      color: var(--mat-sys-on-surface-variant);
+    }
+
+    dd {
+      margin: 0;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+  }
+
+  .due-now {
+    padding-top: vars.$spacing-xs;
+    margin-top: vars.$spacing-xs;
+    font-weight: vars.$font-weight-bold;
+    border-top: func.rem(1) solid var(--mat-sys-outline-variant);
+
+    dt {
+      color: inherit;
+    }
+  }
+}
+
+.proration-error {
+  margin: 0;
+  color: var(--mat-sys-error);
+}
+
+.proration-note,
+.proration-hint {
+  margin: vars.$spacing-sm 0 0;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-on-surface-variant);
+}

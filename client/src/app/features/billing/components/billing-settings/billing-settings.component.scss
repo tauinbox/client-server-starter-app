@@ -97,6 +97,14 @@
   margin: 0;
   font-variant-numeric: tabular-nums;
 
+  &.none {
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  + .card-actions {
+    margin-top: vars.$spacing-md;
+  }
+
   .card-brand {
     font-weight: vars.$font-weight-medium;
     text-transform: capitalize;

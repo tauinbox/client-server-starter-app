@@ -163,6 +163,56 @@ export const BillingStore = signalStore(
       }
     }
 
+    /**
+     * Instantly switch the subscription to another plan (prorated server-side),
+     * then quietly refresh the artifacts the switch produces: the proration
+     * receipt rows in the invoice history and the usage summary (the billing
+     * mode may have changed).
+     */
+    async function changePlan(planKey: string): Promise<boolean> {
+      patchState(store, { working: true });
+      try {
+        const subscription = await firstValueFrom(billing.changePlan(planKey));
+        patchState(store, { subscription });
+        notify.success('billing.changePlan.success');
+      } catch (error) {
+        notify.error(error as HttpErrorResponse, 'billing.errors.changeFailed');
+        return false;
+      } finally {
+        patchState(store, { working: false });
+      }
+      try {
+        const [invoices, usage] = await Promise.all([
+          firstValueFrom(billing.getInvoices()),
+          firstValueFrom(billing.getUsage())
+        ]);
+        patchState(store, { invoices, usage });
+      } catch {
+        // The switch itself succeeded and was reported; a stale invoice list
+        // self-heals on the next settings load.
+      }
+      return true;
+    }
+
+    /**
+     * Start the provider-hosted payment-method update flow and return the
+     * session (the caller performs the redirect). `null` on failure.
+     */
+    async function startPaymentMethodUpdate(): Promise<CheckoutSessionResponse | null> {
+      patchState(store, { working: true });
+      try {
+        return await firstValueFrom(billing.updatePaymentMethod());
+      } catch (error) {
+        notify.error(
+          error as HttpErrorResponse,
+          'billing.errors.paymentMethodFailed'
+        );
+        return null;
+      } finally {
+        patchState(store, { working: false });
+      }
+    }
+
     async function cancel(mode: CancelMode = 'period_end'): Promise<boolean> {
       patchState(store, { working: true });
       try {
@@ -199,6 +249,8 @@ export const BillingStore = signalStore(
       loadSettings,
       refreshSubscription,
       checkout,
+      changePlan,
+      startPaymentMethodUpdate,
       cancel,
       setRegion
     };
