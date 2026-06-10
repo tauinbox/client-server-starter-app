@@ -21,6 +21,7 @@ import type {
   AuthenticatedRequest,
   MockCustomer,
   MockInvoice,
+  MockPaymentMethod,
   MockPlan,
   MockSubscription,
   MockUsageRecord
@@ -235,6 +236,61 @@ billingRouter.get('/usage', authGuard, (req: Request, res: Response) => {
   };
   res.json(summary);
 });
+
+// POST /billing/payment-method — start the payment-method update flow for the
+// current subscription. The server returns a hosted provider session and swaps
+// the default method only when the provider's success webhook lands; the mock
+// has no provider, so the swap happens synchronously here (same documented
+// timing divergence as the plan-change settlement) and the session shape is
+// still returned. The replacement card is deterministic for E2E assertions.
+billingRouter.post(
+  '/payment-method',
+  authGuard,
+  (req: Request, res: Response) => {
+    const { user } = req as AuthenticatedRequest;
+    const customer = findCustomer(user.id);
+    const sub = customer ? findCurrentSubscription(customer.id) : undefined;
+    if (!customer || !sub) {
+      res.status(404).json({
+        message: 'No active subscription to update the payment method for',
+        statusCode: 404
+      });
+      return;
+    }
+
+    const state = getState();
+    const nowIso = new Date().toISOString();
+    for (const method of state.billingPaymentMethods.values()) {
+      if (method.customerId === customer.id && method.isDefault) {
+        method.isDefault = false;
+        method.updatedAt = nowIso;
+      }
+    }
+    const replacement: MockPaymentMethod = {
+      id: uuidv4(),
+      customerId: customer.id,
+      provider: sub.provider,
+      providerMethodRef: `pm_${uuidv4()}`,
+      brand: 'mastercard',
+      last4: '4444',
+      isDefault: true,
+      createdAt: nowIso,
+      updatedAt: nowIso
+    };
+    state.billingPaymentMethods.set(replacement.id, replacement);
+    customer.defaultPaymentMethodId = replacement.id;
+    customer.updatedAt = nowIso;
+    sub.paymentMethodId = replacement.id;
+    sub.updatedAt = nowIso;
+
+    const sessionRef = uuidv4();
+    res.json({
+      provider: sub.provider,
+      url: `https://mock-checkout.local/${sub.provider}/method/${sessionRef}`,
+      sessionRef
+    });
+  }
+);
 
 // POST /billing/checkout — start a hosted checkout for a plan.
 billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {

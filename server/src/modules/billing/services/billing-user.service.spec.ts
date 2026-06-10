@@ -1,7 +1,11 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  ServiceUnavailableException
+} from '@nestjs/common';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { User } from '../../users/entities/user.entity';
@@ -102,6 +106,7 @@ function provider(
   id: BillingProviderId;
   managesLifecycle: boolean;
   startCheckout: jest.Mock;
+  updatePaymentMethod: jest.Mock;
   cancel: jest.Mock;
   changePlan: jest.Mock;
   previewChangePlan: jest.Mock;
@@ -114,6 +119,9 @@ function provider(
     startCheckout: jest
       .fn()
       .mockResolvedValue({ url: 'https://checkout/x', sessionRef: 'sess-1' }),
+    updatePaymentMethod: jest
+      .fn()
+      .mockResolvedValue({ url: 'https://method/x', sessionRef: 'mu-1' }),
     cancel: jest.fn().mockResolvedValue(undefined),
     changePlan: jest.fn().mockResolvedValue(undefined),
     previewChangePlan: jest
@@ -327,6 +335,103 @@ describe('BillingUserService', () => {
       await expect(ctx.service.cancelSubscription('user-1')).rejects.toThrow(
         NotFoundException
       );
+    });
+  });
+
+  describe('startPaymentMethodUpdate', () => {
+    it("starts the provider's method-update flow returning to the settings page", async () => {
+      const ctx = await build();
+      const customer = { id: 'cust-1', userId: 'user-1' };
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        provider: 'yookassa' as const,
+        providerSubscriptionId: null,
+        status: 'active'
+      });
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      const result = await ctx.service.startPaymentMethodUpdate('user-1');
+
+      expect(ctx.billing.getProviderById).toHaveBeenCalledWith('yookassa');
+      expect(yoo.updatePaymentMethod).toHaveBeenCalledWith(null, customer, {
+        successUrl: 'http://localhost:4200/billing/settings',
+        cancelUrl: 'http://localhost:4200/billing/settings'
+      });
+      expect(result).toEqual({
+        provider: 'yookassa',
+        url: 'https://method/x',
+        sessionRef: 'mu-1'
+      });
+    });
+
+    it('passes the provider subscription reference for a provider-managed subscription', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1'
+      });
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        provider: 'paddle' as const,
+        providerSubscriptionId: 'sub_ext',
+        status: 'active'
+      });
+      const paddle = provider('paddle', true);
+      ctx.billing.getProviderById.mockReturnValue(paddle);
+
+      await ctx.service.startPaymentMethodUpdate('user-1');
+
+      expect(paddle.updatePaymentMethod).toHaveBeenCalledWith(
+        'sub_ext',
+        expect.objectContaining({ id: 'cust-1' }),
+        expect.anything()
+      );
+    });
+
+    it('throws when there is no subscription to update the method for', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      ctx.subscriptions.findOne.mockResolvedValue(null);
+
+      await expect(
+        ctx.service.startPaymentMethodUpdate('user-1')
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects a provider-managed subscription not yet linked to the provider', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        provider: 'paddle' as const,
+        providerSubscriptionId: null,
+        status: 'active'
+      });
+      const paddle = provider('paddle', true);
+      ctx.billing.getProviderById.mockReturnValue(paddle);
+
+      await expect(
+        ctx.service.startPaymentMethodUpdate('user-1')
+      ).rejects.toThrow(ConflictException);
+      expect(paddle.updatePaymentMethod).not.toHaveBeenCalled();
+    });
+
+    it('throws when the subscription provider is not registered', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        provider: 'yookassa' as const,
+        providerSubscriptionId: null,
+        status: 'active'
+      });
+      ctx.billing.getProviderById.mockReturnValue(undefined);
+
+      await expect(
+        ctx.service.startPaymentMethodUpdate('user-1')
+      ).rejects.toThrow(ServiceUnavailableException);
     });
   });
 

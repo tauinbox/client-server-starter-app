@@ -23,6 +23,7 @@ import type {
   NormalizedEvent,
   NormalizedInvoicePayload,
   NormalizedPaymentFailedPayload,
+  NormalizedPaymentMethodPayload,
   NormalizedSubscriptionPayload
 } from '../providers/payment-provider.interface';
 
@@ -91,6 +92,12 @@ export class BillingEventReducer {
       case 'payment.failed':
         await this.reducePaymentFailed(
           event.payload as NormalizedPaymentFailedPayload
+        );
+        break;
+      case 'payment_method.updated':
+        await this.reducePaymentMethodUpdated(
+          event.provider,
+          event.payload as NormalizedPaymentMethodPayload
         );
         break;
       case 'subscription.plan_changed':
@@ -419,6 +426,62 @@ export class BillingEventReducer {
     subscription.status = trialing ? 'trialing' : 'active';
     await manager.save(subscription);
     return subscription.id;
+  }
+
+  /**
+   * Default-method swap from a self-managed (YooKassa) method-update re-bind
+   * (design §11): the new card replaces the old default — previous methods are
+   * kept but demoted, the customer's autopay pointer and the open
+   * subscription's bookkeeping reference move to the new row. No invoice is
+   * written and the subscription status is untouched (a past_due subscription
+   * stays past_due until the renewal retry actually charges the new card).
+   * Idempotency is event-level: the `billing_webhook_events` unique key gates
+   * a replayed delivery upstream.
+   */
+  private async reducePaymentMethodUpdated(
+    provider: BillingProviderId,
+    payload: NormalizedPaymentMethodPayload
+  ): Promise<void> {
+    const customerId = payload.ref.customerId;
+    const saved = payload.savedPaymentMethod;
+    if (!customerId || !saved) {
+      this.logger.warn(
+        'Skipping payment_method.updated: no customer reference or saved method'
+      );
+      return;
+    }
+
+    await withTransaction(this.dataSource, async (manager) => {
+      await manager.update(
+        PaymentMethod,
+        { customerId, isDefault: true },
+        { isDefault: false }
+      );
+      const method = await manager.save(
+        manager.create(PaymentMethod, {
+          customerId,
+          provider,
+          providerMethodRef: saved.providerMethodRef,
+          brand: saved.brand,
+          last4: saved.last4,
+          isDefault: true
+        })
+      );
+      await manager.update(
+        Customer,
+        { id: customerId },
+        { defaultPaymentMethodId: method.id }
+      );
+
+      const subscription = await manager.findOne(Subscription, {
+        where: { customerId, status: In([...SELF_MANAGED_OPEN_STATUSES]) },
+        order: { createdAt: 'DESC' }
+      });
+      if (subscription) {
+        subscription.paymentMethodId = method.id;
+        await manager.save(subscription);
+      }
+    });
   }
 
   private async reducePaymentFailed(

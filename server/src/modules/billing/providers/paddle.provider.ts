@@ -255,6 +255,36 @@ export class PaddleProvider implements PaymentProvider {
     };
   }
 
+  /**
+   * Payment-method change is a hosted Paddle flow (design §16.D): the
+   * subscription's zero-amount `update-payment-method` transaction opens a
+   * checkout where the customer enters the new card. Paddle stores the method
+   * itself — there is no local `PaymentMethod` row to swap — and emits a
+   * `transaction.completed` with origin `subscription_payment_method_change`,
+   * which `normalize` drops (no money moved, nothing to reduce).
+   */
+  async updatePaymentMethod(
+    providerSubscriptionId: string | null
+  ): Promise<CheckoutSession> {
+    const paddle = this.requireClient();
+    if (!providerSubscriptionId) {
+      throw new ServiceUnavailableException(
+        'The subscription is not linked to Paddle yet'
+      );
+    }
+    const transaction =
+      await paddle.subscriptions.getPaymentMethodChangeTransaction(
+        providerSubscriptionId
+      );
+    const url = transaction.checkout?.url;
+    if (!url) {
+      throw new ServiceUnavailableException(
+        'Paddle did not return a checkout URL'
+      );
+    }
+    return { url, sessionRef: transaction.id };
+  }
+
   async cancel(
     providerSubscriptionId: string,
     mode: CancelMode
@@ -369,14 +399,26 @@ export class PaddleProvider implements PaymentProvider {
             event.data as SubscriptionNotification
           )
         };
-      case EventName.TransactionCompleted:
+      case EventName.TransactionCompleted: {
+        const txn = event.data as TransactionNotification;
+        // A payment-method-change transaction is zero-amount — no money moved,
+        // nothing to reduce onto an Invoice (Paddle holds the new method).
+        if (txn.origin === 'subscription_payment_method_change') {
+          return null;
+        }
         return {
           ...base,
           type: 'invoice.paid',
-          payload: this.invoicePayload(event.data as TransactionNotification)
+          payload: this.invoicePayload(txn)
         };
+      }
       case EventName.TransactionPaymentFailed: {
         const txn = event.data as TransactionNotification;
+        // An abandoned/declined method change leaves the old method in place —
+        // it must not feed the dunning/payment-failed pipeline.
+        if (txn.origin === 'subscription_payment_method_change') {
+          return null;
+        }
         const payload: NormalizedPaymentFailedPayload = {
           ref: refFromCustomData(txn.customData),
           providerSubscriptionId: txn.subscriptionId,

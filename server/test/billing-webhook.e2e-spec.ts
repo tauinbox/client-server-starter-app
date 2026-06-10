@@ -154,6 +154,7 @@ function makeStubProvider(): PaymentProvider {
     chargeUsage: jest.fn(),
     changePlan: jest.fn(),
     previewChangePlan: jest.fn(),
+    updatePaymentMethod: jest.fn(),
     cancel: jest.fn(),
     refund: jest.fn(),
     verifyAndParseWebhook: (rawBody: Buffer) => {

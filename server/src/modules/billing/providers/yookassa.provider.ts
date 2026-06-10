@@ -30,9 +30,17 @@ import type {
   NormalizedEvent,
   NormalizedInvoicePayload,
   NormalizedPaymentFailedPayload,
+  NormalizedPaymentMethodPayload,
   PaymentProvider,
   ReceiptItem
 } from './payment-provider.interface';
+
+/**
+ * Metadata marker a payment-method-update re-bind payment carries, so its
+ * success webhook maps to `payment_method.updated` (a default-method swap)
+ * instead of `invoice.paid` (which would insert an invoice and re-activate).
+ */
+const METHOD_UPDATE_PURPOSE = 'method_update';
 
 /** Minor units (kopecks) → YooKassa decimal string, e.g. `99000` → `'990.00'`. */
 function toAmountValue(amountMinor: number): string {
@@ -42,6 +50,12 @@ function toAmountValue(amountMinor: number): string {
 /** YooKassa decimal string → minor units, e.g. `'990.00'` → `99000`. */
 function toMinor(value: string): number {
   return Math.round(Number.parseFloat(value) * 100);
+}
+
+/** Whether a payment is a method-update re-bind (per its metadata marker). */
+function isMethodUpdate(metadata: unknown): boolean {
+  const data = (metadata ?? {}) as Record<string, unknown>;
+  return data['purpose'] === METHOD_UPDATE_PURPOSE;
 }
 
 /** Reads our `customerId`/`userId` echoed back through YooKassa metadata. */
@@ -177,6 +191,42 @@ export class YooKassaProvider implements PaymentProvider {
               price.currency
             )
           })
+    };
+
+    const payment = await yoo.createPayment(payload, randomUUID());
+    const url = payment.confirmation?.confirmation_url;
+    if (!url) {
+      throw new ServiceUnavailableException(
+        'YooKassa did not return a confirmation URL'
+      );
+    }
+    return { url, sessionRef: payment.id };
+  }
+
+  /**
+   * Replaces the saved card via a zero-amount re-bind (design §16.B — the same
+   * save-without-payment mechanism trials use): no money moves, so no fiscal
+   * receipt. The `purpose` metadata routes the success webhook to
+   * `payment_method.updated`, where the reducer swaps the default method.
+   */
+  async updatePaymentMethod(
+    _providerSubscriptionId: string | null,
+    customer: Customer,
+    urls: CheckoutUrls
+  ): Promise<CheckoutSession> {
+    const yoo = this.requireClient();
+    const payload: ICreatePayment = {
+      amount: { value: toAmountValue(0), currency: customer.currency },
+      capture: true,
+      save_payment_method: true,
+      confirmation: { type: 'redirect', return_url: urls.successUrl },
+      description: 'Payment method update',
+      metadata: {
+        customerId: customer.id,
+        userId: customer.userId,
+        purpose: METHOD_UPDATE_PURPOSE
+      },
+      merchant_customer_id: customer.id
     };
 
     const payment = await yoo.createPayment(payload, randomUUID());
@@ -328,6 +378,15 @@ export class YooKassaProvider implements PaymentProvider {
               last4: method.card?.last4 ?? '0000'
             }
           : null;
+      // A method-update re-bind is not a payment: swap the default method,
+      // never insert an invoice or touch the subscription status.
+      if (isMethodUpdate(payment.metadata)) {
+        const payload: NormalizedPaymentMethodPayload = {
+          ref,
+          savedPaymentMethod
+        };
+        return { ...base, type: 'payment_method.updated', payload };
+      }
       const payload: NormalizedInvoicePayload = {
         ref,
         providerInvoiceRef: payment.id,
@@ -343,6 +402,11 @@ export class YooKassaProvider implements PaymentProvider {
     }
 
     if (payment.status === 'canceled') {
+      // An abandoned/declined method-update re-bind leaves the old method in
+      // place — it must not feed the dunning/payment-failed pipeline.
+      if (isMethodUpdate(payment.metadata)) {
+        return null;
+      }
       const payload: NormalizedPaymentFailedPayload = {
         ref,
         providerSubscriptionId: null

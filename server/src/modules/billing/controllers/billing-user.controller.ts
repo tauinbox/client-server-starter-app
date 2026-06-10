@@ -75,6 +75,17 @@ export class BillingUserController {
     return this.billingUser.getDefaultPaymentMethod(req.user.userId);
   }
 
+  @Post('payment-method')
+  @HttpCode(200)
+  @ApiOperation({
+    summary:
+      'Start the payment-method update flow for the current subscription (hosted by the provider).'
+  })
+  @ApiOkResponse({ type: CheckoutSessionResponseDto })
+  updatePaymentMethod(@Req() req: JwtAuthRequest) {
+    return this.billingUser.startPaymentMethodUpdate(req.user.userId);
+  }
+
   @Post('checkout')
   @HttpCode(200)
   @ApiOperation({
