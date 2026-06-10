@@ -113,6 +113,21 @@ export class YooKassaProvider implements PaymentProvider {
     );
   }
 
+  changePlan(): Promise<void> {
+    // Self-managed lifecycle: there is no provider-side subscription to update.
+    // The core computes the proration (ProrationCalculator) and settles it via
+    // refund + chargeOffSession with the two 54-FZ documents (design §17.4).
+    throw new NotImplementedException(
+      'YooKassaProvider.changePlan is not applicable (proration is computed by the core)'
+    );
+  }
+
+  previewChangePlan(): Promise<never> {
+    throw new NotImplementedException(
+      'YooKassaProvider.previewChangePlan is not applicable (proration is computed by the core)'
+    );
+  }
+
   async startCheckout(
     customer: Customer,
     plan: Plan,

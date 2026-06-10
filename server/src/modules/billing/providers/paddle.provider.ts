@@ -19,6 +19,7 @@ import type { Plan } from '../entities/plan.entity';
 import { PADDLE_CLIENT } from './paddle.client';
 import type {
   CancelMode,
+  ChangePreview,
   ChargeResult,
   CheckoutSession,
   CheckoutUrls,
@@ -195,6 +196,63 @@ export class PaddleProvider implements PaymentProvider {
         }
       ]
     });
+  }
+
+  /** The new plan's Paddle catalog price id — required for update/preview. */
+  private requirePriceId(plan: Plan): string {
+    const priceId = plan.prices.paddle?.providerPriceId;
+    if (!priceId) {
+      throw new ServiceUnavailableException(
+        `Plan "${plan.key}" has no Paddle price configured`
+      );
+    }
+    return priceId;
+  }
+
+  /**
+   * Delegated plan change (design §16.A): swap the subscription item to the new
+   * plan's catalog price with `prorated_immediately` — Paddle computes the
+   * credit/charge, bills the difference and emits `subscription.updated` +
+   * `transaction.completed` webhooks that reconcile our rows. Custom data is
+   * re-planted wholesale (the update replaces it): the customer identifiers the
+   * reducer correlates by, and the NEW plan key so the webhook does not revert
+   * the local plan to the stale checkout-time key.
+   */
+  async changePlan(
+    providerSubscriptionId: string,
+    customer: Customer,
+    plan: Plan
+  ): Promise<void> {
+    const paddle = this.requireClient();
+    await paddle.subscriptions.update(providerSubscriptionId, {
+      items: [{ priceId: this.requirePriceId(plan), quantity: 1 }],
+      prorationBillingMode: 'prorated_immediately',
+      customData: {
+        customerId: customer.id,
+        userId: customer.userId,
+        planKey: plan.key
+      }
+    });
+  }
+
+  async previewChangePlan(
+    providerSubscriptionId: string,
+    plan: Plan
+  ): Promise<ChangePreview> {
+    const paddle = this.requireClient();
+    const preview = await paddle.subscriptions.previewUpdate(
+      providerSubscriptionId,
+      {
+        items: [{ priceId: this.requirePriceId(plan), quantity: 1 }],
+        prorationBillingMode: 'prorated_immediately'
+      }
+    );
+    return {
+      amountMinor: Number(
+        preview.immediateTransaction?.details?.totals?.total ?? '0'
+      ),
+      currency: preview.currencyCode ?? plan.prices.paddle?.currency ?? 'USD'
+    };
   }
 
   async cancel(

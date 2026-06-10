@@ -182,8 +182,4 @@ describe('UsageRating', () => {
     ).rejects.toThrow('no price for provider "paddle"');
     expect(sum).not.toHaveBeenCalled();
   });
-
-  it('still rejects proration as M3 work', () => {
-    expect(() => rating.prorate()).toThrow('Usage-plan proration (M3)');
-  });
 });

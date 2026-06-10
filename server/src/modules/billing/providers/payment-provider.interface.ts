@@ -115,6 +115,12 @@ export interface ChargeResult {
   providerInvoiceRef: string;
 }
 
+/** Net immediate cost of a delegated plan change, from the provider's preview. */
+export interface ChangePreview {
+  amountMinor: number;
+  currency: string;
+}
+
 /**
  * Payment provider behind the `BILLING_PROVIDERS` token. Paddle manages the
  * subscription lifecycle itself (`managesLifecycle = true`); YooKassa is
@@ -151,6 +157,25 @@ export interface PaymentProvider {
     description: string,
     chargeKey: string
   ): Promise<void>;
+  /**
+   * Switches a provider-managed subscription to `plan` with immediate
+   * proration (Paddle `subscriptions.update`, `prorated_immediately`). The
+   * provider computes the credit/charge and emits the usual webhooks; the
+   * `customer` identifiers are re-planted in custom data so they — and the new
+   * plan key — survive the update for the webhook reducer. Self-managed
+   * providers reject this call: their proration is computed by the core
+   * (`ProrationCalculator`) and settled via refund + chargeOffSession.
+   */
+  changePlan(
+    providerSubscriptionId: string,
+    customer: Customer,
+    plan: Plan
+  ): Promise<void>;
+  /** Previews `changePlan` without applying it (net immediate amount). */
+  previewChangePlan(
+    providerSubscriptionId: string,
+    plan: Plan
+  ): Promise<ChangePreview>;
   cancel(providerSubscriptionId: string, mode: CancelMode): Promise<void>;
   refund(
     providerInvoiceRef: string,

@@ -20,7 +20,12 @@ function paddleMock() {
   return {
     webhooks: { unmarshal: jest.fn() },
     transactions: { create: jest.fn(), get: jest.fn() },
-    subscriptions: { cancel: jest.fn(), createOneTimeCharge: jest.fn() },
+    subscriptions: {
+      cancel: jest.fn(),
+      createOneTimeCharge: jest.fn(),
+      update: jest.fn(),
+      previewUpdate: jest.fn()
+    },
     adjustments: { create: jest.fn() }
   };
 }
@@ -338,6 +343,81 @@ describe('PaddleProvider', () => {
         });
       }
     );
+  });
+
+  describe('changePlan', () => {
+    const customer = {
+      id: 'cust-1',
+      userId: 'user-1'
+    } as Customer;
+    const plan = {
+      key: 'business',
+      name: 'Business',
+      prices: {
+        paddle: {
+          currency: 'USD',
+          amountMinor: 2900,
+          providerPriceId: 'pri_biz'
+        }
+      }
+    } as Plan;
+
+    it('swaps the item to the new catalog price with immediate proration and re-plants custom data', async () => {
+      const { provider, client } = await build({});
+      client!.subscriptions.update.mockResolvedValue({});
+
+      await provider.changePlan('sub_ext', customer, plan);
+
+      expect(client!.subscriptions.update).toHaveBeenCalledWith('sub_ext', {
+        items: [{ priceId: 'pri_biz', quantity: 1 }],
+        prorationBillingMode: 'prorated_immediately',
+        customData: {
+          customerId: 'cust-1',
+          userId: 'user-1',
+          planKey: 'business'
+        }
+      });
+    });
+
+    it('throws when the target plan has no Paddle price id', async () => {
+      const { provider } = await build({});
+      const priceless = { key: 'usage', prices: {} } as Plan;
+
+      await expect(
+        provider.changePlan('sub_ext', customer, priceless)
+      ).rejects.toThrow(ServiceUnavailableException);
+    });
+
+    it('previews the update and returns the immediate net amount', async () => {
+      const { provider, client } = await build({});
+      client!.subscriptions.previewUpdate.mockResolvedValue({
+        currencyCode: 'USD',
+        immediateTransaction: { details: { totals: { total: '1700' } } }
+      });
+
+      const preview = await provider.previewChangePlan('sub_ext', plan);
+
+      expect(client!.subscriptions.previewUpdate).toHaveBeenCalledWith(
+        'sub_ext',
+        {
+          items: [{ priceId: 'pri_biz', quantity: 1 }],
+          prorationBillingMode: 'prorated_immediately'
+        }
+      );
+      expect(preview).toEqual({ amountMinor: 1700, currency: 'USD' });
+    });
+
+    it('previews zero when no immediate transaction results', async () => {
+      const { provider, client } = await build({});
+      client!.subscriptions.previewUpdate.mockResolvedValue({
+        currencyCode: 'USD',
+        immediateTransaction: null
+      });
+
+      const preview = await provider.previewChangePlan('sub_ext', plan);
+
+      expect(preview).toEqual({ amountMinor: 0, currency: 'USD' });
+    });
   });
 
   describe('chargeUsage', () => {

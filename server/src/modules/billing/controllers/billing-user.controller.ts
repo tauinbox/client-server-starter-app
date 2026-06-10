@@ -21,6 +21,8 @@ import { RequireEntitlement } from '../entitlements/require-entitlement.decorato
 import { BillingUserService } from '../services/billing-user.service';
 import { CheckoutRequestDto } from '../dtos/checkout-request.dto';
 import { CancelSubscriptionRequestDto } from '../dtos/cancel-subscription-request.dto';
+import { ChangeSubscriptionRequestDto } from '../dtos/change-subscription-request.dto';
+import { ProrationPreviewResponseDto } from '../dtos/proration-preview-response.dto';
 import { RegionRequestDto } from '../dtos/region-request.dto';
 import { SubscriptionResponseDto } from '../dtos/subscription-response.dto';
 import { InvoiceResponseDto } from '../dtos/invoice-response.dto';
@@ -81,6 +83,33 @@ export class BillingUserController {
   @ApiOkResponse({ type: CheckoutSessionResponseDto })
   checkout(@Req() req: JwtAuthRequest, @Body() body: CheckoutRequestDto) {
     return this.billingUser.checkout(req.user.userId, body.planKey);
+  }
+
+  @Post('subscription/change')
+  @HttpCode(200)
+  @ApiOperation({
+    summary:
+      'Switch the current subscription to another plan (tier and/or billing mode), instantly with proration.'
+  })
+  @ApiOkResponse({ type: SubscriptionResponseDto })
+  changePlan(
+    @Req() req: JwtAuthRequest,
+    @Body() body: ChangeSubscriptionRequestDto
+  ) {
+    return this.billingUser.changePlan(req.user.userId, body.planKey);
+  }
+
+  @Post('subscription/change/preview')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Preview the prorated cost of a plan switch without applying it.'
+  })
+  @ApiOkResponse({ type: ProrationPreviewResponseDto })
+  previewChange(
+    @Req() req: JwtAuthRequest,
+    @Body() body: ChangeSubscriptionRequestDto
+  ) {
+    return this.billingUser.previewChange(req.user.userId, body.planKey);
   }
 
   @Post('subscription/cancel')

@@ -1,4 +1,4 @@
-import { Injectable, NotImplementedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { And, LessThan, MoreThanOrEqual, Repository } from 'typeorm';
 import { UsageRecord } from '../entities/usage-record.entity';
@@ -6,7 +6,6 @@ import type { Plan } from '../entities/plan.entity';
 import type { Subscription } from '../entities/subscription.entity';
 import type {
   BillingPeriod,
-  ProrationResult,
   RatedAmount,
   RatingStrategy
 } from './rating-strategy.interface';
@@ -90,9 +89,5 @@ export class UsageRating implements RatingStrategy {
             ]
           : []
     };
-  }
-
-  prorate(): ProrationResult {
-    throw new NotImplementedException('Usage-plan proration (M3)');
   }
 }
