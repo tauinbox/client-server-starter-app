@@ -3,6 +3,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  NotImplementedException,
   ServiceUnavailableException
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -102,6 +103,14 @@ export class YooKassaProvider implements PaymentProvider {
     // via `metadata`/`merchant_customer_id`. The billing customer id is the
     // stable reference we tag every payment with.
     return Promise.resolve(customer.providerCustomerId ?? customer.id);
+  }
+
+  chargeUsage(): Promise<void> {
+    // Self-managed lifecycle: usage periods are closed and charged by the
+    // renewal scheduler through chargeOffSession (with the 54-FZ receipt).
+    throw new NotImplementedException(
+      'YooKassaProvider.chargeUsage is not applicable (usage is charged by the renewal scheduler)'
+    );
   }
 
   async startCheckout(

@@ -15,6 +15,8 @@ import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { BILLING_PROVIDERS } from '../src/modules/billing/providers/payment-provider.interface';
 import { FixedRating } from '../src/modules/billing/rating/fixed-rating.strategy';
+import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
+import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { DUNNING_MAX_ATTEMPTS } from '../src/modules/billing/renewals/renewal-queue.constants';
 import { EntitlementCacheListener } from '../src/modules/billing/listeners/entitlement-cache.listener';
@@ -113,7 +115,6 @@ function subscriptionsRepo(store: Store) {
             store.subscriptions.filter(
               (s) =>
                 s.lifecycleOwner === 'self' &&
-                s.billingMode === 'fixed' &&
                 ['trialing', 'active', 'past_due'].includes(s.status)
             )
           )
@@ -129,6 +130,7 @@ describe('Billing renewal scheduler (e2e)', () => {
   let store: Store;
   let invalidateUser: jest.Mock;
   let chargeOffSession: jest.Mock;
+  let usageSum: jest.Mock;
 
   beforeEach(async () => {
     store = {
@@ -147,6 +149,21 @@ describe('Billing renewal scheduler (e2e)', () => {
           billingMode: 'fixed',
           interval: 'month',
           prices: { yookassa: { currency: 'RUB', amountMinor: 99000 } }
+        }),
+        Object.assign(new Plan(), {
+          key: 'usage',
+          name: 'Pay as you go',
+          billingMode: 'usage',
+          interval: 'month',
+          meterKey: 'api_calls',
+          prices: {
+            yookassa: {
+              currency: 'RUB',
+              amountMinor: 0,
+              unitPriceMinor: 200,
+              includedUnits: 100
+            }
+          }
         })
       ],
       invoices: []
@@ -155,6 +172,7 @@ describe('Billing renewal scheduler (e2e)', () => {
     chargeOffSession = jest
       .fn()
       .mockResolvedValue({ providerInvoiceRef: 'pay_1' });
+    usageSum = jest.fn().mockResolvedValue(null);
 
     const manager = makeManager(store);
     const moduleRef = await Test.createTestingModule({
@@ -162,6 +180,11 @@ describe('Billing renewal scheduler (e2e)', () => {
       providers: [
         RenewalService,
         FixedRating,
+        UsageRating,
+        {
+          provide: getRepositoryToken(UsageRecord),
+          useValue: { sum: usageSum }
+        },
         EntitlementCacheListener,
         {
           provide: getRepositoryToken(Subscription),
@@ -231,6 +254,33 @@ describe('Billing renewal scheduler (e2e)', () => {
       new Date('2026-07-01T00:00:00Z')
     );
     // The renewed event reached the entitlement-cache listener over the real bus.
+    expect(invalidateUser).toHaveBeenCalledWith('user-1');
+  });
+
+  it('closes a usage period postpaid: charges the overage and advances', async () => {
+    usageSum.mockResolvedValue(142);
+    store.subscriptions.push(
+      makeSub({ planKey: 'usage', billingMode: 'usage' })
+    );
+
+    await service.runDueRenewals(NOW);
+
+    expect(chargeOffSession).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'cust-1' }),
+      8400,
+      [
+        {
+          description: 'Pay as you go: api_calls × 42',
+          amountMinor: 8400,
+          quantity: 1
+        }
+      ],
+      expect.stringMatching(/^renewal:sub-1:/)
+    );
+    expect(store.invoices).toHaveLength(1);
+    expect(store.subscriptions[0].currentPeriodEnd).toEqual(
+      new Date('2026-07-01T00:00:00Z')
+    );
     expect(invalidateUser).toHaveBeenCalledWith('user-1');
   });
 

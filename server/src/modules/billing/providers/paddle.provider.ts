@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   EventName,
   Paddle,
+  type CurrencyCode,
   type SubscriptionNotification,
   type TransactionNotification
 } from '@paddle/paddle-node-sdk';
@@ -49,6 +50,20 @@ function mapSubscriptionStatus(status: string): SubscriptionStatus {
     default:
       return 'incomplete';
   }
+}
+
+/**
+ * Reads the postpaid usage-charge key our `chargeUsage` planted in the
+ * non-catalog price's custom data, echoed back on the charge's transaction.
+ */
+function usageChargeKeyFrom(txn: TransactionNotification): string | null {
+  for (const item of txn.items ?? []) {
+    const key: unknown = item.price?.customData?.['usageChargeKey'];
+    if (typeof key === 'string') {
+      return key;
+    }
+  }
+  return null;
 }
 
 /** Reads our `customerId`/`userId` echoed back through Paddle custom data. */
@@ -142,10 +157,44 @@ export class PaddleProvider implements PaymentProvider {
 
   chargeOffSession(): Promise<ChargeResult> {
     // Paddle owns renewals; off-session charging is the self-managed (YooKassa)
-    // path. Paddle usage charges (createOneTimeCharge) land in M2.
+    // path. Paddle usage is charged via chargeUsage (createOneTimeCharge).
     throw new NotImplementedException(
       'PaddleProvider.chargeOffSession is not applicable (provider-managed lifecycle)'
     );
+  }
+
+  /**
+   * Posts the period's usage total as a one-time charge on the subscription
+   * (design §17.3 — postpaid at the billing-cycle boundary, no Paddle
+   * metering). The price is non-catalog with the charge key in its custom
+   * data; the resulting `transaction.completed` webhook carries it back so the
+   * reducer reconciles the pending usage invoice.
+   */
+  async chargeUsage(
+    providerSubscriptionId: string,
+    amountMinor: number,
+    currency: string,
+    description: string,
+    chargeKey: string
+  ): Promise<void> {
+    const paddle = this.requireClient();
+    await paddle.subscriptions.createOneTimeCharge(providerSubscriptionId, {
+      effectiveFrom: 'immediately',
+      items: [
+        {
+          quantity: 1,
+          price: {
+            description,
+            unitPrice: {
+              amount: String(amountMinor),
+              currencyCode: currency as CurrencyCode
+            },
+            product: { name: 'Metered usage', taxCategory: 'standard' },
+            customData: { usageChargeKey: chargeKey }
+          }
+        }
+      ]
+    });
   }
 
   async cancel(
@@ -272,7 +321,8 @@ export class PaddleProvider implements PaymentProvider {
         const txn = event.data as TransactionNotification;
         const payload: NormalizedPaymentFailedPayload = {
           ref: refFromCustomData(txn.customData),
-          providerSubscriptionId: txn.subscriptionId
+          providerSubscriptionId: txn.subscriptionId,
+          usageChargeKey: usageChargeKeyFrom(txn)
         };
         return { ...base, type: 'payment.failed', payload };
       }
@@ -310,7 +360,8 @@ export class PaddleProvider implements PaymentProvider {
       currency: txn.currencyCode,
       periodStart: txn.billingPeriod?.startsAt ?? null,
       periodEnd: txn.billingPeriod?.endsAt ?? null,
-      paidAt: txn.billedAt
+      paidAt: txn.billedAt,
+      usageChargeKey: usageChargeKeyFrom(txn)
     };
   }
 }

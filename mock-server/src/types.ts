@@ -167,6 +167,11 @@ export interface MockSubscription {
   trialEnd: string | null;
   paymentMethodId: string | null;
   providerSubscriptionId: string | null;
+  /**
+   * Internal dunning counter for the /__control renewal simulation — mirrors
+   * the server's @Exclude'd column and is never serialized on the wire.
+   */
+  dunningAttempts?: number;
   createdAt: string;
   updatedAt: string;
 }

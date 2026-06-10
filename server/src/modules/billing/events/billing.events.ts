@@ -43,6 +43,22 @@ export class PlanChangedEvent {
   ) {}
 }
 
+/**
+ * A provider-managed usage subscription rolled over its billing period (the
+ * provider's renewal webhook moved `current_period_*` forward). Carries the
+ * closed period so the usage-invoicing listener can rate and charge it
+ * postpaid. Self-managed (YooKassa) closes are charged inline by the renewal
+ * scheduler and never emit this.
+ */
+export class UsagePeriodClosedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly subscriptionId: string,
+    public readonly periodStart: Date,
+    public readonly periodEnd: Date
+  ) {}
+}
+
 export class InvoicePaidEvent {
   constructor(
     public readonly userId: string,

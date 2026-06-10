@@ -15,7 +15,8 @@ import {
   SubscriptionActivatedEvent,
   SubscriptionCanceledEvent,
   SubscriptionPastDueEvent,
-  SubscriptionRenewedEvent
+  SubscriptionRenewedEvent,
+  UsagePeriodClosedEvent
 } from '../events/billing.events';
 import type {
   NormalizedCustomerRef,
@@ -133,6 +134,7 @@ export class BillingEventReducer {
     const result = await withTransaction(this.dataSource, async (manager) => {
       const userId = await this.resolveUserId(manager, payload.ref);
       const now = new Date();
+      let closedPeriod: { start: Date; end: Date } | null = null;
 
       let subscription = await manager.findOne(Subscription, {
         where: { providerSubscriptionId: payload.providerSubscriptionId }
@@ -163,6 +165,27 @@ export class BillingEventReducer {
           paymentMethodId: null
         });
       } else {
+        // A provider-managed usage subscription whose incoming snapshot starts
+        // a new period at/after the stored boundary has just rolled over — the
+        // stored period is closed and must be invoiced postpaid. Detected
+        // before the snapshot is applied; a replayed snapshot no longer
+        // advances anything, so it never re-detects.
+        const incomingStart = payload.currentPeriodStart
+          ? new Date(payload.currentPeriodStart)
+          : null;
+        if (
+          subscription.billingMode === 'usage' &&
+          subscription.lifecycleOwner === 'provider' &&
+          incomingStart &&
+          !Number.isNaN(incomingStart.getTime()) &&
+          incomingStart.getTime() >= subscription.currentPeriodEnd.getTime()
+        ) {
+          closedPeriod = {
+            start: subscription.currentPeriodStart,
+            end: subscription.currentPeriodEnd
+          };
+        }
+
         subscription.status = payload.status;
         subscription.cancelAtPeriodEnd = payload.cancelAtPeriodEnd;
         if (payload.planKey) {
@@ -182,13 +205,24 @@ export class BillingEventReducer {
       }
 
       const saved = await manager.save(subscription);
-      return { subscriptionId: saved.id, userId };
+      return { subscriptionId: saved.id, userId, closedPeriod };
     });
 
     if (!result?.userId) {
       return;
     }
     this.emitSubscriptionEvent(type, result.userId, result.subscriptionId);
+    if (result.closedPeriod) {
+      this.events.emit(
+        UsagePeriodClosedEvent.name,
+        new UsagePeriodClosedEvent(
+          result.userId,
+          result.subscriptionId,
+          result.closedPeriod.start,
+          result.closedPeriod.end
+        )
+      );
+    }
   }
 
   private emitSubscriptionEvent(
@@ -245,6 +279,34 @@ export class BillingEventReducer {
     const result = await withTransaction(this.dataSource, async (manager) => {
       const userId = await this.resolveUserId(manager, payload.ref);
       const now = new Date();
+
+      // A postpaid usage charge round-trips its `usage:{sub}:{periodEnd}` key
+      // through the provider's price custom data; the payment settles the
+      // pending invoice the usage-invoicing listener planted instead of
+      // inserting a second row.
+      if (payload.usageChargeKey) {
+        const reconciled = await manager.update(
+          Invoice,
+          { providerEventId: payload.usageChargeKey, status: 'pending' },
+          {
+            status: 'paid',
+            providerInvoiceRef: payload.providerInvoiceRef,
+            paidAt: parseDate(payload.paidAt, now)
+          }
+        );
+        const invoice = await manager.findOne(Invoice, {
+          where: { providerEventId: payload.usageChargeKey }
+        });
+        if (invoice) {
+          // No pending row matched but the invoice exists — an already-settled
+          // replay; never insert a duplicate alongside it.
+          return reconciled.affected
+            ? { invoiceId: invoice.id, userId, activatedSubscriptionId: null }
+            : null;
+        }
+        // The keyed invoice vanished — fall through to the plain insert so the
+        // payment is still recorded.
+      }
 
       // Provider-managed invoices link by the provider subscription id; a
       // self-managed (YooKassa) first payment has none, so the incomplete
@@ -362,6 +424,16 @@ export class BillingEventReducer {
   private async reducePaymentFailed(
     payload: NormalizedPaymentFailedPayload
   ): Promise<void> {
+    // A failed postpaid usage charge surfaces on its pending invoice; the
+    // subscription stays as the provider reports it (Paddle owns dunning).
+    if (payload.usageChargeKey) {
+      await this.dataSource.manager.update(
+        Invoice,
+        { providerEventId: payload.usageChargeKey, status: 'pending' },
+        { status: 'failed' }
+      );
+    }
+
     const userId = await withTransaction(this.dataSource, (manager) =>
       this.resolveUserId(manager, payload.ref)
     );

@@ -75,12 +75,21 @@ export interface NormalizedInvoicePayload {
    * reducer stores it and activates the local subscription keyed by customer id.
    */
   savedPaymentMethod?: NormalizedSavedPaymentMethod | null;
+  /**
+   * The `usage:{subscriptionId}:{periodEnd}` key a postpaid usage charge was
+   * posted under (echoed back through the provider's price custom data). When
+   * present, the reducer reconciles the payment onto the matching pending
+   * usage invoice instead of inserting a new row.
+   */
+  usageChargeKey?: string | null;
 }
 
 /** Failure context carried by a `payment.failed` normalized event. */
 export interface NormalizedPaymentFailedPayload {
   ref: NormalizedCustomerRef;
   providerSubscriptionId: string | null;
+  /** See `NormalizedInvoicePayload.usageChargeKey` — marks the pending usage invoice failed. */
+  usageChargeKey?: string | null;
 }
 
 export type CancelMode = 'period_end' | 'immediate';
@@ -128,6 +137,20 @@ export interface PaymentProvider {
     receiptItems: ReceiptItem[],
     idempotencyKey?: string
   ): Promise<ChargeResult>;
+  /**
+   * Posts a postpaid usage charge against a provider-managed subscription at
+   * its billing-cycle boundary (Paddle `createOneTimeCharge`). `chargeKey` is
+   * echoed back through the provider's price custom data so the resulting paid
+   * webhook reconciles onto the pending usage invoice. Self-managed providers
+   * charge usage through the renewal scheduler and reject this call.
+   */
+  chargeUsage(
+    providerSubscriptionId: string,
+    amountMinor: number,
+    currency: string,
+    description: string,
+    chargeKey: string
+  ): Promise<void>;
   cancel(providerSubscriptionId: string, mode: CancelMode): Promise<void>;
   refund(
     providerInvoiceRef: string,

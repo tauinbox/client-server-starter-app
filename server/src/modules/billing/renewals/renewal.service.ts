@@ -20,6 +20,7 @@ import {
   type PaymentProvider
 } from '../providers/payment-provider.interface';
 import { FixedRating } from '../rating/fixed-rating.strategy';
+import { UsageRating } from '../rating/usage-rating.strategy';
 import type { RatedAmount } from '../rating/rating-strategy.interface';
 import { addInterval } from '../utils/period.util';
 import {
@@ -54,6 +55,7 @@ export class RenewalService {
     @Inject(BILLING_PROVIDERS)
     private readonly providers: PaymentProvider[],
     private readonly fixedRating: FixedRating,
+    private readonly usageRating: UsageRating,
     private readonly events: EventEmitter2
   ) {}
 
@@ -75,14 +77,13 @@ export class RenewalService {
   /**
    * Self-managed subscriptions past their due moment: a trial reaching
    * `trial_end`, an active period reaching `current_period_end`, or a `past_due`
-   * one reaching its next dunning retry. Usage-mode renewals are charged with the
-   * usage subsystem, so only fixed tiers are swept here.
+   * one reaching its next dunning retry. Both rating modes are swept — fixed
+   * tiers prepay the next period, usage tiers postpay the one that just ended.
    */
   private findDue(now: Date): Promise<Subscription[]> {
     return this.subscriptions
       .createQueryBuilder('s')
       .where('s.lifecycleOwner = :owner', { owner: 'self' })
-      .andWhere('s.billingMode = :mode', { mode: 'fixed' })
       .andWhere(
         new Brackets((qb) => {
           qb.where('s.status = :trialing AND s.trialEnd <= :now')
@@ -146,23 +147,40 @@ export class RenewalService {
       subscription.status === 'trialing' && subscription.trialEnd
         ? subscription.trialEnd
         : subscription.currentPeriodEnd;
-    const rated = this.fixedRating.amountForPeriod(subscription, plan);
+    // Fixed prepays the upcoming period; usage postpays the one ending at the
+    // anchor, rated over [currentPeriodStart, anchor). The rated receipt items
+    // ride into the provider's 54-FZ receipt unchanged.
+    const rated =
+      subscription.billingMode === 'usage'
+        ? await this.usageRating.amountForPeriod(subscription, plan, {
+            start: subscription.currentPeriodStart,
+            end: anchor
+          })
+        : this.fixedRating.amountForPeriod(subscription, plan);
     const idempotencyKey = `renewal:${subscription.id}:${anchor.getTime()}:${subscription.dunningAttempts}`;
 
     let charge: ChargeResult;
-    try {
-      charge = await provider.chargeOffSession(
-        customer,
-        rated.amountMinor,
-        rated.receiptItems,
-        idempotencyKey
-      );
-    } catch (error) {
-      this.logger.warn(
-        `Renewal charge failed for subscription ${id}: ${(error as Error).message}`
-      );
-      await this.handleFailure(subscription, customer.userId, now);
-      return;
+    if (rated.amountMinor === 0 && subscription.billingMode === 'usage') {
+      // Nothing accrued in the closed period: a zero-amount payment is not
+      // chargeable/fiscalizable, so skip the provider call but still record a
+      // zero invoice — its unique provider_event_id is what advances the
+      // period exactly once.
+      charge = { providerInvoiceRef: idempotencyKey };
+    } else {
+      try {
+        charge = await provider.chargeOffSession(
+          customer,
+          rated.amountMinor,
+          rated.receiptItems,
+          idempotencyKey
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Renewal charge failed for subscription ${id}: ${(error as Error).message}`
+        );
+        await this.handleFailure(subscription, customer.userId, now);
+        return;
+      }
     }
 
     await this.handleSuccess(
@@ -198,6 +216,12 @@ export class RenewalService {
   ): Promise<void> {
     const newPeriodStart = anchor;
     const newPeriodEnd = addInterval(anchor, plan.interval);
+    // A fixed invoice covers the period being prepaid; a usage invoice covers
+    // the metered period that just closed.
+    const invoicePeriod =
+      subscription.billingMode === 'usage'
+        ? { start: subscription.currentPeriodStart, end: anchor }
+        : { start: newPeriodStart, end: newPeriodEnd };
 
     const result = await withTransaction(this.dataSource, async (manager) => {
       const insert = await manager
@@ -214,8 +238,8 @@ export class RenewalService {
           currency: customer.currency,
           status: 'paid',
           billingMode: subscription.billingMode,
-          periodStart: newPeriodStart,
-          periodEnd: newPeriodEnd,
+          periodStart: invoicePeriod.start,
+          periodEnd: invoicePeriod.end,
           paidAt: now,
           receiptRef: null
         })
