@@ -564,7 +564,7 @@ export const seedFeatureFlagRules: MockFeatureFlagRule[] =
   generateFeatureFlagRules();
 
 // Billing plan catalog — mirrors server/src/seeders/billing-plans.seeder.ts:
-// Free/Pro/Business (fixed) + an inactive `usage` tier. Two prices per tier
+// Free/Pro/Business (fixed) + the `usage` tier. Two prices per tier
 // (RUB via YooKassa, USD via Paddle) in minor units.
 function generatePlans(): MockPlan[] {
   const now = '2025-01-01T00:00:00.000Z';
@@ -638,7 +638,7 @@ function generatePlans(): MockPlan[] {
       meterKey: 'api_calls',
       entitlements: ['reports', 'api-access'],
       limits: null,
-      active: false,
+      active: true,
       prices: {
         yookassa: {
           currency: 'RUB',

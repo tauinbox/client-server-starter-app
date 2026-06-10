@@ -4,7 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
   BillingProviderId,
   BillingRegion,
-  PlanResponse
+  PlanResponse,
+  UsageSummaryResponse
 } from '@app/shared/types';
 import {
   getState,
@@ -183,6 +184,54 @@ billingRouter.get(
     res.json(method ? toPaymentMethodResponse(method) : null);
   }
 );
+
+// GET /billing/usage — metered usage aggregated over the current billing
+// period of the caller's usage-mode subscription, or null. Mirrors the
+// server's UsageRating math: records with occurredAt in [periodStart,
+// periodEnd), overage beyond includedUnits charged at unitPriceMinor.
+billingRouter.get('/usage', authGuard, (req: Request, res: Response) => {
+  const { user } = req as AuthenticatedRequest;
+  const customer = findCustomer(user.id);
+  const sub = customer ? findCurrentSubscription(customer.id) : undefined;
+  if (!sub || sub.billingMode !== 'usage') {
+    res.json(null);
+    return;
+  }
+  const plan = [...getState().plans.values()].find(
+    (p) => p.key === sub.planKey
+  );
+  const price = plan?.prices[sub.provider];
+  if (!plan || !price) {
+    res.json(null);
+    return;
+  }
+
+  const totalUnits = [...getState().billingUsageRecords.values()]
+    .filter(
+      (r) =>
+        r.subscriptionId === sub.id &&
+        r.occurredAt >= sub.currentPeriodStart &&
+        r.occurredAt < sub.currentPeriodEnd
+    )
+    .reduce((sum, r) => sum + r.quantity, 0);
+
+  const includedUnits = price.includedUnits ?? 0;
+  const unitPriceMinor = price.unitPriceMinor ?? 0;
+  const billableUnits = Math.max(0, totalUnits - includedUnits);
+  const summary: UsageSummaryResponse = {
+    subscriptionId: sub.id,
+    meterKey: plan.meterKey,
+    periodStart: sub.currentPeriodStart,
+    periodEnd: sub.currentPeriodEnd,
+    totalUnits,
+    includedUnits,
+    billableUnits,
+    unitPriceMinor,
+    amountMinor: billableUnits * unitPriceMinor,
+    currency: price.currency
+  };
+  res.json(summary);
+});
 
 // POST /billing/checkout — start a hosted checkout for a plan.
 billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {

@@ -274,6 +274,7 @@ To apply multiple restrictions simultaneously, either use `$and` in a single `cu
 - **Pricing page** (`/billing`) — plan tiers as cards with the recommended tier visually lifted (raised + primary accent + "Most popular" chip); currency follows the resolved provider; publicly accessible (anonymous visitors are sent to login on "Choose")
 - **Checkout** — "Choose" starts a hosted-checkout session on the resolved provider and redirects; the return routes `/billing/success` (polls the subscription until active) and `/billing/cancel` confirm the outcome (the provider webhook is the source of truth)
 - **Billing settings** (`/billing/settings`) — current plan with a semantic status chip, cancel-at-period-end (confirm dialog), saved payment method, and an invoice history (table on desktop, stacked cards on handset)
+- **Pay-as-you-go tier** — the metered `usage` plan is active in the catalog: the pricing page shows its per-unit teaser, and `GET /api/v1/billing/usage` returns the caller's current-period meter (total/included/billable units and the accrued amount); the dedicated usage UI lands with the usage-UI milestone
 - **Billing region** — Auto / Russia / International control on the pricing page (authenticated only) that sets the provider used for the next checkout
 - **Availability gating** — the billing nav entry and routes are hidden behind the public `billing` feature flag, which the server keeps off until at least one payment provider is configured
 - Fully internationalized (EN / RU) via a lazy-loaded `billing` Transloco scope

@@ -125,6 +125,26 @@ export type UsageResponse = {
 };
 
 /**
+ * Result of `GET /billing/usage` — the caller's metered usage aggregated over
+ * the current billing period of their usage-mode subscription (null when there
+ * is no open usage subscription). `billableUnits` is the overage beyond the
+ * plan's included units; `amountMinor` is what that overage costs at the
+ * plan's unit price.
+ */
+export type UsageSummaryResponse = {
+  subscriptionId: string;
+  meterKey: string | null;
+  periodStart: string;
+  periodEnd: string;
+  totalUnits: number;
+  includedUnits: number;
+  billableUnits: number;
+  unitPriceMinor: number;
+  amountMinor: number;
+  currency: string;
+};
+
+/**
  * Result of `POST /billing/checkout` — a hosted-checkout redirect. `sessionRef`
  * is the provider session reference echoed back on the return URL.
  */
