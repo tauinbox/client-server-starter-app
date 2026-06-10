@@ -40,6 +40,15 @@ describe('BillingService', () => {
     expect(result).toBeNull();
   });
 
+  it('GETs the current-period usage summary (nullable)', () => {
+    let result: unknown;
+    service.getUsage().subscribe((r) => (result = r));
+    const req = httpMock.expectOne(`${BILLING_API_V1}/usage`);
+    expect(req.request.method).toBe('GET');
+    req.flush(null);
+    expect(result).toBeNull();
+  });
+
   it('POSTs a checkout with the plan key', () => {
     service.checkout('pro').subscribe();
     const req = httpMock.expectOne(`${BILLING_API_V1}/checkout`);

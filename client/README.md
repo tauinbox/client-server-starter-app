@@ -79,10 +79,11 @@ src/app/
 │       ├── components/
 │       │   ├── pricing-page/      # PricingPageComponent — plan cards (featured Pro), region control (Auto/Russia/International, authed only), Choose → checkout (anonymous → /login)
 │       │   ├── plan-card/         # PlanCardComponent — presentational tier card; featured = raised + accent + "Most popular" chip; emits choose
-│       │   ├── billing-settings/  # BillingSettingsComponent — current plan + status chip, cancel (confirm dialog), payment method, invoices (table desktop / cards handset)
+│       │   ├── billing-settings/  # BillingSettingsComponent — current plan + status chip, cancel (confirm dialog), payment method, usage meter (usage-mode subs), invoices (table desktop / cards handset)
+│       │   ├── usage-meter/       # UsageMeterComponent — current-period usage card: unit readout, quota gauge (included = primary, overage = error tone; hidden when the plan includes no units), money mini-ledger ending in the accrued amount
 │       │   └── checkout-return/   # CheckoutReturnComponent — /billing/success polls the subscription until active; /billing/cancel neutral state (mode via route data)
-│       ├── services/       # BillingService (HTTP → /api/v1/billing/*: plans, subscription, invoices, payment-method, checkout, subscription/cancel, region)
-│       ├── store/          # BillingStore — route-level signalStore (plans, subscription, invoices, paymentMethod, region); loadPricing/loadSettings/checkout/cancel/setRegion
+│       ├── services/       # BillingService (HTTP → /api/v1/billing/*: plans, subscription, invoices, payment-method, usage, checkout, subscription/cancel, region)
+│       ├── store/          # BillingStore — route-level signalStore (plans, subscription, invoices, paymentMethod, usage, region); loadPricing/loadSettings/checkout/cancel/setRegion
 │       ├── guards/         # billingAvailableGuard — awaits flag load, allows when the `billing` flag resolves true, else redirects home (no auth requirement → public pricing)
 │       └── utils/          # billing-format — formatMoney (minor units → Intl currency), resolveDisplayProvider (region or language heuristic), planPriceFor
 └── shared/

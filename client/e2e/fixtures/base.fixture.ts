@@ -163,6 +163,14 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           }
         );
         return res.json();
+      },
+      async seedBillingUsage(args) {
+        const res = await fetch(`${baseUrl}/__control/billing/seed-usage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(args)
+        });
+        return res.json();
       }
     };
 

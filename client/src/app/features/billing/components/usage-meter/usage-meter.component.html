@@ -1,0 +1,75 @@
+<mat-card
+  appearance="outlined"
+  class="usage-card"
+  *transloco="let t; scope: 'billing'"
+>
+  <mat-card-content>
+    <div class="usage-header">
+      <h2 class="card-heading">{{ t('billing.usage.title') }}</h2>
+      @if (usage().meterKey; as meterKey) {
+        <span class="meter-key">{{ meterKey }}</span>
+      }
+    </div>
+
+    @if (usage().totalUnits === 0) {
+      <p class="usage-empty">{{ t('billing.usage.empty') }}</p>
+    } @else {
+      <p class="usage-readout">
+        <span class="total">{{ totalLabel() }}</span>
+        <span class="readout-caption">
+          {{ t('billing.usage.unitsUsed') }}
+          @if (hasQuota()) {
+            · {{ t('billing.usage.ofIncluded', { included: includedLabel() }) }}
+          }
+        </span>
+      </p>
+
+      @if (hasQuota()) {
+        <div
+          class="usage-gauge"
+          role="progressbar"
+          [attr.aria-label]="t('billing.usage.gaugeLabel')"
+          [attr.aria-valuenow]="usage().totalUnits"
+          [attr.aria-valuemin]="0"
+          [attr.aria-valuemax]="usage().includedUnits"
+        >
+          <div class="gauge-fill">
+            <span
+              class="segment included"
+              [style.width.%]="includedPct()"
+            ></span>
+            @if (hasOverage()) {
+              <span
+                class="segment overage"
+                [style.width.%]="overagePct()"
+              ></span>
+            }
+          </div>
+        </div>
+      }
+
+      <dl class="usage-ledger">
+        <div class="ledger-row">
+          <dt>{{ t('billing.usage.billableUnits') }}</dt>
+          <dd>{{ billableLabel() }}</dd>
+        </div>
+        <div class="ledger-row">
+          <dt>{{ t('billing.usage.unitPrice') }}</dt>
+          <dd>{{ unitPriceLabel() }}</dd>
+        </div>
+        <div class="ledger-row accrued">
+          <dt>{{ t('billing.usage.accrued') }}</dt>
+          <dd>{{ accruedLabel() }}</dd>
+        </div>
+      </dl>
+    }
+
+    <p class="usage-period">
+      <span>
+        {{ usage().periodStart | date: 'mediumDate' }} –
+        {{ usage().periodEnd | date: 'mediumDate' }}
+      </span>
+      <span>{{ t('billing.usage.billedAtPeriodEnd') }}</span>
+    </p>
+  </mat-card-content>
+</mat-card>

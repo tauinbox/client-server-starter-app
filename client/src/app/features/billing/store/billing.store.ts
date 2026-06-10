@@ -15,7 +15,8 @@ import type {
   InvoiceResponse,
   PaymentMethodResponse,
   PlanResponse,
-  SubscriptionResponse
+  SubscriptionResponse,
+  UsageSummaryResponse
 } from '@app/shared/types';
 import { NotifyService } from '@core/services/notify.service';
 import { BillingService, type CancelMode } from '../services/billing.service';
@@ -25,6 +26,7 @@ type BillingState = {
   subscription: SubscriptionResponse | null;
   invoices: InvoiceResponse[];
   paymentMethod: PaymentMethodResponse | null;
+  usage: UsageSummaryResponse | null;
   region: BillingRegionResponse | null;
   loading: boolean;
   working: boolean;
@@ -35,6 +37,7 @@ const initialState: BillingState = {
   subscription: null,
   invoices: [],
   paymentMethod: null,
+  usage: null,
   region: null,
   loading: false,
   working: false
@@ -99,15 +102,16 @@ export const BillingStore = signalStore(
       patchState(store, { loading: false });
     }
 
-    /** Settings page: subscription + invoices + payment method + plans + region. */
+    /** Settings page: subscription + invoices + payment method + usage + plans + region. */
     async function loadSettings(): Promise<void> {
       patchState(store, { loading: true });
       try {
-        const [subscription, invoices, paymentMethod, plans, region] =
+        const [subscription, invoices, paymentMethod, usage, plans, region] =
           await Promise.all([
             firstValueFrom(billing.getSubscription()),
             firstValueFrom(billing.getInvoices()),
             firstValueFrom(billing.getPaymentMethod()),
+            firstValueFrom(billing.getUsage()),
             firstValueFrom(billing.getPlans()),
             firstValueFrom(billing.getRegion())
           ]);
@@ -115,6 +119,7 @@ export const BillingStore = signalStore(
           subscription,
           invoices,
           paymentMethod,
+          usage,
           plans,
           region
         });

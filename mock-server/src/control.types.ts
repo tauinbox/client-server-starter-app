@@ -1,6 +1,7 @@
 import type {
   SubscriptionResponse,
-  SubscriptionStatus
+  SubscriptionStatus,
+  UsageResponse
 } from '@app/shared/types';
 import type {
   MockPermission,
@@ -70,4 +71,15 @@ export type ControlApi = {
     planKey?: string;
     status?: SubscriptionStatus;
   }): Promise<SubscriptionResponse>;
+  // Seeds a metered-usage record on the customer's subscription (defaults:
+  // meterKey 'api_calls', quantity 1, occurredAt now) so usage views and
+  // rating have data without going through the admin ingest endpoint.
+  seedBillingUsage(args: {
+    customerId: string;
+    meterKey?: string;
+    quantity?: number;
+    occurredAt?: string;
+    subscriptionId?: string;
+    idempotencyKey?: string;
+  }): Promise<UsageResponse>;
 };

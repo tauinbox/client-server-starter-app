@@ -3,7 +3,8 @@ import { of, throwError } from 'rxjs';
 import type {
   InvoiceResponse,
   PlanResponse,
-  SubscriptionResponse
+  SubscriptionResponse,
+  UsageSummaryResponse
 } from '@app/shared/types';
 import { NotifyService } from '@core/services/notify.service';
 import { BillingService } from '../services/billing.service';
@@ -61,12 +62,26 @@ const invoice: InvoiceResponse = {
   updatedAt: '2026-06-01T00:00:00.000Z'
 };
 
+const usageSummary: UsageSummaryResponse = {
+  subscriptionId: 'sub-1',
+  meterKey: 'api_calls',
+  periodStart: '2026-06-01T00:00:00.000Z',
+  periodEnd: '2026-07-01T00:00:00.000Z',
+  totalUnits: 142,
+  includedUnits: 100,
+  billableUnits: 42,
+  unitPriceMinor: 200,
+  amountMinor: 8400,
+  currency: 'USD'
+};
+
 describe('BillingStore', () => {
   let billingMock: {
     getPlans: ReturnType<typeof vi.fn>;
     getSubscription: ReturnType<typeof vi.fn>;
     getInvoices: ReturnType<typeof vi.fn>;
     getPaymentMethod: ReturnType<typeof vi.fn>;
+    getUsage: ReturnType<typeof vi.fn>;
     getRegion: ReturnType<typeof vi.fn>;
     checkout: ReturnType<typeof vi.fn>;
     cancel: ReturnType<typeof vi.fn>;
@@ -87,6 +102,7 @@ describe('BillingStore', () => {
       getSubscription: vi.fn().mockReturnValue(of(activeSub)),
       getInvoices: vi.fn().mockReturnValue(of([invoice])),
       getPaymentMethod: vi.fn().mockReturnValue(of(null)),
+      getUsage: vi.fn().mockReturnValue(of(usageSummary)),
       getRegion: vi.fn().mockReturnValue(
         of({
           region: 'auto',
@@ -128,6 +144,7 @@ describe('BillingStore', () => {
     expect(store.plans()).toHaveLength(1);
     expect(store.subscription()).toEqual(activeSub);
     expect(store.invoices()).toHaveLength(1);
+    expect(store.usage()).toEqual(usageSummary);
     expect(store.currentPlan()?.key).toBe('pro');
     expect(store.hasActiveSubscription()).toBe(true);
     expect(store.loading()).toBe(false);

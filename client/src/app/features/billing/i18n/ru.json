@@ -55,6 +55,17 @@
     "invoiceAmount": "Сумма",
     "receipt": "Чек"
   },
+  "usage": {
+    "title": "Потребление за период",
+    "empty": "В этом периоде потребления пока нет.",
+    "unitsUsed": "единиц использовано",
+    "ofIncluded": "из {{ included }} включённых",
+    "gaugeLabel": "Потребление относительно включённых единиц",
+    "billableUnits": "Платные единицы",
+    "unitPrice": "Цена за единицу",
+    "accrued": "Начислено за период",
+    "billedAtPeriodEnd": "Списание в конце периода"
+  },
   "checkout": {
     "processingTitle": "Подтверждаем подписку…",
     "processingMessage": "Это займёт несколько секунд.",
