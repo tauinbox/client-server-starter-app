@@ -2,7 +2,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { User } from '../../users/entities/user.entity';
 import { Customer } from '../entities/customer.entity';
@@ -10,8 +10,13 @@ import { Invoice } from '../entities/invoice.entity';
 import { PaymentMethod } from '../entities/payment-method.entity';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
-import { SubscriptionCanceledEvent } from '../events/billing.events';
+import {
+  InvoicePaidEvent,
+  PlanChangedEvent,
+  SubscriptionCanceledEvent
+} from '../events/billing.events';
 import { BillingService } from '../billing.service';
+import { ProrationCalculator } from '../rating/proration-calculator';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import { BillingUserService } from './billing-user.service';
 
@@ -31,6 +36,43 @@ function repo(): RepoMock {
       Promise.resolve({ id: 'generated-id', ...entity })
     )
   };
+}
+
+type InsertedInvoice = Record<string, unknown> & {
+  providerEventId?: string | null;
+};
+
+/** Transactional manager stub: records invoice inserts, dedups on event id. */
+function makeInsertStore() {
+  const inserted: InsertedInvoice[] = [];
+  let seq = 0;
+  const manager = {
+    createQueryBuilder: () => {
+      const captured: { values?: InsertedInvoice } = {};
+      const builder = {
+        insert: () => builder,
+        into: () => builder,
+        values: (v: InsertedInvoice) => {
+          captured.values = v;
+          return builder;
+        },
+        orIgnore: () => builder,
+        returning: () => builder,
+        execute: () => {
+          const v = captured.values ?? {};
+          const dup = inserted.some(
+            (i) => i.providerEventId === v.providerEventId
+          );
+          if (dup) return Promise.resolve({ raw: [] });
+          const id = `inv-${++seq}`;
+          inserted.push({ id, ...v });
+          return Promise.resolve({ raw: [{ id }] });
+        }
+      };
+      return builder;
+    }
+  };
+  return { inserted, manager };
 }
 
 function makePlan(overrides: Partial<Plan> = {}): Plan {
@@ -61,6 +103,10 @@ function provider(
   managesLifecycle: boolean;
   startCheckout: jest.Mock;
   cancel: jest.Mock;
+  changePlan: jest.Mock;
+  previewChangePlan: jest.Mock;
+  chargeOffSession: jest.Mock;
+  refund: jest.Mock;
 } {
   return {
     id,
@@ -68,7 +114,15 @@ function provider(
     startCheckout: jest
       .fn()
       .mockResolvedValue({ url: 'https://checkout/x', sessionRef: 'sess-1' }),
-    cancel: jest.fn().mockResolvedValue(undefined)
+    cancel: jest.fn().mockResolvedValue(undefined),
+    changePlan: jest.fn().mockResolvedValue(undefined),
+    previewChangePlan: jest
+      .fn()
+      .mockResolvedValue({ amountMinor: 1700, currency: 'USD' }),
+    chargeOffSession: jest
+      .fn()
+      .mockResolvedValue({ providerInvoiceRef: 'pay_change' }),
+    refund: jest.fn().mockResolvedValue(undefined)
   };
 }
 
@@ -96,15 +150,22 @@ async function build() {
     )
   };
 
+  const insertStore = makeInsertStore();
+  const dataSource = {
+    transaction: (cb: (m: unknown) => unknown) => cb(insertStore.manager)
+  };
+
   const module = await Test.createTestingModule({
     providers: [
       BillingUserService,
+      ProrationCalculator,
       { provide: getRepositoryToken(Customer), useValue: customers },
       { provide: getRepositoryToken(Subscription), useValue: subscriptions },
       { provide: getRepositoryToken(Invoice), useValue: invoices },
       { provide: getRepositoryToken(PaymentMethod), useValue: paymentMethods },
       { provide: getRepositoryToken(Plan), useValue: plans },
       { provide: getRepositoryToken(User), useValue: users },
+      { provide: getDataSourceToken(), useValue: dataSource },
       { provide: BillingService, useValue: billing },
       { provide: UsageRating, useValue: usageRating },
       {
@@ -125,7 +186,8 @@ async function build() {
     users,
     billing,
     usageRating,
-    emit
+    emit,
+    insertedInvoices: insertStore.inserted
   };
 }
 
@@ -265,6 +327,450 @@ describe('BillingUserService', () => {
       await expect(ctx.service.cancelSubscription('user-1')).rejects.toThrow(
         NotFoundException
       );
+    });
+  });
+
+  describe('changePlan', () => {
+    const customer = {
+      id: 'cust-1',
+      userId: 'user-1',
+      country: 'RU',
+      currency: 'RUB',
+      providerOverride: null
+    };
+    // 30-day period; the frozen "now" leaves exactly 12 whole days remaining.
+    const periodStart = new Date('2026-06-01T00:00:00Z');
+    const periodEnd = new Date('2026-07-01T00:00:00Z');
+    const frozenNow = new Date('2026-06-19T00:00:00Z');
+
+    const proPlan = makePlan();
+    const businessPlan = makePlan({
+      id: 'plan-business',
+      key: 'business',
+      name: 'Business',
+      prices: {
+        yookassa: { currency: 'RUB', amountMinor: 290000 },
+        paddle: {
+          currency: 'USD',
+          amountMinor: 2900,
+          providerPriceId: 'pri_biz'
+        }
+      }
+    });
+    const usagePlan = makePlan({
+      id: 'plan-usage',
+      key: 'usage',
+      name: 'Pay as you go',
+      billingMode: 'usage',
+      meterKey: 'api_calls',
+      prices: {
+        yookassa: {
+          currency: 'RUB',
+          amountMinor: 0,
+          unitPriceMinor: 200,
+          includedUnits: 0
+        }
+      }
+    });
+
+    function makeSub(overrides: Partial<Subscription> = {}): Subscription {
+      return {
+        id: 'sub-1',
+        customerId: 'cust-1',
+        planKey: 'pro',
+        provider: 'yookassa',
+        billingMode: 'fixed',
+        status: 'active',
+        lifecycleOwner: 'self',
+        currentPeriodStart: periodStart,
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: false,
+        trialEnd: null,
+        providerSubscriptionId: null,
+        ...overrides
+      } as Subscription;
+    }
+
+    function plansByKey(ctx: Awaited<ReturnType<typeof build>>): void {
+      const byKey: Record<string, Plan> = {
+        pro: proPlan,
+        business: businessPlan,
+        usage: usagePlan
+      };
+      ctx.plans.findOne.mockImplementation((opts: { where: { key: string } }) =>
+        Promise.resolve(byKey[opts.where.key] ?? null)
+      );
+    }
+
+    beforeEach(() => {
+      jest.useFakeTimers({ now: frozenNow, doNotFake: ['nextTick'] });
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('delegates a provider-managed change to the provider and updates the local row', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue({ ...customer, country: 'US' });
+      const sub = makeSub({
+        provider: 'paddle',
+        lifecycleOwner: 'provider',
+        providerSubscriptionId: 'sub_ext'
+      });
+      ctx.subscriptions.findOne.mockResolvedValue(sub);
+      ctx.subscriptions.save.mockImplementation((s: object) =>
+        Promise.resolve(s)
+      );
+      const paddle = provider('paddle', true);
+      ctx.billing.getProviderById.mockReturnValue(paddle);
+
+      const result = await ctx.service.changePlan('user-1', 'business');
+
+      expect(paddle.changePlan).toHaveBeenCalledWith(
+        'sub_ext',
+        expect.objectContaining({ id: 'cust-1' }),
+        businessPlan
+      );
+      expect(paddle.chargeOffSession).not.toHaveBeenCalled();
+      expect(paddle.refund).not.toHaveBeenCalled();
+      expect(result.planKey).toBe('business');
+      expect(ctx.emit).toHaveBeenCalledWith(
+        PlanChangedEvent.name,
+        expect.objectContaining({
+          userId: 'user-1',
+          subscriptionId: 'sub-1',
+          fromPlanKey: 'pro',
+          toPlanKey: 'business'
+        })
+      );
+      expect(ctx.insertedInvoices).toHaveLength(0);
+    });
+
+    it('upgrade (self-managed): charges the prorated difference, then refunds the remainder', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      ctx.subscriptions.save.mockImplementation((s: object) =>
+        Promise.resolve(s)
+      );
+      ctx.invoices.findOne.mockResolvedValue({
+        id: 'inv-period',
+        amountMinor: 99000,
+        providerInvoiceRef: 'pay_period',
+        status: 'paid',
+        billingMode: 'fixed'
+      });
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      const result = await ctx.service.changePlan('user-1', 'business');
+
+      // 12 of 30 days: charge 290000*12/30, refund 99000*12/30.
+      expect(yoo.chargeOffSession).toHaveBeenCalledWith(
+        customer,
+        116000,
+        expect.arrayContaining([
+          expect.objectContaining({ amountMinor: 116000 })
+        ]),
+        `change-charge:sub-1:business:${periodEnd.getTime()}`
+      );
+      expect(yoo.refund).toHaveBeenCalledWith(
+        'pay_period',
+        39600,
+        `change-refund:sub-1:business:${periodEnd.getTime()}`
+      );
+      expect(ctx.insertedInvoices).toHaveLength(2);
+      expect(ctx.insertedInvoices[0]).toMatchObject({
+        amountMinor: 116000,
+        status: 'paid',
+        billingMode: 'fixed'
+      });
+      expect(ctx.insertedInvoices[1]).toMatchObject({
+        amountMinor: 39600,
+        status: 'refunded'
+      });
+      expect(result.planKey).toBe('business');
+      expect(ctx.emit).toHaveBeenCalledWith(
+        InvoicePaidEvent.name,
+        expect.objectContaining({ userId: 'user-1' })
+      );
+      expect(ctx.emit).toHaveBeenCalledWith(
+        PlanChangedEvent.name,
+        expect.objectContaining({ fromPlanKey: 'pro', toPlanKey: 'business' })
+      );
+    });
+
+    it('downgrade caps the refund at the original invoice amount', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSub({ planKey: 'business' })
+      );
+      ctx.subscriptions.save.mockImplementation((s: object) =>
+        Promise.resolve(s)
+      );
+      // The period was paid with a discounted 100000 invoice — smaller than the
+      // computed 116000 remainder, so the cap applies.
+      ctx.invoices.findOne.mockResolvedValue({
+        id: 'inv-period',
+        amountMinor: 100000,
+        providerInvoiceRef: 'pay_period',
+        status: 'paid',
+        billingMode: 'fixed'
+      });
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await ctx.service.changePlan('user-1', 'pro');
+
+      expect(yoo.refund).toHaveBeenCalledWith(
+        'pay_period',
+        100000,
+        expect.any(String)
+      );
+      expect(yoo.chargeOffSession).toHaveBeenCalledWith(
+        customer,
+        39600,
+        expect.any(Array),
+        expect.any(String)
+      );
+    });
+
+    it('fixed → usage refunds the remainder without charging', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      const sub = makeSub();
+      ctx.subscriptions.findOne.mockResolvedValue(sub);
+      ctx.subscriptions.save.mockImplementation((s: object) =>
+        Promise.resolve(s)
+      );
+      ctx.invoices.findOne.mockResolvedValue({
+        id: 'inv-period',
+        amountMinor: 99000,
+        providerInvoiceRef: 'pay_period',
+        status: 'paid',
+        billingMode: 'fixed'
+      });
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      const result = await ctx.service.changePlan('user-1', 'usage');
+
+      expect(yoo.chargeOffSession).not.toHaveBeenCalled();
+      expect(yoo.refund).toHaveBeenCalledWith(
+        'pay_period',
+        39600,
+        expect.any(String)
+      );
+      expect(result.billingMode).toBe('usage');
+    });
+
+    it('moves no money on a trial switch', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSub({ status: 'trialing', trialEnd: new Date('2026-06-25') })
+      );
+      ctx.subscriptions.save.mockImplementation((s: object) =>
+        Promise.resolve(s)
+      );
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      const result = await ctx.service.changePlan('user-1', 'business');
+
+      expect(yoo.chargeOffSession).not.toHaveBeenCalled();
+      expect(yoo.refund).not.toHaveBeenCalled();
+      expect(ctx.insertedInvoices).toHaveLength(0);
+      expect(result.planKey).toBe('business');
+    });
+
+    it('a declined charge aborts the switch with nothing moved', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      const yoo = provider('yookassa', false);
+      yoo.chargeOffSession.mockRejectedValue(new Error('declined'));
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await expect(
+        ctx.service.changePlan('user-1', 'business')
+      ).rejects.toThrow('declined');
+
+      expect(yoo.refund).not.toHaveBeenCalled();
+      expect(ctx.subscriptions.save).not.toHaveBeenCalled();
+      expect(ctx.emit).not.toHaveBeenCalled();
+    });
+
+    it('guards: no subscription, same plan, past_due, scheduled cancel, missing provider price', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+
+      ctx.subscriptions.findOne.mockResolvedValue(null);
+      await expect(ctx.service.changePlan('user-1', 'pro')).rejects.toThrow(
+        NotFoundException
+      );
+
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      await expect(ctx.service.changePlan('user-1', 'pro')).rejects.toThrow(
+        'You are already on this plan.'
+      );
+
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSub({ status: 'past_due' })
+      );
+      await expect(
+        ctx.service.changePlan('user-1', 'business')
+      ).rejects.toThrow(ConflictException);
+
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSub({ cancelAtPeriodEnd: true })
+      );
+      await expect(
+        ctx.service.changePlan('user-1', 'business')
+      ).rejects.toThrow('cancellation is scheduled');
+
+      // The usage plan carries no paddle price → unavailable for a paddle sub.
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSub({ provider: 'paddle', providerSubscriptionId: 'sub_ext' })
+      );
+      await expect(ctx.service.changePlan('user-1', 'usage')).rejects.toThrow(
+        'not available for your billing provider'
+      );
+    });
+  });
+
+  describe('previewChange', () => {
+    const customer = {
+      id: 'cust-1',
+      userId: 'user-1',
+      country: 'RU',
+      currency: 'RUB',
+      providerOverride: null
+    };
+    const periodEnd = new Date('2026-07-01T00:00:00Z');
+
+    beforeEach(() => {
+      jest.useFakeTimers({
+        now: new Date('2026-06-19T00:00:00Z'),
+        doNotFake: ['nextTick']
+      });
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    function setupYoo(ctx: Awaited<ReturnType<typeof build>>) {
+      const byKey: Record<string, Plan> = {
+        pro: makePlan(),
+        business: makePlan({
+          id: 'plan-business',
+          key: 'business',
+          name: 'Business',
+          prices: { yookassa: { currency: 'RUB', amountMinor: 290000 } }
+        })
+      };
+      ctx.plans.findOne.mockImplementation((opts: { where: { key: string } }) =>
+        Promise.resolve(byKey[opts.where.key] ?? null)
+      );
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        customerId: 'cust-1',
+        planKey: 'pro',
+        provider: 'yookassa',
+        billingMode: 'fixed',
+        status: 'active',
+        currentPeriodStart: new Date('2026-06-01T00:00:00Z'),
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: false
+      });
+    }
+
+    it('returns the computed split for a self-managed subscription', async () => {
+      const ctx = await build();
+      setupYoo(ctx);
+      ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
+
+      const preview = await ctx.service.previewChange('user-1', 'business');
+
+      expect(preview).toEqual({
+        provider: 'yookassa',
+        fromPlanKey: 'pro',
+        toPlanKey: 'business',
+        currency: 'RUB',
+        creditMinor: 39600,
+        chargeMinor: 116000,
+        dueNowMinor: 76400
+      });
+    });
+
+    it('returns the provider net for a delegated subscription', async () => {
+      const ctx = await build();
+      const byKey: Record<string, Plan> = {
+        pro: makePlan({
+          prices: {
+            paddle: {
+              currency: 'USD',
+              amountMinor: 1200,
+              providerPriceId: 'pri_pro'
+            }
+          }
+        }),
+        business: makePlan({
+          id: 'plan-business',
+          key: 'business',
+          name: 'Business',
+          prices: {
+            paddle: {
+              currency: 'USD',
+              amountMinor: 2900,
+              providerPriceId: 'pri_biz'
+            }
+          }
+        })
+      };
+      ctx.plans.findOne.mockImplementation((opts: { where: { key: string } }) =>
+        Promise.resolve(byKey[opts.where.key] ?? null)
+      );
+      ctx.customers.findOne.mockResolvedValue({ ...customer, country: 'US' });
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        planKey: 'pro',
+        provider: 'paddle',
+        status: 'active',
+        providerSubscriptionId: 'sub_ext',
+        currentPeriodStart: new Date('2026-06-01T00:00:00Z'),
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: false
+      });
+      const paddle = provider('paddle', true);
+      ctx.billing.getProviderById.mockReturnValue(paddle);
+
+      const preview = await ctx.service.previewChange('user-1', 'business');
+
+      expect(paddle.previewChangePlan).toHaveBeenCalledWith(
+        'sub_ext',
+        expect.objectContaining({ key: 'business' })
+      );
+      expect(preview).toEqual({
+        provider: 'paddle',
+        fromPlanKey: 'pro',
+        toPlanKey: 'business',
+        currency: 'USD',
+        creditMinor: null,
+        chargeMinor: null,
+        dueNowMinor: 1700
+      });
     });
   });
 

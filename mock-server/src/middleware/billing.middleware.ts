@@ -5,6 +5,7 @@ import type {
   BillingProviderId,
   BillingRegion,
   PlanResponse,
+  ProrationPreviewResponse,
   UsageSummaryResponse
 } from '@app/shared/types';
 import {
@@ -19,6 +20,8 @@ import { adminGuard, authGuard } from '../helpers/auth.helpers';
 import type {
   AuthenticatedRequest,
   MockCustomer,
+  MockInvoice,
+  MockPlan,
   MockSubscription,
   MockUsageRecord
 } from '../types';
@@ -302,6 +305,249 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
     sessionRef
   });
 });
+
+// ---------------------------------------------------------------------------
+// Plan change with proration (design §17.4). Mirrors the server's guards and
+// ProrationCalculator math (whole-day granularity, refund-and-recharge). The
+// server's Paddle path delegates the money to Paddle and reconciles invoices
+// via webhooks; the mock has no provider, so both providers settle the same
+// synchronous way — the documented divergence is timing, not shape.
+// ---------------------------------------------------------------------------
+const DAY_MS = 86_400_000;
+const CHANGEABLE_STATUSES: ReadonlyArray<MockSubscription['status']> = [
+  'trialing',
+  'active'
+];
+
+interface MockProrationQuote {
+  remainderDays: number;
+  totalDays: number;
+  currency: string;
+  refundMinor: number;
+  chargeMinor: number;
+}
+
+function prorationQuote(
+  fromPlan: MockPlan,
+  toPlan: MockPlan,
+  provider: BillingProviderId,
+  sub: MockSubscription,
+  now: Date
+): MockProrationQuote {
+  const periodStart = new Date(sub.currentPeriodStart).getTime();
+  const periodEnd = new Date(sub.currentPeriodEnd).getTime();
+  const totalDays = Math.max(1, Math.round((periodEnd - periodStart) / DAY_MS));
+  const remainderDays = Math.min(
+    totalDays,
+    Math.max(0, Math.ceil((periodEnd - now.getTime()) / DAY_MS))
+  );
+  const fromMinor = fromPlan.prices[provider]?.amountMinor ?? 0;
+  const toMinor = toPlan.prices[provider]?.amountMinor ?? 0;
+  return {
+    remainderDays,
+    totalDays,
+    currency:
+      toPlan.prices[provider]?.currency ??
+      fromPlan.prices[provider]?.currency ??
+      'USD',
+    refundMinor: Math.floor((fromMinor * remainderDays) / totalDays),
+    chargeMinor: Math.floor((toMinor * remainderDays) / totalDays)
+  };
+}
+
+interface ChangeGuardResult {
+  customer: MockCustomer;
+  sub: MockSubscription;
+  fromPlan: MockPlan;
+  toPlan: MockPlan;
+}
+
+/** Shared guards of change/preview; replies with the error and returns null. */
+function guardChange(req: Request, res: Response): ChangeGuardResult | null {
+  const { user } = req as AuthenticatedRequest;
+  const planKey =
+    typeof req.body?.planKey === 'string' ? req.body.planKey.trim() : '';
+  if (!planKey) {
+    res
+      .status(400)
+      .json({ message: 'planKey must be a string', statusCode: 400 });
+    return null;
+  }
+
+  const customer = findCustomer(user.id);
+  const sub = customer ? findCurrentSubscription(customer.id) : undefined;
+  if (!customer || !sub) {
+    res
+      .status(404)
+      .json({ message: 'No active subscription to change', statusCode: 404 });
+    return null;
+  }
+  if (!CHANGEABLE_STATUSES.includes(sub.status)) {
+    res.status(409).json({
+      message:
+        'The subscription must be active to change plans. Settle any outstanding payment first.',
+      statusCode: 409
+    });
+    return null;
+  }
+  if (sub.cancelAtPeriodEnd) {
+    res.status(409).json({
+      message:
+        'A cancellation is scheduled for this subscription; it can no longer change plans.',
+      statusCode: 409
+    });
+    return null;
+  }
+
+  const toPlan = [...getState().plans.values()].find(
+    (p) => p.key === planKey && p.active
+  );
+  if (!toPlan) {
+    res
+      .status(404)
+      .json({ message: `Plan "${planKey}" was not found`, statusCode: 404 });
+    return null;
+  }
+  if (toPlan.key === sub.planKey) {
+    res
+      .status(409)
+      .json({ message: 'You are already on this plan.', statusCode: 409 });
+    return null;
+  }
+  if (!toPlan.prices[sub.provider]) {
+    res.status(409).json({
+      message: `Plan "${toPlan.key}" is not available for your billing provider.`,
+      statusCode: 409
+    });
+    return null;
+  }
+
+  const fromPlan = [...getState().plans.values()].find(
+    (p) => p.key === sub.planKey
+  );
+  if (!fromPlan) {
+    res.status(503).json({
+      message: 'The current plan is missing from the catalog',
+      statusCode: 503
+    });
+    return null;
+  }
+
+  return { customer, sub, fromPlan, toPlan };
+}
+
+// POST /billing/subscription/change — instant prorated plan/mode switch.
+billingRouter.post(
+  '/subscription/change',
+  authGuard,
+  (req: Request, res: Response) => {
+    const ctx = guardChange(req, res);
+    if (!ctx) return;
+    const { customer, sub, fromPlan, toPlan } = ctx;
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    // Trial moves no money; a paid period settles the two §17.4 documents.
+    if (sub.status !== 'trialing') {
+      const quote = prorationQuote(fromPlan, toPlan, sub.provider, sub, now);
+      const state = getState();
+
+      if (quote.chargeMinor > 0) {
+        const charge: MockInvoice = {
+          id: uuidv4(),
+          customerId: customer.id,
+          subscriptionId: sub.id,
+          provider: sub.provider,
+          providerInvoiceRef: `in_${uuidv4()}`,
+          amountMinor: quote.chargeMinor,
+          currency: quote.currency,
+          status: 'paid',
+          billingMode: toPlan.billingMode,
+          periodStart: nowIso,
+          periodEnd: sub.currentPeriodEnd,
+          paidAt: nowIso,
+          receiptRef: null,
+          createdAt: nowIso,
+          updatedAt: nowIso
+        };
+        state.billingInvoices.set(charge.id, charge);
+      }
+
+      // Refund capped by the latest paid fixed invoice (nothing paid → nothing
+      // to give back), mirroring the server's refund-source rule.
+      const source = [...state.billingInvoices.values()]
+        .filter(
+          (i) =>
+            i.subscriptionId === sub.id &&
+            i.status === 'paid' &&
+            i.billingMode === 'fixed' &&
+            i.amountMinor > 0
+        )
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      const refundMinor = source
+        ? Math.min(quote.refundMinor, source.amountMinor)
+        : 0;
+      if (refundMinor > 0 && source) {
+        const refund: MockInvoice = {
+          id: uuidv4(),
+          customerId: customer.id,
+          subscriptionId: sub.id,
+          provider: sub.provider,
+          providerInvoiceRef: source.providerInvoiceRef,
+          amountMinor: refundMinor,
+          currency: quote.currency,
+          status: 'refunded',
+          billingMode: 'fixed',
+          periodStart: nowIso,
+          periodEnd: sub.currentPeriodEnd,
+          paidAt: nowIso,
+          receiptRef: null,
+          createdAt: nowIso,
+          updatedAt: nowIso
+        };
+        state.billingInvoices.set(refund.id, refund);
+      }
+    }
+
+    sub.planKey = toPlan.key;
+    sub.billingMode = toPlan.billingMode;
+    sub.updatedAt = nowIso;
+    res.json(toSubscriptionResponse(sub));
+  }
+);
+
+// POST /billing/subscription/change/preview — prorated cost without applying.
+billingRouter.post(
+  '/subscription/change/preview',
+  authGuard,
+  (req: Request, res: Response) => {
+    const ctx = guardChange(req, res);
+    if (!ctx) return;
+    const { sub, fromPlan, toPlan } = ctx;
+    const delegated = managesLifecycle(sub.provider);
+    const quote = prorationQuote(
+      fromPlan,
+      toPlan,
+      sub.provider,
+      sub,
+      new Date()
+    );
+    const trial = sub.status === 'trialing';
+    const refundMinor = trial ? 0 : quote.refundMinor;
+    const chargeMinor = trial ? 0 : quote.chargeMinor;
+
+    const preview: ProrationPreviewResponse = {
+      provider: sub.provider,
+      fromPlanKey: fromPlan.key,
+      toPlanKey: toPlan.key,
+      currency: quote.currency,
+      creditMinor: delegated ? null : refundMinor,
+      chargeMinor: delegated ? null : chargeMinor,
+      dueNowMinor: chargeMinor - refundMinor
+    };
+    res.json(preview);
+  }
+);
 
 // POST /billing/subscription/cancel — cancel current sub (period-end default).
 billingRouter.post(

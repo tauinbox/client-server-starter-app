@@ -33,6 +33,7 @@ import {
 } from './providers/payment-provider.interface';
 import { FixedRating } from './rating/fixed-rating.strategy';
 import { UsageRating } from './rating/usage-rating.strategy';
+import { ProrationCalculator } from './rating/proration-calculator';
 import { PlanService } from './services/plan.service';
 import { BillingUserService } from './services/billing-user.service';
 import { BillingAdminService } from './services/billing-admin.service';
@@ -124,6 +125,7 @@ export class BillingModule {
         YooKassaProvider,
         FixedRating,
         UsageRating,
+        ProrationCalculator,
         WebhookIngestionService,
         BillingEventReducer,
         RenewalService,

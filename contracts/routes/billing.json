@@ -32,6 +32,16 @@
     },
     {
       "method": "POST",
+      "path": "/api/v1/billing/subscription/change",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/billing/subscription/change/preview",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
       "path": "/api/v1/billing/subscription/cancel",
       "expectedStatus": 401
     },

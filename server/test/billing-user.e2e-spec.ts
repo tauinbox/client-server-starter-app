@@ -7,7 +7,11 @@
 // the protected handlers can be exercised without a live PostgreSQL.
 
 import { Test } from '@nestjs/testing';
-import { VersioningType, type INestApplication } from '@nestjs/common';
+import {
+  ValidationPipe,
+  VersioningType,
+  type INestApplication
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { NextFunction, Request, Response } from 'express';
 import * as request from 'supertest';
@@ -84,6 +88,8 @@ describe('Billing user self-service (e2e)', () => {
     getDefaultPaymentMethod: jest.fn(),
     getUsageSummary: jest.fn(),
     checkout: jest.fn(),
+    changePlan: jest.fn(),
+    previewChange: jest.fn(),
     cancelSubscription: jest.fn(),
     getRegion: jest.fn(),
     setRegion: jest.fn()
@@ -106,6 +112,8 @@ describe('Billing user self-service (e2e)', () => {
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
+    // Mirrors the prod pipe so the DTO validation contract is exercised.
+    app.useGlobalPipes(new ValidationPipe({ transform: true }));
     // Inject the authenticated user (set by the global JwtAuthGuard in prod).
     app.use((req: Request, _res: Response, next: NextFunction) => {
       const userId = (req.headers['x-test-user'] as string) ?? 'user-1';
@@ -222,6 +230,62 @@ describe('Billing user self-service (e2e)', () => {
       url: 'https://checkout/x',
       sessionRef: 'sess-1'
     });
+  });
+
+  it('changes the plan for the caller and serializes the subscription', async () => {
+    billingUser.changePlan.mockResolvedValue(
+      Object.assign(makeSubscription(), { planKey: 'business' })
+    );
+
+    const res = await request(server)
+      .post('/api/v1/billing/subscription/change')
+      .set('x-test-user', 'user-7')
+      .send({ planKey: 'business' })
+      .expect(200);
+
+    expect(billingUser.changePlan).toHaveBeenCalledWith('user-7', 'business');
+    expect((res.body as { planKey: string }).planKey).toBe('business');
+    expect(res.body).not.toHaveProperty('providerSubscriptionId');
+  });
+
+  it('previews a plan change without applying it', async () => {
+    billingUser.previewChange.mockResolvedValue({
+      provider: 'yookassa',
+      fromPlanKey: 'pro',
+      toPlanKey: 'business',
+      currency: 'RUB',
+      creditMinor: 39600,
+      chargeMinor: 116000,
+      dueNowMinor: 76400
+    });
+
+    const res = await request(server)
+      .post('/api/v1/billing/subscription/change/preview')
+      .send({ planKey: 'business' })
+      .expect(200);
+
+    expect(billingUser.previewChange).toHaveBeenCalledWith(
+      'user-1',
+      'business'
+    );
+    expect(res.body).toEqual({
+      provider: 'yookassa',
+      fromPlanKey: 'pro',
+      toPlanKey: 'business',
+      currency: 'RUB',
+      creditMinor: 39600,
+      chargeMinor: 116000,
+      dueNowMinor: 76400
+    });
+  });
+
+  it('rejects a plan change without a planKey', async () => {
+    await request(server)
+      .post('/api/v1/billing/subscription/change')
+      .send({})
+      .expect(400);
+
+    expect(billingUser.changePlan).not.toHaveBeenCalled();
   });
 
   it('cancels the current subscription at period end', async () => {

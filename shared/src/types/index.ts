@@ -71,6 +71,7 @@ export type {
   InvoiceResponse,
   UsageResponse,
   UsageSummaryResponse,
+  ProrationPreviewResponse,
   CheckoutSessionResponse,
   BillingRegionResponse
 } from './billing.types';

@@ -145,6 +145,25 @@ export type UsageSummaryResponse = {
 };
 
 /**
+ * Result of `POST /billing/subscription/change/preview` — what an instant
+ * prorated switch to `toPlanKey` would cost right now (design §17.4, §21.3).
+ * For the self-managed provider (YooKassa) the server computes the split:
+ * `creditMinor` is the refunded unused remainder of the current plan and
+ * `chargeMinor` the new plan prorated to the period end. For the delegated
+ * provider (Paddle) only the net is known — both split fields are `null`.
+ * `dueNowMinor` is the net effect (`charge − credit`); negative = net refund.
+ */
+export type ProrationPreviewResponse = {
+  provider: BillingProviderId;
+  fromPlanKey: string;
+  toPlanKey: string;
+  currency: string;
+  creditMinor: number | null;
+  chargeMinor: number | null;
+  dueNowMinor: number;
+};
+
+/**
  * Result of `POST /billing/checkout` — a hosted-checkout redirect. `sessionRef`
  * is the provider session reference echoed back on the return URL.
  */

@@ -1,15 +1,11 @@
-import { Injectable, NotImplementedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { Plan } from '../entities/plan.entity';
 import type { Subscription } from '../entities/subscription.entity';
-import type {
-  ProrationResult,
-  RatedAmount,
-  RatingStrategy
-} from './rating-strategy.interface';
+import type { RatedAmount, RatingStrategy } from './rating-strategy.interface';
 
 /**
  * Fixed-tier rating: the period charge is the plan's price for the
- * subscription's resolved provider. Proration is deferred to M3.
+ * subscription's resolved provider.
  */
 @Injectable()
 export class FixedRating implements RatingStrategy {
@@ -28,9 +24,5 @@ export class FixedRating implements RatingStrategy {
         { description: plan.name, amountMinor: price.amountMinor, quantity: 1 }
       ]
     };
-  }
-
-  prorate(): ProrationResult {
-    throw new NotImplementedException('Fixed-plan proration (M3)');
   }
 }

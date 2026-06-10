@@ -1,25 +1,38 @@
 import {
   ConflictException,
   Injectable,
-  NotFoundException
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import type {
   BillingProviderId,
   BillingRegion,
-  CheckoutSessionResponse
+  CheckoutSessionResponse,
+  ProrationPreviewResponse
 } from '@app/shared/types';
+import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { User } from '../../users/entities/user.entity';
 import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { PaymentMethod } from '../entities/payment-method.entity';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
-import { SubscriptionCanceledEvent } from '../events/billing.events';
-import type { CancelMode } from '../providers/payment-provider.interface';
+import {
+  InvoicePaidEvent,
+  PlanChangedEvent,
+  SubscriptionCanceledEvent
+} from '../events/billing.events';
+import type {
+  CancelMode,
+  PaymentProvider
+} from '../providers/payment-provider.interface';
+import { ProrationCalculator } from '../rating/proration-calculator';
+import type { ProrationQuote } from '../rating/proration-calculator';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
 import { addInterval } from '../utils/period.util';
@@ -30,6 +43,22 @@ const ACTIVE_STATUSES = ['trialing', 'active', 'past_due'] as const;
 
 /** Non-canceled statuses — the "current" subscription for read/cancel/region. */
 const OPEN_STATUSES = ['incomplete', 'trialing', 'active', 'past_due'] as const;
+
+/**
+ * Statuses a plan change is allowed from. `past_due` must settle its debt first
+ * (a switch would tangle proration with dunning); `incomplete` has nothing to
+ * prorate yet.
+ */
+const CHANGEABLE_STATUSES = ['trialing', 'active'] as const;
+
+/** Everything a plan change / proration preview operates on. */
+interface ChangeContext {
+  customer: Customer;
+  subscription: Subscription;
+  fromPlan: Plan;
+  toPlan: Plan;
+  provider: PaymentProvider;
+}
 
 /** Maps the user's registration locale to a billing country + currency. */
 function geoFromLocale(locale: string): { country: string; currency: string } {
@@ -73,11 +102,15 @@ export class BillingUserService {
     private readonly plans: Repository<Plan>,
     @InjectRepository(User)
     private readonly users: Repository<User>,
+    @InjectDataSource() private readonly dataSource: DataSource,
     private readonly billing: BillingService,
     private readonly usageRating: UsageRating,
+    private readonly proration: ProrationCalculator,
     private readonly config: ConfigService,
     private readonly events: EventEmitter2
   ) {}
+
+  private readonly logger = new Logger(BillingUserService.name);
 
   async getCurrentSubscription(userId: string): Promise<Subscription | null> {
     const customer = await this.customers.findOne({ where: { userId } });
@@ -240,6 +273,307 @@ export class BillingUserService {
       );
     }
     return saved;
+  }
+
+  /**
+   * Instant plan/mode change with proration (design §11, §17.4). Paddle
+   * delegates the money side (`subscriptions.update`, prorated immediately) and
+   * the local row is updated optimistically — the provider's webhooks confirm.
+   * YooKassa is computed here: charge the new plan's prorated remainder first
+   * (the failure-prone leg — a declined card aborts the switch with nothing
+   * moved), then refund the old plan's unused remainder; each leg is its own
+   * fiscal document and its own local invoice row. A refund failure after a
+   * successful charge is logged and the switch proceeds — the admin console can
+   * re-issue the refund, while reverting would double-tangle the money.
+   */
+  async changePlan(userId: string, planKey: string): Promise<Subscription> {
+    const ctx = await this.resolveChangeContext(userId, planKey);
+    const { customer, subscription, fromPlan, toPlan, provider } = ctx;
+
+    if (provider.managesLifecycle) {
+      if (!subscription.providerSubscriptionId) {
+        throw new ConflictException(
+          'The subscription is not linked to the provider yet. Try again shortly.'
+        );
+      }
+      await provider.changePlan(
+        subscription.providerSubscriptionId,
+        customer,
+        toPlan
+      );
+      return this.applyPlanChange(ctx);
+    }
+
+    // Trial: nothing has been charged yet, so a switch moves no money.
+    const quote =
+      subscription.status === 'trialing'
+        ? null
+        : this.proration.quote({
+            fromPlan,
+            toPlan,
+            provider: provider.id,
+            periodStart: subscription.currentPeriodStart,
+            periodEnd: subscription.currentPeriodEnd,
+            now: new Date()
+          });
+
+    const periodEndMs = subscription.currentPeriodEnd.getTime();
+    let chargeInvoiceId: string | null = null;
+
+    if (quote && quote.chargeMinor > 0) {
+      const chargeKey = `change-charge:${subscription.id}:${toPlan.key}:${periodEndMs}`;
+      const charge = await provider.chargeOffSession(
+        customer,
+        quote.chargeMinor,
+        quote.chargeItems,
+        chargeKey
+      );
+      chargeInvoiceId = await this.recordChangeInvoice({
+        subscription,
+        customer,
+        providerEventId: chargeKey,
+        providerInvoiceRef: charge.providerInvoiceRef,
+        amountMinor: quote.chargeMinor,
+        status: 'paid',
+        billingMode: toPlan.billingMode
+      });
+    }
+
+    await this.refundUnusedRemainder(ctx, quote, periodEndMs);
+
+    const saved = await this.applyPlanChange(ctx);
+    if (chargeInvoiceId) {
+      this.events.emit(
+        InvoicePaidEvent.name,
+        new InvoicePaidEvent(userId, chargeInvoiceId)
+      );
+    }
+    return saved;
+  }
+
+  /**
+   * What an instant switch to `planKey` would cost right now, without applying
+   * it. Paddle answers via `previewUpdate` (net only); YooKassa is the local
+   * calculator's split. The YooKassa credit shown is the uncapped remainder —
+   * the executed refund may be capped by the original invoice's amount.
+   */
+  async previewChange(
+    userId: string,
+    planKey: string
+  ): Promise<ProrationPreviewResponse> {
+    const ctx = await this.resolveChangeContext(userId, planKey);
+    const { subscription, fromPlan, toPlan, provider } = ctx;
+    const base = {
+      provider: provider.id,
+      fromPlanKey: fromPlan.key,
+      toPlanKey: toPlan.key
+    };
+
+    if (provider.managesLifecycle) {
+      if (!subscription.providerSubscriptionId) {
+        throw new ConflictException(
+          'The subscription is not linked to the provider yet. Try again shortly.'
+        );
+      }
+      const preview = await provider.previewChangePlan(
+        subscription.providerSubscriptionId,
+        toPlan
+      );
+      return {
+        ...base,
+        currency: preview.currency,
+        creditMinor: null,
+        chargeMinor: null,
+        dueNowMinor: preview.amountMinor
+      };
+    }
+
+    if (subscription.status === 'trialing') {
+      const currency =
+        toPlan.prices[provider.id]?.currency ?? ctx.customer.currency;
+      return {
+        ...base,
+        currency,
+        creditMinor: 0,
+        chargeMinor: 0,
+        dueNowMinor: 0
+      };
+    }
+
+    const quote = this.proration.quote({
+      fromPlan,
+      toPlan,
+      provider: provider.id,
+      periodStart: subscription.currentPeriodStart,
+      periodEnd: subscription.currentPeriodEnd,
+      now: new Date()
+    });
+    return {
+      ...base,
+      currency: quote.currency,
+      creditMinor: quote.refundMinor,
+      chargeMinor: quote.chargeMinor,
+      dueNowMinor: quote.chargeMinor - quote.refundMinor
+    };
+  }
+
+  /** Resolves and guards everything a change/preview needs (shared path). */
+  private async resolveChangeContext(
+    userId: string,
+    planKey: string
+  ): Promise<ChangeContext> {
+    const customer = await this.customers.findOne({ where: { userId } });
+    const subscription = customer
+      ? await this.findCurrentSubscription(customer.id)
+      : null;
+    if (!customer || !subscription) {
+      throw new NotFoundException('No active subscription to change');
+    }
+    if (
+      !(CHANGEABLE_STATUSES as readonly string[]).includes(subscription.status)
+    ) {
+      throw new ConflictException(
+        'The subscription must be active to change plans. Settle any outstanding payment first.'
+      );
+    }
+    if (subscription.cancelAtPeriodEnd) {
+      throw new ConflictException(
+        'A cancellation is scheduled for this subscription; it can no longer change plans.'
+      );
+    }
+
+    const toPlan = await this.plans.findOne({ where: { key: planKey } });
+    if (!toPlan || !toPlan.active) {
+      throw new NotFoundException(`Plan "${planKey}" was not found`);
+    }
+    if (toPlan.key === subscription.planKey) {
+      throw new ConflictException('You are already on this plan.');
+    }
+    if (!toPlan.prices[subscription.provider]) {
+      throw new ConflictException(
+        `Plan "${toPlan.key}" is not available for your billing provider.`
+      );
+    }
+
+    const fromPlan = await this.plans.findOne({
+      where: { key: subscription.planKey }
+    });
+    if (!fromPlan) {
+      throw new ServiceUnavailableException(
+        'The current plan is missing from the catalog'
+      );
+    }
+
+    const provider = this.billing.getProviderById(subscription.provider);
+    if (!provider) {
+      throw new ServiceUnavailableException(
+        `Billing provider "${subscription.provider}" is not registered`
+      );
+    }
+
+    return { customer, subscription, fromPlan, toPlan, provider };
+  }
+
+  /**
+   * Refund leg of a self-managed switch: capped by the original period
+   * invoice's amount (no refund source → nothing to give back, e.g. a period
+   * opened by a zero usage invoice). Never fails the switch — see changePlan.
+   */
+  private async refundUnusedRemainder(
+    ctx: ChangeContext,
+    quote: ProrationQuote | null,
+    periodEndMs: number
+  ): Promise<void> {
+    if (!quote || quote.refundMinor <= 0) return;
+    const { customer, subscription, toPlan, provider } = ctx;
+
+    const source = await this.invoices.findOne({
+      where: {
+        subscriptionId: subscription.id,
+        status: 'paid',
+        billingMode: 'fixed'
+      },
+      order: { createdAt: 'DESC' }
+    });
+    if (!source || source.amountMinor <= 0) return;
+
+    const refundMinor = Math.min(quote.refundMinor, source.amountMinor);
+    const refundKey = `change-refund:${subscription.id}:${toPlan.key}:${periodEndMs}`;
+    try {
+      await provider.refund(source.providerInvoiceRef, refundMinor, refundKey);
+    } catch (error) {
+      this.logger.error(
+        `Proration refund failed for subscription ${subscription.id} (${refundMinor} minor): ${(error as Error).message}`
+      );
+      return;
+    }
+
+    await this.recordChangeInvoice({
+      subscription,
+      customer,
+      providerEventId: refundKey,
+      providerInvoiceRef: source.providerInvoiceRef,
+      amountMinor: refundMinor,
+      status: 'refunded',
+      billingMode: 'fixed'
+    });
+  }
+
+  /** Persists the new plan on the local row and publishes the change. */
+  private async applyPlanChange(ctx: ChangeContext): Promise<Subscription> {
+    const { customer, subscription, fromPlan, toPlan } = ctx;
+    subscription.planKey = toPlan.key;
+    subscription.billingMode = toPlan.billingMode;
+    const saved = await this.subscriptions.save(subscription);
+    this.events.emit(
+      PlanChangedEvent.name,
+      new PlanChangedEvent(customer.userId, saved.id, fromPlan.key, toPlan.key)
+    );
+    return saved;
+  }
+
+  /**
+   * Records one leg of a self-managed switch as its own invoice row (the two
+   * fiscal documents of §17.4 stay visible in the history). The unique
+   * `providerEventId` makes a double-submitted change insert each leg once.
+   */
+  private async recordChangeInvoice(args: {
+    subscription: Subscription;
+    customer: Customer;
+    providerEventId: string;
+    providerInvoiceRef: string;
+    amountMinor: number;
+    status: 'paid' | 'refunded';
+    billingMode: Plan['billingMode'];
+  }): Promise<string | null> {
+    const { subscription, customer } = args;
+    const now = new Date();
+    return withTransaction(this.dataSource, async (manager) => {
+      const insert = await manager
+        .createQueryBuilder()
+        .insert()
+        .into(Invoice)
+        .values({
+          customerId: subscription.customerId,
+          subscriptionId: subscription.id,
+          provider: subscription.provider,
+          providerEventId: args.providerEventId,
+          providerInvoiceRef: args.providerInvoiceRef,
+          amountMinor: args.amountMinor,
+          currency: customer.currency,
+          status: args.status,
+          billingMode: args.billingMode,
+          periodStart: now,
+          periodEnd: subscription.currentPeriodEnd,
+          paidAt: now,
+          receiptRef: null
+        })
+        .orIgnore()
+        .returning(['id'])
+        .execute();
+      const rows = insert.raw as Array<{ id: string }>;
+      return rows[0]?.id ?? null;
+    });
   }
 
   async getRegion(userId: string): Promise<{
