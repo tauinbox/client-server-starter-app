@@ -27,6 +27,7 @@ import { InvoiceResponseDto } from '../dtos/invoice-response.dto';
 import { PaymentMethodResponseDto } from '../dtos/payment-method-response.dto';
 import { CheckoutSessionResponseDto } from '../dtos/checkout-session-response.dto';
 import { BillingRegionResponseDto } from '../dtos/billing-region-response.dto';
+import { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
 
 @ApiTags('Billing API')
 @ApiBearerAuth()
@@ -51,6 +52,16 @@ export class BillingUserController {
   @ApiOkResponse({ type: [InvoiceResponseDto] })
   getInvoices(@Req() req: JwtAuthRequest) {
     return this.billingUser.listInvoices(req.user.userId);
+  }
+
+  @Get('usage')
+  @ApiOperation({
+    summary:
+      "The caller's metered usage for the current billing period, or null."
+  })
+  @ApiOkResponse({ type: UsageSummaryResponseDto })
+  getUsage(@Req() req: JwtAuthRequest) {
+    return this.billingUser.getUsageSummary(req.user.userId);
   }
 
   @Get('payment-method')

@@ -70,6 +70,7 @@ export type {
   SubscriptionResponse,
   InvoiceResponse,
   UsageResponse,
+  UsageSummaryResponse,
   CheckoutSessionResponse,
   BillingRegionResponse
 } from './billing.types';

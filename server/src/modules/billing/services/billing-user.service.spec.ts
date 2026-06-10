@@ -12,6 +12,7 @@ import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import { BillingService } from '../billing.service';
+import { UsageRating } from '../rating/usage-rating.strategy';
 import { BillingUserService } from './billing-user.service';
 
 type RepoMock = {
@@ -80,6 +81,8 @@ async function build() {
   const users = repo();
   const emit = jest.fn();
 
+  const usageRating = { summarizeForPeriod: jest.fn() };
+
   const billing = {
     resolveProvider: jest.fn(),
     getProviderById: jest.fn(),
@@ -103,6 +106,7 @@ async function build() {
       { provide: getRepositoryToken(Plan), useValue: plans },
       { provide: getRepositoryToken(User), useValue: users },
       { provide: BillingService, useValue: billing },
+      { provide: UsageRating, useValue: usageRating },
       {
         provide: ConfigService,
         useValue: { get: () => 'http://localhost:4200' }
@@ -120,6 +124,7 @@ async function build() {
     plans,
     users,
     billing,
+    usageRating,
     emit
   };
 }
@@ -283,6 +288,92 @@ describe('BillingUserService', () => {
       expect(ctx.invoices.find).toHaveBeenCalledWith(
         expect.objectContaining({ where: { customerId: 'cust-9' } })
       );
+    });
+  });
+
+  describe('getUsageSummary', () => {
+    const usageSub = {
+      id: 'sub-1',
+      customerId: 'cust-1',
+      planKey: 'usage',
+      provider: 'yookassa' as const,
+      billingMode: 'usage' as const,
+      status: 'active',
+      currentPeriodStart: new Date('2026-06-01T00:00:00Z'),
+      currentPeriodEnd: new Date('2026-07-01T00:00:00Z')
+    };
+
+    it('returns null without a customer, subscription, or usage mode', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue(null);
+      expect(await ctx.service.getUsageSummary('user-1')).toBeNull();
+
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      ctx.subscriptions.findOne.mockResolvedValue(null);
+      expect(await ctx.service.getUsageSummary('user-1')).toBeNull();
+
+      ctx.subscriptions.findOne.mockResolvedValue({
+        ...usageSub,
+        billingMode: 'fixed'
+      });
+      expect(await ctx.service.getUsageSummary('user-1')).toBeNull();
+      expect(ctx.usageRating.summarizeForPeriod).not.toHaveBeenCalled();
+    });
+
+    it('returns null instead of a 500 when the plan row is gone', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      ctx.subscriptions.findOne.mockResolvedValue(usageSub);
+      ctx.plans.findOne.mockResolvedValue(null);
+
+      expect(await ctx.service.getUsageSummary('user-1')).toBeNull();
+    });
+
+    it('rates the current period of the caller’s usage subscription', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      ctx.subscriptions.findOne.mockResolvedValue(usageSub);
+      const plan = makePlan({
+        key: 'usage',
+        billingMode: 'usage',
+        meterKey: 'api_calls'
+      });
+      ctx.plans.findOne.mockResolvedValue(plan);
+      ctx.usageRating.summarizeForPeriod.mockResolvedValue({
+        totalUnits: 142,
+        includedUnits: 100,
+        billableUnits: 42,
+        unitPriceMinor: 200,
+        amountMinor: 8400,
+        currency: 'RUB',
+        receiptItems: [{ description: 'x', amountMinor: 8400, quantity: 1 }]
+      });
+
+      const summary = await ctx.service.getUsageSummary('user-1');
+
+      expect(ctx.customers.findOne).toHaveBeenCalledWith({
+        where: { userId: 'user-1' }
+      });
+      expect(ctx.usageRating.summarizeForPeriod).toHaveBeenCalledWith(
+        usageSub,
+        plan,
+        {
+          start: usageSub.currentPeriodStart,
+          end: usageSub.currentPeriodEnd
+        }
+      );
+      expect(summary).toEqual({
+        subscriptionId: 'sub-1',
+        meterKey: 'api_calls',
+        periodStart: usageSub.currentPeriodStart,
+        periodEnd: usageSub.currentPeriodEnd,
+        totalUnits: 142,
+        includedUnits: 100,
+        billableUnits: 42,
+        unitPriceMinor: 200,
+        amountMinor: 8400,
+        currency: 'RUB'
+      });
     });
   });
 

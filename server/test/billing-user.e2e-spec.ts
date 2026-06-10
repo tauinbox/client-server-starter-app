@@ -82,6 +82,7 @@ describe('Billing user self-service (e2e)', () => {
     getCurrentSubscription: jest.fn(),
     listInvoices: jest.fn(),
     getDefaultPaymentMethod: jest.fn(),
+    getUsageSummary: jest.fn(),
     checkout: jest.fn(),
     cancelSubscription: jest.fn(),
     getRegion: jest.fn(),
@@ -154,6 +155,40 @@ describe('Billing user self-service (e2e)', () => {
     expect(invoices).toHaveLength(1);
     expect(invoices[0].providerInvoiceRef).toBe('pay_1');
     expect(invoices[0]).not.toHaveProperty('providerEventId');
+  });
+
+  it('returns the current-period usage summary for the caller', async () => {
+    billingUser.getUsageSummary.mockResolvedValue({
+      subscriptionId: 'sub-1',
+      meterKey: 'api_calls',
+      periodStart: new Date('2026-06-01T00:00:00Z'),
+      periodEnd: new Date('2026-07-01T00:00:00Z'),
+      totalUnits: 142,
+      includedUnits: 100,
+      billableUnits: 42,
+      unitPriceMinor: 200,
+      amountMinor: 8400,
+      currency: 'RUB'
+    });
+
+    const res = await request(server)
+      .get('/api/v1/billing/usage')
+      .set('x-test-user', 'user-7')
+      .expect(200);
+
+    expect(billingUser.getUsageSummary).toHaveBeenCalledWith('user-7');
+    expect(res.body).toEqual({
+      subscriptionId: 'sub-1',
+      meterKey: 'api_calls',
+      periodStart: '2026-06-01T00:00:00.000Z',
+      periodEnd: '2026-07-01T00:00:00.000Z',
+      totalUnits: 142,
+      includedUnits: 100,
+      billableUnits: 42,
+      unitPriceMinor: 200,
+      amountMinor: 8400,
+      currency: 'RUB'
+    });
   });
 
   it('scopes reads to the authenticated user (IDOR boundary)', async () => {

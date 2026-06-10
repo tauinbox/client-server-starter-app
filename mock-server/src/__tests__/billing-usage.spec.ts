@@ -68,6 +68,101 @@ function postUsage(token: string, body: unknown): Promise<Response> {
   });
 }
 
+// Activates a subscription on the given plan for a user and returns ids.
+async function activateSubscription(
+  email: string,
+  planKey: string
+): Promise<{ customerId: string; subscriptionId: string; userId: string }> {
+  const loginRes = await fetch(`${baseUrl}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email, password: 'Password1' })
+  });
+  const me = (await loginRes.json()) as { user: { id: string } };
+  const res = await fetch(
+    `${baseUrl}/__control/billing/activate-subscription`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ userId: me.user.id, planKey })
+    }
+  );
+  expect(res.status).toBe(200);
+  const sub = (await res.json()) as { id: string; customerId: string };
+  return {
+    customerId: sub.customerId,
+    subscriptionId: sub.id,
+    userId: me.user.id
+  };
+}
+
+async function seedUsage(
+  customerId: string,
+  quantity: number,
+  occurredAt?: string
+): Promise<void> {
+  const res = await fetch(`${baseUrl}/__control/billing/seed-usage`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ customerId, quantity, occurredAt })
+  });
+  expect(res.status).toBe(200);
+}
+
+function getUsage(token?: string): Promise<Response> {
+  return fetch(`${baseUrl}/api/v1/billing/usage`, {
+    headers: token ? { authorization: `Bearer ${token}` } : {}
+  });
+}
+
+describe('GET /api/v1/billing/usage parity with server', () => {
+  it('rejects unauthenticated calls (401)', async () => {
+    const res = await getUsage();
+    expect(res.status).toBe(401);
+  });
+
+  it('returns null when the caller has no usage-mode subscription', async () => {
+    const token = await login('user@example.com');
+
+    // No customer at all.
+    expect(await (await getUsage(token)).json()).toBeNull();
+
+    // A fixed-mode subscription is not metered either.
+    await activateSubscription('user@example.com', 'pro');
+    expect(await (await getUsage(token)).json()).toBeNull();
+  });
+
+  it('aggregates current-period records and rates the overage', async () => {
+    const token = await login('user@example.com');
+    const { customerId, subscriptionId } = await activateSubscription(
+      'user@example.com',
+      'usage'
+    );
+    await seedUsage(customerId, 30);
+    await seedUsage(customerId, 12);
+    // Outside the current period — must not count.
+    await seedUsage(customerId, 999, '2000-01-01T00:00:00.000Z');
+
+    const res = await getUsage(token);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+
+    // user@example.com is non-RU → paddle price: $0.02/unit, 0 included.
+    expect(body).toMatchObject({
+      subscriptionId,
+      meterKey: 'api_calls',
+      totalUnits: 42,
+      includedUnits: 0,
+      billableUnits: 42,
+      unitPriceMinor: 2,
+      amountMinor: 84,
+      currency: 'USD'
+    });
+    expect(typeof body['periodStart']).toBe('string');
+    expect(typeof body['periodEnd']).toBe('string');
+  });
+});
+
 describe('POST /api/v1/admin/billing/usage parity with server', () => {
   it('records usage and never serializes the idempotency key', async () => {
     const token = await login('admin@example.com');

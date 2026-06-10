@@ -20,9 +20,10 @@ export interface ProrationResult {
 
 /**
  * How a subscription's charge for a period is computed (Axis B). `FixedRating`
- * reads the plan's per-provider price; `UsageRating` aggregates `UsageRecord`s
- * (M2). Proration is provider-specific and lands in M3 (Paddle delegates,
- * YooKassa computes by whole days).
+ * reads the plan's per-provider price synchronously; `UsageRating` aggregates
+ * `UsageRecord`s from the database, so the contract admits both shapes.
+ * Proration is provider-specific and lands in M3 (Paddle delegates, YooKassa
+ * computes by whole days).
  */
 export interface RatingStrategy {
   readonly mode: BillingMode;
@@ -30,6 +31,6 @@ export interface RatingStrategy {
     subscription: Subscription,
     plan: Plan,
     period: BillingPeriod
-  ): RatedAmount;
+  ): RatedAmount | Promise<RatedAmount>;
   prorate(fromPlan: Plan, toPlan: Plan, remainderDays: number): ProrationResult;
 }

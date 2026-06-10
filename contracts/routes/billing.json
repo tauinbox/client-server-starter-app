@@ -17,6 +17,11 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/billing/usage",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/billing/payment-method",
       "expectedStatus": 401
     },

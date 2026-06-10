@@ -24,9 +24,8 @@ type SeedPlan = {
 
 // Starter catalog (design §17.1). Two prices per tier — RUB charged via YooKassa,
 // USD via Paddle — keyed by provider; the resolved billing region selects which
-// is shown/charged. Money is in minor units. The `usage` plan ships inactive so a
-// non-functional tier is never exposed until the usage subsystem (M2) activates
-// it. All values are illustrative defaults, editable here.
+// is shown/charged. Money is in minor units. All values are illustrative
+// defaults, editable here.
 const PLANS: SeedPlan[] = [
   {
     key: 'free',
@@ -86,7 +85,7 @@ const PLANS: SeedPlan[] = [
     entitlements: ['reports', 'api-access'],
     limits: null,
     trialDays: 0,
-    active: false,
+    active: true,
     prices: {
       yookassa: {
         currency: 'RUB',

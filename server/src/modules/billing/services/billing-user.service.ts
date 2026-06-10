@@ -20,6 +20,8 @@ import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import type { CancelMode } from '../providers/payment-provider.interface';
+import { UsageRating } from '../rating/usage-rating.strategy';
+import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
 import { addInterval } from '../utils/period.util';
 import { BillingService } from '../billing.service';
 
@@ -72,6 +74,7 @@ export class BillingUserService {
     @InjectRepository(User)
     private readonly users: Repository<User>,
     private readonly billing: BillingService,
+    private readonly usageRating: UsageRating,
     private readonly config: ConfigService,
     private readonly events: EventEmitter2
   ) {}
@@ -89,6 +92,46 @@ export class BillingUserService {
       where: { customerId: customer.id },
       order: { createdAt: 'DESC' }
     });
+  }
+
+  /**
+   * The caller's metered usage aggregated over the current billing period.
+   * Null when there is nothing to meter: no customer, no open subscription, or
+   * a fixed-mode one. A dangling `planKey` also yields null — a read must not
+   * surface a data-integrity 500.
+   */
+  async getUsageSummary(
+    userId: string
+  ): Promise<UsageSummaryResponseDto | null> {
+    const customer = await this.customers.findOne({ where: { userId } });
+    if (!customer) return null;
+    const subscription = await this.findCurrentSubscription(customer.id);
+    if (!subscription || subscription.billingMode !== 'usage') return null;
+    const plan = await this.plans.findOne({
+      where: { key: subscription.planKey }
+    });
+    if (!plan) return null;
+
+    const summary = await this.usageRating.summarizeForPeriod(
+      subscription,
+      plan,
+      {
+        start: subscription.currentPeriodStart,
+        end: subscription.currentPeriodEnd
+      }
+    );
+    return {
+      subscriptionId: subscription.id,
+      meterKey: plan.meterKey,
+      periodStart: subscription.currentPeriodStart,
+      periodEnd: subscription.currentPeriodEnd,
+      totalUnits: summary.totalUnits,
+      includedUnits: summary.includedUnits,
+      billableUnits: summary.billableUnits,
+      unitPriceMinor: summary.unitPriceMinor,
+      amountMinor: summary.amountMinor,
+      currency: summary.currency
+    };
   }
 
   async getDefaultPaymentMethod(userId: string): Promise<PaymentMethod | null> {
