@@ -93,6 +93,11 @@
       }
     </div>
 
+    <!-- Usage meter (usage-mode subscriptions only) -->
+    @if (store.usage(); as usage) {
+      <nxs-usage-meter class="usage-section" [usage]="usage" />
+    }
+
     <!-- Invoices -->
     <mat-card appearance="outlined" class="settings-card invoices-card">
       <mat-card-content>

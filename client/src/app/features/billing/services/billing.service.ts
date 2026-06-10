@@ -8,7 +8,8 @@ import type {
   InvoiceResponse,
   PaymentMethodResponse,
   PlanResponse,
-  SubscriptionResponse
+  SubscriptionResponse,
+  UsageSummaryResponse
 } from '@app/shared/types';
 
 export const BILLING_API_V1 = '/api/v1/billing';
@@ -16,8 +17,8 @@ export const BILLING_API_V1 = '/api/v1/billing';
 export type CancelMode = 'period_end' | 'immediate';
 
 /**
- * Thin HTTP wrapper over the M1 user billing API (design §11). Read endpoints
- * for subscription and payment method return `null` when none exists.
+ * Thin HTTP wrapper over the user billing API (design §11). Read endpoints
+ * for subscription, payment method and usage return `null` when none exists.
  */
 @Injectable({ providedIn: 'root' })
 export class BillingService {
@@ -35,6 +36,12 @@ export class BillingService {
 
   getInvoices(): Observable<InvoiceResponse[]> {
     return this.#http.get<InvoiceResponse[]>(`${BILLING_API_V1}/invoices`);
+  }
+
+  getUsage(): Observable<UsageSummaryResponse | null> {
+    return this.#http.get<UsageSummaryResponse | null>(
+      `${BILLING_API_V1}/usage`
+    );
   }
 
   getPaymentMethod(): Observable<PaymentMethodResponse | null> {

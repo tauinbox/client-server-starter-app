@@ -84,16 +84,64 @@ test.describe('Billing', () => {
       page.getByRole('heading', { name: /You're on Pro/ })
     ).toBeVisible();
 
-    // Settings reflects the active plan + a paid invoice.
+    // Settings reflects the active plan + a paid invoice. Fixed-mode plans
+    // have no metered usage, so the usage meter must not render.
     await page.goto('/billing/settings');
     await expect(page.locator('.plan-summary')).toContainText('Pro');
     await expect(page.locator('.plan-summary')).toContainText('Active');
     await expect(page.locator('.invoice-table tbody tr')).toHaveCount(1);
+    await expect(page.locator('nxs-usage-meter')).toHaveCount(0);
 
     // Cancel at period end via the confirm dialog.
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
     await page.getByRole('button', { name: 'Cancel subscription' }).click();
 
     await expect(page.locator('.plan-summary')).toContainText('Cancels on');
+  });
+
+  test('usage subscription shows the current-period usage meter', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+
+    // Put the user on the pay-as-you-go plan and meter some usage. The seeded
+    // usage plan is paddle/USD with unitPriceMinor 2 and no included units,
+    // so 142 units accrue 284 minor units = $2.84.
+    const subscription = await _mockServer.activateBillingSubscription({
+      userId: USER_ID,
+      planKey: 'usage'
+    });
+    await _mockServer.seedBillingUsage({
+      customerId: subscription.customerId,
+      quantity: 142
+    });
+
+    await page.goto('/billing/settings');
+
+    const meter = page.locator('nxs-usage-meter');
+    await expect(meter).toBeVisible();
+    await expect(meter.locator('.usage-readout .total')).toHaveText('142');
+    await expect(meter.locator('.meter-key')).toHaveText('api_calls');
+    await expect(meter.locator('.ledger-row.accrued')).toContainText('$2.84');
+    // Pure pay-as-you-go (no included units) renders no quota gauge.
+    await expect(meter.locator('.usage-gauge')).toHaveCount(0);
+  });
+
+  test('usage meter shows the empty state with no metered usage', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await _mockServer.activateBillingSubscription({
+      userId: USER_ID,
+      planKey: 'usage'
+    });
+
+    await page.goto('/billing/settings');
+
+    const meter = page.locator('nxs-usage-meter');
+    await expect(meter).toBeVisible();
+    await expect(meter.locator('.usage-empty')).toBeVisible();
   });
 });

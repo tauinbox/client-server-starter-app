@@ -55,6 +55,17 @@
     "invoiceAmount": "Amount",
     "receipt": "Receipt"
   },
+  "usage": {
+    "title": "Usage this period",
+    "empty": "No usage yet this period.",
+    "unitsUsed": "units used",
+    "ofIncluded": "of {{ included }} included",
+    "gaugeLabel": "Usage against included units",
+    "billableUnits": "Billable units",
+    "unitPrice": "Unit price",
+    "accrued": "Accrued this period",
+    "billedAtPeriodEnd": "Billed at period end"
+  },
   "checkout": {
     "processingTitle": "Confirming your subscription…",
     "processingMessage": "This only takes a moment.",

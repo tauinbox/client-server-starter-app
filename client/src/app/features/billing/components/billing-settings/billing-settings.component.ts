@@ -20,6 +20,7 @@ import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service'
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { BillingStore } from '../../store/billing.store';
 import { formatMoney, planPriceFor } from '../../utils/billing-format';
+import { UsageMeterComponent } from '../usage-meter/usage-meter.component';
 
 @Component({
   selector: 'nxs-billing-settings',
@@ -31,7 +32,8 @@ import { formatMoney, planPriceFor } from '../../utils/billing-format';
     MatButton,
     MatIcon,
     MatProgressSpinner,
-    TranslocoDirective
+    TranslocoDirective,
+    UsageMeterComponent
   ],
   templateUrl: './billing-settings.component.html',
   styleUrl: './billing-settings.component.scss',

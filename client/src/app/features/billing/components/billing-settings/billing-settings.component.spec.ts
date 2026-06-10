@@ -7,7 +7,8 @@ import { of } from 'rxjs';
 import type {
   InvoiceResponse,
   PlanResponse,
-  SubscriptionResponse
+  SubscriptionResponse,
+  UsageSummaryResponse
 } from '@app/shared/types';
 import { LayoutService } from '@core/services/layout.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
@@ -67,12 +68,26 @@ const invoice: InvoiceResponse = {
   updatedAt: '2026-06-01T00:00:00.000Z'
 };
 
+const usageSummary: UsageSummaryResponse = {
+  subscriptionId: 'sub-1',
+  meterKey: 'api_calls',
+  periodStart: '2026-06-01T00:00:00.000Z',
+  periodEnd: '2026-07-01T00:00:00.000Z',
+  totalUnits: 142,
+  includedUnits: 100,
+  billableUnits: 42,
+  unitPriceMinor: 200,
+  amountMinor: 8400,
+  currency: 'USD'
+};
+
 describe('BillingSettingsComponent', () => {
   let fixture: ComponentFixture<BillingSettingsComponent>;
   let storeMock: {
     subscription: ReturnType<typeof signal<SubscriptionResponse | null>>;
     invoices: ReturnType<typeof signal<InvoiceResponse[]>>;
     paymentMethod: ReturnType<typeof signal<null>>;
+    usage: ReturnType<typeof signal<UsageSummaryResponse | null>>;
     loading: ReturnType<typeof signal<boolean>>;
     working: ReturnType<typeof signal<boolean>>;
     currentPlan: ReturnType<typeof signal<PlanResponse | null>>;
@@ -82,13 +97,17 @@ describe('BillingSettingsComponent', () => {
   };
   let dialogMock: { openConfirm: ReturnType<typeof vi.fn> };
 
-  async function setup(hasSub: boolean): Promise<void> {
+  async function setup(
+    hasSub: boolean,
+    usage?: UsageSummaryResponse
+  ): Promise<void> {
     storeMock = {
       subscription: signal<SubscriptionResponse | null>(
         hasSub ? activeSub : null
       ),
       invoices: signal<InvoiceResponse[]>(hasSub ? [invoice] : []),
       paymentMethod: signal(null),
+      usage: signal<UsageSummaryResponse | null>(usage ?? null),
       loading: signal(false),
       working: signal(false),
       currentPlan: signal<PlanResponse | null>(hasSub ? proPlan : null),
@@ -119,6 +138,18 @@ describe('BillingSettingsComponent', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Pro');
     expect(text).toContain('$12.00');
+  });
+
+  it('renders the usage meter when a usage summary is present', async () => {
+    await setup(true, usageSummary);
+    expect(
+      fixture.nativeElement.querySelector('nxs-usage-meter')
+    ).not.toBeNull();
+  });
+
+  it('hides the usage meter without a usage summary', async () => {
+    await setup(true);
+    expect(fixture.nativeElement.querySelector('nxs-usage-meter')).toBeNull();
   });
 
   it('renders the empty state with no subscription', async () => {
