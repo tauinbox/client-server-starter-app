@@ -20,7 +20,7 @@ function paddleMock() {
   return {
     webhooks: { unmarshal: jest.fn() },
     transactions: { create: jest.fn(), get: jest.fn() },
-    subscriptions: { cancel: jest.fn() },
+    subscriptions: { cancel: jest.fn(), createOneTimeCharge: jest.fn() },
     adjustments: { create: jest.fn() }
   };
 }
@@ -199,6 +199,45 @@ describe('PaddleProvider', () => {
       });
     });
 
+    it('extracts the usage charge key echoed through the price custom data', async () => {
+      const { provider, client } = await build({});
+      client!.webhooks.unmarshal.mockResolvedValue({
+        eventId: 'evt_u1',
+        eventType: EventName.TransactionCompleted,
+        data: {
+          ...transactionData,
+          items: [
+            { price: { customData: { usageChargeKey: 'usage:sub-1:123' } } }
+          ]
+        }
+      });
+
+      const result = await provider.verifyAndParseWebhook(Buffer.from('{}'), {
+        'paddle-signature': 'sig'
+      });
+
+      expect((result!.payload as NormalizedInvoicePayload).usageChargeKey).toBe(
+        'usage:sub-1:123'
+      );
+    });
+
+    it('leaves the usage charge key null on ordinary subscription transactions', async () => {
+      const { provider, client } = await build({});
+      client!.webhooks.unmarshal.mockResolvedValue({
+        eventId: 'evt_u2',
+        eventType: EventName.TransactionCompleted,
+        data: { ...transactionData, items: [{ price: { customData: null } }] }
+      });
+
+      const result = await provider.verifyAndParseWebhook(Buffer.from('{}'), {
+        'paddle-signature': 'sig'
+      });
+
+      expect(
+        (result!.payload as NormalizedInvoicePayload).usageChargeKey
+      ).toBeNull();
+    });
+
     it('maps transaction.payment_failed to payment.failed', async () => {
       const { provider, client } = await build({});
       client!.webhooks.unmarshal.mockResolvedValue({
@@ -299,6 +338,46 @@ describe('PaddleProvider', () => {
         });
       }
     );
+  });
+
+  describe('chargeUsage', () => {
+    it('posts an immediate one-time charge with the key in the price custom data', async () => {
+      const { provider, client } = await build({});
+
+      await provider.chargeUsage(
+        'sub_123',
+        8400,
+        'USD',
+        'Pay as you go: api_calls × 42',
+        'usage:sub-1:123'
+      );
+
+      expect(client!.subscriptions.createOneTimeCharge).toHaveBeenCalledWith(
+        'sub_123',
+        {
+          effectiveFrom: 'immediately',
+          items: [
+            {
+              quantity: 1,
+              price: {
+                description: 'Pay as you go: api_calls × 42',
+                unitPrice: { amount: '8400', currencyCode: 'USD' },
+                product: { name: 'Metered usage', taxCategory: 'standard' },
+                customData: { usageChargeKey: 'usage:sub-1:123' }
+              }
+            }
+          ]
+        }
+      );
+    });
+
+    it('rejects when Paddle is not configured', async () => {
+      const { provider } = await build({ client: null });
+
+      await expect(
+        provider.chargeUsage('sub_123', 1, 'USD', 'usage', 'k')
+      ).rejects.toThrow(ServiceUnavailableException);
+    });
   });
 
   describe('refund', () => {

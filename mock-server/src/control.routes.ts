@@ -500,4 +500,140 @@ router.post('/billing/seed-usage', (req, res) => {
   res.json(toUsageResponse(record));
 });
 
+// Mirrors the server's dunning policy (renewal-queue.constants).
+const DUNNING_MAX_ATTEMPTS = 3;
+
+// POST /__control/billing/advance-renewal — renewal-clock advance for E2E:
+// treats the subscription's current period as due NOW and runs one scheduler
+// pass on it, mirroring the server's period-close semantics. `outcome:
+// 'success'` (default) charges and advances: fixed subs get a paid invoice at
+// the plan price covering the NEW period; usage subs get a postpaid invoice
+// covering the CLOSED period (records with occurredAt in [periodStart, now),
+// overage beyond includedUnits at unitPriceMinor; zero usage → zero invoice,
+// no charge). `outcome: 'failure'` simulates a declined off-session charge:
+// past_due + dunning, canceling once the attempts are exhausted.
+router.post('/billing/advance-renewal', (req, res) => {
+  const {
+    userId,
+    subscriptionId,
+    outcome = 'success'
+  } = req.body as {
+    userId?: string;
+    subscriptionId?: string;
+    outcome?: 'success' | 'failure';
+  };
+  if (outcome !== 'success' && outcome !== 'failure') {
+    res.status(400).json({ message: 'outcome must be success or failure' });
+    return;
+  }
+
+  const state = getState();
+  let subscription = subscriptionId
+    ? state.billingSubscriptions.get(subscriptionId)
+    : undefined;
+  if (!subscription && userId) {
+    const customer = [...state.billingCustomers.values()].find(
+      (c) => c.userId === userId
+    );
+    subscription = customer
+      ? [...state.billingSubscriptions.values()]
+          .filter(
+            (s) =>
+              s.customerId === customer.id &&
+              ['trialing', 'active', 'past_due'].includes(s.status)
+          )
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+      : undefined;
+  }
+  if (!subscription) {
+    res.status(404).json({ message: 'subscription not found' });
+    return;
+  }
+
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  if (outcome === 'failure') {
+    const attempts = (subscription.dunningAttempts ?? 0) + 1;
+    subscription.dunningAttempts = attempts;
+    subscription.status =
+      attempts >= DUNNING_MAX_ATTEMPTS ? 'canceled' : 'past_due';
+    if (subscription.status === 'canceled') {
+      subscription.cancelAtPeriodEnd = false;
+    }
+    subscription.updatedAt = nowIso;
+    res.json(toSubscriptionResponse(subscription));
+    return;
+  }
+
+  const plan = [...state.plans.values()].find(
+    (p) => p.key === subscription.planKey
+  );
+  const price = plan?.prices[subscription.provider];
+  if (!plan || !price) {
+    res.status(404).json({ message: 'plan or price not found' });
+    return;
+  }
+
+  // Cancel-at-period-end: the boundary cancels instead of charging.
+  if (subscription.cancelAtPeriodEnd) {
+    subscription.status = 'canceled';
+    subscription.updatedAt = nowIso;
+    res.json(toSubscriptionResponse(subscription));
+    return;
+  }
+
+  // The clock advance anchors the boundary at NOW: the closed period is
+  // [currentPeriodStart, now) and the new one [now, now + interval).
+  const closedStart = subscription.currentPeriodStart;
+  const newEnd = new Date(now);
+  if (plan.interval === 'year') newEnd.setFullYear(newEnd.getFullYear() + 1);
+  else newEnd.setMonth(newEnd.getMonth() + 1);
+
+  let amountMinor = price.amountMinor;
+  let periodStart = nowIso;
+  let periodEnd = newEnd.toISOString();
+  if (subscription.billingMode === 'usage') {
+    const totalUnits = [...state.billingUsageRecords.values()]
+      .filter(
+        (r) =>
+          r.subscriptionId === subscription.id &&
+          r.occurredAt >= closedStart &&
+          r.occurredAt < nowIso
+      )
+      .reduce((sum, r) => sum + r.quantity, 0);
+    const billableUnits = Math.max(0, totalUnits - (price.includedUnits ?? 0));
+    amountMinor = billableUnits * (price.unitPriceMinor ?? 0);
+    periodStart = closedStart;
+    periodEnd = nowIso;
+  }
+
+  const invoice: MockInvoice = {
+    id: randomUUID(),
+    customerId: subscription.customerId,
+    subscriptionId: subscription.id,
+    provider: subscription.provider,
+    providerInvoiceRef: `in_${randomUUID()}`,
+    amountMinor,
+    currency: price.currency,
+    status: 'paid',
+    billingMode: subscription.billingMode,
+    periodStart,
+    periodEnd,
+    paidAt: nowIso,
+    receiptRef: null,
+    createdAt: nowIso,
+    updatedAt: nowIso
+  };
+  state.billingInvoices.set(invoice.id, invoice);
+
+  subscription.status = 'active';
+  subscription.trialEnd = null;
+  subscription.dunningAttempts = 0;
+  subscription.currentPeriodStart = nowIso;
+  subscription.currentPeriodEnd = newEnd.toISOString();
+  subscription.updatedAt = nowIso;
+  res.json(toSubscriptionResponse(subscription));
+});
+
 export default router;

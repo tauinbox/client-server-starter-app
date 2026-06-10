@@ -15,6 +15,8 @@ import {
 } from '../events/billing.events';
 import { BILLING_PROVIDERS } from '../providers/payment-provider.interface';
 import { FixedRating } from '../rating/fixed-rating.strategy';
+import { UsageRating } from '../rating/usage-rating.strategy';
+import { UsageRecord } from '../entities/usage-record.entity';
 import { RenewalService } from './renewal.service';
 import {
   DUNNING_MAX_ATTEMPTS,
@@ -149,7 +151,6 @@ function subscriptionsRepo(store: Store) {
             store.subscriptions.filter(
               (s) =>
                 s.lifecycleOwner === 'self' &&
-                s.billingMode === 'fixed' &&
                 ['trialing', 'active', 'past_due'].includes(s.status)
             )
           )
@@ -161,7 +162,8 @@ function subscriptionsRepo(store: Store) {
 
 async function build(
   store: Store,
-  chargeOffSession: jest.Mock
+  chargeOffSession: jest.Mock,
+  usageSum: jest.Mock = jest.fn().mockResolvedValue(null)
 ): Promise<{ service: RenewalService; emit: jest.Mock; charge: jest.Mock }> {
   const emit = jest.fn();
   const manager = makeManager(store);
@@ -183,6 +185,11 @@ async function build(
     providers: [
       RenewalService,
       FixedRating,
+      UsageRating,
+      {
+        provide: getRepositoryToken(UsageRecord),
+        useValue: { sum: usageSum }
+      },
       {
         provide: getRepositoryToken(Subscription),
         useValue: subscriptionsRepo(store)
@@ -391,6 +398,141 @@ describe('RenewalService', () => {
       SubscriptionCanceledEvent.name,
       expect.objectContaining({ userId: 'user-1' })
     );
+  });
+
+  describe('usage-mode subscriptions (postpaid period close)', () => {
+    function makeUsagePlan(): Plan {
+      return Object.assign(new Plan(), {
+        id: 'plan-usage',
+        key: 'usage',
+        name: 'Pay as you go',
+        description: null,
+        billingMode: 'usage',
+        interval: 'month',
+        meterKey: 'api_calls',
+        entitlements: [],
+        limits: null,
+        trialDays: 0,
+        active: true,
+        prices: {
+          yookassa: {
+            currency: 'RUB',
+            amountMinor: 0,
+            unitPriceMinor: 200,
+            includedUnits: 100
+          }
+        },
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    }
+
+    function usageStore(sub: Subscription): Store {
+      const store = baseStore(sub);
+      store.plans.push(makeUsagePlan());
+      return store;
+    }
+
+    const usageSub = () =>
+      makeSub({ planKey: 'usage', billingMode: 'usage' as const });
+
+    it('charges the overage of the closed period and invoices that period', async () => {
+      const sub = usageSub();
+      const store = usageStore(sub);
+      const charge = jest
+        .fn()
+        .mockResolvedValue({ providerInvoiceRef: 'pay_usage' });
+      const sum = jest.fn().mockResolvedValue(142);
+      const { service, emit } = await build(store, charge, sum);
+
+      await service.runDueRenewals(NOW);
+
+      expect(charge).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'cust-1' }),
+        8400,
+        [
+          {
+            description: 'Pay as you go: api_calls × 42',
+            amountMinor: 8400,
+            quantity: 1
+          }
+        ],
+        'renewal:sub-1:' + new Date('2026-06-01T00:00:00Z').getTime() + ':0'
+      );
+      // The invoice covers the metered period that just closed, not the new one.
+      expect(store.invoices[0]).toMatchObject({
+        amountMinor: 8400,
+        billingMode: 'usage',
+        periodStart: new Date('2026-05-01T00:00:00Z'),
+        periodEnd: new Date('2026-06-01T00:00:00Z')
+      });
+      // The subscription itself advances to the next period.
+      expect(sub.currentPeriodStart).toEqual(new Date('2026-06-01T00:00:00Z'));
+      expect(sub.currentPeriodEnd).toEqual(new Date('2026-07-01T00:00:00Z'));
+      expect(emit).toHaveBeenCalledWith(
+        SubscriptionRenewedEvent.name,
+        expect.objectContaining({ subscriptionId: 'sub-1' })
+      );
+    });
+
+    it('rates the closed period [currentPeriodStart, anchor)', async () => {
+      const sub = usageSub();
+      const store = usageStore(sub);
+      const sum = jest.fn().mockResolvedValue(150);
+      const { service } = await build(
+        store,
+        jest.fn().mockResolvedValue({ providerInvoiceRef: 'pay_u' }),
+        sum
+      );
+
+      await service.runDueRenewals(NOW);
+
+      expect(sum).toHaveBeenCalledWith(
+        'quantity',
+        expect.objectContaining({ subscriptionId: 'sub-1' })
+      );
+    });
+
+    it('closes a zero-usage period without a provider charge via a zero invoice', async () => {
+      const sub = usageSub();
+      const store = usageStore(sub);
+      const charge = jest.fn();
+      const sum = jest.fn().mockResolvedValue(null);
+      const { service, emit } = await build(store, charge, sum);
+
+      await service.runDueRenewals(NOW);
+
+      expect(charge).not.toHaveBeenCalled();
+      expect(store.invoices).toHaveLength(1);
+      expect(store.invoices[0]).toMatchObject({
+        amountMinor: 0,
+        status: 'paid',
+        billingMode: 'usage'
+      });
+      expect(sub.currentPeriodEnd).toEqual(new Date('2026-07-01T00:00:00Z'));
+      expect(emit).toHaveBeenCalledWith(
+        InvoicePaidEvent.name,
+        expect.objectContaining({ userId: 'user-1' })
+      );
+    });
+
+    it('walks the dunning ladder when the usage charge fails', async () => {
+      const sub = usageSub();
+      const store = usageStore(sub);
+      const charge = jest.fn().mockRejectedValue(new Error('declined'));
+      const sum = jest.fn().mockResolvedValue(142);
+      const { service, emit } = await build(store, charge, sum);
+
+      await service.runDueRenewals(NOW);
+
+      expect(sub.status).toBe('past_due');
+      expect(sub.dunningAttempts).toBe(1);
+      expect(store.invoices).toHaveLength(0);
+      expect(emit).toHaveBeenCalledWith(
+        PaymentFailedEvent.name,
+        expect.objectContaining({ userId: 'user-1' })
+      );
+    });
   });
 
   it('is idempotent across a double scan (charges and advances once)', async () => {

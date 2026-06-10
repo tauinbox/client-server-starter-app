@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { Customer } from '../entities/customer.entity';
+import { Invoice } from '../entities/invoice.entity';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import {
@@ -9,7 +10,8 @@ import {
   PaymentFailedEvent,
   SubscriptionActivatedEvent,
   SubscriptionCanceledEvent,
-  SubscriptionRenewedEvent
+  SubscriptionRenewedEvent,
+  UsagePeriodClosedEvent
 } from '../events/billing.events';
 import type {
   NormalizedEvent,
@@ -23,7 +25,9 @@ interface ManagerStubs {
   subscription: Subscription | null;
   plan: Plan | null;
   customer: Customer | null;
+  invoice: Invoice | null;
   invoiceInsertRows: Array<{ id: string }>;
+  updateAffected: number;
 }
 
 function buildManager(stubs: ManagerStubs) {
@@ -31,11 +35,14 @@ function buildManager(stubs: ManagerStubs) {
     Promise.resolve({ ...entity, id: entity.id ?? 'sub-new' })
   );
   const create = jest.fn((_entity: unknown, data: object) => ({ ...data }));
-  const update = jest.fn().mockResolvedValue(undefined);
+  const update = jest
+    .fn()
+    .mockResolvedValue({ affected: stubs.updateAffected });
   const findOne = jest.fn((entity: unknown, _opts: unknown) => {
     if (entity === Subscription) return Promise.resolve(stubs.subscription);
     if (entity === Plan) return Promise.resolve(stubs.plan);
     if (entity === Customer) return Promise.resolve(stubs.customer);
+    if (entity === Invoice) return Promise.resolve(stubs.invoice);
     return Promise.resolve(null);
   });
   const execute = jest.fn().mockResolvedValue({ raw: stubs.invoiceInsertRows });
@@ -55,7 +62,9 @@ async function build(stubs: Partial<ManagerStubs> = {}) {
     subscription: null,
     plan: null,
     customer: null,
+    invoice: null,
     invoiceInsertRows: [{ id: 'inv-1' }],
+    updateAffected: 0,
     ...stubs
   });
   const emit = jest.fn();
@@ -230,6 +239,153 @@ describe('BillingEventReducer', () => {
     });
   });
 
+  describe('usage period rollover (provider-managed)', () => {
+    const usageSub = () =>
+      ({
+        id: 'sub-1',
+        billingMode: 'usage',
+        lifecycleOwner: 'provider',
+        providerSubscriptionId: 'sub_123',
+        currentPeriodStart: new Date('2026-05-01T00:00:00Z'),
+        currentPeriodEnd: new Date('2026-06-01T00:00:00Z')
+      }) as Subscription;
+
+    it('emits UsagePeriodClosed with the closed period when the snapshot starts a new one', async () => {
+      const { reducer, emit } = await build({ subscription: usageSub() });
+
+      await reducer.reduce(
+        event(
+          'subscription.renewed',
+          subPayload({
+            currentPeriodStart: '2026-06-01T00:00:00Z',
+            currentPeriodEnd: '2026-07-01T00:00:00Z'
+          })
+        )
+      );
+
+      expect(emit).toHaveBeenCalledWith(
+        UsagePeriodClosedEvent.name,
+        expect.objectContaining({
+          userId: 'user-1',
+          subscriptionId: 'sub-1',
+          periodStart: new Date('2026-05-01T00:00:00Z'),
+          periodEnd: new Date('2026-06-01T00:00:00Z')
+        })
+      );
+    });
+
+    it('does not emit when the snapshot stays inside the stored period', async () => {
+      const { reducer, emit } = await build({ subscription: usageSub() });
+
+      await reducer.reduce(
+        event(
+          'subscription.renewed',
+          subPayload({
+            currentPeriodStart: '2026-05-01T00:00:00Z',
+            currentPeriodEnd: '2026-06-01T00:00:00Z'
+          })
+        )
+      );
+
+      expect(emit).not.toHaveBeenCalledWith(
+        UsagePeriodClosedEvent.name,
+        expect.anything()
+      );
+    });
+
+    it('does not emit for fixed-mode subscriptions on rollover', async () => {
+      const { reducer, emit } = await build({
+        subscription: {
+          ...usageSub(),
+          billingMode: 'fixed'
+        } as Subscription
+      });
+
+      await reducer.reduce(
+        event(
+          'subscription.renewed',
+          subPayload({
+            currentPeriodStart: '2026-06-01T00:00:00Z',
+            currentPeriodEnd: '2026-07-01T00:00:00Z'
+          })
+        )
+      );
+
+      expect(emit).not.toHaveBeenCalledWith(
+        UsagePeriodClosedEvent.name,
+        expect.anything()
+      );
+    });
+  });
+
+  describe('invoice.paid — usage charge reconciliation', () => {
+    const usagePaidPayload: NormalizedInvoicePayload = {
+      ref: { customerId: 'cust-1', userId: 'user-1' },
+      providerInvoiceRef: 'txn_usage',
+      providerSubscriptionId: 'sub_123',
+      amountMinor: 8400,
+      currency: 'USD',
+      periodStart: null,
+      periodEnd: null,
+      paidAt: '2026-06-01T00:05:00Z',
+      usageChargeKey: 'usage:sub-1:1780272000000'
+    };
+
+    it('settles the pending usage invoice instead of inserting a new row', async () => {
+      const { reducer, manager, emit } = await build({
+        invoice: { id: 'inv-usage' } as Invoice,
+        updateAffected: 1
+      });
+
+      await reducer.reduce(event('invoice.paid', usagePaidPayload));
+
+      expect(manager.update).toHaveBeenCalledWith(
+        Invoice,
+        {
+          providerEventId: 'usage:sub-1:1780272000000',
+          status: 'pending'
+        },
+        expect.objectContaining({
+          status: 'paid',
+          providerInvoiceRef: 'txn_usage'
+        })
+      );
+      expect(manager.execute).not.toHaveBeenCalled();
+      expect(emit).toHaveBeenCalledWith(
+        InvoicePaidEvent.name,
+        expect.objectContaining({ userId: 'user-1', invoiceId: 'inv-usage' })
+      );
+    });
+
+    it('is a no-op when the keyed invoice is already settled (replay)', async () => {
+      const { reducer, manager, emit } = await build({
+        invoice: { id: 'inv-usage' } as Invoice,
+        updateAffected: 0
+      });
+
+      await reducer.reduce(event('invoice.paid', usagePaidPayload));
+
+      expect(manager.execute).not.toHaveBeenCalled();
+      expect(emit).not.toHaveBeenCalled();
+    });
+
+    it('falls back to a plain insert when the keyed invoice is missing', async () => {
+      const { reducer, manager, emit } = await build({
+        subscription: { id: 'sub-1', billingMode: 'usage' } as Subscription,
+        invoice: null,
+        invoiceInsertRows: [{ id: 'inv-2' }]
+      });
+
+      await reducer.reduce(event('invoice.paid', usagePaidPayload));
+
+      expect(manager.execute).toHaveBeenCalledTimes(1);
+      expect(emit).toHaveBeenCalledWith(
+        InvoicePaidEvent.name,
+        expect.objectContaining({ invoiceId: 'inv-2' })
+      );
+    });
+  });
+
   describe('invoice.paid', () => {
     const invoicePayload: NormalizedInvoicePayload = {
       ref: { customerId: 'cust-1', userId: 'user-1' },
@@ -351,6 +507,28 @@ describe('BillingEventReducer', () => {
   });
 
   describe('payment.failed', () => {
+    it('marks the pending usage invoice failed when the charge key is present', async () => {
+      const payload: NormalizedPaymentFailedPayload = {
+        ref: { customerId: 'cust-1', userId: 'user-1' },
+        providerSubscriptionId: 'sub_123',
+        usageChargeKey: 'usage:sub-1:1780272000000'
+      };
+      const { reducer, manager } = await build({
+        subscription: { id: 'sub-1' } as Subscription
+      });
+
+      await reducer.reduce(event('payment.failed', payload));
+
+      expect(manager.update).toHaveBeenCalledWith(
+        Invoice,
+        {
+          providerEventId: 'usage:sub-1:1780272000000',
+          status: 'pending'
+        },
+        { status: 'failed' }
+      );
+    });
+
     it('emits PaymentFailed with the linked subscription id', async () => {
       const payload: NormalizedPaymentFailedPayload = {
         ref: { customerId: 'cust-1', userId: 'user-1' },

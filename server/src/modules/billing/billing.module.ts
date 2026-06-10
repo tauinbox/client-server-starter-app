@@ -37,6 +37,7 @@ import { PlanService } from './services/plan.service';
 import { BillingUserService } from './services/billing-user.service';
 import { BillingAdminService } from './services/billing-admin.service';
 import { UsageService } from './services/usage.service';
+import { UsageInvoicingService } from './services/usage-invoicing.service';
 import { BillingPlansController } from './controllers/billing-plans.controller';
 import { BillingUserController } from './controllers/billing-user.controller';
 import { BillingAdminController } from './controllers/billing-admin.controller';
@@ -113,6 +114,7 @@ export class BillingModule {
         BillingUserService,
         BillingAdminService,
         UsageService,
+        UsageInvoicingService,
         BillingConfiguredAttributesRegistrar,
         EntitlementService,
         EntitlementGuard,
