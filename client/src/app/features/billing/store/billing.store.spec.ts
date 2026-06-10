@@ -84,6 +84,8 @@ describe('BillingStore', () => {
     getUsage: ReturnType<typeof vi.fn>;
     getRegion: ReturnType<typeof vi.fn>;
     checkout: ReturnType<typeof vi.fn>;
+    changePlan: ReturnType<typeof vi.fn>;
+    updatePaymentMethod: ReturnType<typeof vi.fn>;
     cancel: ReturnType<typeof vi.fn>;
     setRegion: ReturnType<typeof vi.fn>;
   };
@@ -114,6 +116,17 @@ describe('BillingStore', () => {
         .fn()
         .mockReturnValue(
           of({ provider: 'paddle', url: 'https://x', sessionRef: 's' })
+        ),
+      changePlan: vi.fn().mockReturnValue(
+        of({
+          ...activeSub,
+          planKey: 'business'
+        } satisfies SubscriptionResponse)
+      ),
+      updatePaymentMethod: vi
+        .fn()
+        .mockReturnValue(
+          of({ provider: 'paddle', url: 'https://pm', sessionRef: 'pm-s' })
         ),
       cancel: vi
         .fn()
@@ -172,6 +185,51 @@ describe('BillingStore', () => {
     expect(ok).toBe(true);
     expect(store.subscription()?.cancelAtPeriodEnd).toBe(true);
     expect(notifyMock.success).toHaveBeenCalled();
+  });
+
+  it('changePlan patches the subscription and refreshes invoices + usage', async () => {
+    const changeInvoice = { ...invoice, id: 'inv-2', status: 'refunded' };
+    billingMock.getInvoices.mockReturnValue(of([invoice, changeInvoice]));
+    const store = createStore();
+
+    const ok = await store.changePlan('business');
+
+    expect(ok).toBe(true);
+    expect(billingMock.changePlan).toHaveBeenCalledWith('business');
+    expect(store.subscription()?.planKey).toBe('business');
+    expect(store.invoices()).toHaveLength(2);
+    expect(billingMock.getUsage).toHaveBeenCalled();
+    expect(notifyMock.success).toHaveBeenCalled();
+    expect(store.working()).toBe(false);
+  });
+
+  it('surfaces a changePlan error without refreshing invoices', async () => {
+    billingMock.changePlan.mockReturnValue(throwError(() => new Error('409')));
+    const store = createStore();
+
+    const ok = await store.changePlan('business');
+
+    expect(ok).toBe(false);
+    expect(notifyMock.error).toHaveBeenCalled();
+    expect(billingMock.getInvoices).not.toHaveBeenCalled();
+    expect(store.working()).toBe(false);
+  });
+
+  it('startPaymentMethodUpdate returns the provider session', async () => {
+    const store = createStore();
+    const session = await store.startPaymentMethodUpdate();
+    expect(session?.url).toBe('https://pm');
+    expect(store.working()).toBe(false);
+  });
+
+  it('surfaces a payment-method update error and returns null', async () => {
+    billingMock.updatePaymentMethod.mockReturnValue(
+      throwError(() => new Error('404'))
+    );
+    const store = createStore();
+    const session = await store.startPaymentMethodUpdate();
+    expect(session).toBeNull();
+    expect(notifyMock.error).toHaveBeenCalled();
   });
 
   it('surfaces a checkout error and returns null', async () => {

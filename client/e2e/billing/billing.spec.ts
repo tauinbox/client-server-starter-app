@@ -99,6 +99,64 @@ test.describe('Billing', () => {
     await expect(page.locator('.plan-summary')).toContainText('Cancels on');
   });
 
+  test('change plan via the proration dialog surfaces the receipts', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await _mockServer.activateBillingSubscription({
+      userId: USER_ID,
+      planKey: 'pro'
+    });
+
+    await page.goto('/billing/settings');
+    await page.getByRole('button', { name: 'Change plan' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(
+      dialog.getByRole('heading', { name: 'Change plan' })
+    ).toBeVisible();
+
+    // Selecting a target fetches the proration preview. The en-locale user is
+    // on Paddle (delegated lifecycle), so the ledger shows the net amount:
+    // business $29.00 minus the unused pro $12.00 with a full period left.
+    await dialog.getByRole('radio', { name: /Business/ }).click();
+    await expect(dialog.locator('.due-now dd')).toHaveText('$17.00');
+
+    await dialog.getByRole('button', { name: 'Confirm' }).click();
+
+    await expect(page.locator('.plan-summary')).toContainText('Business');
+
+    // Proration receipts surfaced in the invoice history: the original period
+    // invoice plus the two legs of the switch (charge + refund).
+    await expect(page.locator('.invoice-table tbody tr')).toHaveCount(3);
+    await expect(page.locator('.invoice-table')).toContainText('Refunded');
+  });
+
+  test('payment-method update redirects to the provider and swaps the card', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await stubHostedCheckout(page);
+    await _mockServer.activateBillingSubscription({
+      userId: USER_ID,
+      planKey: 'pro'
+    });
+
+    await page.goto('/billing/settings');
+    await expect(page.locator('.payment-method')).toContainText('4242');
+
+    await page.getByRole('button', { name: 'Update' }).click();
+    await expect(page).toHaveURL(/mock-checkout\.local/);
+
+    // The mock settles the provider's success webhook synchronously, so the
+    // swapped default method is visible as soon as the user returns.
+    await page.goto('/billing/settings');
+    await expect(page.locator('.payment-method')).toContainText('mastercard');
+    await expect(page.locator('.payment-method')).toContainText('4444');
+  });
+
   test('usage subscription shows the current-period usage meter', async ({
     page,
     _mockServer

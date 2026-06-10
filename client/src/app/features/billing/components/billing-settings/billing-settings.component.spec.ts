@@ -4,6 +4,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
+import { MatDialog } from '@angular/material/dialog';
 import type {
   InvoiceResponse,
   PlanResponse,
@@ -14,6 +15,7 @@ import { LayoutService } from '@core/services/layout.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 import { BillingStore } from '../../store/billing.store';
+import { ChangePlanDialogComponent } from '../change-plan-dialog/change-plan-dialog.component';
 import { BillingSettingsComponent } from './billing-settings.component';
 
 const proPlan: PlanResponse = {
@@ -88,34 +90,47 @@ describe('BillingSettingsComponent', () => {
     invoices: ReturnType<typeof signal<InvoiceResponse[]>>;
     paymentMethod: ReturnType<typeof signal<null>>;
     usage: ReturnType<typeof signal<UsageSummaryResponse | null>>;
+    plans: ReturnType<typeof signal<PlanResponse[]>>;
     loading: ReturnType<typeof signal<boolean>>;
     working: ReturnType<typeof signal<boolean>>;
     currentPlan: ReturnType<typeof signal<PlanResponse | null>>;
     hasActiveSubscription: ReturnType<typeof signal<boolean>>;
     loadSettings: ReturnType<typeof vi.fn>;
     cancel: ReturnType<typeof vi.fn>;
+    changePlan: ReturnType<typeof vi.fn>;
+    startPaymentMethodUpdate: ReturnType<typeof vi.fn>;
   };
   let dialogMock: { openConfirm: ReturnType<typeof vi.fn> };
+  let matDialogMock: { open: ReturnType<typeof vi.fn> };
 
   async function setup(
     hasSub: boolean,
-    usage?: UsageSummaryResponse
+    usage?: UsageSummaryResponse,
+    subscription?: SubscriptionResponse
   ): Promise<void> {
     storeMock = {
       subscription: signal<SubscriptionResponse | null>(
-        hasSub ? activeSub : null
+        hasSub ? (subscription ?? activeSub) : null
       ),
       invoices: signal<InvoiceResponse[]>(hasSub ? [invoice] : []),
       paymentMethod: signal(null),
       usage: signal<UsageSummaryResponse | null>(usage ?? null),
+      plans: signal<PlanResponse[]>([proPlan]),
       loading: signal(false),
       working: signal(false),
       currentPlan: signal<PlanResponse | null>(hasSub ? proPlan : null),
       hasActiveSubscription: signal(hasSub),
       loadSettings: vi.fn().mockResolvedValue(undefined),
-      cancel: vi.fn().mockResolvedValue(true)
+      cancel: vi.fn().mockResolvedValue(true),
+      changePlan: vi.fn().mockResolvedValue(true),
+      startPaymentMethodUpdate: vi.fn().mockResolvedValue(null)
     };
     dialogMock = { openConfirm: vi.fn().mockReturnValue(of(true)) };
+    matDialogMock = {
+      open: vi.fn().mockReturnValue({
+        afterClosed: () => of({ planKey: 'business' })
+      })
+    };
 
     await TestBed.configureTestingModule({
       imports: [BillingSettingsComponent, TranslocoTestingModuleWithLangs],
@@ -124,6 +139,7 @@ describe('BillingSettingsComponent', () => {
         provideRouter([]),
         { provide: BillingStore, useValue: storeMock },
         { provide: AdaptiveDialogService, useValue: dialogMock },
+        { provide: MatDialog, useValue: matDialogMock },
         { provide: LayoutService, useValue: { isHandset: signal(false) } }
       ]
     }).compileComponents();
@@ -162,5 +178,48 @@ describe('BillingSettingsComponent', () => {
     fixture.componentInstance.onCancel();
     expect(dialogMock.openConfirm).toHaveBeenCalled();
     expect(storeMock.cancel).toHaveBeenCalledWith('period_end');
+  });
+
+  it('opens the change-plan dialog and applies the chosen plan', async () => {
+    await setup(true);
+    (
+      fixture.nativeElement.querySelector(
+        '.change-plan-btn'
+      ) as HTMLButtonElement
+    ).click();
+
+    expect(matDialogMock.open).toHaveBeenCalledWith(
+      ChangePlanDialogComponent,
+      expect.objectContaining({
+        data: expect.objectContaining({ subscription: activeSub })
+      })
+    );
+    expect(storeMock.changePlan).toHaveBeenCalledWith('business');
+  });
+
+  it('hides the change-plan button when a cancellation is scheduled', async () => {
+    await setup(true, undefined, { ...activeSub, cancelAtPeriodEnd: true });
+    expect(fixture.nativeElement.querySelector('.change-plan-btn')).toBeNull();
+  });
+
+  it('shows the payment-method card with the update action even without a saved method', async () => {
+    await setup(true);
+    expect(
+      fixture.nativeElement.querySelector('.payment-method.none')
+    ).not.toBeNull();
+
+    (
+      fixture.nativeElement.querySelector(
+        '.update-method-btn'
+      ) as HTMLButtonElement
+    ).click();
+    expect(storeMock.startPaymentMethodUpdate).toHaveBeenCalled();
+  });
+
+  it('hides the payment-method card without a subscription', async () => {
+    await setup(false);
+    expect(
+      fixture.nativeElement.querySelector('.update-method-btn')
+    ).toBeNull();
   });
 });

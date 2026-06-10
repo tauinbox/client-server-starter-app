@@ -8,6 +8,7 @@ import type {
   InvoiceResponse,
   PaymentMethodResponse,
   PlanResponse,
+  ProrationPreviewResponse,
   SubscriptionResponse,
   UsageSummaryResponse
 } from '@app/shared/types';
@@ -54,6 +55,28 @@ export class BillingService {
     return this.#http.post<CheckoutSessionResponse>(
       `${BILLING_API_V1}/checkout`,
       { planKey }
+    );
+  }
+
+  changePlan(planKey: string): Observable<SubscriptionResponse> {
+    return this.#http.post<SubscriptionResponse>(
+      `${BILLING_API_V1}/subscription/change`,
+      { planKey }
+    );
+  }
+
+  previewChange(planKey: string): Observable<ProrationPreviewResponse> {
+    return this.#http.post<ProrationPreviewResponse>(
+      `${BILLING_API_V1}/subscription/change/preview`,
+      { planKey }
+    );
+  }
+
+  /** Starts the provider-hosted payment-method update flow (redirect session). */
+  updatePaymentMethod(): Observable<CheckoutSessionResponse> {
+    return this.#http.post<CheckoutSessionResponse>(
+      `${BILLING_API_V1}/payment-method`,
+      {}
     );
   }
 

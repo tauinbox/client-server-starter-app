@@ -49,9 +49,17 @@
             </p>
 
             <div class="card-actions">
-              <a matButton="outlined" [routerLink]="billingRoute">
-                {{ t('billing.settings.changePlan') }}
-              </a>
+              @if (canChangePlan()) {
+                <button
+                  matButton="outlined"
+                  type="button"
+                  class="change-plan-btn"
+                  [disabled]="store.working()"
+                  (click)="onChangePlan()"
+                >
+                  {{ t('billing.settings.changePlan') }}
+                </button>
+              }
               @if (canCancel()) {
                 <button
                   matButton="text"
@@ -77,17 +85,36 @@
       </mat-card>
 
       <!-- Payment method -->
-      @if (store.paymentMethod(); as method) {
+      @if (showPaymentMethodCard()) {
         <mat-card appearance="outlined" class="settings-card">
           <mat-card-content>
             <h2 class="card-heading">
               {{ t('billing.settings.paymentMethod') }}
             </h2>
-            <p class="payment-method">
-              <mat-icon aria-hidden="true">credit_card</mat-icon>
-              <span class="card-brand">{{ method.brand }}</span>
-              <span class="card-digits">•••• {{ method.last4 }}</span>
-            </p>
+            @if (store.paymentMethod(); as method) {
+              <p class="payment-method">
+                <mat-icon aria-hidden="true">credit_card</mat-icon>
+                <span class="card-brand">{{ method.brand }}</span>
+                <span class="card-digits">•••• {{ method.last4 }}</span>
+              </p>
+            } @else {
+              <p class="payment-method none">
+                {{ t('billing.settings.noPaymentMethod') }}
+              </p>
+            }
+            @if (store.hasActiveSubscription()) {
+              <div class="card-actions">
+                <button
+                  matButton="outlined"
+                  type="button"
+                  class="update-method-btn"
+                  [disabled]="store.working()"
+                  (click)="onUpdatePaymentMethod()"
+                >
+                  {{ t('billing.settings.updatePaymentMethod') }}
+                </button>
+              </div>
+            }
           </mat-card-content>
         </mat-card>
       }
