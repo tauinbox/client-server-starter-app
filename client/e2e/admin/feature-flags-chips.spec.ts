@@ -23,12 +23,13 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
     const envInput = dialog.getByRole('combobox', { name: /Environments/i });
     await envInput.fill('production');
     await envInput.press('Enter');
-    await envInput.fill('qa-eu');
-    await envInput.press('Enter');
-    // Production may come from autocomplete OR Enter; either way the chip must render
+    // Wait for the chip before typing the next value: a second token-end racing
+    // the first one can clobber it (both build on the same stale selected list)
     await expect(
       dialog.getByRole('row', { name: /production/i })
     ).toBeVisible();
+    await envInput.fill('qa-eu');
+    await envInput.press('Enter');
     await expect(dialog.getByRole('row', { name: /qa-eu/i })).toBeVisible();
     // Dismiss any lingering autocomplete overlay before clicking outside controls
     await envInput.press('Escape');
