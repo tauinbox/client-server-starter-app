@@ -10,7 +10,9 @@ import { BillingService } from './billing.service';
 import { BillingConfigService } from './config/billing-config.service';
 import { BillingConfiguredAttributesRegistrar } from './registrars/billing-configured-attributes.registrar';
 import { Customer } from './entities/customer.entity';
+import { CustomerGrant } from './entities/customer-grant.entity';
 import { Invoice } from './entities/invoice.entity';
+import { Product } from './entities/product.entity';
 import { PaymentMethod } from './entities/payment-method.entity';
 import { Plan } from './entities/plan.entity';
 import { Subscription } from './entities/subscription.entity';
@@ -75,7 +77,9 @@ export class BillingModule {
         FeatureFlagsModule,
         TypeOrmModule.forFeature([
           Customer,
+          CustomerGrant,
           Plan,
+          Product,
           Subscription,
           Invoice,
           PaymentMethod,

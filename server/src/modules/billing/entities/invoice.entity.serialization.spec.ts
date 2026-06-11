@@ -13,6 +13,8 @@ function createInvoice(overrides: Partial<Invoice> = {}): Invoice {
     currency: 'USD',
     status: 'paid',
     billingMode: 'fixed',
+    kind: 'subscription',
+    productId: null,
     periodStart: new Date('2025-01-01T00:00:00Z'),
     periodEnd: new Date('2025-02-01T00:00:00Z'),
     paidAt: new Date('2025-01-01T00:00:00Z'),

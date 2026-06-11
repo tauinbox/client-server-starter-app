@@ -14,6 +14,16 @@ export type SubscriptionStatus =
 export type InvoiceStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 
 /**
+ * Distinguishes recurring subscription invoices from standalone one-time
+ * purchases (SKU / custom amount). One-time invoices have `subscriptionId`
+ * null and reference the purchased product via `productId`.
+ */
+export type InvoiceKind = 'subscription' | 'one_time';
+
+/** Catalog entry kind: fixed-price SKU, credit pack, or custom amount. */
+export type ProductType = 'sku' | 'credits' | 'custom';
+
+/**
  * Region selector for the manual billing-region override. `auto` clears the
  * override (geo decides); `ru` pins YooKassa; `world` pins Paddle.
  */
@@ -33,6 +43,61 @@ export type PlanPrice = {
   unitPriceMinor?: number;
   includedUnits?: number;
   providerPriceId?: string;
+};
+
+/**
+ * One provider's price for a one-time product, keyed by provider like
+ * `PlanPrice`. Fixed-price products (`sku`/`credits`) set `amountMinor`
+ * (server-authoritative) and, for Paddle, the catalog `paddlePriceId`.
+ * `custom` products set the allowed `minAmountMinor`/`maxAmountMinor` bounds
+ * instead — the buyer picks the amount within them.
+ */
+export type ProductPrice = {
+  currency: string;
+  amountMinor?: number;
+  paddlePriceId?: string;
+  minAmountMinor?: number;
+  maxAmountMinor?: number;
+};
+
+/**
+ * What a paid one-time purchase grants: `credits` tops up the prepaid credit
+ * balance (credit packs); `entitlement` unlocks a capability via a
+ * `CustomerGrant`, permanent unless `durationDays` is set. `custom` products
+ * carry no grant (donation / pay-by-invoice).
+ */
+export type ProductGrant = {
+  credits?: number;
+  entitlement?: string;
+  durationDays?: number;
+};
+
+export type ProductResponse = {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  type: ProductType;
+  prices: Partial<Record<BillingProviderId, ProductPrice>>;
+  grant: ProductGrant | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * An entitlement unlocked by a paid one-time SKU purchase. Active while
+ * neither expired nor revoked; unioned into the customer's capabilities by
+ * EntitlementService.
+ */
+export type CustomerGrantResponse = {
+  id: string;
+  customerId: string;
+  entitlement: string;
+  sourceInvoiceId: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
 };
 
 export type PlanResponse = {
@@ -102,6 +167,8 @@ export type InvoiceResponse = {
   currency: string;
   status: InvoiceStatus;
   billingMode: BillingMode;
+  kind: InvoiceKind;
+  productId: string | null;
   periodStart: string;
   periodEnd: string;
   paidAt: string | null;

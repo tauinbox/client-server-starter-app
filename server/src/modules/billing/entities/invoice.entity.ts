@@ -9,6 +9,7 @@ import { Exclude } from 'class-transformer';
 import type {
   BillingMode,
   BillingProviderId,
+  InvoiceKind,
   InvoiceStatus
 } from '@app/shared/types';
 
@@ -49,6 +50,12 @@ export class Invoice {
 
   @Column({ name: 'billing_mode', type: 'varchar', length: 16 })
   billingMode: BillingMode;
+
+  @Column({ type: 'varchar', length: 16, default: 'subscription' })
+  kind: InvoiceKind;
+
+  @Column({ name: 'product_id', type: 'uuid', nullable: true })
+  productId: string | null;
 
   @Column({ name: 'period_start', type: 'timestamp' })
   periodStart: Date;
