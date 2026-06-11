@@ -41,8 +41,8 @@ import type { CancelMode } from '@features/billing/services/billing.service';
 import { BillingAdminStore } from '../../store/billing-admin.store';
 
 /**
- * Admin-shell billing console (design §12, §21.5): a read view of every
- * customer's subscriptions and invoices with the two M1 mutations — cancel a
+ * Admin-shell billing console: a read view of every
+ * customer's subscriptions and invoices with two mutations — cancel a
  * subscription (end-of-period or immediate) and refund a paid invoice. Access
  * is gated by the CASL `manage Billing` permission both at the route and here
  * (action buttons hide without it).

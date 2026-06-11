@@ -6,7 +6,7 @@ import type { BillingProviderId } from '@app/shared/types';
  * Env-derived "is this provider configured" signal (booleans only — no secrets
  * leak). A provider counts as configured when both of its credential env vars
  * are present. The env vars themselves are formalised (Joi + `.env.example` +
- * compose defaults) in M0.6; this service reads them through `ConfigService`,
+ * compose defaults); this service reads them through `ConfigService`,
  * which passes unknown env vars through (`allowUnknown`).
  */
 @Injectable()

@@ -25,6 +25,7 @@ import { BillingService } from '../billing.service';
 import { ProrationCalculator } from '../rating/proration-calculator';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import { BillingUserService } from './billing-user.service';
+import { CreditService } from './credit.service';
 
 type RepoMock = {
   findOne: jest.Mock;
@@ -151,6 +152,7 @@ async function build() {
   const emit = jest.fn();
 
   const usageRating = { summarizeForPeriod: jest.fn() };
+  const credits = { getBalance: jest.fn().mockResolvedValue(null) };
 
   const billing = {
     resolveProvider: jest.fn(),
@@ -183,6 +185,7 @@ async function build() {
       { provide: getRepositoryToken(User), useValue: users },
       { provide: getDataSourceToken(), useValue: dataSource },
       { provide: BillingService, useValue: billing },
+      { provide: CreditService, useValue: credits },
       { provide: UsageRating, useValue: usageRating },
       {
         provide: ConfigService,
@@ -202,6 +205,7 @@ async function build() {
     products,
     users,
     billing,
+    credits,
     usageRating,
     emit,
     insertedInvoices: insertStore.inserted
@@ -429,6 +433,30 @@ describe('BillingUserService', () => {
 
       expect(result).toEqual([usdProduct]);
       expect(ctx.billing.geoDefaultFor).toHaveBeenCalledWith('US');
+    });
+  });
+
+  describe('getCredits', () => {
+    it('returns null for a user with no billing customer', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue(null);
+
+      await expect(ctx.service.getCredits('user-1')).resolves.toBeNull();
+      expect(ctx.credits.getBalance).not.toHaveBeenCalled();
+    });
+
+    it("returns the customer's balance", async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
+      const balance = {
+        customerId: RU_CUSTOMER.id,
+        balanceUnits: 1240,
+        updatedAt: new Date()
+      };
+      ctx.credits.getBalance.mockResolvedValue(balance);
+
+      await expect(ctx.service.getCredits('user-1')).resolves.toBe(balance);
+      expect(ctx.credits.getBalance).toHaveBeenCalledWith(RU_CUSTOMER.id);
     });
   });
 

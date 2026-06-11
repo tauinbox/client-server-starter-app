@@ -18,10 +18,10 @@ type SeedProduct = {
   active: boolean;
 };
 
-// Starter one-time catalog (design §20). A fixed-price sku that unlocks an
-// entitlement for a limited period, and a bounded custom-amount product
-// (donation). All values are illustrative defaults, editable here. Credit
-// packs join this catalog with the credits subsystem.
+// Starter one-time catalog. A fixed-price sku that unlocks an
+// entitlement for a limited period, a bounded custom-amount product
+// (donation), and prepaid credit packs spent as metered usage. All values are
+// illustrative defaults, editable here.
 const PRODUCTS: SeedProduct[] = [
   {
     key: 'report-pack',
@@ -49,6 +49,42 @@ const PRODUCTS: SeedProduct[] = [
       paddle: { currency: 'USD', minAmountMinor: 100, maxAmountMinor: 50000 }
     },
     grant: null,
+    active: true
+  },
+  {
+    key: 'credits-500',
+    name: '500 credits',
+    description: '500 prepaid usage units',
+    type: 'credits',
+    prices: {
+      yookassa: { currency: 'RUB', amountMinor: 50000 },
+      paddle: { currency: 'USD', amountMinor: 500 }
+    },
+    grant: { credits: 500 },
+    active: true
+  },
+  {
+    key: 'credits-1000',
+    name: '1000 credits',
+    description: '1000 prepaid usage units at a better rate',
+    type: 'credits',
+    prices: {
+      yookassa: { currency: 'RUB', amountMinor: 90000 },
+      paddle: { currency: 'USD', amountMinor: 900 }
+    },
+    grant: { credits: 1000 },
+    active: true
+  },
+  {
+    key: 'credits-5000',
+    name: '5000 credits',
+    description: '5000 prepaid usage units at the best rate',
+    type: 'credits',
+    prices: {
+      yookassa: { currency: 'RUB', amountMinor: 400000 },
+      paddle: { currency: 'USD', amountMinor: 4000 }
+    },
+    grant: { credits: 5000 },
     active: true
   }
 ];

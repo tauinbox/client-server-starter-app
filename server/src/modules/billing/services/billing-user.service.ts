@@ -20,6 +20,7 @@ import type {
 } from '@app/shared/types';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { User } from '../../users/entities/user.entity';
+import { CreditBalance } from '../entities/credit-balance.entity';
 import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { PaymentMethod } from '../entities/payment-method.entity';
@@ -41,6 +42,7 @@ import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
 import { addInterval } from '../utils/period.util';
 import { BillingService } from '../billing.service';
+import { CreditService } from './credit.service';
 
 /** Subscriptions that grant access — re-checkout while one exists is blocked. */
 const ACTIVE_STATUSES = ['trialing', 'active', 'past_due'] as const;
@@ -72,7 +74,7 @@ function geoFromLocale(locale: string): { country: string; currency: string } {
 }
 
 /**
- * One-time product types listed in the purchase catalog (design §20.3).
+ * One-time product types listed in the purchase catalog.
  * `custom` is listed too: its price entry carries the amount bounds and
  * currency the donation form renders — the client must not hardcode money.
  */
@@ -92,7 +94,7 @@ function sanitizeReceiptText(text: string): string {
   );
 }
 
-/** Region selector ⇄ provider override (design §19). */
+/** Region selector ⇄ provider override. */
 function overrideForRegion(region: BillingRegion): BillingProviderId | null {
   if (region === 'ru') return 'yookassa';
   if (region === 'world') return 'paddle';
@@ -106,7 +108,7 @@ function regionForOverride(override: BillingProviderId | null): BillingRegion {
 }
 
 /**
- * User-scoped billing self-service (design §11, §19). Every read and mutation is
+ * User-scoped billing self-service. Every read and mutation is
  * keyed on the caller's `userId` — the customer is resolved from it, never from a
  * client-supplied id, so there is no IDOR surface. Checkout creates the local
  * subscription for the self-managed (YooKassa) provider before redirecting; the
@@ -131,6 +133,7 @@ export class BillingUserService {
     private readonly users: Repository<User>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly billing: BillingService,
+    private readonly credits: CreditService,
     private readonly usageRating: UsageRating,
     private readonly proration: ProrationCalculator,
     private readonly config: ConfigService,
@@ -194,6 +197,16 @@ export class BillingUserService {
     };
   }
 
+  /**
+   * The caller's prepaid credit balance, or null when nothing was ever
+   * purchased — the client renders that as zero credits.
+   */
+  async getCredits(userId: string): Promise<CreditBalance | null> {
+    const customer = await this.customers.findOne({ where: { userId } });
+    if (!customer) return null;
+    return this.credits.getBalance(customer.id);
+  }
+
   async getDefaultPaymentMethod(userId: string): Promise<PaymentMethod | null> {
     const customer = await this.customers.findOne({ where: { userId } });
     if (!customer?.defaultPaymentMethodId) return null;
@@ -203,7 +216,7 @@ export class BillingUserService {
   }
 
   /**
-   * The one-time purchase catalog (design §20.3): active products that carry
+   * The one-time purchase catalog: active products that carry
    * a price entry for the caller's effective provider — fixed-price
    * `sku`/`credits` plus `custom`, whose entry holds the amount bounds the
    * donation form needs. Like `getRegion`, this is a read — it resolves the
@@ -224,7 +237,7 @@ export class BillingUserService {
   }
 
   /**
-   * Starts a standalone one-time purchase (design §20.3): resolves the
+   * Starts a standalone one-time purchase: resolves the
    * provider (availability-asserting, like checkout) and opens the provider's
    * one-time payment with the product id round-tripped through custom data so
    * the paid webhook reduces onto a `kind 'one_time'` invoice and applies the
@@ -282,7 +295,7 @@ export class BillingUserService {
   }
 
   /**
-   * The amount actually charged (threat model §20.5: amount tampering).
+   * The amount actually charged (threat model: amount tampering).
    * Fixed-price products charge the catalog price; `custom` requires a client
    * amount inside the product's configured bounds.
    */
@@ -395,8 +408,8 @@ export class BillingUserService {
   }
 
   /**
-   * Starts the payment-method update flow for the caller's open subscription
-   * (design §11). Dispatched on the subscription's provider (like cancel) —
+   * Starts the payment-method update flow for the caller's open
+   * subscription. Dispatched on the subscription's provider (like cancel) —
    * not the region-resolved one, which may differ after an override change.
    * Paddle hosts the change on its zero-amount checkout; YooKassa re-binds the
    * card with a zero-amount payment whose success webhook swaps the default.
@@ -482,7 +495,7 @@ export class BillingUserService {
   }
 
   /**
-   * Instant plan/mode change with proration (design §11, §17.4). Paddle
+   * Instant plan/mode change with proration. Paddle
    * delegates the money side (`subscriptions.update`, prorated immediately) and
    * the local row is updated optimistically — the provider's webhooks confirm.
    * YooKassa is computed here: charge the new plan's prorated remainder first
@@ -740,7 +753,7 @@ export class BillingUserService {
 
   /**
    * Records one leg of a self-managed switch as its own invoice row (the two
-   * fiscal documents of §17.4 stay visible in the history). The unique
+   * fiscal documents of the switch stay visible in the history). The unique
    * `providerEventId` makes a double-submitted change insert each leg once.
    */
   private async recordChangeInvoice(args: {
@@ -820,7 +833,7 @@ export class BillingUserService {
     const newEffective =
       newOverride ?? this.billing.geoDefaultFor(customer.country);
 
-    // No in-place cross-provider migration (design §19): if a live subscription
+    // No in-place cross-provider migration: if a live subscription
     // is on a different provider than the new region resolves to, reject.
     const open = await this.subscriptions.findOne({
       where: { customerId: customer.id, status: In([...OPEN_STATUSES]) }

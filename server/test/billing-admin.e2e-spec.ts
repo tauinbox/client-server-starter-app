@@ -1,4 +1,4 @@
-// End-to-end coverage for the admin billing controller (design §11).
+// End-to-end coverage for the admin billing controller.
 // Verifies the CASL `manage Billing` boundary (non-admin → 403, admin → 200),
 // HTTP serialization (ClassSerializerInterceptor strips @Exclude'd provider
 // refs), and that cancel/refund dispatch to the service. The PermissionsGuard is

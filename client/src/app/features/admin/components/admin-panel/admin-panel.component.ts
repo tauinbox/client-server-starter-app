@@ -43,7 +43,7 @@ export class AdminPanelComponent {
 
   protected readonly routes = AppRouteSegmentEnum;
 
-  // The billing admin tab is hidden when billing is unavailable (design §18.3):
+  // The billing admin tab is hidden when billing is unavailable:
   // the public `billing` flag resolves false when no provider is configured.
   protected readonly billingAvailable =
     this.#flagsStore.isEnabled(BILLING_FLAG_KEY);

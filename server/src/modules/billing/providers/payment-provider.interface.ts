@@ -8,7 +8,7 @@ import type { Plan } from '../entities/plan.entity';
 
 /**
  * Provider-agnostic event shape a `PaymentProvider` produces from a verified
- * webhook. The core reduces it onto `Subscription`/`Invoice` (M1+); `payload`
+ * webhook. The core reduces it onto `Subscription`/`Invoice`; `payload`
  * carries the original provider object the reducer needs.
  */
 export type NormalizedEventType =
@@ -88,7 +88,7 @@ export interface NormalizedInvoicePayload {
    */
   usageChargeKey?: string | null;
   /**
-   * `'one_time'` for a standalone purchase (design §20) — the provider echoes
+   * `'one_time'` for a standalone purchase — the provider echoes
    * the marker planted by `createOneTimePayment`, and the reducer writes an
    * `Invoice` with no subscription and applies the product's grant instead of
    * activating anything. Absent/`'subscription'` for recurring invoices.
@@ -136,7 +136,7 @@ export interface ReceiptItem {
 }
 
 /**
- * A standalone one-time purchase (design §20.2). `productId` is echoed through
+ * A standalone one-time purchase. `productId` is echoed through
  * the provider's custom data/metadata so the paid webhook reduces onto an
  * `Invoice` with the product reference; `paddlePriceId` selects the Paddle
  * catalog price for fixed-price products — absent for `custom` amounts, which
@@ -175,9 +175,9 @@ export interface ChangePreview {
 /**
  * Payment provider behind the `BILLING_PROVIDERS` token. Paddle manages the
  * subscription lifecycle itself (`managesLifecycle = true`); YooKassa is
- * self-managed (`false`) so the core drives renewals. Real implementations land
- * in M1 — the M0 stubs throw `NotImplemented`, except `verifyAndParseWebhook`
- * which returns `null` so the webhook-ingestion seam (M0.5) is exercisable.
+ * self-managed (`false`) so the core drives renewals. `verifyAndParseWebhook`
+ * returns `null` for a payload that cannot be verified, so the
+ * webhook-ingestion seam stays exercisable without provider credentials.
  */
 export interface PaymentProvider {
   readonly id: BillingProviderId;
@@ -195,7 +195,7 @@ export interface PaymentProvider {
     idempotencyKey?: string
   ): Promise<ChargeResult>;
   /**
-   * Starts a standalone one-time payment (design §20.2) — no subscription, no
+   * Starts a standalone one-time payment — no subscription, no
    * saved payment method. Paddle: `transactions.create` with the catalog
    * `paddlePriceId` or an inline price; YooKassa: `createPayment` with a 54-FZ
    * receipt and a redirect confirmation. The one-time marker and `productId`
@@ -241,7 +241,7 @@ export interface PaymentProvider {
   ): Promise<ChangePreview>;
   /**
    * Starts the flow that replaces the payment instrument behind the
-   * subscription (design §11). Paddle returns its hosted payment-method-change
+   * subscription. Paddle returns its hosted payment-method-change
    * checkout for the provider-side subscription (`providerSubscriptionId`
    * required); YooKassa creates a zero-amount card re-bind whose success
    * webhook (`payment_method.updated`) swaps the default saved method.

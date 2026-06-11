@@ -14,6 +14,9 @@ import * as request from 'supertest';
 import type { Server } from 'http';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { EntitlementService } from '../src/modules/billing/entitlements/entitlement.service';
+import { CreditService } from '../src/modules/billing/services/credit.service';
+import { CreditBalance } from '../src/modules/billing/entities/credit-balance.entity';
+import { CreditLedger } from '../src/modules/billing/entities/credit-ledger.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { CustomerGrant } from '../src/modules/billing/entities/customer-grant.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
@@ -46,6 +49,8 @@ interface Stores {
   plans: Plan[];
   products: Product[];
   grants: CustomerGrant[];
+  creditBalances: CreditBalance[];
+  creditLedger: CreditLedger[];
   webhookEvents: Array<{ id: string; providerEventId: string }>;
 }
 
@@ -96,12 +101,33 @@ function makeManager(stores: Stores) {
         if (entity instanceof CustomerGrant) {
           entity.id = `grant-${++seq}`;
           stores.grants.push(entity);
+        } else if (entity instanceof CreditLedger) {
+          entity.id = `ledger-${++seq}`;
+          stores.creditLedger.push(entity);
         } else {
           entity.id = `sub-${++seq}`;
           stores.subscriptions.push(entity as Subscription);
         }
       }
       return Promise.resolve(entity);
+    },
+    // Stands in for CreditService's balance upsert (the only raw SQL in the
+    // billing reduce path): params are [customerId, delta].
+    query: (_sql: string, params: [string, number]) => {
+      const [customerId, delta] = params;
+      const balance = stores.creditBalances.find(
+        (b) => b.customerId === customerId
+      );
+      if (balance) {
+        balance.balanceUnits += delta;
+      } else {
+        stores.creditBalances.push({
+          customerId,
+          balanceUnits: delta,
+          updatedAt: new Date()
+        } as CreditBalance);
+      }
+      return Promise.resolve(undefined);
     },
     createQueryBuilder: () => {
       const captured: { values?: Record<string, unknown> } = {};
@@ -210,9 +236,17 @@ describe('Billing Paddle webhook (e2e)', () => {
           key: 'donation',
           type: 'custom',
           grant: null
+        } as Product,
+        {
+          id: 'prod-cr',
+          key: 'credits-500',
+          type: 'credits',
+          grant: { credits: 500 }
         } as Product
       ],
       grants: [],
+      creditBalances: [],
+      creditLedger: [],
       webhookEvents: []
     };
     emit = jest.fn();
@@ -223,7 +257,7 @@ describe('Billing Paddle webhook (e2e)', () => {
     };
 
     // EntitlementService over the same stores: proves a paid sku purchase
-    // resolves into an active capability (the §20.1 grant union), end to end.
+    // resolves into an active capability (the grant union), end to end.
     const cacheStore = new Map<string, unknown>();
     const moduleRef = await Test.createTestingModule({
       controllers: [BillingWebhooksController],
@@ -231,6 +265,14 @@ describe('Billing Paddle webhook (e2e)', () => {
         WebhookIngestionService,
         BillingEventReducer,
         EntitlementService,
+        CreditService,
+        {
+          provide: getRepositoryToken(CreditBalance),
+          useValue: {
+            findOne: (opts: { where: Partial<CreditBalance> }) =>
+              Promise.resolve(findWhere(stores.creditBalances, opts.where))
+          }
+        },
         {
           provide: getRepositoryToken(WebhookEvent),
           useValue: makeWebhookEventRepo(stores)
@@ -364,7 +406,7 @@ describe('Billing Paddle webhook (e2e)', () => {
     expect(stores.subscriptions).toHaveLength(0);
   });
 
-  // ── One-time purchases (design §20.4) ──────────────────────────────────────
+  // ── One-time purchases ──────────────────────────────────────────────────────
 
   const oneTimePaid = (
     providerEventId: string,
@@ -458,6 +500,39 @@ describe('Billing Paddle webhook (e2e)', () => {
     });
     expect(stores.grants).toHaveLength(0);
   });
+
+  it('tops up the prepaid balance from a paid credit-pack purchase', async () => {
+    await postWebhook(oneTimePaid('evt_ot_cr', 'prod-cr'));
+
+    expect(stores.invoices).toHaveLength(1);
+    expect(stores.invoices[0]).toMatchObject({
+      kind: 'one_time',
+      productId: 'prod-cr',
+      status: 'paid'
+    });
+    expect(stores.creditBalances).toEqual([
+      expect.objectContaining({ customerId: 'cust-1', balanceUnits: 500 })
+    ]);
+    expect(stores.creditLedger).toEqual([
+      expect.objectContaining({
+        customerId: 'cust-1',
+        delta: 500,
+        reason: 'purchase',
+        refInvoiceId: stores.invoices[0].id
+      })
+    ]);
+    // A credit pack writes no entitlement grant.
+    expect(stores.grants).toHaveLength(0);
+  });
+
+  it('replays the credit-pack webhook without topping up twice', async () => {
+    await postWebhook(oneTimePaid('evt_ot_cr', 'prod-cr'));
+    await postWebhook(oneTimePaid('evt_ot_cr', 'prod-cr'));
+
+    expect(stores.invoices).toHaveLength(1);
+    expect(stores.creditBalances[0].balanceUnits).toBe(500);
+    expect(stores.creditLedger).toHaveLength(1);
+  });
 });
 
 // ── Paddle usage invoicing flow (real event bus) ────────────────────────────
@@ -545,6 +620,8 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
       ],
       products: [],
       grants: [],
+      creditBalances: [],
+      creditLedger: [],
       webhookEvents: []
     };
     chargeUsage = jest.fn().mockResolvedValue(undefined);
@@ -566,6 +643,14 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
         BillingEventReducer,
         UsageInvoicingService,
         UsageRating,
+        CreditService,
+        {
+          provide: getRepositoryToken(CreditBalance),
+          useValue: {
+            findOne: (opts: { where: Partial<CreditBalance> }) =>
+              Promise.resolve(findWhere(stores.creditBalances, opts.where))
+          }
+        },
         {
           provide: getRepositoryToken(UsageRecord),
           useValue: { sum: jest.fn().mockResolvedValue(142) }
@@ -687,6 +772,57 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
       status: 'paid',
       providerInvoiceRef: 'txn_usage_1'
     });
+  });
+
+  it('spends prepaid credits before charging and charges only the remainder', async () => {
+    stores.creditBalances.push({
+      customerId: 'cust-1',
+      balanceUnits: 10,
+      updatedAt: new Date()
+    } as CreditBalance);
+
+    await postWebhook(renewalEvent);
+    await settle();
+
+    // 42 billable − 10 credits = 32 × $0.02 = 64 minor units.
+    expect(chargeUsage).toHaveBeenCalledWith(
+      'sub_paddle_1',
+      64,
+      'USD',
+      'Pay as you go: api_calls × 32',
+      CHARGE_KEY
+    );
+    expect(stores.invoices[0]).toMatchObject({
+      amountMinor: 64,
+      status: 'pending'
+    });
+    expect(stores.creditBalances[0].balanceUnits).toBe(0);
+    expect(stores.creditLedger).toEqual([
+      expect.objectContaining({
+        customerId: 'cust-1',
+        delta: -10,
+        reason: 'usage',
+        refInvoiceId: stores.invoices[0].id
+      })
+    ]);
+  });
+
+  it('records a fully credit-covered period as paid at zero without a charge', async () => {
+    stores.creditBalances.push({
+      customerId: 'cust-1',
+      balanceUnits: 1000,
+      updatedAt: new Date()
+    } as CreditBalance);
+
+    await postWebhook(renewalEvent);
+    await settle();
+
+    expect(chargeUsage).not.toHaveBeenCalled();
+    expect(stores.invoices[0]).toMatchObject({
+      amountMinor: 0,
+      status: 'paid'
+    });
+    expect(stores.creditBalances[0].balanceUnits).toBe(958);
   });
 
   it('never double-charges a replayed renewal rollover', async () => {

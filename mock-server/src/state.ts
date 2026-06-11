@@ -8,6 +8,7 @@ import { packRules } from '@casl/ability/extra';
 import type {
   AdminUserResponse,
   MockAuditLog,
+  MockCreditBalance,
   MockFeatureFlag,
   MockFeatureFlagRule,
   MockPermission,
@@ -23,6 +24,7 @@ import type {
   UserResponse
 } from './types';
 import type {
+  CreditBalanceResponse,
   FeatureFlagResponse,
   FeatureFlagRuleResponse,
   PermissionResponse,
@@ -93,7 +95,8 @@ export function resetState(): void {
     billingInvoices: new Map(),
     billingPaymentMethods: new Map(),
     billingCustomerGrants: new Map(),
-    billingPurchaseSessions: new Map()
+    billingPurchaseSessions: new Map(),
+    billingCreditBalances: new Map()
   };
 }
 
@@ -481,6 +484,16 @@ export function toPlanResponse(plan: MockPlan): PlanResponse {
     prices: plan.prices,
     createdAt: plan.createdAt,
     updatedAt: plan.updatedAt
+  };
+}
+
+export function toCreditBalanceResponse(
+  balance: MockCreditBalance
+): CreditBalanceResponse {
+  return {
+    customerId: balance.customerId,
+    balanceUnits: balance.balanceUnits,
+    updatedAt: balance.updatedAt
   };
 }
 

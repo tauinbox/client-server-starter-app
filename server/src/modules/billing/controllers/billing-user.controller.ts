@@ -30,6 +30,7 @@ import { PaymentMethodResponseDto } from '../dtos/payment-method-response.dto';
 import { CheckoutSessionResponseDto } from '../dtos/checkout-session-response.dto';
 import { BillingRegionResponseDto } from '../dtos/billing-region-response.dto';
 import { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
+import { CreditBalanceResponseDto } from '../dtos/credit-balance-response.dto';
 import { ProductResponseDto } from '../dtos/product-response.dto';
 import { PurchaseRequestDto } from '../dtos/purchase-request.dto';
 import { PurchaseSessionResponseDto } from '../dtos/purchase-session-response.dto';
@@ -97,6 +98,16 @@ export class BillingUserController {
   @ApiOkResponse({ type: [ProductResponseDto] })
   listProducts(@Req() req: JwtAuthRequest) {
     return this.billingUser.listProducts(req.user.userId);
+  }
+
+  @Get('credits')
+  @ApiOperation({
+    summary:
+      "The caller's prepaid credit balance, or null when none was ever bought."
+  })
+  @ApiOkResponse({ type: CreditBalanceResponseDto })
+  getCredits(@Req() req: JwtAuthRequest) {
+    return this.billingUser.getCredits(req.user.userId);
   }
 
   @Post('purchase')

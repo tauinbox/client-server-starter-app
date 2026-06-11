@@ -1,6 +1,7 @@
 import type { AddressInfo } from 'net';
 import type { Server } from 'http';
 import type {
+  CreditBalanceResponse,
   InvoiceResponse,
   ProductResponse,
   PurchaseSessionResponse
@@ -77,7 +78,13 @@ describe('GET /billing/products', () => {
     expect(res.status).toBe(200);
     const products = (await res.json()) as ProductResponse[];
 
-    expect(products.map((p) => p.key)).toEqual(['report-pack', 'donation']);
+    expect(products.map((p) => p.key)).toEqual([
+      'report-pack',
+      'donation',
+      'credits-500',
+      'credits-1000',
+      'credits-5000'
+    ]);
     // en-locale seed user resolves to paddle/USD.
     expect(products[0].prices.paddle).toEqual({
       currency: 'USD',
@@ -204,5 +211,44 @@ describe('/__control/billing/complete-purchase', () => {
       headers: { authorization: `Bearer ${token}` }
     });
     expect(premium.status).toBe(403);
+  });
+
+  it('settles a credit pack into the prepaid balance', async () => {
+    const token = await login();
+
+    // Before any purchase the balance read is null (rendered as zero).
+    const before = await fetch(`${baseUrl}/api/v1/billing/credits`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+    expect(before.status).toBe(200);
+    expect(await before.json()).toBeNull();
+
+    const purchase = await postPurchase(token, { productKey: 'credits-500' });
+    const session = (await purchase.json()) as PurchaseSessionResponse;
+    const complete = await completePurchase({ sessionRef: session.sessionRef });
+    expect(complete.status).toBe(200);
+
+    const after = await fetch(`${baseUrl}/api/v1/billing/credits`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+    const balance = (await after.json()) as CreditBalanceResponse;
+    expect(balance.balanceUnits).toBe(500);
+
+    // A second pack accumulates on the same balance.
+    const again = await postPurchase(token, { productKey: 'credits-1000' });
+    const session2 = (await again.json()) as PurchaseSessionResponse;
+    await completePurchase({ sessionRef: session2.sessionRef });
+    const accumulated = await fetch(`${baseUrl}/api/v1/billing/credits`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+    const total = (await accumulated.json()) as CreditBalanceResponse;
+    expect(total.balanceUnits).toBe(1500);
+  });
+});
+
+describe('GET /billing/credits', () => {
+  it('requires auth', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/billing/credits`);
+    expect(res.status).toBe(401);
   });
 });

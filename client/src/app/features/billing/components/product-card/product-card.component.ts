@@ -12,7 +12,7 @@ import { TranslocoDirective } from '@jsverse/transloco';
 import type { ProductResponse } from '@app/shared/types';
 
 /**
- * Presentational one-time product card (design §21.4): a fixed-price
+ * Presentational one-time product card: a fixed-price
  * sku/credits catalog entry rendered as a horizontal "ticket" — leading tonal
  * icon, name + description, and a price/buy stub split off by a dashed rule.
  * Emits `buy` when the call-to-action is pressed; the parent owns the

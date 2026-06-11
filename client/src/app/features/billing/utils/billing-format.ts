@@ -8,7 +8,7 @@ import type {
 
 /**
  * Format an integer minor-unit amount as a localized currency string. Money is
- * stored in minor units (design §3); this divides by the currency's minor-unit
+ * stored in minor units; this divides by the currency's minor-unit
  * scale (2 for RUB/USD; 0 for zero-decimal currencies like JPY) and renders via
  * `Intl.NumberFormat`. `locale` follows the active UI language.
  */

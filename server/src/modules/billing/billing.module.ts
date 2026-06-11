@@ -9,6 +9,8 @@ import { parseRedisConnection } from '../../common/utils/parse-redis-connection'
 import { BillingService } from './billing.service';
 import { BillingConfigService } from './config/billing-config.service';
 import { BillingConfiguredAttributesRegistrar } from './registrars/billing-configured-attributes.registrar';
+import { CreditBalance } from './entities/credit-balance.entity';
+import { CreditLedger } from './entities/credit-ledger.entity';
 import { Customer } from './entities/customer.entity';
 import { CustomerGrant } from './entities/customer-grant.entity';
 import { Invoice } from './entities/invoice.entity';
@@ -37,6 +39,7 @@ import { FixedRating } from './rating/fixed-rating.strategy';
 import { UsageRating } from './rating/usage-rating.strategy';
 import { ProrationCalculator } from './rating/proration-calculator';
 import { PlanService } from './services/plan.service';
+import { CreditService } from './services/credit.service';
 import { BillingUserService } from './services/billing-user.service';
 import { BillingAdminService } from './services/billing-admin.service';
 import { UsageService } from './services/usage.service';
@@ -76,6 +79,8 @@ export class BillingModule {
         AuthModule,
         FeatureFlagsModule,
         TypeOrmModule.forFeature([
+          CreditBalance,
+          CreditLedger,
           Customer,
           CustomerGrant,
           Plan,
@@ -116,6 +121,7 @@ export class BillingModule {
         BillingService,
         BillingConfigService,
         PlanService,
+        CreditService,
         BillingUserService,
         BillingAdminService,
         UsageService,
@@ -160,6 +166,7 @@ export class BillingModule {
         EntitlementService,
         EntitlementGuard,
         UsageService,
+        CreditService,
         BILLING_PROVIDERS
       ]
     };

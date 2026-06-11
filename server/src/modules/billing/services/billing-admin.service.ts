@@ -10,14 +10,16 @@ import { IsNull, Repository } from 'typeorm';
 import { Customer } from '../entities/customer.entity';
 import { CustomerGrant } from '../entities/customer-grant.entity';
 import { Invoice } from '../entities/invoice.entity';
+import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { EntitlementService } from '../entitlements/entitlement.service';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import type { CancelMode } from '../providers/payment-provider.interface';
 import { BillingService } from '../billing.service';
+import { CreditService } from './credit.service';
 
 /**
- * Admin-facing billing operations (design §11). Unlike `BillingUserService`,
+ * Admin-facing billing operations. Unlike `BillingUserService`,
  * reads and mutations here are addressed by entity id across all customers —
  * the CASL `manage Billing` permission, not per-caller scoping, is the access
  * boundary. Cancel/refund delegate the money side to the resolved provider and
@@ -34,8 +36,11 @@ export class BillingAdminService {
     private readonly customers: Repository<Customer>,
     @InjectRepository(CustomerGrant)
     private readonly grants: Repository<CustomerGrant>,
+    @InjectRepository(Product)
+    private readonly products: Repository<Product>,
     private readonly billing: BillingService,
     private readonly entitlements: EntitlementService,
+    private readonly credits: CreditService,
     private readonly events: EventEmitter2
   ) {}
 
@@ -114,17 +119,18 @@ export class BillingAdminService {
     }
 
     // A full refund settles the invoice as `refunded`; a partial refund leaves it
-    // `paid` (the M1 schema has no partial-refund status or refunded-amount column).
+    // `paid` (the schema has no partial-refund status or refunded-amount column).
     if (refundAmount === invoice.amountMinor) {
       invoice.status = 'refunded';
       await this.revokeOneTimeGrants(invoice);
+      await this.clawbackCreditPurchase(invoice);
     }
     return this.invoices.save(invoice);
   }
 
   /**
-   * Refunding a one-time purchase in full takes back what it granted (design
-   * §20.5): the sku's `CustomerGrant` is revoked and the buyer's cached
+   * Refunding a one-time purchase in full takes back what it granted: the
+   * sku's `CustomerGrant` is revoked and the buyer's cached
    * entitlements are dropped. A `custom` purchase has no grants — nothing
    * matches and the refund stays a plain money move. Partial refunds keep the
    * invoice `paid`, so the grant survives them by construction.
@@ -144,6 +150,31 @@ export class BillingAdminService {
     if (userId) {
       await this.entitlements.invalidateUser(userId);
     }
+  }
+
+  /**
+   * Refunding a credit-pack purchase in full takes the granted units back:
+   * the balance is decremented by the pack size and the deduction journaled
+   * as a `refund` ledger entry. Already-spent credits drive the balance
+   * negative, which blocks further usage until topped up — there is no
+   * auto-debt write-off. Exactly-once application is guaranteed by the
+   * invoice's one-way `paid → refunded` flip guarded above.
+   */
+  private async clawbackCreditPurchase(invoice: Invoice): Promise<void> {
+    if (invoice.kind !== 'one_time' || !invoice.productId) {
+      return;
+    }
+    const product = await this.products.findOne({
+      where: { id: invoice.productId }
+    });
+    if (product?.type !== 'credits' || !product.grant?.credits) {
+      return;
+    }
+    await this.credits.clawbackPurchase(
+      invoice.customerId,
+      invoice.id,
+      product.grant.credits
+    );
   }
 
   private async resolveUserId(customerId: string): Promise<string | null> {

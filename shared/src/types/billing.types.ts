@@ -100,6 +100,18 @@ export type CustomerGrantResponse = {
   createdAt: string;
 };
 
+/**
+ * The customer's prepaid credit balance (credit packs). Topped up by paid
+ * `credits` purchases, spent by metered usage before money is charged. A
+ * refund of already-spent credits may drive it negative — usage recording is
+ * blocked until the balance is topped up back above zero.
+ */
+export type CreditBalanceResponse = {
+  customerId: string;
+  balanceUnits: number;
+  updatedAt: string;
+};
+
 export type PlanResponse = {
   id: string;
   key: string;
@@ -213,7 +225,7 @@ export type UsageSummaryResponse = {
 
 /**
  * Result of `POST /billing/subscription/change/preview` — what an instant
- * prorated switch to `toPlanKey` would cost right now (design §17.4, §21.3).
+ * prorated switch to `toPlanKey` would cost right now.
  * For the self-managed provider (YooKassa) the server computes the split:
  * `creditMinor` is the refunded unused remainder of the current plan and
  * `chargeMinor` the new plan prorated to the period end. For the delegated
@@ -253,7 +265,7 @@ export type PurchaseSessionResponse = {
 };
 
 /**
- * Result of `GET`/`PUT /billing/region` (design §19). `region` is the user's
+ * Result of `GET`/`PUT /billing/region`. `region` is the user's
  * current selection (`auto` = no override). `detectedProvider` is the geo
  * default; `effectiveProvider` is what the next checkout would actually use
  * (`providerOverride ?? geoDefault`).

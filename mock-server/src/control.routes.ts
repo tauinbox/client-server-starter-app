@@ -63,7 +63,8 @@ function buildStateSnapshot(state: State): StateSnapshot {
       toUsageResponse
     ),
     billingCustomerGrants: Array.from(state.billingCustomerGrants.values()),
-    billingPurchaseSessions: Array.from(state.billingPurchaseSessions.values())
+    billingPurchaseSessions: Array.from(state.billingPurchaseSessions.values()),
+    billingCreditBalances: Array.from(state.billingCreditBalances.values())
   };
 }
 
@@ -513,9 +514,9 @@ router.post('/billing/seed-usage', (req, res) => {
 // Settles a pending purchase session — by explicit `sessionRef`, or the
 // latest one for `userId` — exactly the way the server's webhook reducer
 // would: a paid `one_time` invoice keyed by the provider payment reference,
-// plus a CustomerGrant when the product is an entitlement-granting sku.
-// Settling deletes the session, mirroring the reducer's once-per-payment
-// idempotency.
+// plus a CustomerGrant when the product is an entitlement-granting sku, plus
+// a credit-balance top-up when it is a credit pack. Settling deletes the
+// session, mirroring the reducer's once-per-payment idempotency.
 router.post('/billing/complete-purchase', (req, res) => {
   const { userId, sessionRef } = req.body as {
     userId?: string;
@@ -583,6 +584,22 @@ router.post('/billing/complete-purchase', (req, res) => {
       createdAt: nowIso
     };
     state.billingCustomerGrants.set(grant.id, grant);
+  }
+
+  // A paid credit pack tops up the prepaid balance, mirroring the server's
+  // webhook reducer.
+  if (product?.type === 'credits' && product.grant?.credits) {
+    const balance = state.billingCreditBalances.get(session.customerId);
+    if (balance) {
+      balance.balanceUnits += product.grant.credits;
+      balance.updatedAt = nowIso;
+    } else {
+      state.billingCreditBalances.set(session.customerId, {
+        customerId: session.customerId,
+        balanceUnits: product.grant.credits,
+        updatedAt: nowIso
+      });
+    }
   }
 
   state.billingPurchaseSessions.delete(session.sessionRef);

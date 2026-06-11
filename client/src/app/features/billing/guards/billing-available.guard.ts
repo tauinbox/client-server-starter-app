@@ -4,7 +4,7 @@ import { BILLING_FLAG_KEY } from '@app/shared/constants';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 
 /**
- * Route guard for the billing feature (design §18.3). Unlike `featureFlagGuard`
+ * Route guard for the billing feature. Unlike `featureFlagGuard`
  * it does NOT require authentication — the pricing page is public — it only
  * checks that the public `billing` flag resolves true (server gates it on at
  * least one provider being configured). Flags are normally loaded during app

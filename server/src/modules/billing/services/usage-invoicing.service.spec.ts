@@ -1,8 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { Customer } from '../entities/customer.entity';
-import { Invoice } from '../entities/invoice.entity';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import {
@@ -11,6 +10,7 @@ import {
 } from '../events/billing.events';
 import { BILLING_PROVIDERS } from '../providers/payment-provider.interface';
 import { UsageRating } from '../rating/usage-rating.strategy';
+import { CreditService } from './credit.service';
 import { UsageInvoicingService } from './usage-invoicing.service';
 
 const PERIOD_START = new Date('2026-05-01T00:00:00Z');
@@ -40,8 +40,11 @@ function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
 async function build(options: {
   subscription?: Subscription | null;
   insertRows?: Array<{ id: string }>;
+  availableCredits?: number;
   summary?: Partial<{
     amountMinor: number;
+    creditUnitsApplied: number;
+    chargedUnits: number;
     currency: string;
     receiptItems: unknown[];
   }>;
@@ -50,11 +53,13 @@ async function build(options: {
     options.subscription === undefined
       ? makeSubscription()
       : options.subscription;
-  const summarizeForPeriod = jest.fn().mockResolvedValue({
+  const summarizeForPeriodWithCredits = jest.fn().mockResolvedValue({
     totalUnits: 142,
     includedUnits: 100,
     billableUnits: 42,
     unitPriceMinor: 200,
+    creditUnitsApplied: 0,
+    chargedUnits: 42,
     amountMinor: 8400,
     currency: 'USD',
     receiptItems: [
@@ -69,7 +74,7 @@ async function build(options: {
   const chargeUsage = jest.fn().mockResolvedValue(undefined);
   const emit = jest.fn();
   const capturedValues: { value?: Record<string, unknown> } = {};
-  const invoices = {
+  const manager = {
     createQueryBuilder: () => {
       const builder = {
         insert: () => builder,
@@ -85,6 +90,13 @@ async function build(options: {
       };
       return builder;
     }
+  };
+  const dataSource = {
+    transaction: jest.fn((cb: (m: typeof manager) => unknown) => cb(manager))
+  };
+  const credits = {
+    availableUnits: jest.fn().mockResolvedValue(options.availableCredits ?? 0),
+    spendOnUsage: jest.fn().mockResolvedValue(undefined)
   };
 
   const moduleRef = await Test.createTestingModule({
@@ -112,12 +124,13 @@ async function build(options: {
             .mockResolvedValue({ key: 'usage', name: 'Pay as you go' })
         }
       },
-      { provide: getRepositoryToken(Invoice), useValue: invoices },
+      { provide: getDataSourceToken(), useValue: dataSource },
       {
         provide: BILLING_PROVIDERS,
         useValue: [{ id: 'paddle', chargeUsage }]
       },
-      { provide: UsageRating, useValue: { summarizeForPeriod } },
+      { provide: UsageRating, useValue: { summarizeForPeriodWithCredits } },
+      { provide: CreditService, useValue: credits },
       { provide: EventEmitter2, useValue: { emit } }
     ]
   }).compile();
@@ -125,7 +138,8 @@ async function build(options: {
   return {
     service: moduleRef.get(UsageInvoicingService),
     chargeUsage,
-    summarizeForPeriod,
+    summarizeForPeriodWithCredits,
+    credits,
     emit,
     capturedValues
   };
@@ -133,15 +147,21 @@ async function build(options: {
 
 describe('UsageInvoicingService', () => {
   it('plants a pending invoice for the closed period, then posts the provider charge', async () => {
-    const { service, chargeUsage, summarizeForPeriod, capturedValues, emit } =
-      await build({});
+    const {
+      service,
+      chargeUsage,
+      summarizeForPeriodWithCredits,
+      capturedValues,
+      emit
+    } = await build({});
 
     await service.handlePeriodClosed(EVENT);
 
-    expect(summarizeForPeriod).toHaveBeenCalledWith(
+    expect(summarizeForPeriodWithCredits).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'sub-1' }),
       expect.objectContaining({ key: 'usage' }),
-      { start: PERIOD_START, end: PERIOD_END }
+      { start: PERIOD_START, end: PERIOD_END },
+      0
     );
     expect(capturedValues.value).toMatchObject({
       customerId: 'cust-1',
@@ -167,13 +187,21 @@ describe('UsageInvoicingService', () => {
   });
 
   it('records a zero-usage close as a paid zero invoice without charging', async () => {
-    const { service, chargeUsage, capturedValues, emit } = await build({
-      summary: { amountMinor: 0, receiptItems: [] }
-    });
+    const { service, chargeUsage, credits, capturedValues, emit } = await build(
+      {
+        summary: {
+          amountMinor: 0,
+          creditUnitsApplied: 0,
+          chargedUnits: 0,
+          receiptItems: []
+        }
+      }
+    );
 
     await service.handlePeriodClosed(EVENT);
 
     expect(chargeUsage).not.toHaveBeenCalled();
+    expect(credits.spendOnUsage).not.toHaveBeenCalled();
     expect(capturedValues.value).toMatchObject({
       amountMinor: 0,
       status: 'paid',
@@ -185,12 +213,87 @@ describe('UsageInvoicingService', () => {
     );
   });
 
-  it('never double-charges: a lost insert race skips the provider call', async () => {
-    const { service, chargeUsage } = await build({ insertRows: [] });
+  it('spends partial credits with the insert and charges only the remainder', async () => {
+    const { service, chargeUsage, credits, capturedValues } = await build({
+      availableCredits: 10,
+      summary: {
+        creditUnitsApplied: 10,
+        chargedUnits: 32,
+        amountMinor: 6400,
+        receiptItems: [
+          {
+            description: 'Pay as you go: api_calls × 32',
+            amountMinor: 6400,
+            quantity: 1
+          }
+        ]
+      }
+    });
+
+    await service.handlePeriodClosed(EVENT);
+
+    expect(credits.spendOnUsage).toHaveBeenCalledWith(
+      expect.anything(),
+      'cust-1',
+      'inv-1',
+      10
+    );
+    expect(capturedValues.value).toMatchObject({
+      amountMinor: 6400,
+      status: 'pending'
+    });
+    expect(chargeUsage).toHaveBeenCalledWith(
+      'psub_1',
+      6400,
+      'USD',
+      'Pay as you go: api_calls × 32',
+      CHARGE_KEY
+    );
+  });
+
+  it('covers the whole period with credits: paid zero invoice, spend, no charge', async () => {
+    const { service, chargeUsage, credits, capturedValues, emit } = await build(
+      {
+        availableCredits: 100,
+        summary: {
+          creditUnitsApplied: 42,
+          chargedUnits: 0,
+          amountMinor: 0,
+          receiptItems: []
+        }
+      }
+    );
 
     await service.handlePeriodClosed(EVENT);
 
     expect(chargeUsage).not.toHaveBeenCalled();
+    expect(credits.spendOnUsage).toHaveBeenCalledWith(
+      expect.anything(),
+      'cust-1',
+      'inv-1',
+      42
+    );
+    expect(capturedValues.value).toMatchObject({
+      amountMinor: 0,
+      status: 'paid'
+    });
+    expect(emit).toHaveBeenCalledWith(
+      InvoicePaidEvent.name,
+      expect.objectContaining({ userId: 'user-1', invoiceId: 'inv-1' })
+    );
+  });
+
+  it('never double-charges or double-spends: a lost insert race skips both', async () => {
+    const { service, chargeUsage, credits } = await build({
+      insertRows: [],
+      availableCredits: 10,
+      summary: { creditUnitsApplied: 10, chargedUnits: 32, amountMinor: 6400 }
+    });
+
+    await service.handlePeriodClosed(EVENT);
+
+    expect(chargeUsage).not.toHaveBeenCalled();
+    expect(credits.spendOnUsage).not.toHaveBeenCalled();
   });
 
   it('leaves the invoice pending and swallows a failed provider call', async () => {

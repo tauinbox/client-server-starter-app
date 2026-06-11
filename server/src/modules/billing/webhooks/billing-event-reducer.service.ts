@@ -11,6 +11,7 @@ import { PaymentMethod } from '../entities/payment-method.entity';
 import { Plan } from '../entities/plan.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
+import { CreditService } from '../services/credit.service';
 import {
   InvoicePaidEvent,
   PaymentFailedEvent,
@@ -39,7 +40,7 @@ function parseDate(iso: string | null, fallback: Date): Date {
 }
 
 /**
- * Which side owns the subscription lifecycle (design §8): YooKassa is
+ * Which side owns the subscription lifecycle: YooKassa is
  * self-managed (the core drives renewals), every other provider (Paddle) is
  * provider-managed.
  */
@@ -69,6 +70,7 @@ export class BillingEventReducer {
 
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly credits: CreditService,
     private readonly events: EventEmitter2
   ) {}
 
@@ -103,7 +105,7 @@ export class BillingEventReducer {
         );
         break;
       case 'subscription.plan_changed':
-        // Plan changes are applied by the M3 change flow.
+        // Plan changes are applied by the dedicated change flow.
         break;
     }
   }
@@ -410,10 +412,10 @@ export class BillingEventReducer {
   }
 
   /**
-   * Applies the purchased product's effect once per paid one-time invoice
-   * (design §20.4): an `sku` product inserts a `CustomerGrant` (expiry from
-   * `grant.durationDays`, else permanent); `custom` carries no grant; credit
-   * packs are the M5 extension of this switch. Idempotency comes from the
+   * Applies the purchased product's effect once per paid one-time invoice:
+   * an `sku` product inserts a `CustomerGrant` (expiry from
+   * `grant.durationDays`, else permanent); a `credits` pack tops up the
+   * prepaid balance; `custom` carries no grant. Idempotency comes from the
    * caller — the grant runs only when the invoice insert won the unique
    * `provider_event_id` race.
    */
@@ -430,7 +432,21 @@ export class BillingEventReducer {
     const product = await manager.findOne(Product, {
       where: { id: productId }
     });
-    if (product?.type !== 'sku' || !product.grant?.entitlement) {
+    if (!product?.grant) {
+      return;
+    }
+
+    if (product.type === 'credits' && product.grant.credits) {
+      await this.credits.addPurchase(
+        manager,
+        customerId,
+        invoiceId,
+        product.grant.credits
+      );
+      return;
+    }
+
+    if (product.type !== 'sku' || !product.grant.entitlement) {
       return;
     }
     const { entitlement, durationDays } = product.grant;
@@ -448,7 +464,7 @@ export class BillingEventReducer {
   }
 
   /**
-   * Self-managed first-payment activation (design §8.2): persist the saved card
+   * Self-managed first-payment activation: persist the saved card
    * as the customer's default `PaymentMethod`, point the subscription at it, and
    * flip it out of `incomplete` (to `trialing` while a trial is still running,
    * else `active`). Idempotency is guaranteed by the caller's invoice insert.
@@ -487,8 +503,8 @@ export class BillingEventReducer {
   }
 
   /**
-   * Default-method swap from a self-managed (YooKassa) method-update re-bind
-   * (design §11): the new card replaces the old default — previous methods are
+   * Default-method swap from a self-managed (YooKassa) method-update re-bind:
+   * the new card replaces the old default — previous methods are
    * kept but demoted, the customer's autopay pointer and the open
    * subscription's bookkeeping reference move to the new row. No invoice is
    * written and the subscription status is untouched (a past_due subscription

@@ -194,6 +194,12 @@ export interface MockProduct {
   updatedAt: string;
 }
 
+export interface MockCreditBalance {
+  customerId: string;
+  balanceUnits: number;
+  updatedAt: string;
+}
+
 export interface MockCustomerGrant {
   id: string;
   customerId: string;
@@ -307,10 +313,13 @@ export interface State {
   billingInvoices: Map<string, MockInvoice>;
   billingPaymentMethods: Map<string, MockPaymentMethod>;
   billingUsageRecords: Map<string, MockUsageRecord>;
-  // Entitlement grants from paid one-time sku purchases (design §20.1).
+  // Entitlement grants from paid one-time sku purchases.
   billingCustomerGrants: Map<string, MockCustomerGrant>;
   // Purchases opened but not yet settled by /__control/billing/complete-purchase.
   billingPurchaseSessions: Map<string, MockPurchaseSession>;
+  // Prepaid credit balances keyed by customer id — topped up by paid credit
+  // pack purchases, mirroring the server's balance row.
+  billingCreditBalances: Map<string, MockCreditBalance>;
   // CAPTCHA — public configuration advertised via /api/v1/auth/captcha-config.
   // Default: disabled. Tests can flip via /__control/captcha to exercise the
   // soft-trigger flow without an external Turnstile dependency.

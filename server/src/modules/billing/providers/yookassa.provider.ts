@@ -45,7 +45,7 @@ import type {
 const METHOD_UPDATE_PURPOSE = 'method_update';
 
 /**
- * Metadata marker a standalone one-time purchase carries (design §20), so its
+ * Metadata marker a standalone one-time purchase carries, so its
  * success webhook reduces onto a `kind 'one_time'` invoice instead of being
  * mistaken for a subscription first payment (which would activate the
  * customer's open subscription and save the card).
@@ -152,7 +152,7 @@ export class YooKassaProvider implements PaymentProvider {
   changePlan(): Promise<void> {
     // Self-managed lifecycle: there is no provider-side subscription to update.
     // The core computes the proration (ProrationCalculator) and settles it via
-    // refund + chargeOffSession with the two 54-FZ documents (design §17.4).
+    // refund + chargeOffSession with the two 54-FZ documents.
     throw new NotImplementedException(
       'YooKassaProvider.changePlan is not applicable (proration is computed by the core)'
     );
@@ -226,7 +226,7 @@ export class YooKassaProvider implements PaymentProvider {
   }
 
   /**
-   * Standalone one-time purchase (design §20.2): a plain payment with a 54-FZ
+   * Standalone one-time purchase: a plain payment with a 54-FZ
    * receipt and a redirect confirmation — the card is NOT saved (no
    * `save_payment_method`). The one-time marker + `productId` ride in metadata
    * so the success webhook reduces onto a `one_time` invoice instead of
@@ -270,7 +270,7 @@ export class YooKassaProvider implements PaymentProvider {
   }
 
   /**
-   * Replaces the saved card via a zero-amount re-bind (design §16.B — the same
+   * Replaces the saved card via a zero-amount re-bind (the same
    * save-without-payment mechanism trials use): no money moves, so no fiscal
    * receipt. The `purpose` metadata routes the success webhook to
    * `payment_method.updated`, where the reducer swaps the default method.

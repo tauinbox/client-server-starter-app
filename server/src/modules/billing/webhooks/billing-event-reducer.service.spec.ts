@@ -22,6 +22,7 @@ import type {
   NormalizedSubscriptionPayload
 } from '../providers/payment-provider.interface';
 import { PaymentMethod } from '../entities/payment-method.entity';
+import { CreditService } from '../services/credit.service';
 import { BillingEventReducer } from './billing-event-reducer.service';
 
 interface ManagerStubs {
@@ -101,16 +102,18 @@ async function build(stubs: Partial<ManagerStubs> = {}) {
     transaction: jest.fn((cb: (m: typeof manager) => unknown) => cb(manager)),
     manager
   };
+  const credits = { addPurchase: jest.fn().mockResolvedValue(undefined) };
 
   const module = await Test.createTestingModule({
     providers: [
       BillingEventReducer,
       { provide: getDataSourceToken(), useValue: dataSource },
+      { provide: CreditService, useValue: credits },
       { provide: EventEmitter2, useValue: { emit } }
     ]
   }).compile();
 
-  return { reducer: module.get(BillingEventReducer), manager, emit };
+  return { reducer: module.get(BillingEventReducer), manager, emit, credits };
 }
 
 const subPayload = (
@@ -535,7 +538,7 @@ describe('BillingEventReducer', () => {
     });
   });
 
-  describe('invoice.paid — one-time purchase (design §20.4)', () => {
+  describe('invoice.paid — one-time purchase', () => {
     const oneTimePayload: NormalizedInvoicePayload = {
       ref: { customerId: 'cust-1', userId: 'user-1' },
       providerInvoiceRef: 'pay_ot',
@@ -630,8 +633,40 @@ describe('BillingEventReducer', () => {
       );
     });
 
+    it('tops up the prepaid balance for a paid credit pack', async () => {
+      const { reducer, manager, emit, credits } = await build({
+        product: {
+          id: 'prod-cr',
+          type: 'credits',
+          grant: { credits: 500 }
+        } as Product,
+        invoiceInsertRows: [{ id: 'inv-cr' }]
+      });
+
+      await reducer.reduce(
+        event(
+          'invoice.paid',
+          { ...oneTimePayload, productId: 'prod-cr' },
+          'yookassa'
+        )
+      );
+
+      expect(credits.addPurchase).toHaveBeenCalledWith(
+        expect.anything(),
+        'cust-1',
+        'inv-cr',
+        500
+      );
+      // A credit pack writes no CustomerGrant.
+      expect(manager.save).not.toHaveBeenCalled();
+      expect(emit).toHaveBeenCalledWith(
+        InvoicePaidEvent.name,
+        expect.objectContaining({ userId: 'user-1', invoiceId: 'inv-cr' })
+      );
+    });
+
     it('does not re-grant on a replayed webhook (duplicate invoice insert)', async () => {
-      const { reducer, manager, emit } = await build({
+      const { reducer, manager, emit, credits } = await build({
         product: {
           id: 'prod-1',
           type: 'sku',
@@ -643,7 +678,29 @@ describe('BillingEventReducer', () => {
       await reducer.reduce(event('invoice.paid', oneTimePayload, 'yookassa'));
 
       expect(manager.save).not.toHaveBeenCalled();
+      expect(credits.addPurchase).not.toHaveBeenCalled();
       expect(emit).not.toHaveBeenCalled();
+    });
+
+    it('does not top up on a replayed credit-pack webhook', async () => {
+      const { reducer, credits } = await build({
+        product: {
+          id: 'prod-cr',
+          type: 'credits',
+          grant: { credits: 500 }
+        } as Product,
+        invoiceInsertRows: []
+      });
+
+      await reducer.reduce(
+        event(
+          'invoice.paid',
+          { ...oneTimePayload, productId: 'prod-cr' },
+          'yookassa'
+        )
+      );
+
+      expect(credits.addPurchase).not.toHaveBeenCalled();
     });
 
     it('never links or activates an open self-managed subscription on a one-time payment', async () => {

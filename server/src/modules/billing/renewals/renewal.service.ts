@@ -22,6 +22,7 @@ import {
 import { FixedRating } from '../rating/fixed-rating.strategy';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import type { RatedAmount } from '../rating/rating-strategy.interface';
+import { CreditService } from '../services/credit.service';
 import { addInterval } from '../utils/period.util';
 import {
   DUNNING_MAX_ATTEMPTS,
@@ -29,8 +30,8 @@ import {
 } from './renewal-queue.constants';
 
 /**
- * Drives the self-managed (YooKassa) subscription lifecycle the core owns
- * (design §8.2): each scan charges the saved card off-session for every due
+ * Drives the self-managed (YooKassa) subscription lifecycle the core owns:
+ * each scan charges the saved card off-session for every due
  * subscription, advances the period on success, and on failure walks the dunning
  * ladder (`past_due` → retries → `canceled`). Provider-managed (Paddle)
  * subscriptions are skipped — their renewals arrive as webhooks.
@@ -56,6 +57,7 @@ export class RenewalService {
     private readonly providers: PaymentProvider[],
     private readonly fixedRating: FixedRating,
     private readonly usageRating: UsageRating,
+    private readonly credits: CreditService,
     private readonly events: EventEmitter2
   ) {}
 
@@ -148,20 +150,28 @@ export class RenewalService {
         ? subscription.trialEnd
         : subscription.currentPeriodEnd;
     // Fixed prepays the upcoming period; usage postpays the one ending at the
-    // anchor, rated over [currentPeriodStart, anchor). The rated receipt items
-    // ride into the provider's 54-FZ receipt unchanged.
-    const rated =
+    // anchor, rated over [currentPeriodStart, anchor) with prepaid credits
+    // offsetting billable units before money is charged — the balance is read
+    // here and deducted only when the invoice insert wins. The rated receipt
+    // items ride into the provider's 54-FZ receipt unchanged.
+    const usageSummary =
       subscription.billingMode === 'usage'
-        ? await this.usageRating.amountForPeriod(subscription, plan, {
-            start: subscription.currentPeriodStart,
-            end: anchor
-          })
-        : this.fixedRating.amountForPeriod(subscription, plan);
+        ? await this.usageRating.summarizeForPeriodWithCredits(
+            subscription,
+            plan,
+            { start: subscription.currentPeriodStart, end: anchor },
+            await this.credits.availableUnits(subscription.customerId)
+          )
+        : null;
+    const rated: RatedAmount =
+      usageSummary ?? this.fixedRating.amountForPeriod(subscription, plan);
+    const creditUnitsApplied = usageSummary?.creditUnitsApplied ?? 0;
     const idempotencyKey = `renewal:${subscription.id}:${anchor.getTime()}:${subscription.dunningAttempts}`;
 
     let charge: ChargeResult;
     if (rated.amountMinor === 0 && subscription.billingMode === 'usage') {
-      // Nothing accrued in the closed period: a zero-amount payment is not
+      // Nothing left to charge for the closed period (no usage, or prepaid
+      // credits covered it all): a zero-amount payment is not
       // chargeable/fiscalizable, so skip the provider call but still record a
       // zero invoice — its unique provider_event_id is what advances the
       // period exactly once.
@@ -188,6 +198,7 @@ export class RenewalService {
       customer,
       plan,
       rated,
+      creditUnitsApplied,
       charge,
       anchor,
       idempotencyKey,
@@ -209,6 +220,7 @@ export class RenewalService {
     customer: Customer,
     plan: Plan,
     rated: RatedAmount,
+    creditUnitsApplied: number,
     charge: ChargeResult,
     anchor: Date,
     idempotencyKey: string,
@@ -251,6 +263,17 @@ export class RenewalService {
       // exists — the period was already advanced, so this replay is a no-op.
       const rows = insert.raw as Array<{ id: string }>;
       if (rows.length === 0) return null;
+
+      // Credits offset this period's billable units; the deduction commits
+      // with the winning insert, so a replayed scan spends nothing.
+      if (creditUnitsApplied > 0) {
+        await this.credits.spendOnUsage(
+          manager,
+          subscription.customerId,
+          rows[0].id,
+          creditUnitsApplied
+        );
+      }
 
       const fresh = await manager.findOne(Subscription, {
         where: { id: subscription.id }
