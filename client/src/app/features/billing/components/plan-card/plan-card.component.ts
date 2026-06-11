@@ -12,7 +12,7 @@ import { TranslocoDirective } from '@jsverse/transloco';
 import type { PlanResponse } from '@app/shared/types';
 
 /**
- * Presentational pricing-tier card (design §21.1). The recommended tier is
+ * Presentational pricing-tier card. The recommended tier is
  * lifted via the `featured` flag (elevation + accent + "Most popular" chip).
  * Emits `choose` when the call-to-action is pressed; the parent owns checkout.
  */

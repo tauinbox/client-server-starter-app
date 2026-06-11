@@ -25,7 +25,7 @@ export interface RecordUsageInput {
 }
 
 /**
- * Metering ingest (design §3, §5). Records raw usage events against a customer's
+ * Metering ingest. Records raw usage events against a customer's
  * active subscription; aggregation/rating happens later (UsageRating, BKL-076).
  *
  * Ingest is idempotent on `idempotencyKey` (unique column): a replay of the same

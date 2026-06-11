@@ -5,7 +5,7 @@ import type { EntitlementCapability } from './entitlement.types';
 export const ENTITLEMENT_KEY = 'entitlement_capability';
 
 /**
- * Gates a route behind a billing capability (design §6). Returns 403 when the
+ * Gates a route behind a billing capability. Returns 403 when the
  * caller's plan does not grant it. Authorization is separate — combine with
  * `@Authorize` for permissions.
  */

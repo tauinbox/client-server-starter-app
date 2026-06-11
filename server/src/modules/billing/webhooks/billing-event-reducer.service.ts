@@ -40,7 +40,7 @@ function parseDate(iso: string | null, fallback: Date): Date {
 }
 
 /**
- * Which side owns the subscription lifecycle (design §8): YooKassa is
+ * Which side owns the subscription lifecycle: YooKassa is
  * self-managed (the core drives renewals), every other provider (Paddle) is
  * provider-managed.
  */
@@ -105,7 +105,7 @@ export class BillingEventReducer {
         );
         break;
       case 'subscription.plan_changed':
-        // Plan changes are applied by the M3 change flow.
+        // Plan changes are applied by the dedicated change flow.
         break;
     }
   }
@@ -464,7 +464,7 @@ export class BillingEventReducer {
   }
 
   /**
-   * Self-managed first-payment activation (design §8.2): persist the saved card
+   * Self-managed first-payment activation: persist the saved card
    * as the customer's default `PaymentMethod`, point the subscription at it, and
    * flip it out of `incomplete` (to `trialing` while a trial is still running,
    * else `active`). Idempotency is guaranteed by the caller's invoice insert.
@@ -503,8 +503,8 @@ export class BillingEventReducer {
   }
 
   /**
-   * Default-method swap from a self-managed (YooKassa) method-update re-bind
-   * (design §11): the new card replaces the old default — previous methods are
+   * Default-method swap from a self-managed (YooKassa) method-update re-bind:
+   * the new card replaces the old default — previous methods are
    * kept but demoted, the customer's autopay pointer and the open
    * subscription's bookkeeping reference move to the new row. No invoice is
    * written and the subscription status is untouched (a past_due subscription

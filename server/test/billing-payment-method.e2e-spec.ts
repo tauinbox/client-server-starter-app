@@ -1,4 +1,4 @@
-// End-to-end coverage for the payment-method update flow (design §11, §16.B/D):
+// End-to-end coverage for the payment-method update flow:
 // a YooKassa method-update re-bind webhook flows through the public receiver →
 // WebhookIngestionService → the REAL YooKassaProvider (re-fetch by id against a
 // mocked client) → BillingEventReducer, which swaps the customer's default

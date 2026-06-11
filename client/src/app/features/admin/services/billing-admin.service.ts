@@ -7,7 +7,7 @@ import type { CancelMode } from '@features/billing/services/billing.service';
 const ADMIN_BILLING_API_V1 = '/api/v1/admin/billing';
 
 /**
- * Thin HTTP wrapper over the M1 admin billing API (design §11). Reads and
+ * Thin HTTP wrapper over the admin billing API. Reads and
  * mutations are addressed by entity id across all customers — the server gates
  * them on the CASL `manage Billing` permission, not per-caller scoping.
  */

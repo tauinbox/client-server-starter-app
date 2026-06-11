@@ -13,7 +13,7 @@ import type { UsageSummaryResponse } from '@app/shared/types';
 import { formatMoney } from '../../utils/billing-format';
 
 /**
- * Current-period usage meter (design §12). Plans with included units get a
+ * Current-period usage meter. Plans with included units get a
  * quota gauge — used quota in the primary tone, overage in the error tone;
  * pure pay-as-you-go plans (no included units) skip the gauge since there is
  * no cap to measure against. The money mini-ledger ends in the accrued amount.

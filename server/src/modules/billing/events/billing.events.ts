@@ -1,7 +1,7 @@
 /**
  * Billing domain events (EventEmitter2 — no forwardRef across module boundaries,
  * per the cross-module communication rule). Emitted by the subscription/invoice
- * reducers (M1+) once a verified provider webhook is applied. Every event carries
+ * reducers once a verified provider webhook is applied. Every event carries
  * the affected `userId` so the entitlement-cache listener can invalidate exactly
  * that user without re-querying the customer mapping.
  */

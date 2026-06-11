@@ -30,8 +30,8 @@ import {
 } from './renewal-queue.constants';
 
 /**
- * Drives the self-managed (YooKassa) subscription lifecycle the core owns
- * (design §8.2): each scan charges the saved card off-session for every due
+ * Drives the self-managed (YooKassa) subscription lifecycle the core owns:
+ * each scan charges the saved card off-session for every due
  * subscription, advances the period on success, and on failure walks the dunning
  * ladder (`past_due` → retries → `canceled`). Provider-managed (Paddle)
  * subscriptions are skipped — their renewals arrive as webhooks.

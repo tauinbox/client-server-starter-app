@@ -16,7 +16,7 @@ import {
 } from './entitlement.types';
 
 /**
- * Statuses that keep full entitlements (design §7): `active`/`trialing`, plus
+ * Statuses that keep full entitlements: `active`/`trialing`, plus
  * `past_due` through the dunning grace window. The drop to Free happens on the
  * `past_due → canceled` transition, not on entering `past_due`.
  */
@@ -81,9 +81,9 @@ export class EntitlementService {
   }
 
   /**
-   * Plan capabilities unioned with active one-time purchase grants (design
-   * §20.1): a paid sku unlocks its entitlement on top of whatever tier the
-   * user is on — including Free.
+   * Plan capabilities unioned with active one-time purchase grants: a paid
+   * sku unlocks its entitlement on top of whatever tier the user is on —
+   * including Free.
    */
   private async resolve(userId: string): Promise<ResolvedEntitlements> {
     const customer = await this.customers.findOne({ where: { userId } });

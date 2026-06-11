@@ -29,7 +29,7 @@ export interface CreditedUsageSummary extends UsagePeriodSummary {
 }
 
 /**
- * Pay-as-you-go rating (design §5): sum the subscription's `UsageRecord`s whose
+ * Pay-as-you-go rating: sum the subscription's `UsageRecord`s whose
  * `occurredAt` falls inside the period (start inclusive, end exclusive — a
  * record stamped exactly at the boundary belongs to the next period), subtract
  * the plan's included units, and charge the overage at the unit price. Pure

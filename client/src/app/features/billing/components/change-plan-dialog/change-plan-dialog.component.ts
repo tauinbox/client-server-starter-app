@@ -58,7 +58,7 @@ const MINUS = '− ';
 const PLUS = '+ ';
 
 /**
- * Change-plan dialog with a live proration preview (design §21.3). The target
+ * Change-plan dialog with a live proration preview. The target
  * is picked as billing mode + plan; every selection fetches the prorated cost
  * and renders it as an itemized mini-ledger ending in a bold "Due now". The
  * dialog only previews — it closes with the chosen plan key and the caller

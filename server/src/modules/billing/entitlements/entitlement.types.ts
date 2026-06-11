@@ -1,5 +1,5 @@
 /**
- * Billing capabilities (design §6, §17.2) — a separate axis from feature flags:
+ * Billing capabilities — a separate axis from feature flags:
  * flags are admin-toggled rollout tools, entitlements are what a paid plan grants.
  * Free = empty set (base access only). The numeric limit dimension (records/seats)
  * travels alongside the capability set in `ResolvedEntitlements.limits`.

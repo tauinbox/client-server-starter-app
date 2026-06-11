@@ -116,7 +116,7 @@ export class PricingPageComponent implements OnInit {
       });
   });
 
-  // Usage tier teaser (lights up in M2 when the usage plan is activated).
+  // Usage tier teaser (shown while the usage plan is active in the catalog).
   protected readonly usagePlan = computed(
     () =>
       this.store.plans().find((plan) => plan.billingMode === 'usage') ?? null
@@ -132,12 +132,12 @@ export class PricingPageComponent implements OnInit {
 
   // Region control: shown to authenticated callers once the region is known
   // (the endpoint requires auth). Hidden for anonymous visitors (no override
-  // to set). See design §19 / availability §18.
+  // to set).
   protected readonly showRegionControl = computed(
     () => this.isAuthenticated() && this.store.region() !== null
   );
 
-  // One-time purchases (design §21.4): fixed-price products as cards, custom
+  // One-time purchases: fixed-price products as cards, custom
   // products as donation forms. The catalog endpoint requires auth, so the
   // section exists only for authenticated callers with a non-empty catalog.
   protected readonly oneTimeProducts = computed<PricedProduct[]>(() => {

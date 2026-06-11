@@ -13,7 +13,7 @@ import {
 } from 'class-validator';
 
 /**
- * Metering ingest payload (design §3, §5). The usage record is attached to the
+ * Metering ingest payload. The usage record is attached to the
  * customer's currently-active subscription server-side, so the caller never
  * supplies a subscription id. `idempotencyKey` is the dedup anchor — replaying
  * the same key returns the original record instead of double-counting.

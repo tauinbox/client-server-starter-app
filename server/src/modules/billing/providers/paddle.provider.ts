@@ -34,7 +34,7 @@ import type {
 } from './payment-provider.interface';
 
 /**
- * Custom-data marker a one-time purchase transaction carries (design §20), so
+ * Custom-data marker a one-time purchase transaction carries, so
  * its completed/failed webhooks are told apart from subscription transactions.
  */
 const ONE_TIME_KIND = 'one_time';
@@ -134,9 +134,9 @@ export class PaddleProvider implements PaymentProvider {
     // Paddle creates/links the customer during hosted checkout (it collects the
     // email there) and we correlate back via custom data, so a standalone
     // create — which needs an email the billing Customer doesn't carry — is not
-    // part of the M1 flow.
+    // part of the checkout flow.
     throw new NotImplementedException(
-      'Paddle links the customer during checkout; ensureCustomer is unused in M1'
+      'Paddle links the customer during checkout; ensureCustomer is unused'
     );
   }
 
@@ -176,7 +176,7 @@ export class PaddleProvider implements PaymentProvider {
   }
 
   /**
-   * Standalone one-time purchase (design §20.2): a Paddle transaction with the
+   * Standalone one-time purchase: a Paddle transaction with the
    * product's catalog price (`paddlePriceId`) or, for a custom amount, an
    * inline non-catalog price. The one-time marker + `productId` ride in custom
    * data so the `transaction.completed` webhook reduces onto a `one_time`
@@ -231,7 +231,7 @@ export class PaddleProvider implements PaymentProvider {
 
   /**
    * Posts the period's usage total as a one-time charge on the subscription
-   * (design §17.3 — postpaid at the billing-cycle boundary, no Paddle
+   * (postpaid at the billing-cycle boundary, no Paddle
    * metering). The price is non-catalog with the charge key in its custom
    * data; the resulting `transaction.completed` webhook carries it back so the
    * reducer reconciles the pending usage invoice.
@@ -275,7 +275,7 @@ export class PaddleProvider implements PaymentProvider {
   }
 
   /**
-   * Delegated plan change (design §16.A): swap the subscription item to the new
+   * Delegated plan change: swap the subscription item to the new
    * plan's catalog price with `prorated_immediately` — Paddle computes the
    * credit/charge, bills the difference and emits `subscription.updated` +
    * `transaction.completed` webhooks that reconcile our rows. Custom data is
@@ -321,7 +321,7 @@ export class PaddleProvider implements PaymentProvider {
   }
 
   /**
-   * Payment-method change is a hosted Paddle flow (design §16.D): the
+   * Payment-method change is a hosted Paddle flow: the
    * subscription's zero-amount `update-payment-method` transaction opens a
    * checkout where the customer enters the new card. Paddle stores the method
    * itself — there is no local `PaymentMethod` row to swap — and emits a

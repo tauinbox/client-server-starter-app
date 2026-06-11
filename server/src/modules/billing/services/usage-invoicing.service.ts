@@ -20,7 +20,7 @@ import { CreditService } from './credit.service';
 
 /**
  * Invoices a closed usage period of a provider-managed (Paddle) subscription
- * (design §17.3 — postpaid at the billing-cycle boundary). The flow is
+ * (postpaid at the billing-cycle boundary). The flow is
  * exactly-once by construction: a pending `Invoice` keyed by the unique
  * `usage:{subscriptionId}:{periodEnd}` is inserted BEFORE the provider charge,
  * so a duplicate close (replayed/raced webhook) loses the insert and never

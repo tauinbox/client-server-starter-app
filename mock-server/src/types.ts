@@ -313,7 +313,7 @@ export interface State {
   billingInvoices: Map<string, MockInvoice>;
   billingPaymentMethods: Map<string, MockPaymentMethod>;
   billingUsageRecords: Map<string, MockUsageRecord>;
-  // Entitlement grants from paid one-time sku purchases (design §20.1).
+  // Entitlement grants from paid one-time sku purchases.
   billingCustomerGrants: Map<string, MockCustomerGrant>;
   // Purchases opened but not yet settled by /__control/billing/complete-purchase.
   billingPurchaseSessions: Map<string, MockPurchaseSession>;

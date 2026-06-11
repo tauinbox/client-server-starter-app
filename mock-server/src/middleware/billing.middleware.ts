@@ -87,7 +87,7 @@ function geoDefault(country: string): BillingProviderId {
   return country.toUpperCase() === 'RU' ? 'yookassa' : 'paddle';
 }
 
-// Mock treats both providers as configured (design §18.5), so lifecycle
+// Mock treats both providers as configured, so lifecycle
 // ownership is purely the provider's: YooKassa self-managed, Paddle managed.
 function managesLifecycle(provider: BillingProviderId): boolean {
   return provider !== 'yookassa';
@@ -500,7 +500,7 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// Plan change with proration (design §17.4). Mirrors the server's guards and
+// Plan change with proration. Mirrors the server's guards and
 // ProrationCalculator math (whole-day granularity, refund-and-recharge). The
 // server's Paddle path delegates the money to Paddle and reconciles invoices
 // via webhooks; the mock has no provider, so both providers settle the same
@@ -640,7 +640,7 @@ billingRouter.post(
     const now = new Date();
     const nowIso = now.toISOString();
 
-    // Trial moves no money; a paid period settles the two §17.4 documents.
+    // Trial moves no money; a paid period settles the charge + refund legs.
     if (sub.status !== 'trialing') {
       const quote = prorationQuote(fromPlan, toPlan, sub.provider, sub, now);
       const state = getState();
@@ -879,7 +879,7 @@ billingRouter.get(
 );
 
 // ---------------------------------------------------------------------------
-// Admin billing (design §11). CASL `manage Billing` is mirrored by adminGuard:
+// Admin billing. CASL `manage Billing` is mirrored by adminGuard:
 // 401 unauthenticated, 403 non-admin. Reads and mutations are addressed by
 // entity id across all customers (no per-caller scoping).
 // ---------------------------------------------------------------------------
@@ -984,7 +984,7 @@ billingAdminRouter.post(
   }
 );
 
-// Metering ingest (design §3, §5). Mirrors RecordUsageRequestDto validation, the
+// Metering ingest. Mirrors RecordUsageRequestDto validation, the
 // active-subscription requirement, and idempotency on `idempotencyKey`. There is
 // no public meter endpoint — this lives under the `manage Billing` admin guard.
 const USAGE_ACTIVE_STATUSES = ['trialing', 'active', 'past_due'];

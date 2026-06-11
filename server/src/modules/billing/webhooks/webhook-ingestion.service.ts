@@ -29,8 +29,7 @@ import {
  * an idempotency row (unique (provider, provider_event_id) — replays no-op),
  * then hand off to reduction. When Redis is configured the reduction runs on
  * BullMQ so the HTTP ack stays within the provider's timeout; without Redis it
- * runs inline, mirroring MailService's optional-queue fallback. The reducer
- * itself lands in M1 — processEvent is the seam.
+ * runs inline, mirroring MailService's optional-queue fallback.
  */
 @Injectable()
 export class WebhookIngestionService {

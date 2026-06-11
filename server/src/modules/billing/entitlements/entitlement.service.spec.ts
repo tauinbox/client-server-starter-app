@@ -151,7 +151,7 @@ describe('EntitlementService', () => {
     });
   });
 
-  describe('one-time purchase grants (design §20.1)', () => {
+  describe('one-time purchase grants', () => {
     it('unions active grants with the subscription plan capabilities, deduplicated', async () => {
       withProSubscription('active');
       grants.find.mockResolvedValue([

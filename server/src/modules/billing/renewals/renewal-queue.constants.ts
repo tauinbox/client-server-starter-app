@@ -10,7 +10,7 @@ export const BILLING_RENEWAL_SCHEDULER_ID = 'billing-renewal-scan';
 export const RENEWAL_SCAN_INTERVAL_MS = 60 * 60 * 1000;
 
 /**
- * Dunning policy (design §1): a failed self-managed charge moves the
+ * Dunning policy: a failed self-managed charge moves the
  * subscription to `past_due`; the scheduler retries up to this many times,
  * spaced `DUNNING_RETRY_DELAY_MS` apart (≈ a 7-day grace window), then cancels.
  * Entitlements are kept through the grace window and drop only on cancellation.

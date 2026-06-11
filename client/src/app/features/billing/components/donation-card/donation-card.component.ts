@@ -37,7 +37,7 @@ type DonationFormData = {
 };
 
 /**
- * Custom-amount one-time purchase card (design §21.4): quick preset amounts
+ * Custom-amount one-time purchase card: quick preset amounts
  * derived from the product's configured minimum, a bounded custom amount, and
  * an optional receipt note. All money facts (currency, bounds) come from the
  * catalog entry priced for the resolved provider — nothing is hardcoded

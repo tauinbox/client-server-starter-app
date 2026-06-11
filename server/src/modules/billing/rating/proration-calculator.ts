@@ -28,7 +28,7 @@ export interface ProrationQuote {
 }
 
 /**
- * Self-managed (YooKassa) plan-change proration (design §17.4): immediate
+ * Self-managed (YooKassa) plan-change proration: immediate
  * switch, refund-and-recharge, whole-day granularity, no credit carry-forward.
  * Both legs use the same remainder so the split stays internally consistent;
  * each leg is fiscalized separately (refund receipt + payment receipt). Usage

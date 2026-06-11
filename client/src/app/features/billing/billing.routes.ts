@@ -11,7 +11,7 @@ export const billingRoutes: Routes = [
     providers: [BillingStore],
     children: [
       {
-        // Public pricing page (design §18.3 — anonymous pricing included).
+        // Public pricing page (anonymous pricing included).
         path: '',
         loadComponent: () =>
           import('./components/pricing-page/pricing-page.component').then(

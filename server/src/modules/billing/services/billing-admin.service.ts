@@ -19,7 +19,7 @@ import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
 
 /**
- * Admin-facing billing operations (design §11). Unlike `BillingUserService`,
+ * Admin-facing billing operations. Unlike `BillingUserService`,
  * reads and mutations here are addressed by entity id across all customers —
  * the CASL `manage Billing` permission, not per-caller scoping, is the access
  * boundary. Cancel/refund delegate the money side to the resolved provider and
@@ -119,7 +119,7 @@ export class BillingAdminService {
     }
 
     // A full refund settles the invoice as `refunded`; a partial refund leaves it
-    // `paid` (the M1 schema has no partial-refund status or refunded-amount column).
+    // `paid` (the schema has no partial-refund status or refunded-amount column).
     if (refundAmount === invoice.amountMinor) {
       invoice.status = 'refunded';
       await this.revokeOneTimeGrants(invoice);
@@ -129,8 +129,8 @@ export class BillingAdminService {
   }
 
   /**
-   * Refunding a one-time purchase in full takes back what it granted (design
-   * §20.5): the sku's `CustomerGrant` is revoked and the buyer's cached
+   * Refunding a one-time purchase in full takes back what it granted: the
+   * sku's `CustomerGrant` is revoked and the buyer's cached
    * entitlements are dropped. A `custom` purchase has no grants — nothing
    * matches and the refund stays a plain money move. Partial refunds keep the
    * invoice `paid`, so the grant survives them by construction.

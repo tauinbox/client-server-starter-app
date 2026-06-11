@@ -20,7 +20,7 @@ export const BILLING_API_V1 = '/api/v1/billing';
 export type CancelMode = 'period_end' | 'immediate';
 
 /**
- * One-time purchase request (design §20.3). `amountMinor` is required for
+ * One-time purchase request. `amountMinor` is required for
  * custom-amount products and ignored for fixed-price ones (the server price
  * is authoritative); `description` is the optional buyer note on the receipt.
  */
@@ -31,7 +31,7 @@ export type PurchaseRequest = {
 };
 
 /**
- * Thin HTTP wrapper over the user billing API (design §11). Read endpoints
+ * Thin HTTP wrapper over the user billing API. Read endpoints
  * for subscription, payment method and usage return `null` when none exists.
  */
 @Injectable({ providedIn: 'root' })

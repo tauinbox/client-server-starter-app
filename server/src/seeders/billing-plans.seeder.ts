@@ -22,7 +22,7 @@ type SeedPlan = {
   prices: Partial<Record<BillingProviderId, PlanPrice>>;
 };
 
-// Starter catalog (design §17.1). Two prices per tier — RUB charged via YooKassa,
+// Starter catalog. Two prices per tier — RUB charged via YooKassa,
 // USD via Paddle — keyed by provider; the resolved billing region selects which
 // is shown/charged. Money is in minor units. All values are illustrative
 // defaults, editable here.
