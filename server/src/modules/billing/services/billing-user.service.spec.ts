@@ -480,6 +480,30 @@ describe('BillingUserService', () => {
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
     });
 
+    it('returns to the client checkout-return routes (/billing/success|cancel)', async () => {
+      const ctx = await build();
+      ctx.plans.findOne.mockResolvedValue(makePlan());
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'US',
+        providerOverride: null
+      });
+      const paddle = provider('paddle', true);
+      ctx.billing.resolveProvider.mockResolvedValue(paddle);
+
+      await ctx.service.checkout('user-1', 'pro');
+
+      expect(paddle.startCheckout).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        {
+          successUrl: 'http://localhost:4200/billing/success',
+          cancelUrl: 'http://localhost:4200/billing/cancel'
+        }
+      );
+    });
+
     it('rejects checkout when the plan is unknown', async () => {
       const ctx = await build();
       ctx.plans.findOne.mockResolvedValue(null);

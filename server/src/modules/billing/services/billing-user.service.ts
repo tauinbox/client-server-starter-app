@@ -883,8 +883,9 @@ export class BillingUserService {
     return geoFromLocale(user?.locale ?? 'en').country;
   }
 
+  // Must match the client's checkout-return routes (/billing/success|cancel).
   private checkoutUrl(outcome: 'success' | 'cancel'): string {
-    return `${this.clientBaseUrl()}/billing/checkout/${outcome}`;
+    return `${this.clientBaseUrl()}/billing/${outcome}`;
   }
 
   /** Where a method-update flow returns to — the billing settings page. */
