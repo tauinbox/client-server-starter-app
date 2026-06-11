@@ -1,4 +1,8 @@
-import type { BillingProviderId, SubscriptionStatus } from '@app/shared/types';
+import type {
+  BillingProviderId,
+  InvoiceKind,
+  SubscriptionStatus
+} from '@app/shared/types';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
 
@@ -83,6 +87,15 @@ export interface NormalizedInvoicePayload {
    * usage invoice instead of inserting a new row.
    */
   usageChargeKey?: string | null;
+  /**
+   * `'one_time'` for a standalone purchase (design §20) — the provider echoes
+   * the marker planted by `createOneTimePayment`, and the reducer writes an
+   * `Invoice` with no subscription and applies the product's grant instead of
+   * activating anything. Absent/`'subscription'` for recurring invoices.
+   */
+  kind?: InvoiceKind;
+  /** The purchased `Product` id echoed back on a one-time payment. */
+  productId?: string | null;
 }
 
 /**
@@ -122,6 +135,33 @@ export interface ReceiptItem {
   quantity: number;
 }
 
+/**
+ * A standalone one-time purchase (design §20.2). `productId` is echoed through
+ * the provider's custom data/metadata so the paid webhook reduces onto an
+ * `Invoice` with the product reference; `paddlePriceId` selects the Paddle
+ * catalog price for fixed-price products — absent for `custom` amounts, which
+ * are charged via an inline (non-catalog) price.
+ */
+export interface OneTimePaymentParams {
+  amountMinor: number;
+  currency: string;
+  description: string;
+  receiptItems: ReceiptItem[];
+  productId: string;
+  urls: CheckoutUrls;
+  paddlePriceId?: string;
+}
+
+/**
+ * Where the buyer completes a one-time payment: YooKassa always returns a
+ * confirmation `url`; Paddle may complete client-side via Paddle.js with the
+ * transaction id (`sessionRef`), so `url` is optional.
+ */
+export interface OneTimePaymentSession {
+  url?: string;
+  sessionRef: string;
+}
+
 export interface ChargeResult {
   providerInvoiceRef: string;
 }
@@ -154,6 +194,18 @@ export interface PaymentProvider {
     receiptItems: ReceiptItem[],
     idempotencyKey?: string
   ): Promise<ChargeResult>;
+  /**
+   * Starts a standalone one-time payment (design §20.2) — no subscription, no
+   * saved payment method. Paddle: `transactions.create` with the catalog
+   * `paddlePriceId` or an inline price; YooKassa: `createPayment` with a 54-FZ
+   * receipt and a redirect confirmation. The one-time marker and `productId`
+   * round-trip through custom data so the paid webhook reduces onto a
+   * `kind 'one_time'` invoice and applies the product's grant.
+   */
+  createOneTimePayment(
+    customer: Customer,
+    params: OneTimePaymentParams
+  ): Promise<OneTimePaymentSession>;
   /**
    * Posts a postpaid usage charge against a provider-managed subscription at
    * its billing-cycle boundary (Paddle `createOneTimeCharge`). `chargeKey` is

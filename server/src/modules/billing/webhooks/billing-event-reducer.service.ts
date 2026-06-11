@@ -5,9 +5,11 @@ import { DataSource, In, type EntityManager } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
+import { CustomerGrant } from '../entities/customer-grant.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { PaymentMethod } from '../entities/payment-method.entity';
 import { Plan } from '../entities/plan.entity';
+import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import {
   InvoicePaidEvent,
@@ -315,22 +317,27 @@ export class BillingEventReducer {
         // payment is still recorded.
       }
 
-      // Provider-managed invoices link by the provider subscription id; a
-      // self-managed (YooKassa) first payment has none, so the incomplete
-      // subscription created at checkout is found by customer id.
-      const subscription = payload.providerSubscriptionId
-        ? await manager.findOne(Subscription, {
-            where: { providerSubscriptionId: payload.providerSubscriptionId }
-          })
-        : selfManaged
+      // A one-time purchase belongs to no subscription — it must never match
+      // the self-managed open-subscription fallback below (which would
+      // activate it). Provider-managed invoices link by the provider
+      // subscription id; a self-managed (YooKassa) first payment has none, so
+      // the incomplete subscription created at checkout is found by customer id.
+      const oneTime = payload.kind === 'one_time';
+      const subscription = oneTime
+        ? null
+        : payload.providerSubscriptionId
           ? await manager.findOne(Subscription, {
-              where: {
-                customerId,
-                status: In([...SELF_MANAGED_OPEN_STATUSES])
-              },
-              order: { createdAt: 'DESC' }
+              where: { providerSubscriptionId: payload.providerSubscriptionId }
             })
-          : null;
+          : selfManaged
+            ? await manager.findOne(Subscription, {
+                where: {
+                  customerId,
+                  status: In([...SELF_MANAGED_OPEN_STATUSES])
+                },
+                order: { createdAt: 'DESC' }
+              })
+            : null;
 
       const insert = await manager
         .createQueryBuilder()
@@ -346,6 +353,8 @@ export class BillingEventReducer {
           currency: payload.currency,
           status: 'paid',
           billingMode: subscription?.billingMode ?? 'fixed',
+          kind: oneTime ? 'one_time' : 'subscription',
+          productId: oneTime ? (payload.productId ?? null) : null,
           periodStart: parseDate(payload.periodStart, now),
           periodEnd: parseDate(payload.periodEnd, now),
           paidAt: parseDate(payload.paidAt, now),
@@ -356,11 +365,22 @@ export class BillingEventReducer {
         .execute();
 
       // orIgnore returns no row on a replayed event — the unique
-      // provider_event_id gates the whole reduce, so the activation below runs
-      // exactly once per paid invoice.
+      // provider_event_id gates the whole reduce, so the activation/grant
+      // below runs exactly once per paid invoice.
       const rows = insert.raw as Array<{ id: string }>;
       if (rows.length === 0) {
         return null;
+      }
+
+      if (oneTime) {
+        await this.applyOneTimeGrant(
+          manager,
+          customerId,
+          rows[0].id,
+          payload.productId ?? null,
+          now
+        );
+        return { invoiceId: rows[0].id, userId, activatedSubscriptionId: null };
       }
 
       const activatedSubscriptionId =
@@ -387,6 +407,44 @@ export class BillingEventReducer {
         )
       );
     }
+  }
+
+  /**
+   * Applies the purchased product's effect once per paid one-time invoice
+   * (design §20.4): an `sku` product inserts a `CustomerGrant` (expiry from
+   * `grant.durationDays`, else permanent); `custom` carries no grant; credit
+   * packs are the M5 extension of this switch. Idempotency comes from the
+   * caller — the grant runs only when the invoice insert won the unique
+   * `provider_event_id` race.
+   */
+  private async applyOneTimeGrant(
+    manager: EntityManager,
+    customerId: string,
+    invoiceId: string,
+    productId: string | null,
+    now: Date
+  ): Promise<void> {
+    if (!productId) {
+      return;
+    }
+    const product = await manager.findOne(Product, {
+      where: { id: productId }
+    });
+    if (product?.type !== 'sku' || !product.grant?.entitlement) {
+      return;
+    }
+    const { entitlement, durationDays } = product.grant;
+    await manager.save(
+      manager.create(CustomerGrant, {
+        customerId,
+        entitlement,
+        sourceInvoiceId: invoiceId,
+        expiresAt: durationDays
+          ? new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000)
+          : null,
+        revokedAt: null
+      })
+    );
   }
 
   /**

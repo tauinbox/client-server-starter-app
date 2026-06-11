@@ -12,8 +12,10 @@ import { VersioningType, type INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import type { Server } from 'http';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
+import { CustomerGrant } from '../src/modules/billing/entities/customer-grant.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
+import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
@@ -27,7 +29,10 @@ import { WebhookIngestionService } from '../src/modules/billing/webhooks/webhook
 import { BillingWebhooksController } from '../src/modules/billing/webhooks/billing-webhooks.controller';
 import { UsageInvoicingService } from '../src/modules/billing/services/usage-invoicing.service';
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
-import { SubscriptionActivatedEvent } from '../src/modules/billing/events/billing.events';
+import {
+  InvoicePaidEvent,
+  SubscriptionActivatedEvent
+} from '../src/modules/billing/events/billing.events';
 
 // ── In-memory stores + EntityManager / DataSource stand-ins ─────────────────
 
@@ -36,6 +41,8 @@ interface Stores {
   invoices: Invoice[];
   customers: Customer[];
   plans: Plan[];
+  products: Product[];
+  grants: CustomerGrant[];
   webhookEvents: Array<{ id: string; providerEventId: string }>;
 }
 
@@ -61,6 +68,8 @@ function makeManager(stores: Stores) {
         return Promise.resolve(findWhere(stores.customers, opts.where));
       if (entity === Invoice)
         return Promise.resolve(findWhere(stores.invoices, opts.where));
+      if (entity === Product)
+        return Promise.resolve(findWhere(stores.products, opts.where));
       return Promise.resolve(null);
     },
     update: (
@@ -77,11 +86,17 @@ function makeManager(stores: Stores) {
       for (const row of matches) Object.assign(row, set);
       return Promise.resolve({ affected: matches.length });
     },
-    create: (_entity: unknown, data: object) => ({ ...data }) as Subscription,
-    save: (entity: Subscription) => {
+    create: (entity: { prototype: object }, data: object) =>
+      Object.assign(Object.create(entity.prototype) as object, data),
+    save: (entity: { id?: string }) => {
       if (!entity.id) {
-        entity.id = `sub-${++seq}`;
-        stores.subscriptions.push(entity);
+        if (entity instanceof CustomerGrant) {
+          entity.id = `grant-${++seq}`;
+          stores.grants.push(entity);
+        } else {
+          entity.id = `sub-${++seq}`;
+          stores.subscriptions.push(entity as Subscription);
+        }
       }
       return Promise.resolve(entity);
     },
@@ -151,6 +166,7 @@ function makeStubProvider(): PaymentProvider {
     ensureCustomer: jest.fn(),
     startCheckout: jest.fn(),
     chargeOffSession: jest.fn(),
+    createOneTimePayment: jest.fn(),
     chargeUsage: jest.fn(),
     changePlan: jest.fn(),
     previewChangePlan: jest.fn(),
@@ -178,6 +194,21 @@ describe('Billing Paddle webhook (e2e)', () => {
       invoices: [],
       customers: [{ id: 'cust-1', userId: 'user-1' } as Customer],
       plans: [{ key: 'pro', billingMode: 'fixed' } as Plan],
+      products: [
+        {
+          id: 'prod-sku',
+          key: 'report-pack',
+          type: 'sku',
+          grant: { entitlement: 'reports' }
+        } as Product,
+        {
+          id: 'prod-don',
+          key: 'donation',
+          type: 'custom',
+          grant: null
+        } as Product
+      ],
+      grants: [],
       webhookEvents: []
     };
     emit = jest.fn();
@@ -277,6 +308,90 @@ describe('Billing Paddle webhook (e2e)', () => {
 
     expect(stores.subscriptions).toHaveLength(0);
   });
+
+  // ── One-time purchases (design §20.4) ──────────────────────────────────────
+
+  const oneTimePaid = (
+    providerEventId: string,
+    productId: string
+  ): NormalizedEvent => ({
+    provider: 'paddle',
+    providerEventId,
+    type: 'invoice.paid',
+    payload: {
+      ref: { customerId: 'cust-1', userId: 'user-1' },
+      providerInvoiceRef: 'txn_ot_1',
+      providerSubscriptionId: null,
+      amountMinor: 4900,
+      currency: 'USD',
+      periodStart: null,
+      periodEnd: null,
+      paidAt: '2026-06-11T10:00:00Z',
+      kind: 'one_time',
+      productId
+    }
+  });
+
+  function postWebhook(event: NormalizedEvent) {
+    return request(server)
+      .post('/api/v1/billing/webhooks/paddle')
+      .set('paddle-signature', 'sig')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ event }))
+      .expect(200);
+  }
+
+  it('reduces a paid one-time sku purchase onto a one_time invoice and grants the entitlement', async () => {
+    await postWebhook(oneTimePaid('evt_ot_1', 'prod-sku'));
+
+    expect(stores.invoices).toHaveLength(1);
+    expect(stores.invoices[0]).toMatchObject({
+      kind: 'one_time',
+      productId: 'prod-sku',
+      subscriptionId: null,
+      status: 'paid',
+      amountMinor: 4900
+    });
+    expect(stores.grants).toHaveLength(1);
+    expect(stores.grants[0]).toMatchObject({
+      customerId: 'cust-1',
+      entitlement: 'reports',
+      sourceInvoiceId: stores.invoices[0].id,
+      expiresAt: null,
+      revokedAt: null
+    });
+    expect(stores.subscriptions).toHaveLength(0);
+    expect(emit).toHaveBeenCalledWith(
+      InvoicePaidEvent.name,
+      expect.objectContaining({ userId: 'user-1' })
+    );
+    expect(emit).not.toHaveBeenCalledWith(
+      SubscriptionActivatedEvent.name,
+      expect.anything()
+    );
+  });
+
+  it('replays the one-time paid webhook without duplicating the invoice or the grant', async () => {
+    await postWebhook(oneTimePaid('evt_ot_1', 'prod-sku'));
+    await postWebhook(oneTimePaid('evt_ot_1', 'prod-sku'));
+
+    expect(stores.invoices).toHaveLength(1);
+    expect(stores.grants).toHaveLength(1);
+    expect(emit).toHaveBeenCalledTimes(1);
+  });
+
+  it('records a paid custom (donation) purchase without any grant', async () => {
+    await postWebhook(oneTimePaid('evt_ot_don', 'prod-don'));
+
+    expect(stores.invoices).toHaveLength(1);
+    expect(stores.invoices[0]).toMatchObject({
+      kind: 'one_time',
+      productId: 'prod-don',
+      subscriptionId: null,
+      status: 'paid'
+    });
+    expect(stores.grants).toHaveLength(0);
+  });
 });
 
 // ── Paddle usage invoicing flow (real event bus) ────────────────────────────
@@ -362,6 +477,8 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
           }
         } as Plan
       ],
+      products: [],
+      grants: [],
       webhookEvents: []
     };
     chargeUsage = jest.fn().mockResolvedValue(undefined);

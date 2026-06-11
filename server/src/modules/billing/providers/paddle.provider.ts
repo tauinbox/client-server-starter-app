@@ -28,8 +28,16 @@ import type {
   NormalizedInvoicePayload,
   NormalizedPaymentFailedPayload,
   NormalizedSubscriptionPayload,
+  OneTimePaymentParams,
+  OneTimePaymentSession,
   PaymentProvider
 } from './payment-provider.interface';
+
+/**
+ * Custom-data marker a one-time purchase transaction carries (design §20), so
+ * its completed/failed webhooks are told apart from subscription transactions.
+ */
+const ONE_TIME_KIND = 'one_time';
 
 /** First header value (Paddle sends a single `paddle-signature`). */
 function firstHeader(value: string | string[] | undefined): string | undefined {
@@ -65,6 +73,17 @@ function usageChargeKeyFrom(txn: TransactionNotification): string | null {
     }
   }
   return null;
+}
+
+/** Reads the one-time purchase marker + product id echoed via custom data. */
+function oneTimeFromCustomData(
+  customData: Record<string, unknown> | null | undefined
+): { productId: string | null } | null {
+  if (customData?.['kind'] !== ONE_TIME_KIND) {
+    return null;
+  }
+  const productId = customData['productId'];
+  return { productId: typeof productId === 'string' ? productId : null };
 }
 
 /** Reads our `customerId`/`userId` echoed back through Paddle custom data. */
@@ -154,6 +173,52 @@ export class PaddleProvider implements PaymentProvider {
       );
     }
     return { url, sessionRef: transaction.id };
+  }
+
+  /**
+   * Standalone one-time purchase (design §20.2): a Paddle transaction with the
+   * product's catalog price (`paddlePriceId`) or, for a custom amount, an
+   * inline non-catalog price. The one-time marker + `productId` ride in custom
+   * data so the `transaction.completed` webhook reduces onto a `one_time`
+   * invoice. The buyer completes on the hosted checkout URL when Paddle
+   * returns one, else client-side via Paddle.js with the transaction id.
+   */
+  async createOneTimePayment(
+    customer: Customer,
+    params: OneTimePaymentParams
+  ): Promise<OneTimePaymentSession> {
+    const paddle = this.requireClient();
+    const transaction = await paddle.transactions.create({
+      items: [
+        params.paddlePriceId
+          ? { priceId: params.paddlePriceId, quantity: 1 }
+          : {
+              quantity: 1,
+              price: {
+                description: params.description,
+                unitPrice: {
+                  amount: String(params.amountMinor),
+                  currencyCode: params.currency as CurrencyCode
+                },
+                product: { name: params.description, taxCategory: 'standard' }
+              }
+            }
+      ],
+      ...(customer.providerCustomerId
+        ? { customerId: customer.providerCustomerId }
+        : {}),
+      customData: {
+        customerId: customer.id,
+        userId: customer.userId,
+        kind: ONE_TIME_KIND,
+        productId: params.productId
+      },
+      checkout: { url: params.urls.successUrl }
+    });
+    return {
+      url: transaction.checkout?.url ?? undefined,
+      sessionRef: transaction.id
+    };
   }
 
   chargeOffSession(): Promise<ChargeResult> {
@@ -415,8 +480,13 @@ export class PaddleProvider implements PaymentProvider {
       case EventName.TransactionPaymentFailed: {
         const txn = event.data as TransactionNotification;
         // An abandoned/declined method change leaves the old method in place —
-        // it must not feed the dunning/payment-failed pipeline.
-        if (txn.origin === 'subscription_payment_method_change') {
+        // it must not feed the dunning/payment-failed pipeline. Same for a
+        // one-time purchase: nothing pending exists locally until it is paid,
+        // and a subscription payment-failed event would be wrong.
+        if (
+          txn.origin === 'subscription_payment_method_change' ||
+          oneTimeFromCustomData(txn.customData)
+        ) {
           return null;
         }
         const payload: NormalizedPaymentFailedPayload = {
@@ -452,6 +522,7 @@ export class PaddleProvider implements PaymentProvider {
   private invoicePayload(
     txn: TransactionNotification
   ): NormalizedInvoicePayload {
+    const oneTime = oneTimeFromCustomData(txn.customData);
     return {
       ref: refFromCustomData(txn.customData),
       providerInvoiceRef: txn.id,
@@ -461,7 +532,8 @@ export class PaddleProvider implements PaymentProvider {
       periodStart: txn.billingPeriod?.startsAt ?? null,
       periodEnd: txn.billingPeriod?.endsAt ?? null,
       paidAt: txn.billedAt,
-      usageChargeKey: usageChargeKeyFrom(txn)
+      usageChargeKey: usageChargeKeyFrom(txn),
+      ...(oneTime ? { kind: 'one_time', productId: oneTime.productId } : {})
     };
   }
 }

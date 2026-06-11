@@ -281,6 +281,60 @@ describe('PaddleProvider', () => {
       expect(result).toBeNull();
     });
 
+    it('maps a one-time purchase transaction to invoice.paid with kind + product id', async () => {
+      const { provider, client } = await build({});
+      client!.webhooks.unmarshal.mockResolvedValue({
+        eventId: 'evt_ot_1',
+        eventType: EventName.TransactionCompleted,
+        data: {
+          ...transactionData,
+          subscriptionId: null,
+          customData: {
+            customerId: 'cust-1',
+            userId: 'user-1',
+            kind: 'one_time',
+            productId: 'prod-1'
+          }
+        }
+      });
+
+      const result = await provider.verifyAndParseWebhook(Buffer.from('{}'), {
+        'paddle-signature': 'sig'
+      });
+
+      expect(result).toMatchObject({ type: 'invoice.paid' });
+      expect(result!.payload as NormalizedInvoicePayload).toMatchObject({
+        kind: 'one_time',
+        productId: 'prod-1',
+        providerSubscriptionId: null,
+        amountMinor: 1200
+      });
+    });
+
+    it('drops a failed one-time purchase transaction (nothing pending to fail)', async () => {
+      const { provider, client } = await build({});
+      client!.webhooks.unmarshal.mockResolvedValue({
+        eventId: 'evt_ot_2',
+        eventType: EventName.TransactionPaymentFailed,
+        data: {
+          ...transactionData,
+          subscriptionId: null,
+          customData: {
+            customerId: 'cust-1',
+            userId: 'user-1',
+            kind: 'one_time',
+            productId: 'prod-1'
+          }
+        }
+      });
+
+      const result = await provider.verifyAndParseWebhook(Buffer.from('{}'), {
+        'paddle-signature': 'sig'
+      });
+
+      expect(result).toBeNull();
+    });
+
     it('maps transaction.payment_failed to payment.failed', async () => {
       const { provider, client } = await build({});
       client!.webhooks.unmarshal.mockResolvedValue({
@@ -361,6 +415,103 @@ describe('PaddleProvider', () => {
           cancelUrl: 'https://app/cancel'
         })
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+  });
+
+  describe('createOneTimePayment', () => {
+    const customer = {
+      id: 'cust-1',
+      userId: 'user-1',
+      providerCustomerId: null
+    } as Customer;
+    const urls = {
+      successUrl: 'https://app/return',
+      cancelUrl: 'https://app/cancel'
+    };
+
+    it('creates a catalog-price transaction carrying the one-time marker', async () => {
+      const { provider, client } = await build({});
+      client!.transactions.create.mockResolvedValue({
+        id: 'txn_ot',
+        checkout: { url: 'https://pay.paddle.com/checkout/txn_ot' }
+      });
+
+      const session = await provider.createOneTimePayment(customer, {
+        amountMinor: 4900,
+        currency: 'USD',
+        description: 'Pro report pack',
+        receiptItems: [
+          { description: 'Pro report pack', amountMinor: 4900, quantity: 1 }
+        ],
+        productId: 'prod-1',
+        urls,
+        paddlePriceId: 'pri_sku'
+      });
+
+      expect(client!.transactions.create).toHaveBeenCalledWith({
+        items: [{ priceId: 'pri_sku', quantity: 1 }],
+        customData: {
+          customerId: 'cust-1',
+          userId: 'user-1',
+          kind: 'one_time',
+          productId: 'prod-1'
+        },
+        checkout: { url: 'https://app/return' }
+      });
+      expect(session).toEqual({
+        url: 'https://pay.paddle.com/checkout/txn_ot',
+        sessionRef: 'txn_ot'
+      });
+    });
+
+    it('creates an inline-price transaction for a custom amount', async () => {
+      const { provider, client } = await build({});
+      client!.transactions.create.mockResolvedValue({
+        id: 'txn_donation',
+        checkout: null
+      });
+
+      const session = await provider.createOneTimePayment(customer, {
+        amountMinor: 1500,
+        currency: 'USD',
+        description: 'Donation',
+        receiptItems: [
+          { description: 'Donation', amountMinor: 1500, quantity: 1 }
+        ],
+        productId: 'prod-custom',
+        urls
+      });
+
+      expect(client!.transactions.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: [
+            {
+              quantity: 1,
+              price: {
+                description: 'Donation',
+                unitPrice: { amount: '1500', currencyCode: 'USD' },
+                product: { name: 'Donation', taxCategory: 'standard' }
+              }
+            }
+          ]
+        })
+      );
+      // No hosted url: the client completes via Paddle.js with the txn id.
+      expect(session).toEqual({ url: undefined, sessionRef: 'txn_donation' });
+    });
+
+    it('rejects when Paddle is not configured', async () => {
+      const { provider } = await build({ client: null });
+      await expect(
+        provider.createOneTimePayment(customer, {
+          amountMinor: 1,
+          currency: 'USD',
+          description: 'x',
+          receiptItems: [],
+          productId: 'prod-1',
+          urls
+        })
+      ).rejects.toThrow(ServiceUnavailableException);
     });
   });
 

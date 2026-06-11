@@ -248,6 +248,78 @@ describe('YooKassaProvider', () => {
     });
   });
 
+  describe('createOneTimePayment', () => {
+    const params = {
+      amountMinor: 50000,
+      currency: 'RUB',
+      description: 'Pro report pack',
+      receiptItems: [
+        { description: 'Pro report pack', amountMinor: 50000, quantity: 1 }
+      ],
+      productId: 'prod-1',
+      urls
+    };
+
+    it('creates a plain payment with a receipt and the one-time marker, without saving the card', async () => {
+      const { provider, client } = await build();
+      client!.createPayment.mockResolvedValue({
+        id: 'pay-ot',
+        status: 'pending',
+        confirmation: { confirmation_url: 'https://yoomoney/checkout/pay-ot' }
+      });
+
+      const session = await provider.createOneTimePayment(customer, params);
+
+      const [payload, idempotencyKey] = client!.createPayment.mock.calls[0] as [
+        ICreatePayment,
+        string
+      ];
+      expect(payload).toMatchObject({
+        amount: { value: '500.00', currency: 'RUB' },
+        capture: true,
+        confirmation: { type: 'redirect', return_url: urls.successUrl },
+        description: 'Pro report pack',
+        metadata: {
+          customerId: 'cust-1',
+          userId: 'user-1',
+          purpose: 'one_time',
+          productId: 'prod-1'
+        },
+        merchant_customer_id: 'cust-1'
+      });
+      expect(payload.save_payment_method).toBeUndefined();
+      expect(payload.receipt!.items[0]).toMatchObject({
+        description: 'Pro report pack',
+        quantity: '1',
+        amount: { value: '500.00', currency: 'RUB' },
+        vat_code: 1
+      });
+      expect(typeof idempotencyKey).toBe('string');
+      expect(session).toEqual({
+        url: 'https://yoomoney/checkout/pay-ot',
+        sessionRef: 'pay-ot'
+      });
+    });
+
+    it('throws when YooKassa returns no confirmation url', async () => {
+      const { provider, client } = await build();
+      client!.createPayment.mockResolvedValue({
+        id: 'pay-ot',
+        confirmation: {}
+      });
+      await expect(
+        provider.createOneTimePayment(customer, params)
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+
+    it('throws when YooKassa is not configured', async () => {
+      const { provider } = await build({ client: null });
+      await expect(
+        provider.createOneTimePayment(customer, params)
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+  });
+
   describe('chargeOffSession', () => {
     const savedCustomer = {
       ...customer,
@@ -526,6 +598,59 @@ describe('YooKassaProvider', () => {
       expect(
         await provider.verifyAndParseWebhook(
           notification('payment.canceled', 'pay-mu')
+        )
+      ).toBeNull();
+    });
+
+    it('maps a succeeded one-time purchase to invoice.paid with kind + product id and no saved method', async () => {
+      const { provider, client } = await build();
+      client!.getPayment.mockResolvedValue({
+        id: 'pay-ot',
+        status: 'succeeded',
+        amount: { value: '500.00', currency: 'RUB' },
+        captured_at: '2026-06-11T10:00:00Z',
+        payment_method: {
+          id: 'tok-stray',
+          saved: true,
+          card: { card_type: 'Visa', last4: '1111' }
+        },
+        metadata: {
+          customerId: 'cust-1',
+          userId: 'user-1',
+          purpose: 'one_time',
+          productId: 'prod-1'
+        }
+      });
+
+      const result = await provider.verifyAndParseWebhook(
+        notification('payment.succeeded', 'pay-ot')
+      );
+
+      expect(result).toMatchObject({ type: 'invoice.paid' });
+      const payload = result!.payload as NormalizedInvoicePayload;
+      expect(payload).toMatchObject({
+        kind: 'one_time',
+        productId: 'prod-1',
+        providerSubscriptionId: null,
+        amountMinor: 50000
+      });
+      // A one-time purchase never persists a payment method, even if the
+      // provider reports the card as saved.
+      expect(payload.savedPaymentMethod).toBeNull();
+    });
+
+    it('ignores a canceled one-time purchase (nothing pending to fail)', async () => {
+      const { provider, client } = await build();
+      client!.getPayment.mockResolvedValue({
+        id: 'pay-ot',
+        status: 'canceled',
+        amount: { value: '500.00', currency: 'RUB' },
+        metadata: { customerId: 'cust-1', purpose: 'one_time' }
+      });
+
+      expect(
+        await provider.verifyAndParseWebhook(
+          notification('payment.canceled', 'pay-ot')
         )
       ).toBeNull();
     });
