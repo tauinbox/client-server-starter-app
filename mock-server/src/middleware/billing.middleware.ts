@@ -292,6 +292,31 @@ billingRouter.post(
   }
 );
 
+// GET /billing/products — one-time purchase catalog. Minimal M4 parity: the
+// mock state carries no product catalog yet (it lands with the one-time UI
+// work), so the route mirrors the server's contract over an empty catalog.
+billingRouter.get('/products', authGuard, (_req: Request, res: Response) => {
+  res.json([]);
+});
+
+// POST /billing/purchase — start a one-time purchase. Same request validation
+// as the server; with the mock's empty catalog every product key resolves to
+// 404, exactly the server's response for an unknown product.
+billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
+  const productKey =
+    typeof req.body?.productKey === 'string' ? req.body.productKey.trim() : '';
+  if (!productKey) {
+    res
+      .status(400)
+      .json({ message: 'productKey must be a string', statusCode: 400 });
+    return;
+  }
+  res.status(404).json({
+    message: `Product "${productKey}" was not found`,
+    statusCode: 404
+  });
+});
+
 // POST /billing/checkout — start a hosted checkout for a plan.
 billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;

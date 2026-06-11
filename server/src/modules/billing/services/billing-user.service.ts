@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -13,7 +14,9 @@ import type {
   BillingProviderId,
   BillingRegion,
   CheckoutSessionResponse,
-  ProrationPreviewResponse
+  ProductPrice,
+  ProrationPreviewResponse,
+  PurchaseSessionResponse
 } from '@app/shared/types';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { User } from '../../users/entities/user.entity';
@@ -21,6 +24,7 @@ import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { PaymentMethod } from '../entities/payment-method.entity';
 import { Plan } from '../entities/plan.entity';
+import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import {
   InvoicePaidEvent,
@@ -67,6 +71,23 @@ function geoFromLocale(locale: string): { country: string; currency: string } {
     : { country: 'US', currency: 'USD' };
 }
 
+/** One-time product types listed in the purchase catalog (design §20.3). */
+const LISTED_PRODUCT_TYPES = ['sku', 'credits'] as const;
+
+/**
+ * Receipt text travels into provider receipts and 54-FZ fiscal documents —
+ * strip markup-capable and control characters, keep it plain prose.
+ */
+function sanitizeReceiptText(text: string): string {
+  return (
+    text
+      .replace(/\s+/g, ' ')
+      // eslint-disable-next-line no-control-regex
+      .replace(/[<>\u0000-\u001f\u007f]/g, '')
+      .trim()
+  );
+}
+
 /** Region selector ⇄ provider override (design §19). */
 function overrideForRegion(region: BillingRegion): BillingProviderId | null {
   if (region === 'ru') return 'yookassa';
@@ -100,6 +121,8 @@ export class BillingUserService {
     private readonly paymentMethods: Repository<PaymentMethod>,
     @InjectRepository(Plan)
     private readonly plans: Repository<Plan>,
+    @InjectRepository(Product)
+    private readonly products: Repository<Product>,
     @InjectRepository(User)
     private readonly users: Repository<User>,
     @InjectDataSource() private readonly dataSource: DataSource,
@@ -173,6 +196,136 @@ export class BillingUserService {
     return this.paymentMethods.findOne({
       where: { id: customer.defaultPaymentMethodId, customerId: customer.id }
     });
+  }
+
+  /**
+   * The one-time purchase catalog (design §20.3): active fixed-price products
+   * (`sku`/`credits` — never `custom`, which has no listable price) that carry
+   * a price for the caller's effective provider. Like `getRegion`, this is a
+   * read — it resolves the provider without asserting availability, so the
+   * catalog stays browsable while a provider is disabled.
+   */
+  async listProducts(userId: string): Promise<Product[]> {
+    const customer = await this.customers.findOne({ where: { userId } });
+    const providerId = customer
+      ? this.billing.effectiveProviderId(customer)
+      : this.billing.geoDefaultFor(await this.detectCountry(userId));
+
+    const products = await this.products.find({
+      where: { active: true, type: In([...LISTED_PRODUCT_TYPES]) },
+      order: { createdAt: 'ASC' }
+    });
+    return products.filter((product) => product.prices[providerId]);
+  }
+
+  /**
+   * Starts a standalone one-time purchase (design §20.3): resolves the
+   * provider (availability-asserting, like checkout) and opens the provider's
+   * one-time payment with the product id round-tripped through custom data so
+   * the paid webhook reduces onto a `kind 'one_time'` invoice and applies the
+   * grant. The server is price-authoritative for fixed-price products — a
+   * client-sent amount is ignored; `custom` amounts are validated against the
+   * product's bounds.
+   */
+  async purchase(
+    userId: string,
+    request: { productKey: string; amountMinor?: number; description?: string }
+  ): Promise<PurchaseSessionResponse> {
+    const product = await this.products.findOne({
+      where: { key: request.productKey }
+    });
+    if (!product || !product.active) {
+      throw new NotFoundException(
+        `Product "${request.productKey}" was not found`
+      );
+    }
+
+    const customer = await this.getOrCreateCustomer(userId);
+    const provider = await this.billing.resolveProvider(customer);
+
+    const price = product.prices[provider.id];
+    if (!price) {
+      throw new ConflictException(
+        `Product "${product.key}" is not available for your billing provider.`
+      );
+    }
+
+    const amountMinor = this.resolvePurchaseAmount(
+      product,
+      price,
+      request.amountMinor
+    );
+    const description = this.purchaseDescription(product, request.description);
+
+    const session = await provider.createOneTimePayment(customer, {
+      amountMinor,
+      currency: price.currency,
+      description,
+      receiptItems: [{ description, amountMinor, quantity: 1 }],
+      productId: product.id,
+      urls: {
+        successUrl: this.checkoutUrl('success'),
+        cancelUrl: this.checkoutUrl('cancel')
+      },
+      paddlePriceId: price.paddlePriceId
+    });
+    return {
+      provider: provider.id,
+      url: session.url ?? null,
+      sessionRef: session.sessionRef
+    };
+  }
+
+  /**
+   * The amount actually charged (threat model §20.5: amount tampering).
+   * Fixed-price products charge the catalog price; `custom` requires a client
+   * amount inside the product's configured bounds.
+   */
+  private resolvePurchaseAmount(
+    product: Product,
+    price: ProductPrice,
+    requestedMinor: number | undefined
+  ): number {
+    if (product.type !== 'custom') {
+      if (!price.amountMinor || price.amountMinor <= 0) {
+        throw new ServiceUnavailableException(
+          `Product "${product.key}" has no price configured`
+        );
+      }
+      return price.amountMinor;
+    }
+
+    const { minAmountMinor, maxAmountMinor } = price;
+    if (!minAmountMinor || !maxAmountMinor) {
+      throw new ServiceUnavailableException(
+        `Product "${product.key}" has no amount bounds configured`
+      );
+    }
+    if (requestedMinor === undefined) {
+      throw new BadRequestException(
+        'amountMinor is required for a custom-amount product'
+      );
+    }
+    if (requestedMinor < minAmountMinor || requestedMinor > maxAmountMinor) {
+      throw new BadRequestException(
+        `amountMinor must be between ${minAmountMinor} and ${maxAmountMinor}`
+      );
+    }
+    return requestedMinor;
+  }
+
+  /**
+   * The receipt line text: the product name, with the buyer's note appended on
+   * a custom purchase — sanitized, since it lands in fiscal documents.
+   */
+  private purchaseDescription(product: Product, note?: string): string {
+    if (product.type !== 'custom' || !note) {
+      return product.name;
+    }
+    const sanitized = sanitizeReceiptText(note);
+    return sanitized
+      ? `${product.name}: ${sanitized}`.slice(0, 128)
+      : product.name;
   }
 
   async checkout(
