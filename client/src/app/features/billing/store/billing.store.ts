@@ -15,14 +15,21 @@ import type {
   InvoiceResponse,
   PaymentMethodResponse,
   PlanResponse,
+  ProductResponse,
+  PurchaseSessionResponse,
   SubscriptionResponse,
   UsageSummaryResponse
 } from '@app/shared/types';
 import { NotifyService } from '@core/services/notify.service';
-import { BillingService, type CancelMode } from '../services/billing.service';
+import {
+  BillingService,
+  type CancelMode,
+  type PurchaseRequest
+} from '../services/billing.service';
 
 type BillingState = {
   plans: PlanResponse[];
+  products: ProductResponse[];
   subscription: SubscriptionResponse | null;
   invoices: InvoiceResponse[];
   paymentMethod: PaymentMethodResponse | null;
@@ -34,6 +41,7 @@ type BillingState = {
 
 const initialState: BillingState = {
   plans: [],
+  products: [],
   subscription: null,
   invoices: [],
   paymentMethod: null,
@@ -87,17 +95,27 @@ export const BillingStore = signalStore(
       }
     }
 
+    async function loadProducts(): Promise<void> {
+      try {
+        const products = await firstValueFrom(billing.getProducts());
+        patchState(store, { products });
+      } catch (error) {
+        notify.error(error as HttpErrorResponse, 'billing.errors.loadFailed');
+      }
+    }
+
     /**
-     * Pricing page: plans always; region + current subscription only when
-     * authenticated (both endpoints require auth, and the subscription drives
-     * the "Current" badge on the matching tier).
+     * Pricing page: plans always; region, current subscription and the
+     * one-time catalog only when authenticated (those endpoints require auth;
+     * the subscription drives the "Current" badge on the matching tier).
      */
     async function loadPricing(authenticated: boolean): Promise<void> {
       patchState(store, { loading: true });
       await Promise.all([
         loadPlans(),
         authenticated ? loadRegion() : Promise.resolve(),
-        authenticated ? refreshSubscription() : Promise.resolve()
+        authenticated ? refreshSubscription() : Promise.resolve(),
+        authenticated ? loadProducts() : Promise.resolve()
       ]);
       patchState(store, { loading: false });
     }
@@ -160,6 +178,42 @@ export const BillingStore = signalStore(
         return null;
       } finally {
         patchState(store, { working: false });
+      }
+    }
+
+    /**
+     * Start a one-time purchase and return the provider session (the caller
+     * persists the pending ref and performs the redirect). `null` on failure.
+     */
+    async function purchase(
+      request: PurchaseRequest
+    ): Promise<PurchaseSessionResponse | null> {
+      patchState(store, { working: true });
+      try {
+        return await firstValueFrom(billing.purchase(request));
+      } catch (error) {
+        notify.error(
+          error as HttpErrorResponse,
+          'billing.errors.purchaseFailed'
+        );
+        return null;
+      } finally {
+        patchState(store, { working: false });
+      }
+    }
+
+    /**
+     * Refresh just the invoices (e.g. while a one-time purchase return waits
+     * for the provider webhook to settle the paid invoice).
+     */
+    async function refreshInvoices(): Promise<InvoiceResponse[]> {
+      try {
+        const invoices = await firstValueFrom(billing.getInvoices());
+        patchState(store, { invoices });
+        return invoices;
+      } catch (error) {
+        notify.error(error as HttpErrorResponse, 'billing.errors.loadFailed');
+        return store.invoices();
       }
     }
 
@@ -245,10 +299,13 @@ export const BillingStore = signalStore(
     return {
       loadPlans,
       loadRegion,
+      loadProducts,
       loadPricing,
       loadSettings,
       refreshSubscription,
+      refreshInvoices,
       checkout,
+      purchase,
       changePlan,
       startPaymentMethodUpdate,
       cancel,

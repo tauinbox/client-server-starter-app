@@ -8,7 +8,9 @@ import type {
   InvoiceResponse,
   PaymentMethodResponse,
   PlanResponse,
+  ProductResponse,
   ProrationPreviewResponse,
+  PurchaseSessionResponse,
   SubscriptionResponse,
   UsageSummaryResponse
 } from '@app/shared/types';
@@ -16,6 +18,17 @@ import type {
 export const BILLING_API_V1 = '/api/v1/billing';
 
 export type CancelMode = 'period_end' | 'immediate';
+
+/**
+ * One-time purchase request (design §20.3). `amountMinor` is required for
+ * custom-amount products and ignored for fixed-price ones (the server price
+ * is authoritative); `description` is the optional buyer note on the receipt.
+ */
+export type PurchaseRequest = {
+  productKey: string;
+  amountMinor?: number;
+  description?: string;
+};
 
 /**
  * Thin HTTP wrapper over the user billing API (design §11). Read endpoints
@@ -48,6 +61,17 @@ export class BillingService {
   getPaymentMethod(): Observable<PaymentMethodResponse | null> {
     return this.#http.get<PaymentMethodResponse | null>(
       `${BILLING_API_V1}/payment-method`
+    );
+  }
+
+  getProducts(): Observable<ProductResponse[]> {
+    return this.#http.get<ProductResponse[]>(`${BILLING_API_V1}/products`);
+  }
+
+  purchase(request: PurchaseRequest): Observable<PurchaseSessionResponse> {
+    return this.#http.post<PurchaseSessionResponse>(
+      `${BILLING_API_V1}/purchase`,
+      request
     );
   }
 

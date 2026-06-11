@@ -53,5 +53,41 @@
         }}</span>
       </div>
     }
+
+    <!-- One-time purchases: SKU catalog + donation (design §21.4). -->
+    @if (showOneTime()) {
+      <section class="one-time" aria-labelledby="one-time-title">
+        <header class="one-time-header">
+          <h2 id="one-time-title">{{ t('billing.oneTime.title') }}</h2>
+          <p>{{ t('billing.oneTime.subtitle') }}</p>
+        </header>
+
+        <div class="one-time-grid">
+          <div class="one-time-products">
+            @for (item of oneTimeProducts(); track item.key) {
+              <nxs-product-card
+                [product]="item.product"
+                [price]="item.price"
+                [disabled]="store.working()"
+                (buy)="onBuy(item)"
+              />
+            }
+          </div>
+
+          @if (donationProducts().length > 0) {
+            <div class="one-time-donations">
+              @for (donation of donationProducts(); track donation.key) {
+                <nxs-donation-card
+                  [product]="donation"
+                  [provider]="displayProvider()"
+                  [disabled]="store.working()"
+                  (donate)="onDonate(donation, $event)"
+                />
+              }
+            </div>
+          }
+        </div>
+      </section>
+    }
   }
 </section>

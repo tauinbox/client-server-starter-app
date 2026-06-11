@@ -6,11 +6,13 @@ import { signal } from '@angular/core';
 import type {
   BillingRegionResponse,
   PlanResponse,
+  ProductResponse,
   SubscriptionResponse
 } from '@app/shared/types';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 import { BillingStore } from '../../store/billing.store';
+import { readPendingPurchase } from '../../utils/pending-purchase';
 import { PricingPageComponent } from './pricing-page.component';
 
 function plan(key: string, name: string, amountMinor: number): PlanResponse {
@@ -32,34 +34,73 @@ function plan(key: string, name: string, amountMinor: number): PlanResponse {
   };
 }
 
+const reportPack: ProductResponse = {
+  id: 'prod-report-pack',
+  key: 'report-pack',
+  name: 'Report pack',
+  description: '30 days of reports access',
+  type: 'sku',
+  prices: { paddle: { currency: 'USD', amountMinor: 500 } },
+  grant: { entitlement: 'reports', durationDays: 30 },
+  active: true,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z'
+};
+
+const donation: ProductResponse = {
+  id: 'prod-donation',
+  key: 'donation',
+  name: 'Donation',
+  description: 'Support the project',
+  type: 'custom',
+  prices: {
+    paddle: { currency: 'USD', minAmountMinor: 100, maxAmountMinor: 50000 }
+  },
+  grant: null,
+  active: true,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z'
+};
+
 describe('PricingPageComponent', () => {
   let fixture: ComponentFixture<PricingPageComponent>;
   let storeMock: {
     plans: ReturnType<typeof signal<PlanResponse[]>>;
+    products: ReturnType<typeof signal<ProductResponse[]>>;
     subscription: ReturnType<typeof signal<SubscriptionResponse | null>>;
     region: ReturnType<typeof signal<BillingRegionResponse | null>>;
     loading: ReturnType<typeof signal<boolean>>;
     working: ReturnType<typeof signal<boolean>>;
     loadPricing: ReturnType<typeof vi.fn>;
     checkout: ReturnType<typeof vi.fn>;
+    purchase: ReturnType<typeof vi.fn>;
     setRegion: ReturnType<typeof vi.fn>;
   };
   let authMock: { isAuthenticated: ReturnType<typeof signal<boolean>> };
   let routerMock: { navigate: ReturnType<typeof vi.fn> };
 
-  async function setup(authenticated: boolean): Promise<void> {
+  afterEach(() => {
+    sessionStorage.clear();
+  });
+
+  async function setup(
+    authenticated: boolean,
+    products: ProductResponse[] = []
+  ): Promise<void> {
     storeMock = {
       plans: signal<PlanResponse[]>([
         plan('free', 'Free', 0),
         plan('pro', 'Pro', 1200),
         plan('business', 'Business', 2900)
       ]),
+      products: signal<ProductResponse[]>(products),
       subscription: signal<SubscriptionResponse | null>(null),
       region: signal<BillingRegionResponse | null>(null),
       loading: signal(false),
       working: signal(false),
       loadPricing: vi.fn().mockResolvedValue(undefined),
       checkout: vi.fn().mockResolvedValue(null),
+      purchase: vi.fn().mockResolvedValue(null),
       setRegion: vi.fn().mockResolvedValue(true)
     };
     authMock = { isAuthenticated: signal(authenticated) };
@@ -118,5 +159,93 @@ describe('PricingPageComponent', () => {
     await setup(true);
     fixture.componentInstance.onChoose('pro');
     expect(storeMock.checkout).toHaveBeenCalledWith('pro');
+  });
+
+  it('renders the one-time section with product and donation cards for authed users', async () => {
+    await setup(true, [reportPack, donation]);
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('.one-time')).not.toBeNull();
+    expect(host.querySelectorAll('nxs-product-card').length).toBe(1);
+    expect(host.querySelectorAll('nxs-donation-card').length).toBe(1);
+  });
+
+  it('hides the one-time section when the catalog is empty or anonymous', async () => {
+    await setup(true, []);
+    expect(fixture.nativeElement.querySelector('.one-time')).toBeNull();
+    fixture.destroy();
+
+    TestBed.resetTestingModule();
+    await setup(false, [reportPack]);
+    expect(fixture.nativeElement.querySelector('.one-time')).toBeNull();
+  });
+
+  it('starts an sku purchase at the catalog price and parks the session hand-off', async () => {
+    await setup(true, [reportPack]);
+    storeMock.purchase.mockResolvedValue({
+      provider: 'paddle',
+      url: null,
+      sessionRef: 'session-7'
+    });
+
+    fixture.componentInstance.onBuy({
+      key: reportPack.key,
+      price: '$5.00',
+      product: reportPack
+    });
+    await fixture.whenStable();
+
+    expect(storeMock.purchase).toHaveBeenCalledWith({
+      productKey: 'report-pack'
+    });
+    expect(readPendingPurchase()).toEqual({
+      sessionRef: 'session-7',
+      productName: 'Report pack',
+      amountMinor: 500,
+      currency: 'USD'
+    });
+    // No hosted-checkout URL (client-side completion) → straight to the
+    // return page where the webhook confirmation is polled.
+    expect(routerMock.navigate).toHaveBeenCalledWith(['/billing/success']);
+  });
+
+  it('starts a donation purchase with the chosen amount and note', async () => {
+    await setup(true, [donation]);
+    storeMock.purchase.mockResolvedValue({
+      provider: 'paddle',
+      url: null,
+      sessionRef: 'session-8'
+    });
+
+    fixture.componentInstance.onDonate(donation, {
+      amountMinor: 1500,
+      note: 'Keep it up'
+    });
+    await fixture.whenStable();
+
+    expect(storeMock.purchase).toHaveBeenCalledWith({
+      productKey: 'donation',
+      amountMinor: 1500,
+      description: 'Keep it up'
+    });
+    expect(readPendingPurchase()).toEqual({
+      sessionRef: 'session-8',
+      productName: 'Donation',
+      amountMinor: 1500,
+      currency: 'USD'
+    });
+  });
+
+  it('parks nothing when the purchase fails to start', async () => {
+    await setup(true, [reportPack]);
+
+    fixture.componentInstance.onBuy({
+      key: reportPack.key,
+      price: '$5.00',
+      product: reportPack
+    });
+    await fixture.whenStable();
+
+    expect(readPendingPurchase()).toBeNull();
+    expect(routerMock.navigate).not.toHaveBeenCalled();
   });
 });

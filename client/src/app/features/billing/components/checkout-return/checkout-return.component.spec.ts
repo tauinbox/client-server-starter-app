@@ -3,9 +3,17 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
-import type { PlanResponse, SubscriptionResponse } from '@app/shared/types';
+import type {
+  InvoiceResponse,
+  PlanResponse,
+  SubscriptionResponse
+} from '@app/shared/types';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 import { BillingStore } from '../../store/billing.store';
+import {
+  readPendingPurchase,
+  storePendingPurchase
+} from '../../utils/pending-purchase';
 import { CheckoutReturnComponent } from './checkout-return.component';
 
 const proPlan: PlanResponse = {
@@ -29,6 +37,13 @@ const activeSub = {
   currentPeriodEnd: '2026-07-01T00:00:00.000Z'
 } as SubscriptionResponse;
 
+const paidPurchaseInvoice = {
+  id: 'inv-1',
+  providerInvoiceRef: 'session-1',
+  status: 'paid',
+  kind: 'one_time'
+} as InvoiceResponse;
+
 describe('CheckoutReturnComponent', () => {
   let fixture: ComponentFixture<CheckoutReturnComponent>;
   let storeMock: {
@@ -37,12 +52,18 @@ describe('CheckoutReturnComponent', () => {
     subscription: ReturnType<typeof signal<SubscriptionResponse | null>>;
     hasActiveSubscription: ReturnType<typeof signal<boolean>>;
     refreshSubscription: ReturnType<typeof vi.fn>;
+    refreshInvoices: ReturnType<typeof vi.fn>;
     loadPlans: ReturnType<typeof vi.fn>;
   };
 
+  afterEach(() => {
+    sessionStorage.clear();
+  });
+
   async function setup(
     mode: 'success' | 'cancel',
-    active: boolean
+    active: boolean,
+    invoices: InvoiceResponse[] = []
   ): Promise<void> {
     storeMock = {
       plans: signal<PlanResponse[]>(active ? [proPlan] : []),
@@ -52,6 +73,7 @@ describe('CheckoutReturnComponent', () => {
       ),
       hasActiveSubscription: signal(active),
       refreshSubscription: vi.fn().mockResolvedValue(active ? activeSub : null),
+      refreshInvoices: vi.fn().mockResolvedValue(invoices),
       loadPlans: vi.fn().mockResolvedValue(undefined)
     };
 
@@ -83,5 +105,41 @@ describe('CheckoutReturnComponent', () => {
     expect(storeMock.refreshSubscription).not.toHaveBeenCalled();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Checkout canceled');
+  });
+
+  it('confirms a one-time purchase by its provider payment reference and clears the hand-off', async () => {
+    storePendingPurchase({
+      sessionRef: 'session-1',
+      productName: 'Report pack',
+      amountMinor: 500,
+      currency: 'USD'
+    });
+
+    await setup('success', false, [paidPurchaseInvoice]);
+
+    expect(storeMock.refreshInvoices).toHaveBeenCalled();
+    expect(storeMock.refreshSubscription).not.toHaveBeenCalled();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Thank you for your purchase!');
+    expect(text).toContain('Report pack');
+    expect(text).toContain('$5.00');
+    expect(readPendingPurchase()).toBeNull();
+  });
+
+  it('keeps polling subscription-style when no purchase is pending', async () => {
+    await setup('success', true, [paidPurchaseInvoice]);
+    expect(storeMock.refreshSubscription).toHaveBeenCalled();
+    expect(storeMock.refreshInvoices).not.toHaveBeenCalled();
+  });
+
+  it('clears a stale purchase hand-off on a cancel return', async () => {
+    storePendingPurchase({
+      sessionRef: 'session-9',
+      productName: 'Donation',
+      amountMinor: 1500,
+      currency: 'USD'
+    });
+    await setup('cancel', false);
+    expect(readPendingPurchase()).toBeNull();
   });
 });

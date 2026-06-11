@@ -12,6 +12,7 @@ import type {
   MockFeatureFlagRule,
   MockPermission,
   MockPlan,
+  MockProduct,
   MockSubscription,
   MockInvoice,
   MockPaymentMethod,
@@ -26,6 +27,7 @@ import type {
   FeatureFlagRuleResponse,
   PermissionResponse,
   PlanResponse,
+  ProductResponse,
   SubscriptionResponse,
   InvoiceResponse,
   PaymentMethodResponse,
@@ -47,7 +49,8 @@ import {
   seedRolePermissions,
   seedFeatureFlags,
   seedFeatureFlagRules,
-  seedPlans
+  seedPlans,
+  seedProducts
 } from './seed';
 
 // Each Playwright worker imports this module in its own process,
@@ -83,11 +86,14 @@ export function resetState(): void {
       payload: { ...r.payload }
     })),
     plans: new Map(seedPlans.map((p) => [p.id, { ...p }])),
+    billingProducts: new Map(seedProducts.map((p) => [p.id, { ...p }])),
     billingCustomers: new Map(),
     billingSubscriptions: new Map(),
     billingUsageRecords: new Map(),
     billingInvoices: new Map(),
-    billingPaymentMethods: new Map()
+    billingPaymentMethods: new Map(),
+    billingCustomerGrants: new Map(),
+    billingPurchaseSessions: new Map()
   };
 }
 
@@ -475,6 +481,21 @@ export function toPlanResponse(plan: MockPlan): PlanResponse {
     prices: plan.prices,
     createdAt: plan.createdAt,
     updatedAt: plan.updatedAt
+  };
+}
+
+export function toProductResponse(product: MockProduct): ProductResponse {
+  return {
+    id: product.id,
+    key: product.key,
+    name: product.name,
+    description: product.description,
+    type: product.type,
+    prices: product.prices,
+    grant: product.grant,
+    active: product.active,
+    createdAt: product.createdAt,
+    updatedAt: product.updatedAt
   };
 }
 

@@ -87,6 +87,50 @@
   }
 }
 
+// One-time purchases band (design §21.4): catalog column + donation column,
+// asymmetric on desktop, stacked below tablet-portrait.
+.one-time {
+  margin-top: vars.$spacing-xxl;
+}
+
+.one-time-header {
+  margin-bottom: vars.$spacing-lg;
+
+  h2 {
+    margin: 0;
+    font-size: vars.$font-size-xl;
+    font-weight: vars.$font-weight-bold;
+  }
+
+  p {
+    margin: vars.$spacing-xs 0 0;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.one-time-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(func.rem(320), func.rem(420));
+  gap: vars.$spacing-lg;
+  align-items: start;
+
+  @media (max-width: vars.$breakpoint-sm) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.one-time-products {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-md;
+}
+
+.one-time-donations {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-md;
+}
+
 // Staggered reveal of plan cards on load (design §21, one restrained motion).
 @media (prefers-reduced-motion: no-preference) {
   .plan-grid nxs-plan-card {

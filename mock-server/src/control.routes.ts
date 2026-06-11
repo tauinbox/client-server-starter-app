@@ -4,6 +4,7 @@ import {
   addOAuthAccounts,
   getState,
   resetState,
+  toInvoiceResponse,
   toSubscriptionResponse,
   toUsageResponse,
   toUserResponse
@@ -11,6 +12,7 @@ import {
 import type { StateSnapshot } from './control.types';
 import type {
   MockCustomer,
+  MockCustomerGrant,
   MockInvoice,
   MockPaymentMethod,
   MockPermission,
@@ -52,13 +54,16 @@ function buildStateSnapshot(state: State): StateSnapshot {
     featureFlags: Array.from(state.featureFlags.values()),
     featureFlagRules: state.featureFlagRules,
     plans: Array.from(state.plans.values()),
+    billingProducts: Array.from(state.billingProducts.values()),
     billingCustomers: Array.from(state.billingCustomers.values()),
     billingSubscriptions: Array.from(state.billingSubscriptions.values()),
     billingInvoices: Array.from(state.billingInvoices.values()),
     billingPaymentMethods: Array.from(state.billingPaymentMethods.values()),
     billingUsageRecords: Array.from(state.billingUsageRecords.values()).map(
       toUsageResponse
-    )
+    ),
+    billingCustomerGrants: Array.from(state.billingCustomerGrants.values()),
+    billingPurchaseSessions: Array.from(state.billingPurchaseSessions.values())
   };
 }
 
@@ -500,6 +505,88 @@ router.post('/billing/seed-usage', (req, res) => {
   };
   state.billingUsageRecords.set(record.id, record);
   res.json(toUsageResponse(record));
+});
+
+// POST /__control/billing/complete-purchase — simulate the provider's paid
+// webhook for a one-time purchase opened via POST /billing/purchase (the real
+// flow redirects to an external hosted-checkout page Playwright can't visit).
+// Settles a pending purchase session — by explicit `sessionRef`, or the
+// latest one for `userId` — exactly the way the server's webhook reducer
+// would: a paid `one_time` invoice keyed by the provider payment reference,
+// plus a CustomerGrant when the product is an entitlement-granting sku.
+// Settling deletes the session, mirroring the reducer's once-per-payment
+// idempotency.
+router.post('/billing/complete-purchase', (req, res) => {
+  const { userId, sessionRef } = req.body as {
+    userId?: string;
+    sessionRef?: string;
+  };
+  if (!userId && !sessionRef) {
+    res.status(400).json({ message: 'userId or sessionRef is required' });
+    return;
+  }
+
+  const state = getState();
+  let session = sessionRef
+    ? state.billingPurchaseSessions.get(sessionRef)
+    : undefined;
+  if (!session && userId) {
+    const customer = [...state.billingCustomers.values()].find(
+      (c) => c.userId === userId
+    );
+    session = customer
+      ? [...state.billingPurchaseSessions.values()]
+          .filter((s) => s.customerId === customer.id)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+      : undefined;
+  }
+  if (!session) {
+    res.status(404).json({ message: 'pending purchase session not found' });
+    return;
+  }
+
+  const nowIso = new Date().toISOString();
+  const invoice: MockInvoice = {
+    id: randomUUID(),
+    customerId: session.customerId,
+    subscriptionId: null,
+    provider: session.provider,
+    providerInvoiceRef: session.sessionRef,
+    amountMinor: session.amountMinor,
+    currency: session.currency,
+    status: 'paid',
+    billingMode: 'fixed',
+    kind: 'one_time',
+    productId: session.productId,
+    periodStart: nowIso,
+    periodEnd: nowIso,
+    paidAt: nowIso,
+    receiptRef: null,
+    createdAt: nowIso,
+    updatedAt: nowIso
+  };
+  state.billingInvoices.set(invoice.id, invoice);
+
+  const product = state.billingProducts.get(session.productId);
+  if (product?.type === 'sku' && product.grant?.entitlement) {
+    const grant: MockCustomerGrant = {
+      id: randomUUID(),
+      customerId: session.customerId,
+      entitlement: product.grant.entitlement,
+      sourceInvoiceId: invoice.id,
+      expiresAt: product.grant.durationDays
+        ? new Date(
+            Date.now() + product.grant.durationDays * 86_400_000
+          ).toISOString()
+        : null,
+      revokedAt: null,
+      createdAt: nowIso
+    };
+    state.billingCustomerGrants.set(grant.id, grant);
+  }
+
+  state.billingPurchaseSessions.delete(session.sessionRef);
+  res.json(toInvoiceResponse(invoice));
 });
 
 // Mirrors the server's dunning policy (renewal-queue.constants).

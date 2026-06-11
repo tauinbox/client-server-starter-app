@@ -71,8 +71,12 @@ function geoFromLocale(locale: string): { country: string; currency: string } {
     : { country: 'US', currency: 'USD' };
 }
 
-/** One-time product types listed in the purchase catalog (design §20.3). */
-const LISTED_PRODUCT_TYPES = ['sku', 'credits'] as const;
+/**
+ * One-time product types listed in the purchase catalog (design §20.3).
+ * `custom` is listed too: its price entry carries the amount bounds and
+ * currency the donation form renders — the client must not hardcode money.
+ */
+const LISTED_PRODUCT_TYPES = ['sku', 'credits', 'custom'] as const;
 
 /**
  * Receipt text travels into provider receipts and 54-FZ fiscal documents —
@@ -199,11 +203,12 @@ export class BillingUserService {
   }
 
   /**
-   * The one-time purchase catalog (design §20.3): active fixed-price products
-   * (`sku`/`credits` — never `custom`, which has no listable price) that carry
-   * a price for the caller's effective provider. Like `getRegion`, this is a
-   * read — it resolves the provider without asserting availability, so the
-   * catalog stays browsable while a provider is disabled.
+   * The one-time purchase catalog (design §20.3): active products that carry
+   * a price entry for the caller's effective provider — fixed-price
+   * `sku`/`credits` plus `custom`, whose entry holds the amount bounds the
+   * donation form needs. Like `getRegion`, this is a read — it resolves the
+   * provider without asserting availability, so the catalog stays browsable
+   * while a provider is disabled.
    */
   async listProducts(userId: string): Promise<Product[]> {
     const customer = await this.customers.findOne({ where: { userId } });

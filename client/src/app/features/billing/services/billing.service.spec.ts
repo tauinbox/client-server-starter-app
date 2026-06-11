@@ -49,6 +49,27 @@ describe('BillingService', () => {
     expect(result).toBeNull();
   });
 
+  it('GETs the one-time product catalog', () => {
+    service.getProducts().subscribe();
+    const req = httpMock.expectOne(`${BILLING_API_V1}/products`);
+    expect(req.request.method).toBe('GET');
+    req.flush([]);
+  });
+
+  it('POSTs a purchase with the product key and optional custom fields', () => {
+    service
+      .purchase({ productKey: 'donation', amountMinor: 1500, description: 'x' })
+      .subscribe();
+    const req = httpMock.expectOne(`${BILLING_API_V1}/purchase`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({
+      productKey: 'donation',
+      amountMinor: 1500,
+      description: 'x'
+    });
+    req.flush({ provider: 'paddle', url: null, sessionRef: 's' });
+  });
+
   it('POSTs a checkout with the plan key', () => {
     service.checkout('pro').subscribe();
     const req = httpMock.expectOne(`${BILLING_API_V1}/checkout`);

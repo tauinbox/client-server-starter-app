@@ -396,20 +396,21 @@ describe('BillingUserService', () => {
   });
 
   describe('listProducts', () => {
-    it('lists active fixed-price products carrying a price for the effective provider', async () => {
+    it('lists active products carrying a price entry for the effective provider, including custom bounds', async () => {
       const ctx = await build();
       ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
       const priced = makeProduct();
+      const donation = makeDonation();
       const unpriced = makeProduct({
         id: 'prod-2',
         key: 'paddle-only',
         prices: { paddle: { currency: 'USD', amountMinor: 500 } }
       });
-      ctx.products.find.mockResolvedValue([priced, unpriced]);
+      ctx.products.find.mockResolvedValue([priced, donation, unpriced]);
 
       const result = await ctx.service.listProducts('user-1');
 
-      expect(result).toEqual([priced]);
+      expect(result).toEqual([priced, donation]);
       expect(ctx.products.find).toHaveBeenCalledWith({
         where: expect.objectContaining({ active: true }) as unknown,
         order: { createdAt: 'ASC' }

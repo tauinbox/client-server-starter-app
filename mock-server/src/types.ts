@@ -176,6 +176,50 @@ export interface MockSubscription {
   updatedAt: string;
 }
 
+export interface MockProduct {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  type: import('@app/shared/types').ProductType;
+  prices: Partial<
+    Record<
+      import('@app/shared/types').BillingProviderId,
+      import('@app/shared/types').ProductPrice
+    >
+  >;
+  grant: import('@app/shared/types').ProductGrant | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MockCustomerGrant {
+  id: string;
+  customerId: string;
+  entitlement: string;
+  sourceInvoiceId: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+/**
+ * A one-time purchase opened against the provider but not yet paid. The server
+ * keeps no such row — the provider session is the pending state and the paid
+ * webhook materializes the invoice. The mock needs the handle so the
+ * /__control purchase settlement can replay exactly what the webhook would.
+ */
+export interface MockPurchaseSession {
+  sessionRef: string;
+  customerId: string;
+  productId: string;
+  provider: import('@app/shared/types').BillingProviderId;
+  amountMinor: number;
+  currency: string;
+  createdAt: string;
+}
+
 export interface MockInvoice {
   id: string;
   customerId: string;
@@ -253,6 +297,9 @@ export interface State {
   // Billing plan catalog — mirrors the server's plan seeder. The `usage` plan is
   // seeded inactive (hidden from GET /billing/plans until the usage subsystem).
   plans: Map<string, MockPlan>;
+  // One-time purchase catalog — mirrors the server's product seeder
+  // (report-pack sku + bounded donation custom).
+  billingProducts: Map<string, MockProduct>;
   // Billing customers/subscriptions/invoices/payment methods — created on demand
   // by checkout / region changes, mirroring the server's per-user scoping.
   billingCustomers: Map<string, MockCustomer>;
@@ -260,6 +307,10 @@ export interface State {
   billingInvoices: Map<string, MockInvoice>;
   billingPaymentMethods: Map<string, MockPaymentMethod>;
   billingUsageRecords: Map<string, MockUsageRecord>;
+  // Entitlement grants from paid one-time sku purchases (design §20.1).
+  billingCustomerGrants: Map<string, MockCustomerGrant>;
+  // Purchases opened but not yet settled by /__control/billing/complete-purchase.
+  billingPurchaseSessions: Map<string, MockPurchaseSession>;
   // CAPTCHA — public configuration advertised via /api/v1/auth/captcha-config.
   // Default: disabled. Tests can flip via /__control/captcha to exercise the
   // soft-trigger flow without an external Turnstile dependency.

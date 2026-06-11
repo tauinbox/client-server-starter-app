@@ -1,0 +1,80 @@
+@use '../../../../../styles/abstracts/functions' as func;
+@use '../../../../../styles/abstracts/variables' as vars;
+
+:host {
+  display: block;
+}
+
+// Tertiary top accent: kin to the featured plan's primary accent, but its own
+// hue — a supporting gesture, not a competing tier.
+.donation-card {
+  border-top: func.rem(4) solid var(--mat-sys-tertiary);
+  border-radius: vars.$border-radius-lg;
+}
+
+.donation-body {
+  display: flex;
+  flex-direction: column;
+  padding: vars.$spacing-lg;
+}
+
+.donation-header {
+  display: flex;
+  gap: vars.$spacing-md;
+  align-items: center;
+  margin-bottom: vars.$spacing-md;
+}
+
+.donation-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: func.rem(48);
+  height: func.rem(48);
+  background: var(--mat-sys-tertiary-container);
+  border-radius: vars.$border-radius-md;
+
+  mat-icon {
+    color: var(--mat-sys-on-tertiary-container);
+  }
+}
+
+.donation-name {
+  margin: 0;
+  font-size: vars.$font-size-base;
+  font-weight: vars.$font-weight-medium;
+}
+
+.donation-description {
+  margin: vars.$spacing-xxs 0 0;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.amount-presets {
+  width: 100%;
+  margin-bottom: vars.$spacing-md;
+
+  mat-button-toggle {
+    flex: 1;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.bounds-hint {
+  margin: 0 0 vars.$spacing-sm;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.donation-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: vars.$spacing-xs;
+
+  .pay-btn {
+    min-width: func.rem(160);
+    font-variant-numeric: tabular-nums;
+  }
+}

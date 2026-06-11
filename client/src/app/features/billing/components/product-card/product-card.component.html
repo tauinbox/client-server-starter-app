@@ -1,0 +1,43 @@
+<mat-card
+  *transloco="let t; scope: 'billing'"
+  class="product-card"
+  appearance="outlined"
+  tabindex="0"
+>
+  <mat-card-content class="product-body">
+    <span class="product-icon" aria-hidden="true">
+      <mat-icon>{{ icon() }}</mat-icon>
+    </span>
+
+    <div class="product-info">
+      <h3 class="product-name">{{ product().name }}</h3>
+      @if (product().description) {
+        <p class="product-description">{{ product().description }}</p>
+      }
+      @if (grantEntitlement(); as entitlement) {
+        <p class="product-grant">
+          <mat-icon aria-hidden="true">lock_open</mat-icon>
+          <span>{{ t('billing.entitlements.' + entitlement) }}</span>
+          @if (grantDays(); as days) {
+            <span class="grant-days">
+              · {{ t('billing.oneTime.validDays', { days }) }}
+            </span>
+          }
+        </p>
+      }
+    </div>
+
+    <div class="product-stub">
+      <span class="product-price">{{ price() }}</span>
+      <button
+        matButton="filled"
+        type="button"
+        class="buy-btn"
+        [disabled]="disabled()"
+        (click)="onBuy()"
+      >
+        {{ t('billing.oneTime.buy') }}
+      </button>
+    </div>
+  </mat-card-content>
+</mat-card>

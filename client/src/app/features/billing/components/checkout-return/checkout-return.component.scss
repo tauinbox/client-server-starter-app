@@ -40,6 +40,12 @@
   }
 }
 
+.purchase-summary .amount {
+  font-weight: vars.$font-weight-bold;
+  font-variant-numeric: tabular-nums;
+  color: var(--mat-sys-on-surface);
+}
+
 .return-icon {
   width: func.rem(56);
   height: func.rem(56);
