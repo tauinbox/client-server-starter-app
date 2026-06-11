@@ -30,6 +30,9 @@ import { PaymentMethodResponseDto } from '../dtos/payment-method-response.dto';
 import { CheckoutSessionResponseDto } from '../dtos/checkout-session-response.dto';
 import { BillingRegionResponseDto } from '../dtos/billing-region-response.dto';
 import { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
+import { ProductResponseDto } from '../dtos/product-response.dto';
+import { PurchaseRequestDto } from '../dtos/purchase-request.dto';
+import { PurchaseSessionResponseDto } from '../dtos/purchase-session-response.dto';
 
 @ApiTags('Billing API')
 @ApiBearerAuth()
@@ -84,6 +87,27 @@ export class BillingUserController {
   @ApiOkResponse({ type: CheckoutSessionResponseDto })
   updatePaymentMethod(@Req() req: JwtAuthRequest) {
     return this.billingUser.startPaymentMethodUpdate(req.user.userId);
+  }
+
+  @Get('products')
+  @ApiOperation({
+    summary:
+      "One-time purchase catalog: active fixed-price products priced for the caller's resolved provider."
+  })
+  @ApiOkResponse({ type: [ProductResponseDto] })
+  listProducts(@Req() req: JwtAuthRequest) {
+    return this.billingUser.listProducts(req.user.userId);
+  }
+
+  @Post('purchase')
+  @HttpCode(200)
+  @ApiOperation({
+    summary:
+      'Start a one-time purchase (fixed-price product, or a bounded custom amount) on the resolved provider.'
+  })
+  @ApiOkResponse({ type: PurchaseSessionResponseDto })
+  purchase(@Req() req: JwtAuthRequest, @Body() body: PurchaseRequestDto) {
+    return this.billingUser.purchase(req.user.userId, body);
   }
 
   @Post('checkout')

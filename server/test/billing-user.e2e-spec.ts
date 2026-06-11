@@ -91,6 +91,8 @@ describe('Billing user self-service (e2e)', () => {
     getUsageSummary: jest.fn(),
     startPaymentMethodUpdate: jest.fn(),
     checkout: jest.fn(),
+    listProducts: jest.fn(),
+    purchase: jest.fn(),
     changePlan: jest.fn(),
     previewChange: jest.fn(),
     cancelSubscription: jest.fn(),
@@ -233,6 +235,60 @@ describe('Billing user self-service (e2e)', () => {
       url: 'https://checkout/x',
       sessionRef: 'sess-1'
     });
+  });
+
+  it('lists the one-time purchase catalog for the caller', async () => {
+    billingUser.listProducts.mockResolvedValue([]);
+
+    await request(server)
+      .get('/api/v1/billing/products')
+      .set('x-test-user', 'user-7')
+      .expect(200)
+      .expect([]);
+
+    expect(billingUser.listProducts).toHaveBeenCalledWith('user-7');
+  });
+
+  it('starts a one-time purchase for the caller', async () => {
+    billingUser.purchase.mockResolvedValue({
+      provider: 'yookassa',
+      url: 'https://pay/x',
+      sessionRef: 'ot-1'
+    });
+
+    const res = await request(server)
+      .post('/api/v1/billing/purchase')
+      .set('x-test-user', 'user-7')
+      .send({ productKey: 'donation', amountMinor: 150000 })
+      .expect(200);
+
+    expect(billingUser.purchase).toHaveBeenCalledWith('user-7', {
+      productKey: 'donation',
+      amountMinor: 150000
+    });
+    expect(res.body).toEqual({
+      provider: 'yookassa',
+      url: 'https://pay/x',
+      sessionRef: 'ot-1'
+    });
+  });
+
+  it('rejects a purchase without a productKey', async () => {
+    await request(server)
+      .post('/api/v1/billing/purchase')
+      .send({ amountMinor: 100 })
+      .expect(400);
+
+    expect(billingUser.purchase).not.toHaveBeenCalled();
+  });
+
+  it('rejects a purchase with a non-positive amount', async () => {
+    await request(server)
+      .post('/api/v1/billing/purchase')
+      .send({ productKey: 'donation', amountMinor: 0 })
+      .expect(400);
+
+    expect(billingUser.purchase).not.toHaveBeenCalled();
   });
 
   it('starts the payment-method update flow for the caller', async () => {

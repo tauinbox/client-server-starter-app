@@ -241,6 +241,18 @@ export type CheckoutSessionResponse = {
 };
 
 /**
+ * Result of `POST /billing/purchase` — where the buyer completes a one-time
+ * payment. YooKassa always returns a confirmation `url`; Paddle may complete
+ * client-side via Paddle.js with the transaction id (`sessionRef`), so `url`
+ * can be null.
+ */
+export type PurchaseSessionResponse = {
+  provider: BillingProviderId;
+  url: string | null;
+  sessionRef: string;
+};
+
+/**
  * Result of `GET`/`PUT /billing/region` (design §19). `region` is the user's
  * current selection (`auto` = no override). `detectedProvider` is the geo
  * default; `effectiveProvider` is what the next checkout would actually use

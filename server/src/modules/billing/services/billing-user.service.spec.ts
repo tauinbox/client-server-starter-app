@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
+  BadRequestException,
   ConflictException,
   NotFoundException,
   ServiceUnavailableException
@@ -13,6 +14,7 @@ import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { PaymentMethod } from '../entities/payment-method.entity';
 import { Plan } from '../entities/plan.entity';
+import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import {
   InvoicePaidEvent,
@@ -111,6 +113,7 @@ function provider(
   changePlan: jest.Mock;
   previewChangePlan: jest.Mock;
   chargeOffSession: jest.Mock;
+  createOneTimePayment: jest.Mock;
   refund: jest.Mock;
 } {
   return {
@@ -119,6 +122,9 @@ function provider(
     startCheckout: jest
       .fn()
       .mockResolvedValue({ url: 'https://checkout/x', sessionRef: 'sess-1' }),
+    createOneTimePayment: jest
+      .fn()
+      .mockResolvedValue({ url: 'https://pay/x', sessionRef: 'ot-1' }),
     updatePaymentMethod: jest
       .fn()
       .mockResolvedValue({ url: 'https://method/x', sessionRef: 'mu-1' }),
@@ -140,6 +146,7 @@ async function build() {
   const invoices = repo();
   const paymentMethods = repo();
   const plans = repo();
+  const products = repo();
   const users = repo();
   const emit = jest.fn();
 
@@ -172,6 +179,7 @@ async function build() {
       { provide: getRepositoryToken(Invoice), useValue: invoices },
       { provide: getRepositoryToken(PaymentMethod), useValue: paymentMethods },
       { provide: getRepositoryToken(Plan), useValue: plans },
+      { provide: getRepositoryToken(Product), useValue: products },
       { provide: getRepositoryToken(User), useValue: users },
       { provide: getDataSourceToken(), useValue: dataSource },
       { provide: BillingService, useValue: billing },
@@ -191,6 +199,7 @@ async function build() {
     invoices,
     paymentMethods,
     plans,
+    products,
     users,
     billing,
     usageRating,
@@ -199,7 +208,229 @@ async function build() {
   };
 }
 
+function makeProduct(overrides: Partial<Product> = {}): Product {
+  return {
+    id: 'prod-1',
+    key: 'report-pack',
+    name: 'Report pack',
+    description: null,
+    type: 'sku',
+    prices: {
+      yookassa: { currency: 'RUB', amountMinor: 49000 },
+      paddle: { currency: 'USD', amountMinor: 500, paddlePriceId: 'pri_1' }
+    },
+    grant: { entitlement: 'reports', durationDays: 30 },
+    active: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides
+  } as Product;
+}
+
+function makeDonation(overrides: Partial<Product> = {}): Product {
+  return makeProduct({
+    id: 'prod-don',
+    key: 'donation',
+    name: 'Donation',
+    type: 'custom',
+    prices: {
+      yookassa: {
+        currency: 'RUB',
+        minAmountMinor: 10000,
+        maxAmountMinor: 5000000
+      }
+    },
+    grant: null,
+    ...overrides
+  });
+}
+
 describe('BillingUserService', () => {
+  const RU_CUSTOMER = {
+    id: 'cust-1',
+    userId: 'user-1',
+    country: 'RU',
+    currency: 'RUB',
+    providerOverride: null
+  };
+
+  describe('purchase', () => {
+    function setupPurchase(product: Product) {
+      return build().then((ctx) => {
+        ctx.products.findOne.mockResolvedValue(product);
+        ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
+        const yoo = provider('yookassa', false);
+        ctx.billing.resolveProvider.mockResolvedValue(yoo);
+        return { ctx, yoo };
+      });
+    }
+
+    it('charges the catalog price for an sku — a client-sent amount is ignored', async () => {
+      const { ctx, yoo } = await setupPurchase(makeProduct());
+
+      const result = await ctx.service.purchase('user-1', {
+        productKey: 'report-pack',
+        amountMinor: 1
+      });
+
+      expect(yoo.createOneTimePayment).toHaveBeenCalledWith(
+        RU_CUSTOMER,
+        expect.objectContaining({
+          amountMinor: 49000,
+          currency: 'RUB',
+          description: 'Report pack',
+          receiptItems: [
+            { description: 'Report pack', amountMinor: 49000, quantity: 1 }
+          ],
+          productId: 'prod-1'
+        })
+      );
+      expect(result).toEqual({
+        provider: 'yookassa',
+        url: 'https://pay/x',
+        sessionRef: 'ot-1'
+      });
+    });
+
+    it('returns a null url when the provider completes client-side (Paddle.js)', async () => {
+      const { ctx, yoo } = await setupPurchase(makeProduct());
+      yoo.createOneTimePayment.mockResolvedValue({ sessionRef: 'txn-1' });
+
+      const result = await ctx.service.purchase('user-1', {
+        productKey: 'report-pack'
+      });
+
+      expect(result).toEqual({
+        provider: 'yookassa',
+        url: null,
+        sessionRef: 'txn-1'
+      });
+    });
+
+    it('rejects an unknown product with 404', async () => {
+      const ctx = await build();
+      ctx.products.findOne.mockResolvedValue(null);
+
+      await expect(
+        ctx.service.purchase('user-1', { productKey: 'nope' })
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects an inactive product with 404', async () => {
+      const { ctx } = await setupPurchase(makeProduct({ active: false }));
+
+      await expect(
+        ctx.service.purchase('user-1', { productKey: 'report-pack' })
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects a product with no price for the resolved provider with 409', async () => {
+      const { ctx } = await setupPurchase(
+        makeProduct({
+          prices: { paddle: { currency: 'USD', amountMinor: 500 } }
+        })
+      );
+
+      await expect(
+        ctx.service.purchase('user-1', { productKey: 'report-pack' })
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('rejects an sku whose catalog price is misconfigured with 503', async () => {
+      const { ctx } = await setupPurchase(
+        makeProduct({ prices: { yookassa: { currency: 'RUB' } } })
+      );
+
+      await expect(
+        ctx.service.purchase('user-1', { productKey: 'report-pack' })
+      ).rejects.toThrow(ServiceUnavailableException);
+    });
+
+    it('requires an amount for a custom product', async () => {
+      const { ctx } = await setupPurchase(makeDonation());
+
+      await expect(
+        ctx.service.purchase('user-1', { productKey: 'donation' })
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it.each([9999, 5000001])(
+      'rejects a custom amount outside the product bounds (%d)',
+      async (amountMinor) => {
+        const { ctx, yoo } = await setupPurchase(makeDonation());
+
+        await expect(
+          ctx.service.purchase('user-1', {
+            productKey: 'donation',
+            amountMinor
+          })
+        ).rejects.toThrow(BadRequestException);
+        expect(yoo.createOneTimePayment).not.toHaveBeenCalled();
+      }
+    );
+
+    it('charges a bounded custom amount with the sanitized note on the receipt', async () => {
+      const { ctx, yoo } = await setupPurchase(makeDonation());
+
+      await ctx.service.purchase('user-1', {
+        productKey: 'donation',
+        amountMinor: 150000,
+        description: '  Keep\nit  up <3 '
+      });
+
+      expect(yoo.createOneTimePayment).toHaveBeenCalledWith(
+        RU_CUSTOMER,
+        expect.objectContaining({
+          amountMinor: 150000,
+          description: 'Donation: Keep it up 3',
+          receiptItems: [
+            {
+              description: 'Donation: Keep it up 3',
+              amountMinor: 150000,
+              quantity: 1
+            }
+          ]
+        })
+      );
+    });
+  });
+
+  describe('listProducts', () => {
+    it('lists active fixed-price products carrying a price for the effective provider', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
+      const priced = makeProduct();
+      const unpriced = makeProduct({
+        id: 'prod-2',
+        key: 'paddle-only',
+        prices: { paddle: { currency: 'USD', amountMinor: 500 } }
+      });
+      ctx.products.find.mockResolvedValue([priced, unpriced]);
+
+      const result = await ctx.service.listProducts('user-1');
+
+      expect(result).toEqual([priced]);
+      expect(ctx.products.find).toHaveBeenCalledWith({
+        where: expect.objectContaining({ active: true }) as unknown,
+        order: { createdAt: 'ASC' }
+      });
+    });
+
+    it('falls back to the geo-default provider for a user without a customer', async () => {
+      const ctx = await build();
+      ctx.users.findOne.mockResolvedValue({ id: 'user-1', locale: 'en-US' });
+      const usdProduct = makeProduct({
+        prices: { paddle: { currency: 'USD', amountMinor: 500 } }
+      });
+      ctx.products.find.mockResolvedValue([usdProduct]);
+
+      const result = await ctx.service.listProducts('user-1');
+
+      expect(result).toEqual([usdProduct]);
+      expect(ctx.billing.geoDefaultFor).toHaveBeenCalledWith('US');
+    });
+  });
+
   describe('checkout', () => {
     it('creates a local incomplete subscription for a self-managed provider', async () => {
       const ctx = await build();

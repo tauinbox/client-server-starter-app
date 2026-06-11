@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { In } from 'typeorm';
+import { In, IsNull } from 'typeorm';
 import type { SubscriptionStatus } from '@app/shared/types';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { Customer } from '../entities/customer.entity';
+import { CustomerGrant } from '../entities/customer-grant.entity';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { EntitlementService } from './entitlement.service';
@@ -15,6 +16,7 @@ describe('EntitlementService', () => {
   let customers: { findOne: jest.Mock };
   let subscriptions: { findOne: jest.Mock };
   let plans: { findOne: jest.Mock };
+  let grants: { find: jest.Mock };
   let cacheStore: Map<string, unknown>;
   let cache: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
   let metrics: { recordCacheAccess: jest.Mock };
@@ -46,6 +48,7 @@ describe('EntitlementService', () => {
     customers = { findOne: jest.fn().mockResolvedValue(null) };
     subscriptions = { findOne: jest.fn().mockResolvedValue(null) };
     plans = { findOne: jest.fn().mockResolvedValue(null) };
+    grants = { find: jest.fn().mockResolvedValue([]) };
     metrics = { recordCacheAccess: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -54,6 +57,7 @@ describe('EntitlementService', () => {
         { provide: getRepositoryToken(Customer), useValue: customers },
         { provide: getRepositoryToken(Subscription), useValue: subscriptions },
         { provide: getRepositoryToken(Plan), useValue: plans },
+        { provide: getRepositoryToken(CustomerGrant), useValue: grants },
         { provide: CACHE_MANAGER, useValue: cache },
         { provide: MetricsService, useValue: metrics }
       ]
@@ -144,6 +148,68 @@ describe('EntitlementService', () => {
         'entitlements',
         'hit'
       );
+    });
+  });
+
+  describe('one-time purchase grants (design §20.1)', () => {
+    it('unions active grants with the subscription plan capabilities, deduplicated', async () => {
+      withProSubscription('active');
+      grants.find.mockResolvedValue([
+        { entitlement: 'priority-support', expiresAt: null, revokedAt: null },
+        { entitlement: 'reports', expiresAt: null, revokedAt: null }
+      ]);
+      const resolved = await service.capabilitiesFor('user-1');
+      expect(resolved.capabilities).toEqual([
+        'reports',
+        'api-access',
+        'data-export',
+        'priority-support'
+      ]);
+      expect(resolved.planKey).toBe('pro');
+    });
+
+    it('unions grants on top of the Free tier when there is no subscription', async () => {
+      customers.findOne.mockResolvedValue({ id: 'cust-1', userId: 'user-1' });
+      plans.findOne.mockResolvedValue(FREE_PLAN);
+      grants.find.mockResolvedValue([
+        { entitlement: 'reports', expiresAt: null, revokedAt: null }
+      ]);
+      const resolved = await service.capabilitiesFor('user-1');
+      expect(resolved.planKey).toBe(FREE_PLAN_KEY);
+      expect(resolved.capabilities).toEqual(['reports']);
+    });
+
+    it('queries only non-revoked grants scoped to the customer', async () => {
+      customers.findOne.mockResolvedValue({ id: 'cust-1', userId: 'user-1' });
+      await service.capabilitiesFor('user-1');
+      expect(grants.find).toHaveBeenCalledWith({
+        where: { customerId: 'cust-1', revokedAt: IsNull() }
+      });
+    });
+
+    it('ignores expired grants but keeps ones expiring in the future', async () => {
+      customers.findOne.mockResolvedValue({ id: 'cust-1', userId: 'user-1' });
+      plans.findOne.mockResolvedValue(FREE_PLAN);
+      grants.find.mockResolvedValue([
+        {
+          entitlement: 'reports',
+          expiresAt: new Date(Date.now() - 1000),
+          revokedAt: null
+        },
+        {
+          entitlement: 'data-export',
+          expiresAt: new Date(Date.now() + 60_000),
+          revokedAt: null
+        }
+      ]);
+      const resolved = await service.capabilitiesFor('user-1');
+      expect(resolved.capabilities).toEqual(['data-export']);
+    });
+
+    it('never fetches grants for a user without a customer record', async () => {
+      plans.findOne.mockResolvedValue(FREE_PLAN);
+      await service.capabilitiesFor('user-1');
+      expect(grants.find).not.toHaveBeenCalled();
     });
   });
 

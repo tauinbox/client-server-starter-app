@@ -6,10 +6,12 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { Customer } from '../entities/customer.entity';
+import { CustomerGrant } from '../entities/customer-grant.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { Subscription } from '../entities/subscription.entity';
+import { EntitlementService } from '../entitlements/entitlement.service';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import type { CancelMode } from '../providers/payment-provider.interface';
 import { BillingService } from '../billing.service';
@@ -30,7 +32,10 @@ export class BillingAdminService {
     private readonly invoices: Repository<Invoice>,
     @InjectRepository(Customer)
     private readonly customers: Repository<Customer>,
+    @InjectRepository(CustomerGrant)
+    private readonly grants: Repository<CustomerGrant>,
     private readonly billing: BillingService,
+    private readonly entitlements: EntitlementService,
     private readonly events: EventEmitter2
   ) {}
 
@@ -112,8 +117,33 @@ export class BillingAdminService {
     // `paid` (the M1 schema has no partial-refund status or refunded-amount column).
     if (refundAmount === invoice.amountMinor) {
       invoice.status = 'refunded';
+      await this.revokeOneTimeGrants(invoice);
     }
     return this.invoices.save(invoice);
+  }
+
+  /**
+   * Refunding a one-time purchase in full takes back what it granted (design
+   * §20.5): the sku's `CustomerGrant` is revoked and the buyer's cached
+   * entitlements are dropped. A `custom` purchase has no grants — nothing
+   * matches and the refund stays a plain money move. Partial refunds keep the
+   * invoice `paid`, so the grant survives them by construction.
+   */
+  private async revokeOneTimeGrants(invoice: Invoice): Promise<void> {
+    if (invoice.kind !== 'one_time') {
+      return;
+    }
+    const revoked = await this.grants.update(
+      { sourceInvoiceId: invoice.id, revokedAt: IsNull() },
+      { revokedAt: new Date() }
+    );
+    if (!revoked.affected) {
+      return;
+    }
+    const userId = await this.resolveUserId(invoice.customerId);
+    if (userId) {
+      await this.entitlements.invalidateUser(userId);
+    }
   }
 
   private async resolveUserId(customerId: string): Promise<string | null> {

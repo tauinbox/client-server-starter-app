@@ -2,10 +2,11 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
-import { In, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import type { SubscriptionStatus } from '@app/shared/types';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { Customer } from '../entities/customer.entity';
+import { CustomerGrant } from '../entities/customer-grant.entity';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import {
@@ -37,6 +38,8 @@ export class EntitlementService {
     private readonly subscriptions: Repository<Subscription>,
     @InjectRepository(Plan)
     private readonly plans: Repository<Plan>,
+    @InjectRepository(CustomerGrant)
+    private readonly grants: Repository<CustomerGrant>,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
     private readonly metrics: MetricsService
   ) {}
@@ -77,21 +80,51 @@ export class EntitlementService {
     await this.bumpVersion();
   }
 
+  /**
+   * Plan capabilities unioned with active one-time purchase grants (design
+   * §20.1): a paid sku unlocks its entitlement on top of whatever tier the
+   * user is on — including Free.
+   */
   private async resolve(userId: string): Promise<ResolvedEntitlements> {
     const customer = await this.customers.findOne({ where: { userId } });
-    if (customer) {
-      const subscription = await this.subscriptions.findOne({
-        where: { customerId: customer.id, status: In(ENTITLED_STATUSES) },
-        order: { createdAt: 'DESC' }
+    const base = customer
+      ? await this.subscriptionEntitlements(customer.id)
+      : await this.freeEntitlements();
+    if (!customer) return base;
+
+    const granted = await this.activeGrantEntitlements(customer.id);
+    if (granted.length === 0) return base;
+    return {
+      ...base,
+      capabilities: [...new Set([...base.capabilities, ...granted])]
+    };
+  }
+
+  private async subscriptionEntitlements(
+    customerId: string
+  ): Promise<ResolvedEntitlements> {
+    const subscription = await this.subscriptions.findOne({
+      where: { customerId, status: In(ENTITLED_STATUSES) },
+      order: { createdAt: 'DESC' }
+    });
+    if (subscription) {
+      const plan = await this.plans.findOne({
+        where: { key: subscription.planKey }
       });
-      if (subscription) {
-        const plan = await this.plans.findOne({
-          where: { key: subscription.planKey }
-        });
-        if (plan) return this.toResolved(plan);
-      }
+      if (plan) return this.toResolved(plan);
     }
     return this.freeEntitlements();
+  }
+
+  /** Entitlements from non-revoked, non-expired one-time purchase grants. */
+  private async activeGrantEntitlements(customerId: string): Promise<string[]> {
+    const grants = await this.grants.find({
+      where: { customerId, revokedAt: IsNull() }
+    });
+    const now = Date.now();
+    return grants
+      .filter((grant) => !grant.expiresAt || grant.expiresAt.getTime() > now)
+      .map((grant) => grant.entitlement);
   }
 
   private async freeEntitlements(): Promise<ResolvedEntitlements> {

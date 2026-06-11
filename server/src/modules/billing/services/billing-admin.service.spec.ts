@@ -6,10 +6,13 @@ import {
   NotFoundException
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { IsNull } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Customer } from '../entities/customer.entity';
+import { CustomerGrant } from '../entities/customer-grant.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { Subscription } from '../entities/subscription.entity';
+import { EntitlementService } from '../entitlements/entitlement.service';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import { BillingService } from '../billing.service';
 import { BillingAdminService } from './billing-admin.service';
@@ -18,13 +21,15 @@ type RepoMock = {
   findOne: jest.Mock;
   find: jest.Mock;
   save: jest.Mock;
+  update: jest.Mock;
 };
 
 function repo(): RepoMock {
   return {
     findOne: jest.fn().mockResolvedValue(null),
     find: jest.fn().mockResolvedValue([]),
-    save: jest.fn((entity: object) => Promise.resolve(entity))
+    save: jest.fn((entity: object) => Promise.resolve(entity)),
+    update: jest.fn().mockResolvedValue({ affected: 0 })
   };
 }
 
@@ -87,10 +92,14 @@ async function build() {
   const subscriptions = repo();
   const invoices = repo();
   const customers = repo();
+  const grants = repo();
   const emit = jest.fn();
 
   const billing = {
     getProviderById: jest.fn()
+  };
+  const entitlements = {
+    invalidateUser: jest.fn().mockResolvedValue(undefined)
   };
 
   const module = await Test.createTestingModule({
@@ -99,7 +108,9 @@ async function build() {
       { provide: getRepositoryToken(Subscription), useValue: subscriptions },
       { provide: getRepositoryToken(Invoice), useValue: invoices },
       { provide: getRepositoryToken(Customer), useValue: customers },
+      { provide: getRepositoryToken(CustomerGrant), useValue: grants },
       { provide: BillingService, useValue: billing },
+      { provide: EntitlementService, useValue: entitlements },
       { provide: EventEmitter2, useValue: { emit } }
     ]
   }).compile();
@@ -109,7 +120,9 @@ async function build() {
     subscriptions,
     invoices,
     customers,
+    grants,
     billing,
+    entitlements,
     emit
   };
 }
@@ -245,6 +258,78 @@ describe('BillingAdminService', () => {
         expect.any(String)
       );
       expect(saved.status).toBe('paid');
+    });
+
+    describe('one-time purchases (design §20.5)', () => {
+      function makeOneTimeInvoice(overrides: Partial<Invoice> = {}): Invoice {
+        return makeInvoice({
+          kind: 'one_time',
+          subscriptionId: null,
+          productId: 'prod-1',
+          amountMinor: 49000,
+          ...overrides
+        });
+      }
+
+      it('full refund of an sku purchase revokes its grant and drops the cached entitlements', async () => {
+        const ctx = await build();
+        ctx.invoices.findOne.mockResolvedValue(makeOneTimeInvoice());
+        ctx.grants.update.mockResolvedValue({ affected: 1 });
+        ctx.customers.findOne.mockResolvedValue({
+          id: 'cust-1',
+          userId: 'user-1'
+        });
+        const yoo = providerStub('yookassa');
+        ctx.billing.getProviderById.mockReturnValue(yoo);
+
+        const saved = await ctx.service.refundInvoice('inv-1');
+
+        expect(saved.status).toBe('refunded');
+        expect(ctx.grants.update).toHaveBeenCalledWith(
+          { sourceInvoiceId: 'inv-1', revokedAt: IsNull() },
+          { revokedAt: expect.any(Date) as Date }
+        );
+        expect(ctx.entitlements.invalidateUser).toHaveBeenCalledWith('user-1');
+      });
+
+      it('partial refund of an sku purchase keeps the grant', async () => {
+        const ctx = await build();
+        ctx.invoices.findOne.mockResolvedValue(makeOneTimeInvoice());
+        const yoo = providerStub('yookassa');
+        ctx.billing.getProviderById.mockReturnValue(yoo);
+
+        const saved = await ctx.service.refundInvoice('inv-1', 10000);
+
+        expect(saved.status).toBe('paid');
+        expect(ctx.grants.update).not.toHaveBeenCalled();
+        expect(ctx.entitlements.invalidateUser).not.toHaveBeenCalled();
+      });
+
+      it('full refund of a custom purchase is a plain refund (no grants matched)', async () => {
+        const ctx = await build();
+        ctx.invoices.findOne.mockResolvedValue(
+          makeOneTimeInvoice({ productId: 'prod-don' })
+        );
+        ctx.grants.update.mockResolvedValue({ affected: 0 });
+        const yoo = providerStub('yookassa');
+        ctx.billing.getProviderById.mockReturnValue(yoo);
+
+        const saved = await ctx.service.refundInvoice('inv-1');
+
+        expect(saved.status).toBe('refunded');
+        expect(ctx.entitlements.invalidateUser).not.toHaveBeenCalled();
+      });
+
+      it('never touches grants when refunding a subscription invoice', async () => {
+        const ctx = await build();
+        ctx.invoices.findOne.mockResolvedValue(makeInvoice());
+        const yoo = providerStub('yookassa');
+        ctx.billing.getProviderById.mockReturnValue(yoo);
+
+        await ctx.service.refundInvoice('inv-1');
+
+        expect(ctx.grants.update).not.toHaveBeenCalled();
+      });
     });
   });
 });

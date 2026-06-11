@@ -6,11 +6,14 @@
 // replay idempotency — without a running PostgreSQL or real Paddle.
 
 import { Test } from '@nestjs/testing';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
 import { VersioningType, type INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import type { Server } from 'http';
+import { MetricsService } from '../src/modules/core/metrics/metrics.service';
+import { EntitlementService } from '../src/modules/billing/entitlements/entitlement.service';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { CustomerGrant } from '../src/modules/billing/entities/customer-grant.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
@@ -187,6 +190,7 @@ describe('Billing Paddle webhook (e2e)', () => {
   let server: Server;
   let stores: Stores;
   let emit: jest.Mock;
+  let entitlements: EntitlementService;
 
   beforeEach(async () => {
     stores = {
@@ -218,20 +222,71 @@ describe('Billing Paddle webhook (e2e)', () => {
       manager
     };
 
+    // EntitlementService over the same stores: proves a paid sku purchase
+    // resolves into an active capability (the §20.1 grant union), end to end.
+    const cacheStore = new Map<string, unknown>();
     const moduleRef = await Test.createTestingModule({
       controllers: [BillingWebhooksController],
       providers: [
         WebhookIngestionService,
         BillingEventReducer,
+        EntitlementService,
         {
           provide: getRepositoryToken(WebhookEvent),
           useValue: makeWebhookEventRepo(stores)
         },
+        {
+          provide: getRepositoryToken(Customer),
+          useValue: {
+            findOne: (opts: { where: Partial<Customer> }) =>
+              Promise.resolve(findWhere(stores.customers, opts.where))
+          }
+        },
+        {
+          provide: getRepositoryToken(Subscription),
+          useValue: { findOne: () => Promise.resolve(null) }
+        },
+        {
+          provide: getRepositoryToken(Plan),
+          useValue: {
+            findOne: (opts: { where: Partial<Plan> }) =>
+              Promise.resolve(findWhere(stores.plans, opts.where))
+          }
+        },
+        {
+          provide: getRepositoryToken(CustomerGrant),
+          useValue: {
+            find: (opts: { where: { customerId: string } }) =>
+              Promise.resolve(
+                stores.grants.filter(
+                  (grant) =>
+                    grant.customerId === opts.where.customerId &&
+                    grant.revokedAt === null
+                )
+              )
+          }
+        },
+        {
+          provide: CACHE_MANAGER,
+          useValue: {
+            get: (key: string) => Promise.resolve(cacheStore.get(key)),
+            set: (key: string, value: unknown) => {
+              cacheStore.set(key, value);
+              return Promise.resolve();
+            },
+            del: (key: string) => {
+              cacheStore.delete(key);
+              return Promise.resolve();
+            }
+          }
+        },
+        { provide: MetricsService, useValue: { recordCacheAccess: jest.fn() } },
         { provide: getDataSourceToken(), useValue: dataSource },
         { provide: EventEmitter2, useValue: { emit } },
         { provide: BILLING_PROVIDERS, useValue: [makeStubProvider()] }
       ]
     }).compile();
+    entitlements = moduleRef.get(EntitlementService);
 
     app = moduleRef.createNestApplication({ rawBody: true });
     app.setGlobalPrefix('api');
@@ -369,6 +424,17 @@ describe('Billing Paddle webhook (e2e)', () => {
       SubscriptionActivatedEvent.name,
       expect.anything()
     );
+  });
+
+  it('resolves the granted entitlement as active for the buyer (capability union)', async () => {
+    const before = await entitlements.capabilitiesFor('user-1');
+    expect(before.capabilities).not.toContain('reports');
+    await entitlements.invalidateUser('user-1');
+
+    await postWebhook(oneTimePaid('evt_ot_1', 'prod-sku'));
+
+    const after = await entitlements.capabilitiesFor('user-1');
+    expect(after.capabilities).toContain('reports');
   });
 
   it('replays the one-time paid webhook without duplicating the invoice or the grant', async () => {
