@@ -21,6 +21,7 @@ import { RenewalService } from '../src/modules/billing/renewals/renewal.service'
 import { DUNNING_MAX_ATTEMPTS } from '../src/modules/billing/renewals/renewal-queue.constants';
 import { EntitlementCacheListener } from '../src/modules/billing/listeners/entitlement-cache.listener';
 import { EntitlementService } from '../src/modules/billing/entitlements/entitlement.service';
+import { CreditService } from '../src/modules/billing/services/credit.service';
 
 interface Store {
   subscriptions: Subscription[];
@@ -229,7 +230,16 @@ describe('Billing renewal scheduler (e2e)', () => {
             }
           ]
         },
-        { provide: EntitlementService, useValue: { invalidateUser } }
+        { provide: EntitlementService, useValue: { invalidateUser } },
+        // No prepaid credits in this scenario set — the credits-as-usage flow
+        // has its own coverage in billing-webhook.e2e-spec and the unit specs.
+        {
+          provide: CreditService,
+          useValue: {
+            availableUnits: jest.fn().mockResolvedValue(0),
+            spendOnUsage: jest.fn()
+          }
+        }
       ]
     }).compile();
 

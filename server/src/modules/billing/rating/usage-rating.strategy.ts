@@ -20,6 +20,15 @@ export interface UsagePeriodSummary extends RatedAmount {
 }
 
 /**
+ * A period rated with prepaid credits applied first: only `chargedUnits` (the
+ * overage left after `creditUnitsApplied`) cost money.
+ */
+export interface CreditedUsageSummary extends UsagePeriodSummary {
+  creditUnitsApplied: number;
+  chargedUnits: number;
+}
+
+/**
  * Pay-as-you-go rating (design §5): sum the subscription's `UsageRecord`s whose
  * `occurredAt` falls inside the period (start inclusive, end exclusive — a
  * record stamped exactly at the boundary belongs to the next period), subtract
@@ -45,6 +54,44 @@ export class UsageRating implements RatingStrategy {
     return {
       amountMinor: summary.amountMinor,
       receiptItems: summary.receiptItems
+    };
+  }
+
+  /**
+   * Rates a period with the customer's prepaid credits spent before money is
+   * charged: credits offset billable units one-for-one, and only the
+   * remainder is priced. Pure with respect to the balance — the caller reads
+   * the available units and deducts `creditUnitsApplied` itself, gated on its
+   * idempotent invoice insert.
+   */
+  async summarizeForPeriodWithCredits(
+    subscription: Subscription,
+    plan: Plan,
+    period: BillingPeriod,
+    availableCreditUnits: number
+  ): Promise<CreditedUsageSummary> {
+    const base = await this.summarizeForPeriod(subscription, plan, period);
+    const creditUnitsApplied = Math.min(
+      Math.max(0, availableCreditUnits),
+      base.billableUnits
+    );
+    const chargedUnits = base.billableUnits - creditUnitsApplied;
+    const amountMinor = chargedUnits * base.unitPriceMinor;
+    return {
+      ...base,
+      creditUnitsApplied,
+      chargedUnits,
+      amountMinor,
+      receiptItems:
+        amountMinor > 0
+          ? [
+              {
+                description: `${plan.name}: ${plan.meterKey ?? 'usage'} × ${chargedUnits}`,
+                amountMinor,
+                quantity: 1
+              }
+            ]
+          : []
     };
   }
 

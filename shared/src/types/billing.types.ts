@@ -100,6 +100,18 @@ export type CustomerGrantResponse = {
   createdAt: string;
 };
 
+/**
+ * The customer's prepaid credit balance (credit packs). Topped up by paid
+ * `credits` purchases, spent by metered usage before money is charged. A
+ * refund of already-spent credits may drive it negative — usage recording is
+ * blocked until the balance is topped up back above zero.
+ */
+export type CreditBalanceResponse = {
+  customerId: string;
+  balanceUnits: number;
+  updatedAt: string;
+};
+
 export type PlanResponse = {
   id: string;
   key: string;

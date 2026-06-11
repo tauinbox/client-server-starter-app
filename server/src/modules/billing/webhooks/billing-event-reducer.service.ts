@@ -11,6 +11,7 @@ import { PaymentMethod } from '../entities/payment-method.entity';
 import { Plan } from '../entities/plan.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
+import { CreditService } from '../services/credit.service';
 import {
   InvoicePaidEvent,
   PaymentFailedEvent,
@@ -69,6 +70,7 @@ export class BillingEventReducer {
 
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly credits: CreditService,
     private readonly events: EventEmitter2
   ) {}
 
@@ -410,10 +412,10 @@ export class BillingEventReducer {
   }
 
   /**
-   * Applies the purchased product's effect once per paid one-time invoice
-   * (design §20.4): an `sku` product inserts a `CustomerGrant` (expiry from
-   * `grant.durationDays`, else permanent); `custom` carries no grant; credit
-   * packs are the M5 extension of this switch. Idempotency comes from the
+   * Applies the purchased product's effect once per paid one-time invoice:
+   * an `sku` product inserts a `CustomerGrant` (expiry from
+   * `grant.durationDays`, else permanent); a `credits` pack tops up the
+   * prepaid balance; `custom` carries no grant. Idempotency comes from the
    * caller — the grant runs only when the invoice insert won the unique
    * `provider_event_id` race.
    */
@@ -430,7 +432,21 @@ export class BillingEventReducer {
     const product = await manager.findOne(Product, {
       where: { id: productId }
     });
-    if (product?.type !== 'sku' || !product.grant?.entitlement) {
+    if (!product?.grant) {
+      return;
+    }
+
+    if (product.type === 'credits' && product.grant.credits) {
+      await this.credits.addPurchase(
+        manager,
+        customerId,
+        invoiceId,
+        product.grant.credits
+      );
+      return;
+    }
+
+    if (product.type !== 'sku' || !product.grant.entitlement) {
       return;
     }
     const { entitlement, durationDays } = product.grant;

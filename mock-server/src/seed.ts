@@ -661,8 +661,8 @@ function generatePlans(): MockPlan[] {
 export const seedPlans: MockPlan[] = generatePlans();
 
 // One-time purchase catalog — mirrors server/src/seeders/billing-products.seeder.ts:
-// a fixed-price sku unlocking the `reports` entitlement for 30 days, and a
-// bounded custom-amount donation (no grant).
+// a fixed-price sku unlocking the `reports` entitlement for 30 days, a bounded
+// custom-amount donation (no grant), and prepaid credit packs.
 function generateProducts(): MockProduct[] {
   const now = '2025-01-01T00:00:00.000Z';
   return [
@@ -696,6 +696,51 @@ function generateProducts(): MockProduct[] {
         paddle: { currency: 'USD', minAmountMinor: 100, maxAmountMinor: 50000 }
       },
       grant: null,
+      active: true,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: 'prod-credits-500',
+      key: 'credits-500',
+      name: '500 credits',
+      description: '500 prepaid usage units',
+      type: 'credits',
+      prices: {
+        yookassa: { currency: 'RUB', amountMinor: 50000 },
+        paddle: { currency: 'USD', amountMinor: 500 }
+      },
+      grant: { credits: 500 },
+      active: true,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: 'prod-credits-1000',
+      key: 'credits-1000',
+      name: '1000 credits',
+      description: '1000 prepaid usage units at a better rate',
+      type: 'credits',
+      prices: {
+        yookassa: { currency: 'RUB', amountMinor: 90000 },
+        paddle: { currency: 'USD', amountMinor: 900 }
+      },
+      grant: { credits: 1000 },
+      active: true,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: 'prod-credits-5000',
+      key: 'credits-5000',
+      name: '5000 credits',
+      description: '5000 prepaid usage units at the best rate',
+      type: 'credits',
+      prices: {
+        yookassa: { currency: 'RUB', amountMinor: 400000 },
+        paddle: { currency: 'USD', amountMinor: 4000 }
+      },
+      grant: { credits: 5000 },
       active: true,
       createdAt: now,
       updatedAt: now

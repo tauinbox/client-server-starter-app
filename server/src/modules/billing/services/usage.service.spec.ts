@@ -1,8 +1,9 @@
 import { Test } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
+import { CreditService } from './credit.service';
 import { UsageService } from './usage.service';
 
 type RepoMock = {
@@ -41,16 +42,19 @@ describe('UsageService', () => {
   let service: UsageService;
   let usageRecords: RepoMock;
   let subscriptions: RepoMock;
+  let credits: { isBlocked: jest.Mock };
 
   beforeEach(async () => {
     usageRecords = repo();
     subscriptions = repo();
+    credits = { isBlocked: jest.fn().mockResolvedValue(false) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         UsageService,
         { provide: getRepositoryToken(UsageRecord), useValue: usageRecords },
-        { provide: getRepositoryToken(Subscription), useValue: subscriptions }
+        { provide: getRepositoryToken(Subscription), useValue: subscriptions },
+        { provide: CreditService, useValue: credits }
       ]
     }).compile();
 
@@ -131,5 +135,23 @@ describe('UsageService', () => {
       NotFoundException
     );
     expect(usageRecords.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects new usage with 409 while the credit balance is negative', async () => {
+    credits.isBlocked.mockResolvedValue(true);
+    subscriptions.findOne.mockResolvedValue(makeSubscription());
+
+    await expect(service.record(INPUT)).rejects.toBeInstanceOf(
+      ConflictException
+    );
+    expect(usageRecords.save).not.toHaveBeenCalled();
+  });
+
+  it('still answers a replayed key while blocked (idempotency wins)', async () => {
+    const existing = { id: 'usage-1', idempotencyKey: 'evt-1' } as UsageRecord;
+    usageRecords.findOne.mockResolvedValue(existing);
+    credits.isBlocked.mockResolvedValue(true);
+
+    await expect(service.record(INPUT)).resolves.toBe(existing);
   });
 });

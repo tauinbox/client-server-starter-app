@@ -1,8 +1,14 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
+import { CreditService } from './credit.service';
 
 const PG_UNIQUE_VIOLATION = '23505';
 
@@ -36,7 +42,8 @@ export class UsageService {
     @InjectRepository(UsageRecord)
     private readonly usageRecords: Repository<UsageRecord>,
     @InjectRepository(Subscription)
-    private readonly subscriptions: Repository<Subscription>
+    private readonly subscriptions: Repository<Subscription>,
+    private readonly credits: CreditService
   ) {}
 
   async record(input: RecordUsageInput): Promise<UsageRecord> {
@@ -45,6 +52,14 @@ export class UsageService {
     });
     if (existing) {
       return existing;
+    }
+
+    // A negative balance means a refund clawed back already-spent credits:
+    // no new usage may accrue until the debt is topped up.
+    if (await this.credits.isBlocked(input.customerId)) {
+      throw new ConflictException(
+        'Credit balance is negative. Top up credits before recording more usage.'
+      );
     }
 
     const subscription = await this.subscriptions.findOne({

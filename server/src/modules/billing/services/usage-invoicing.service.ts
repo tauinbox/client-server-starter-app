@@ -1,7 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { Plan } from '../entities/plan.entity';
@@ -15,6 +16,7 @@ import {
   type PaymentProvider
 } from '../providers/payment-provider.interface';
 import { UsageRating } from '../rating/usage-rating.strategy';
+import { CreditService } from './credit.service';
 
 /**
  * Invoices a closed usage period of a provider-managed (Paddle) subscription
@@ -25,7 +27,9 @@ import { UsageRating } from '../rating/usage-rating.strategy';
  * double-charges. The charge's `transaction.completed` webhook carries the key
  * back and the reducer settles the pending row; `payment.failed` marks it
  * failed (dunning for provider-managed subscriptions stays with the provider).
- * A zero-usage period needs no charge — the invoice is recorded paid at 0.
+ * Prepaid credits offset billable units first — they are deducted in the same
+ * transaction as the winning insert. A period whose charge nets to zero (no
+ * usage, or credits cover it all) skips the provider and is recorded paid at 0.
  */
 @Injectable()
 export class UsageInvoicingService {
@@ -38,11 +42,11 @@ export class UsageInvoicingService {
     private readonly customers: Repository<Customer>,
     @InjectRepository(Plan)
     private readonly plans: Repository<Plan>,
-    @InjectRepository(Invoice)
-    private readonly invoices: Repository<Invoice>,
+    @InjectDataSource() private readonly dataSource: DataSource,
     @Inject(BILLING_PROVIDERS)
     private readonly providers: PaymentProvider[],
     private readonly usageRating: UsageRating,
+    private readonly credits: CreditService,
     private readonly events: EventEmitter2
   ) {}
 
@@ -83,47 +87,72 @@ export class UsageInvoicingService {
       return;
     }
 
-    const summary = await this.usageRating.summarizeForPeriod(
+    // Prepaid credits offset billable units before money is charged. The
+    // balance is read here and deducted only when the invoice insert below
+    // wins — a replayed close spends nothing twice.
+    const availableCredits = await this.credits.availableUnits(
+      subscription.customerId
+    );
+    const summary = await this.usageRating.summarizeForPeriodWithCredits(
       subscription,
       plan,
-      { start: event.periodStart, end: event.periodEnd }
+      { start: event.periodStart, end: event.periodEnd },
+      availableCredits
     );
     const chargeKey = `usage:${subscription.id}:${event.periodEnd.getTime()}`;
-    const zeroUsage = summary.amountMinor === 0;
+    const zeroCharge = summary.amountMinor === 0;
 
-    const insert = await this.invoices
-      .createQueryBuilder()
-      .insert()
-      .into(Invoice)
-      .values({
-        customerId: subscription.customerId,
-        subscriptionId: subscription.id,
-        provider: subscription.provider,
-        providerEventId: chargeKey,
-        providerInvoiceRef: zeroUsage ? chargeKey : '',
-        amountMinor: summary.amountMinor,
-        currency: summary.currency,
-        status: zeroUsage ? 'paid' : 'pending',
-        billingMode: 'usage',
-        periodStart: event.periodStart,
-        periodEnd: event.periodEnd,
-        paidAt: zeroUsage ? new Date() : null,
-        receiptRef: null
-      })
-      .orIgnore()
-      .returning(['id'])
-      .execute();
+    const invoiceId = await withTransaction(
+      this.dataSource,
+      async (manager) => {
+        const insert = await manager
+          .createQueryBuilder()
+          .insert()
+          .into(Invoice)
+          .values({
+            customerId: subscription.customerId,
+            subscriptionId: subscription.id,
+            provider: subscription.provider,
+            providerEventId: chargeKey,
+            providerInvoiceRef: zeroCharge ? chargeKey : '',
+            amountMinor: summary.amountMinor,
+            currency: summary.currency,
+            status: zeroCharge ? 'paid' : 'pending',
+            billingMode: 'usage',
+            periodStart: event.periodStart,
+            periodEnd: event.periodEnd,
+            paidAt: zeroCharge ? new Date() : null,
+            receiptRef: null
+          })
+          .orIgnore()
+          .returning(['id'])
+          .execute();
 
-    const rows = insert.raw as Array<{ id: string }>;
-    if (rows.length === 0) {
+        const rows = insert.raw as Array<{ id: string }>;
+        if (rows.length === 0) {
+          return null;
+        }
+        if (summary.creditUnitsApplied > 0) {
+          await this.credits.spendOnUsage(
+            manager,
+            subscription.customerId,
+            rows[0].id,
+            summary.creditUnitsApplied
+          );
+        }
+        return rows[0].id;
+      }
+    );
+
+    if (!invoiceId) {
       // This period close was already invoiced (replayed or raced) — done.
       return;
     }
 
-    if (zeroUsage) {
+    if (zeroCharge) {
       this.events.emit(
         InvoicePaidEvent.name,
-        new InvoicePaidEvent(event.userId, rows[0].id)
+        new InvoicePaidEvent(event.userId, invoiceId)
       );
       return;
     }

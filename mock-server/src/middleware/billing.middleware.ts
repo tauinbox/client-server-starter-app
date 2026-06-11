@@ -10,6 +10,7 @@ import type {
 } from '@app/shared/types';
 import {
   getState,
+  toCreditBalanceResponse,
   toInvoiceResponse,
   toPaymentMethodResponse,
   toPlanResponse,
@@ -309,6 +310,17 @@ billingRouter.get('/products', authGuard, (req: Request, res: Response) => {
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     .map(toProductResponse);
   res.json(products);
+});
+
+// GET /billing/credits — caller's prepaid credit balance, or null when no
+// credit pack was ever bought (the client renders that as zero).
+billingRouter.get('/credits', authGuard, (req: Request, res: Response) => {
+  const { user } = req as AuthenticatedRequest;
+  const customer = findCustomer(user.id);
+  const balance = customer
+    ? getState().billingCreditBalances.get(customer.id)
+    : undefined;
+  res.json(balance ? toCreditBalanceResponse(balance) : null);
 });
 
 // POST /billing/purchase — start a one-time purchase. Mirrors the server's

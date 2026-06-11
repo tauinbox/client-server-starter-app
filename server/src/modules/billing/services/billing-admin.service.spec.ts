@@ -11,11 +11,13 @@ import type { BillingProviderId } from '@app/shared/types';
 import { Customer } from '../entities/customer.entity';
 import { CustomerGrant } from '../entities/customer-grant.entity';
 import { Invoice } from '../entities/invoice.entity';
+import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { EntitlementService } from '../entitlements/entitlement.service';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import { BillingService } from '../billing.service';
 import { BillingAdminService } from './billing-admin.service';
+import { CreditService } from './credit.service';
 
 type RepoMock = {
   findOne: jest.Mock;
@@ -93,6 +95,7 @@ async function build() {
   const invoices = repo();
   const customers = repo();
   const grants = repo();
+  const products = repo();
   const emit = jest.fn();
 
   const billing = {
@@ -100,6 +103,9 @@ async function build() {
   };
   const entitlements = {
     invalidateUser: jest.fn().mockResolvedValue(undefined)
+  };
+  const credits = {
+    clawbackPurchase: jest.fn().mockResolvedValue(undefined)
   };
 
   const module = await Test.createTestingModule({
@@ -109,8 +115,10 @@ async function build() {
       { provide: getRepositoryToken(Invoice), useValue: invoices },
       { provide: getRepositoryToken(Customer), useValue: customers },
       { provide: getRepositoryToken(CustomerGrant), useValue: grants },
+      { provide: getRepositoryToken(Product), useValue: products },
       { provide: BillingService, useValue: billing },
       { provide: EntitlementService, useValue: entitlements },
+      { provide: CreditService, useValue: credits },
       { provide: EventEmitter2, useValue: { emit } }
     ]
   }).compile();
@@ -121,8 +129,10 @@ async function build() {
     invoices,
     customers,
     grants,
+    products,
     billing,
     entitlements,
+    credits,
     emit
   };
 }
@@ -260,7 +270,7 @@ describe('BillingAdminService', () => {
       expect(saved.status).toBe('paid');
     });
 
-    describe('one-time purchases (design §20.5)', () => {
+    describe('one-time purchases', () => {
       function makeOneTimeInvoice(overrides: Partial<Invoice> = {}): Invoice {
         return makeInvoice({
           kind: 'one_time',
@@ -329,6 +339,65 @@ describe('BillingAdminService', () => {
         await ctx.service.refundInvoice('inv-1');
 
         expect(ctx.grants.update).not.toHaveBeenCalled();
+        expect(ctx.credits.clawbackPurchase).not.toHaveBeenCalled();
+      });
+
+      it('full refund of a credit pack claws the granted units back', async () => {
+        const ctx = await build();
+        ctx.invoices.findOne.mockResolvedValue(
+          makeOneTimeInvoice({ productId: 'prod-cr' })
+        );
+        ctx.products.findOne.mockResolvedValue({
+          id: 'prod-cr',
+          type: 'credits',
+          grant: { credits: 500 }
+        });
+        const yoo = providerStub('yookassa');
+        ctx.billing.getProviderById.mockReturnValue(yoo);
+
+        const saved = await ctx.service.refundInvoice('inv-1');
+
+        expect(saved.status).toBe('refunded');
+        expect(ctx.credits.clawbackPurchase).toHaveBeenCalledWith(
+          'cust-1',
+          'inv-1',
+          500
+        );
+      });
+
+      it('partial refund of a credit pack claws nothing back', async () => {
+        const ctx = await build();
+        ctx.invoices.findOne.mockResolvedValue(
+          makeOneTimeInvoice({ productId: 'prod-cr' })
+        );
+        ctx.products.findOne.mockResolvedValue({
+          id: 'prod-cr',
+          type: 'credits',
+          grant: { credits: 500 }
+        });
+        const yoo = providerStub('yookassa');
+        ctx.billing.getProviderById.mockReturnValue(yoo);
+
+        const saved = await ctx.service.refundInvoice('inv-1', 10000);
+
+        expect(saved.status).toBe('paid');
+        expect(ctx.credits.clawbackPurchase).not.toHaveBeenCalled();
+      });
+
+      it('full refund of an sku purchase claws no credits back', async () => {
+        const ctx = await build();
+        ctx.invoices.findOne.mockResolvedValue(makeOneTimeInvoice());
+        ctx.products.findOne.mockResolvedValue({
+          id: 'prod-1',
+          type: 'sku',
+          grant: { entitlement: 'reports' }
+        });
+        const yoo = providerStub('yookassa');
+        ctx.billing.getProviderById.mockReturnValue(yoo);
+
+        await ctx.service.refundInvoice('inv-1');
+
+        expect(ctx.credits.clawbackPurchase).not.toHaveBeenCalled();
       });
     });
   });

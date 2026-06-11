@@ -20,6 +20,7 @@ import type {
 } from '@app/shared/types';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { User } from '../../users/entities/user.entity';
+import { CreditBalance } from '../entities/credit-balance.entity';
 import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { PaymentMethod } from '../entities/payment-method.entity';
@@ -41,6 +42,7 @@ import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
 import { addInterval } from '../utils/period.util';
 import { BillingService } from '../billing.service';
+import { CreditService } from './credit.service';
 
 /** Subscriptions that grant access — re-checkout while one exists is blocked. */
 const ACTIVE_STATUSES = ['trialing', 'active', 'past_due'] as const;
@@ -131,6 +133,7 @@ export class BillingUserService {
     private readonly users: Repository<User>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly billing: BillingService,
+    private readonly credits: CreditService,
     private readonly usageRating: UsageRating,
     private readonly proration: ProrationCalculator,
     private readonly config: ConfigService,
@@ -192,6 +195,16 @@ export class BillingUserService {
       amountMinor: summary.amountMinor,
       currency: summary.currency
     };
+  }
+
+  /**
+   * The caller's prepaid credit balance, or null when nothing was ever
+   * purchased — the client renders that as zero credits.
+   */
+  async getCredits(userId: string): Promise<CreditBalance | null> {
+    const customer = await this.customers.findOne({ where: { userId } });
+    if (!customer) return null;
+    return this.credits.getBalance(customer.id);
   }
 
   async getDefaultPaymentMethod(userId: string): Promise<PaymentMethod | null> {

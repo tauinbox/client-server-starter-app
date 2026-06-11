@@ -182,4 +182,101 @@ describe('UsageRating', () => {
     ).rejects.toThrow('no price for provider "paddle"');
     expect(sum).not.toHaveBeenCalled();
   });
+
+  describe('summarizeForPeriodWithCredits', () => {
+    it('offsets billable units with partial credits and reprices the remainder', async () => {
+      sum.mockResolvedValue(142);
+
+      const summary = await rating.summarizeForPeriodWithCredits(
+        makeSubscription(),
+        makePlan(),
+        PERIOD,
+        10
+      );
+
+      expect(summary).toMatchObject({
+        billableUnits: 42,
+        creditUnitsApplied: 10,
+        chargedUnits: 32,
+        amountMinor: 6400
+      });
+      expect(summary.receiptItems).toEqual([
+        {
+          description: 'Pay as you go: api_calls × 32',
+          amountMinor: 6400,
+          quantity: 1
+        }
+      ]);
+    });
+
+    it('caps the spend at the billable units when credits exceed them', async () => {
+      sum.mockResolvedValue(142);
+
+      const summary = await rating.summarizeForPeriodWithCredits(
+        makeSubscription(),
+        makePlan(),
+        PERIOD,
+        1000
+      );
+
+      expect(summary).toMatchObject({
+        creditUnitsApplied: 42,
+        chargedUnits: 0,
+        amountMinor: 0,
+        receiptItems: []
+      });
+    });
+
+    it('changes nothing with zero credits available', async () => {
+      sum.mockResolvedValue(142);
+
+      const summary = await rating.summarizeForPeriodWithCredits(
+        makeSubscription(),
+        makePlan(),
+        PERIOD,
+        0
+      );
+
+      expect(summary).toMatchObject({
+        creditUnitsApplied: 0,
+        chargedUnits: 42,
+        amountMinor: 8400
+      });
+    });
+
+    it('ignores a negative available balance (nothing to spend)', async () => {
+      sum.mockResolvedValue(142);
+
+      const summary = await rating.summarizeForPeriodWithCredits(
+        makeSubscription(),
+        makePlan(),
+        PERIOD,
+        -100
+      );
+
+      expect(summary).toMatchObject({
+        creditUnitsApplied: 0,
+        chargedUnits: 42,
+        amountMinor: 8400
+      });
+    });
+
+    it('spends no credits on a period with no overage', async () => {
+      sum.mockResolvedValue(99);
+
+      const summary = await rating.summarizeForPeriodWithCredits(
+        makeSubscription(),
+        makePlan(),
+        PERIOD,
+        50
+      );
+
+      expect(summary).toMatchObject({
+        billableUnits: 0,
+        creditUnitsApplied: 0,
+        chargedUnits: 0,
+        amountMinor: 0
+      });
+    });
+  });
 });

@@ -30,6 +30,7 @@ import { FixedRating } from '../src/modules/billing/rating/fixed-rating.strategy
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
+import { CreditService } from '../src/modules/billing/services/credit.service';
 import { WebhookIngestionService } from '../src/modules/billing/webhooks/webhook-ingestion.service';
 import { BillingWebhooksController } from '../src/modules/billing/webhooks/billing-webhooks.controller';
 
@@ -282,6 +283,16 @@ describe('Billing payment-method update flow (e2e)', () => {
         RenewalService,
         FixedRating,
         UsageRating,
+        // No prepaid credits in this scenario set — the credits flow has its
+        // own coverage in billing-webhook.e2e-spec and the unit specs.
+        {
+          provide: CreditService,
+          useValue: {
+            availableUnits: jest.fn().mockResolvedValue(0),
+            spendOnUsage: jest.fn(),
+            addPurchase: jest.fn()
+          }
+        },
         YooKassaProvider,
         { provide: YOOKASSA_CLIENT, useValue: { getPayment, createPayment } },
         {
