@@ -1,0 +1,75 @@
+<mat-card
+  *transloco="let t; scope: 'billing'"
+  class="donation-card"
+  appearance="outlined"
+>
+  <mat-card-content class="donation-body">
+    <header class="donation-header">
+      <span class="donation-icon" aria-hidden="true">
+        <mat-icon>volunteer_activism</mat-icon>
+      </span>
+      <div>
+        <h3 class="donation-name">{{ product().name }}</h3>
+        @if (product().description) {
+          <p class="donation-description">{{ product().description }}</p>
+        }
+      </div>
+    </header>
+
+    <mat-button-toggle-group
+      class="amount-presets"
+      [value]="selection()"
+      [disabled]="disabled()"
+      [attr.aria-label]="t('billing.oneTime.amountLabel')"
+      (change)="onSelect($event.value)"
+    >
+      @for (preset of presets(); track preset.amountMinor) {
+        <mat-button-toggle [value]="preset.amountMinor">
+          {{ preset.label }}
+        </mat-button-toggle>
+      }
+      <mat-button-toggle value="custom">
+        {{ t('billing.oneTime.custom') }}
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+
+    @if (isCustom()) {
+      <div class="custom-amount">
+        <nxs-form-field
+          [field]="donationForm.amount"
+          label="billing.oneTime.amountLabel"
+          prefixIcon="payments"
+        />
+        <p class="bounds-hint">
+          {{
+            t('billing.oneTime.amountBounds', {
+              min: boundsHint().min,
+              max: boundsHint().max
+            })
+          }}
+        </p>
+      </div>
+    }
+
+    <nxs-form-field
+      [field]="donationForm.note"
+      label="billing.oneTime.noteLabel"
+    />
+
+    <div class="donation-actions">
+      <button
+        matButton="filled"
+        type="button"
+        class="pay-btn"
+        [disabled]="!canPay()"
+        (click)="onPay()"
+      >
+        @if (payLabel()) {
+          {{ t('billing.oneTime.pay', { amount: payLabel() }) }}
+        } @else {
+          {{ t('billing.oneTime.payNoAmount') }}
+        }
+      </button>
+    </div>
+  </mat-card-content>
+</mat-card>

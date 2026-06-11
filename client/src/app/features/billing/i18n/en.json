@@ -8,6 +8,21 @@
     "current": "Current",
     "usageTeaser": "Pay as you go · {{ price }} / unit — only pay for what you use"
   },
+  "oneTime": {
+    "title": "One-time purchases",
+    "subtitle": "Pay once — no subscription needed, your plan stays unchanged.",
+    "buy": "Buy",
+    "validDays": "valid {{ days }} days",
+    "custom": "Custom",
+    "amountLabel": "Amount",
+    "amountBounds": "Between {{ min }} and {{ max }}",
+    "noteLabel": "Note (optional)",
+    "pay": "Pay {{ amount }}",
+    "payNoAmount": "Pay",
+    "amountInvalid": "Enter a valid amount.",
+    "amountRange": "Amount must be between {{ min }} and {{ max }}.",
+    "noteTooLong": "The note is too long."
+  },
   "region": {
     "label": "Billing region",
     "auto": "Auto",
@@ -78,7 +93,10 @@
     "pendingMessage": "We're still confirming your subscription. It will appear in your billing settings shortly.",
     "canceledTitle": "Checkout canceled",
     "canceledMessage": "No charge was made. You can pick a plan whenever you're ready.",
-    "backToPlans": "Back to plans"
+    "backToPlans": "Back to plans",
+    "purchaseProcessingTitle": "Confirming your payment…",
+    "purchaseSuccessTitle": "Thank you for your purchase!",
+    "purchasePendingMessage": "We're still confirming your payment. The receipt will appear in your invoices shortly."
   },
   "changePlan": {
     "title": "Change plan",
@@ -107,6 +125,7 @@
     "cancelFailed": "Could not cancel the subscription. Please try again.",
     "regionFailed": "Could not change the billing region.",
     "changeFailed": "Could not change the plan. Please try again.",
-    "paymentMethodFailed": "Could not start the payment-method update. Please try again."
+    "paymentMethodFailed": "Could not start the payment-method update. Please try again.",
+    "purchaseFailed": "Could not start the purchase. Please try again."
   }
 }

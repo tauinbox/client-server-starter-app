@@ -1,7 +1,14 @@
-import type { PlanPrice, PlanResponse } from '@app/shared/types';
+import type {
+  PlanPrice,
+  PlanResponse,
+  ProductResponse
+} from '@app/shared/types';
 import {
   formatMoney,
+  minorUnitScale,
+  parseAmountToMinor,
   planPriceFor,
+  productPriceFor,
   resolveDisplayProvider
 } from './billing-format';
 
@@ -64,6 +71,61 @@ describe('billing-format', () => {
 
     it('returns null when no prices exist', () => {
       expect(planPriceFor(makePlan({}), 'paddle')).toBeNull();
+    });
+  });
+
+  describe('productPriceFor', () => {
+    function makeProduct(prices: ProductResponse['prices']): ProductResponse {
+      return {
+        id: 'prod-1',
+        key: 'donation',
+        name: 'Donation',
+        description: null,
+        type: 'custom',
+        prices,
+        grant: null,
+        active: true,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      };
+    }
+
+    it('returns the entry for the requested provider, with fallback', () => {
+      const product = makeProduct({
+        paddle: { currency: 'USD', minAmountMinor: 100, maxAmountMinor: 50000 }
+      });
+      expect(productPriceFor(product, 'paddle')?.minAmountMinor).toBe(100);
+      expect(productPriceFor(product, 'yookassa')?.currency).toBe('USD');
+      expect(productPriceFor(makeProduct({}), 'paddle')).toBeNull();
+    });
+  });
+
+  describe('minorUnitScale', () => {
+    it('is 2 for RUB/USD and 0 for zero-decimal currencies', () => {
+      expect(minorUnitScale('USD')).toBe(2);
+      expect(minorUnitScale('RUB')).toBe(2);
+      expect(minorUnitScale('JPY')).toBe(0);
+    });
+  });
+
+  describe('parseAmountToMinor', () => {
+    it('parses integers and up-to-2-decimal amounts into minor units', () => {
+      expect(parseAmountToMinor('15', 'USD')).toBe(1500);
+      expect(parseAmountToMinor('15.5', 'USD')).toBe(1550);
+      expect(parseAmountToMinor('15.55', 'USD')).toBe(1555);
+      expect(parseAmountToMinor(' 1500 ', 'RUB')).toBe(150000);
+    });
+
+    it('accepts a comma decimal separator', () => {
+      expect(parseAmountToMinor('12,34', 'RUB')).toBe(1234);
+    });
+
+    it('rejects junk, negatives, zero and over-precise input', () => {
+      expect(parseAmountToMinor('abc', 'USD')).toBeNull();
+      expect(parseAmountToMinor('-5', 'USD')).toBeNull();
+      expect(parseAmountToMinor('0', 'USD')).toBeNull();
+      expect(parseAmountToMinor('1.234', 'USD')).toBeNull();
+      expect(parseAmountToMinor('', 'USD')).toBeNull();
     });
   });
 });

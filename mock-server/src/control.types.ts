@@ -1,4 +1,5 @@
 import type {
+  InvoiceResponse,
   SubscriptionResponse,
   SubscriptionStatus,
   UsageResponse
@@ -82,4 +83,12 @@ export type ControlApi = {
     subscriptionId?: string;
     idempotencyKey?: string;
   }): Promise<UsageResponse>;
+  // Simulates the provider's paid webhook for a one-time purchase opened via
+  // POST /billing/purchase: settles the pending session (by sessionRef, or
+  // the latest one for userId) into a paid `one_time` invoice plus the sku's
+  // entitlement grant. Returns the settled invoice.
+  completeBillingPurchase(args: {
+    userId?: string;
+    sessionRef?: string;
+  }): Promise<InvoiceResponse>;
 };

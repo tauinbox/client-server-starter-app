@@ -12,16 +12,30 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIcon } from '@angular/material/icon';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { toSignal } from '@angular/core/rxjs-interop';
-import type { BillingRegion, PlanResponse } from '@app/shared/types';
+import type {
+  BillingRegion,
+  PlanResponse,
+  ProductResponse
+} from '@app/shared/types';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { BillingStore } from '../../store/billing.store';
 import {
   formatMoney,
   planPriceFor,
+  productPriceFor,
   resolveDisplayProvider
 } from '../../utils/billing-format';
+import {
+  storePendingPurchase,
+  type PendingPurchase
+} from '../../utils/pending-purchase';
 import { PlanCardComponent } from '../plan-card/plan-card.component';
+import { ProductCardComponent } from '../product-card/product-card.component';
+import {
+  DonationCardComponent,
+  type DonationSubmit
+} from '../donation-card/donation-card.component';
 
 type PricedPlan = {
   readonly key: string;
@@ -31,6 +45,12 @@ type PricedPlan = {
   readonly plan: PlanResponse;
 };
 
+type PricedProduct = {
+  readonly key: string;
+  readonly price: string;
+  readonly product: ProductResponse;
+};
+
 @Component({
   selector: 'nxs-pricing-page',
   imports: [
@@ -38,7 +58,9 @@ type PricedPlan = {
     MatButtonToggleModule,
     MatIcon,
     TranslocoDirective,
-    PlanCardComponent
+    PlanCardComponent,
+    ProductCardComponent,
+    DonationCardComponent
   ],
   templateUrl: './pricing-page.component.html',
   styleUrl: './pricing-page.component.scss',
@@ -115,6 +137,35 @@ export class PricingPageComponent implements OnInit {
     () => this.isAuthenticated() && this.store.region() !== null
   );
 
+  // One-time purchases (design §21.4): fixed-price products as cards, custom
+  // products as donation forms. The catalog endpoint requires auth, so the
+  // section exists only for authenticated callers with a non-empty catalog.
+  protected readonly oneTimeProducts = computed<PricedProduct[]>(() => {
+    const provider = this.displayProvider();
+    const lang = this.#lang();
+    return this.store
+      .products()
+      .filter((product) => product.type !== 'custom')
+      .map((product) => {
+        const price = productPriceFor(product, provider);
+        return {
+          key: product.key,
+          product,
+          price: price?.amountMinor
+            ? formatMoney(price.amountMinor, price.currency, lang)
+            : ''
+        };
+      });
+  });
+
+  protected readonly donationProducts = computed(() =>
+    this.store.products().filter((product) => product.type === 'custom')
+  );
+
+  protected readonly showOneTime = computed(
+    () => this.isAuthenticated() && this.store.products().length > 0
+  );
+
   protected readonly regionOptions: readonly BillingRegion[] = [
     'auto',
     'ru',
@@ -142,5 +193,55 @@ export class PricingPageComponent implements OnInit {
         this.#window.location.href = session.url;
       }
     });
+  }
+
+  onBuy(item: PricedProduct): void {
+    const price = productPriceFor(item.product, this.displayProvider());
+    void this.#purchase(
+      { productKey: item.product.key },
+      {
+        productName: item.product.name,
+        amountMinor: price?.amountMinor ?? 0,
+        currency: price?.currency ?? 'USD'
+      }
+    );
+  }
+
+  onDonate(product: ProductResponse, submit: DonationSubmit): void {
+    const price = productPriceFor(product, this.displayProvider());
+    void this.#purchase(
+      {
+        productKey: product.key,
+        amountMinor: submit.amountMinor,
+        description: submit.note
+      },
+      {
+        productName: product.name,
+        amountMinor: submit.amountMinor,
+        currency: price?.currency ?? 'USD'
+      }
+    );
+  }
+
+  /**
+   * Start the one-time purchase, park the session reference for the return
+   * page, then follow the provider: redirect when it hands back a hosted
+   * checkout URL, or go straight to the return page when the payment
+   * completes client-side (Paddle.js) and the webhook confirms it.
+   */
+  async #purchase(
+    request: { productKey: string; amountMinor?: number; description?: string },
+    pending: Omit<PendingPurchase, 'sessionRef'>
+  ): Promise<void> {
+    const session = await this.store.purchase(request);
+    if (!session) return;
+    storePendingPurchase({ ...pending, sessionRef: session.sessionRef });
+    if (session.url && this.#window) {
+      this.#window.location.href = session.url;
+      return;
+    }
+    void this.#router.navigate([
+      `/${AppRouteSegmentEnum.Billing}/${AppRouteSegmentEnum.BillingSuccess}`
+    ]);
   }
 }

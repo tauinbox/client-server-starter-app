@@ -8,6 +8,39 @@
         <a matButton="filled" [routerLink]="pricingRoute">
           {{ t('billing.checkout.backToPlans') }}
         </a>
+      } @else if (purchase(); as pending) {
+        @switch (pollState()) {
+          @case ('pending') {
+            <mat-spinner diameter="48" />
+            <h1>{{ t('billing.checkout.purchaseProcessingTitle') }}</h1>
+            <p>{{ t('billing.checkout.processingMessage') }}</p>
+          }
+          @case ('confirmed') {
+            <mat-icon class="return-icon success" aria-hidden="true"
+              >check_circle</mat-icon
+            >
+            <h1>{{ t('billing.checkout.purchaseSuccessTitle') }}</h1>
+            <p class="purchase-summary">
+              {{ pending.productName }}
+              @if (purchaseAmount()) {
+                · <span class="amount">{{ purchaseAmount() }}</span>
+              }
+            </p>
+            <a matButton="filled" [routerLink]="settingsRoute">
+              {{ t('billing.checkout.goToSettings') }}
+            </a>
+          }
+          @case ('unconfirmed') {
+            <mat-icon class="return-icon neutral" aria-hidden="true"
+              >hourglass_top</mat-icon
+            >
+            <h1>{{ t('billing.checkout.pendingTitle') }}</h1>
+            <p>{{ t('billing.checkout.purchasePendingMessage') }}</p>
+            <a matButton="filled" [routerLink]="settingsRoute">
+              {{ t('billing.checkout.goToSettings') }}
+            </a>
+          }
+        }
       } @else {
         @switch (pollState()) {
           @case ('pending') {

@@ -80,12 +80,14 @@ const usageSummary: UsageSummaryResponse = {
 describe('BillingStore', () => {
   let billingMock: {
     getPlans: ReturnType<typeof vi.fn>;
+    getProducts: ReturnType<typeof vi.fn>;
     getSubscription: ReturnType<typeof vi.fn>;
     getInvoices: ReturnType<typeof vi.fn>;
     getPaymentMethod: ReturnType<typeof vi.fn>;
     getUsage: ReturnType<typeof vi.fn>;
     getRegion: ReturnType<typeof vi.fn>;
     checkout: ReturnType<typeof vi.fn>;
+    purchase: ReturnType<typeof vi.fn>;
     changePlan: ReturnType<typeof vi.fn>;
     updatePaymentMethod: ReturnType<typeof vi.fn>;
     cancel: ReturnType<typeof vi.fn>;
@@ -118,6 +120,12 @@ describe('BillingStore', () => {
         .fn()
         .mockReturnValue(
           of({ provider: 'paddle', url: 'https://x', sessionRef: 's' })
+        ),
+      getProducts: vi.fn().mockReturnValue(of([])),
+      purchase: vi
+        .fn()
+        .mockReturnValue(
+          of({ provider: 'paddle', url: null, sessionRef: 'ot-1' })
         ),
       changePlan: vi.fn().mockReturnValue(
         of({
@@ -172,6 +180,42 @@ describe('BillingStore', () => {
     expect(billingMock.getPlans).toHaveBeenCalled();
     expect(billingMock.getRegion).not.toHaveBeenCalled();
     expect(billingMock.getSubscription).not.toHaveBeenCalled();
+    expect(billingMock.getProducts).not.toHaveBeenCalled();
+  });
+
+  it('loadPricing loads the one-time catalog for authenticated callers', async () => {
+    const store = createStore();
+    await store.loadPricing(true);
+
+    expect(billingMock.getProducts).toHaveBeenCalled();
+  });
+
+  it('purchase returns the provider session', async () => {
+    const store = createStore();
+    const session = await store.purchase({ productKey: 'report-pack' });
+    expect(session?.sessionRef).toBe('ot-1');
+    expect(billingMock.purchase).toHaveBeenCalledWith({
+      productKey: 'report-pack'
+    });
+    expect(store.working()).toBe(false);
+  });
+
+  it('surfaces a purchase error and returns null', async () => {
+    billingMock.purchase.mockReturnValue(throwError(() => new Error('boom')));
+    const store = createStore();
+    const session = await store.purchase({ productKey: 'report-pack' });
+    expect(session).toBeNull();
+    expect(notifyMock.error).toHaveBeenCalledWith(
+      expect.anything(),
+      'billing.errors.purchaseFailed'
+    );
+  });
+
+  it('refreshInvoices patches the invoice list', async () => {
+    const store = createStore();
+    const invoices = await store.refreshInvoices();
+    expect(invoices).toHaveLength(1);
+    expect(store.invoices()).toHaveLength(1);
   });
 
   it('checkout returns the provider session', async () => {

@@ -396,20 +396,21 @@ describe('BillingUserService', () => {
   });
 
   describe('listProducts', () => {
-    it('lists active fixed-price products carrying a price for the effective provider', async () => {
+    it('lists active products carrying a price entry for the effective provider, including custom bounds', async () => {
       const ctx = await build();
       ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
       const priced = makeProduct();
+      const donation = makeDonation();
       const unpriced = makeProduct({
         id: 'prod-2',
         key: 'paddle-only',
         prices: { paddle: { currency: 'USD', amountMinor: 500 } }
       });
-      ctx.products.find.mockResolvedValue([priced, unpriced]);
+      ctx.products.find.mockResolvedValue([priced, donation, unpriced]);
 
       const result = await ctx.service.listProducts('user-1');
 
-      expect(result).toEqual([priced]);
+      expect(result).toEqual([priced, donation]);
       expect(ctx.products.find).toHaveBeenCalledWith({
         where: expect.objectContaining({ active: true }) as unknown,
         order: { createdAt: 'ASC' }
@@ -477,6 +478,30 @@ describe('BillingUserService', () => {
       await ctx.service.checkout('user-1', 'pro');
 
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
+    });
+
+    it('returns to the client checkout-return routes (/billing/success|cancel)', async () => {
+      const ctx = await build();
+      ctx.plans.findOne.mockResolvedValue(makePlan());
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'US',
+        providerOverride: null
+      });
+      const paddle = provider('paddle', true);
+      ctx.billing.resolveProvider.mockResolvedValue(paddle);
+
+      await ctx.service.checkout('user-1', 'pro');
+
+      expect(paddle.startCheckout).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        {
+          successUrl: 'http://localhost:4200/billing/success',
+          cancelUrl: 'http://localhost:4200/billing/cancel'
+        }
+      );
     });
 
     it('rejects checkout when the plan is unknown', async () => {

@@ -16,7 +16,8 @@ import type {
   MockAction,
   MockFeatureFlag,
   MockFeatureFlagRule,
-  MockPlan
+  MockPlan,
+  MockProduct
 } from './types';
 
 // Fixed seed for reproducible data across restarts
@@ -658,3 +659,48 @@ function generatePlans(): MockPlan[] {
 }
 
 export const seedPlans: MockPlan[] = generatePlans();
+
+// One-time purchase catalog — mirrors server/src/seeders/billing-products.seeder.ts:
+// a fixed-price sku unlocking the `reports` entitlement for 30 days, and a
+// bounded custom-amount donation (no grant).
+function generateProducts(): MockProduct[] {
+  const now = '2025-01-01T00:00:00.000Z';
+  return [
+    {
+      id: 'prod-report-pack',
+      key: 'report-pack',
+      name: 'Report pack',
+      description: '30 days of reports access without a subscription',
+      type: 'sku',
+      prices: {
+        yookassa: { currency: 'RUB', amountMinor: 49000 },
+        paddle: { currency: 'USD', amountMinor: 500 }
+      },
+      grant: { entitlement: 'reports', durationDays: 30 },
+      active: true,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: 'prod-donation',
+      key: 'donation',
+      name: 'Donation',
+      description: 'Support the project with any amount',
+      type: 'custom',
+      prices: {
+        yookassa: {
+          currency: 'RUB',
+          minAmountMinor: 10000,
+          maxAmountMinor: 5000000
+        },
+        paddle: { currency: 'USD', minAmountMinor: 100, maxAmountMinor: 50000 }
+      },
+      grant: null,
+      active: true,
+      createdAt: now,
+      updatedAt: now
+    }
+  ];
+}
+
+export const seedProducts: MockProduct[] = generateProducts();

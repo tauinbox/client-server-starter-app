@@ -157,6 +157,105 @@ test.describe('Billing', () => {
     await expect(page.locator('.payment-method')).toContainText('4444');
   });
 
+  test('one-time SKU purchase settles into a paid invoice and a thank-you return', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await stubHostedCheckout(page);
+
+    // The one-time section renders the seeded catalog below the plans.
+    await page.goto('/billing');
+    const skuCard = page.locator('nxs-product-card', {
+      hasText: 'Report pack'
+    });
+    await expect(skuCard).toBeVisible();
+    await expect(skuCard).toContainText('$5.00');
+
+    await skuCard.getByRole('button', { name: 'Buy' }).click();
+    await expect(page).toHaveURL(/mock-checkout\.local/);
+
+    // Simulate the provider's paid webhook, then return from checkout.
+    await _mockServer.completeBillingPurchase({ userId: USER_ID });
+    await page.goto('/billing/success');
+
+    await expect(
+      page.getByRole('heading', { name: 'Thank you for your purchase!' })
+    ).toBeVisible();
+    await expect(page.locator('.purchase-summary')).toContainText(
+      'Report pack'
+    );
+    await expect(page.locator('.purchase-summary')).toContainText('$5.00');
+
+    // The paid one-time invoice is in the history; no subscription appeared.
+    await page.goto('/billing/settings');
+    await expect(page.locator('.invoice-table tbody tr')).toHaveCount(1);
+    await expect(page.locator('.invoice-table')).toContainText('$5.00');
+    await expect(page.locator('.plan-summary')).toContainText(
+      'No subscription yet'
+    );
+  });
+
+  test('donation with a custom amount and note settles at the chosen amount', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await stubHostedCheckout(page);
+
+    await page.goto('/billing');
+    const donationCard = page.locator('nxs-donation-card');
+    await expect(donationCard).toBeVisible();
+
+    // Quick presets derive from the catalog minimum ($1): $3 / $5 / Custom.
+    await expect(
+      donationCard.getByRole('button', { name: 'Pay $3.00' })
+    ).toBeEnabled();
+
+    await donationCard.getByRole('radio', { name: 'Custom' }).click();
+    await donationCard.getByRole('textbox', { name: 'Amount' }).fill('15');
+    await donationCard
+      .getByRole('textbox', { name: 'Note (optional)' })
+      .fill('Keep it up');
+    await donationCard.getByRole('button', { name: 'Pay $15.00' }).click();
+
+    await expect(page).toHaveURL(/mock-checkout\.local/);
+
+    await _mockServer.completeBillingPurchase({ userId: USER_ID });
+    await page.goto('/billing/success');
+
+    await expect(
+      page.getByRole('heading', { name: 'Thank you for your purchase!' })
+    ).toBeVisible();
+    await expect(page.locator('.purchase-summary')).toContainText('$15.00');
+
+    await page.goto('/billing/settings');
+    await expect(page.locator('.invoice-table tbody tr')).toHaveCount(1);
+    await expect(page.locator('.invoice-table')).toContainText('$15.00');
+  });
+
+  test('donation rejects an out-of-bounds custom amount client-side', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+
+    await page.goto('/billing');
+    const donationCard = page.locator('nxs-donation-card');
+    await donationCard.getByRole('radio', { name: 'Custom' }).click();
+
+    // $0.50 is below the $1 catalog minimum: error shown, pay disabled.
+    const amount = donationCard.getByRole('textbox', { name: 'Amount' });
+    await amount.fill('0.50');
+    await amount.blur();
+    await expect(donationCard.locator('mat-error')).toContainText(
+      'between $1.00 and $500.00'
+    );
+    await expect(
+      donationCard.getByRole('button', { name: /^Pay/ })
+    ).toBeDisabled();
+  });
+
   test('usage subscription shows the current-period usage meter', async ({
     page,
     _mockServer

@@ -1,0 +1,117 @@
+@use '../../../../../styles/abstracts/functions' as func;
+@use '../../../../../styles/abstracts/variables' as vars;
+
+:host {
+  display: block;
+}
+
+.product-card {
+  border-radius: vars.$border-radius-lg;
+  transition:
+    transform vars.$transition-fast ease,
+    box-shadow vars.$transition-fast ease;
+
+  &:focus-visible {
+    outline: func.rem(2) solid var(--mat-sys-primary);
+    outline-offset: func.rem(2);
+  }
+
+  &:hover {
+    transform: translateY(func.rem(-2));
+  }
+}
+
+.product-body {
+  display: flex;
+  gap: vars.$spacing-md;
+  align-items: center;
+  padding: vars.$spacing-md vars.$spacing-lg;
+}
+
+// Leading tonal icon square — the card's anchor point.
+.product-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: func.rem(48);
+  height: func.rem(48);
+  background: var(--mat-sys-secondary-container);
+  border-radius: vars.$border-radius-md;
+
+  mat-icon {
+    color: var(--mat-sys-on-secondary-container);
+  }
+}
+
+.product-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.product-name {
+  margin: 0;
+  font-size: vars.$font-size-base;
+  font-weight: vars.$font-weight-medium;
+}
+
+.product-description {
+  margin: vars.$spacing-xxs 0 0;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.product-grant {
+  display: flex;
+  gap: vars.$spacing-xxs;
+  align-items: center;
+  margin: vars.$spacing-xs 0 0;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-primary);
+
+  mat-icon {
+    width: func.rem(16);
+    height: func.rem(16);
+    font-size: func.rem(16);
+  }
+
+  .grant-days {
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+// Price + action stub, split off ticket-style by a dashed rule.
+.product-stub {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: vars.$spacing-xs;
+  align-items: flex-end;
+  padding-inline-start: vars.$spacing-lg;
+  border-inline-start: func.rem(1) dashed var(--mat-sys-outline-variant);
+}
+
+.product-price {
+  font-size: vars.$font-size-lg;
+  font-weight: vars.$font-weight-bold;
+  font-variant-numeric: tabular-nums;
+}
+
+// Below tablet-portrait the ticket stacks: stub moves under the info with the
+// dashed rule rotated to horizontal.
+@media (max-width: vars.$breakpoint-xs) {
+  .product-body {
+    flex-wrap: wrap;
+  }
+
+  .product-stub {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding-block-start: vars.$spacing-sm;
+    padding-inline-start: 0;
+    border-block-start: func.rem(1) dashed var(--mat-sys-outline-variant);
+    border-inline-start: none;
+  }
+}

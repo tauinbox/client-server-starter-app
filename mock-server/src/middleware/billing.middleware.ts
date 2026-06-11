@@ -13,6 +13,7 @@ import {
   toInvoiceResponse,
   toPaymentMethodResponse,
   toPlanResponse,
+  toProductResponse,
   toSubscriptionResponse,
   toUsageResponse
 } from '../state';
@@ -292,17 +293,31 @@ billingRouter.post(
   }
 );
 
-// GET /billing/products — one-time purchase catalog. Minimal M4 parity: the
-// mock state carries no product catalog yet (it lands with the one-time UI
-// work), so the route mirrors the server's contract over an empty catalog.
-billingRouter.get('/products', authGuard, (_req: Request, res: Response) => {
-  res.json([]);
+// GET /billing/products — one-time purchase catalog: active products carrying
+// a price entry for the caller's effective provider (sku/credits fixed prices
+// plus custom amount bounds), oldest first. Like /region this is a read — no
+// availability assertion, the catalog stays browsable.
+billingRouter.get('/products', authGuard, (req: Request, res: Response) => {
+  const { user } = req as AuthenticatedRequest;
+  const customer = findCustomer(user.id);
+  const provider = customer
+    ? effectiveProvider(customer)
+    : geoDefault(geoFromLocale(user.locale).country);
+
+  const products = [...getState().billingProducts.values()]
+    .filter((product) => product.active && product.prices[provider])
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map(toProductResponse);
+  res.json(products);
 });
 
-// POST /billing/purchase — start a one-time purchase. Same request validation
-// as the server; with the mock's empty catalog every product key resolves to
-// 404, exactly the server's response for an unknown product.
+// POST /billing/purchase — start a one-time purchase. Mirrors the server's
+// validation chain: unknown/inactive product 404, no price for the resolved
+// provider 409, misconfigured catalog 503, custom amount required and bounded
+// 400. The provider session is recorded as a pending purchase that
+// /__control/billing/complete-purchase settles the way the paid webhook would.
 billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
+  const { user } = req as AuthenticatedRequest;
   const productKey =
     typeof req.body?.productKey === 'string' ? req.body.productKey.trim() : '';
   if (!productKey) {
@@ -311,9 +326,94 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
       .json({ message: 'productKey must be a string', statusCode: 400 });
     return;
   }
-  res.status(404).json({
-    message: `Product "${productKey}" was not found`,
-    statusCode: 404
+  const requestedMinor = req.body?.amountMinor as unknown;
+  if (
+    requestedMinor !== undefined &&
+    (!Number.isInteger(requestedMinor) || (requestedMinor as number) < 1)
+  ) {
+    res.status(400).json({
+      message: 'amountMinor must be a positive integer',
+      statusCode: 400
+    });
+    return;
+  }
+
+  const product = [...getState().billingProducts.values()].find(
+    (p) => p.key === productKey
+  );
+  if (!product || !product.active) {
+    res.status(404).json({
+      message: `Product "${productKey}" was not found`,
+      statusCode: 404
+    });
+    return;
+  }
+
+  const customer = getOrCreateCustomer(user.id, user.locale);
+  const provider = effectiveProvider(customer);
+  const price = product.prices[provider];
+  if (!price) {
+    res.status(409).json({
+      message: `Product "${product.key}" is not available for your billing provider.`,
+      statusCode: 409
+    });
+    return;
+  }
+
+  // Amount resolution mirrors the server's threat model: fixed-price products
+  // charge the catalog price (client amount ignored); custom requires a
+  // client amount inside the configured bounds.
+  let amountMinor: number;
+  if (product.type !== 'custom') {
+    if (!price.amountMinor || price.amountMinor <= 0) {
+      res.status(503).json({
+        message: `Product "${product.key}" has no price configured`,
+        statusCode: 503
+      });
+      return;
+    }
+    amountMinor = price.amountMinor;
+  } else {
+    const { minAmountMinor, maxAmountMinor } = price;
+    if (!minAmountMinor || !maxAmountMinor) {
+      res.status(503).json({
+        message: `Product "${product.key}" has no amount bounds configured`,
+        statusCode: 503
+      });
+      return;
+    }
+    if (requestedMinor === undefined) {
+      res.status(400).json({
+        message: 'amountMinor is required for a custom-amount product',
+        statusCode: 400
+      });
+      return;
+    }
+    const requested = requestedMinor as number;
+    if (requested < minAmountMinor || requested > maxAmountMinor) {
+      res.status(400).json({
+        message: `amountMinor must be between ${minAmountMinor} and ${maxAmountMinor}`,
+        statusCode: 400
+      });
+      return;
+    }
+    amountMinor = requested;
+  }
+
+  const sessionRef = uuidv4();
+  getState().billingPurchaseSessions.set(sessionRef, {
+    sessionRef,
+    customerId: customer.id,
+    productId: product.id,
+    provider,
+    amountMinor,
+    currency: price.currency,
+    createdAt: new Date().toISOString()
+  });
+  res.json({
+    provider,
+    url: `https://mock-checkout.local/${provider}/purchase/${sessionRef}`,
+    sessionRef
   });
 });
 
@@ -743,7 +843,19 @@ billingRouter.get(
     const plan = sub
       ? [...getState().plans.values()].find((p) => p.key === sub.planKey)
       : undefined;
-    if (!plan?.entitlements.includes('reports')) {
+    // Plan capabilities unioned with active (non-revoked, non-expired)
+    // one-time purchase grants — mirrors the server's EntitlementService.
+    const now = Date.now();
+    const granted = customer
+      ? [...getState().billingCustomerGrants.values()].some(
+          (grant) =>
+            grant.customerId === customer.id &&
+            grant.entitlement === 'reports' &&
+            !grant.revokedAt &&
+            (!grant.expiresAt || Date.parse(grant.expiresAt) > now)
+        )
+      : false;
+    if (!plan?.entitlements.includes('reports') && !granted) {
       res.status(403).json({
         message: 'This action requires the "reports" entitlement',
         statusCode: 403

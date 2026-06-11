@@ -171,6 +171,17 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           body: JSON.stringify(args)
         });
         return res.json();
+      },
+      async completeBillingPurchase(args) {
+        const res = await fetch(
+          `${baseUrl}/__control/billing/complete-purchase`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(args)
+          }
+        );
+        return res.json();
       }
     };
 
