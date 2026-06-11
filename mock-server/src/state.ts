@@ -510,6 +510,8 @@ export function toInvoiceResponse(invoice: MockInvoice): InvoiceResponse {
     currency: invoice.currency,
     status: invoice.status,
     billingMode: invoice.billingMode,
+    kind: invoice.kind,
+    productId: invoice.productId,
     periodStart: invoice.periodStart,
     periodEnd: invoice.periodEnd,
     paidAt: invoice.paidAt,

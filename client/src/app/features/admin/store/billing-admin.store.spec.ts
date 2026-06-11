@@ -32,6 +32,8 @@ const paidInvoice: InvoiceResponse = {
   currency: 'USD',
   status: 'paid',
   billingMode: 'fixed',
+  kind: 'subscription',
+  productId: null,
   periodStart: '2026-06-01T00:00:00.000Z',
   periodEnd: '2026-07-01T00:00:00.000Z',
   paidAt: '2026-06-01T00:00:00.000Z',

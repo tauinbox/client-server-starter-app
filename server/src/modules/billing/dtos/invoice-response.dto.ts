@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import type {
   BillingMode,
   BillingProviderId,
+  InvoiceKind,
   InvoiceResponse,
   InvoiceStatus,
   StructuralDiff,
@@ -39,6 +40,15 @@ export class InvoiceResponseDto {
 
   @ApiProperty({ enum: ['fixed', 'usage'], example: 'fixed' })
   billingMode: BillingMode;
+
+  @ApiProperty({
+    enum: ['subscription', 'one_time'],
+    example: 'subscription'
+  })
+  kind: InvoiceKind;
+
+  @ApiProperty({ nullable: true, example: null })
+  productId: string | null;
 
   @ApiProperty({ example: '2023-01-01T00:00:00Z' })
   periodStart: Date;

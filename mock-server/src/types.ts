@@ -186,6 +186,8 @@ export interface MockInvoice {
   currency: string;
   status: import('@app/shared/types').InvoiceStatus;
   billingMode: import('@app/shared/types').BillingMode;
+  kind: import('@app/shared/types').InvoiceKind;
+  productId: string | null;
   periodStart: string;
   periodEnd: string;
   paidAt: string | null;

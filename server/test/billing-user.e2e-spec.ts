@@ -70,6 +70,8 @@ function makeInvoice(): Invoice {
     currency: 'RUB',
     status: 'paid',
     billingMode: 'fixed',
+    kind: 'subscription',
+    productId: null,
     periodStart: new Date('2026-06-01T00:00:00Z'),
     periodEnd: new Date('2026-07-01T00:00:00Z'),
     paidAt: new Date('2026-06-01T00:05:00Z'),

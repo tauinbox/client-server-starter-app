@@ -63,6 +63,8 @@ function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
     currency: 'RUB',
     status: 'paid',
     billingMode: 'fixed',
+    kind: 'subscription',
+    productId: null,
     periodStart: new Date(),
     periodEnd: new Date(),
     paidAt: new Date(),
