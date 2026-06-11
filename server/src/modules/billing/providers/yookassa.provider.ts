@@ -31,6 +31,8 @@ import type {
   NormalizedInvoicePayload,
   NormalizedPaymentFailedPayload,
   NormalizedPaymentMethodPayload,
+  OneTimePaymentParams,
+  OneTimePaymentSession,
   PaymentProvider,
   ReceiptItem
 } from './payment-provider.interface';
@@ -41,6 +43,14 @@ import type {
  * instead of `invoice.paid` (which would insert an invoice and re-activate).
  */
 const METHOD_UPDATE_PURPOSE = 'method_update';
+
+/**
+ * Metadata marker a standalone one-time purchase carries (design §20), so its
+ * success webhook reduces onto a `kind 'one_time'` invoice instead of being
+ * mistaken for a subscription first payment (which would activate the
+ * customer's open subscription and save the card).
+ */
+const ONE_TIME_PURPOSE = 'one_time';
 
 /** Minor units (kopecks) → YooKassa decimal string, e.g. `99000` → `'990.00'`. */
 function toAmountValue(amountMinor: number): string {
@@ -56,6 +66,18 @@ function toMinor(value: string): number {
 function isMethodUpdate(metadata: unknown): boolean {
   const data = (metadata ?? {}) as Record<string, unknown>;
   return data['purpose'] === METHOD_UPDATE_PURPOSE;
+}
+
+/** Reads the one-time purchase marker + product id echoed via metadata. */
+function oneTimeFromMetadata(
+  metadata: unknown
+): { productId: string | null } | null {
+  const data = (metadata ?? {}) as Record<string, unknown>;
+  if (data['purpose'] !== ONE_TIME_PURPOSE) {
+    return null;
+  }
+  const productId = data['productId'];
+  return { productId: typeof productId === 'string' ? productId : null };
 }
 
 /** Reads our `customerId`/`userId` echoed back through YooKassa metadata. */
@@ -191,6 +213,50 @@ export class YooKassaProvider implements PaymentProvider {
               price.currency
             )
           })
+    };
+
+    const payment = await yoo.createPayment(payload, randomUUID());
+    const url = payment.confirmation?.confirmation_url;
+    if (!url) {
+      throw new ServiceUnavailableException(
+        'YooKassa did not return a confirmation URL'
+      );
+    }
+    return { url, sessionRef: payment.id };
+  }
+
+  /**
+   * Standalone one-time purchase (design §20.2): a plain payment with a 54-FZ
+   * receipt and a redirect confirmation — the card is NOT saved (no
+   * `save_payment_method`). The one-time marker + `productId` ride in metadata
+   * so the success webhook reduces onto a `one_time` invoice instead of
+   * activating a subscription.
+   */
+  async createOneTimePayment(
+    customer: Customer,
+    params: OneTimePaymentParams
+  ): Promise<OneTimePaymentSession> {
+    const yoo = this.requireClient();
+    const payload: ICreatePayment = {
+      amount: {
+        value: toAmountValue(params.amountMinor),
+        currency: params.currency
+      },
+      capture: true,
+      confirmation: { type: 'redirect', return_url: params.urls.successUrl },
+      description: params.description,
+      metadata: {
+        customerId: customer.id,
+        userId: customer.userId,
+        purpose: ONE_TIME_PURPOSE,
+        productId: params.productId
+      },
+      merchant_customer_id: customer.id,
+      receipt: await this.buildReceipt(
+        customer.userId,
+        params.receiptItems,
+        params.currency
+      )
     };
 
     const payment = await yoo.createPayment(payload, randomUUID());
@@ -387,6 +453,9 @@ export class YooKassaProvider implements PaymentProvider {
         };
         return { ...base, type: 'payment_method.updated', payload };
       }
+      // A one-time purchase never saves a card or touches the subscription —
+      // the marker routes the reducer to the one_time invoice + grant path.
+      const oneTime = oneTimeFromMetadata(payment.metadata);
       const payload: NormalizedInvoicePayload = {
         ref,
         providerInvoiceRef: payment.id,
@@ -396,15 +465,20 @@ export class YooKassaProvider implements PaymentProvider {
         periodStart: null,
         periodEnd: null,
         paidAt: payment.captured_at ?? payment.created_at ?? null,
-        savedPaymentMethod
+        savedPaymentMethod: oneTime ? null : savedPaymentMethod,
+        ...(oneTime ? { kind: 'one_time', productId: oneTime.productId } : {})
       };
       return { ...base, type: 'invoice.paid', payload };
     }
 
     if (payment.status === 'canceled') {
       // An abandoned/declined method-update re-bind leaves the old method in
-      // place — it must not feed the dunning/payment-failed pipeline.
-      if (isMethodUpdate(payment.metadata)) {
+      // place — it must not feed the dunning/payment-failed pipeline. Same for
+      // a one-time purchase: nothing pending exists locally until it is paid.
+      if (
+        isMethodUpdate(payment.metadata) ||
+        oneTimeFromMetadata(payment.metadata)
+      ) {
         return null;
       }
       const payload: NormalizedPaymentFailedPayload = {

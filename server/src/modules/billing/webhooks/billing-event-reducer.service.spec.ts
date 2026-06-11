@@ -4,6 +4,7 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { Plan } from '../entities/plan.entity';
+import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import {
   InvoicePaidEvent,
@@ -28,6 +29,7 @@ interface ManagerStubs {
   plan: Plan | null;
   customer: Customer | null;
   invoice: Invoice | null;
+  product: Product | null;
   invoiceInsertRows: Array<{ id: string }>;
   updateAffected: number;
 }
@@ -45,18 +47,42 @@ function buildManager(stubs: ManagerStubs) {
     if (entity === Plan) return Promise.resolve(stubs.plan);
     if (entity === Customer) return Promise.resolve(stubs.customer);
     if (entity === Invoice) return Promise.resolve(stubs.invoice);
+    if (entity === Product) return Promise.resolve(stubs.product);
     return Promise.resolve(null);
   });
   const execute = jest.fn().mockResolvedValue({ raw: stubs.invoiceInsertRows });
-  const createQueryBuilder = jest.fn(() => ({
-    insert: jest.fn().mockReturnThis(),
-    into: jest.fn().mockReturnThis(),
-    values: jest.fn().mockReturnThis(),
-    orIgnore: jest.fn().mockReturnThis(),
-    returning: jest.fn().mockReturnThis(),
-    execute
-  }));
-  return { save, create, update, findOne, createQueryBuilder, execute };
+  const insertValues = jest.fn();
+  interface InsertBuilder {
+    insert: () => InsertBuilder;
+    into: () => InsertBuilder;
+    values: (v: Record<string, unknown>) => InsertBuilder;
+    orIgnore: () => InsertBuilder;
+    returning: () => InsertBuilder;
+    execute: jest.Mock;
+  }
+  const createQueryBuilder = jest.fn((): InsertBuilder => {
+    const builder: InsertBuilder = {
+      insert: () => builder,
+      into: () => builder,
+      values: (v) => {
+        insertValues(v);
+        return builder;
+      },
+      orIgnore: () => builder,
+      returning: () => builder,
+      execute
+    };
+    return builder;
+  });
+  return {
+    save,
+    create,
+    update,
+    findOne,
+    createQueryBuilder,
+    execute,
+    insertValues
+  };
 }
 
 async function build(stubs: Partial<ManagerStubs> = {}) {
@@ -65,6 +91,7 @@ async function build(stubs: Partial<ManagerStubs> = {}) {
     plan: null,
     customer: null,
     invoice: null,
+    product: null,
     invoiceInsertRows: [{ id: 'inv-1' }],
     updateAffected: 0,
     ...stubs
@@ -505,6 +532,147 @@ describe('BillingEventReducer', () => {
 
       expect(manager.update).not.toHaveBeenCalled();
       expect(emit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('invoice.paid — one-time purchase (design §20.4)', () => {
+    const oneTimePayload: NormalizedInvoicePayload = {
+      ref: { customerId: 'cust-1', userId: 'user-1' },
+      providerInvoiceRef: 'pay_ot',
+      providerSubscriptionId: null,
+      amountMinor: 50000,
+      currency: 'RUB',
+      periodStart: null,
+      periodEnd: null,
+      paidAt: '2026-06-11T10:00:00Z',
+      kind: 'one_time',
+      productId: 'prod-1'
+    };
+
+    it('inserts a one_time invoice with no subscription and grants the sku entitlement', async () => {
+      const { reducer, manager, emit } = await build({
+        product: {
+          id: 'prod-1',
+          type: 'sku',
+          grant: { entitlement: 'reports' }
+        } as Product,
+        invoiceInsertRows: [{ id: 'inv-ot' }]
+      });
+
+      await reducer.reduce(event('invoice.paid', oneTimePayload, 'yookassa'));
+
+      expect(manager.insertValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'one_time',
+          productId: 'prod-1',
+          subscriptionId: null,
+          status: 'paid',
+          billingMode: 'fixed'
+        })
+      );
+      expect(manager.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customerId: 'cust-1',
+          entitlement: 'reports',
+          sourceInvoiceId: 'inv-ot',
+          expiresAt: null,
+          revokedAt: null
+        })
+      );
+      expect(emit).toHaveBeenCalledWith(
+        InvoicePaidEvent.name,
+        expect.objectContaining({ userId: 'user-1', invoiceId: 'inv-ot' })
+      );
+      expect(emit).not.toHaveBeenCalledWith(
+        SubscriptionActivatedEvent.name,
+        expect.anything()
+      );
+    });
+
+    it('sets the grant expiry from durationDays', async () => {
+      const { reducer, manager } = await build({
+        product: {
+          id: 'prod-1',
+          type: 'sku',
+          grant: { entitlement: 'reports', durationDays: 30 }
+        } as Product,
+        invoiceInsertRows: [{ id: 'inv-ot' }]
+      });
+
+      await reducer.reduce(event('invoice.paid', oneTimePayload, 'yookassa'));
+
+      expect(manager.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entitlement: 'reports',
+          expiresAt: expect.any(Date) as Date
+        })
+      );
+    });
+
+    it('applies no grant for a custom (donation) product', async () => {
+      const { reducer, manager, emit } = await build({
+        product: { id: 'prod-don', type: 'custom', grant: null } as Product,
+        invoiceInsertRows: [{ id: 'inv-don' }]
+      });
+
+      await reducer.reduce(
+        event(
+          'invoice.paid',
+          { ...oneTimePayload, productId: 'prod-don' },
+          'yookassa'
+        )
+      );
+
+      expect(manager.save).not.toHaveBeenCalled();
+      expect(emit).toHaveBeenCalledWith(
+        InvoicePaidEvent.name,
+        expect.objectContaining({ userId: 'user-1', invoiceId: 'inv-don' })
+      );
+    });
+
+    it('does not re-grant on a replayed webhook (duplicate invoice insert)', async () => {
+      const { reducer, manager, emit } = await build({
+        product: {
+          id: 'prod-1',
+          type: 'sku',
+          grant: { entitlement: 'reports' }
+        } as Product,
+        invoiceInsertRows: []
+      });
+
+      await reducer.reduce(event('invoice.paid', oneTimePayload, 'yookassa'));
+
+      expect(manager.save).not.toHaveBeenCalled();
+      expect(emit).not.toHaveBeenCalled();
+    });
+
+    it('never links or activates an open self-managed subscription on a one-time payment', async () => {
+      const { reducer, manager, emit } = await build({
+        subscription: {
+          id: 'sub-1',
+          customerId: 'cust-1',
+          provider: 'yookassa',
+          billingMode: 'fixed',
+          status: 'incomplete',
+          trialEnd: null
+        } as Subscription,
+        product: { id: 'prod-don', type: 'custom', grant: null } as Product,
+        invoiceInsertRows: [{ id: 'inv-ot' }]
+      });
+
+      await reducer.reduce(event('invoice.paid', oneTimePayload, 'yookassa'));
+
+      expect(manager.findOne).not.toHaveBeenCalledWith(
+        Subscription,
+        expect.anything()
+      );
+      expect(manager.insertValues).toHaveBeenCalledWith(
+        expect.objectContaining({ subscriptionId: null })
+      );
+      expect(emit).not.toHaveBeenCalledWith(
+        SubscriptionActivatedEvent.name,
+        expect.anything()
+      );
     });
   });
 
