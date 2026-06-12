@@ -1,4 +1,4 @@
-import type { OnInit } from '@angular/core';
+import type { OnInit, WritableSignal } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -44,6 +44,17 @@ export type RolePermissionsDialogData = {
 export type PermissionGroup = {
   resource: string;
   permissions: PermissionResponse[];
+};
+
+/**
+ * Condition editors backed by a raw JSON text buffer. `custom` is NOT one of
+ * them — it keeps invalid text in the condition itself and patches anyway.
+ */
+type JsonObjectEditor = 'fieldMatch' | 'userAttr';
+
+const JSON_EDITOR_SEEDS: Record<JsonObjectEditor, string> = {
+  fieldMatch: '{\n  "fieldName": ["value1", "value2"]\n}',
+  userAttr: '{\n  "recordField": "id"\n}'
 };
 
 @Component({
@@ -285,118 +296,46 @@ export class RolePermissionsDialogComponent implements OnInit {
     this.#patchCondition(permissionId, { ownership: { userField: value } });
   }
 
-  // ─── fieldMatch ───────────────────────────────────────────────────────
+  // ─── fieldMatch / userAttr (JSON object editors) ──────────────────────
 
   hasFieldMatch(permissionId: string): boolean {
-    return !!this.conditionsMap().get(permissionId)?.fieldMatch;
+    return this.#hasJsonEditor(permissionId, 'fieldMatch');
   }
 
   getFieldMatchText(permissionId: string): string {
-    return this.fieldMatchText().get(permissionId) ?? '';
+    return this.#jsonEditorText(permissionId, 'fieldMatch');
   }
 
   getFieldMatchError(permissionId: string): string {
-    return this.jsonErrors().get(`${permissionId}:fieldMatch`) ?? '';
+    return this.#jsonEditorError(permissionId, 'fieldMatch');
   }
 
   toggleFieldMatch(permissionId: string): void {
-    if (this.hasFieldMatch(permissionId)) {
-      this.#removeConditionKey(permissionId, 'fieldMatch');
-      const texts = new Map(this.fieldMatchText());
-      texts.delete(permissionId);
-      this.fieldMatchText.set(texts);
-      this.#clearJsonError(permissionId, 'fieldMatch');
-    } else {
-      const initial = '{\n  "fieldName": ["value1", "value2"]\n}';
-      this.#patchCondition(permissionId, { fieldMatch: {} });
-      const texts = new Map(this.fieldMatchText());
-      texts.set(permissionId, initial);
-      this.fieldMatchText.set(texts);
-    }
+    this.#toggleJsonEditor(permissionId, 'fieldMatch');
   }
 
   applyFieldMatch(permissionId: string, event: Event): void {
-    const text = (event.target as HTMLTextAreaElement).value;
-    const texts = new Map(this.fieldMatchText());
-    texts.set(permissionId, text);
-    this.fieldMatchText.set(texts);
-
-    if (!text.trim()) {
-      this.#removeConditionKey(permissionId, 'fieldMatch');
-      this.#clearJsonError(permissionId, 'fieldMatch');
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(text) as Record<string, unknown[]>;
-      this.#patchCondition(permissionId, { fieldMatch: parsed });
-      this.#clearJsonError(permissionId, 'fieldMatch');
-    } catch {
-      this.#setJsonError(
-        permissionId,
-        'fieldMatch',
-        this.#translocoService.translate(
-          'admin.rolePermissions.invalidJsonObject'
-        )
-      );
-    }
+    this.#applyJsonEditor(permissionId, 'fieldMatch', event);
   }
 
-  // ─── userAttr ─────────────────────────────────────────────────────────
-
   hasUserAttr(permissionId: string): boolean {
-    return !!this.conditionsMap().get(permissionId)?.userAttr;
+    return this.#hasJsonEditor(permissionId, 'userAttr');
   }
 
   getUserAttrText(permissionId: string): string {
-    return this.userAttrText().get(permissionId) ?? '';
+    return this.#jsonEditorText(permissionId, 'userAttr');
   }
 
   getUserAttrError(permissionId: string): string {
-    return this.jsonErrors().get(`${permissionId}:userAttr`) ?? '';
+    return this.#jsonEditorError(permissionId, 'userAttr');
   }
 
   toggleUserAttr(permissionId: string): void {
-    if (this.hasUserAttr(permissionId)) {
-      this.#removeConditionKey(permissionId, 'userAttr');
-      const texts = new Map(this.userAttrText());
-      texts.delete(permissionId);
-      this.userAttrText.set(texts);
-      this.#clearJsonError(permissionId, 'userAttr');
-    } else {
-      const initial = '{\n  "recordField": "id"\n}';
-      this.#patchCondition(permissionId, { userAttr: {} });
-      const texts = new Map(this.userAttrText());
-      texts.set(permissionId, initial);
-      this.userAttrText.set(texts);
-    }
+    this.#toggleJsonEditor(permissionId, 'userAttr');
   }
 
   applyUserAttr(permissionId: string, event: Event): void {
-    const text = (event.target as HTMLTextAreaElement).value;
-    const texts = new Map(this.userAttrText());
-    texts.set(permissionId, text);
-    this.userAttrText.set(texts);
-
-    if (!text.trim()) {
-      this.#removeConditionKey(permissionId, 'userAttr');
-      this.#clearJsonError(permissionId, 'userAttr');
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(text) as Record<string, unknown>;
-      this.#patchCondition(permissionId, { userAttr: parsed });
-      this.#clearJsonError(permissionId, 'userAttr');
-    } catch {
-      this.#setJsonError(
-        permissionId,
-        'userAttr',
-        this.#translocoService.translate(
-          'admin.rolePermissions.invalidJsonObject'
-        )
-      );
-    }
+    this.#applyJsonEditor(permissionId, 'userAttr', event);
   }
 
   // ─── custom ───────────────────────────────────────────────────────────
@@ -513,19 +452,97 @@ export class RolePermissionsDialogComponent implements OnInit {
     map.delete(permissionId);
     this.conditionsMap.set(map);
 
-    const fmTexts = new Map(this.fieldMatchText());
-    fmTexts.delete(permissionId);
-    this.fieldMatchText.set(fmTexts);
-
-    const uaTexts = new Map(this.userAttrText());
-    uaTexts.delete(permissionId);
-    this.userAttrText.set(uaTexts);
+    this.#deleteEditorText(permissionId, 'fieldMatch');
+    this.#deleteEditorText(permissionId, 'userAttr');
 
     const errors = new Map(this.jsonErrors());
     for (const key of [...errors.keys()]) {
       if (key.startsWith(`${permissionId}:`)) errors.delete(key);
     }
     this.jsonErrors.set(errors);
+  }
+
+  #editorTexts(editor: JsonObjectEditor): WritableSignal<Map<string, string>> {
+    return editor === 'fieldMatch' ? this.fieldMatchText : this.userAttrText;
+  }
+
+  #editorPatch(
+    editor: JsonObjectEditor,
+    value: Record<string, unknown[]>
+  ): Partial<PermissionCondition> {
+    return editor === 'fieldMatch'
+      ? { fieldMatch: value }
+      : { userAttr: value };
+  }
+
+  #setEditorText(
+    permissionId: string,
+    editor: JsonObjectEditor,
+    text: string
+  ): void {
+    const textsSignal = this.#editorTexts(editor);
+    const texts = new Map(textsSignal());
+    texts.set(permissionId, text);
+    textsSignal.set(texts);
+  }
+
+  #deleteEditorText(permissionId: string, editor: JsonObjectEditor): void {
+    const textsSignal = this.#editorTexts(editor);
+    const texts = new Map(textsSignal());
+    texts.delete(permissionId);
+    textsSignal.set(texts);
+  }
+
+  #hasJsonEditor(permissionId: string, editor: JsonObjectEditor): boolean {
+    return !!this.conditionsMap().get(permissionId)?.[editor];
+  }
+
+  #jsonEditorText(permissionId: string, editor: JsonObjectEditor): string {
+    return this.#editorTexts(editor)().get(permissionId) ?? '';
+  }
+
+  #jsonEditorError(permissionId: string, editor: JsonObjectEditor): string {
+    return this.jsonErrors().get(`${permissionId}:${editor}`) ?? '';
+  }
+
+  #toggleJsonEditor(permissionId: string, editor: JsonObjectEditor): void {
+    if (this.#hasJsonEditor(permissionId, editor)) {
+      this.#removeConditionKey(permissionId, editor);
+      this.#deleteEditorText(permissionId, editor);
+      this.#clearJsonError(permissionId, editor);
+    } else {
+      this.#patchCondition(permissionId, this.#editorPatch(editor, {}));
+      this.#setEditorText(permissionId, editor, JSON_EDITOR_SEEDS[editor]);
+    }
+  }
+
+  #applyJsonEditor(
+    permissionId: string,
+    editor: JsonObjectEditor,
+    event: Event
+  ): void {
+    const text = (event.target as HTMLTextAreaElement).value;
+    this.#setEditorText(permissionId, editor, text);
+
+    if (!text.trim()) {
+      this.#removeConditionKey(permissionId, editor);
+      this.#clearJsonError(permissionId, editor);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(text) as Record<string, unknown[]>;
+      this.#patchCondition(permissionId, this.#editorPatch(editor, parsed));
+      this.#clearJsonError(permissionId, editor);
+    } catch {
+      this.#setJsonError(
+        permissionId,
+        editor,
+        this.#translocoService.translate(
+          'admin.rolePermissions.invalidJsonObject'
+        )
+      );
+    }
   }
 
   #patchCondition(

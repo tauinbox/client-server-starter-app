@@ -4,7 +4,10 @@ import { of } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
-import type { RoleAdminResponse } from '@app/shared/types/role.types';
+import type {
+  PermissionCondition,
+  RoleAdminResponse
+} from '@app/shared/types/role.types';
 import { NotifyService } from '@core/services/notify.service';
 import type { RolePermissionItem } from '../../../services/role.service';
 import { RoleService } from '../../../services/role.service';
@@ -73,6 +76,15 @@ function makeRolePermItem(permissionId: string): RolePermissionItem {
     conditions: null,
     permission: perm
   };
+}
+
+/** Builds a blur event whose target is a real textarea carrying `value`. */
+function textareaBlurEvent(value: string): Event {
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  const event = new Event('blur');
+  textarea.dispatchEvent(event);
+  return event;
 }
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
@@ -484,6 +496,117 @@ describe('RolePermissionsDialogComponent', () => {
       component.setEffect('perm-a', 'deny');
 
       expect(component.isDeny('perm-a')).toBe(false);
+    });
+  });
+
+  type Comp = RolePermissionsDialogComponent;
+
+  describe.each([
+    {
+      name: 'fieldMatch' as const,
+      seed: '{\n  "fieldName": ["value1", "value2"]\n}',
+      has: (c: Comp, id: string) => c.hasFieldMatch(id),
+      getText: (c: Comp, id: string) => c.getFieldMatchText(id),
+      getError: (c: Comp, id: string) => c.getFieldMatchError(id),
+      toggle: (c: Comp, id: string) => c.toggleFieldMatch(id),
+      apply: (c: Comp, id: string, value: string) =>
+        c.applyFieldMatch(id, textareaBlurEvent(value)),
+      condValue: (c: Comp, id: string) => c.conditionsMap().get(id)?.fieldMatch,
+      makeCondition: (v: Record<string, unknown[]>): PermissionCondition => ({
+        fieldMatch: v
+      })
+    },
+    {
+      name: 'userAttr' as const,
+      seed: '{\n  "recordField": "id"\n}',
+      has: (c: Comp, id: string) => c.hasUserAttr(id),
+      getText: (c: Comp, id: string) => c.getUserAttrText(id),
+      getError: (c: Comp, id: string) => c.getUserAttrError(id),
+      toggle: (c: Comp, id: string) => c.toggleUserAttr(id),
+      apply: (c: Comp, id: string, value: string) =>
+        c.applyUserAttr(id, textareaBlurEvent(value)),
+      condValue: (c: Comp, id: string) => c.conditionsMap().get(id)?.userAttr,
+      makeCondition: (v: Record<string, unknown[]>): PermissionCondition => ({
+        userAttr: v
+      })
+    }
+  ])('$name JSON editor', (editor) => {
+    it('toggle on seeds the default JSON template and an empty condition', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      editor.toggle(component, 'perm-a');
+
+      expect(editor.has(component, 'perm-a')).toBe(true);
+      expect(editor.getText(component, 'perm-a')).toBe(editor.seed);
+      expect(editor.condValue(component, 'perm-a')).toEqual({});
+    });
+
+    it('valid JSON patches the condition and clears a previous error', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      editor.toggle(component, 'perm-a');
+      editor.apply(component, 'perm-a', '{ not json');
+      editor.apply(component, 'perm-a', '{ "field": ["a", "b"] }');
+
+      expect(editor.condValue(component, 'perm-a')).toEqual({
+        field: ['a', 'b']
+      });
+      expect(editor.getError(component, 'perm-a')).toBe('');
+      expect(component.canSave()).toBe(true);
+    });
+
+    it('invalid JSON sets the keyed error, keeps the text and disables save', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      editor.toggle(component, 'perm-a');
+      editor.apply(component, 'perm-a', '{ not json');
+
+      expect(editor.getError(component, 'perm-a')).not.toBe('');
+      expect(component.jsonErrors().has(`perm-a:${editor.name}`)).toBe(true);
+      expect(editor.getText(component, 'perm-a')).toBe('{ not json');
+      // condition keeps the last valid value (empty object from toggle)
+      expect(editor.condValue(component, 'perm-a')).toEqual({});
+      expect(component.canSave()).toBe(false);
+    });
+
+    it('clearing the text removes the condition key and the error', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      editor.toggle(component, 'perm-a');
+      editor.apply(component, 'perm-a', '{ not json');
+      editor.apply(component, 'perm-a', '   ');
+
+      expect(editor.has(component, 'perm-a')).toBe(false);
+      expect(editor.getError(component, 'perm-a')).toBe('');
+      // condition collapsed back to null — matches the original state
+      expect(component.isDirty()).toBe(false);
+    });
+
+    it('toggle off removes the condition key, text buffer and error', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      editor.toggle(component, 'perm-a');
+      editor.apply(component, 'perm-a', '{ not json');
+      editor.toggle(component, 'perm-a');
+
+      expect(editor.has(component, 'perm-a')).toBe(false);
+      expect(editor.getText(component, 'perm-a')).toBe('');
+      expect(editor.getError(component, 'perm-a')).toBe('');
+      expect(component.isDirty()).toBe(false);
+    });
+
+    it('initialises the text buffer from loaded conditions', () => {
+      const item = {
+        ...makeRolePermItem('perm-a'),
+        conditions: editor.makeCondition({ foo: ['bar'] })
+      };
+      const { component } = setup([item]);
+
+      expect(editor.has(component, 'perm-a')).toBe(true);
+      expect(editor.getText(component, 'perm-a')).toBe(
+        JSON.stringify({ foo: ['bar'] }, null, 2)
+      );
+      expect(component.isDirty()).toBe(false);
     });
   });
 });
