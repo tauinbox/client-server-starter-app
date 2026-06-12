@@ -84,6 +84,9 @@
         </mat-card-content>
       </mat-card>
 
+      <!-- Credits (prepaid usage units, design §21.2) -->
+      <nxs-credits-card [credits]="store.credits()" />
+
       <!-- Payment method -->
       @if (showPaymentMethodCard()) {
         <mat-card appearance="outlined" class="settings-card">

@@ -12,6 +12,7 @@ import type {
   BillingRegion,
   BillingRegionResponse,
   CheckoutSessionResponse,
+  CreditBalanceResponse,
   InvoiceResponse,
   PaymentMethodResponse,
   PlanResponse,
@@ -34,6 +35,7 @@ type BillingState = {
   invoices: InvoiceResponse[];
   paymentMethod: PaymentMethodResponse | null;
   usage: UsageSummaryResponse | null;
+  credits: CreditBalanceResponse | null;
   region: BillingRegionResponse | null;
   loading: boolean;
   working: boolean;
@@ -46,6 +48,7 @@ const initialState: BillingState = {
   invoices: [],
   paymentMethod: null,
   usage: null,
+  credits: null,
   region: null,
   loading: false,
   working: false
@@ -120,24 +123,33 @@ export const BillingStore = signalStore(
       patchState(store, { loading: false });
     }
 
-    /** Settings page: subscription + invoices + payment method + usage + plans + region. */
+    /** Settings page: subscription + invoices + payment method + usage + credits + plans + region. */
     async function loadSettings(): Promise<void> {
       patchState(store, { loading: true });
       try {
-        const [subscription, invoices, paymentMethod, usage, plans, region] =
-          await Promise.all([
-            firstValueFrom(billing.getSubscription()),
-            firstValueFrom(billing.getInvoices()),
-            firstValueFrom(billing.getPaymentMethod()),
-            firstValueFrom(billing.getUsage()),
-            firstValueFrom(billing.getPlans()),
-            firstValueFrom(billing.getRegion())
-          ]);
+        const [
+          subscription,
+          invoices,
+          paymentMethod,
+          usage,
+          credits,
+          plans,
+          region
+        ] = await Promise.all([
+          firstValueFrom(billing.getSubscription()),
+          firstValueFrom(billing.getInvoices()),
+          firstValueFrom(billing.getPaymentMethod()),
+          firstValueFrom(billing.getUsage()),
+          firstValueFrom(billing.getCredits()),
+          firstValueFrom(billing.getPlans()),
+          firstValueFrom(billing.getRegion())
+        ]);
         patchState(store, {
           subscription,
           invoices,
           paymentMethod,
           usage,
+          credits,
           plans,
           region
         });

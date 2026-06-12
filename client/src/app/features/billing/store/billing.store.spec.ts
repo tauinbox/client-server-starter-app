@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import type {
+  CreditBalanceResponse,
   InvoiceResponse,
   PlanResponse,
   SubscriptionResponse,
@@ -64,6 +65,12 @@ const invoice: InvoiceResponse = {
   updatedAt: '2026-06-01T00:00:00.000Z'
 };
 
+const creditBalance: CreditBalanceResponse = {
+  customerId: 'cust-1',
+  balanceUnits: 1240,
+  updatedAt: '2026-06-01T00:00:00.000Z'
+};
+
 const usageSummary: UsageSummaryResponse = {
   subscriptionId: 'sub-1',
   meterKey: 'api_calls',
@@ -85,6 +92,7 @@ describe('BillingStore', () => {
     getInvoices: ReturnType<typeof vi.fn>;
     getPaymentMethod: ReturnType<typeof vi.fn>;
     getUsage: ReturnType<typeof vi.fn>;
+    getCredits: ReturnType<typeof vi.fn>;
     getRegion: ReturnType<typeof vi.fn>;
     checkout: ReturnType<typeof vi.fn>;
     purchase: ReturnType<typeof vi.fn>;
@@ -109,6 +117,7 @@ describe('BillingStore', () => {
       getInvoices: vi.fn().mockReturnValue(of([invoice])),
       getPaymentMethod: vi.fn().mockReturnValue(of(null)),
       getUsage: vi.fn().mockReturnValue(of(usageSummary)),
+      getCredits: vi.fn().mockReturnValue(of(creditBalance)),
       getRegion: vi.fn().mockReturnValue(
         of({
           region: 'auto',
@@ -168,6 +177,7 @@ describe('BillingStore', () => {
     expect(store.subscription()).toEqual(activeSub);
     expect(store.invoices()).toHaveLength(1);
     expect(store.usage()).toEqual(usageSummary);
+    expect(store.credits()).toEqual(creditBalance);
     expect(store.currentPlan()?.key).toBe('pro');
     expect(store.hasActiveSubscription()).toBe(true);
     expect(store.loading()).toBe(false);

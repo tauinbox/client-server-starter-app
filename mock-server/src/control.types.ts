@@ -91,4 +91,14 @@ export type ControlApi = {
     userId?: string;
     sessionRef?: string;
   }): Promise<InvoiceResponse>;
+  // Renewal-clock advance: treats the current period as due NOW and runs one
+  // scheduler pass. `success` charges and advances (usage subs settle the
+  // closed period postpaid, with prepaid credits offsetting billable units
+  // before pricing); `failure` walks the dunning ladder. Returns the
+  // subscription after the pass.
+  advanceBillingRenewal(args: {
+    userId?: string;
+    subscriptionId?: string;
+    outcome?: 'success' | 'failure';
+  }): Promise<SubscriptionResponse>;
 };

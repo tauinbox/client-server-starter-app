@@ -154,4 +154,53 @@ describe('POST /__control/billing/advance-renewal', () => {
     const res = await control('advance-renewal', { userId: id });
     expect(res.status).toBe(404);
   });
+
+  it('spends prepaid credits before charging: full cover first, then the remainder priced', async () => {
+    const { token, id } = await login('user@example.com');
+    const { customerId } = await activate(id, 'usage');
+
+    // Buy a 500-unit pack and settle it the way the paid webhook would.
+    const purchase = await fetch(`${baseUrl}/api/v1/billing/purchase`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ productKey: 'credits-500' })
+    });
+    const session = (await purchase.json()) as { sessionRef: string };
+    await control('complete-purchase', { sessionRef: session.sessionRef });
+
+    async function balanceUnits(): Promise<number> {
+      const res = await fetch(`${baseUrl}/api/v1/billing/credits`, {
+        headers: { authorization: `Bearer ${token}` }
+      });
+      const body = (await res.json()) as { balanceUnits: number } | null;
+      return body?.balanceUnits ?? 0;
+    }
+
+    // Pass 1 — 30 billable units, 500 credits: fully covered, zero invoice.
+    await control('seed-usage', { customerId, quantity: 30 });
+    let res = await control('advance-renewal', { userId: id });
+    expect(res.status).toBe(200);
+    expect(await balanceUnits()).toBe(470);
+    let invoices = await listInvoices(token);
+    expect(
+      invoices.some(
+        (i) => i['billingMode'] === 'usage' && i['amountMinor'] === 0
+      )
+    ).toBe(true);
+
+    // Pass 2 — 600 billable units, 470 credits left: 130 charged at $0.02.
+    await control('seed-usage', { customerId, quantity: 600 });
+    res = await control('advance-renewal', { userId: id });
+    expect(res.status).toBe(200);
+    expect(await balanceUnits()).toBe(0);
+    invoices = await listInvoices(token);
+    expect(
+      invoices.some(
+        (i) => i['billingMode'] === 'usage' && i['amountMinor'] === 260
+      )
+    ).toBe(true);
+  });
 });

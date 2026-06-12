@@ -941,6 +941,39 @@ billingAdminRouter.post(
   }
 );
 
+// A full refund of a one-time purchase takes back what it granted, mirroring
+// the server's BillingAdminService: the sku's CustomerGrant is revoked and a
+// credit pack's units are clawed back (the balance may go negative, which
+// blocks further usage until topped up). Partial refunds keep the invoice
+// `paid`, so grants and credits survive them by construction.
+function revokeOneTimeEffects(invoice: MockInvoice): void {
+  if (invoice.kind !== 'one_time') return;
+  const state = getState();
+  const nowIso = new Date().toISOString();
+
+  for (const grant of state.billingCustomerGrants.values()) {
+    if (grant.sourceInvoiceId === invoice.id && !grant.revokedAt) {
+      grant.revokedAt = nowIso;
+    }
+  }
+
+  const product = invoice.productId
+    ? state.billingProducts.get(invoice.productId)
+    : undefined;
+  if (product?.type !== 'credits' || !product.grant?.credits) return;
+  const balance = state.billingCreditBalances.get(invoice.customerId);
+  if (balance) {
+    balance.balanceUnits -= product.grant.credits;
+    balance.updatedAt = nowIso;
+  } else {
+    state.billingCreditBalances.set(invoice.customerId, {
+      customerId: invoice.customerId,
+      balanceUnits: -product.grant.credits,
+      updatedAt: nowIso
+    });
+  }
+}
+
 billingAdminRouter.post(
   '/invoices/:id/refund',
   adminGuard,
@@ -978,6 +1011,7 @@ billingAdminRouter.post(
     const refundAmount = amountMinor ?? invoice.amountMinor;
     if (refundAmount === invoice.amountMinor) {
       invoice.status = 'refunded';
+      revokeOneTimeEffects(invoice);
     }
     invoice.updatedAt = new Date().toISOString();
     res.json(toInvoiceResponse(invoice));
@@ -1026,6 +1060,19 @@ billingAdminRouter.post('/usage', adminGuard, (req: Request, res: Response) => {
   );
   if (existing) {
     res.status(201).json(toUsageResponse(existing));
+    return;
+  }
+
+  // A negative balance means a refund clawed back already-spent credits: no
+  // new usage may accrue until the debt is topped up. Replays above still
+  // succeed — the record predates the block, exactly like the server.
+  const creditBalance = state.billingCreditBalances.get(customerId);
+  if (creditBalance && creditBalance.balanceUnits < 0) {
+    res.status(409).json({
+      message:
+        'Credit balance is negative. Top up credits before recording more usage.',
+      statusCode: 409
+    });
     return;
   }
 

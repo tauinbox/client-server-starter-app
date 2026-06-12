@@ -5,6 +5,7 @@ import type {
 } from '@app/shared/types';
 import {
   formatMoney,
+  formatUnits,
   minorUnitScale,
   parseAmountToMinor,
   planPriceFor,
@@ -43,6 +44,19 @@ describe('billing-format', () => {
 
     it('renders zero amounts', () => {
       expect(formatMoney(0, 'USD', 'en')).toContain('0');
+    });
+  });
+
+  describe('formatUnits', () => {
+    it('groups digits per locale', () => {
+      expect(formatUnits(1240, 'en')).toBe('1,240');
+      // ru groups with a (narrow) no-break space - match any whitespace to
+      // stay stable across ICU versions.
+      expect(formatUnits(1240, 'ru')).toMatch(/^1\s240$/);
+    });
+
+    it('keeps the sign of an overdrawn balance', () => {
+      expect(formatUnits(-200, 'en')).toBe('-200');
     });
   });
 

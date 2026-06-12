@@ -28,6 +28,7 @@ import type {
   ChangePlanDialogResult
 } from '../change-plan-dialog/change-plan-dialog.component';
 import { ChangePlanDialogComponent } from '../change-plan-dialog/change-plan-dialog.component';
+import { CreditsCardComponent } from '../credits-card/credits-card.component';
 import { UsageMeterComponent } from '../usage-meter/usage-meter.component';
 
 @Component({
@@ -41,6 +42,7 @@ import { UsageMeterComponent } from '../usage-meter/usage-meter.component';
     MatIcon,
     MatProgressSpinner,
     TranslocoDirective,
+    CreditsCardComponent,
     UsageMeterComponent
   ],
   templateUrl: './billing-settings.component.html',
