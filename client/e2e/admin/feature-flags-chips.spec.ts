@@ -17,20 +17,27 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
 
-    await dialog.getByRole('textbox', { name: 'Key' }).fill('chips-rollout');
-
-    // Environments — chip-grid combobox accepts free text via Enter
+    // Environments — chip-grid combobox accepts free text via Enter.
+    // Focus can be stolen between fill()'s internal focus and text insertion
+    // (observed in CI: the filled text landed in the Key field while the chip
+    // input stayed empty), so verify the value reached the chip input before
+    // committing with Enter, and retry the whole add if it leaked elsewhere.
+    // Retrying is safe: the chip component ignores duplicate values, and
+    // waiting for the chip row also serializes the adds (a second token-end
+    // racing the first can clobber it — both build on the same stale list).
     const envInput = dialog.getByRole('combobox', { name: /Environments/i });
-    await envInput.fill('production');
-    await envInput.press('Enter');
-    // Wait for the chip before typing the next value: a second token-end racing
-    // the first one can clobber it (both build on the same stale selected list)
-    await expect(
-      dialog.getByRole('row', { name: /production/i })
-    ).toBeVisible();
-    await envInput.fill('qa-eu');
-    await envInput.press('Enter');
-    await expect(dialog.getByRole('row', { name: /qa-eu/i })).toBeVisible();
+    const addEnvironment = async (env: string) => {
+      await expect(async () => {
+        await envInput.fill(env);
+        await expect(envInput).toHaveValue(env, { timeout: 1000 });
+        await envInput.press('Enter');
+        await expect(dialog.getByRole('row', { name: env })).toBeVisible({
+          timeout: 2000
+        });
+      }).toPass({ timeout: 15_000 });
+    };
+    await addEnvironment('production');
+    await addEnvironment('qa-eu');
     // Dismiss any lingering autocomplete overlay before clicking outside controls
     await envInput.press('Escape');
 
@@ -51,6 +58,13 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
       .first()
       .click();
     await expect(ruleRow.getByRole('row', { name: /^user/i })).toBeVisible();
+
+    // Fill Key last: it is the dialog's first tabbable element, so text leaked
+    // by a focus steal during the chip interactions lands here — an
+    // authoritative fill now overwrites anything that may have leaked.
+    const keyInput = dialog.getByRole('textbox', { name: 'Key' });
+    await keyInput.fill('chips-rollout');
+    await expect(keyInput).toHaveValue('chips-rollout');
 
     const createResp = page.waitForResponse(
       (r) =>
