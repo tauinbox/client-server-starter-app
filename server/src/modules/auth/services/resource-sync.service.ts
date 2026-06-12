@@ -43,6 +43,7 @@ export class ResourceSyncService implements OnApplicationBootstrap {
   private async syncResources(): Promise<void> {
     const registeredNames = new Set<string>();
     const controllers = this.discoveryService.getControllers();
+    const actions = await this.actionRepository.find();
 
     for (const wrapper of controllers) {
       const metatype = wrapper.metatype as
@@ -99,19 +100,28 @@ export class ResourceSyncService implements OnApplicationBootstrap {
       });
 
       // Auto-create permissions for this resource × all actions
-      const actions = await this.actionRepository.find();
-      for (const action of actions) {
-        const exists = await this.permissionRepository.findOne({
-          where: { resourceId: resource.id, actionId: action.id }
+      if (actions.length > 0) {
+        const existingPermissions = await this.permissionRepository.find({
+          where: { resourceId: resource.id }
         });
-        if (!exists) {
+        const existingActionIds = new Set(
+          existingPermissions.map((permission) => permission.actionId)
+        );
+        const missingActions = actions.filter(
+          (action) => !existingActionIds.has(action.id)
+        );
+        if (missingActions.length > 0) {
           await this.permissionRepository.save(
-            this.permissionRepository.create({
-              resourceId: resource.id,
-              actionId: action.id
-            })
+            missingActions.map((action) =>
+              this.permissionRepository.create({
+                resourceId: resource.id,
+                actionId: action.id
+              })
+            )
           );
-          this.logger.log(`Created permission: ${meta.name}:${action.name}`);
+          for (const action of missingActions) {
+            this.logger.log(`Created permission: ${meta.name}:${action.name}`);
+          }
         }
       }
 
@@ -121,19 +131,14 @@ export class ResourceSyncService implements OnApplicationBootstrap {
     // Mark unregistered resources as orphaned
     const allResources = await this.resourceRepository.find();
     for (const resource of allResources) {
-      if (!registeredNames.has(resource.name)) {
-        if (!resource.isOrphaned) {
-          resource.isOrphaned = true;
-          await this.resourceRepository.save(resource);
-          this.logger.warn(
-            `Resource "${resource.name}" marked as orphaned — no controller registered it. Permissions for this resource are now disabled.`
-          );
-        } else {
-          this.logger.warn(
-            `Resource "${resource.name}" is still orphaned — permissions remain disabled`
-          );
-        }
+      if (registeredNames.has(resource.name)) continue;
+      if (!resource.isOrphaned) {
+        resource.isOrphaned = true;
+        await this.resourceRepository.save(resource);
       }
+      this.logger.warn(
+        `Resource "${resource.name}" is orphaned — no controller registered it. Permissions for this resource are disabled.`
+      );
     }
 
     this.resourceRegistry.register([...registeredNames]);

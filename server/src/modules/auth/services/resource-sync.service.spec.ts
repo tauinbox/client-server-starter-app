@@ -31,7 +31,7 @@ describe('ResourceSyncService', () => {
     save: jest.Mock;
   };
   let permissionRepoMock: {
-    findOne: jest.Mock;
+    find: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
   };
@@ -66,7 +66,7 @@ describe('ResourceSyncService', () => {
     };
 
     permissionRepoMock = {
-      findOne: jest.fn().mockResolvedValue(null),
+      find: jest.fn().mockResolvedValue([]),
       create: jest.fn().mockImplementation((data: object) => data),
       save: jest.fn().mockResolvedValue(undefined)
     };
@@ -220,7 +220,7 @@ describe('ResourceSyncService', () => {
         { id: 'act-read', name: 'read' },
         { id: 'act-write', name: 'write' }
       ]);
-      permissionRepoMock.findOne.mockResolvedValue(null);
+      permissionRepoMock.find.mockResolvedValue([]);
 
       await service.onApplicationBootstrap();
 
@@ -233,7 +233,15 @@ describe('ResourceSyncService', () => {
         resourceId: 'res-1',
         actionId: 'act-write'
       });
-      expect(permissionRepoMock.save).toHaveBeenCalledTimes(2);
+      expect(permissionRepoMock.save).toHaveBeenCalledTimes(1);
+      expect(permissionRepoMock.save).toHaveBeenCalledWith([
+        { resourceId: 'res-1', actionId: 'act-read' },
+        { resourceId: 'res-1', actionId: 'act-write' }
+      ]);
+      expect(permissionRepoMock.find).toHaveBeenCalledTimes(1);
+      expect(permissionRepoMock.find).toHaveBeenCalledWith({
+        where: { resourceId: 'res-1' }
+      });
     });
 
     it('should not create permission if it already exists', async () => {
@@ -242,7 +250,9 @@ describe('ResourceSyncService', () => {
       reflectorMock.get.mockReturnValue(usersMeta);
       resourceServiceMock.upsertResource.mockResolvedValue({ id: 'res-1' });
       actionRepoMock.find.mockResolvedValue([{ id: 'act-1', name: 'read' }]);
-      permissionRepoMock.findOne.mockResolvedValue({ id: 'perm-1' });
+      permissionRepoMock.find.mockResolvedValue([
+        { id: 'perm-1', actionId: 'act-1' }
+      ]);
 
       await service.onApplicationBootstrap();
 
@@ -258,6 +268,7 @@ describe('ResourceSyncService', () => {
 
       await service.onApplicationBootstrap();
 
+      expect(permissionRepoMock.find).not.toHaveBeenCalled();
       expect(permissionRepoMock.create).not.toHaveBeenCalled();
     });
 
