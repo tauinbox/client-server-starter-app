@@ -709,7 +709,21 @@ router.post('/billing/advance-renewal', (req, res) => {
       )
       .reduce((sum, r) => sum + r.quantity, 0);
     const billableUnits = Math.max(0, totalUnits - (price.includedUnits ?? 0));
-    amountMinor = billableUnits * (price.unitPriceMinor ?? 0);
+    // Prepaid credits offset billable units one-for-one before pricing,
+    // mirroring the server's summarizeForPeriodWithCredits + spend commit: a
+    // clawed-back negative balance offers nothing, and the deduction settles
+    // with the postpaid invoice below.
+    const balance = state.billingCreditBalances.get(subscription.customerId);
+    const creditUnitsApplied = Math.min(
+      Math.max(0, balance?.balanceUnits ?? 0),
+      billableUnits
+    );
+    if (balance && creditUnitsApplied > 0) {
+      balance.balanceUnits -= creditUnitsApplied;
+      balance.updatedAt = nowIso;
+    }
+    amountMinor =
+      (billableUnits - creditUnitsApplied) * (price.unitPriceMinor ?? 0);
     periodStart = closedStart;
     periodEnd = nowIso;
   }

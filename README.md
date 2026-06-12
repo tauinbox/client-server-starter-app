@@ -273,7 +273,7 @@ To apply multiple restrictions simultaneously, either use `$and` in a single `cu
 ### Billing (self-service)
 - **Pricing page** (`/billing`) — plan tiers as cards with the recommended tier visually lifted (raised + primary accent + "Most popular" chip); currency follows the resolved provider; publicly accessible (anonymous visitors are sent to login on "Choose")
 - **Checkout** — "Choose" starts a hosted-checkout session on the resolved provider and redirects; the return routes `/billing/success` (polls the subscription until active) and `/billing/cancel` confirm the outcome (the provider webhook is the source of truth)
-- **Billing settings** (`/billing/settings`) — current plan with a semantic status chip, change-plan dialog, cancel-at-period-end (confirm dialog), saved payment method with an update action, and an invoice history (table on desktop, stacked cards on handset)
+- **Billing settings** (`/billing/settings`) — current plan with a semantic status chip, change-plan dialog, cancel-at-period-end (confirm dialog), a prepaid-credits wallet card, saved payment method with an update action, and an invoice history (table on desktop, stacked cards on handset)
 - **Pay-as-you-go tier** — the metered `usage` plan is active in the catalog: the pricing page shows its per-unit teaser, and `GET /api/v1/billing/usage` returns the caller's current-period meter (total/included/billable units and the accrued amount)
 - **Usage meter** — billing settings shows a current-period usage card for usage-mode subscriptions: large unit readout, a quota gauge when the plan includes units (used quota in the primary tone, overage in the error tone), and a money mini-ledger (billable units × unit price) ending in the accrued amount; pure pay-as-you-go plans skip the gauge
 - **Plan change with proration** — the change-plan dialog in billing settings picks a billing mode (fixed / pay-as-you-go) and a target plan, then shows a live proration mini-ledger from `/change/preview` (YooKassa: credit − / charge + / bold "Due now"; Paddle: the net amount — the provider settles the split; a negative net reads "Refund due"). Confirming calls `POST /api/v1/billing/subscription/change`, which switches instantly: Paddle computes the proration itself (`subscriptions.update`, prorated immediately), YooKassa is settled server-side per the refund-and-recharge policy (charge the new plan's whole-day remainder first, then refund the old plan's unused remainder — two fiscal documents, both surfaced as receipt rows in the invoice history)
@@ -281,6 +281,7 @@ To apply multiple restrictions simultaneously, either use `$and` in a single `cu
 - **Billing region** — Auto / Russia / International control on the pricing page (authenticated only) that sets the provider used for the next checkout
 - **One-time purchases** — a section below the plan grid (authenticated only) renders the `GET /api/v1/billing/products` catalog: fixed-price products as horizontal ticket cards (tonal icon, unlocked-entitlement meta, price + "Buy" split off by a dashed rule) and custom-amount products as a donation card (quick preset amounts derived from the catalog minimum, a bounded custom amount with client-side validation, an optional receipt note, and a pay button that always shows the live amount). The purchase session reference is parked in `sessionStorage` before the provider redirect; `/billing/success` detects it and polls the invoice list for the paid `one_time` invoice (keyed by the provider payment reference) instead of the subscription, ending in a thank-you card with the product and amount
 - **Prepaid credit packs** — `credits` products in the one-time catalog (seeded 500/1000/5000-unit packs) render as the same ticket cards; a paid pack tops up the customer's prepaid credit balance (`GET /api/v1/billing/credits`), which metered usage spends before money is charged — a usage period fully covered by credits settles as a paid zero invoice with no provider charge. A full refund of a credit-pack invoice claws the units back; if they were already spent the balance goes negative and new usage recording is blocked (409) until topped up
+- **Credits wallet** — billing settings shows the balance as a wallet card sharing the catalog's ticket vocabulary (tonal toll icon, dashed punch line): a confident zero state ("0 credits — top up"), an overdrawn state in the error palette explaining that usage is paused, and a top-up/buy action leading to the credit packs on the pricing page
 - **Availability gating** — the billing nav entry and routes are hidden behind the public `billing` feature flag, which the server keeps off until at least one payment provider is configured
 - Fully internationalized (EN / RU) via a lazy-loaded `billing` Transloco scope
 
@@ -804,8 +805,8 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 |------|------|-------|--------|
 | Server unit tests | Jest | `*.spec.ts` alongside source | 463 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | Configured |
-| Client unit tests | Vitest | `*.spec.ts` alongside source | 550 tests passing |
-| Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 145 tests passing |
+| Client unit tests | Vitest | `*.spec.ts` alongside source | 862 tests passing |
+| Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 201 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
 
 ## CI/CD

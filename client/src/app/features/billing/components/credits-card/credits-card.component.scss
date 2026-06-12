@@ -1,0 +1,87 @@
+@use '../../../../../styles/abstracts/functions' as func;
+@use '../../../../../styles/abstracts/variables' as vars;
+
+:host {
+  display: block;
+}
+
+.credits-card {
+  width: 100%;
+}
+
+.card-heading {
+  margin: 0 0 vars.$spacing-md;
+  font-size: vars.$font-size-sm;
+  font-weight: vars.$font-weight-medium;
+  color: var(--mat-sys-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: func.rem(0.5);
+}
+
+// Wallet readout. Shares the one-time "ticket" vocabulary with the
+// pricing-page product cards — same tonal toll square, same dashed punch line
+// before the action stub — so the balance and the packs that fill it read as
+// one family. The figure is the anchor: display-size tabular numerals.
+.credits-readout {
+  display: flex;
+  gap: vars.$spacing-md;
+  align-items: center;
+
+  .credits-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: func.rem(48);
+    height: func.rem(48);
+    background: var(--mat-sys-secondary-container);
+    border-radius: vars.$border-radius-md;
+
+    mat-icon {
+      color: var(--mat-sys-on-secondary-container);
+    }
+  }
+
+  .credits-units {
+    font-size: vars.$font-size-xxl;
+    font-weight: vars.$font-weight-bold;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+
+  .credits-caption {
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  // An overdrawn balance (refund clawback) flips the wallet to the error
+  // palette — the figure itself carries the warning before the hint does.
+  &.negative {
+    color: var(--mat-sys-error);
+
+    .credits-icon {
+      background: var(--mat-sys-error-container);
+
+      mat-icon {
+        color: var(--mat-sys-on-error-container);
+      }
+    }
+  }
+}
+
+.credits-hint {
+  margin: vars.$spacing-sm 0 0;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-on-surface-variant);
+
+  &.negative {
+    color: var(--mat-sys-error);
+  }
+}
+
+// Ticket punch line splitting the action stub off the readout.
+.credits-actions {
+  padding-block-start: vars.$spacing-sm;
+  margin-top: vars.$spacing-md;
+  border-block-start: func.rem(1) dashed var(--mat-sys-outline-variant);
+}

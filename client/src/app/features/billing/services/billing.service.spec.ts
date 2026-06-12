@@ -56,6 +56,15 @@ describe('BillingService', () => {
     req.flush([]);
   });
 
+  it('GETs the prepaid credit balance (nullable)', () => {
+    let result: unknown;
+    service.getCredits().subscribe((r) => (result = r));
+    const req = httpMock.expectOne(`${BILLING_API_V1}/credits`);
+    expect(req.request.method).toBe('GET');
+    req.flush(null);
+    expect(result).toBeNull();
+  });
+
   it('POSTs a purchase with the product key and optional custom fields', () => {
     service
       .purchase({ productKey: 'donation', amountMinor: 1500, description: 'x' })

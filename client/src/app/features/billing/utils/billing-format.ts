@@ -61,6 +61,15 @@ export function productPriceFor(
   return product.prices[provider] ?? Object.values(product.prices)[0] ?? null;
 }
 
+/**
+ * Format a credit-unit count with locale-aware digit grouping (e.g. 1240 →
+ * "1,240" / "1 240"). Negative balances keep their sign — a refund clawback
+ * may overdraw the balance and the figure must say so.
+ */
+export function formatUnits(units: number, locale: string): string {
+  return new Intl.NumberFormat(locale).format(units);
+}
+
 /** The currency's minor-unit scale (2 for RUB/USD, 0 for e.g. JPY). */
 export function minorUnitScale(currency: string): number {
   return (

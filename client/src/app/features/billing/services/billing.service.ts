@@ -5,6 +5,7 @@ import type {
   BillingRegion,
   BillingRegionResponse,
   CheckoutSessionResponse,
+  CreditBalanceResponse,
   InvoiceResponse,
   PaymentMethodResponse,
   PlanResponse,
@@ -66,6 +67,13 @@ export class BillingService {
 
   getProducts(): Observable<ProductResponse[]> {
     return this.#http.get<ProductResponse[]>(`${BILLING_API_V1}/products`);
+  }
+
+  /** The caller's prepaid credit balance; null when no pack was ever bought. */
+  getCredits(): Observable<CreditBalanceResponse | null> {
+    return this.#http.get<CreditBalanceResponse | null>(
+      `${BILLING_API_V1}/credits`
+    );
   }
 
   purchase(request: PurchaseRequest): Observable<PurchaseSessionResponse> {

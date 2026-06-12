@@ -252,3 +252,165 @@ describe('GET /billing/credits', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => {
+  function getCredits(token: string): Promise<Response> {
+    return fetch(`${baseUrl}/api/v1/billing/credits`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+  }
+
+  function refund(
+    adminToken: string,
+    invoiceId: string,
+    body: unknown = {}
+  ): Promise<Response> {
+    return fetch(
+      `${baseUrl}/api/v1/admin/billing/invoices/${invoiceId}/refund`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify(body)
+      }
+    );
+  }
+
+  function recordUsage(adminToken: string, body: unknown): Promise<Response> {
+    return fetch(`${baseUrl}/api/v1/admin/billing/usage`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify(body)
+    });
+  }
+
+  async function buyCredits(
+    token: string,
+    productKey: string
+  ): Promise<InvoiceResponse> {
+    const purchase = await postPurchase(token, { productKey });
+    const session = (await purchase.json()) as PurchaseSessionResponse;
+    const complete = await completePurchase({
+      sessionRef: session.sessionRef
+    });
+    expect(complete.status).toBe(200);
+    return (await complete.json()) as InvoiceResponse;
+  }
+
+  it('claws back the pack on full refund; spent credits drive the balance negative and block usage', async () => {
+    const token = await login();
+    const adminToken = await login('admin@example.com');
+
+    // Usage-mode subscription so credits can be spent at the period close.
+    const activate = await fetch(
+      `${baseUrl}/__control/billing/activate-subscription`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: '2', planKey: 'usage' })
+      }
+    );
+    expect(activate.status).toBe(200);
+    const { customerId } = (await activate.json()) as { customerId: string };
+
+    const invoice = await buyCredits(token, 'credits-500');
+
+    // Meter 200 units, then close the period: the renewal spends 200 credits.
+    const first = await recordUsage(adminToken, {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 200,
+      idempotencyKey: 'clawback-k1'
+    });
+    expect(first.status).toBe(201);
+    const advance = await fetch(
+      `${baseUrl}/__control/billing/advance-renewal`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: '2' })
+      }
+    );
+    expect(advance.status).toBe(200);
+    const spent = (await (await getCredits(token)).json()) as {
+      balanceUnits: number;
+    };
+    expect(spent.balanceUnits).toBe(300);
+
+    // Full refund of the pack takes all 500 back: 300 - 500 = -200.
+    const refunded = await refund(adminToken, invoice.id);
+    expect(refunded.status).toBe(200);
+    expect(((await refunded.json()) as InvoiceResponse).status).toBe(
+      'refunded'
+    );
+    const negative = (await (await getCredits(token)).json()) as {
+      balanceUnits: number;
+    };
+    expect(negative.balanceUnits).toBe(-200);
+
+    // New usage is blocked while the balance is negative…
+    const blocked = await recordUsage(adminToken, {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 1,
+      idempotencyKey: 'clawback-k2'
+    });
+    expect(blocked.status).toBe(409);
+    expect(((await blocked.json()) as { message: string }).message).toBe(
+      'Credit balance is negative. Top up credits before recording more usage.'
+    );
+
+    // …but a replay of an already-recorded key still succeeds (server parity).
+    const replay = await recordUsage(adminToken, {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 200,
+      idempotencyKey: 'clawback-k1'
+    });
+    expect(replay.status).toBe(201);
+  });
+
+  it('a partial refund keeps the invoice paid and the credits intact', async () => {
+    const token = await login();
+    const adminToken = await login('admin@example.com');
+    const invoice = await buyCredits(token, 'credits-500');
+
+    const partial = await refund(adminToken, invoice.id, { amountMinor: 100 });
+    expect(partial.status).toBe(200);
+    expect(((await partial.json()) as InvoiceResponse).status).toBe('paid');
+
+    const balance = (await (await getCredits(token)).json()) as {
+      balanceUnits: number;
+    };
+    expect(balance.balanceUnits).toBe(500);
+  });
+
+  it('revokes the sku entitlement grant on full refund', async () => {
+    const token = await login();
+    const adminToken = await login('admin@example.com');
+
+    const purchase = await postPurchase(token, { productKey: 'report-pack' });
+    const session = (await purchase.json()) as PurchaseSessionResponse;
+    const complete = await completePurchase({
+      sessionRef: session.sessionRef
+    });
+    const invoice = (await complete.json()) as InvoiceResponse;
+
+    const before = await fetch(`${baseUrl}/api/v1/billing/premium-content`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+    expect(before.status).toBe(200);
+
+    await refund(adminToken, invoice.id);
+
+    const after = await fetch(`${baseUrl}/api/v1/billing/premium-content`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+    expect(after.status).toBe(403);
+  });
+});

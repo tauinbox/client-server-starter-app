@@ -301,4 +301,81 @@ test.describe('Billing', () => {
     await expect(meter).toBeVisible();
     await expect(meter.locator('.usage-empty')).toBeVisible();
   });
+
+  test('buying a credit pack raises the wallet balance in settings', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await stubHostedCheckout(page);
+
+    // Before any purchase the wallet shows the confident zero state.
+    await page.goto('/billing/settings');
+    const credits = page.locator('.credits-card');
+    await expect(credits.locator('.credits-units')).toHaveText('0');
+    await expect(credits.locator('.credits-hint')).toBeVisible();
+    await expect(credits.getByRole('link', { name: 'Top up' })).toBeVisible();
+
+    // The top-up action lands on the pricing page's credit packs.
+    await credits.getByRole('link', { name: 'Top up' }).click();
+    await expect(page).toHaveURL(/\/billing$/);
+    const pack = page.locator('nxs-product-card', {
+      hasText: '1000 credits'
+    });
+    await expect(pack).toContainText('$9.00');
+    await pack.getByRole('button', { name: 'Buy' }).click();
+    await expect(page).toHaveURL(/mock-checkout\.local/);
+
+    // Settle the provider's paid webhook; the wallet reflects the pack.
+    await _mockServer.completeBillingPurchase({ userId: USER_ID });
+    await page.goto('/billing/settings');
+    await expect(credits.locator('.credits-units')).toHaveText('1,000');
+    await expect(credits.locator('.credits-hint')).toHaveCount(0);
+    await expect(
+      credits.getByRole('link', { name: 'Buy credits' })
+    ).toBeVisible();
+  });
+
+  test('metered usage consumes prepaid credits at the period close', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await stubHostedCheckout(page);
+
+    // Pay-as-you-go subscription + a 1000-unit pack in the wallet.
+    const subscription = await _mockServer.activateBillingSubscription({
+      userId: USER_ID,
+      planKey: 'usage'
+    });
+    await page.goto('/billing');
+    await page
+      .locator('nxs-product-card', { hasText: '1000 credits' })
+      .getByRole('button', { name: 'Buy' })
+      .click();
+    await expect(page).toHaveURL(/mock-checkout\.local/);
+    await _mockServer.completeBillingPurchase({ userId: USER_ID });
+
+    // 142 metered units close the period: credits cover them one-for-one,
+    // so the postpaid invoice is zero and the wallet drops to 858.
+    await _mockServer.seedBillingUsage({
+      customerId: subscription.customerId,
+      quantity: 142
+    });
+    await _mockServer.advanceBillingRenewal({ userId: USER_ID });
+
+    await page.goto('/billing/settings');
+    await expect(page.locator('.credits-card .credits-units')).toHaveText(
+      '858'
+    );
+    // Three invoices: $0 activation, the $9.00 pack, and the $0 postpaid
+    // close — without credits the 142 units would have charged $2.84.
+    await expect(page.locator('.invoice-table tbody tr')).toHaveCount(3);
+    await expect(
+      page.locator('.invoice-table tbody tr', { hasText: '$9.00' })
+    ).toHaveCount(1);
+    await expect(
+      page.locator('.invoice-table tbody tr', { hasText: '$2.84' })
+    ).toHaveCount(0);
+  });
 });

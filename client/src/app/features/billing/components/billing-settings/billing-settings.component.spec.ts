@@ -6,6 +6,7 @@ import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import type {
+  CreditBalanceResponse,
   InvoiceResponse,
   PlanResponse,
   SubscriptionResponse,
@@ -92,6 +93,7 @@ describe('BillingSettingsComponent', () => {
     invoices: ReturnType<typeof signal<InvoiceResponse[]>>;
     paymentMethod: ReturnType<typeof signal<null>>;
     usage: ReturnType<typeof signal<UsageSummaryResponse | null>>;
+    credits: ReturnType<typeof signal<CreditBalanceResponse | null>>;
     plans: ReturnType<typeof signal<PlanResponse[]>>;
     loading: ReturnType<typeof signal<boolean>>;
     working: ReturnType<typeof signal<boolean>>;
@@ -108,7 +110,8 @@ describe('BillingSettingsComponent', () => {
   async function setup(
     hasSub: boolean,
     usage?: UsageSummaryResponse,
-    subscription?: SubscriptionResponse
+    subscription?: SubscriptionResponse,
+    credits?: CreditBalanceResponse
   ): Promise<void> {
     storeMock = {
       subscription: signal<SubscriptionResponse | null>(
@@ -117,6 +120,7 @@ describe('BillingSettingsComponent', () => {
       invoices: signal<InvoiceResponse[]>(hasSub ? [invoice] : []),
       paymentMethod: signal(null),
       usage: signal<UsageSummaryResponse | null>(usage ?? null),
+      credits: signal<CreditBalanceResponse | null>(credits ?? null),
       plans: signal<PlanResponse[]>([proPlan]),
       loading: signal(false),
       working: signal(false),
@@ -223,5 +227,21 @@ describe('BillingSettingsComponent', () => {
     expect(
       fixture.nativeElement.querySelector('.update-method-btn')
     ).toBeNull();
+  });
+
+  it('feeds the store balance into the credits wallet card', async () => {
+    await setup(true, undefined, undefined, {
+      customerId: 'cust-1',
+      balanceUnits: 1240,
+      updatedAt: '2026-06-01T00:00:00.000Z'
+    });
+
+    const card = fixture.nativeElement.querySelector(
+      'nxs-credits-card'
+    ) as HTMLElement;
+    expect(card).not.toBeNull();
+    expect(card.querySelector('.credits-units')?.textContent).toContain(
+      '1,240'
+    );
   });
 });

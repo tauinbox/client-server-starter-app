@@ -1,0 +1,51 @@
+<mat-card
+  *transloco="let t; scope: 'billing'"
+  appearance="outlined"
+  class="credits-card"
+>
+  <mat-card-content>
+    <h2 class="card-heading">{{ t('billing.settings.credits') }}</h2>
+
+    <div class="credits-readout" [class.negative]="negative()">
+      <span class="credits-icon" aria-hidden="true">
+        <mat-icon>toll</mat-icon>
+      </span>
+      <div class="credits-figure">
+        <div class="credits-units">{{ label() }}</div>
+        <div class="credits-caption">
+          {{ t('billing.settings.creditsUnits') }}
+        </div>
+      </div>
+    </div>
+
+    @if (negative()) {
+      <p class="credits-hint negative">
+        {{ t('billing.settings.creditsNegativeHint') }}
+      </p>
+    } @else if (empty()) {
+      <p class="credits-hint">
+        {{ t('billing.settings.creditsZeroHint') }}
+      </p>
+    }
+
+    <div class="credits-actions">
+      @if (empty() || negative()) {
+        <a
+          matButton="filled"
+          class="buy-credits-btn"
+          [routerLink]="billingRoute"
+        >
+          {{ t('billing.settings.topUpCredits') }}
+        </a>
+      } @else {
+        <a
+          matButton="outlined"
+          class="buy-credits-btn"
+          [routerLink]="billingRoute"
+        >
+          {{ t('billing.settings.buyCredits') }}
+        </a>
+      }
+    </div>
+  </mat-card-content>
+</mat-card>
