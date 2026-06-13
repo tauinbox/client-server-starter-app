@@ -35,6 +35,16 @@ const ENUMERATION_SAFE_INITIATE_RESPONSE = {
     'If the new email is available, a confirmation link has been sent to it.'
 };
 
+const ENUMERATION_SAFE_RESEND_RESPONSE = {
+  message:
+    'If an account with that email exists and is not yet verified, a verification email has been sent.'
+};
+
+const ENUMERATION_SAFE_FORGOT_RESPONSE = {
+  message:
+    'If an account with that email exists, a password reset link has been sent.'
+};
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -285,10 +295,7 @@ export class AuthService {
 
     // Always return success to prevent email enumeration
     if (!user || user.isEmailVerified) {
-      return {
-        message:
-          'If an account with that email exists and is not yet verified, a verification email has been sent.'
-      };
+      return ENUMERATION_SAFE_RESEND_RESPONSE;
     }
 
     const { rawToken, hashedToken, expiresAt } = issueEmailVerificationToken();
@@ -305,10 +312,7 @@ export class AuthService {
         this.logger.error('Failed to resend verification email', err)
       );
 
-    return {
-      message:
-        'If an account with that email exists and is not yet verified, a verification email has been sent.'
-    };
+    return ENUMERATION_SAFE_RESEND_RESPONSE;
   }
 
   async forgotPassword(
@@ -319,10 +323,7 @@ export class AuthService {
 
     // Always return success to prevent email enumeration
     if (!user || !user.isActive) {
-      return {
-        message:
-          'If an account with that email exists, a password reset link has been sent.'
-      };
+      return ENUMERATION_SAFE_FORGOT_RESPONSE;
     }
 
     const rawToken = crypto.randomBytes(32).toString('hex');
@@ -349,10 +350,7 @@ export class AuthService {
         this.logger.error('Failed to send password reset email', err)
       );
 
-    return {
-      message:
-        'If an account with that email exists, a password reset link has been sent.'
-    };
+    return ENUMERATION_SAFE_FORGOT_RESPONSE;
   }
 
   async resetPassword(
