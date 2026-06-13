@@ -38,8 +38,9 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
     };
     await addEnvironment('production');
     await addEnvironment('qa-eu');
-    // Dismiss any lingering autocomplete overlay before clicking outside controls
+    // Its overlay sits over the rule row and would swallow the Type-select click.
     await envInput.press('Escape');
+    await expect(page.locator('.mat-mdc-autocomplete-panel')).toHaveCount(0);
 
     // Add a role rule
     await dialog.getByRole('button', { name: 'Add rule' }).click();
