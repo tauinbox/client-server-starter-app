@@ -490,6 +490,11 @@ describe('BillingEventReducer', () => {
         event('invoice.paid', selfManagedPayload, 'yookassa')
       );
 
+      expect(manager.update).toHaveBeenCalledWith(
+        PaymentMethod,
+        { customerId: 'cust-1', isDefault: true },
+        { isDefault: false }
+      );
       expect(manager.save).toHaveBeenCalledWith(
         expect.objectContaining({
           providerMethodRef: 'pm_tok',
@@ -534,6 +539,37 @@ describe('BillingEventReducer', () => {
       );
 
       expect(manager.update).not.toHaveBeenCalled();
+      expect(emit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('invoice.paid — off-session charge reconcile', () => {
+    const offSessionPayload: NormalizedInvoicePayload = {
+      ref: { customerId: 'cust-1', userId: 'user-1' },
+      providerInvoiceRef: 'pay-1',
+      providerSubscriptionId: null,
+      amountMinor: 99000,
+      currency: 'RUB',
+      periodStart: null,
+      periodEnd: null,
+      paidAt: '2026-06-08T00:01:00Z',
+      offSessionChargeKey: 'renewal:sub-1:123:0'
+    };
+
+    it('reconciles onto the core-recorded invoice without inserting, activating, or emitting', async () => {
+      const { reducer, manager, emit } = await build({ updateAffected: 1 });
+
+      await reducer.reduce(
+        event('invoice.paid', offSessionPayload, 'yookassa')
+      );
+
+      expect(manager.update).toHaveBeenCalledWith(
+        Invoice,
+        { providerEventId: 'renewal:sub-1:123:0' },
+        { providerInvoiceRef: 'pay-1' }
+      );
+      expect(manager.execute).not.toHaveBeenCalled();
+      expect(manager.create).not.toHaveBeenCalled();
       expect(emit).not.toHaveBeenCalled();
     });
   });

@@ -287,6 +287,19 @@ export class BillingEventReducer {
     const customerId = payload.ref.customerId;
     const selfManaged = lifecycleOwnerFor(provider) === 'self';
 
+    // The core already recorded this off-session charge's invoice (keyed by the
+    // charge key) and emitted InvoicePaidEvent; only reconcile the confirmed
+    // payment ref. Never insert here — that would claim the unique key the
+    // core's period-advance relies on.
+    if (payload.offSessionChargeKey) {
+      await this.dataSource.manager.update(
+        Invoice,
+        { providerEventId: payload.offSessionChargeKey },
+        { providerInvoiceRef: payload.providerInvoiceRef }
+      );
+      return;
+    }
+
     const result = await withTransaction(this.dataSource, async (manager) => {
       const userId = await this.resolveUserId(manager, payload.ref);
       const now = new Date();
@@ -476,6 +489,13 @@ export class BillingEventReducer {
     now: Date
   ): Promise<string> {
     if (payload.savedPaymentMethod) {
+      // Demote the current default before inserting the new one (mirrors
+      // reducePaymentMethodUpdated) so defaults never accumulate.
+      await manager.update(
+        PaymentMethod,
+        { customerId: subscription.customerId, isDefault: true },
+        { isDefault: false }
+      );
       const method = await manager.save(
         manager.create(PaymentMethod, {
           customerId: subscription.customerId,
