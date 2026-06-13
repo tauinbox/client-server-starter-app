@@ -70,6 +70,10 @@ jobs:
             type=raw,value=sha-${{ env.COMMIT_HASH }}
 
       # Build locally first, scan, then push — prevents pushing vulnerable images to GHCR
+      # ignore-error on cache-to: the GHA cache backend intermittently fails the
+      # export (e.g. "error writing layer blob: not_found"). The cache is an
+      # optimization, so a failed export must not abort a production deploy of an
+      # already-built, scanned image.
       - name: Build server image
         uses: docker/build-push-action@v7
         with:
@@ -79,7 +83,7 @@ jobs:
           load: true
           tags: ${{ steps.meta-server.outputs.tags }}
           cache-from: type=gha,scope=server
-          cache-to: type=gha,scope=server,mode=max
+          cache-to: type=gha,scope=server,mode=max,ignore-error=true
 
       # Block deploy on CRITICAL CVEs; HIGH is enforced zero by the weekly Scheduled Rebuild
       # (which uses no-cache to avoid stale apk layers).
@@ -101,7 +105,7 @@ jobs:
           tags: ${{ steps.meta-client.outputs.tags }}
           build-args: COMMIT_HASH=${{ env.COMMIT_HASH }}
           cache-from: type=gha,scope=client
-          cache-to: type=gha,scope=client,mode=max
+          cache-to: type=gha,scope=client,mode=max,ignore-error=true
 
       # Block deploy on CRITICAL CVEs — see note on server scan above
       - name: Scan client image
