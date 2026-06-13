@@ -60,9 +60,6 @@ export class AuthService {
 
     // Check account lockout
     if (user && user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
-      const retryAfter = Math.ceil(
-        (user.lockedUntil.getTime() - Date.now()) / 1000
-      );
       this.auditService.logFireAndForget({
         action: AuditAction.USER_LOGIN_FAILURE,
         actorEmail: email,
@@ -70,16 +67,7 @@ export class AuthService {
         targetType: 'User',
         details: { reason: 'account_locked' }
       });
-      throw new HttpException(
-        {
-          message:
-            'Account is temporarily locked due to too many failed login attempts',
-          errorKey: ErrorKeys.AUTH.ACCOUNT_LOCKED,
-          lockedUntil: user.lockedUntil.toISOString(),
-          retryAfter
-        },
-        HttpStatus.LOCKED
-      );
+      throw this.lockedAccountException(user.lockedUntil);
     }
 
     const hashToCompare =
@@ -100,9 +88,6 @@ export class AuthService {
         attemptsAfterIncrement = failedLoginAttempts;
 
         if (failedLoginAttempts >= MAX_FAILED_ATTEMPTS && lockedUntil) {
-          const retryAfter = Math.ceil(
-            (lockedUntil.getTime() - Date.now()) / 1000
-          );
           this.auditService.logFireAndForget({
             action: AuditAction.USER_LOGIN_FAILURE,
             actorEmail: email,
@@ -113,16 +98,7 @@ export class AuthService {
               failedLoginAttempts
             }
           });
-          throw new HttpException(
-            {
-              message:
-                'Account is temporarily locked due to too many failed login attempts',
-              errorKey: ErrorKeys.AUTH.ACCOUNT_LOCKED,
-              lockedUntil: lockedUntil.toISOString(),
-              retryAfter
-            },
-            HttpStatus.LOCKED
-          );
+          throw this.lockedAccountException(lockedUntil);
         }
       }
       this.auditService.logFireAndForget({
@@ -820,6 +796,20 @@ export class AuthService {
 
   async revokeAllUserSessions(userId: string): Promise<void> {
     await this.invalidateAllSessions(userId);
+  }
+
+  private lockedAccountException(lockedUntil: Date): HttpException {
+    const retryAfter = Math.ceil((lockedUntil.getTime() - Date.now()) / 1000);
+    return new HttpException(
+      {
+        message:
+          'Account is temporarily locked due to too many failed login attempts',
+        errorKey: ErrorKeys.AUTH.ACCOUNT_LOCKED,
+        lockedUntil: lockedUntil.toISOString(),
+        retryAfter
+      },
+      HttpStatus.LOCKED
+    );
   }
 
   private async invalidateAllSessions(userId: string): Promise<void> {
