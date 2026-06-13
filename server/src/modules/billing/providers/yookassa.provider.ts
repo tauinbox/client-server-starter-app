@@ -52,6 +52,14 @@ const METHOD_UPDATE_PURPOSE = 'method_update';
  */
 const ONE_TIME_PURPOSE = 'one_time';
 
+/**
+ * Marks a core-initiated off-session charge (renewal, trial conversion, usage
+ * close, plan-change proration), carrying the `chargeKey` of the invoice the
+ * core already recorded. Routes the confirming webhook to a reconcile/no-op so
+ * it neither double-records nor re-activates — the scheduler owns the lifecycle.
+ */
+const OFF_SESSION_PURPOSE = 'off_session';
+
 /** Minor units (kopecks) → YooKassa decimal string, e.g. `99000` → `'990.00'`. */
 function toAmountValue(amountMinor: number): string {
   return (amountMinor / 100).toFixed(2);
@@ -78,6 +86,20 @@ function oneTimeFromMetadata(
   }
   const productId = data['productId'];
   return { productId: typeof productId === 'string' ? productId : null };
+}
+
+/**
+ * Reads the off-session charge marker — returns the core invoice key the
+ * confirming webhook must reconcile onto, or `null` if the payment is not a
+ * core-initiated off-session charge.
+ */
+function offSessionChargeKeyFrom(metadata: unknown): string | null {
+  const data = (metadata ?? {}) as Record<string, unknown>;
+  if (data['purpose'] !== OFF_SESSION_PURPOSE) {
+    return null;
+  }
+  const key = data['chargeKey'];
+  return typeof key === 'string' ? key : null;
 }
 
 /** Reads our `customerId`/`userId` echoed back through YooKassa metadata. */
@@ -322,7 +344,15 @@ export class YooKassaProvider implements PaymentProvider {
       capture: true,
       payment_method_id: token,
       description: receiptItems[0]?.description ?? 'Subscription charge',
-      metadata: { customerId: customer.id, userId: customer.userId },
+      // The idempotency key is the core invoice's providerEventId; echo it so
+      // the confirming webhook reconciles onto that invoice (see OFF_SESSION_PURPOSE).
+      metadata: {
+        customerId: customer.id,
+        userId: customer.userId,
+        ...(idempotencyKey
+          ? { purpose: OFF_SESSION_PURPOSE, chargeKey: idempotencyKey }
+          : {})
+      },
       merchant_customer_id: customer.id,
       receipt: await this.buildReceipt(
         customer.userId,
@@ -453,6 +483,24 @@ export class YooKassaProvider implements PaymentProvider {
         };
         return { ...base, type: 'payment_method.updated', payload };
       }
+      // Surface the off-session charge key so the reducer reconciles onto the
+      // invoice the core already recorded (see OFF_SESSION_PURPOSE).
+      const offSessionChargeKey = offSessionChargeKeyFrom(payment.metadata);
+      if (offSessionChargeKey) {
+        const payload: NormalizedInvoicePayload = {
+          ref,
+          providerInvoiceRef: payment.id,
+          providerSubscriptionId: null,
+          amountMinor: toMinor(payment.amount.value),
+          currency: payment.amount.currency,
+          periodStart: null,
+          periodEnd: null,
+          paidAt: payment.captured_at ?? payment.created_at ?? null,
+          savedPaymentMethod: null,
+          offSessionChargeKey
+        };
+        return { ...base, type: 'invoice.paid', payload };
+      }
       // A one-time purchase never saves a card or touches the subscription —
       // the marker routes the reducer to the one_time invoice + grant path.
       const oneTime = oneTimeFromMetadata(payment.metadata);
@@ -472,12 +520,13 @@ export class YooKassaProvider implements PaymentProvider {
     }
 
     if (payment.status === 'canceled') {
-      // An abandoned/declined method-update re-bind leaves the old method in
-      // place — it must not feed the dunning/payment-failed pipeline. Same for
-      // a one-time purchase: nothing pending exists locally until it is paid.
+      // None of these feed dunning: a method-update/one-time has nothing pending
+      // locally, and an off-session decline is already handled by the scheduler's
+      // own dunning (a second PaymentFailedEvent would be spurious).
       if (
         isMethodUpdate(payment.metadata) ||
-        oneTimeFromMetadata(payment.metadata)
+        oneTimeFromMetadata(payment.metadata) ||
+        offSessionChargeKeyFrom(payment.metadata)
       ) {
         return null;
       }

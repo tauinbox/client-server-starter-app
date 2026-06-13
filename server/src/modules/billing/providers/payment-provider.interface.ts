@@ -88,6 +88,16 @@ export interface NormalizedInvoicePayload {
    */
   usageChargeKey?: string | null;
   /**
+   * The `providerEventId` of the invoice a self-managed (YooKassa) scheduler
+   * charge already recorded — its idempotency key, echoed back through the
+   * payment's metadata. Set on the provider's confirming `payment.succeeded`
+   * for any core-initiated off-session charge (renewal, trial conversion, usage
+   * close, plan-change proration). The core inserted the paid invoice and
+   * emitted `InvoicePaidEvent` itself, so the reducer reconciles onto that row
+   * and never inserts a duplicate, saves a second default card, or re-activates.
+   */
+  offSessionChargeKey?: string | null;
+  /**
    * `'one_time'` for a standalone purchase — the provider echoes
    * the marker planted by `createOneTimePayment`, and the reducer writes an
    * `Invoice` with no subscription and applies the product's grant instead of

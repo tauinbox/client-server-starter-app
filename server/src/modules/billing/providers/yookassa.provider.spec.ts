@@ -421,6 +421,43 @@ describe('YooKassaProvider', () => {
         provider.chargeOffSession(savedCustomer, 99000, items)
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
+
+    it('stamps the off-session marker carrying the invoice key so the webhook is reconcilable', async () => {
+      const { provider, client } = await build();
+      client!.createPayment.mockResolvedValue({
+        id: 'pay-8',
+        status: 'succeeded'
+      });
+
+      await provider.chargeOffSession(
+        savedCustomer,
+        99000,
+        items,
+        'renewal:sub-1:123:0'
+      );
+
+      const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
+      expect(payload.metadata).toMatchObject({
+        customerId: 'cust-1',
+        userId: 'user-1',
+        purpose: 'off_session',
+        chargeKey: 'renewal:sub-1:123:0'
+      });
+    });
+
+    it('omits the off-session marker when no idempotency key is supplied', async () => {
+      const { provider, client } = await build();
+      client!.createPayment.mockResolvedValue({
+        id: 'pay-9',
+        status: 'succeeded'
+      });
+
+      await provider.chargeOffSession(savedCustomer, 99000, items);
+
+      const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
+      expect(payload.metadata).not.toHaveProperty('purpose');
+      expect(payload.metadata).not.toHaveProperty('chargeKey');
+    });
   });
 
   describe('cancel', () => {
@@ -694,6 +731,59 @@ describe('YooKassaProvider', () => {
 
       expect(
         await provider.verifyAndParseWebhook(notification('payment.succeeded'))
+      ).toBeNull();
+    });
+
+    it('maps a succeeded off-session charge to invoice.paid with the reconcile key and no saved method', async () => {
+      const { provider, client } = await build();
+      client!.getPayment.mockResolvedValue({
+        id: 'pay-os',
+        status: 'succeeded',
+        amount: { value: '990.00', currency: 'RUB' },
+        captured_at: '2026-06-08T00:01:00Z',
+        payment_method: {
+          id: 'tok-x',
+          saved: true,
+          card: { card_type: 'Visa', last4: '4242' }
+        },
+        metadata: {
+          customerId: 'cust-1',
+          userId: 'user-1',
+          purpose: 'off_session',
+          chargeKey: 'renewal:sub-1:123:0'
+        }
+      });
+
+      const result = await provider.verifyAndParseWebhook(
+        notification('payment.succeeded', 'pay-os')
+      );
+
+      expect(result).toMatchObject({ type: 'invoice.paid' });
+      const payload = result!.payload as NormalizedInvoicePayload;
+      expect(payload.offSessionChargeKey).toBe('renewal:sub-1:123:0');
+      expect(payload.providerInvoiceRef).toBe('pay-os');
+      // The card is already saved from the first payment; a renewal must not
+      // re-persist it.
+      expect(payload.savedPaymentMethod).toBeNull();
+    });
+
+    it('ignores a canceled off-session charge (the scheduler owns dunning)', async () => {
+      const { provider, client } = await build();
+      client!.getPayment.mockResolvedValue({
+        id: 'pay-os',
+        status: 'canceled',
+        amount: { value: '990.00', currency: 'RUB' },
+        metadata: {
+          customerId: 'cust-1',
+          purpose: 'off_session',
+          chargeKey: 'renewal:sub-1:123:0'
+        }
+      });
+
+      expect(
+        await provider.verifyAndParseWebhook(
+          notification('payment.canceled', 'pay-os')
+        )
       ).toBeNull();
     });
   });
