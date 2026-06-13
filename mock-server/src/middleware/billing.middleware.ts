@@ -993,23 +993,31 @@ billingAdminRouter.post(
       return;
     }
 
+    const alreadyRefunded = invoice.refundedMinor ?? 0;
+    const remaining = invoice.amountMinor - alreadyRefunded;
     const amountMinor = req.body?.amountMinor;
-    if (amountMinor !== undefined) {
-      if (
-        !Number.isInteger(amountMinor) ||
-        amountMinor <= 0 ||
-        amountMinor > invoice.amountMinor
-      ) {
-        res.status(400).json({
-          message: 'Refund amount must be between 1 and the invoice total',
-          statusCode: 400
-        });
-        return;
-      }
+    if (amountMinor !== undefined && !Number.isInteger(amountMinor)) {
+      res.status(400).json({
+        message:
+          'Refund amount must be between 1 and the remaining refundable total',
+        statusCode: 400
+      });
+      return;
     }
 
-    const refundAmount = amountMinor ?? invoice.amountMinor;
-    if (refundAmount === invoice.amountMinor) {
+    const refundAmount = amountMinor ?? remaining;
+    if (refundAmount <= 0 || refundAmount > remaining) {
+      res.status(400).json({
+        message:
+          'Refund amount must be between 1 and the remaining refundable total',
+        statusCode: 400
+      });
+      return;
+    }
+
+    const cumulativeRefunded = alreadyRefunded + refundAmount;
+    invoice.refundedMinor = cumulativeRefunded;
+    if (cumulativeRefunded >= invoice.amountMinor) {
       invoice.status = 'refunded';
       revokeOneTimeEffects(invoice);
     }

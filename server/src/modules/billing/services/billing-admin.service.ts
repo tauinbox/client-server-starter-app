@@ -102,25 +102,35 @@ export class BillingAdminService {
       throw new ConflictException('Only paid invoices can be refunded');
     }
 
-    const refundAmount = amountMinor ?? invoice.amountMinor;
-    if (refundAmount <= 0 || refundAmount > invoice.amountMinor) {
+    const alreadyRefunded = invoice.refundedMinor ?? 0;
+    const remaining = invoice.amountMinor - alreadyRefunded;
+    const refundAmount = amountMinor ?? remaining;
+    if (refundAmount <= 0 || refundAmount > remaining) {
       throw new BadRequestException(
-        'Refund amount must be between 1 and the invoice total'
+        'Refund amount must be between 1 and the remaining refundable total'
       );
     }
+
+    const cumulativeRefunded = alreadyRefunded + refundAmount;
 
     const provider = this.billing.getProviderById(invoice.provider);
     if (provider) {
+      // Key on the cumulative-after total so sequential partial legs get distinct
+      // keys (a replay of the same leg maps back to the same key and dedups).
       await provider.refund(
         invoice.providerInvoiceRef,
         refundAmount,
-        `refund-${invoice.id}-${refundAmount}`
+        `refund-${invoice.id}-${cumulativeRefunded}`
       );
     }
 
-    // A full refund settles the invoice as `refunded`; a partial refund leaves it
-    // `paid` (the schema has no partial-refund status or refunded-amount column).
-    if (refundAmount === invoice.amountMinor) {
+    invoice.refundedMinor = cumulativeRefunded;
+
+    // Once cumulative refunds reach the invoice total the invoice settles as
+    // `refunded` and reverses what it granted. A partial refund leaves it `paid`.
+    // The one-way `paid → refunded` flip keeps grant revoke / credit clawback
+    // exactly-once even across multiple partial legs.
+    if (cumulativeRefunded >= invoice.amountMinor) {
       invoice.status = 'refunded';
       await this.revokeOneTimeGrants(invoice);
       await this.clawbackCreditPurchase(invoice);

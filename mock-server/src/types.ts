@@ -233,6 +233,8 @@ export interface MockInvoice {
   provider: import('@app/shared/types').BillingProviderId;
   providerInvoiceRef: string;
   amountMinor: number;
+  /** Cumulative refunded minor units; server-DB-only, off the wire. */
+  refundedMinor?: number;
   currency: string;
   status: import('@app/shared/types').InvoiceStatus;
   billingMode: import('@app/shared/types').BillingMode;

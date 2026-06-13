@@ -390,6 +390,54 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     expect(balance.balanceUnits).toBe(500);
   });
 
+  it('two partial refunds summing to the total settle the invoice and claw the pack back once', async () => {
+    const token = await login();
+    const adminToken = await login('admin@example.com');
+    const invoice = await buyCredits(token, 'credits-500');
+    const half = Math.floor(invoice.amountMinor / 2);
+    const rest = invoice.amountMinor - half;
+
+    const first = await refund(adminToken, invoice.id, { amountMinor: half });
+    expect(first.status).toBe(200);
+    expect(((await first.json()) as InvoiceResponse).status).toBe('paid');
+    // The pack survives the first partial leg.
+    const afterFirst = (await (await getCredits(token)).json()) as {
+      balanceUnits: number;
+    };
+    expect(afterFirst.balanceUnits).toBe(500);
+
+    const second = await refund(adminToken, invoice.id, { amountMinor: rest });
+    expect(second.status).toBe(200);
+    expect(((await second.json()) as InvoiceResponse).status).toBe('refunded');
+    // Clawed back exactly once: 500 - 500 = 0.
+    const afterSecond = (await (await getCredits(token)).json()) as {
+      balanceUnits: number;
+    };
+    expect(afterSecond.balanceUnits).toBe(0);
+  });
+
+  it('rejects a partial refund that would exceed the remaining refundable total', async () => {
+    const token = await login();
+    const adminToken = await login('admin@example.com');
+    const invoice = await buyCredits(token, 'credits-500');
+    const half = Math.floor(invoice.amountMinor / 2);
+
+    const first = await refund(adminToken, invoice.id, { amountMinor: half });
+    expect(first.status).toBe(200);
+    expect(((await first.json()) as InvoiceResponse).status).toBe('paid');
+
+    // Only `amountMinor - half` remains; asking for more than that is a 400.
+    const over = await refund(adminToken, invoice.id, {
+      amountMinor: invoice.amountMinor - half + 1
+    });
+    expect(over.status).toBe(400);
+    // Credits stay intact — the rejected leg had no side effects.
+    const balance = (await (await getCredits(token)).json()) as {
+      balanceUnits: number;
+    };
+    expect(balance.balanceUnits).toBe(500);
+  });
+
   it('revokes the sku entitlement grant on full refund', async () => {
     const token = await login();
     const adminToken = await login('admin@example.com');
@@ -412,5 +460,34 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
       headers: { authorization: `Bearer ${token}` }
     });
     expect(after.status).toBe(403);
+  });
+
+  it('two partial refunds summing to the total revoke the sku grant once', async () => {
+    const token = await login();
+    const adminToken = await login('admin@example.com');
+
+    const purchase = await postPurchase(token, { productKey: 'report-pack' });
+    const session = (await purchase.json()) as PurchaseSessionResponse;
+    const complete = await completePurchase({ sessionRef: session.sessionRef });
+    const invoice = (await complete.json()) as InvoiceResponse;
+    const half = Math.floor(invoice.amountMinor / 2);
+    const rest = invoice.amountMinor - half;
+
+    // First partial leg leaves the invoice paid and the grant intact.
+    const first = await refund(adminToken, invoice.id, { amountMinor: half });
+    expect(((await first.json()) as InvoiceResponse).status).toBe('paid');
+    const stillGranted = await fetch(
+      `${baseUrl}/api/v1/billing/premium-content`,
+      { headers: { authorization: `Bearer ${token}` } }
+    );
+    expect(stillGranted.status).toBe(200);
+
+    // Second leg reaches the total: invoice flips and the grant is revoked.
+    const second = await refund(adminToken, invoice.id, { amountMinor: rest });
+    expect(((await second.json()) as InvoiceResponse).status).toBe('refunded');
+    const revoked = await fetch(`${baseUrl}/api/v1/billing/premium-content`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+    expect(revoked.status).toBe(403);
   });
 });

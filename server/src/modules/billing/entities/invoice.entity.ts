@@ -42,6 +42,10 @@ export class Invoice {
   @Column({ name: 'amount_minor', type: 'integer' })
   amountMinor: number;
 
+  @Column({ name: 'refunded_minor', type: 'integer', default: 0 })
+  @Exclude()
+  refundedMinor: number;
+
   @Column({ type: 'varchar', length: 3 })
   currency: string;
 

@@ -238,6 +238,21 @@ describe('BillingAdminService', () => {
       );
     });
 
+    it('rejects a refund that would push cumulative refunds past the total', async () => {
+      const ctx = await build();
+      // 50000 already refunded → only 49000 of the 99000 total remains.
+      ctx.invoices.findOne.mockResolvedValue(
+        makeInvoice({ refundedMinor: 50000 })
+      );
+      const yoo = providerStub('yookassa');
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await expect(ctx.service.refundInvoice('inv-1', 50000)).rejects.toThrow(
+        BadRequestException
+      );
+      expect(yoo.refund).not.toHaveBeenCalled();
+    });
+
     it('full refund marks the invoice refunded and calls the provider', async () => {
       const ctx = await build();
       ctx.invoices.findOne.mockResolvedValue(makeInvoice());
@@ -300,6 +315,69 @@ describe('BillingAdminService', () => {
           { revokedAt: expect.any(Date) as Date }
         );
         expect(ctx.entitlements.invalidateUser).toHaveBeenCalledWith('user-1');
+      });
+
+      it('two partial refunds summing to the total settle the invoice and revoke the sku grant once', async () => {
+        const ctx = await build();
+        // amountMinor 49000 → two 24500 legs reach the total.
+        const invoice = makeOneTimeInvoice();
+        ctx.invoices.findOne.mockResolvedValue(invoice);
+        ctx.grants.update.mockResolvedValue({ affected: 1 });
+        ctx.customers.findOne.mockResolvedValue({
+          id: 'cust-1',
+          userId: 'user-1'
+        });
+        const yoo = providerStub('yookassa');
+        ctx.billing.getProviderById.mockReturnValue(yoo);
+
+        const first = await ctx.service.refundInvoice('inv-1', 24500);
+        expect(first.status).toBe('paid');
+        expect(ctx.grants.update).not.toHaveBeenCalled();
+
+        const second = await ctx.service.refundInvoice('inv-1', 24500);
+        expect(second.status).toBe('refunded');
+        expect(ctx.grants.update).toHaveBeenCalledTimes(1);
+        expect(ctx.entitlements.invalidateUser).toHaveBeenCalledTimes(1);
+
+        // Each leg keys on the cumulative-after total, so the provider sees two
+        // distinct refunds (the original bug let identical-amount legs collide).
+        expect(yoo.refund).toHaveBeenNthCalledWith(
+          1,
+          'pay_1',
+          24500,
+          'refund-inv-1-24500'
+        );
+        expect(yoo.refund).toHaveBeenNthCalledWith(
+          2,
+          'pay_1',
+          24500,
+          'refund-inv-1-49000'
+        );
+      });
+
+      it('two partial refunds summing to the total claw the credit pack back once', async () => {
+        const ctx = await build();
+        const invoice = makeOneTimeInvoice({ productId: 'prod-cr' });
+        ctx.invoices.findOne.mockResolvedValue(invoice);
+        ctx.products.findOne.mockResolvedValue({
+          id: 'prod-cr',
+          type: 'credits',
+          grant: { credits: 500 }
+        });
+        const yoo = providerStub('yookassa');
+        ctx.billing.getProviderById.mockReturnValue(yoo);
+
+        await ctx.service.refundInvoice('inv-1', 24500);
+        expect(ctx.credits.clawbackPurchase).not.toHaveBeenCalled();
+
+        const second = await ctx.service.refundInvoice('inv-1', 24500);
+        expect(second.status).toBe('refunded');
+        expect(ctx.credits.clawbackPurchase).toHaveBeenCalledTimes(1);
+        expect(ctx.credits.clawbackPurchase).toHaveBeenCalledWith(
+          'cust-1',
+          'inv-1',
+          500
+        );
       });
 
       it('partial refund of an sku purchase keeps the grant', async () => {
