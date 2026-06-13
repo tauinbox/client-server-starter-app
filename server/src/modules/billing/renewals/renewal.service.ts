@@ -169,12 +169,10 @@ export class RenewalService {
     const idempotencyKey = `renewal:${subscription.id}:${anchor.getTime()}:${subscription.dunningAttempts}`;
 
     let charge: ChargeResult;
-    if (rated.amountMinor === 0 && subscription.billingMode === 'usage') {
-      // Nothing left to charge for the closed period (no usage, or prepaid
-      // credits covered it all): a zero-amount payment is not
-      // chargeable/fiscalizable, so skip the provider call but still record a
-      // zero invoice — its unique provider_event_id is what advances the
-      // period exactly once.
+    if (rated.amountMinor === 0) {
+      // Zero-amount renewals (usage with no overage / fully credited, or a fixed
+      // $0 plan like Free) aren't chargeable/fiscalizable: skip the provider but
+      // still record a zero invoice whose provider_event_id advances the period.
       charge = { providerInvoiceRef: idempotencyKey };
     } else {
       try {

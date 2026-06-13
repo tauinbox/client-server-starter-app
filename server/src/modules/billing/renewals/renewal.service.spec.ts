@@ -621,6 +621,45 @@ describe('RenewalService', () => {
     });
   });
 
+  it('renews a fixed $0 plan without a provider charge via a zero invoice', async () => {
+    const sub = makeSub({ planKey: 'free' });
+    const store = baseStore(sub);
+    store.plans.push(
+      Object.assign(new Plan(), {
+        ...makePlan(),
+        id: 'plan-free',
+        key: 'free',
+        name: 'Free',
+        prices: { yookassa: { currency: 'RUB', amountMinor: 0 } }
+      })
+    );
+    const charge = jest.fn();
+    const { service, emit } = await build(store, charge);
+
+    await service.runDueRenewals(NOW);
+
+    expect(charge).not.toHaveBeenCalled();
+    expect(store.invoices).toHaveLength(1);
+    expect(store.invoices[0]).toMatchObject({
+      amountMinor: 0,
+      status: 'paid',
+      billingMode: 'fixed'
+    });
+    expect(sub.status).toBe('active');
+    expect(sub.currentPeriodStart).toEqual(new Date('2026-06-01T00:00:00Z'));
+    expect(sub.currentPeriodEnd).toEqual(new Date('2026-07-01T00:00:00Z'));
+    expect(sub.dunningAttempts).toBe(0);
+    expect(
+      emit.mock.calls.filter(
+        (call: unknown[]) => call[0] === PaymentFailedEvent.name
+      )
+    ).toHaveLength(0);
+    expect(emit).toHaveBeenCalledWith(
+      SubscriptionRenewedEvent.name,
+      expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
+    );
+  });
+
   it('is idempotent across a double scan (charges and advances once)', async () => {
     const sub = makeSub();
     const store = baseStore(sub);
