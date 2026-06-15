@@ -645,6 +645,26 @@ billingRouter.post(
       const quote = prorationQuote(fromPlan, toPlan, sub.provider, sub, now);
       const state = getState();
 
+      // Resolve the refund source BEFORE recording the new charge so the charge
+      // can't become its own refund source (mirrors the server's ordering). The
+      // refund is the latest paid fixed invoice that paid for the outgoing plan,
+      // capped by what is still unrefunded on it.
+      const source = [...state.billingInvoices.values()]
+        .filter(
+          (i) =>
+            i.subscriptionId === sub.id &&
+            i.status === 'paid' &&
+            i.billingMode === 'fixed' &&
+            i.amountMinor > 0
+        )
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      const refundMinor = source
+        ? Math.min(
+            quote.refundMinor,
+            source.amountMinor - (source.refundedMinor ?? 0)
+          )
+        : 0;
+
       if (quote.chargeMinor > 0) {
         const charge: MockInvoice = {
           id: uuidv4(),
@@ -668,20 +688,6 @@ billingRouter.post(
         state.billingInvoices.set(charge.id, charge);
       }
 
-      // Refund capped by the latest paid fixed invoice (nothing paid → nothing
-      // to give back), mirroring the server's refund-source rule.
-      const source = [...state.billingInvoices.values()]
-        .filter(
-          (i) =>
-            i.subscriptionId === sub.id &&
-            i.status === 'paid' &&
-            i.billingMode === 'fixed' &&
-            i.amountMinor > 0
-        )
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-      const refundMinor = source
-        ? Math.min(quote.refundMinor, source.amountMinor)
-        : 0;
       if (refundMinor > 0 && source) {
         const refund: MockInvoice = {
           id: uuidv4(),
@@ -703,6 +709,9 @@ billingRouter.post(
           updatedAt: nowIso
         };
         state.billingInvoices.set(refund.id, refund);
+        // Record the partial refund on the source so an admin refund of the same
+        // invoice can't give the money back twice.
+        source.refundedMinor = (source.refundedMinor ?? 0) + refundMinor;
       }
     }
 

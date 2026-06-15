@@ -32,6 +32,7 @@ type RepoMock = {
   find: jest.Mock;
   create: jest.Mock;
   save: jest.Mock;
+  update: jest.Mock;
 };
 
 function repo(): RepoMock {
@@ -41,7 +42,8 @@ function repo(): RepoMock {
     create: jest.fn((data: object) => ({ ...data })),
     save: jest.fn((entity: { id?: string }) =>
       Promise.resolve({ id: 'generated-id', ...entity })
-    )
+    ),
+    update: jest.fn().mockResolvedValue({ affected: 1 })
   };
 }
 
@@ -54,6 +56,10 @@ function makeInsertStore() {
   const inserted: InsertedInvoice[] = [];
   let seq = 0;
   const manager = {
+    // changePlan applies the plan and bumps the refund source within the tx.
+    save: (_target: unknown, entity: { id?: string }) =>
+      Promise.resolve({ id: 'generated-id', ...entity }),
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
     createQueryBuilder: () => {
       const captured: { values?: InsertedInvoice } = {};
       const builder = {
@@ -169,7 +175,9 @@ async function build() {
 
   const insertStore = makeInsertStore();
   const dataSource = {
-    transaction: (cb: (m: unknown) => unknown) => cb(insertStore.manager)
+    transaction: jest.fn((cb: (m: unknown) => unknown) =>
+      cb(insertStore.manager)
+    )
   };
 
   const module = await Test.createTestingModule({
@@ -208,6 +216,7 @@ async function build() {
     credits,
     usageRating,
     emit,
+    dataSource,
     insertedInvoices: insertStore.inserted
   };
 }
@@ -776,6 +785,7 @@ describe('BillingUserService', () => {
         cancelAtPeriodEnd: false,
         trialEnd: null,
         providerSubscriptionId: null,
+        version: 1,
         ...overrides
       } as Subscription;
     }
@@ -1033,6 +1043,121 @@ describe('BillingUserService', () => {
       );
       await expect(ctx.service.changePlan('user-1', 'usage')).rejects.toThrow(
         'not available for your billing provider'
+      );
+    });
+
+    it('serializes concurrent changes: the claim CAS loser is rejected with no second charge', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      ctx.invoices.findOne.mockResolvedValue({
+        id: 'inv-period',
+        amountMinor: 99000,
+        providerInvoiceRef: 'pay_period',
+        status: 'paid',
+        billingMode: 'fixed',
+        refundedMinor: 0
+      });
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+      // First claim wins the compare-and-swap; the second misses (affected 0).
+      ctx.subscriptions.update
+        .mockResolvedValueOnce({ affected: 1 })
+        .mockResolvedValueOnce({ affected: 0 });
+
+      const results = await Promise.allSettled([
+        ctx.service.changePlan('user-1', 'business'),
+        ctx.service.changePlan('user-1', 'business')
+      ]);
+
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      const rejected = results.filter(
+        (r): r is PromiseRejectedResult => r.status === 'rejected'
+      );
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0].reason).toBeInstanceOf(ConflictException);
+      // The loser never reaches the provider, so the customer is charged once.
+      expect(yoo.chargeOffSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('commits the charge invoice and the plan apply in one transaction — a commit failure announces nothing', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      ctx.invoices.findOne.mockResolvedValue(null);
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+      // The single local transaction fails after the provider charge succeeded.
+      ctx.dataSource.transaction.mockImplementation(() => {
+        throw new Error('db write failed');
+      });
+
+      await expect(
+        ctx.service.changePlan('user-1', 'business')
+      ).rejects.toThrow('db write failed');
+
+      // The charge happened (idempotent for a later retry) but nothing local was
+      // committed, so no PlanChanged / InvoicePaid escapes as "applied".
+      expect(yoo.chargeOffSession).toHaveBeenCalledTimes(1);
+      expect(ctx.emit).not.toHaveBeenCalled();
+    });
+
+    it('resolves the refund source before recording the new charge so it cannot refund itself', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+      // Capture how many invoices have been recorded when the source is resolved.
+      let insertedWhenResolved = -1;
+      ctx.invoices.findOne.mockImplementation(() => {
+        insertedWhenResolved = ctx.insertedInvoices.length;
+        return Promise.resolve({
+          id: 'inv-period',
+          amountMinor: 99000,
+          providerInvoiceRef: 'pay_period',
+          status: 'paid',
+          billingMode: 'fixed',
+          refundedMinor: 0
+        });
+      });
+
+      await ctx.service.changePlan('user-1', 'business');
+
+      expect(insertedWhenResolved).toBe(0);
+      expect(yoo.refund).toHaveBeenCalledWith(
+        'pay_period',
+        39600,
+        expect.any(String)
+      );
+    });
+
+    it('caps the proration refund by the source’s already-refunded amount', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      ctx.invoices.findOne.mockResolvedValue({
+        id: 'inv-period',
+        amountMinor: 99000,
+        providerInvoiceRef: 'pay_period',
+        status: 'paid',
+        billingMode: 'fixed',
+        refundedMinor: 80000
+      });
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await ctx.service.changePlan('user-1', 'business');
+
+      // refundable = 99000 - 80000 = 19000; the 39600 remainder is capped to it.
+      expect(yoo.refund).toHaveBeenCalledWith(
+        'pay_period',
+        19000,
+        expect.any(String)
       );
     });
   });

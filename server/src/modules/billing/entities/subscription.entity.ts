@@ -54,6 +54,14 @@ export class Subscription {
   @Column({ name: 'payment_method_id', type: 'uuid', nullable: true })
   paymentMethodId: string | null;
 
+  /**
+   * Optimistic-concurrency token bumped by each self-service plan change so two
+   * concurrent changes can't both charge: the loser's compare-and-swap misses.
+   */
+  @Column({ type: 'integer', default: 1 })
+  @Exclude()
+  version: number;
+
   /** Consecutive failed self-managed charges; resets to 0 on a successful one. */
   @Column({ name: 'dunning_attempts', type: 'integer', default: 0 })
   @Exclude()
