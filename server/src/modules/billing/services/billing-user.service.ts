@@ -9,7 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import type {
   BillingProviderId,
   BillingRegion,
@@ -37,7 +37,6 @@ import type {
   PaymentProvider
 } from '../providers/payment-provider.interface';
 import { ProrationCalculator } from '../rating/proration-calculator';
-import type { ProrationQuote } from '../rating/proration-calculator';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
 import { addInterval } from '../utils/period.util';
@@ -515,6 +514,8 @@ export class BillingUserService {
           'The subscription is not linked to the provider yet. Try again shortly.'
         );
       }
+      // Serialize against a concurrent change on the same row before delegating.
+      await this.claimChange(subscription);
       await provider.changePlan(
         subscription.providerSubscriptionId,
         customer,
@@ -536,31 +537,103 @@ export class BillingUserService {
             now: new Date()
           });
 
-    const periodEndMs = subscription.currentPeriodEnd.getTime();
-    let chargeInvoiceId: string | null = null;
+    // Claim the change before any money moves: a concurrent change to a
+    // different plan loses this compare-and-swap and is rejected here, so the
+    // provider is never asked for a second, conflicting charge.
+    await this.claimChange(subscription);
 
+    const periodEndMs = subscription.currentPeriodEnd.getTime();
+    const chargeKey = `change-charge:${subscription.id}:${toPlan.key}:${periodEndMs}`;
+    const refundKey = `change-refund:${subscription.id}:${toPlan.key}:${periodEndMs}`;
+
+    // Resolve the refund source BEFORE creating the new charge: the proration
+    // refund must target the invoice that paid for the outgoing plan's current
+    // coverage, never the charge we are about to record for the incoming plan.
+    const refund =
+      quote && quote.refundMinor > 0
+        ? await this.resolveRefund(subscription, quote.refundMinor)
+        : null;
+
+    // External legs run outside the DB transaction — a provider HTTP call must
+    // never be held inside an open transaction. Both keys are stable across
+    // retries so a replay reconciles instead of charging/refunding twice.
+    let chargeRef: string | null = null;
     if (quote && quote.chargeMinor > 0) {
-      const chargeKey = `change-charge:${subscription.id}:${toPlan.key}:${periodEndMs}`;
       const charge = await provider.chargeOffSession(
         customer,
         quote.chargeMinor,
         quote.chargeItems,
         chargeKey
       );
-      chargeInvoiceId = await this.recordChangeInvoice({
-        subscription,
-        customer,
-        providerEventId: chargeKey,
-        providerInvoiceRef: charge.providerInvoiceRef,
-        amountMinor: quote.chargeMinor,
-        status: 'paid',
-        billingMode: toPlan.billingMode
-      });
+      chargeRef = charge.providerInvoiceRef;
     }
 
-    await this.refundUnusedRemainder(ctx, quote, periodEndMs);
+    let refundIssued = false;
+    if (refund) {
+      try {
+        await provider.refund(
+          refund.source.providerInvoiceRef,
+          refund.minor,
+          refundKey
+        );
+        refundIssued = true;
+      } catch (error) {
+        // A refund failure after a successful charge never reverts the switch —
+        // reverting would double-tangle the money; the admin console can re-issue.
+        this.logger.error(
+          `Proration refund failed for subscription ${subscription.id} (${refund.minor} minor): ${(error as Error).message}`
+        );
+      }
+    }
 
-    const saved = await this.applyPlanChange(ctx);
+    // Single transaction: both invoice legs, the partial-refund bookkeeping on
+    // the source, and the plan apply commit together — a crash can't leave money
+    // recorded without the plan applied, or the plan applied without the money.
+    const chargeAmount = quote?.chargeMinor ?? 0;
+    const { saved, chargeInvoiceId } = await withTransaction(
+      this.dataSource,
+      async (manager) => {
+        let chargeInvoiceId: string | null = null;
+        if (chargeRef) {
+          chargeInvoiceId = await this.insertChangeInvoice(manager, {
+            subscription,
+            customer,
+            providerEventId: chargeKey,
+            providerInvoiceRef: chargeRef,
+            amountMinor: chargeAmount,
+            status: 'paid',
+            billingMode: toPlan.billingMode
+          });
+        }
+        if (refundIssued && refund) {
+          await this.insertChangeInvoice(manager, {
+            subscription,
+            customer,
+            providerEventId: refundKey,
+            providerInvoiceRef: refund.source.providerInvoiceRef,
+            amountMinor: refund.minor,
+            status: 'refunded',
+            billingMode: 'fixed'
+          });
+          // Record the partial refund on the source so an admin refund of the
+          // same invoice can't give the money back a second time.
+          await manager.update(
+            Invoice,
+            { id: refund.source.id },
+            { refundedMinor: (refund.source.refundedMinor ?? 0) + refund.minor }
+          );
+        }
+        subscription.planKey = toPlan.key;
+        subscription.billingMode = toPlan.billingMode;
+        const saved = await manager.save(Subscription, subscription);
+        return { saved, chargeInvoiceId };
+      }
+    );
+
+    this.events.emit(
+      PlanChangedEvent.name,
+      new PlanChangedEvent(customer.userId, saved.id, fromPlan.key, toPlan.key)
+    );
     if (chargeInvoiceId) {
       this.events.emit(
         InvoicePaidEvent.name,
@@ -568,6 +641,30 @@ export class BillingUserService {
       );
     }
     return saved;
+  }
+
+  /**
+   * Compare-and-swap claim on the subscription's version: the first change to
+   * land bumps it; a concurrent change that read the same version loses the CAS
+   * and is rejected before any money moves. Stays out of the DB transaction so
+   * no row lock is held across the provider HTTP call.
+   */
+  private async claimChange(subscription: Subscription): Promise<void> {
+    const result = await this.subscriptions.update(
+      {
+        id: subscription.id,
+        version: subscription.version,
+        status: In([...CHANGEABLE_STATUSES]),
+        cancelAtPeriodEnd: false
+      },
+      { version: subscription.version + 1 }
+    );
+    if (result.affected !== 1) {
+      throw new ConflictException(
+        'This subscription is already being updated. Please retry.'
+      );
+    }
+    subscription.version += 1;
   }
 
   /**
@@ -694,18 +791,17 @@ export class BillingUserService {
   }
 
   /**
-   * Refund leg of a self-managed switch: capped by the original period
-   * invoice's amount (no refund source → nothing to give back, e.g. a period
-   * opened by a zero usage invoice). Never fails the switch — see changePlan.
+   * Resolves the refund leg of a self-managed switch: the invoice that paid for
+   * the outgoing plan's current coverage and how much of the computed remainder
+   * is actually refundable against it. The amount is capped by what is still
+   * unrefunded on that invoice (no source, or nothing left → no refund, e.g. a
+   * period opened by a zero usage invoice). Resolved before the new charge is
+   * recorded so the charge can't become its own refund source.
    */
-  private async refundUnusedRemainder(
-    ctx: ChangeContext,
-    quote: ProrationQuote | null,
-    periodEndMs: number
-  ): Promise<void> {
-    if (!quote || quote.refundMinor <= 0) return;
-    const { customer, subscription, toPlan, provider } = ctx;
-
+  private async resolveRefund(
+    subscription: Subscription,
+    refundMinor: number
+  ): Promise<{ source: Invoice; minor: number } | null> {
     const source = await this.invoices.findOne({
       where: {
         subscriptionId: subscription.id,
@@ -714,28 +810,12 @@ export class BillingUserService {
       },
       order: { createdAt: 'DESC' }
     });
-    if (!source || source.amountMinor <= 0) return;
+    if (!source) return null;
 
-    const refundMinor = Math.min(quote.refundMinor, source.amountMinor);
-    const refundKey = `change-refund:${subscription.id}:${toPlan.key}:${periodEndMs}`;
-    try {
-      await provider.refund(source.providerInvoiceRef, refundMinor, refundKey);
-    } catch (error) {
-      this.logger.error(
-        `Proration refund failed for subscription ${subscription.id} (${refundMinor} minor): ${(error as Error).message}`
-      );
-      return;
-    }
-
-    await this.recordChangeInvoice({
-      subscription,
-      customer,
-      providerEventId: refundKey,
-      providerInvoiceRef: source.providerInvoiceRef,
-      amountMinor: refundMinor,
-      status: 'refunded',
-      billingMode: 'fixed'
-    });
+    const refundable = source.amountMinor - (source.refundedMinor ?? 0);
+    const minor = Math.min(refundMinor, refundable);
+    if (minor <= 0) return null;
+    return { source, minor };
   }
 
   /** Persists the new plan on the local row and publishes the change. */
@@ -752,47 +832,49 @@ export class BillingUserService {
   }
 
   /**
-   * Records one leg of a self-managed switch as its own invoice row (the two
-   * fiscal documents of the switch stay visible in the history). The unique
-   * `providerEventId` makes a double-submitted change insert each leg once.
+   * Records one leg of a self-managed switch as its own invoice row within the
+   * caller's transaction (the two fiscal documents of the switch stay visible in
+   * the history). The unique `providerEventId` makes a double-submitted change
+   * insert each leg at most once.
    */
-  private async recordChangeInvoice(args: {
-    subscription: Subscription;
-    customer: Customer;
-    providerEventId: string;
-    providerInvoiceRef: string;
-    amountMinor: number;
-    status: 'paid' | 'refunded';
-    billingMode: Plan['billingMode'];
-  }): Promise<string | null> {
+  private async insertChangeInvoice(
+    manager: EntityManager,
+    args: {
+      subscription: Subscription;
+      customer: Customer;
+      providerEventId: string;
+      providerInvoiceRef: string;
+      amountMinor: number;
+      status: 'paid' | 'refunded';
+      billingMode: Plan['billingMode'];
+    }
+  ): Promise<string | null> {
     const { subscription, customer } = args;
     const now = new Date();
-    return withTransaction(this.dataSource, async (manager) => {
-      const insert = await manager
-        .createQueryBuilder()
-        .insert()
-        .into(Invoice)
-        .values({
-          customerId: subscription.customerId,
-          subscriptionId: subscription.id,
-          provider: subscription.provider,
-          providerEventId: args.providerEventId,
-          providerInvoiceRef: args.providerInvoiceRef,
-          amountMinor: args.amountMinor,
-          currency: customer.currency,
-          status: args.status,
-          billingMode: args.billingMode,
-          periodStart: now,
-          periodEnd: subscription.currentPeriodEnd,
-          paidAt: now,
-          receiptRef: null
-        })
-        .orIgnore()
-        .returning(['id'])
-        .execute();
-      const rows = insert.raw as Array<{ id: string }>;
-      return rows[0]?.id ?? null;
-    });
+    const insert = await manager
+      .createQueryBuilder()
+      .insert()
+      .into(Invoice)
+      .values({
+        customerId: subscription.customerId,
+        subscriptionId: subscription.id,
+        provider: subscription.provider,
+        providerEventId: args.providerEventId,
+        providerInvoiceRef: args.providerInvoiceRef,
+        amountMinor: args.amountMinor,
+        currency: customer.currency,
+        status: args.status,
+        billingMode: args.billingMode,
+        periodStart: now,
+        periodEnd: subscription.currentPeriodEnd,
+        paidAt: now,
+        receiptRef: null
+      })
+      .orIgnore()
+      .returning(['id'])
+      .execute();
+    const rows = insert.raw as Array<{ id: string }>;
+    return rows[0]?.id ?? null;
   }
 
   async getRegion(userId: string): Promise<{

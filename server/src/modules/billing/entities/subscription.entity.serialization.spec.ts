@@ -20,6 +20,7 @@ function createSubscription(
     paymentMethodId: null,
     dunningAttempts: 0,
     nextRenewalAttemptAt: null,
+    version: 1,
     createdAt: new Date('2025-01-01T00:00:00Z'),
     updatedAt: new Date('2025-01-01T00:00:00Z'),
     ...overrides
@@ -36,6 +37,11 @@ describe('Subscription entity serialization', () => {
     const plain = instanceToPlain(createSubscription());
     expect(plain).not.toHaveProperty('dunningAttempts');
     expect(plain).not.toHaveProperty('nextRenewalAttemptAt');
+  });
+
+  it('hides the concurrency token', () => {
+    const plain = instanceToPlain(createSubscription());
+    expect(plain).not.toHaveProperty('version');
   });
 
   it('keeps the public wire fields', () => {
