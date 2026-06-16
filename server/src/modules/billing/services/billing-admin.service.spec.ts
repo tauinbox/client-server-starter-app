@@ -5,7 +5,7 @@ import {
   ConflictException,
   NotFoundException
 } from '@nestjs/common';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { IsNull } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Customer } from '../entities/customer.entity';
@@ -108,6 +108,36 @@ async function build() {
     clawbackPurchase: jest.fn().mockResolvedValue(undefined)
   };
 
+  // Transactional manager that routes the refund's entity-typed calls to the
+  // same repo mocks, so the existing per-test setups/assertions still apply.
+  const manager = {
+    findOne: jest.fn((entity: unknown, options: unknown): Promise<unknown> => {
+      if (entity === Invoice)
+        return invoices.findOne(options) as Promise<unknown>;
+      if (entity === Product)
+        return products.findOne(options) as Promise<unknown>;
+      return Promise.resolve(null);
+    }),
+    update: jest.fn(
+      (
+        entity: unknown,
+        criteria: unknown,
+        partial: unknown
+      ): Promise<unknown> => {
+        if (entity === CustomerGrant)
+          return grants.update(criteria, partial) as Promise<unknown>;
+        return Promise.resolve({ affected: 0 });
+      }
+    ),
+    save: jest.fn((entity: unknown, data: unknown): Promise<unknown> => {
+      if (entity === Invoice) return invoices.save(data) as Promise<unknown>;
+      return Promise.resolve(data);
+    })
+  };
+  const dataSource = {
+    transaction: jest.fn((cb: (m: typeof manager) => unknown) => cb(manager))
+  };
+
   const module = await Test.createTestingModule({
     providers: [
       BillingAdminService,
@@ -119,7 +149,8 @@ async function build() {
       { provide: BillingService, useValue: billing },
       { provide: EntitlementService, useValue: entitlements },
       { provide: CreditService, useValue: credits },
-      { provide: EventEmitter2, useValue: { emit } }
+      { provide: EventEmitter2, useValue: { emit } },
+      { provide: getDataSourceToken(), useValue: dataSource }
     ]
   }).compile();
 
@@ -133,7 +164,9 @@ async function build() {
     billing,
     entitlements,
     credits,
-    emit
+    emit,
+    manager,
+    dataSource
   };
 }
 
@@ -218,6 +251,71 @@ describe('BillingAdminService', () => {
       await expect(ctx.service.refundInvoice('missing')).rejects.toThrow(
         NotFoundException
       );
+    });
+
+    it('row-locks the invoice and runs the whole refund in one transaction', async () => {
+      const ctx = await build();
+      ctx.invoices.findOne.mockResolvedValue(
+        makeInvoice({
+          kind: 'one_time',
+          subscriptionId: null,
+          productId: 'prod-cr',
+          amountMinor: 49000
+        })
+      );
+      ctx.products.findOne.mockResolvedValue({
+        id: 'prod-cr',
+        type: 'credits',
+        grant: { credits: 500 }
+      });
+      ctx.billing.getProviderById.mockReturnValue(providerStub('yookassa'));
+
+      await ctx.service.refundInvoice('inv-1');
+
+      // Without the transaction + row lock two concurrent refunds both read
+      // `paid` and double-claw; the read must happen under a pessimistic write
+      // lock inside the transaction, and the clawback must join that same
+      // transaction (same manager) so it commits atomically with the flip.
+      expect(ctx.dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(ctx.manager.findOne).toHaveBeenCalledWith(
+        Invoice,
+        expect.objectContaining({ lock: { mode: 'pessimistic_write' } })
+      );
+      expect(ctx.credits.clawbackPurchase).toHaveBeenCalledWith(
+        ctx.manager,
+        'cust-1',
+        'inv-1',
+        500
+      );
+    });
+
+    it('rejects a repeat full refund and claws credits back exactly once', async () => {
+      const ctx = await build();
+      // The same row is re-read on the second call (a serialized concurrent
+      // refund sees the committed state): once flipped to `refunded` it can no
+      // longer be refunded, so the clawback runs exactly once.
+      ctx.invoices.findOne.mockResolvedValue(
+        makeInvoice({
+          kind: 'one_time',
+          subscriptionId: null,
+          productId: 'prod-cr',
+          amountMinor: 49000
+        })
+      );
+      ctx.products.findOne.mockResolvedValue({
+        id: 'prod-cr',
+        type: 'credits',
+        grant: { credits: 500 }
+      });
+      ctx.billing.getProviderById.mockReturnValue(providerStub('yookassa'));
+
+      const first = await ctx.service.refundInvoice('inv-1');
+      expect(first.status).toBe('refunded');
+
+      await expect(ctx.service.refundInvoice('inv-1')).rejects.toThrow(
+        ConflictException
+      );
+      expect(ctx.credits.clawbackPurchase).toHaveBeenCalledTimes(1);
     });
 
     it('rejects refunding an unpaid invoice', async () => {
@@ -374,6 +472,7 @@ describe('BillingAdminService', () => {
         expect(second.status).toBe('refunded');
         expect(ctx.credits.clawbackPurchase).toHaveBeenCalledTimes(1);
         expect(ctx.credits.clawbackPurchase).toHaveBeenCalledWith(
+          ctx.manager,
           'cust-1',
           'inv-1',
           500
@@ -437,6 +536,7 @@ describe('BillingAdminService', () => {
 
         expect(saved.status).toBe('refunded');
         expect(ctx.credits.clawbackPurchase).toHaveBeenCalledWith(
+          ctx.manager,
           'cust-1',
           'inv-1',
           500

@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository, type EntityManager } from 'typeorm';
-import { withTransaction } from '../../../common/utils/with-transaction.util';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, type EntityManager } from 'typeorm';
 import { CreditBalance } from '../entities/credit-balance.entity';
 import { CreditLedger } from '../entities/credit-ledger.entity';
 import type { CreditLedgerReason } from '../entities/credit-ledger.entity';
@@ -19,8 +18,7 @@ import type { CreditLedgerReason } from '../entities/credit-ledger.entity';
 export class CreditService {
   constructor(
     @InjectRepository(CreditBalance)
-    private readonly balances: Repository<CreditBalance>,
-    @InjectDataSource() private readonly dataSource: DataSource
+    private readonly balances: Repository<CreditBalance>
   ) {}
 
   getBalance(customerId: string): Promise<CreditBalance | null> {
@@ -61,17 +59,18 @@ export class CreditService {
 
   /**
    * A full refund of a credit-pack purchase takes the granted units back.
+   * Runs on the caller's `EntityManager` so the deduction commits or rolls back
+   * atomically with the invoice's `paid → refunded` flip that triggered it.
    * Already-spent credits drive the balance negative — usage stays blocked
    * until it is topped up; the debt is never written off automatically.
    */
   clawbackPurchase(
+    manager: EntityManager,
     customerId: string,
     invoiceId: string,
     credits: number
   ): Promise<void> {
-    return withTransaction(this.dataSource, (manager) =>
-      this.applyDelta(manager, customerId, invoiceId, -credits, 'refund')
-    );
+    return this.applyDelta(manager, customerId, invoiceId, -credits, 'refund');
   }
 
   private async applyDelta(
