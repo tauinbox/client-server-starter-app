@@ -336,8 +336,8 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 
 | Technology | Version |
 |------------|---------|
-| Angular | 21.2.5 |
-| Angular Material | 21.2.3 |
+| Angular | 21.2.17 |
+| Angular Material | 21.2.14 |
 | TypeScript | 5.9.3 |
 | @ngrx/signals | 21.0.1 |
 | @jsverse/transloco | 7.5.0 |
