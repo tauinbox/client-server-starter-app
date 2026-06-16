@@ -19,6 +19,7 @@ import {
   toUsageResponse
 } from '../state';
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
+import { addInterval } from '../utils/period';
 import type {
   AuthenticatedRequest,
   MockCustomer,
@@ -145,13 +146,6 @@ function findCurrentSubscription(
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return subs[0];
-}
-
-function addInterval(from: Date, interval: 'month' | 'year'): Date {
-  const end = new Date(from);
-  if (interval === 'year') end.setFullYear(end.getFullYear() + 1);
-  else end.setMonth(end.getMonth() + 1);
-  return end;
 }
 
 // GET /billing/subscription — current subscription or null.
