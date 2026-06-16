@@ -343,7 +343,7 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 | @jsverse/transloco | 7.5.0 |
 | RxJS | 7.8.2 |
 | Vitest | 4.0.18 |
-| Playwright | 1.58.2 |
+| Playwright | 1.61.0 |
 | ESLint | 9.39.2 |
 | Prettier | 3.8.1 |
 | Stylelint | 17.1.1 |

@@ -209,6 +209,10 @@ jobs:
 
       - name: Install Playwright Chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
+        # Guard against a hung browser install (e.g. the Node 24.16 + extract-zip
+        # stall fixed by the Playwright bump): fail fast instead of running the
+        # job out to its 6h limit.
+        timeout-minutes: 5
         run: npx playwright install chromium
 
       - name: Build client
