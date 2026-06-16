@@ -87,67 +87,69 @@ export class UsageInvoicingService {
       return;
     }
 
-    // Prepaid credits offset billable units before money is charged. The
-    // balance is read here and deducted only when the invoice insert below
-    // wins — a replayed close spends nothing twice.
-    const availableCredits = await this.credits.availableUnits(
-      subscription.customerId
-    );
-    const summary = await this.usageRating.summarizeForPeriodWithCredits(
-      subscription,
-      plan,
-      { start: event.periodStart, end: event.periodEnd },
-      availableCredits
-    );
     const chargeKey = `usage:${subscription.id}:${event.periodEnd.getTime()}`;
-    const zeroCharge = summary.amountMinor === 0;
 
-    const invoiceId = await withTransaction(
-      this.dataSource,
-      async (manager) => {
-        const insert = await manager
-          .createQueryBuilder()
-          .insert()
-          .into(Invoice)
-          .values({
-            customerId: subscription.customerId,
-            subscriptionId: subscription.id,
-            provider: subscription.provider,
-            providerEventId: chargeKey,
-            providerInvoiceRef: zeroCharge ? chargeKey : '',
-            amountMinor: summary.amountMinor,
-            currency: summary.currency,
-            status: zeroCharge ? 'paid' : 'pending',
-            billingMode: 'usage',
-            periodStart: event.periodStart,
-            periodEnd: event.periodEnd,
-            paidAt: zeroCharge ? new Date() : null,
-            receiptRef: null
-          })
-          .orIgnore()
-          .returning(['id'])
-          .execute();
+    // Read, rate against, and deduct the credit balance in one FOR-UPDATE-locked
+    // transaction so concurrent closes for the same customer serialize: the
+    // second rates against the balance the first already spent (deduction gated
+    // on the winning insert, so a replay spends nothing twice).
+    const result = await withTransaction(this.dataSource, async (manager) => {
+      const availableCredits = await this.credits.availableUnitsForUpdate(
+        manager,
+        subscription.customerId
+      );
+      const summary = await this.usageRating.summarizeForPeriodWithCredits(
+        subscription,
+        plan,
+        { start: event.periodStart, end: event.periodEnd },
+        availableCredits
+      );
+      const zeroCharge = summary.amountMinor === 0;
 
-        const rows = insert.raw as Array<{ id: string }>;
-        if (rows.length === 0) {
-          return null;
-        }
-        if (summary.creditUnitsApplied > 0) {
-          await this.credits.spendOnUsage(
-            manager,
-            subscription.customerId,
-            rows[0].id,
-            summary.creditUnitsApplied
-          );
-        }
-        return rows[0].id;
+      const insert = await manager
+        .createQueryBuilder()
+        .insert()
+        .into(Invoice)
+        .values({
+          customerId: subscription.customerId,
+          subscriptionId: subscription.id,
+          provider: subscription.provider,
+          providerEventId: chargeKey,
+          providerInvoiceRef: zeroCharge ? chargeKey : '',
+          amountMinor: summary.amountMinor,
+          currency: summary.currency,
+          status: zeroCharge ? 'paid' : 'pending',
+          billingMode: 'usage',
+          periodStart: event.periodStart,
+          periodEnd: event.periodEnd,
+          paidAt: zeroCharge ? new Date() : null,
+          receiptRef: null
+        })
+        .orIgnore()
+        .returning(['id'])
+        .execute();
+
+      const rows = insert.raw as Array<{ id: string }>;
+      if (rows.length === 0) {
+        return null;
       }
-    );
+      if (summary.creditUnitsApplied > 0) {
+        await this.credits.spendOnUsage(
+          manager,
+          subscription.customerId,
+          rows[0].id,
+          summary.creditUnitsApplied
+        );
+      }
+      return { invoiceId: rows[0].id, summary, zeroCharge };
+    });
 
-    if (!invoiceId) {
+    if (!result) {
       // This period close was already invoiced (replayed or raced) — done.
       return;
     }
+
+    const { invoiceId, summary, zeroCharge } = result;
 
     if (zeroCharge) {
       this.events.emit(

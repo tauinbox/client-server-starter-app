@@ -1,9 +1,11 @@
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { CreditBalance } from '../entities/credit-balance.entity';
 import { Customer } from '../entities/customer.entity';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
+import { UsageRecord } from '../entities/usage-record.entity';
 import {
   InvoicePaidEvent,
   UsagePeriodClosedEvent
@@ -95,7 +97,9 @@ async function build(options: {
     transaction: jest.fn((cb: (m: typeof manager) => unknown) => cb(manager))
   };
   const credits = {
-    availableUnits: jest.fn().mockResolvedValue(options.availableCredits ?? 0),
+    availableUnitsForUpdate: jest
+      .fn()
+      .mockResolvedValue(options.availableCredits ?? 0),
     spendOnUsage: jest.fn().mockResolvedValue(undefined)
   };
 
@@ -309,5 +313,175 @@ describe('UsageInvoicingService', () => {
     await service.handlePeriodClosed(EVENT);
 
     expect(chargeUsage).not.toHaveBeenCalled();
+  });
+});
+
+// Two overlapping closes for the same customer (provider backfill/redelivery or
+// multi-instance) over the real CreditService + UsageRating, with a transaction
+// stand-in that serializes bodies the way a held row lock would. Reverting to a
+// read-before-transaction makes both closes read the full balance and overspend.
+describe('UsageInvoicingService - concurrent period closes (credit lock)', () => {
+  const CUST = 'cust-1';
+  const STARTING_CREDITS = 30;
+  const PERIOD_1_END = new Date('2026-06-01T00:00:00Z');
+  const PERIOD_2_END = new Date('2026-07-01T00:00:00Z');
+
+  async function buildLocked() {
+    // Single shared balance row; both the FOR-UPDATE read and the upsert hit it.
+    const ledger: Array<{ delta: number }> = [];
+    const invoices: Array<{ id: string; providerEventId: string }> = [];
+    const state = { balance: STARTING_CREDITS };
+    let seq = 0;
+
+    const manager = {
+      findOne: (entity: unknown, _opts: unknown) =>
+        entity === CreditBalance
+          ? Promise.resolve({ customerId: CUST, balanceUnits: state.balance })
+          : Promise.resolve(null),
+      query: (_sql: string, params: [string, number]) => {
+        state.balance += params[1];
+        return Promise.resolve(undefined);
+      },
+      create: (entity: { prototype: object }, data: object) =>
+        Object.assign(Object.create(entity.prototype) as object, data),
+      save: (entity: { delta?: number }) => {
+        if (typeof entity.delta === 'number')
+          ledger.push({ delta: entity.delta });
+        return Promise.resolve(entity);
+      },
+      createQueryBuilder: () => {
+        const captured: { values?: { providerEventId: string } } = {};
+        const builder = {
+          insert: () => builder,
+          into: () => builder,
+          values: (v: { providerEventId: string }) => {
+            captured.values = v;
+            return builder;
+          },
+          orIgnore: () => builder,
+          returning: () => builder,
+          execute: () => {
+            const v = captured.values!;
+            if (invoices.some((i) => i.providerEventId === v.providerEventId)) {
+              return Promise.resolve({ raw: [] });
+            }
+            const id = `inv-${++seq}`;
+            invoices.push({ id, providerEventId: v.providerEventId });
+            return Promise.resolve({ raw: [{ id }] });
+          }
+        };
+        return builder;
+      }
+    };
+
+    // Serialize overlapping transaction bodies: each waits for the previous to
+    // settle, the way a held pessimistic_write lock on the balance row would.
+    let lock: Promise<unknown> = Promise.resolve();
+    const dataSource = {
+      transaction: (cb: (m: typeof manager) => unknown) => {
+        const run = lock.then(() => cb(manager));
+        lock = run.then(
+          () => undefined,
+          () => undefined
+        );
+        return run;
+      }
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        UsageInvoicingService,
+        CreditService,
+        UsageRating,
+        {
+          provide: getRepositoryToken(Subscription),
+          useValue: {
+            findOne: jest.fn().mockResolvedValue(makeSubscription())
+          }
+        },
+        {
+          provide: getRepositoryToken(Customer),
+          useValue: {
+            findOne: jest.fn().mockResolvedValue({ id: CUST, userId: 'user-1' })
+          }
+        },
+        {
+          provide: getRepositoryToken(Plan),
+          useValue: {
+            findOne: jest.fn().mockResolvedValue({
+              key: 'usage',
+              name: 'Pay as you go',
+              meterKey: 'api_calls',
+              prices: {
+                paddle: {
+                  includedUnits: 10,
+                  unitPriceMinor: 100,
+                  currency: 'USD'
+                }
+              }
+            })
+          }
+        },
+        {
+          provide: getRepositoryToken(CreditBalance),
+          // Same stateful balance as the manager, so a read-before-transaction
+          // (pre-fix) path reads it too and the test still reproduces overspend.
+          useValue: {
+            findOne: jest.fn(() =>
+              Promise.resolve({ customerId: CUST, balanceUnits: state.balance })
+            )
+          }
+        },
+        {
+          provide: getRepositoryToken(UsageRecord),
+          // 60 recorded units, 10 included -> 50 billable per period, well over
+          // the 30-credit balance, so each close wants more credits than it holds.
+          useValue: { sum: jest.fn().mockResolvedValue(60) }
+        },
+        { provide: getDataSourceToken(), useValue: dataSource },
+        {
+          provide: BILLING_PROVIDERS,
+          useValue: [{ id: 'paddle', chargeUsage: jest.fn() }]
+        },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } }
+      ]
+    }).compile();
+
+    return {
+      service: moduleRef.get(UsageInvoicingService),
+      state,
+      ledger,
+      invoices
+    };
+  }
+
+  it('applies no more credits than the balance holds across two overlapping closes', async () => {
+    const { service, state, ledger, invoices } = await buildLocked();
+
+    await Promise.all([
+      service.invoiceClosedPeriod(
+        new UsagePeriodClosedEvent(
+          'user-1',
+          'sub-1',
+          PERIOD_1_END,
+          PERIOD_2_END
+        )
+      ),
+      service.invoiceClosedPeriod(
+        new UsagePeriodClosedEvent(
+          'user-1',
+          'sub-1',
+          PERIOD_2_END,
+          new Date('2026-08-01T00:00:00Z')
+        )
+      )
+    ]);
+
+    // The second close rated against the decremented balance: exactly one spend
+    // of the full 30 credits, balance settled at 0 and never went negative.
+    expect(invoices).toHaveLength(2);
+    const spent = ledger.reduce((sum, l) => sum + l.delta, 0);
+    expect(spent).toBe(-STARTING_CREDITS);
+    expect(state.balance).toBe(0);
   });
 });

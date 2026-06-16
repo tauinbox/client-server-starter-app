@@ -84,6 +84,8 @@ function makeManager(stores: Stores) {
         return Promise.resolve(findWhere(stores.invoices, opts.where));
       if (entity === Product)
         return Promise.resolve(findWhere(stores.products, opts.where));
+      if (entity === CreditBalance)
+        return Promise.resolve(findWhere(stores.creditBalances, opts.where));
       return Promise.resolve(null);
     },
     update: (

@@ -31,6 +31,25 @@ export class CreditService {
     return Math.max(0, balance?.balanceUnits ?? 0);
   }
 
+  /**
+   * Reads available units while holding a `FOR UPDATE` lock on the balance row
+   * on the caller's transactional `EntityManager`. Concurrent usage spenders
+   * for the same customer serialize on the lock: the second waits, then reads
+   * the balance the first already decremented, so credits cannot be applied
+   * twice off one stale read. A customer with no balance row has nothing to
+   * lock and nothing to spend (0 units) - the race is irrelevant there.
+   */
+  async availableUnitsForUpdate(
+    manager: EntityManager,
+    customerId: string
+  ): Promise<number> {
+    const balance = await manager.findOne(CreditBalance, {
+      where: { customerId },
+      lock: { mode: 'pessimistic_write' }
+    });
+    return Math.max(0, balance?.balanceUnits ?? 0);
+  }
+
   /** Negative balance (refund of already-spent credits) blocks usage. */
   async isBlocked(customerId: string): Promise<boolean> {
     const balance = await this.getBalance(customerId);
