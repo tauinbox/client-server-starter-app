@@ -158,6 +158,21 @@ export class BillingEventReducer {
           );
           return null;
         }
+        // 1:1 invariant (UQ_subscriptions_customer_open): a customer who already
+        // has an open subscription must not get a second one. Skip + warn rather
+        // than let the insert abort the whole webhook transaction.
+        const openExisting = await manager.findOne(Subscription, {
+          where: {
+            customerId: payload.ref.customerId,
+            status: In([...SELF_MANAGED_OPEN_STATUSES])
+          }
+        });
+        if (openExisting) {
+          this.logger.warn(
+            `Skipping ${type} for ${payload.providerSubscriptionId}: customer ${payload.ref.customerId} already has open subscription ${openExisting.id}`
+          );
+          return null;
+        }
         const plan = await manager.findOne(Plan, {
           where: { key: payload.planKey }
         });

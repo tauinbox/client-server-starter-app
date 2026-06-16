@@ -167,6 +167,32 @@ describe('BillingEventReducer', () => {
       );
     });
 
+    it('skips creating a second subscription when the customer already has an open one', async () => {
+      const { reducer, manager, emit } = await build();
+      // First Subscription lookup (by providerSubscriptionId) misses, so the
+      // create branch runs; the second (open-subscription guard) finds a conflict.
+      let subLookups = 0;
+      manager.findOne.mockImplementation((entity: unknown) => {
+        if (entity === Subscription) {
+          subLookups += 1;
+          return Promise.resolve(
+            subLookups === 1
+              ? null
+              : ({ id: 'sub-open', status: 'active' } as Subscription)
+          );
+        }
+        if (entity === Plan)
+          return Promise.resolve({ billingMode: 'fixed' } as Plan);
+        return Promise.resolve(null);
+      });
+
+      await reducer.reduce(event('subscription.activated', subPayload()));
+
+      expect(manager.create).not.toHaveBeenCalled();
+      expect(manager.save).not.toHaveBeenCalled();
+      expect(emit).not.toHaveBeenCalled();
+    });
+
     it('stamps the event provider and derives the lifecycle owner (YooKassa = self)', async () => {
       const { reducer, manager } = await build({
         plan: { billingMode: 'fixed' } as Plan

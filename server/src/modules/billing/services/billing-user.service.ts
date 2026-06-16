@@ -46,6 +46,8 @@ import { CreditService } from './credit.service';
 /** Subscriptions that grant access — re-checkout while one exists is blocked. */
 const ACTIVE_STATUSES = ['trialing', 'active', 'past_due'] as const;
 
+const PG_UNIQUE_VIOLATION = '23505';
+
 /** Non-canceled statuses — the "current" subscription for read/cancel/region. */
 const OPEN_STATUSES = ['incomplete', 'trialing', 'active', 'past_due'] as const;
 
@@ -369,30 +371,56 @@ export class BillingUserService {
     // the server-side enforcement behind the UI availability gating.
     const provider = await this.billing.resolveProvider(customer);
 
+    // A prior unpaid checkout leaves an `incomplete` row. Reuse it rather than
+    // stack a second open subscription (forbidden by UQ_subscriptions_customer_open).
+    const pending = await this.subscriptions.findOne({
+      where: { customerId: customer.id, status: 'incomplete' }
+    });
+
     // Self-managed (YooKassa) has no provider-side subscription object, so the
     // local row is created here in `incomplete`; the success webhook flips it to
     // active. Provider-managed (Paddle) rows are created by the webhook reducer.
     if (!provider.managesLifecycle) {
       const now = new Date();
-      await this.subscriptions.save(
-        this.subscriptions.create({
-          customerId: customer.id,
-          planKey: plan.key,
-          provider: provider.id,
-          billingMode: plan.billingMode,
-          status: 'incomplete',
-          lifecycleOwner: 'self',
-          currentPeriodStart: now,
-          currentPeriodEnd: addInterval(now, plan.interval),
-          cancelAtPeriodEnd: false,
-          trialEnd:
-            plan.trialDays > 0
-              ? new Date(now.getTime() + plan.trialDays * 86_400_000)
-              : null,
-          providerSubscriptionId: null,
-          paymentMethodId: null
-        })
-      );
+      const fields = {
+        planKey: plan.key,
+        provider: provider.id,
+        billingMode: plan.billingMode,
+        status: 'incomplete' as const,
+        lifecycleOwner: 'self' as const,
+        currentPeriodStart: now,
+        currentPeriodEnd: addInterval(now, plan.interval),
+        cancelAtPeriodEnd: false,
+        trialEnd:
+          plan.trialDays > 0
+            ? new Date(now.getTime() + plan.trialDays * 86_400_000)
+            : null,
+        providerSubscriptionId: null,
+        paymentMethodId: null
+      };
+      if (pending) {
+        await this.subscriptions.save(Object.assign(pending, fields));
+      } else {
+        try {
+          await this.subscriptions.save(
+            this.subscriptions.create({ customerId: customer.id, ...fields })
+          );
+        } catch (error: unknown) {
+          // Lost the insert race against a concurrent checkout: the partial
+          // unique index rejected the second open row.
+          if ((error as { code?: string }).code === PG_UNIQUE_VIOLATION) {
+            throw new ConflictException(
+              'You already have an active subscription. Cancel it before subscribing to another plan.'
+            );
+          }
+          throw error;
+        }
+      }
+    } else if (pending) {
+      // The region now resolves a provider-managed plan; release the stale
+      // self `incomplete` so the provider's activation webhook isn't blocked.
+      pending.status = 'canceled';
+      await this.subscriptions.save(pending);
     }
 
     const session = await provider.startCheckout(customer, plan, {
