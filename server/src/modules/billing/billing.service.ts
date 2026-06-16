@@ -87,7 +87,7 @@ export class BillingService {
     provider: BillingProviderId
   ): Promise<boolean> {
     const flagKey = PROVIDER_ENABLED_FLAG[provider];
-    const flags = await this.featureFlags.findAll();
-    return flags.find((f) => f.key === flagKey)?.enabled ?? false;
+    const flag = await this.featureFlags.findByKey(flagKey);
+    return flag?.enabled ?? false;
   }
 }

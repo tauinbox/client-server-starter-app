@@ -91,6 +91,23 @@ describe('FeatureFlagService', () => {
     service = module.get(FeatureFlagService);
   });
 
+  describe('findByKey', () => {
+    it('returns the flag for a known key without loading rules', async () => {
+      flagRepo.findOne.mockResolvedValue(sampleFlag);
+      const result = await service.findByKey('new-dashboard');
+      expect(result).toBe(sampleFlag);
+      expect(flagRepo.findOne).toHaveBeenCalledWith({
+        where: { key: 'new-dashboard' }
+      });
+      expect(ruleRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('returns null when the key is absent', async () => {
+      flagRepo.findOne.mockResolvedValue(null);
+      expect(await service.findByKey('missing')).toBeNull();
+    });
+  });
+
   describe('findOne', () => {
     it('returns the flag with rules ordered by createdAt', async () => {
       flagRepo.findOne.mockResolvedValue(sampleFlag);
