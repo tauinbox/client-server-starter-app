@@ -51,7 +51,13 @@ interface Stores {
   grants: CustomerGrant[];
   creditBalances: CreditBalance[];
   creditLedger: CreditLedger[];
-  webhookEvents: Array<{ id: string; providerEventId: string }>;
+  webhookEvents: Array<{
+    id: string;
+    provider: string;
+    providerEventId: string;
+    status: string;
+    payload: NormalizedEvent;
+  }>;
 }
 
 function findWhere<T extends object>(rows: T[], where: Partial<T>): T | null {
@@ -156,14 +162,29 @@ function makeManager(stores: Stores) {
   };
 }
 
+// Stateful stand-in for the WebhookEvent repo: the (provider, provider_event_id)
+// unique key gates the insert, and `update` flips the row's status so the
+// status-aware dedup (skip only when `processed`) can be exercised end to end.
 function makeWebhookEventRepo(stores: Stores) {
   let seq = 0;
   return {
     createQueryBuilder: () => {
-      const captured: { values?: { providerEventId: string } } = {};
+      const captured: {
+        values?: {
+          provider: string;
+          providerEventId: string;
+          status: string;
+          payload: NormalizedEvent;
+        };
+      } = {};
       const builder = {
         insert: () => builder,
-        values: (v: { providerEventId: string }) => {
+        values: (v: {
+          provider: string;
+          providerEventId: string;
+          status: string;
+          payload: NormalizedEvent;
+        }) => {
           captured.values = v;
           return builder;
         },
@@ -172,17 +193,31 @@ function makeWebhookEventRepo(stores: Stores) {
         execute: () => {
           const v = captured.values!;
           const dup = stores.webhookEvents.some(
-            (e) => e.providerEventId === v.providerEventId
+            (e) =>
+              e.provider === v.provider &&
+              e.providerEventId === v.providerEventId
           );
           if (dup) return Promise.resolve({ raw: [] });
           const id = `wh-${++seq}`;
-          stores.webhookEvents.push({ id, providerEventId: v.providerEventId });
+          stores.webhookEvents.push({
+            id,
+            provider: v.provider,
+            providerEventId: v.providerEventId,
+            status: v.status,
+            payload: v.payload
+          });
           return Promise.resolve({ raw: [{ id }] });
         }
       };
       return builder;
     },
-    update: jest.fn().mockResolvedValue({ affected: 1 })
+    findOne: (opts: { where: Record<string, unknown> }) =>
+      Promise.resolve(findWhere(stores.webhookEvents, opts.where)),
+    update: (where: { id: string }, set: Record<string, unknown>) => {
+      const matches = stores.webhookEvents.filter((e) => e.id === where.id);
+      for (const row of matches) Object.assign(row, set);
+      return Promise.resolve({ affected: matches.length });
+    }
   };
 }
 
@@ -217,6 +252,7 @@ describe('Billing Paddle webhook (e2e)', () => {
   let stores: Stores;
   let emit: jest.Mock;
   let entitlements: EntitlementService;
+  let reducer: BillingEventReducer;
 
   beforeEach(async () => {
     stores = {
@@ -329,6 +365,7 @@ describe('Billing Paddle webhook (e2e)', () => {
       ]
     }).compile();
     entitlements = moduleRef.get(EntitlementService);
+    reducer = moduleRef.get(BillingEventReducer);
 
     app = moduleRef.createNestApplication({ rawBody: true });
     app.setGlobalPrefix('api');
@@ -394,6 +431,39 @@ describe('Billing Paddle webhook (e2e)', () => {
 
     expect(stores.subscriptions).toHaveLength(1);
     expect(emit).toHaveBeenCalledTimes(1);
+  });
+
+  it('reprocesses a delivery whose first reduce failed, applying it exactly once', async () => {
+    // First reduce throws: the idempotency row is committed `received` but
+    // nothing is applied, and the controller surfaces a 500 so the provider
+    // redelivers. The second reduce runs the real reducer.
+    const realReduce = reducer.reduce.bind(reducer);
+    const reduceSpy = jest
+      .spyOn(reducer, 'reduce')
+      .mockRejectedValueOnce(new Error('transient reduce failure'))
+      .mockImplementation((event) => realReduce(event));
+
+    const post = () =>
+      request(server)
+        .post('/api/v1/billing/webhooks/paddle')
+        .set('paddle-signature', 'sig')
+        .set('Content-Type', 'application/json')
+        .send(JSON.stringify({ event: activationEvent }));
+
+    await post().expect(500);
+    expect(stores.subscriptions).toHaveLength(0);
+    expect(stores.webhookEvents).toHaveLength(1);
+    expect(stores.webhookEvents[0].status).toBe('received');
+
+    // Redelivery of the same event id: the still-`received` row is reprocessed
+    // (not deduped on existence), so the subscription is applied exactly once.
+    await post().expect(200);
+    expect(stores.subscriptions).toHaveLength(1);
+    expect(emit).toHaveBeenCalledTimes(1);
+    expect(stores.webhookEvents).toHaveLength(1);
+    expect(stores.webhookEvents[0].status).toBe('processed');
+
+    reduceSpy.mockRestore();
   });
 
   it('rejects a webhook the provider cannot verify', async () => {

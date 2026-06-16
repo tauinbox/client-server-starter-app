@@ -24,6 +24,7 @@ interface Harness {
   service: WebhookIngestionService;
   values: jest.Mock;
   execute: jest.Mock;
+  findOne: jest.Mock;
   update: jest.Mock;
   add: jest.Mock;
   verify: jest.Mock;
@@ -44,8 +45,14 @@ async function buildHarness(opts: {
     execute
   };
   values.mockReturnValue(qb);
+  // On an insert conflict the service looks up the existing row to decide
+  // whether to skip (already `processed`) or reprocess (still `received`).
+  const findOne = jest
+    .fn()
+    .mockResolvedValue({ id: 'wh-1', status: 'processed' });
   const repo = {
     createQueryBuilder: jest.fn().mockReturnValue(qb),
+    findOne,
     update: jest.fn().mockResolvedValue({ affected: 1 })
   };
   const verify = opts.verify ?? jest.fn().mockResolvedValue(event);
@@ -70,6 +77,7 @@ async function buildHarness(opts: {
     service: module.get(WebhookIngestionService),
     values,
     execute,
+    findOne,
     update: repo.update,
     add,
     verify,
@@ -108,7 +116,11 @@ describe('WebhookIngestionService', () => {
     expect(verify).toHaveBeenCalledWith(raw, { 'paddle-signature': 'sig' });
     expect(values).toHaveBeenCalledWith(
       expect.objectContaining({
-        payloadHash: createHash('sha256').update(raw).digest('hex')
+        payloadHash: createHash('sha256').update(raw).digest('hex'),
+        // The verified event is persisted so the reconciliation sweep can
+        // replay a stuck delivery without the provider.
+        payload: event,
+        status: 'received'
       })
     );
   });
@@ -134,6 +146,31 @@ describe('WebhookIngestionService', () => {
       { id: 'wh-1' },
       expect.objectContaining({ status: 'processed' })
     );
+  });
+
+  it('reprocesses when the conflicting row is still `received` (unfinished delivery)', async () => {
+    const { service, execute, findOne, reduce } = await buildHarness({
+      withQueue: false
+    });
+    execute.mockResolvedValueOnce({ raw: [] }); // insert loses the unique race
+    findOne.mockResolvedValueOnce({ id: 'wh-7', status: 'received' });
+
+    await service.ingest('paddle', Buffer.from('{}'), {});
+
+    expect(reduce).toHaveBeenCalledTimes(1);
+    expect(reduce).toHaveBeenCalledWith(event);
+  });
+
+  it('no-ops when the conflicting row is already `processed`', async () => {
+    const { service, execute, findOne, reduce } = await buildHarness({
+      withQueue: false
+    });
+    execute.mockResolvedValueOnce({ raw: [] });
+    findOne.mockResolvedValueOnce({ id: 'wh-7', status: 'processed' });
+
+    await service.ingest('paddle', Buffer.from('{}'), {});
+
+    expect(reduce).not.toHaveBeenCalled();
   });
 
   it('enqueues reduction when a queue is configured', async () => {

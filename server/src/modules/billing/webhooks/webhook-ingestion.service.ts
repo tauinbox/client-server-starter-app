@@ -26,10 +26,17 @@ import {
 
 /**
  * Ingests provider webhooks: verify authenticity via the provider seam, persist
- * an idempotency row (unique (provider, provider_event_id) — replays no-op),
- * then hand off to reduction. When Redis is configured the reduction runs on
- * BullMQ so the HTTP ack stays within the provider's timeout; without Redis it
- * runs inline, mirroring MailService's optional-queue fallback.
+ * an idempotency row (unique (provider, provider_event_id)), then hand off to
+ * reduction. When Redis is configured the reduction runs on BullMQ so the HTTP
+ * ack stays within the provider's timeout; without Redis it runs inline,
+ * mirroring MailService's optional-queue fallback.
+ *
+ * The idempotency row is only a permanent no-op once a delivery has been
+ * `processed`. A row still in `received` means the reduce never completed (it
+ * threw, or the worker died) — a redelivery re-dispatches it rather than
+ * silently dropping it, so a transient reduce failure can never lose the event.
+ * The reduce itself is idempotent (invoice `orIgnore` on provider_event_id,
+ * subscription upsert), so reprocessing applies the effect exactly once.
  */
 @Injectable()
 export class WebhookIngestionService {
@@ -76,6 +83,7 @@ export class WebhookIngestionService {
         providerEventId: event.providerEventId,
         type: event.type,
         payloadHash,
+        payload: event,
         status: 'received',
         processedAt: null
       })
@@ -84,15 +92,29 @@ export class WebhookIngestionService {
       .execute();
 
     const inserted = result.raw as Array<{ id: string }>;
-    if (inserted.length === 0) {
-      // Duplicate (provider, provider_event_id) — replay, already handled.
+    if (inserted.length > 0) {
+      await this.dispatch({ webhookEventId: inserted[0].id, event });
+      return;
+    }
+
+    // The (provider, provider_event_id) row already exists. Skip only if a prior
+    // delivery finished (`processed`); a row still `received` is an unfinished
+    // delivery — reprocess it (idempotent) instead of dropping the event.
+    const existing = await this.webhookEvents.findOne({
+      where: { provider: providerId, providerEventId: event.providerEventId },
+      select: { id: true, status: true }
+    });
+    if (!existing || existing.status === 'processed') {
       this.logger.debug(
         `Duplicate ${providerId} webhook ${event.providerEventId} ignored`
       );
       return;
     }
 
-    await this.dispatch({ webhookEventId: inserted[0].id, event });
+    this.logger.warn(
+      `Reprocessing unfinished ${providerId} webhook ${event.providerEventId}`
+    );
+    await this.dispatch({ webhookEventId: existing.id, event });
   }
 
   private async dispatch(data: BillingWebhookJobData): Promise<void> {

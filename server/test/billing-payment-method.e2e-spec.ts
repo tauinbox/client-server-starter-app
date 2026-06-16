@@ -42,7 +42,13 @@ interface Stores {
   paymentMethods: PaymentMethod[];
   invoices: Array<Record<string, unknown> & { id: string }>;
   plans: Plan[];
-  webhookEvents: Array<{ id: string; providerEventId: string }>;
+  webhookEvents: Array<{
+    id: string;
+    provider: string;
+    providerEventId: string;
+    status: string;
+    payload: object;
+  }>;
 }
 
 const NOW = new Date('2026-06-08T00:00:00Z');
@@ -203,10 +209,22 @@ function makeWebhookEventRepo(stores: Stores) {
   let seq = 0;
   return {
     createQueryBuilder: () => {
-      const captured: { values?: { providerEventId: string } } = {};
+      const captured: {
+        values?: {
+          provider: string;
+          providerEventId: string;
+          status: string;
+          payload: object;
+        };
+      } = {};
       const builder = {
         insert: () => builder,
-        values: (v: { providerEventId: string }) => {
+        values: (v: {
+          provider: string;
+          providerEventId: string;
+          status: string;
+          payload: object;
+        }) => {
           captured.values = v;
           return builder;
         },
@@ -215,17 +233,37 @@ function makeWebhookEventRepo(stores: Stores) {
         execute: () => {
           const v = captured.values!;
           const dup = stores.webhookEvents.some(
-            (e) => e.providerEventId === v.providerEventId
+            (e) =>
+              e.provider === v.provider &&
+              e.providerEventId === v.providerEventId
           );
           if (dup) return Promise.resolve({ raw: [] });
           const id = `wh-${++seq}`;
-          stores.webhookEvents.push({ id, providerEventId: v.providerEventId });
+          stores.webhookEvents.push({
+            id,
+            provider: v.provider,
+            providerEventId: v.providerEventId,
+            status: v.status,
+            payload: v.payload
+          });
           return Promise.resolve({ raw: [{ id }] });
         }
       };
       return builder;
     },
-    update: jest.fn().mockResolvedValue({ affected: 1 })
+    findOne: (opts: { where: { provider: string; providerEventId: string } }) =>
+      Promise.resolve(
+        stores.webhookEvents.find(
+          (e) =>
+            e.provider === opts.where.provider &&
+            e.providerEventId === opts.where.providerEventId
+        ) ?? null
+      ),
+    update: (where: { id: string }, set: Record<string, unknown>) => {
+      const matches = stores.webhookEvents.filter((e) => e.id === where.id);
+      for (const row of matches) Object.assign(row, set);
+      return Promise.resolve({ affected: matches.length });
+    }
   };
 }
 
