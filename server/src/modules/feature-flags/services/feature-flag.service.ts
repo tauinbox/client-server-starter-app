@@ -56,6 +56,14 @@ export class FeatureFlagService {
     return flags;
   }
 
+  /**
+   * Single-flag lookup by unique key (no rules loaded). Returns null when the
+   * key is absent. Used by hot-path admin toggles that only read `enabled`.
+   */
+  async findByKey(key: string): Promise<FeatureFlag | null> {
+    return this.flagRepo.findOne({ where: { key } });
+  }
+
   async findOne(id: string): Promise<FeatureFlag> {
     const flag = await this.flagRepo.findOne({ where: { id } });
     if (!flag) {
