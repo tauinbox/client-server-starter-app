@@ -27,6 +27,7 @@ import type {
 import type { BillingProviderId } from '@app/shared/types';
 import type { NotificationEvent } from '@app/shared/types';
 import { pushToAll, pushToUser } from './sse-hub';
+import { addInterval } from './utils/period';
 import { notifyRoleHolders } from './middleware/roles.middleware';
 
 const router = Router();
@@ -359,9 +360,7 @@ router.post('/billing/activate-subscription', (req, res) => {
 
   const now = new Date();
   const nowIso = now.toISOString();
-  const periodEnd = new Date(now);
-  if (plan.interval === 'year') periodEnd.setFullYear(now.getFullYear() + 1);
-  else periodEnd.setMonth(now.getMonth() + 1);
+  const periodEnd = addInterval(now, plan.interval);
 
   const isRu = (user.locale ?? 'en').toLowerCase().startsWith('ru');
   const country = isRu ? 'RU' : 'US';
@@ -692,9 +691,7 @@ router.post('/billing/advance-renewal', (req, res) => {
   // The clock advance anchors the boundary at NOW: the closed period is
   // [currentPeriodStart, now) and the new one [now, now + interval).
   const closedStart = subscription.currentPeriodStart;
-  const newEnd = new Date(now);
-  if (plan.interval === 'year') newEnd.setFullYear(newEnd.getFullYear() + 1);
-  else newEnd.setMonth(newEnd.getMonth() + 1);
+  const newEnd = addInterval(now, plan.interval);
 
   let amountMinor = price.amountMinor;
   let periodStart = nowIso;
