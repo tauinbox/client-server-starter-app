@@ -49,6 +49,7 @@ import { BillingUserController } from './controllers/billing-user.controller';
 import { BillingAdminController } from './controllers/billing-admin.controller';
 import { BillingWebhooksController } from './webhooks/billing-webhooks.controller';
 import { WebhookIngestionService } from './webhooks/webhook-ingestion.service';
+import { WebhookReconciliationService } from './webhooks/webhook-reconciliation.service';
 import { BillingEventReducer } from './webhooks/billing-event-reducer.service';
 import { BillingWebhookProcessor } from './webhooks/billing-webhook.processor';
 import { BILLING_WEBHOOK_QUEUE } from './webhooks/billing-webhook-queue.constants';
@@ -139,7 +140,9 @@ export class BillingModule {
         WebhookIngestionService,
         BillingEventReducer,
         RenewalService,
-        ...(redisUrl ? [BillingWebhookProcessor] : []),
+        ...(redisUrl
+          ? [WebhookReconciliationService, BillingWebhookProcessor]
+          : []),
         ...(renewalEnabled ? [RenewalProcessor] : []),
         {
           provide: PADDLE_CLIENT,
