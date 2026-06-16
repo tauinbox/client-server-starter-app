@@ -566,6 +566,76 @@ describe('BillingUserService', () => {
       );
       expect(ctx.billing.resolveProvider).not.toHaveBeenCalled();
     });
+
+    it('reuses an existing incomplete row on a repeat self-managed checkout', async () => {
+      const ctx = await build();
+      ctx.plans.findOne.mockResolvedValue(makePlan());
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'RU',
+        providerOverride: null
+      });
+      ctx.billing.resolveProvider.mockResolvedValue(
+        provider('yookassa', false)
+      );
+      // active check: none; pending check: a prior unpaid row.
+      ctx.subscriptions.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'sub-pending', status: 'incomplete' });
+
+      await ctx.service.checkout('user-1', 'pro');
+
+      expect(ctx.subscriptions.create).not.toHaveBeenCalled();
+      expect(ctx.subscriptions.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'sub-pending',
+          planKey: 'pro',
+          status: 'incomplete'
+        })
+      );
+    });
+
+    it('returns 409 when a concurrent checkout wins the insert race', async () => {
+      const ctx = await build();
+      ctx.plans.findOne.mockResolvedValue(makePlan());
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'RU',
+        providerOverride: null
+      });
+      ctx.billing.resolveProvider.mockResolvedValue(
+        provider('yookassa', false)
+      );
+      ctx.subscriptions.findOne.mockResolvedValue(null);
+      ctx.subscriptions.save.mockRejectedValueOnce({ code: '23505' });
+
+      await expect(ctx.service.checkout('user-1', 'pro')).rejects.toThrow(
+        ConflictException
+      );
+    });
+
+    it('releases a stale self incomplete row when the provider is provider-managed', async () => {
+      const ctx = await build();
+      ctx.plans.findOne.mockResolvedValue(makePlan());
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'US',
+        providerOverride: null
+      });
+      ctx.billing.resolveProvider.mockResolvedValue(provider('paddle', true));
+      ctx.subscriptions.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'sub-pending', status: 'incomplete' });
+
+      await ctx.service.checkout('user-1', 'pro');
+
+      expect(ctx.subscriptions.save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'sub-pending', status: 'canceled' })
+      );
+    });
   });
 
   describe('cancelSubscription', () => {

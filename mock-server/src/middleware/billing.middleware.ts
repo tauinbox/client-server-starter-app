@@ -466,16 +466,22 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
   }
 
   const provider = effectiveProvider(customer);
+
+  // A prior unpaid checkout leaves an `incomplete` row. Reuse it rather than
+  // stack a second open subscription (the server enforces this with a partial
+  // unique index; mirror the observable single-open-subscription behavior here).
+  const pending = [...getState().billingSubscriptions.values()].find(
+    (s) => s.customerId === customer.id && s.status === 'incomplete'
+  );
+
   if (!managesLifecycle(provider)) {
     const now = new Date();
-    const sub: MockSubscription = {
-      id: uuidv4(),
-      customerId: customer.id,
+    const fields = {
       planKey: plan.key,
       provider,
       billingMode: plan.billingMode,
-      status: 'incomplete',
-      lifecycleOwner: 'self',
+      status: 'incomplete' as const,
+      lifecycleOwner: 'self' as const,
       currentPeriodStart: now.toISOString(),
       currentPeriodEnd: addInterval(now, plan.interval).toISOString(),
       cancelAtPeriodEnd: false,
@@ -485,10 +491,23 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
           : null,
       paymentMethodId: null,
       providerSubscriptionId: null,
-      createdAt: now.toISOString(),
       updatedAt: now.toISOString()
     };
-    getState().billingSubscriptions.set(sub.id, sub);
+    if (pending) {
+      Object.assign(pending, fields);
+    } else {
+      const sub: MockSubscription = {
+        id: uuidv4(),
+        customerId: customer.id,
+        ...fields,
+        createdAt: now.toISOString()
+      };
+      getState().billingSubscriptions.set(sub.id, sub);
+    }
+  } else if (pending) {
+    // Region now resolves a provider-managed plan; release the stale self row.
+    pending.status = 'canceled';
+    pending.updatedAt = new Date().toISOString();
   }
 
   const sessionRef = uuidv4();
