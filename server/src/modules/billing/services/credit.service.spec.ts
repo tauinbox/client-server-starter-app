@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import type { EntityManager } from 'typeorm';
 import { CreditBalance } from '../entities/credit-balance.entity';
 import { CreditLedger } from '../entities/credit-ledger.entity';
@@ -24,23 +24,18 @@ async function build(balance: Partial<CreditBalance> | null = null) {
     findOne: jest.fn().mockResolvedValue(balance)
   };
   const manager = makeManager();
-  const dataSource = {
-    transaction: jest.fn((cb: (m: ManagerMock) => unknown) => cb(manager))
-  };
 
   const moduleRef = await Test.createTestingModule({
     providers: [
       CreditService,
-      { provide: getRepositoryToken(CreditBalance), useValue: balances },
-      { provide: getDataSourceToken(), useValue: dataSource }
+      { provide: getRepositoryToken(CreditBalance), useValue: balances }
     ]
   }).compile();
 
   return {
     service: moduleRef.get(CreditService),
     balances,
-    manager,
-    dataSource
+    manager
   };
 }
 
@@ -119,12 +114,16 @@ describe('CreditService', () => {
       });
     });
 
-    it('clawbackPurchase runs in its own transaction with a refund ledger entry', async () => {
-      const { service, manager, dataSource } = await build();
+    it('clawbackPurchase applies a refund delta on the caller transaction manager', async () => {
+      const { service, manager } = await build();
 
-      await service.clawbackPurchase('cust-1', 'inv-1', 500);
+      await service.clawbackPurchase(
+        manager as unknown as EntityManager,
+        'cust-1',
+        'inv-1',
+        500
+      );
 
-      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
       expect(manager.query).toHaveBeenCalledWith(expect.any(String), [
         'cust-1',
         -500
