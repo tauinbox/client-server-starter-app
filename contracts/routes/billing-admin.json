@@ -22,6 +22,11 @@
     },
     {
       "method": "POST",
+      "path": "/api/v1/admin/billing/webhook-events/1/replay",
+      "expectedStatus": 401
+    },
+    {
+      "method": "POST",
       "path": "/api/v1/admin/billing/usage",
       "expectedStatus": 401
     }

@@ -161,6 +161,25 @@ describe('WebhookIngestionService', () => {
     expect(reduce).toHaveBeenCalledWith(event);
   });
 
+  it('resets a redelivered `dead_letter` row before reprocessing it', async () => {
+    const { service, execute, findOne, update, reduce } = await buildHarness({
+      withQueue: false
+    });
+    execute.mockResolvedValueOnce({ raw: [] }); // insert loses the unique race
+    findOne.mockResolvedValueOnce({ id: 'wh-9', status: 'dead_letter' });
+
+    await service.ingest('paddle', Buffer.from('{}'), {});
+
+    // The quarantine/failure history is cleared first so the sweep does not
+    // instantly re-dead-letter the row.
+    expect(update).toHaveBeenNthCalledWith(
+      1,
+      { id: 'wh-9' },
+      { status: 'received', attempts: 0, lastError: null }
+    );
+    expect(reduce).toHaveBeenCalledWith(event);
+  });
+
   it('no-ops when the conflicting row is already `processed`', async () => {
     const { service, execute, findOne, reduce } = await buildHarness({
       withQueue: false

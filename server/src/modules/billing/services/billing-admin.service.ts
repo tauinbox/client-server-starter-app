@@ -13,6 +13,7 @@ import { CustomerGrant } from '../entities/customer-grant.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
+import { WebhookEvent } from '../entities/webhook-event.entity';
 import { EntitlementService } from '../entitlements/entitlement.service';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import type { CancelMode } from '../providers/payment-provider.interface';
@@ -35,6 +36,8 @@ export class BillingAdminService {
     private readonly invoices: Repository<Invoice>,
     @InjectRepository(Customer)
     private readonly customers: Repository<Customer>,
+    @InjectRepository(WebhookEvent)
+    private readonly webhookEvents: Repository<WebhookEvent>,
     private readonly billing: BillingService,
     private readonly entitlements: EntitlementService,
     private readonly credits: CreditService,
@@ -48,6 +51,35 @@ export class BillingAdminService {
 
   listInvoices(): Promise<Invoice[]> {
     return this.invoices.find({ order: { createdAt: 'DESC' } });
+  }
+
+  /**
+   * Requeues a quarantined webhook delivery: resets a `dead_letter` row to
+   * `received` (and zeroes its failure history) so the reconciliation sweep
+   * picks it up again. The reduce is idempotent, so this can never double-apply
+   * an effect. Only `dead_letter` rows are eligible — a `received` row is still
+   * being swept and a `processed` one is already settled.
+   */
+  async replayWebhookEvent(
+    id: string
+  ): Promise<{ id: string; status: string }> {
+    const event = await this.webhookEvents.findOne({
+      where: { id },
+      select: { id: true, status: true }
+    });
+    if (!event) {
+      throw new NotFoundException('Webhook event not found');
+    }
+    if (event.status !== 'dead_letter') {
+      throw new ConflictException(
+        'Only dead-lettered webhook events can be replayed'
+      );
+    }
+    await this.webhookEvents.update(
+      { id },
+      { status: 'received', attempts: 0, lastError: null }
+    );
+    return { id, status: 'received' };
   }
 
   async cancelSubscription(

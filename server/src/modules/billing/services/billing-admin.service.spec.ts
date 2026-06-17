@@ -13,6 +13,7 @@ import { CustomerGrant } from '../entities/customer-grant.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
+import { WebhookEvent } from '../entities/webhook-event.entity';
 import { EntitlementService } from '../entitlements/entitlement.service';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import { BillingService } from '../billing.service';
@@ -94,6 +95,7 @@ async function build() {
   const subscriptions = repo();
   const invoices = repo();
   const customers = repo();
+  const webhookEvents = repo();
   const grants = repo();
   const products = repo();
   const emit = jest.fn();
@@ -144,6 +146,7 @@ async function build() {
       { provide: getRepositoryToken(Subscription), useValue: subscriptions },
       { provide: getRepositoryToken(Invoice), useValue: invoices },
       { provide: getRepositoryToken(Customer), useValue: customers },
+      { provide: getRepositoryToken(WebhookEvent), useValue: webhookEvents },
       { provide: getRepositoryToken(CustomerGrant), useValue: grants },
       { provide: getRepositoryToken(Product), useValue: products },
       { provide: BillingService, useValue: billing },
@@ -159,6 +162,7 @@ async function build() {
     subscriptions,
     invoices,
     customers,
+    webhookEvents,
     grants,
     products,
     billing,
@@ -577,6 +581,44 @@ describe('BillingAdminService', () => {
 
         expect(ctx.credits.clawbackPurchase).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('replayWebhookEvent', () => {
+    it('throws 404 when the webhook event does not exist', async () => {
+      const ctx = await build();
+      ctx.webhookEvents.findOne.mockResolvedValue(null);
+      await expect(ctx.service.replayWebhookEvent('missing')).rejects.toThrow(
+        NotFoundException
+      );
+    });
+
+    it('rejects replaying a row that is not dead-lettered', async () => {
+      const ctx = await build();
+      ctx.webhookEvents.findOne.mockResolvedValue({
+        id: 'wh-1',
+        status: 'received'
+      });
+      await expect(ctx.service.replayWebhookEvent('wh-1')).rejects.toThrow(
+        ConflictException
+      );
+      expect(ctx.webhookEvents.update).not.toHaveBeenCalled();
+    });
+
+    it('resets a dead-lettered row to `received` and zeroes its failure history', async () => {
+      const ctx = await build();
+      ctx.webhookEvents.findOne.mockResolvedValue({
+        id: 'wh-1',
+        status: 'dead_letter'
+      });
+
+      const result = await ctx.service.replayWebhookEvent('wh-1');
+
+      expect(ctx.webhookEvents.update).toHaveBeenCalledWith(
+        { id: 'wh-1' },
+        { status: 'received', attempts: 0, lastError: null }
+      );
+      expect(result).toEqual({ id: 'wh-1', status: 'received' });
     });
   });
 });
