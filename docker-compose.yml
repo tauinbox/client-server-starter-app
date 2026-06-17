@@ -68,6 +68,11 @@ services:
       DB_HOST: db
       REDIS_URL: redis://redis:6379
       ENVIRONMENT: production
+      # Pin the process timezone so naive `timestamp` columns, `Date`-based
+      # period math, and the midnight cleanup crons are zone-independent.
+      # Base images already default to UTC; this makes the invariant explicit
+      # rather than relying on it.
+      TZ: UTC
       # Trust the reverse proxy on the same host (loopback) and any proxy sitting
       # inside docker bridge / shared networks (uniquelocal covers RFC1918).
       # Without this, req.ip is the proxy's address and every request shares

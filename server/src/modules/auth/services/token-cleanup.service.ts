@@ -9,7 +9,7 @@ export class TokenCleanupService {
   constructor(private refreshTokenService: RefreshTokenService) {}
 
   // Remove expired refresh tokens daily at midnight
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, { timeZone: 'UTC' })
   async handleDailyTokenCleanup() {
     this.logger.log('Starting scheduled cleanup of expired refresh tokens');
 
@@ -24,7 +24,7 @@ export class TokenCleanupService {
 
   // Additional cleanup during light load hours to keep the database optimized
   // Runs every Sunday at 2:00 AM
-  @Cron('0 2 * * 0')
+  @Cron('0 2 * * 0', { timeZone: 'UTC' })
   async handleWeeklyMaintenance() {
     this.logger.log('Starting weekly token maintenance task');
 

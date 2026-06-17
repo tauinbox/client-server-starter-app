@@ -39,6 +39,19 @@ describe('AuditCleanupService', () => {
     expect(service).toBeDefined();
   });
 
+  it('runs the daily audit cleanup in UTC', () => {
+    // Pinned to UTC so the midnight cleanup is independent of the host TZ.
+    const method = Object.getOwnPropertyDescriptor(
+      AuditCleanupService.prototype,
+      'handleDailyAuditLogCleanup'
+    )?.value as object;
+    const options = Reflect.getMetadata('SCHEDULE_CRON_OPTIONS', method) as {
+      timeZone?: string;
+    };
+
+    expect(options.timeZone).toBe('UTC');
+  });
+
   describe('handleDailyAuditLogCleanup', () => {
     it('should delete entries older than the configured retention period', async () => {
       await service.handleDailyAuditLogCleanup();
