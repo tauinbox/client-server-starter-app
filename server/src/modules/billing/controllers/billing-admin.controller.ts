@@ -117,6 +117,20 @@ export class BillingAdminController {
     return this.billingAdmin.refundInvoice(id, body.amountMinor);
   }
 
+  @Post('webhook-events/:id/replay')
+  @HttpCode(200)
+  @Authorize(['manage', 'Billing'])
+  @ApiOperation({
+    summary:
+      'Requeue a dead-lettered webhook delivery for the reconciliation sweep.'
+  })
+  @ApiParam({ name: 'id' })
+  @ApiOkResponse({ description: 'Webhook event reset to `received`.' })
+  @ApiNotFoundResponse({ description: 'Webhook event not found' })
+  replayWebhookEvent(@Param('id', ParseUUIDPipe) id: string) {
+    return this.billingAdmin.replayWebhookEvent(id);
+  }
+
   @Post('usage')
   @Authorize(['manage', 'Billing'])
   @ApiOperation({

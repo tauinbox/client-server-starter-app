@@ -22,6 +22,14 @@ export const WEBHOOK_RECONCILE_INTERVAL_MS = 5 * 60 * 1000;
 export const WEBHOOK_RECEIVED_STUCK_THRESHOLD_MS = 10 * 60 * 1000;
 
 /**
+ * After this many failed reconciliation-sweep replays a delivery is moved to
+ * `dead_letter` so it stops being retried (and logged) every tick. The event is
+ * never dropped — the row keeps its `payload` and stays replayable via the admin
+ * endpoint or a provider redelivery, which both reset the counter.
+ */
+export const WEBHOOK_MAX_REPLAY_ATTEMPTS = 5;
+
+/**
  * Enqueued after a webhook is verified and its idempotency row is inserted.
  * Carries the persisted ledger row id (to mark it processed) and the
  * provider-agnostic event the reducer applies to Subscription/Invoice.

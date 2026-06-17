@@ -1048,6 +1048,19 @@ billingAdminRouter.post(
   }
 );
 
+// The mock webhook receiver is a no-op stub with no event ledger, so there is
+// never a dead-lettered row to replay; the route exists only to mirror the
+// server's auth contract (401 unauthenticated / 403 non-admin), then 404.
+billingAdminRouter.post(
+  '/webhook-events/:id/replay',
+  adminGuard,
+  (_req: Request, res: Response) => {
+    res
+      .status(404)
+      .json({ message: 'Webhook event not found', statusCode: 404 });
+  }
+);
+
 // Metering ingest. Mirrors RecordUsageRequestDto validation, the
 // active-subscription requirement, and idempotency on `idempotencyKey`. There is
 // no public meter endpoint — this lives under the `manage Billing` admin guard.

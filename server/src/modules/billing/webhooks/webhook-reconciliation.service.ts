@@ -4,7 +4,10 @@ import { LessThan, Repository } from 'typeorm';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import type { NormalizedEvent } from '../providers/payment-provider.interface';
 import { WebhookIngestionService } from './webhook-ingestion.service';
-import { WEBHOOK_RECEIVED_STUCK_THRESHOLD_MS } from './billing-webhook-queue.constants';
+import {
+  WEBHOOK_MAX_REPLAY_ATTEMPTS,
+  WEBHOOK_RECEIVED_STUCK_THRESHOLD_MS
+} from './billing-webhook-queue.constants';
 
 /**
  * Recovers webhook deliveries the queued path could otherwise lose: once the
@@ -16,8 +19,11 @@ import { WEBHOOK_RECEIVED_STUCK_THRESHOLD_MS } from './billing-webhook-queue.con
  *
  * Replaying is safe to repeat: the reduce is idempotent and `processEvent`
  * flips the row to `processed` on success, so a row that genuinely succeeds
- * leaves the sweep; one that keeps failing is retried each tick (and logged for
- * operator visibility) rather than churning the queue.
+ * leaves the sweep. A delivery that keeps failing is bounded: after
+ * `WEBHOOK_MAX_REPLAY_ATTEMPTS` failed replays it is moved to `dead_letter`
+ * (one alert on the transition) so the sweep stops hammering it and the error
+ * log stops repeating every tick. It is never dropped — the row keeps its
+ * `payload` and is replayable via the admin endpoint or a provider redelivery.
  */
 @Injectable()
 export class WebhookReconciliationService {
@@ -57,11 +63,43 @@ export class WebhookReconciliationService {
           event: row.payload as NormalizedEvent
         });
       } catch (error) {
-        this.logger.error(
-          `Replay failed for webhook ${row.id} (${row.provider} ${row.providerEventId})`,
-          error as Error
-        );
+        await this.recordFailure(row, error);
       }
+    }
+  }
+
+  /**
+   * Persists a failed replay: bumps `attempts`/`last_error` and, once the
+   * delivery has failed `WEBHOOK_MAX_REPLAY_ATTEMPTS` times, quarantines it as
+   * `dead_letter` (which the sweep query then excludes) with a single alert on
+   * the transition instead of an error every tick.
+   */
+  private async recordFailure(
+    row: WebhookEvent,
+    error: unknown
+  ): Promise<void> {
+    const attempts = row.attempts + 1;
+    const lastError = error instanceof Error ? error.message : String(error);
+    const quarantined = attempts >= WEBHOOK_MAX_REPLAY_ATTEMPTS;
+
+    await this.webhookEvents.update(
+      { id: row.id },
+      quarantined
+        ? { attempts, lastError, status: 'dead_letter' }
+        : { attempts, lastError }
+    );
+
+    if (quarantined) {
+      this.logger.warn(
+        `Quarantined webhook ${row.id} (${row.provider} ${row.providerEventId}) ` +
+          `after ${attempts} failed replays; status -> dead_letter. Last error: ${lastError}`
+      );
+    } else {
+      this.logger.error(
+        `Replay failed for webhook ${row.id} (${row.provider} ${row.providerEventId}) ` +
+          `[attempt ${attempts}/${WEBHOOK_MAX_REPLAY_ATTEMPTS}]`,
+        error as Error
+      );
     }
   }
 }

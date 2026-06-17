@@ -338,7 +338,7 @@ Billing tables (subscriptions foundation; money is always stored in integer mino
 | `billing_credit_balances` | `customer_id` PK (FK, CASCADE), `balance_units` (may go negative after a refund clawback — blocks usage until topped up), `updated_at` |
 | `billing_credit_ledger` | UUID PK, `customer_id` (FK, CASCADE, indexed), `delta`, `reason` (`purchase`/`usage`/`refund`), `ref_invoice_id` (FK to billing_invoices, SET NULL) — append-only journal of every balance change |
 | `billing_usage_records` | UUID PK, `customer_id` (FK, CASCADE), `subscription_id` (FK, CASCADE), `meter_key`, `quantity`, `occurred_at`, `idempotency_key` (unique), `recorded_at` |
-| `billing_webhook_events` | UUID PK, `provider`, `provider_event_id`, `type`, `payload_hash`, `payload` (jsonb, nullable — the verified NormalizedEvent, replayed by the reconciliation sweep), `status`, `received_at`, `processed_at`; unique `(provider, provider_event_id)` makes a `processed` replay a no-op while a stuck `received` row is reprocessed/swept |
+| `billing_webhook_events` | UUID PK, `provider`, `provider_event_id`, `type`, `payload_hash`, `payload` (jsonb, nullable — the verified NormalizedEvent, replayed by the reconciliation sweep), `status` (`received`/`processed`/`dead_letter`), `attempts`, `last_error`, `received_at`, `processed_at`; unique `(provider, provider_event_id)` makes a `processed` replay a no-op while a stuck `received` row is reprocessed/swept. A delivery that fails the sweep `WEBHOOK_MAX_REPLAY_ATTEMPTS` times is quarantined as `dead_letter` (stops churning, alerts once) and stays replayable via `POST /admin/billing/webhook-events/:id/replay` or a provider redelivery |
 
 Migration and seed commands operate on compiled JS in `dist/` — always run `npm run build` first.
 
