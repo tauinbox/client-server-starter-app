@@ -1,4 +1,9 @@
 import { Column, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { Money } from '@app/shared/utils/money';
+import {
+  MoneyToNumber,
+  moneyColumnTransformer
+} from '../../../common/utils/money-column.transformer';
 
 /**
  * The customer's prepaid credit balance. Topped up by paid `credits`
@@ -12,8 +17,14 @@ export class CreditBalance {
   @PrimaryColumn('uuid', { name: 'customer_id' })
   customerId: string;
 
-  @Column({ name: 'balance_units', type: 'integer', default: 0 })
-  balanceUnits: number;
+  @Column({
+    name: 'balance_units',
+    type: 'bigint',
+    default: 0,
+    transformer: moneyColumnTransformer
+  })
+  @MoneyToNumber()
+  balanceUnits: Money;
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;

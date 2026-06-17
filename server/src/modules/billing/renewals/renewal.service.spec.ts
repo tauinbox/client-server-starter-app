@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import type { BillingProviderId } from '@app/shared/types';
+import { Money } from '@app/shared/utils/money';
 import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { Plan } from '../entities/plan.entity';
@@ -198,8 +199,22 @@ async function build(
       FixedRating,
       UsageRating,
       {
+        // UsageRating now aggregates via a raw bigint SUM query; drive the same
+        // `usageSum` control knob through the query-builder's getRawOne wire shape.
         provide: getRepositoryToken(UsageRecord),
-        useValue: { sum: usageSum }
+        useValue: {
+          createQueryBuilder: () => {
+            const qb = {
+              select: () => qb,
+              where: () => qb,
+              andWhere: () => qb,
+              getRawOne: async () => ({
+                total: String((await usageSum()) ?? 0)
+              })
+            };
+            return qb;
+          }
+        }
       },
       {
         provide: getRepositoryToken(Subscription),
@@ -265,7 +280,7 @@ describe('RenewalService', () => {
     );
     expect(store.invoices).toHaveLength(1);
     expect(store.invoices[0]).toMatchObject({
-      amountMinor: 99000,
+      amountMinor: Money.fromMinor(99000),
       currency: 'RUB',
       status: 'paid',
       providerInvoiceRef: 'pay_1'
@@ -474,7 +489,7 @@ describe('RenewalService', () => {
       );
       // The invoice covers the metered period that just closed, not the new one.
       expect(store.invoices[0]).toMatchObject({
-        amountMinor: 8400,
+        amountMinor: Money.fromMinor(8400),
         billingMode: 'usage',
         periodStart: new Date('2026-05-01T00:00:00Z'),
         periodEnd: new Date('2026-06-01T00:00:00Z')
@@ -500,10 +515,9 @@ describe('RenewalService', () => {
 
       await service.runDueRenewals(NOW);
 
-      expect(sum).toHaveBeenCalledWith(
-        'quantity',
-        expect.objectContaining({ subscriptionId: 'sub-1' })
-      );
+      // The exact [start, end) window is asserted in usage-rating.strategy.spec;
+      // here it is enough that the closed period was rated at all.
+      expect(sum).toHaveBeenCalled();
     });
 
     it('closes a zero-usage period without a provider charge via a zero invoice', async () => {
@@ -518,7 +532,7 @@ describe('RenewalService', () => {
       expect(charge).not.toHaveBeenCalled();
       expect(store.invoices).toHaveLength(1);
       expect(store.invoices[0]).toMatchObject({
-        amountMinor: 0,
+        amountMinor: Money.fromMinor(0),
         status: 'paid',
         billingMode: 'usage'
       });
@@ -559,7 +573,9 @@ describe('RenewalService', () => {
         'inv-1',
         10
       );
-      expect(store.invoices[0]).toMatchObject({ amountMinor: 6400 });
+      expect(store.invoices[0]).toMatchObject({
+        amountMinor: Money.fromMinor(6400)
+      });
     });
 
     it('skips the provider entirely when credits cover the whole period', async () => {
@@ -579,7 +595,7 @@ describe('RenewalService', () => {
         42
       );
       expect(store.invoices[0]).toMatchObject({
-        amountMinor: 0,
+        amountMinor: Money.fromMinor(0),
         status: 'paid'
       });
       expect(sub.currentPeriodEnd).toEqual(new Date('2026-07-01T00:00:00Z'));
@@ -641,7 +657,7 @@ describe('RenewalService', () => {
     expect(charge).not.toHaveBeenCalled();
     expect(store.invoices).toHaveLength(1);
     expect(store.invoices[0]).toMatchObject({
-      amountMinor: 0,
+      amountMinor: Money.fromMinor(0),
       status: 'paid',
       billingMode: 'fixed'
     });

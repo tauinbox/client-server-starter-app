@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { Money } from '@app/shared/utils/money';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
@@ -116,7 +117,7 @@ export class UsageInvoicingService {
           provider: subscription.provider,
           providerEventId: chargeKey,
           providerInvoiceRef: zeroCharge ? chargeKey : '',
-          amountMinor: summary.amountMinor,
+          amountMinor: Money.fromMinor(summary.amountMinor),
           currency: summary.currency,
           status: zeroCharge ? 'paid' : 'pending',
           billingMode: 'usage',

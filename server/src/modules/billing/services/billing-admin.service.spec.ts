@@ -8,6 +8,7 @@ import {
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { IsNull } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
+import { Money } from '@app/shared/utils/money';
 import { Customer } from '../entities/customer.entity';
 import { CustomerGrant } from '../entities/customer-grant.entity';
 import { Invoice } from '../entities/invoice.entity';
@@ -67,7 +68,8 @@ function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
     provider: 'yookassa',
     providerEventId: null,
     providerInvoiceRef: 'pay_1',
-    amountMinor: 99000,
+    amountMinor: Money.fromMinor(99000),
+    refundedMinor: Money.fromMinor(0),
     currency: 'RUB',
     status: 'paid',
     billingMode: 'fixed',
@@ -264,7 +266,7 @@ describe('BillingAdminService', () => {
           kind: 'one_time',
           subscriptionId: null,
           productId: 'prod-cr',
-          amountMinor: 49000
+          amountMinor: Money.fromMinor(49000)
         })
       );
       ctx.products.findOne.mockResolvedValue({
@@ -303,7 +305,7 @@ describe('BillingAdminService', () => {
           kind: 'one_time',
           subscriptionId: null,
           productId: 'prod-cr',
-          amountMinor: 49000
+          amountMinor: Money.fromMinor(49000)
         })
       );
       ctx.products.findOne.mockResolvedValue({
@@ -344,7 +346,7 @@ describe('BillingAdminService', () => {
       const ctx = await build();
       // 50000 already refunded → only 49000 of the 99000 total remains.
       ctx.invoices.findOne.mockResolvedValue(
-        makeInvoice({ refundedMinor: 50000 })
+        makeInvoice({ refundedMinor: Money.fromMinor(50000) })
       );
       const yoo = providerStub('yookassa');
       ctx.billing.getProviderById.mockReturnValue(yoo);
@@ -393,7 +395,7 @@ describe('BillingAdminService', () => {
           kind: 'one_time',
           subscriptionId: null,
           productId: 'prod-1',
-          amountMinor: 49000,
+          amountMinor: Money.fromMinor(49000),
           ...overrides
         });
       }

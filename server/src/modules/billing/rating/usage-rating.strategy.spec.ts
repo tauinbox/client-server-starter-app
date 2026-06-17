@@ -1,6 +1,5 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { And, LessThan, MoreThanOrEqual } from 'typeorm';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
@@ -42,15 +41,37 @@ const PERIOD: BillingPeriod = {
 
 describe('UsageRating', () => {
   let rating: UsageRating;
-  let sum: jest.Mock;
+  let getRawOne: jest.Mock;
+  let qb: {
+    select: jest.Mock;
+    where: jest.Mock;
+    andWhere: jest.Mock;
+    getRawOne: jest.Mock;
+  };
+  let createQueryBuilder: jest.Mock;
+
+  /** The bigint SUM is decoded from a numeric string — mock that wire shape. */
+  function mockTotal(total: number): void {
+    getRawOne.mockResolvedValue({ total: String(total) });
+  }
 
   beforeEach(async () => {
-    sum = jest.fn().mockResolvedValue(null);
+    getRawOne = jest.fn().mockResolvedValue({ total: '0' });
+    qb = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getRawOne
+    };
+    createQueryBuilder = jest.fn().mockReturnValue(qb);
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         UsageRating,
-        { provide: getRepositoryToken(UsageRecord), useValue: { sum } }
+        {
+          provide: getRepositoryToken(UsageRecord),
+          useValue: { createQueryBuilder }
+        }
       ]
     }).compile();
 
@@ -58,18 +79,27 @@ describe('UsageRating', () => {
   });
 
   it('aggregates the subscription’s records inside [start, end)', async () => {
-    sum.mockResolvedValue(150);
+    mockTotal(150);
 
     await rating.summarizeForPeriod(makeSubscription(), makePlan(), PERIOD);
 
-    expect(sum).toHaveBeenCalledWith('quantity', {
-      subscriptionId: 'sub-1',
-      occurredAt: And(MoreThanOrEqual(PERIOD.start), LessThan(PERIOD.end))
+    expect(createQueryBuilder).toHaveBeenCalledWith('u');
+    expect(qb.where).toHaveBeenCalledWith(
+      'u.subscriptionId = :subscriptionId',
+      {
+        subscriptionId: 'sub-1'
+      }
+    );
+    expect(qb.andWhere).toHaveBeenCalledWith('u.occurredAt >= :start', {
+      start: PERIOD.start
+    });
+    expect(qb.andWhere).toHaveBeenCalledWith('u.occurredAt < :end', {
+      end: PERIOD.end
     });
   });
 
   it('rates zero usage (no records) as a zero amount with no receipt lines', async () => {
-    sum.mockResolvedValue(null);
+    mockTotal(0);
 
     const summary = await rating.summarizeForPeriod(
       makeSubscription(),
@@ -89,7 +119,7 @@ describe('UsageRating', () => {
   });
 
   it('charges nothing while usage stays within the included units', async () => {
-    sum.mockResolvedValue(99);
+    mockTotal(99);
 
     const summary = await rating.summarizeForPeriod(
       makeSubscription(),
@@ -104,7 +134,7 @@ describe('UsageRating', () => {
   });
 
   it('charges nothing at exactly the included-units boundary', async () => {
-    sum.mockResolvedValue(100);
+    mockTotal(100);
 
     const summary = await rating.summarizeForPeriod(
       makeSubscription(),
@@ -117,7 +147,7 @@ describe('UsageRating', () => {
   });
 
   it('charges only the overage beyond the included units', async () => {
-    sum.mockResolvedValue(142);
+    mockTotal(142);
 
     const summary = await rating.summarizeForPeriod(
       makeSubscription(),
@@ -138,7 +168,7 @@ describe('UsageRating', () => {
   });
 
   it('treats a price without includedUnits/unitPriceMinor as zero values', async () => {
-    sum.mockResolvedValue(10);
+    mockTotal(10);
 
     const summary = await rating.summarizeForPeriod(
       makeSubscription(),
@@ -152,7 +182,7 @@ describe('UsageRating', () => {
   });
 
   it('exposes the rated amount through the RatingStrategy contract', async () => {
-    sum.mockResolvedValue(142);
+    mockTotal(142);
 
     const rated = await rating.amountForPeriod(
       makeSubscription(),
@@ -172,6 +202,32 @@ describe('UsageRating', () => {
     });
   });
 
+  it('rates an overage product that exceeds int32 without overflow or precision loss', async () => {
+    // 50_000 billable units at 50_000 minor each = 2_500_000_000 minor, beyond
+    // the old int32 column ceiling (2_147_483_647). The bigint Money path keeps
+    // it exact — the pre-fix integer column threw 22003 on the invoice insert.
+    mockTotal(50_000);
+    const plan = makePlan({
+      prices: {
+        yookassa: {
+          currency: 'RUB',
+          amountMinor: 0,
+          unitPriceMinor: 50_000,
+          includedUnits: 0
+        }
+      }
+    });
+
+    const summary = await rating.summarizeForPeriod(
+      makeSubscription(),
+      plan,
+      PERIOD
+    );
+
+    expect(summary.billableUnits).toBe(50_000);
+    expect(summary.amountMinor).toBe(2_500_000_000);
+  });
+
   it('rejects a plan with no price for the subscription’s provider', async () => {
     await expect(
       rating.summarizeForPeriod(
@@ -180,12 +236,12 @@ describe('UsageRating', () => {
         PERIOD
       )
     ).rejects.toThrow('no price for provider "paddle"');
-    expect(sum).not.toHaveBeenCalled();
+    expect(createQueryBuilder).not.toHaveBeenCalled();
   });
 
   describe('summarizeForPeriodWithCredits', () => {
     it('offsets billable units with partial credits and reprices the remainder', async () => {
-      sum.mockResolvedValue(142);
+      mockTotal(142);
 
       const summary = await rating.summarizeForPeriodWithCredits(
         makeSubscription(),
@@ -210,7 +266,7 @@ describe('UsageRating', () => {
     });
 
     it('caps the spend at the billable units when credits exceed them', async () => {
-      sum.mockResolvedValue(142);
+      mockTotal(142);
 
       const summary = await rating.summarizeForPeriodWithCredits(
         makeSubscription(),
@@ -228,7 +284,7 @@ describe('UsageRating', () => {
     });
 
     it('changes nothing with zero credits available', async () => {
-      sum.mockResolvedValue(142);
+      mockTotal(142);
 
       const summary = await rating.summarizeForPeriodWithCredits(
         makeSubscription(),
@@ -245,7 +301,7 @@ describe('UsageRating', () => {
     });
 
     it('ignores a negative available balance (nothing to spend)', async () => {
-      sum.mockResolvedValue(142);
+      mockTotal(142);
 
       const summary = await rating.summarizeForPeriodWithCredits(
         makeSubscription(),
@@ -262,7 +318,7 @@ describe('UsageRating', () => {
     });
 
     it('spends no credits on a period with no overage', async () => {
-      sum.mockResolvedValue(99);
+      mockTotal(99);
 
       const summary = await rating.summarizeForPeriodWithCredits(
         makeSubscription(),

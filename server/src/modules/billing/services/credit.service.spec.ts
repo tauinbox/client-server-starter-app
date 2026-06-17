@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import type { EntityManager } from 'typeorm';
+import { Money } from '@app/shared/utils/money';
 import { CreditBalance } from '../entities/credit-balance.entity';
 import { CreditLedger } from '../entities/credit-ledger.entity';
 import { CreditService } from './credit.service';
@@ -42,12 +43,12 @@ async function build(balance: Partial<CreditBalance> | null = null) {
 describe('CreditService', () => {
   describe('reads', () => {
     it('availableUnits returns the positive balance', async () => {
-      const { service } = await build({ balanceUnits: 120 });
+      const { service } = await build({ balanceUnits: Money.fromMinor(120) });
       await expect(service.availableUnits('cust-1')).resolves.toBe(120);
     });
 
     it('availableUnits clamps a negative (clawed-back) balance to zero', async () => {
-      const { service } = await build({ balanceUnits: -50 });
+      const { service } = await build({ balanceUnits: Money.fromMinor(-50) });
       await expect(service.availableUnits('cust-1')).resolves.toBe(0);
     });
 
@@ -57,10 +58,14 @@ describe('CreditService', () => {
     });
 
     it('isBlocked only when the balance is negative', async () => {
-      const { service: negative } = await build({ balanceUnits: -1 });
+      const { service: negative } = await build({
+        balanceUnits: Money.fromMinor(-1)
+      });
       await expect(negative.isBlocked('cust-1')).resolves.toBe(true);
 
-      const { service: zero } = await build({ balanceUnits: 0 });
+      const { service: zero } = await build({
+        balanceUnits: Money.fromMinor(0)
+      });
       await expect(zero.isBlocked('cust-1')).resolves.toBe(false);
 
       const { service: missing } = await build(null);
@@ -85,7 +90,7 @@ describe('CreditService', () => {
       );
       expect(manager.create).toHaveBeenCalledWith(CreditLedger, {
         customerId: 'cust-1',
-        delta: 500,
+        delta: Money.fromMinor(500),
         reason: 'purchase',
         refInvoiceId: 'inv-1'
       });
@@ -108,7 +113,7 @@ describe('CreditService', () => {
       ]);
       expect(manager.create).toHaveBeenCalledWith(CreditLedger, {
         customerId: 'cust-1',
-        delta: -42,
+        delta: Money.fromMinor(-42),
         reason: 'usage',
         refInvoiceId: 'inv-2'
       });
@@ -130,7 +135,7 @@ describe('CreditService', () => {
       ]);
       expect(manager.create).toHaveBeenCalledWith(CreditLedger, {
         customerId: 'cust-1',
-        delta: -500,
+        delta: Money.fromMinor(-500),
         reason: 'refund',
         refInvoiceId: 'inv-1'
       });

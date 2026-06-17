@@ -324,7 +324,7 @@ Core tables managed via TypeORM migrations:
 | `user_roles` | Join table: user_id + role_id (composite PK) |
 | `audit_logs` | UUID PK, action (enum), actorId (nullable), actorEmail (nullable), targetId (nullable), targetType (nullable), details (jsonb), ipAddress, requestId, createdAt |
 
-Billing tables (subscriptions foundation; money is always stored in integer minor units):
+Billing tables (subscriptions foundation; money is always stored in minor units). The overflow-prone money/quantity columns (`billing_invoices.amount_minor`/`refunded_minor`, `billing_credit_balances.balance_units`, `billing_credit_ledger.delta`, `billing_usage_records.quantity`) are `bigint`, decoded to a `Money` BigInt value object by `moneyColumnTransformer` (`common/utils/money-column.transformer.ts`) and serialized to the wire `number` via `@MoneyToNumber()`; pure counters stay `integer`. All billing arithmetic goes through `Money` — no floating-point:
 
 | Table | Description |
 |-------|-------------|

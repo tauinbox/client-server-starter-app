@@ -6,12 +6,17 @@ import {
   UpdateDateColumn
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
+import { Money } from '@app/shared/utils/money';
 import type {
   BillingMode,
   BillingProviderId,
   InvoiceKind,
   InvoiceStatus
 } from '@app/shared/types';
+import {
+  MoneyToNumber,
+  moneyColumnTransformer
+} from '../../../common/utils/money-column.transformer';
 
 @Entity('billing_invoices')
 export class Invoice {
@@ -39,12 +44,22 @@ export class Invoice {
   @Column({ name: 'provider_invoice_ref', type: 'varchar' })
   providerInvoiceRef: string;
 
-  @Column({ name: 'amount_minor', type: 'integer' })
-  amountMinor: number;
+  @Column({
+    name: 'amount_minor',
+    type: 'bigint',
+    transformer: moneyColumnTransformer
+  })
+  @MoneyToNumber()
+  amountMinor: Money;
 
-  @Column({ name: 'refunded_minor', type: 'integer', default: 0 })
+  @Column({
+    name: 'refunded_minor',
+    type: 'bigint',
+    default: 0,
+    transformer: moneyColumnTransformer
+  })
   @Exclude()
-  refundedMinor: number;
+  refundedMinor: Money;
 
   @Column({ type: 'varchar', length: 3 })
   currency: string;

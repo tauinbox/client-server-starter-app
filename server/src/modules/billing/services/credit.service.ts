@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, type EntityManager } from 'typeorm';
+import { Money } from '@app/shared/utils/money';
 import { CreditBalance } from '../entities/credit-balance.entity';
 import { CreditLedger } from '../entities/credit-ledger.entity';
 import type { CreditLedgerReason } from '../entities/credit-ledger.entity';
+
+const ZERO = Money.fromMinor(0);
 
 /**
  * Single owner of the prepaid credit balance. Every change is an atomic SQL
@@ -28,7 +31,7 @@ export class CreditService {
   /** Units usage rating may spend — a clawed-back negative balance offers none. */
   async availableUnits(customerId: string): Promise<number> {
     const balance = await this.getBalance(customerId);
-    return Math.max(0, balance?.balanceUnits ?? 0);
+    return positiveUnits(balance);
   }
 
   /**
@@ -47,13 +50,13 @@ export class CreditService {
       where: { customerId },
       lock: { mode: 'pessimistic_write' }
     });
-    return Math.max(0, balance?.balanceUnits ?? 0);
+    return positiveUnits(balance);
   }
 
   /** Negative balance (refund of already-spent credits) blocks usage. */
   async isBlocked(customerId: string): Promise<boolean> {
     const balance = await this.getBalance(customerId);
-    return (balance?.balanceUnits ?? 0) < 0;
+    return balance != null && balance.balanceUnits.compare(ZERO) < 0;
   }
 
   /** A paid credit-pack purchase tops the balance up. */
@@ -110,10 +113,16 @@ export class CreditService {
     await manager.save(
       manager.create(CreditLedger, {
         customerId,
-        delta,
+        delta: Money.fromMinor(delta),
         reason,
         refInvoiceId: invoiceId
       })
     );
   }
+}
+
+/** Spendable units: a positive balance's count, zero for none / a clawed-back debt. */
+function positiveUnits(balance: CreditBalance | null): number {
+  const units = balance?.balanceUnits;
+  return units && units.compare(ZERO) > 0 ? units.toNumber() : 0;
 }

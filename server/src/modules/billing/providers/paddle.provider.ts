@@ -14,6 +14,7 @@ import {
   type TransactionNotification
 } from '@paddle/paddle-node-sdk';
 import type { SubscriptionStatus } from '@app/shared/types';
+import { Money } from '@app/shared/utils/money';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
 import { PADDLE_CLIENT } from './paddle.client';
@@ -38,6 +39,15 @@ import type {
  * its completed/failed webhooks are told apart from subscription transactions.
  */
 const ONE_TIME_KIND = 'one_time';
+
+/**
+ * Paddle reports money totals as integer minor-unit strings (e.g. `'1200'`).
+ * Parse them exactly through `BigInt` — `Number()` loses precision above 2^53
+ * — and surface the wire-safe `number` (guarded by `Money.toNumber`).
+ */
+function parseMinor(value: string | null | undefined): number {
+  return value ? Money.fromMinor(BigInt(value)).toNumber() : 0;
+}
 
 /** First header value (Paddle sends a single `paddle-signature`). */
 function firstHeader(value: string | string[] | undefined): string | undefined {
@@ -313,8 +323,8 @@ export class PaddleProvider implements PaymentProvider {
       }
     );
     return {
-      amountMinor: Number(
-        preview.immediateTransaction?.details?.totals?.total ?? '0'
+      amountMinor: parseMinor(
+        preview.immediateTransaction?.details?.totals?.total
       ),
       currency: preview.currencyCode ?? plan.prices.paddle?.currency ?? 'USD'
     };
@@ -364,7 +374,7 @@ export class PaddleProvider implements PaymentProvider {
   async refund(providerInvoiceRef: string, amountMinor: number): Promise<void> {
     const paddle = this.requireClient();
     const transaction = await paddle.transactions.get(providerInvoiceRef);
-    const total = Number(transaction.details?.totals?.total ?? '0');
+    const total = parseMinor(transaction.details?.totals?.total);
 
     if (!amountMinor || amountMinor >= total) {
       await paddle.adjustments.create({
@@ -527,7 +537,7 @@ export class PaddleProvider implements PaymentProvider {
       ref: refFromCustomData(txn.customData),
       providerInvoiceRef: txn.id,
       providerSubscriptionId: txn.subscriptionId,
-      amountMinor: Number(txn.details?.totals?.total ?? '0'),
+      amountMinor: parseMinor(txn.details?.totals?.total),
       currency: txn.currencyCode,
       periodStart: txn.billingPeriod?.startsAt ?? null,
       periodEnd: txn.billingPeriod?.endsAt ?? null,

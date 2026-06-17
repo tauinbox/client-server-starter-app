@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import type { BillingProviderId } from '@app/shared/types';
+import { Money } from '@app/shared/utils/money';
 import { User } from '../../users/entities/user.entity';
 import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
@@ -927,7 +928,8 @@ describe('BillingUserService', () => {
       );
       ctx.invoices.findOne.mockResolvedValue({
         id: 'inv-period',
-        amountMinor: 99000,
+        amountMinor: Money.fromMinor(99000),
+        refundedMinor: Money.fromMinor(0),
         providerInvoiceRef: 'pay_period',
         status: 'paid',
         billingMode: 'fixed'
@@ -953,12 +955,12 @@ describe('BillingUserService', () => {
       );
       expect(ctx.insertedInvoices).toHaveLength(2);
       expect(ctx.insertedInvoices[0]).toMatchObject({
-        amountMinor: 116000,
+        amountMinor: Money.fromMinor(116000),
         status: 'paid',
         billingMode: 'fixed'
       });
       expect(ctx.insertedInvoices[1]).toMatchObject({
-        amountMinor: 39600,
+        amountMinor: Money.fromMinor(39600),
         status: 'refunded'
       });
       expect(result.planKey).toBe('business');
@@ -986,7 +988,8 @@ describe('BillingUserService', () => {
       // computed 116000 remainder, so the cap applies.
       ctx.invoices.findOne.mockResolvedValue({
         id: 'inv-period',
-        amountMinor: 100000,
+        amountMinor: Money.fromMinor(100000),
+        refundedMinor: Money.fromMinor(0),
         providerInvoiceRef: 'pay_period',
         status: 'paid',
         billingMode: 'fixed'
@@ -1020,7 +1023,8 @@ describe('BillingUserService', () => {
       );
       ctx.invoices.findOne.mockResolvedValue({
         id: 'inv-period',
-        amountMinor: 99000,
+        amountMinor: Money.fromMinor(99000),
+        refundedMinor: Money.fromMinor(0),
         providerInvoiceRef: 'pay_period',
         status: 'paid',
         billingMode: 'fixed'
@@ -1123,11 +1127,11 @@ describe('BillingUserService', () => {
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
       ctx.invoices.findOne.mockResolvedValue({
         id: 'inv-period',
-        amountMinor: 99000,
+        amountMinor: Money.fromMinor(99000),
         providerInvoiceRef: 'pay_period',
         status: 'paid',
         billingMode: 'fixed',
-        refundedMinor: 0
+        refundedMinor: Money.fromMinor(0)
       });
       const yoo = provider('yookassa', false);
       ctx.billing.getProviderById.mockReturnValue(yoo);
@@ -1187,11 +1191,11 @@ describe('BillingUserService', () => {
         insertedWhenResolved = ctx.insertedInvoices.length;
         return Promise.resolve({
           id: 'inv-period',
-          amountMinor: 99000,
+          amountMinor: Money.fromMinor(99000),
           providerInvoiceRef: 'pay_period',
           status: 'paid',
           billingMode: 'fixed',
-          refundedMinor: 0
+          refundedMinor: Money.fromMinor(0)
         });
       });
 
@@ -1212,11 +1216,11 @@ describe('BillingUserService', () => {
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
       ctx.invoices.findOne.mockResolvedValue({
         id: 'inv-period',
-        amountMinor: 99000,
+        amountMinor: Money.fromMinor(99000),
         providerInvoiceRef: 'pay_period',
         status: 'paid',
         billingMode: 'fixed',
-        refundedMinor: 80000
+        refundedMinor: Money.fromMinor(80000)
       });
       const yoo = provider('yookassa', false);
       ctx.billing.getProviderById.mockReturnValue(yoo);

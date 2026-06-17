@@ -7,6 +7,7 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
+import { Money } from '@app/shared/utils/money';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
 import { CustomerGrant } from '../entities/customer-grant.entity';
@@ -19,6 +20,8 @@ import { SubscriptionCanceledEvent } from '../events/billing.events';
 import type { CancelMode } from '../providers/payment-provider.interface';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
+
+const ZERO = Money.fromMinor(0);
 
 /**
  * Admin-facing billing operations. Unlike `BillingUserService`,
@@ -142,16 +145,20 @@ export class BillingAdminService {
           throw new ConflictException('Only paid invoices can be refunded');
         }
 
-        const alreadyRefunded = invoice.refundedMinor ?? 0;
-        const remaining = invoice.amountMinor - alreadyRefunded;
-        const refundAmount = amountMinor ?? remaining;
-        if (refundAmount <= 0 || refundAmount > remaining) {
+        const alreadyRefunded = invoice.refundedMinor;
+        const remaining = invoice.amountMinor.sub(alreadyRefunded);
+        const refundAmount =
+          amountMinor != null ? Money.fromMinor(amountMinor) : remaining;
+        if (
+          refundAmount.compare(ZERO) <= 0 ||
+          refundAmount.compare(remaining) > 0
+        ) {
           throw new BadRequestException(
             'Refund amount must be between 1 and the remaining refundable total'
           );
         }
 
-        const cumulativeRefunded = alreadyRefunded + refundAmount;
+        const cumulativeRefunded = alreadyRefunded.add(refundAmount);
 
         const provider = this.billing.getProviderById(invoice.provider);
         if (provider) {
@@ -159,8 +166,8 @@ export class BillingAdminService {
           // the same key and dedup at the provider.
           await provider.refund(
             invoice.providerInvoiceRef,
-            refundAmount,
-            `refund-${invoice.id}-${cumulativeRefunded}`
+            refundAmount.toNumber(),
+            `refund-${invoice.id}-${cumulativeRefunded.toMinorString()}`
           );
         }
 
@@ -169,7 +176,7 @@ export class BillingAdminService {
         // The one-way `paid → refunded` flip keeps grant revoke / credit
         // clawback exactly-once across multiple partial legs.
         let invalidateUserId: string | null = null;
-        if (cumulativeRefunded >= invoice.amountMinor) {
+        if (cumulativeRefunded.compare(invoice.amountMinor) >= 0) {
           invoice.status = 'refunded';
           invalidateUserId = await this.revokeOneTimeGrants(manager, invoice);
           await this.clawbackCreditPurchase(manager, invoice);

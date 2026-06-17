@@ -9,6 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Money } from '@app/shared/utils/money';
 import type {
   ICreatePayment,
   ICreateRefund,
@@ -62,12 +63,12 @@ const OFF_SESSION_PURPOSE = 'off_session';
 
 /** Minor units (kopecks) → YooKassa decimal string, e.g. `99000` → `'990.00'`. */
 function toAmountValue(amountMinor: number): string {
-  return (amountMinor / 100).toFixed(2);
+  return Money.fromMinor(amountMinor).toMajorString(2);
 }
 
 /** YooKassa decimal string → minor units, e.g. `'990.00'` → `99000`. */
 function toMinor(value: string): number {
-  return Math.round(Number.parseFloat(value) * 100);
+  return Money.fromMajorString(value, 2).toNumber();
 }
 
 /** Whether a payment is a method-update re-bind (per its metadata marker). */

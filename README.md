@@ -804,7 +804,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1230 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1233 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 168 tests passing |
 | Client unit tests | Vitest | `*.spec.ts` alongside source | 874 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 201 tests passing |

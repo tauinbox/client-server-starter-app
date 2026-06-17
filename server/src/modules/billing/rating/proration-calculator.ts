@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Money } from '@app/shared/utils/money';
 import type { BillingProviderId } from '@app/shared/types';
 import type { Plan } from '../entities/plan.entity';
 import type { ReceiptItem } from '../providers/payment-provider.interface';
@@ -51,8 +52,14 @@ export class ProrationCalculator {
       Math.max(0, Math.ceil((periodEnd.getTime() - now.getTime()) / DAY_MS))
     );
 
-    const refundMinor = Math.floor((fromPrice * remainderDays) / totalDays);
-    const chargeMinor = Math.floor((toPrice * remainderDays) / totalDays);
+    const refundMinor = Money.fromMinor(fromPrice)
+      .mulInt(remainderDays)
+      .divFloor(totalDays)
+      .toNumber();
+    const chargeMinor = Money.fromMinor(toPrice)
+      .mulInt(remainderDays)
+      .divFloor(totalDays)
+      .toNumber();
 
     const currency =
       toPlan.prices[provider]?.currency ??
