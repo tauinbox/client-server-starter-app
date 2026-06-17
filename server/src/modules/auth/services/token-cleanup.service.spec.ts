@@ -32,6 +32,30 @@ describe('TokenCleanupService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('cron schedule', () => {
+    // The cleanup crons fire at fixed wall-clock times (midnight, Sunday 02:00).
+    // Pinning the job timezone to UTC keeps them zone-independent regardless of
+    // the host's TZ, so the schedule never silently shifts across deployments.
+    const getCronTimeZone = (methodName: keyof TokenCleanupService) => {
+      const method = Object.getOwnPropertyDescriptor(
+        TokenCleanupService.prototype,
+        methodName
+      )?.value as object;
+      const options = Reflect.getMetadata('SCHEDULE_CRON_OPTIONS', method) as {
+        timeZone?: string;
+      };
+      return options.timeZone;
+    };
+
+    it('runs the daily token cleanup in UTC', () => {
+      expect(getCronTimeZone('handleDailyTokenCleanup')).toBe('UTC');
+    });
+
+    it('runs the weekly maintenance in UTC', () => {
+      expect(getCronTimeZone('handleWeeklyMaintenance')).toBe('UTC');
+    });
+  });
+
   describe('handleDailyTokenCleanup', () => {
     it('should remove expired tokens in a single call', async () => {
       refreshTokenService.removeExpiredTokens.mockResolvedValue(15);

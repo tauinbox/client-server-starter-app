@@ -17,7 +17,7 @@ export class AuditCleanupService {
     private readonly configService: ConfigService
   ) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, { timeZone: 'UTC' })
   async handleDailyAuditLogCleanup(): Promise<void> {
     const retentionDays =
       this.configService.get<number>('AUDIT_LOG_RETENTION_DAYS') ??
