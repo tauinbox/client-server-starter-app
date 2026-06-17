@@ -9,6 +9,7 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "moduleNameMapper": {
-    "^@app/shared/(.*)$": "<rootDir>/../../shared/src/$1"
+    "^@app/shared/(.*)$": "<rootDir>/../../shared/src/$1",
+    "^temporal-polyfill$": "<rootDir>/../node_modules/temporal-polyfill"
   }
 }
