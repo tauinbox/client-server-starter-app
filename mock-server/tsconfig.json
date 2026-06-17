@@ -15,7 +15,8 @@
     "sourceMap": true,
     "baseUrl": "./",
     "paths": {
-      "@app/shared/*": ["../shared/src/*"]
+      "@app/shared/*": ["../shared/src/*"],
+      "temporal-polyfill": ["node_modules/temporal-polyfill"]
     }
   },
   "include": ["src/**/*", "../shared/src/**/*", "eslint.config.ts"],

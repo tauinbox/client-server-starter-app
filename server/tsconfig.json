@@ -18,7 +18,8 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
-      "@app/shared/*": ["../shared/src/*"]
+      "@app/shared/*": ["../shared/src/*"],
+      "temporal-polyfill": ["node_modules/temporal-polyfill"]
     }
   }
 }
