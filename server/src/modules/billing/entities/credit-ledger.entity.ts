@@ -4,6 +4,8 @@ import {
   Entity,
   PrimaryGeneratedColumn
 } from 'typeorm';
+import { Money } from '@app/shared/utils/money';
+import { moneyColumnTransformer } from '../../../common/utils/money-column.transformer';
 
 /** Why a credit delta was applied: pack purchase, usage spend, refund clawback. */
 export type CreditLedgerReason = 'purchase' | 'usage' | 'refund';
@@ -22,8 +24,8 @@ export class CreditLedger {
   @Column({ name: 'customer_id', type: 'uuid' })
   customerId: string;
 
-  @Column({ type: 'integer' })
-  delta: number;
+  @Column({ type: 'bigint', transformer: moneyColumnTransformer })
+  delta: Money;
 
   @Column({ type: 'varchar', length: 16 })
   reason: CreditLedgerReason;

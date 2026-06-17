@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { Money } from '@app/shared/utils/money';
 import type {
   BillingProviderId,
   BillingRegion,
@@ -648,7 +649,11 @@ export class BillingUserService {
           await manager.update(
             Invoice,
             { id: refund.source.id },
-            { refundedMinor: (refund.source.refundedMinor ?? 0) + refund.minor }
+            {
+              refundedMinor: refund.source.refundedMinor.add(
+                Money.fromMinor(refund.minor)
+              )
+            }
           );
         }
         subscription.planKey = toPlan.key;
@@ -840,7 +845,7 @@ export class BillingUserService {
     });
     if (!source) return null;
 
-    const refundable = source.amountMinor - (source.refundedMinor ?? 0);
+    const refundable = source.amountMinor.sub(source.refundedMinor).toNumber();
     const minor = Math.min(refundMinor, refundable);
     if (minor <= 0) return null;
     return { source, minor };
@@ -889,7 +894,7 @@ export class BillingUserService {
         provider: subscription.provider,
         providerEventId: args.providerEventId,
         providerInvoiceRef: args.providerInvoiceRef,
-        amountMinor: args.amountMinor,
+        amountMinor: Money.fromMinor(args.amountMinor),
         currency: customer.currency,
         status: args.status,
         billingMode: args.billingMode,

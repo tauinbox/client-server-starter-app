@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { Money } from '@app/shared/utils/money';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
 import { CreditService } from './credit.service';
@@ -78,7 +79,7 @@ export class UsageService {
       customerId: input.customerId,
       subscriptionId: subscription.id,
       meterKey: input.meterKey,
-      quantity: input.quantity,
+      quantity: Money.fromMinor(input.quantity),
       occurredAt: input.occurredAt ?? new Date(),
       idempotencyKey: input.idempotencyKey
     });

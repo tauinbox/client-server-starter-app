@@ -1,4 +1,5 @@
 import { instanceToPlain } from 'class-transformer';
+import { Money } from '@app/shared/utils/money';
 import { Invoice } from './invoice.entity';
 
 function createInvoice(overrides: Partial<Invoice> = {}): Invoice {
@@ -9,8 +10,8 @@ function createInvoice(overrides: Partial<Invoice> = {}): Invoice {
     provider: 'paddle',
     providerEventId: 'evt_secret_ref',
     providerInvoiceRef: 'txn_public_ref',
-    amountMinor: 1200,
-    refundedMinor: 0,
+    amountMinor: Money.fromMinor(1200),
+    refundedMinor: Money.fromMinor(0),
     currency: 'USD',
     status: 'paid',
     billingMode: 'fixed',

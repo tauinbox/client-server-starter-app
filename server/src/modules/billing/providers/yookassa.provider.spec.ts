@@ -366,6 +366,27 @@ describe('YooKassaProvider', () => {
       expect(result).toEqual({ providerInvoiceRef: 'pay-4' });
     });
 
+    it('formats a large minor amount without float drift (bigint money path)', async () => {
+      const { provider, client } = await build();
+      client!.createPayment.mockResolvedValue({
+        id: 'pay-big',
+        status: 'succeeded'
+      });
+
+      // 2_500_000_000 minor exceeds the old int32 ceiling; the bigint Money path
+      // formats it with integer-string math, never `(amount / 100).toFixed`.
+      await provider.chargeOffSession(
+        savedCustomer,
+        2_500_000_000,
+        [{ description: 'Bulk', amountMinor: 2_500_000_000, quantity: 1 }],
+        'idem-big'
+      );
+
+      const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
+      expect(payload.amount.value).toBe('25000000.00');
+      expect(payload.receipt!.items[0].amount.value).toBe('25000000.00');
+    });
+
     it('treats a pending (payment-after-receipt) charge as accepted', async () => {
       const { provider, client } = await build();
       client!.createPayment.mockResolvedValue({
@@ -513,6 +534,24 @@ describe('YooKassaProvider', () => {
 
       const [payload] = client!.createRefund.mock.calls[0] as [ICreateRefund];
       expect(payload.amount).toEqual({ value: '990.00', currency: 'RUB' });
+    });
+
+    it('parses a large refund amount exactly on the round-trip (bigint money path)', async () => {
+      const { provider, client } = await build();
+      client!.getPayment.mockResolvedValue({
+        id: 'pay-big',
+        amount: { value: '25000000.00', currency: 'RUB' },
+        description: 'Bulk',
+        metadata: { userId: 'user-1' }
+      });
+      client!.createRefund.mockResolvedValue({ id: 'ref-big' });
+
+      // amount 0 → refund the whole payment: the decimal is parsed to minor and
+      // re-formatted. A float parse would drift; the bigint Money path round-trips.
+      await provider.refund('pay-big', 0);
+
+      const [payload] = client!.createRefund.mock.calls[0] as [ICreateRefund];
+      expect(payload.amount).toEqual({ value: '25000000.00', currency: 'RUB' });
     });
   });
 

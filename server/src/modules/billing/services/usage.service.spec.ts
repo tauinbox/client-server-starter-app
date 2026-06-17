@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { Money } from '@app/shared/utils/money';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
 import { CreditService } from './credit.service';
@@ -73,7 +74,7 @@ describe('UsageService', () => {
         customerId: 'cust-1',
         subscriptionId: 'sub-1',
         meterKey: 'api_calls',
-        quantity: 42,
+        quantity: Money.fromMinor(42),
         idempotencyKey: 'evt-1'
       })
     );

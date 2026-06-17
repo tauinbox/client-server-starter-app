@@ -25,6 +25,7 @@ import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
+import { Money } from '@app/shared/utils/money';
 import { BILLING_PROVIDERS } from '../src/modules/billing/providers/payment-provider.interface';
 import type {
   NormalizedEvent,
@@ -127,11 +128,11 @@ function makeManager(stores: Stores) {
         (b) => b.customerId === customerId
       );
       if (balance) {
-        balance.balanceUnits += delta;
+        balance.balanceUnits = balance.balanceUnits.add(Money.fromMinor(delta));
       } else {
         stores.creditBalances.push({
           customerId,
-          balanceUnits: delta,
+          balanceUnits: Money.fromMinor(delta),
           updatedAt: new Date()
         } as CreditBalance);
       }
@@ -519,7 +520,7 @@ describe('Billing Paddle webhook (e2e)', () => {
       productId: 'prod-sku',
       subscriptionId: null,
       status: 'paid',
-      amountMinor: 4900
+      amountMinor: Money.fromMinor(4900)
     });
     expect(stores.grants).toHaveLength(1);
     expect(stores.grants[0]).toMatchObject({
@@ -583,12 +584,15 @@ describe('Billing Paddle webhook (e2e)', () => {
       status: 'paid'
     });
     expect(stores.creditBalances).toEqual([
-      expect.objectContaining({ customerId: 'cust-1', balanceUnits: 500 })
+      expect.objectContaining({
+        customerId: 'cust-1',
+        balanceUnits: Money.fromMinor(500)
+      })
     ]);
     expect(stores.creditLedger).toEqual([
       expect.objectContaining({
         customerId: 'cust-1',
-        delta: 500,
+        delta: Money.fromMinor(500),
         reason: 'purchase',
         refInvoiceId: stores.invoices[0].id
       })
@@ -602,7 +606,7 @@ describe('Billing Paddle webhook (e2e)', () => {
     await postWebhook(oneTimePaid('evt_ot_cr', 'prod-cr'));
 
     expect(stores.invoices).toHaveLength(1);
-    expect(stores.creditBalances[0].balanceUnits).toBe(500);
+    expect(stores.creditBalances[0].balanceUnits).toEqual(Money.fromMinor(500));
     expect(stores.creditLedger).toHaveLength(1);
   });
 });
@@ -725,7 +729,17 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
         },
         {
           provide: getRepositoryToken(UsageRecord),
-          useValue: { sum: jest.fn().mockResolvedValue(142) }
+          useValue: {
+            createQueryBuilder: () => {
+              const qb = {
+                select: () => qb,
+                where: () => qb,
+                andWhere: () => qb,
+                getRawOne: () => Promise.resolve({ total: '142' })
+              };
+              return qb;
+            }
+          }
         },
         {
           provide: getRepositoryToken(WebhookEvent),
@@ -812,7 +826,7 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
     expect(stores.invoices).toHaveLength(1);
     expect(stores.invoices[0]).toMatchObject({
       providerEventId: CHARGE_KEY,
-      amountMinor: 84,
+      amountMinor: Money.fromMinor(84),
       status: 'pending',
       billingMode: 'usage',
       periodStart: new Date('2026-05-01T00:00:00Z'),
@@ -849,7 +863,7 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
   it('spends prepaid credits before charging and charges only the remainder', async () => {
     stores.creditBalances.push({
       customerId: 'cust-1',
-      balanceUnits: 10,
+      balanceUnits: Money.fromMinor(10),
       updatedAt: new Date()
     } as CreditBalance);
 
@@ -865,14 +879,14 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
       CHARGE_KEY
     );
     expect(stores.invoices[0]).toMatchObject({
-      amountMinor: 64,
+      amountMinor: Money.fromMinor(64),
       status: 'pending'
     });
-    expect(stores.creditBalances[0].balanceUnits).toBe(0);
+    expect(stores.creditBalances[0].balanceUnits).toEqual(Money.fromMinor(0));
     expect(stores.creditLedger).toEqual([
       expect.objectContaining({
         customerId: 'cust-1',
-        delta: -10,
+        delta: Money.fromMinor(-10),
         reason: 'usage',
         refInvoiceId: stores.invoices[0].id
       })
@@ -882,7 +896,7 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
   it('records a fully credit-covered period as paid at zero without a charge', async () => {
     stores.creditBalances.push({
       customerId: 'cust-1',
-      balanceUnits: 1000,
+      balanceUnits: Money.fromMinor(1000),
       updatedAt: new Date()
     } as CreditBalance);
 
@@ -891,10 +905,10 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
 
     expect(chargeUsage).not.toHaveBeenCalled();
     expect(stores.invoices[0]).toMatchObject({
-      amountMinor: 0,
+      amountMinor: Money.fromMinor(0),
       status: 'paid'
     });
-    expect(stores.creditBalances[0].balanceUnits).toBe(958);
+    expect(stores.creditBalances[0].balanceUnits).toEqual(Money.fromMinor(958));
   });
 
   it('never double-charges a replayed renewal rollover', async () => {

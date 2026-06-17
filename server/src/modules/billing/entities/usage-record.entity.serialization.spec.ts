@@ -1,4 +1,5 @@
 import { instanceToPlain } from 'class-transformer';
+import { Money } from '@app/shared/utils/money';
 import { UsageRecord } from './usage-record.entity';
 
 function createUsageRecord(overrides: Partial<UsageRecord> = {}): UsageRecord {
@@ -7,7 +8,7 @@ function createUsageRecord(overrides: Partial<UsageRecord> = {}): UsageRecord {
     customerId: 'cus-1',
     subscriptionId: 'sub-1',
     meterKey: 'api_calls',
-    quantity: 42,
+    quantity: Money.fromMinor(42),
     occurredAt: new Date('2025-01-01T00:00:00Z'),
     idempotencyKey: 'idem_secret_key',
     recordedAt: new Date('2025-01-01T00:00:00Z'),

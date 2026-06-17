@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { And, LessThan, MoreThanOrEqual, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
+import { Money } from '@app/shared/utils/money';
 import { UsageRecord } from '../entities/usage-record.entity';
 import type { Plan } from '../entities/plan.entity';
 import type { Subscription } from '../entities/subscription.entity';
@@ -76,7 +77,9 @@ export class UsageRating implements RatingStrategy {
       base.billableUnits
     );
     const chargedUnits = base.billableUnits - creditUnitsApplied;
-    const amountMinor = chargedUnits * base.unitPriceMinor;
+    const amountMinor = Money.fromMinor(base.unitPriceMinor)
+      .mulInt(chargedUnits)
+      .toNumber();
     return {
       ...base,
       creditUnitsApplied,
@@ -107,16 +110,27 @@ export class UsageRating implements RatingStrategy {
       );
     }
 
-    const totalUnits =
-      (await this.usageRecords.sum('quantity', {
-        subscriptionId: subscription.id,
-        occurredAt: And(MoreThanOrEqual(period.start), LessThan(period.end))
-      })) ?? 0;
+    // SUM over a bigint column comes back as a numeric string; decode it through
+    // Money so an overflow throws loudly rather than silently losing precision
+    // (the start is inclusive, the end exclusive — a record stamped exactly at
+    // the boundary belongs to the next period).
+    const raw = await this.usageRecords
+      .createQueryBuilder('u')
+      .select('COALESCE(SUM(u.quantity), 0)', 'total')
+      .where('u.subscriptionId = :subscriptionId', {
+        subscriptionId: subscription.id
+      })
+      .andWhere('u.occurredAt >= :start', { start: period.start })
+      .andWhere('u.occurredAt < :end', { end: period.end })
+      .getRawOne<{ total: string }>();
+    const totalUnits = Money.fromMinor(BigInt(raw?.total ?? '0')).toNumber();
 
     const includedUnits = price.includedUnits ?? 0;
     const unitPriceMinor = price.unitPriceMinor ?? 0;
     const billableUnits = Math.max(0, totalUnits - includedUnits);
-    const amountMinor = billableUnits * unitPriceMinor;
+    const amountMinor = Money.fromMinor(unitPriceMinor)
+      .mulInt(billableUnits)
+      .toNumber();
 
     return {
       totalUnits,

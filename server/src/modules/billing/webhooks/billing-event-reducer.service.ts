@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, In, type EntityManager } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
+import { Money } from '@app/shared/utils/money';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
 import { CustomerGrant } from '../entities/customer-grant.entity';
@@ -379,7 +380,7 @@ export class BillingEventReducer {
           provider,
           providerEventId,
           providerInvoiceRef: payload.providerInvoiceRef,
-          amountMinor: payload.amountMinor,
+          amountMinor: Money.fromMinor(payload.amountMinor),
           currency: payload.currency,
           status: 'paid',
           billingMode: subscription?.billingMode ?? 'fixed',

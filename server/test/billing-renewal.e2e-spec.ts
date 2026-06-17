@@ -183,8 +183,22 @@ describe('Billing renewal scheduler (e2e)', () => {
         FixedRating,
         UsageRating,
         {
+          // UsageRating aggregates via a raw bigint SUM query; drive the same
+          // `usageSum` knob through the query-builder's getRawOne wire shape.
           provide: getRepositoryToken(UsageRecord),
-          useValue: { sum: usageSum }
+          useValue: {
+            createQueryBuilder: () => {
+              const qb = {
+                select: () => qb,
+                where: () => qb,
+                andWhere: () => qb,
+                getRawOne: async () => ({
+                  total: String((await usageSum()) ?? 0)
+                })
+              };
+              return qb;
+            }
+          }
         },
         EntitlementCacheListener,
         {

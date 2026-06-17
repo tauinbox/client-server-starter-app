@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { Brackets, DataSource, Repository } from 'typeorm';
+import { Money } from '@app/shared/utils/money';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
@@ -244,7 +245,7 @@ export class RenewalService {
           provider: subscription.provider,
           providerEventId: idempotencyKey,
           providerInvoiceRef: charge.providerInvoiceRef,
-          amountMinor: rated.amountMinor,
+          amountMinor: Money.fromMinor(rated.amountMinor),
           currency: customer.currency,
           status: 'paid',
           billingMode: subscription.billingMode,

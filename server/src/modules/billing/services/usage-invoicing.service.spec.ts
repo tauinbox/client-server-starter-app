@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { Money } from '@app/shared/utils/money';
 import { CreditBalance } from '../entities/credit-balance.entity';
 import { Customer } from '../entities/customer.entity';
 import { Plan } from '../entities/plan.entity';
@@ -172,7 +173,7 @@ describe('UsageInvoicingService', () => {
       subscriptionId: 'sub-1',
       provider: 'paddle',
       providerEventId: CHARGE_KEY,
-      amountMinor: 8400,
+      amountMinor: Money.fromMinor(8400),
       currency: 'USD',
       status: 'pending',
       billingMode: 'usage',
@@ -207,7 +208,7 @@ describe('UsageInvoicingService', () => {
     expect(chargeUsage).not.toHaveBeenCalled();
     expect(credits.spendOnUsage).not.toHaveBeenCalled();
     expect(capturedValues.value).toMatchObject({
-      amountMinor: 0,
+      amountMinor: Money.fromMinor(0),
       status: 'paid',
       providerInvoiceRef: CHARGE_KEY
     });
@@ -243,7 +244,7 @@ describe('UsageInvoicingService', () => {
       10
     );
     expect(capturedValues.value).toMatchObject({
-      amountMinor: 6400,
+      amountMinor: Money.fromMinor(6400),
       status: 'pending'
     });
     expect(chargeUsage).toHaveBeenCalledWith(
@@ -278,7 +279,7 @@ describe('UsageInvoicingService', () => {
       42
     );
     expect(capturedValues.value).toMatchObject({
-      amountMinor: 0,
+      amountMinor: Money.fromMinor(0),
       status: 'paid'
     });
     expect(emit).toHaveBeenCalledWith(
@@ -336,7 +337,10 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
     const manager = {
       findOne: (entity: unknown, _opts: unknown) =>
         entity === CreditBalance
-          ? Promise.resolve({ customerId: CUST, balanceUnits: state.balance })
+          ? Promise.resolve({
+              customerId: CUST,
+              balanceUnits: Money.fromMinor(state.balance)
+            })
           : Promise.resolve(null),
       query: (_sql: string, params: [string, number]) => {
         state.balance += params[1];
@@ -344,9 +348,9 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
       },
       create: (entity: { prototype: object }, data: object) =>
         Object.assign(Object.create(entity.prototype) as object, data),
-      save: (entity: { delta?: number }) => {
-        if (typeof entity.delta === 'number')
-          ledger.push({ delta: entity.delta });
+      save: (entity: { delta?: Money }) => {
+        if (entity.delta instanceof Money)
+          ledger.push({ delta: entity.delta.toNumber() });
         return Promise.resolve(entity);
       },
       createQueryBuilder: () => {
@@ -428,7 +432,10 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
           // (pre-fix) path reads it too and the test still reproduces overspend.
           useValue: {
             findOne: jest.fn(() =>
-              Promise.resolve({ customerId: CUST, balanceUnits: state.balance })
+              Promise.resolve({
+                customerId: CUST,
+                balanceUnits: Money.fromMinor(state.balance)
+              })
             )
           }
         },
@@ -436,7 +443,17 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
           provide: getRepositoryToken(UsageRecord),
           // 60 recorded units, 10 included -> 50 billable per period, well over
           // the 30-credit balance, so each close wants more credits than it holds.
-          useValue: { sum: jest.fn().mockResolvedValue(60) }
+          useValue: {
+            createQueryBuilder: () => {
+              const qb = {
+                select: () => qb,
+                where: () => qb,
+                andWhere: () => qb,
+                getRawOne: () => Promise.resolve({ total: '60' })
+              };
+              return qb;
+            }
+          }
         },
         { provide: getDataSourceToken(), useValue: dataSource },
         {
