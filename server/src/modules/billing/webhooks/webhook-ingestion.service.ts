@@ -98,9 +98,8 @@ export class WebhookIngestionService {
     }
 
     // The (provider, provider_event_id) row already exists. Skip only if a prior
-    // delivery finished (`processed`); a row still `received` — or quarantined as
-    // `dead_letter` after exhausting sweep replays — is an unfinished delivery
-    // the provider just re-sent: reprocess it (idempotent) instead of dropping.
+    // delivery finished (`processed`); a `received` or quarantined `dead_letter`
+    // row is unfinished — reprocess it (idempotent) instead of dropping.
     const existing = await this.webhookEvents.findOne({
       where: { provider: providerId, providerEventId: event.providerEventId },
       select: { id: true, status: true }
@@ -115,9 +114,8 @@ export class WebhookIngestionService {
     this.logger.warn(
       `Reprocessing unfinished ${providerId} webhook ${event.providerEventId}`
     );
-    // A fresh provider redelivery gets a clean slate: clear the quarantine /
-    // failure history so the sweep does not instantly re-dead-letter a row that
-    // had already exhausted its attempts.
+    // Clear the quarantine / failure history so a redelivered, already-exhausted
+    // row is not instantly re-dead-lettered by the sweep.
     await this.webhookEvents.update(
       { id: existing.id },
       { status: 'received', attempts: 0, lastError: null }
