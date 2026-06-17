@@ -885,6 +885,7 @@ Server imports common types and constants from the root `shared/` directory via 
 
 - **Types**: `UserResponse` (public), `AdminUserResponse` (admin-only superset with `lockedUntil` + `roles: RoleAdminResponse[]`), `OAuthAccountResponse`, `TokensResponse`, `AuthResponse`, `PaginationMeta`, `PaginatedResponse<T>`, `CursorPaginationMeta`, `CursorPaginatedResponse<T>`, `SortOrder`; `RoleResponse` (public, no `isSystem`/`isSuper`), `RoleAdminResponse` (admin-only superset), `PermissionResponse`, `RolePermissionResponse`, `RoleWithPermissionsResponse`, `PermissionCondition`, `PermissionEffect`, `ResolvedPermission`, `UserPermissionsResponse`, `UserEffectivePermissionsResponse`; `ResourceResponse`, `ActionResponse`, `RbacMetadataResponse`
 - **Constants**: `PASSWORD_REGEX`, `PASSWORD_ERROR`, `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, `MAX_CONCURRENT_SESSIONS`, pagination defaults, user sort columns; `SYSTEM_ROLES`, `SystemRole` (note: `PERMISSIONS` + `Permission` removed — typed `[Actions, Subjects]` tuples used instead)
+- **Utils**: `@app/shared/utils/time` (single import site re-exporting `Temporal` from the `temporal-polyfill` package, pinned exactly until native Temporal ships) and `@app/shared/utils/money` (`Money`, a BigInt value object over integer minor units with an overflow-guarded `toNumber()` for the JSON wire — no floating-point math)
 
 NestJS build compiles shared files into `dist/shared/` alongside `dist/server/`. Migration and seed scripts use paths like `dist/server/src/...` to reflect the nested output structure.
 

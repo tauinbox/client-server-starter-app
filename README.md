@@ -319,6 +319,7 @@ fullstack-starter-app/
 │       │                   # RoleResponse (public) / RoleAdminResponse (with isSystem/isSuper),
 │       │                   # PermissionResponse, UserPermissionsResponse, etc.
 │       ├── constants/      # PASSWORD_REGEX, pagination defaults, SYSTEM_ROLES, MAX_CONCURRENT_SESSIONS, etc.
+│       ├── utils/          # feature-flag-evaluator, mongo-query-safety, time (Temporal barrel), money (BigInt value object)
 │       └── index.ts        # Barrel exports
 ├── client/                 # Angular 21 SPA
 │   ├── src/app/
@@ -803,7 +804,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1206 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1230 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 168 tests passing |
 | Client unit tests | Vitest | `*.spec.ts` alongside source | 874 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 201 tests passing |
