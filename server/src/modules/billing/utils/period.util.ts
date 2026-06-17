@@ -1,30 +1,19 @@
+import { Temporal } from '@app/shared/utils/time';
 import type { PlanInterval } from '@app/shared/types';
 
-/** Last calendar day of the month that `date` falls in. */
-function daysInMonth(year: number, monthIndex: number): number {
-  return new Date(year, monthIndex + 1, 0).getDate();
-}
-
 /**
- * Advances `from` by one plan interval - the local billing-period boundary.
+ * Advances `from` by one plan interval - the billing-period boundary.
  *
- * Clamps to the last valid day of the target month so a month-end anchor does
- * not overflow into the next month (e.g. Jan 31 + month -> Feb 28, not Mar 3).
+ * The arithmetic runs on the UTC wall-clock of `from`, so the result is the
+ * same instant regardless of the process time zone and is unaffected by DST.
+ * Temporal's default `constrain` overflow clamps a month-end anchor to the last
+ * valid day of the target month (e.g. Jan 31 + month -> Feb 28, not Mar 3) and
+ * preserves the time-of-day component.
  */
 export function addInterval(from: Date, interval: PlanInterval): Date {
-  const end = new Date(from);
-  const anchorDay = end.getDate();
-
-  // Pin to day 1 first so the month/year shift cannot itself overflow.
-  end.setDate(1);
-  if (interval === 'year') {
-    end.setFullYear(end.getFullYear() + 1);
-  } else {
-    end.setMonth(end.getMonth() + 1);
-  }
-
-  end.setDate(
-    Math.min(anchorDay, daysInMonth(end.getFullYear(), end.getMonth()))
-  );
-  return end;
+  const start = Temporal.Instant.fromEpochMilliseconds(
+    from.getTime()
+  ).toZonedDateTimeISO('UTC');
+  const end = start.add(interval === 'year' ? { years: 1 } : { months: 1 });
+  return new Date(end.epochMilliseconds);
 }
