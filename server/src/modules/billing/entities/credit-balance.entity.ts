@@ -1,5 +1,12 @@
-import { Column, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  ForeignKey,
+  PrimaryColumn,
+  UpdateDateColumn
+} from 'typeorm';
 import { Money } from '@app/shared/utils/money';
+import { Customer } from './customer.entity';
 import {
   MoneyToNumber,
   moneyColumnTransformer
@@ -15,6 +22,10 @@ import {
 @Entity('billing_credit_balances')
 export class CreditBalance {
   @PrimaryColumn('uuid', { name: 'customer_id' })
+  @ForeignKey<Customer>(() => Customer, {
+    onDelete: 'CASCADE',
+    name: 'FK_billing_credit_balances_customer_id'
+  })
   customerId: string;
 
   @Column({

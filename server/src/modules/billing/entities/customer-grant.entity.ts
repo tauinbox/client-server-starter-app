@@ -2,8 +2,11 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  ForeignKey,
   PrimaryGeneratedColumn
 } from 'typeorm';
+import { Customer } from './customer.entity';
+import { Invoice } from './invoice.entity';
 
 /**
  * An entitlement unlocked by a paid one-time SKU purchase. Active while
@@ -17,12 +20,20 @@ export class CustomerGrant {
   id: string;
 
   @Column({ name: 'customer_id', type: 'uuid' })
+  @ForeignKey<Customer>(() => Customer, {
+    onDelete: 'CASCADE',
+    name: 'FK_billing_customer_grants_customer_id'
+  })
   customerId: string;
 
-  @Column()
+  @Column({ length: 100 })
   entitlement: string;
 
   @Column({ name: 'source_invoice_id', type: 'uuid' })
+  @ForeignKey<Invoice>(() => Invoice, {
+    onDelete: 'CASCADE',
+    name: 'FK_billing_customer_grants_source_invoice_id'
+  })
   sourceInvoiceId: string;
 
   @Column({ name: 'expires_at', type: 'timestamptz', nullable: true })

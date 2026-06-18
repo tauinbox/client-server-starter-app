@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   Entity,
   PrimaryGeneratedColumn,
+  Unique,
   UpdateDateColumn
 } from 'typeorm';
 import type {
@@ -13,17 +14,18 @@ import type {
 } from '@app/shared/types';
 
 @Entity('plans')
+@Unique('UQ_plans_key', ['key'])
 export class Plan {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
+  @Column({ length: 100 })
   key: string;
 
-  @Column()
+  @Column({ length: 100 })
   name: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: 'varchar', length: 500, nullable: true })
   description: string | null;
 
   @Column({ name: 'billing_mode', type: 'varchar', length: 16 })
@@ -32,7 +34,7 @@ export class Plan {
   @Column({ type: 'varchar', length: 16 })
   interval: PlanInterval;
 
-  @Column({ name: 'meter_key', type: 'varchar', nullable: true })
+  @Column({ name: 'meter_key', type: 'varchar', length: 100, nullable: true })
   meterKey: string | null;
 
   @Column({ type: 'text', array: true, default: () => "'{}'" })

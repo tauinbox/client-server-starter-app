@@ -2,7 +2,8 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  PrimaryGeneratedColumn
+  PrimaryGeneratedColumn,
+  Unique
 } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 
@@ -18,6 +19,10 @@ import type { BillingProviderId } from '@app/shared/types';
  * provider redelivery.
  */
 @Entity('billing_webhook_events')
+@Unique('UQ_billing_webhook_events_provider_event', [
+  'provider',
+  'providerEventId'
+])
 export class WebhookEvent {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -25,13 +30,13 @@ export class WebhookEvent {
   @Column({ type: 'varchar', length: 32 })
   provider: BillingProviderId;
 
-  @Column({ name: 'provider_event_id', type: 'varchar' })
+  @Column({ name: 'provider_event_id', type: 'varchar', length: 255 })
   providerEventId: string;
 
-  @Column({ type: 'varchar' })
+  @Column({ type: 'varchar', length: 255 })
   type: string;
 
-  @Column({ name: 'payload_hash', type: 'varchar' })
+  @Column({ name: 'payload_hash', type: 'varchar', length: 255 })
   payloadHash: string;
 
   @Column({ type: 'varchar', length: 16 })

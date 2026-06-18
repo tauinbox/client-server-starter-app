@@ -4,19 +4,21 @@ import {
   Entity,
   OneToMany,
   PrimaryGeneratedColumn,
+  Unique,
   UpdateDateColumn
 } from 'typeorm';
 import { FeatureFlagRule } from './feature-flag-rule.entity';
 
 @Entity('feature_flags')
+@Unique('UQ_feature_flags_key', ['key'])
 export class FeatureFlag {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
+  @Column({ length: 100 })
   key: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: 'varchar', length: 500, nullable: true })
   description: string | null;
 
   @Column({ default: false })

@@ -22,7 +22,10 @@ export class FeatureFlagRule {
   flagId: string;
 
   @ManyToOne(() => FeatureFlag, (flag) => flag.rules, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'flag_id' })
+  @JoinColumn({
+    name: 'flag_id',
+    foreignKeyConstraintName: 'FK_feature_flag_rules_flag_id'
+  })
   flag: FeatureFlag;
 
   @Column({ type: 'varchar', length: 32 })

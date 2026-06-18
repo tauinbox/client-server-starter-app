@@ -13,7 +13,7 @@ import { Resource } from './resource.entity';
 import { Action } from './action.entity';
 
 @Entity('permissions')
-@Unique(['resourceId', 'actionId'])
+@Unique('UQ_permissions_resource_action', ['resourceId', 'actionId'])
 export class Permission {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -27,12 +27,24 @@ export class Permission {
   @Column({ type: 'varchar', nullable: true })
   description: string | null;
 
-  @ManyToOne(() => Resource, (r) => r.permissions, { eager: true })
-  @JoinColumn({ name: 'resource_id' })
+  @ManyToOne(() => Resource, (r) => r.permissions, {
+    eager: true,
+    onDelete: 'RESTRICT'
+  })
+  @JoinColumn({
+    name: 'resource_id',
+    foreignKeyConstraintName: 'FK_permissions_resource'
+  })
   resource: Resource;
 
-  @ManyToOne(() => Action, (a) => a.permissions, { eager: true })
-  @JoinColumn({ name: 'action_id' })
+  @ManyToOne(() => Action, (a) => a.permissions, {
+    eager: true,
+    onDelete: 'RESTRICT'
+  })
+  @JoinColumn({
+    name: 'action_id',
+    foreignKeyConstraintName: 'FK_permissions_action'
+  })
   action: Action;
 
   @OneToMany(() => RolePermission, (rp) => rp.permission)
