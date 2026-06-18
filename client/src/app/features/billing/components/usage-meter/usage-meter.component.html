@@ -66,8 +66,8 @@
 
     <p class="usage-period">
       <span>
-        {{ usage().periodStart | date: 'mediumDate' }} –
-        {{ usage().periodEnd | date: 'mediumDate' }}
+        {{ usage().periodStart | date: 'mediumDate' : 'UTC' }} –
+        {{ usage().periodEnd | date: 'mediumDate' : 'UTC' }}
       </span>
       <span>{{ t('billing.usage.billedAtPeriodEnd') }}</span>
     </p>
