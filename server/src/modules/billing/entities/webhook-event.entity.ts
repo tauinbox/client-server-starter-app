@@ -59,9 +59,9 @@ export class WebhookEvent {
   @Column({ type: 'jsonb', nullable: true })
   payload: object | null;
 
-  @CreateDateColumn({ name: 'received_at' })
+  @CreateDateColumn({ name: 'received_at', type: 'timestamptz' })
   receivedAt: Date;
 
-  @Column({ name: 'processed_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'processed_at', type: 'timestamptz', nullable: true })
   processedAt: Date | null;
 }

@@ -26,6 +26,6 @@ export class CreditBalance {
   @MoneyToNumber()
   balanceUnits: Money;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }

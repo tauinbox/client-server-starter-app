@@ -35,16 +35,16 @@ export class Subscription {
   @Column({ name: 'lifecycle_owner', type: 'varchar', length: 16 })
   lifecycleOwner: 'provider' | 'self';
 
-  @Column({ name: 'current_period_start', type: 'timestamp' })
+  @Column({ name: 'current_period_start', type: 'timestamptz' })
   currentPeriodStart: Date;
 
-  @Column({ name: 'current_period_end', type: 'timestamp' })
+  @Column({ name: 'current_period_end', type: 'timestamptz' })
   currentPeriodEnd: Date;
 
   @Column({ name: 'cancel_at_period_end', default: false })
   cancelAtPeriodEnd: boolean;
 
-  @Column({ name: 'trial_end', type: 'timestamp', nullable: true })
+  @Column({ name: 'trial_end', type: 'timestamptz', nullable: true })
   trialEnd: Date | null;
 
   @Column({ name: 'provider_subscription_id', type: 'varchar', nullable: true })
@@ -70,15 +70,15 @@ export class Subscription {
   /** When the renewal scheduler next retries a `past_due` self-managed charge. */
   @Column({
     name: 'next_renewal_attempt_at',
-    type: 'timestamp',
+    type: 'timestamptz',
     nullable: true
   })
   @Exclude()
   nextRenewalAttemptAt: Date | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }

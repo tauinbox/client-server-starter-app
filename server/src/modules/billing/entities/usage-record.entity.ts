@@ -29,13 +29,13 @@ export class UsageRecord {
   @MoneyToNumber()
   quantity: Money;
 
-  @Column({ name: 'occurred_at', type: 'timestamp' })
+  @Column({ name: 'occurred_at', type: 'timestamptz' })
   occurredAt: Date;
 
   @Column({ name: 'idempotency_key', type: 'varchar', unique: true })
   @Exclude()
   idempotencyKey: string;
 
-  @CreateDateColumn({ name: 'recorded_at' })
+  @CreateDateColumn({ name: 'recorded_at', type: 'timestamptz' })
   recordedAt: Date;
 }

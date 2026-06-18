@@ -41,12 +41,12 @@ export class Resource {
   /** Virtual field — populated by ResourceService.findAll(), not stored in DB */
   isRegistered?: boolean;
 
-  @Column({ name: 'last_synced_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'last_synced_at', type: 'timestamptz', nullable: true })
   lastSyncedAt: Date | null;
 
   @OneToMany(() => Permission, (p) => p.resource)
   permissions: Permission[];
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

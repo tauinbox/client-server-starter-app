@@ -38,12 +38,12 @@ export class FeatureFlagRule {
   // get distinct microsecond timestamps — the basis for stable display order.
   @Column({
     name: 'created_at',
-    type: 'timestamp',
+    type: 'timestamptz',
     precision: 6,
     default: () => 'clock_timestamp()'
   })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }

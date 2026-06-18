@@ -50,9 +50,9 @@ export class Plan {
   @Column({ type: 'jsonb' })
   prices: Partial<Record<BillingProviderId, PlanPrice>>;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }
