@@ -18,7 +18,7 @@ export class Action {
   @Column({ name: 'display_name' })
   displayName: string;
 
-  @Column()
+  @Column({ default: '' })
   description: string;
 
   @Column({ name: 'is_default', default: false })

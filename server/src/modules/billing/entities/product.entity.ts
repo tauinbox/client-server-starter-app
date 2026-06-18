@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   Entity,
   PrimaryGeneratedColumn,
+  Unique,
   UpdateDateColumn
 } from 'typeorm';
 import type {
@@ -13,17 +14,18 @@ import type {
 } from '@app/shared/types';
 
 @Entity('billing_products')
+@Unique('UQ_billing_products_key', ['key'])
 export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
+  @Column({ length: 100 })
   key: string;
 
-  @Column()
+  @Column({ length: 100 })
   name: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: 'varchar', length: 500, nullable: true })
   description: string | null;
 
   @Column({ type: 'varchar', length: 16 })

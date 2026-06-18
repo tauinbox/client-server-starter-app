@@ -12,11 +12,11 @@ export class AuditLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Index()
+  @Index('IDX_audit_logs_action')
   @Column({ type: 'enum', enum: AuditAction })
   action: AuditAction;
 
-  @Index()
+  @Index('IDX_audit_logs_actor_id')
   @Column({ name: 'actor_id', type: 'uuid', nullable: true })
   actorId: string | null;
 
@@ -38,7 +38,7 @@ export class AuditLog {
   @Column({ name: 'request_id', type: 'varchar', nullable: true })
   requestId: string | null;
 
-  @Index()
+  @Index('IDX_audit_logs_created_at')
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

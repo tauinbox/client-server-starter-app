@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  ForeignKey,
   PrimaryGeneratedColumn,
   UpdateDateColumn
 } from 'typeorm';
@@ -11,6 +12,8 @@ import type {
   BillingProviderId,
   SubscriptionStatus
 } from '@app/shared/types';
+import { Customer } from './customer.entity';
+import { PaymentMethod } from './payment-method.entity';
 
 @Entity('subscriptions')
 export class Subscription {
@@ -18,9 +21,13 @@ export class Subscription {
   id: string;
 
   @Column({ name: 'customer_id', type: 'uuid' })
+  @ForeignKey<Customer>(() => Customer, {
+    onDelete: 'CASCADE',
+    name: 'FK_subscriptions_customer_id'
+  })
   customerId: string;
 
-  @Column({ name: 'plan_key', type: 'varchar' })
+  @Column({ name: 'plan_key', type: 'varchar', length: 100 })
   planKey: string;
 
   @Column({ type: 'varchar', length: 32 })
@@ -47,11 +54,20 @@ export class Subscription {
   @Column({ name: 'trial_end', type: 'timestamptz', nullable: true })
   trialEnd: Date | null;
 
-  @Column({ name: 'provider_subscription_id', type: 'varchar', nullable: true })
+  @Column({
+    name: 'provider_subscription_id',
+    type: 'varchar',
+    length: 255,
+    nullable: true
+  })
   @Exclude()
   providerSubscriptionId: string | null;
 
   @Column({ name: 'payment_method_id', type: 'uuid', nullable: true })
+  @ForeignKey<PaymentMethod>(() => PaymentMethod, {
+    onDelete: 'SET NULL',
+    name: 'FK_subscriptions_payment_method_id'
+  })
   paymentMethodId: string | null;
 
   /**

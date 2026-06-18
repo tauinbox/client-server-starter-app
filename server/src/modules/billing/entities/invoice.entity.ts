@@ -2,11 +2,16 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  ForeignKey,
   PrimaryGeneratedColumn,
+  Unique,
   UpdateDateColumn
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import { Money } from '@app/shared/utils/money';
+import { Customer } from './customer.entity';
+import { Subscription } from './subscription.entity';
+import { Product } from './product.entity';
 import type {
   BillingMode,
   BillingProviderId,
@@ -19,14 +24,23 @@ import {
 } from '../../../common/utils/money-column.transformer';
 
 @Entity('billing_invoices')
+@Unique('UQ_billing_invoices_provider_event_id', ['providerEventId'])
 export class Invoice {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column({ name: 'customer_id', type: 'uuid' })
+  @ForeignKey<Customer>(() => Customer, {
+    onDelete: 'CASCADE',
+    name: 'FK_billing_invoices_customer_id'
+  })
   customerId: string;
 
   @Column({ name: 'subscription_id', type: 'uuid', nullable: true })
+  @ForeignKey<Subscription>(() => Subscription, {
+    onDelete: 'SET NULL',
+    name: 'FK_billing_invoices_subscription_id'
+  })
   subscriptionId: string | null;
 
   @Column({ type: 'varchar', length: 32 })
@@ -35,13 +49,13 @@ export class Invoice {
   @Column({
     name: 'provider_event_id',
     type: 'varchar',
-    nullable: true,
-    unique: true
+    length: 255,
+    nullable: true
   })
   @Exclude()
   providerEventId: string | null;
 
-  @Column({ name: 'provider_invoice_ref', type: 'varchar' })
+  @Column({ name: 'provider_invoice_ref', type: 'varchar', length: 255 })
   providerInvoiceRef: string;
 
   @Column({
@@ -74,6 +88,10 @@ export class Invoice {
   kind: InvoiceKind;
 
   @Column({ name: 'product_id', type: 'uuid', nullable: true })
+  @ForeignKey<Product>(() => Product, {
+    onDelete: 'SET NULL',
+    name: 'FK_billing_invoices_product_id'
+  })
   productId: string | null;
 
   @Column({ name: 'period_start', type: 'timestamptz' })
@@ -85,7 +103,7 @@ export class Invoice {
   @Column({ name: 'paid_at', type: 'timestamptz', nullable: true })
   paidAt: Date | null;
 
-  @Column({ name: 'receipt_ref', type: 'varchar', nullable: true })
+  @Column({ name: 'receipt_ref', type: 'varchar', length: 255, nullable: true })
   receiptRef: string | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

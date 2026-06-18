@@ -2,11 +2,13 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  ForeignKey,
   PrimaryGeneratedColumn,
   UpdateDateColumn
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import type { BillingProviderId } from '@app/shared/types';
+import { Customer } from './customer.entity';
 
 @Entity('billing_payment_methods')
 export class PaymentMethod {
@@ -14,12 +16,16 @@ export class PaymentMethod {
   id: string;
 
   @Column({ name: 'customer_id', type: 'uuid' })
+  @ForeignKey<Customer>(() => Customer, {
+    onDelete: 'CASCADE',
+    name: 'FK_billing_payment_methods_customer_id'
+  })
   customerId: string;
 
   @Column({ type: 'varchar', length: 32 })
   provider: BillingProviderId;
 
-  @Column({ name: 'provider_method_ref', type: 'varchar' })
+  @Column({ name: 'provider_method_ref', type: 'varchar', length: 255 })
   @Exclude()
   providerMethodRef: string;
 
