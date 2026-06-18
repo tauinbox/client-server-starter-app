@@ -76,21 +76,21 @@ export class Invoice {
   @Column({ name: 'product_id', type: 'uuid', nullable: true })
   productId: string | null;
 
-  @Column({ name: 'period_start', type: 'timestamp' })
+  @Column({ name: 'period_start', type: 'timestamptz' })
   periodStart: Date;
 
-  @Column({ name: 'period_end', type: 'timestamp' })
+  @Column({ name: 'period_end', type: 'timestamptz' })
   periodEnd: Date;
 
-  @Column({ name: 'paid_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'paid_at', type: 'timestamptz', nullable: true })
   paidAt: Date | null;
 
   @Column({ name: 'receipt_ref', type: 'varchar', nullable: true })
   receiptRef: string | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }

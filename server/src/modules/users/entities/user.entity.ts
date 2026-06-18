@@ -45,7 +45,7 @@ export class User {
   @Exclude()
   failedLoginAttempts: number;
 
-  @Column({ name: 'locked_until', type: 'timestamp', nullable: true })
+  @Column({ name: 'locked_until', type: 'timestamptz', nullable: true })
   @Expose({ groups: ['privileged'] })
   lockedUntil: Date | null;
 
@@ -65,7 +65,7 @@ export class User {
 
   @Column({
     name: 'email_verification_expires_at',
-    type: 'timestamp',
+    type: 'timestamptz',
     nullable: true
   })
   @Exclude()
@@ -77,7 +77,7 @@ export class User {
 
   @Column({
     name: 'password_reset_expires_at',
-    type: 'timestamp',
+    type: 'timestamptz',
     nullable: true
   })
   @Exclude()
@@ -93,20 +93,20 @@ export class User {
 
   @Column({
     name: 'pending_email_expires_at',
-    type: 'timestamp',
+    type: 'timestamptz',
     nullable: true
   })
   @Exclude()
   pendingEmailExpiresAt: Date | null;
 
-  @Column({ name: 'token_revoked_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'token_revoked_at', type: 'timestamptz', nullable: true })
   @Exclude()
   tokenRevokedAt: Date | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })

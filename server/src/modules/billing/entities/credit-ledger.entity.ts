@@ -33,6 +33,6 @@ export class CreditLedger {
   @Column({ name: 'ref_invoice_id', type: 'uuid', nullable: true })
   refInvoiceId: string | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

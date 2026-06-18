@@ -38,6 +38,6 @@ export class Permission {
   @OneToMany(() => RolePermission, (rp) => rp.permission)
   rolePermissions: RolePermission[];
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

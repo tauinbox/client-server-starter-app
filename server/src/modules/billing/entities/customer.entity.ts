@@ -40,9 +40,9 @@ export class Customer {
   @Column({ name: 'default_payment_method_id', type: 'uuid', nullable: true })
   defaultPaymentMethodId: string | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }
