@@ -816,10 +816,10 @@ GitHub Actions runs on every push and pull request to `master` with 5 jobs:
 
 | Job | Depends on | Steps | Artifacts |
 |-----|-----------|-------|-----------|
-| **Server – Checks** | — | lint, format:check, check:routes, check:enums, check:permissions | — |
+| **Server – Checks** | — | audit (high), lint, format:check, check:routes, check:enums, check:permissions | — |
 | **Server – Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
-| **Mock Server** | — | lint, format:check, tsc, test | — |
-| **Client** | — | lint, format:check, test:cov, build | Coverage report |
+| **Mock Server** | — | audit (high), lint, format:check, tsc, test | — |
+| **Client** | — | audit (high), lint, format:check, test:cov, build | Coverage report |
 | **Client E2E** | mock-server | ng build → serve (static), Playwright Chromium | HTML report, test results |
 | **Server – Checks** | — | check:i18n (validates all ErrorKeys exist in all i18n JSON files) | — |
 

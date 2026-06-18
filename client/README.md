@@ -23,6 +23,7 @@ The dev proxy (`proxy.conf.mjs`) forwards `/api` and `/ws` requests to `BACKEND_
 | Unit tests | `npm test` (Vitest) |
 | E2E tests | `npm run test:e2e` (Playwright) |
 | E2E tests (UI) | `npm run test:e2e:ui` |
+| Audit dependencies | `npm run audit:ci` (`npm audit --audit-level=high --omit=dev`, same gate CI enforces) |
 | Release | `npm run release` (bump versions, generate CHANGELOG.md, create git tag) |
 
 ## Architecture
