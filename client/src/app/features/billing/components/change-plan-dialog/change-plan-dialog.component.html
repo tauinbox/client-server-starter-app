@@ -89,7 +89,7 @@
                 {{
                   t('billing.changePlan.chargeUntil', {
                     plan: selectedPlanName(),
-                    date: periodEnd | date: 'mediumDate'
+                    date: periodEnd | date: 'mediumDate' : 'UTC'
                   })
                 }}
               </dt>

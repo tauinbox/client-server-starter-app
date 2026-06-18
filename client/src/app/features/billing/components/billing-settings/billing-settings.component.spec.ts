@@ -162,6 +162,21 @@ describe('BillingSettingsComponent', () => {
     expect(text).toContain('$12.00');
   });
 
+  it('renders billing-boundary dates in UTC regardless of the browser timezone', async () => {
+    vi.stubEnv('TZ', 'America/Los_Angeles');
+    try {
+      await setup(true, usageSummary);
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      // currentPeriodEnd, invoice periodEnd and the usage period end are all
+      // 2026-07-01T00:00:00Z. West of UTC an un-zoned pipe renders the previous
+      // day ("Jun 30") - the off-by-one the UTC arg prevents.
+      expect(text).toContain('Jul 1, 2026');
+      expect(text).not.toContain('Jun 30, 2026');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('renders the usage meter when a usage summary is present', async () => {
     await setup(true, usageSummary);
     expect(

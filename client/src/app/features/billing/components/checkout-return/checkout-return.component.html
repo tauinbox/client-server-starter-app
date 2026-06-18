@@ -59,7 +59,7 @@
               <p>
                 {{
                   t('billing.checkout.successRenews', {
-                    date: periodEnd() | date: 'mediumDate'
+                    date: periodEnd() | date: 'mediumDate' : 'UTC'
                   })
                 }}
               </p>

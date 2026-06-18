@@ -31,7 +31,7 @@
                     t('billing.settings.cancelsOn', {
                       date:
                         store.subscription()!.currentPeriodEnd
-                        | date: 'mediumDate'
+                        | date: 'mediumDate' : 'UTC'
                     })
                   }}
                 </span>
@@ -41,7 +41,7 @@
                     t('billing.settings.renewsOn', {
                       date:
                         store.subscription()!.currentPeriodEnd
-                        | date: 'mediumDate'
+                        | date: 'mediumDate' : 'UTC'
                     })
                   }}
                 </span>
@@ -141,7 +141,8 @@
               <li class="invoice-card">
                 <div class="invoice-card-row">
                   <span>{{
-                    invoice.paidAt ?? invoice.createdAt | date: 'mediumDate'
+                    invoice.paidAt ?? invoice.createdAt
+                      | date: 'mediumDate' : 'UTC'
                   }}</span>
                   <span class="amount">{{ invoiceAmount(invoice) }}</span>
                 </div>
@@ -181,7 +182,8 @@
                 <tr>
                   <td>
                     {{
-                      invoice.paidAt ?? invoice.createdAt | date: 'mediumDate'
+                      invoice.paidAt ?? invoice.createdAt
+                        | date: 'mediumDate' : 'UTC'
                     }}
                   </td>
                   <td>
