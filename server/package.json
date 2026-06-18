@@ -29,7 +29,8 @@
     "check:permissions": "ts-node scripts/check-permissions.ts",
     "check:i18n": "ts-node scripts/check-i18n-keys.ts",
     "check:role-conditions": "ts-node scripts/check-existing-role-conditions.ts",
-    "generate:subjects": "ts-node scripts/generate-subjects.ts"
+    "generate:subjects": "ts-node scripts/generate-subjects.ts",
+    "audit:ci": "npm audit --audit-level=high --omit=dev"
   },
   "dependencies": {
     "@a2seven/yoo-checkout": "^1.1.4",
