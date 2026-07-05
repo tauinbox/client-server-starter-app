@@ -386,6 +386,8 @@ Configured in `CoreModule` via `@nestjs/throttler`. Two throttlers run in parall
 
 When `REDIS_URL` is set the throttler uses `RedisThrottlerStorage` so counters are shared across all instances; otherwise it falls back to the in-process memory store (single-instance only).
 
+The billing webhook receivers (`POST /billing/webhooks/paddle`, `POST /billing/webhooks/yookassa`) carry `@SkipThrottle()`: payment providers deliver from a small set of egress IPs, so all of a provider's webhooks would share one per-IP bucket and a legitimate renewal batch could get 429'd. Authenticity is enforced by signature verification (Paddle) / API re-fetch (YooKassa) and ingestion is idempotent, so the throttle adds no protection on these routes.
+
 Per-route overrides currently in use:
 
 | Endpoint | Window | Limit | Why |
