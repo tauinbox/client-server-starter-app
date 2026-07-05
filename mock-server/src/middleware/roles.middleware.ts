@@ -351,13 +351,26 @@ router.put('/:id/permissions', adminGuard, (req, res) => {
     }
   }
 
+  // Mirror the server: unknown ids fail validation with 400 before the
+  // existing set is touched.
+  const unknownItem = items.find(
+    (item) => !state.permissions.has(item.permissionId)
+  );
+  if (unknownItem) {
+    res.status(400).json({
+      message: `Permission ${unknownItem.permissionId} not found`,
+      statusCode: 400,
+      errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
+    });
+    return;
+  }
+
   // Replace all existing assignments for this role
   state.rolePermissions = state.rolePermissions.filter(
     (rp) => rp.roleId !== id
   );
 
   for (const item of items) {
-    if (!state.permissions.has(item.permissionId)) continue;
     state.rolePermissions.push({
       id: uuidv4(),
       roleId: id,
@@ -428,16 +441,36 @@ router.post('/:id/permissions', adminGuard, (req, res) => {
     }
   }
 
-  for (const permissionId of permissionIds) {
-    // Skip if already assigned
-    const exists = state.rolePermissions.some(
+  // Mirror the server: unknown ids fail validation with 400 before anything
+  // is written, then a duplicate pair maps to 409 (unique constraint) with
+  // no partial writes (single-transaction save on the server).
+  const unknownId = (permissionIds as string[]).find(
+    (permissionId) => !state.permissions.has(permissionId)
+  );
+  if (unknownId !== undefined) {
+    res.status(400).json({
+      message: `Permission ${unknownId} not found`,
+      statusCode: 400,
+      errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
+    });
+    return;
+  }
+
+  const duplicateId = (permissionIds as string[]).find((permissionId) =>
+    state.rolePermissions.some(
       (rp) => rp.roleId === id && rp.permissionId === permissionId
-    );
-    if (exists) continue;
+    )
+  );
+  if (duplicateId !== undefined) {
+    res.status(409).json({
+      message: 'A record with this value already exists',
+      statusCode: 409,
+      errorKey: ErrorKeys.DB.UNIQUE_VIOLATION
+    });
+    return;
+  }
 
-    // Verify permission exists
-    if (!state.permissions.has(permissionId)) continue;
-
+  for (const permissionId of permissionIds as string[]) {
     state.rolePermissions.push({
       id: uuidv4(),
       roleId: id,
@@ -538,9 +571,19 @@ router.post('/assign/:userId', adminGuard, (req, res) => {
     }
   }
 
-  if (!user.roles.includes(role.name)) {
-    user.roles.push(role.name);
+  // Mirror the server: a duplicate assignment hits the user_roles unique
+  // constraint and maps to 409 before any side effect (no token revocation,
+  // no audit entry, no SSE push).
+  if (user.roles.includes(role.name)) {
+    res.status(409).json({
+      message: 'A record with this value already exists',
+      statusCode: 409,
+      errorKey: ErrorKeys.DB.UNIQUE_VIOLATION
+    });
+    return;
   }
+
+  user.roles.push(role.name);
 
   // Revoke tokens on any role change (mirrors UserRoleChangedListener)
   user.tokenRevokedAt = new Date().toISOString();
