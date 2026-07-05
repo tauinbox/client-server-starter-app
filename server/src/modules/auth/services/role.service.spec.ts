@@ -665,6 +665,7 @@ describe('RoleService', () => {
     it('super (manage:all) bypasses can-grant check and writes permissions', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.save.mockResolvedValue([]);
+      mockPermissionRepo.find.mockResolvedValue([permCreateRole]);
       const { ability } = abilityMock({ manageAll: true });
 
       await service.assignPermissionsToRole(
@@ -675,9 +676,52 @@ describe('RoleService', () => {
         'actor-1'
       );
 
-      expect(mockPermissionRepo.find).not.toHaveBeenCalled();
+      // Existence is still validated for super callers; only the can-grant
+      // escalation check is bypassed.
+      expect(mockPermissionRepo.find).toHaveBeenCalled();
       expect(mockRolePermissionRepo.save).toHaveBeenCalled();
       expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
+    });
+
+    it('super caller granting an unknown permission id gets 400 without saving', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockPermissionRepo.find.mockResolvedValue([]);
+      const { ability } = abilityMock({ manageAll: true });
+
+      await expect(
+        service.assignPermissionsToRole(
+          'role-2',
+          ['perm-missing'],
+          undefined,
+          ability,
+          'actor-1'
+        )
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: 'errors.general.resourceNotFound' }
+      });
+
+      expect(mockRolePermissionRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('super caller setting an unknown permission id gets 400 without touching the set', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockPermissionRepo.find.mockResolvedValue([]);
+      const { ability } = abilityMock({ manageAll: true });
+
+      await expect(
+        service.setPermissionsForRole(
+          'role-2',
+          [{ permissionId: 'perm-missing', conditions: null }],
+          ability,
+          'actor-1'
+        )
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: 'errors.general.resourceNotFound' }
+      });
+
+      expect(mockRolePermissionRepo.manager.transaction).not.toHaveBeenCalled();
     });
 
     it('rejects with 403 CANNOT_GRANT_PERMISSION and audits when caller lacks the permission', async () => {

@@ -76,8 +76,10 @@ export class RoleService {
     context: { actorId?: string; roleId: string }
   ): Promise<void> {
     if (!ability) return;
-    if (ability.can('manage', 'all')) return;
+    // Resolve before the super bypass so unknown permission ids fail with a
+    // clean 400 for every caller instead of an opaque FK-violation 409.
     const resolved = await this.resolveGrantItems(items);
+    if (ability.can('manage', 'all')) return;
     try {
       assertCanGrantPermissions(ability, resolved);
     } catch (err) {
