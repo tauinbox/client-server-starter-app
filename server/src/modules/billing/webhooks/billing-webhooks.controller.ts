@@ -6,6 +6,7 @@ import {
   Req
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { Public } from '../../auth/decorators/public.decorator';
 import { WebhookIngestionService } from './webhook-ingestion.service';
@@ -15,8 +16,15 @@ import { WebhookIngestionService } from './webhook-ingestion.service';
  * provider verifies its own authenticity inside verifyAndParseWebhook (Paddle
  * HMAC, YooKassa re-fetch). Signature checks need the unparsed bytes, so these
  * read req.rawBody (enabled by rawBody: true in main.ts) instead of a DTO.
+ *
+ * @SkipThrottle() — providers deliver from a few stable egress IPs, so all of
+ * a provider's webhooks share one per-IP throttle bucket; a renewal batch
+ * above the global limit would get 429'd and delay entitlements until a
+ * provider retry. Authenticity is signature/re-fetch based and ingestion is
+ * idempotent, so the throttle adds no protection here.
  */
 @ApiTags('Billing Webhooks')
+@SkipThrottle()
 @Controller({ path: 'billing/webhooks', version: '1' })
 export class BillingWebhooksController {
   constructor(private readonly ingestion: WebhookIngestionService) {}
