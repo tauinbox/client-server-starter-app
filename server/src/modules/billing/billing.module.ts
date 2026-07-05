@@ -49,6 +49,7 @@ import { BillingUserController } from './controllers/billing-user.controller';
 import { BillingAdminController } from './controllers/billing-admin.controller';
 import { BillingWebhooksController } from './webhooks/billing-webhooks.controller';
 import { WebhookIngestionService } from './webhooks/webhook-ingestion.service';
+import { WebhookIpAllowlistGuard } from './webhooks/webhook-ip-allowlist.guard';
 import { WebhookReconciliationService } from './webhooks/webhook-reconciliation.service';
 import { BillingEventReducer } from './webhooks/billing-event-reducer.service';
 import { BillingWebhookProcessor } from './webhooks/billing-webhook.processor';
@@ -138,6 +139,7 @@ export class BillingModule {
         UsageRating,
         ProrationCalculator,
         WebhookIngestionService,
+        WebhookIpAllowlistGuard,
         BillingEventReducer,
         RenewalService,
         ...(redisUrl

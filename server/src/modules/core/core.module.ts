@@ -107,7 +107,11 @@ export class CoreModule implements NestModule {
             YOOKASSA_VAT_CODE: Joi.number().integer().min(1).max(6).default(1),
             BILLING_DEFAULT_CURRENCY: Joi.string()
               .valid('USD', 'RUB')
-              .default('USD')
+              .default('USD'),
+            // Syntax (IP/CIDR per entry) is validated by
+            // WebhookIpAllowlistGuard, which throws at bootstrap on a
+            // malformed entry.
+            BILLING_WEBHOOK_IP_ALLOWLIST: Joi.string().optional().allow('')
           }),
           validationOptions: {
             allowUnknown: true,

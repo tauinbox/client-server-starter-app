@@ -113,6 +113,7 @@ Copy `.env.example` to `.env` and configure:
 | `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
 | `YOOKASSA_VAT_CODE` | `1` | VAT code on every 54-FZ receipt line (1–6, tax-regime specific; `1` = "без НДС") |
 | `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency for new customers (`USD` or `RUB`). Billing UI stays hidden until at least one provider is configured |
+| `BILLING_WEBHOOK_IP_ALLOWLIST` | - (local), provider egress ranges (docker-compose) | Comma-separated IPs/CIDRs allowed to call `/billing/webhooks/*`; other sources get `403` before any webhook processing. Empty disables the check; a malformed entry fails startup. Requires `TRUSTED_PROXIES` behind a reverse proxy. See [Billing webhook source-IP allowlist](#billing-webhook-source-ip-allowlist) |
 
 ## Architecture
 
@@ -386,7 +387,17 @@ Configured in `CoreModule` via `@nestjs/throttler`. Two throttlers run in parall
 
 When `REDIS_URL` is set the throttler uses `RedisThrottlerStorage` so counters are shared across all instances; otherwise it falls back to the in-process memory store (single-instance only).
 
-The billing webhook receivers (`POST /billing/webhooks/paddle`, `POST /billing/webhooks/yookassa`) carry `@SkipThrottle()`: payment providers deliver from a small set of egress IPs, so all of a provider's webhooks would share one per-IP bucket and a legitimate renewal batch could get 429'd. Authenticity is enforced by signature verification (Paddle) / API re-fetch (YooKassa) and ingestion is idempotent, so the throttle adds no protection on these routes.
+The billing webhook receivers (`POST /billing/webhooks/paddle`, `POST /billing/webhooks/yookassa`) carry `@SkipThrottle()`: payment providers deliver from a small set of egress IPs, so all of a provider's webhooks would share one per-IP bucket and a legitimate renewal batch could get 429'd. Authenticity is enforced by signature verification (Paddle) / API re-fetch (YooKassa) and ingestion is idempotent, so the throttle adds no protection on these routes. With the throttle skipped, unauthenticated traffic to these routes is bounded by the source-IP allowlist below.
+
+### Billing webhook source-IP allowlist
+
+`WebhookIpAllowlistGuard` rejects requests to `/billing/webhooks/*` with `403` unless the client IP matches `BILLING_WEBHOOK_IP_ALLOWLIST` (comma-separated IPs/CIDRs, IPv6 supported). The check runs before any webhook processing - in particular before the outbound YooKassa payment re-fetch, which is what an arbitrary internet host could otherwise trigger at will (YooKassa notifications are unsigned by design; for HMAC-verified Paddle the allowlist is defense in depth).
+
+- Empty/unset disables the check - local dev and the e2e suites run open.
+- `docker-compose.yml` sets the production default to the provider egress ranges published at [Paddle: respond to webhooks](https://developer.paddle.com/webhooks/about/respond-to-webhooks/) (live + sandbox) and [YooKassa: webhooks](https://yookassa.ru/developers/using-api/webhooks), verified 2026-07-05. Both providers recommend allowlisting.
+- **Update procedure:** if a provider's webhooks start being rejected, the guard logs each rejection as a warning with the source IP - re-check the two pages above and update the default in `docker-compose.yml`. Export `BILLING_WEBHOOK_IP_ALLOWLIST` empty to disable the check temporarily without editing the file.
+- A malformed entry fails startup deliberately (a deploy that cannot enforce the list should fail loudly, not fall open or drop webhooks silently).
+- The guard reads `req.ip`, so behind a reverse proxy `TRUSTED_PROXIES` must be configured (see [Deployment behind a reverse proxy](#deployment-behind-a-reverse-proxy)); a spoofed `X-Forwarded-For` from an untrusted peer is ignored.
 
 Per-route overrides currently in use:
 
