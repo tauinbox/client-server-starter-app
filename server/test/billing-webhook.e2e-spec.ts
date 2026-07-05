@@ -7,6 +7,7 @@
 
 import { Test } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { ConfigService } from '@nestjs/config';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
 import { VersioningType, type INestApplication } from '@nestjs/common';
@@ -305,6 +306,8 @@ describe('Billing Paddle webhook (e2e)', () => {
         BillingEventReducer,
         EntitlementService,
         CreditService,
+        // WebhookIpAllowlistGuard dep; unset allowlist keeps the receivers open
+        { provide: ConfigService, useValue: { get: () => undefined } },
         {
           provide: getRepositoryToken(CreditBalance),
           useValue: {
@@ -720,6 +723,8 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
         UsageInvoicingService,
         UsageRating,
         CreditService,
+        // WebhookIpAllowlistGuard dep; unset allowlist keeps the receivers open
+        { provide: ConfigService, useValue: { get: () => undefined } },
         {
           provide: getRepositoryToken(CreditBalance),
           useValue: {

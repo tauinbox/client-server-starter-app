@@ -79,6 +79,18 @@ services:
       # one throttler/audit key — see server/README.md "Deployment behind a
       # reverse proxy". Override by exporting TRUSTED_PROXIES in the shell.
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-loopback,uniquelocal}
+      # Source-IP allowlist for /api/v1/billing/webhooks/* - other addresses
+      # get 403 before any webhook processing. Default = provider egress
+      # ranges as published on 2026-07-05 (Paddle live + sandbox; YooKassa
+      # incl. IPv6). Both providers recommend allowlisting; re-check the pages
+      # below if webhooks start getting rejected (ranges can drift - rejected
+      # IPs are logged as warnings by WebhookIpAllowlistGuard):
+      #   https://developer.paddle.com/webhooks/about/respond-to-webhooks/
+      #   https://yookassa.ru/developers/using-api/webhooks
+      # Export BILLING_WEBHOOK_IP_ALLOWLIST to override; export it empty to
+      # disable the check (no-colon form: an exported empty value wins over
+      # this default). A malformed entry fails startup on purpose.
+      BILLING_WEBHOOK_IP_ALLOWLIST: ${BILLING_WEBHOOK_IP_ALLOWLIST-34.232.58.13,34.195.105.136,34.237.3.244,35.155.119.135,52.11.166.252,34.212.5.7,34.194.127.46,54.234.237.108,3.208.120.145,44.226.236.210,44.241.183.62,100.20.172.113,185.71.76.0/27,185.71.77.0/27,77.75.153.0/25,77.75.156.11,77.75.156.35,77.75.154.128/25,2a02:5180::/32}
     expose:
       - "3000"
     volumes:

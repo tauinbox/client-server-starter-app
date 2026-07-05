@@ -437,6 +437,7 @@ Edit `.env` with your database credentials and settings:
 | `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
 | `YOOKASSA_VAT_CODE` | `1` | VAT code on every 54-FZ receipt line (1–6, tax-regime specific; `1` = "без НДС") |
 | `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency for new customers (`USD` or `RUB`) |
+| `BILLING_WEBHOOK_IP_ALLOWLIST` | - (local), provider egress ranges (docker-compose) | Comma-separated IPs/CIDRs allowed to call the billing webhook receivers (`/api/v1/billing/webhooks/*`); other sources get `403` before any webhook processing. Empty disables the check; a malformed entry fails startup. `docker-compose.yml` defaults it to the published Paddle + YooKassa egress ranges. See ["Billing webhook source-IP allowlist" in `server/README.md`](server/README.md#billing-webhook-source-ip-allowlist) |
 
 ### 3. Set up the database
 
@@ -804,8 +805,8 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1241 tests passing |
-| Server E2E tests | Jest | Separate config in `test/` | 171 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1249 tests passing |
+| Server E2E tests | Jest | Separate config in `test/` | 176 tests passing |
 | Client unit tests | Vitest | `*.spec.ts` alongside source | 874 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 201 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
