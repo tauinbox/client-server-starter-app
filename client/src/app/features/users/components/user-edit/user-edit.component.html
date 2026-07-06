@@ -154,8 +154,10 @@
 
             <button matButton="filled" type="submit">
               @if (saving()) {
-                <mat-spinner diameter="24"></mat-spinner>
-                <span class="ml-2">{{ t('users.edit.saving') }}</span>
+                <span class="app-btn-loading">
+                  <mat-spinner diameter="24"></mat-spinner>
+                  {{ t('users.edit.saving') }}
+                </span>
               } @else {
                 {{ t('common.save') }}
               }

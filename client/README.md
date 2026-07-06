@@ -245,7 +245,7 @@ src/styles/
 ├── base/             # Reset, typography, animations
 ├── themes/           # Light and dark Material themes + CSS vars
 ├── layout/           # Containers, grids
-├── components/       # Cards, forms, loading, tables, dialogs (_dialogs.scss — global dialog overrides), buttons (_buttons.scss — .app-btn-danger destructive utility), chips (_chips.scss — .app-chip-danger destructive utility)
+├── components/       # Cards, forms, loading, tables, dialogs (_dialogs.scss — global dialog overrides), buttons (_buttons.scss — .app-btn-danger destructive utility, .app-btn-loading spinner+label row for a button's loading branch), chips (_chips.scss — .app-chip-danger destructive utility)
 └── utilities/        # Flex, spacing, text, visibility helpers
 ```
 

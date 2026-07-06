@@ -93,9 +93,13 @@
       (click)="submit()"
     >
       @if (isLoading()) {
-        <mat-spinner diameter="18" />
+        <span class="app-btn-loading">
+          <mat-spinner diameter="18" />
+          {{ t('common.save') }}
+        </span>
+      } @else {
+        {{ t('common.save') }}
       }
-      {{ t('common.save') }}
     </button>
   </mat-dialog-actions>
 </ng-container>
