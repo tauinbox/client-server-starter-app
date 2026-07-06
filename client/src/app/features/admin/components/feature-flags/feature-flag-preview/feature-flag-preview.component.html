@@ -83,11 +83,14 @@
       (click)="run()"
     >
       @if (loading()) {
-        <mat-spinner diameter="18" />
+        <span class="app-btn-loading">
+          <mat-spinner diameter="18" />
+          {{ t('admin.featureFlagPreview.runButton') }}
+        </span>
       } @else {
         <mat-icon>play_arrow</mat-icon>
+        {{ t('admin.featureFlagPreview.runButton') }}
       }
-      {{ t('admin.featureFlagPreview.runButton') }}
     </button>
   </div>
 

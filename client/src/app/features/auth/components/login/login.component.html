@@ -60,8 +60,10 @@
                 (click)="resendVerification()"
               >
                 @if (resendingVerification()) {
-                  <mat-spinner diameter="16"></mat-spinner>
-                  {{ t('auth.login.sending') }}
+                  <span class="app-btn-loading">
+                    <mat-spinner diameter="16"></mat-spinner>
+                    {{ t('auth.login.sending') }}
+                  </span>
                 } @else {
                   {{ t('auth.login.resendVerificationEmail') }}
                 }
@@ -79,8 +81,10 @@
             "
           >
             @if (loading()) {
-              <mat-spinner diameter="24"></mat-spinner>
-              <span class="ml-2">{{ t('auth.login.loggingIn') }}</span>
+              <span class="app-btn-loading">
+                <mat-spinner diameter="24"></mat-spinner>
+                {{ t('auth.login.loggingIn') }}
+              </span>
             } @else {
               {{ t('auth.login.title') }}
             }

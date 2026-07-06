@@ -53,8 +53,10 @@
         <div class="form-actions">
           <button matButton="filled" type="submit" [disabled]="!canSubmit()">
             @if (loading()) {
-              <mat-spinner diameter="24"></mat-spinner>
-              <span class="ml-2">{{ t('auth.register.registering') }}</span>
+              <span class="app-btn-loading">
+                <mat-spinner diameter="24"></mat-spinner>
+                {{ t('auth.register.registering') }}
+              </span>
             } @else {
               {{ t('auth.register.title') }}
             }

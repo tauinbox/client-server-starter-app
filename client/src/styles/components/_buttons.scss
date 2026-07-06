@@ -1,3 +1,20 @@
+@use '../abstracts/variables' as vars;
+
+// Wrapper for a button's loading branch (spinner + label). Needed because
+// Material projects non-icon content into the inline .mdc-button__label span,
+// where the block-level <mat-spinner> host would break onto its own line;
+// .mdc-button__label itself is unreachable from encapsulated component styles.
+.app-btn-loading {
+  display: flex;
+  gap: vars.$space-component-gap;
+  align-items: center;
+  justify-content: center;
+
+  mat-spinner {
+    flex-shrink: 0;
+  }
+}
+
 // ── Destructive button utility ─────────────────────────────────────────────
 // Re-themes any Angular Material button variant (filled, text, outlined,
 // tonal, elevated, icon) to the system error palette. Apply on the host
