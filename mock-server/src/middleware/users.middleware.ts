@@ -36,6 +36,7 @@ import {
   toAdminUserResponse
 } from '../state';
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
+import { cancelSubscriptionsForDeletedUser } from './billing.middleware';
 import type { AuthenticatedRequest, MockUser } from '../types';
 import { pushToAll, pushToUser } from '../sse-hub';
 
@@ -653,6 +654,9 @@ router.delete('/:id', adminGuard, (req, res) => {
       state.revokedRefreshTokens.delete(token);
     }
   }
+
+  // Stop any renewals/charges on the deleted user's subscriptions.
+  cancelSubscriptionsForDeletedUser(id);
 
   const actor = (req as AuthenticatedRequest).user;
   logAudit('USER_DELETE', {

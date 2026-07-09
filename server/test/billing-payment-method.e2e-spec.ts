@@ -276,6 +276,7 @@ function subscriptionsRepo(stores: Stores) {
     save: (entity: Subscription) => Promise.resolve(entity),
     createQueryBuilder: () => {
       const qb = {
+        innerJoin: () => qb,
         where: () => qb,
         andWhere: () => qb,
         setParameters: () => qb,

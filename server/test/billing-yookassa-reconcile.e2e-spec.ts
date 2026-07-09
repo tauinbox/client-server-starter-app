@@ -252,6 +252,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
               ),
             createQueryBuilder: () => {
               const qb = {
+                innerJoin: () => qb,
                 where: () => qb,
                 andWhere: () => qb,
                 setParameters: () => qb,

@@ -4,6 +4,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { Brackets, DataSource, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
+import { User } from '../../users/entities/user.entity';
 import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { Plan } from '../entities/plan.entity';
@@ -82,10 +83,16 @@ export class RenewalService {
    * `trial_end`, an active period reaching `current_period_end`, or a `past_due`
    * one reaching its next dunning retry. Both rating modes are swept — fixed
    * tiers prepay the next period, usage tiers postpay the one that just ended.
+   *
+   * Subscriptions of a soft-deleted user are excluded: the user-deleted
+   * listener cancels them locally, and the join guards any path that still
+   * leaves a live row so a deleted user's saved method is never charged.
    */
   private findDue(now: Date): Promise<Subscription[]> {
     return this.subscriptions
       .createQueryBuilder('s')
+      .innerJoin(Customer, 'c', 'c.id = s.customerId')
+      .innerJoin(User, 'u', 'u.id = c.userId AND u.deletedAt IS NULL')
       .where('s.lifecycleOwner = :owner', { owner: 'self' })
       .andWhere(
         new Brackets((qb) => {

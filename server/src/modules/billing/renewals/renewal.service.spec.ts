@@ -30,6 +30,10 @@ interface Store {
   customers: Customer[];
   plans: Plan[];
   invoices: Array<Invoice & { providerEventId: string | null }>;
+  deletedUserIds: Set<string>;
+  // Join conditions findDue issued, so tests can assert the production query
+  // carries the soft-deleted-user guard the getMany mirror reimplements.
+  capturedJoins: string[];
 }
 
 const NOW = new Date('2026-06-08T00:00:00Z');
@@ -142,19 +146,30 @@ function subscriptionsRepo(store: Store) {
     save: (entity: Subscription) => Promise.resolve(entity),
     createQueryBuilder: () => {
       const qb = {
+        innerJoin: (_entity: unknown, _alias: string, condition: string) => {
+          store.capturedJoins.push(condition);
+          return qb;
+        },
         where: () => qb,
         andWhere: () => qb,
         setParameters: () => qb,
         orderBy: () => qb,
-        // Mirrors the non-time WHERE clauses (self + fixed + open status); the
-        // time-based due check is real code in RenewalService.processSubscription.
+        // Mirrors the non-time WHERE clauses (self + fixed + open status) and
+        // the soft-deleted-user join; the time-based due check is real code in
+        // RenewalService.processSubscription.
         getMany: () =>
           Promise.resolve(
-            store.subscriptions.filter(
-              (s) =>
+            store.subscriptions.filter((s) => {
+              const customer = store.customers.find(
+                (c) => c.id === s.customerId
+              );
+              return (
                 s.lifecycleOwner === 'self' &&
-                ['trialing', 'active', 'past_due'].includes(s.status)
-            )
+                ['trialing', 'active', 'past_due'].includes(s.status) &&
+                customer !== undefined &&
+                !store.deletedUserIds.has(customer.userId)
+              );
+            })
           )
       };
       return qb;
@@ -258,7 +273,9 @@ function baseStore(sub: Subscription): Store {
     subscriptions: [sub],
     customers: [makeCustomer()],
     plans: [makePlan()],
-    invoices: []
+    invoices: [],
+    deletedUserIds: new Set(),
+    capturedJoins: []
   };
 }
 
@@ -352,6 +369,23 @@ describe('RenewalService', () => {
 
     expect(charge).not.toHaveBeenCalled();
     expect(store.invoices).toHaveLength(0);
+  });
+
+  it('does not sweep a self-managed subscription whose owning user is soft-deleted', async () => {
+    const sub = makeSub();
+    const store = baseStore(sub);
+    store.deletedUserIds.add('user-1');
+    const charge = jest.fn();
+    const { service } = await build(store, charge);
+
+    await service.runDueRenewals(NOW);
+
+    expect(charge).not.toHaveBeenCalled();
+    // The production filter is the SQL join findDue issues; assert it exists
+    // so the mirrored getMany above cannot drift from the real query.
+    expect(store.capturedJoins).toEqual(
+      expect.arrayContaining([expect.stringContaining('u.deletedAt IS NULL')])
+    );
   });
 
   it('skips provider-managed subscriptions (renewed via webhook)', async () => {
