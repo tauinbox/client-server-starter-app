@@ -117,6 +117,23 @@ function findCustomer(userId: string): MockCustomer | undefined {
   return undefined;
 }
 
+/**
+ * Mirrors the server's billing user-deleted listener: a deleted user's
+ * subscriptions are canceled so nothing keeps renewing or charging. The mock
+ * "provider" is internal, so provider-managed rows settle to the same terminal
+ * state immediately instead of waiting for a webhook.
+ */
+export function cancelSubscriptionsForDeletedUser(userId: string): void {
+  const customer = findCustomer(userId);
+  if (!customer) return;
+  for (const sub of getState().billingSubscriptions.values()) {
+    if (sub.customerId !== customer.id || sub.status === 'canceled') continue;
+    sub.status = 'canceled';
+    sub.cancelAtPeriodEnd = false;
+    sub.updatedAt = new Date().toISOString();
+  }
+}
+
 function getOrCreateCustomer(userId: string, locale: string): MockCustomer {
   const existing = findCustomer(userId);
   if (existing) return existing;
