@@ -660,7 +660,7 @@ API base URL: `/api/v1`
 | GET | `/users/:id` | `users:read` | Get user by ID |
 | GET | `/users/:id/permissions` | `users:read` | Get effective permissions (roles + resolved permissions + packed CASL rules) |
 | POST | `/users` | `users:create` | Create user |
-| PATCH | `/users/:id` | `users:update` | Update user |
+| PATCH | `/users/:id` | `users:update` | Update user (email, name, password, `isActive` deactivate/reactivate, `unlockAccount`) |
 | DELETE | `/users/:id` | `users:delete` | Soft-delete user (sets `deleted_at`, revokes sessions) |
 | POST | `/users/:id/restore` | `users:delete` | Restore soft-deleted user (clears `deleted_at`, sets `isActive=true`) |
 | POST | `/roles` | `roles:create` | Create role |
