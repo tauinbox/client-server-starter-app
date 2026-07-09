@@ -660,7 +660,7 @@ API base URL: `/api/v1`
 | GET | `/users/:id` | `users:read` | Get user by ID |
 | GET | `/users/:id/permissions` | `users:read` | Get effective permissions (roles + resolved permissions + packed CASL rules) |
 | POST | `/users` | `users:create` | Create user |
-| PATCH | `/users/:id` | `users:update` | Update user |
+| PATCH | `/users/:id` | `users:update` | Update user (email, name, password, `isActive` deactivate/reactivate, `unlockAccount`) |
 | DELETE | `/users/:id` | `users:delete` | Soft-delete user (sets `deleted_at`, revokes sessions) |
 | POST | `/users/:id/restore` | `users:delete` | Restore soft-deleted user (clears `deleted_at`, sets `isActive=true`) |
 | POST | `/roles` | `roles:create` | Create role |
@@ -805,8 +805,8 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1254 tests passing |
-| Server E2E tests | Jest | Separate config in `test/` | 180 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1255 tests passing |
+| Server E2E tests | Jest | Separate config in `test/` | 185 tests passing |
 | Client unit tests | Vitest | `*.spec.ts` alongside source | 875 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 201 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |

@@ -527,6 +527,22 @@ router.patch('/:id', adminGuard, (req, res) => {
     }
   }
 
+  if (isActive !== undefined && typeof isActive !== 'boolean') {
+    res.status(400).json({
+      message: 'isActive must be a boolean value',
+      statusCode: 400
+    });
+    return;
+  }
+
+  if (unlockAccount !== undefined && typeof unlockAccount !== 'boolean') {
+    res.status(400).json({
+      message: 'unlockAccount must be a boolean value',
+      statusCode: 400
+    });
+    return;
+  }
+
   if (email !== undefined) {
     const existing = findUserByEmail(email);
     const pendingConflict = Array.from(getState().users.values()).find(

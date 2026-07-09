@@ -563,6 +563,21 @@ describe('UsersService', () => {
       );
     });
 
+    it('should revoke tokens when deactivating a user', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      mockRepository.save.mockResolvedValue({ ...mockUser, isActive: false });
+
+      await service.update('user-1', { isActive: false });
+
+      expect(mockRepository.merge).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          isActive: false,
+          tokenRevokedAt: expect.any(Date) as Date
+        })
+      );
+    });
+
     it('should throw ForbiddenException when ability denies update', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       const canSpy = jest.fn().mockReturnValue(false);

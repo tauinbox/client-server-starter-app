@@ -830,7 +830,7 @@ Admin UIs can then write rules referencing `{ field: 'custom', customKey: 'tenan
 | GET | `/search/cursor` | `users:search` | Search users with cursor-based pagination + same filters as `/search` |
 | GET | `/:id` | `users:read` | Get user by ID |
 | GET | `/:id/permissions` | `users:read` | Get effective permissions for user (roles + resolved permissions + packed CASL rules) |
-| PATCH | `/:id` | `users:update` | Update user |
+| PATCH | `/:id` | `users:update` | Update user (email, name, password, `isActive` deactivate/reactivate, `unlockAccount`) |
 | DELETE | `/:id` | `users:delete` | Soft-delete user (sets `deleted_at`, revokes all active sessions) |
 | POST | `/:id/restore` | `users:delete` | Restore soft-deleted user (clears `deleted_at`, sets `isActive=true`) |
 
