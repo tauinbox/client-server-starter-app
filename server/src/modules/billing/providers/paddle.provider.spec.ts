@@ -27,7 +27,16 @@ function paddleMock() {
       previewUpdate: jest.fn(),
       getPaymentMethodChangeTransaction: jest.fn()
     },
-    adjustments: { create: jest.fn() }
+    adjustments: { create: jest.fn(), list: jest.fn() }
+  };
+}
+
+/** Mimics the SDK's paginated AdjustmentCollection (async-iterable). */
+function adjustmentCollection(items: Array<{ reason: string }>) {
+  return {
+    async *[Symbol.asyncIterator]() {
+      yield* await Promise.resolve(items);
+    }
   };
 }
 
@@ -729,6 +738,75 @@ describe('PaddleProvider', () => {
           items: [{ itemId: 'txnitm_1', type: 'partial', amount: '500' }]
         })
       );
+    });
+
+    it('does not consult existing adjustments when no idempotency key is given', async () => {
+      const { provider, client } = await build({});
+      client!.transactions.get.mockResolvedValue({
+        details: { totals: { total: '1200' }, lineItems: [{ id: 'txnitm_1' }] }
+      });
+
+      await provider.refund('txn_123', 1200);
+
+      expect(client!.adjustments.list).not.toHaveBeenCalled();
+      expect(client!.adjustments.create).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: 'Refund' })
+      );
+    });
+
+    it('embeds the idempotency key in the adjustment reason', async () => {
+      const { provider, client } = await build({});
+      client!.transactions.get.mockResolvedValue({
+        details: { totals: { total: '1200' }, lineItems: [{ id: 'txnitm_1' }] }
+      });
+      client!.adjustments.list.mockReturnValue(
+        adjustmentCollection([{ reason: 'Refund refund-inv-1-500' }])
+      );
+
+      await provider.refund('txn_123', 1200, 'refund-inv-1-1200');
+
+      expect(client!.adjustments.list).toHaveBeenCalledWith({
+        transactionId: ['txn_123'],
+        action: 'refund'
+      });
+      expect(client!.adjustments.create).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: 'Refund refund-inv-1-1200' })
+      );
+    });
+
+    it('retrying with the same key is a no-op once the adjustment exists', async () => {
+      const { provider, client } = await build({});
+      client!.transactions.get.mockResolvedValue({
+        details: { totals: { total: '1200' }, lineItems: [{ id: 'txnitm_1' }] }
+      });
+      client!.adjustments.list.mockReturnValue(
+        adjustmentCollection([{ reason: 'Refund refund-inv-1-1200' }])
+      );
+
+      await provider.refund('txn_123', 1200, 'refund-inv-1-1200');
+
+      expect(client!.adjustments.create).not.toHaveBeenCalled();
+    });
+
+    it('a partial-refund retry with the same key is also a no-op', async () => {
+      const { provider, client } = await build({});
+      client!.transactions.get.mockResolvedValue({
+        details: { totals: { total: '1200' }, lineItems: [{ id: 'txnitm_1' }] }
+      });
+      client!.adjustments.list.mockReturnValue(
+        adjustmentCollection([
+          { reason: 'Refund refund-inv-1-500' },
+          { reason: 'Refund change-refund:sub-1:pro:1750000000000' }
+        ])
+      );
+
+      await provider.refund(
+        'txn_123',
+        500,
+        'change-refund:sub-1:pro:1750000000000'
+      );
+
+      expect(client!.adjustments.create).not.toHaveBeenCalled();
     });
   });
 
