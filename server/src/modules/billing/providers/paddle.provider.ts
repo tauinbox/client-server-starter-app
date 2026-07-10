@@ -371,8 +371,29 @@ export class PaddleProvider implements PaymentProvider {
     });
   }
 
-  async refund(providerInvoiceRef: string, amountMinor: number): Promise<void> {
+  async refund(
+    providerInvoiceRef: string,
+    amountMinor: number,
+    idempotencyKey?: string
+  ): Promise<void> {
     const paddle = this.requireClient();
+
+    // The Paddle API has no client-supplied idempotency keys, so dedup is
+    // app-level: the key is embedded in the adjustment reason, and a retry
+    // finds the adjustment the previous attempt already created and no-ops
+    // instead of issuing a second real refund.
+    if (
+      idempotencyKey &&
+      (await this.findRefundAdjustment(
+        paddle,
+        providerInvoiceRef,
+        idempotencyKey
+      ))
+    ) {
+      return;
+    }
+    const reason = idempotencyKey ? `Refund ${idempotencyKey}` : 'Refund';
+
     const transaction = await paddle.transactions.get(providerInvoiceRef);
     const total = parseMinor(transaction.details?.totals?.total);
 
@@ -381,7 +402,7 @@ export class PaddleProvider implements PaymentProvider {
         transactionId: providerInvoiceRef,
         action: 'refund',
         type: 'full',
-        reason: 'Refund'
+        reason
       });
       return;
     }
@@ -398,11 +419,34 @@ export class PaddleProvider implements PaymentProvider {
       transactionId: providerInvoiceRef,
       action: 'refund',
       type: 'partial',
-      reason: 'Refund',
+      reason,
       items: [
         { itemId: lineItem.id, type: 'partial', amount: String(amountMinor) }
       ]
     });
+  }
+
+  /**
+   * Whether a refund adjustment carrying `idempotencyKey` in its reason
+   * already exists on the transaction. Any status counts as consumed: the
+   * operation behind the key was submitted once, and a later legitimate
+   * refund computes a new cumulative total and therefore a new key.
+   */
+  private async findRefundAdjustment(
+    paddle: Paddle,
+    transactionId: string,
+    idempotencyKey: string
+  ): Promise<boolean> {
+    const adjustments = paddle.adjustments.list({
+      transactionId: [transactionId],
+      action: 'refund'
+    });
+    for await (const adjustment of adjustments) {
+      if (adjustment.reason.includes(idempotencyKey)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   async verifyAndParseWebhook(
