@@ -19,10 +19,14 @@ export interface ResolverContext {
  * Branches are merged in a fixed order — ownership → fieldMatch → userAttr →
  * custom — so when two branches write the same field key the later one wins.
  *
- * Returns `skipPermission: true` to veto the entire permission (no rule is
- * registered for this user) when the input is unsafe enough that even an
- * unconditional grant would be wrong — currently only a denied MongoQuery
- * operator in `custom`.
+ * Returns `skipPermission: true` to veto the entire permission when the input
+ * cannot be honored as authored: a denied MongoQuery operator in `custom`, or
+ * restriction branches that resolve to an empty query (empty `fieldMatch`
+ * arrays, unknown `userAttr` attributes, `custom` that parses to `{}` or not
+ * at all). Registering such a permission unconditionally would silently widen
+ * an intended restriction, so it fails closed instead. A condition object
+ * with no restriction branches (only `effect`) is a legitimate unconditional
+ * rule and is not vetoed.
  */
 export function resolveConditions(
   conditions: PermissionCondition,
@@ -77,6 +81,19 @@ export function resolveConditions(
       }
       Object.assign(query, parsed);
     }
+  }
+
+  const hasRestrictionBranches =
+    (ownership !== undefined && ownership !== null) ||
+    (fieldMatch !== undefined && fieldMatch !== null) ||
+    (userAttr !== undefined && userAttr !== null) ||
+    (custom !== undefined && custom !== null);
+
+  if (hasRestrictionBranches && Object.keys(query).length === 0) {
+    ctx.logger.warn(
+      `Conditions of permission "${ctx.permissionLabel}" resolved to an empty query for user ${ctx.userId} - failing closed, vetoing permission`
+    );
+    return { query, skipPermission: true };
   }
 
   return { query, skipPermission: false };

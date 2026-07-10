@@ -430,6 +430,58 @@ describe('CaslAbilityFactory', () => {
       ).toBe(false);
     });
 
+    it('should register a blanket deny when a deny condition is vetoed (unsafe custom)', async () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+      const permissions: ResolvedPermission[] = [
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update',
+          conditions: null
+        },
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update',
+          conditions: { effect: 'deny', custom: '{"$where":"hack"}' }
+        }
+      ];
+
+      const ability = await factory.createForUser('user-1', roles, permissions);
+
+      // The broken deny must not vanish (that would fail open) - it widens
+      // into an unconditional deny instead.
+      expect(ability.can('update', 'User')).toBe(false);
+
+      warnSpy.mockRestore();
+    });
+
+    it('should register a blanket deny when a deny condition resolves to an empty query', async () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+      const permissions: ResolvedPermission[] = [
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update',
+          conditions: null
+        },
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update',
+          conditions: { effect: 'deny', fieldMatch: { status: [] } }
+        }
+      ];
+
+      const ability = await factory.createForUser('user-1', roles, permissions);
+
+      expect(ability.can('update', 'User')).toBe(false);
+
+      warnSpy.mockRestore();
+    });
+
     it('should treat conditions.effect === "allow" as the default', async () => {
       const roles: RoleInfo[] = [{ name: 'viewer', isSuper: false }];
       const permissions: ResolvedPermission[] = [
@@ -444,6 +496,82 @@ describe('CaslAbilityFactory', () => {
       const ability = await factory.createForUser('user-1', roles, permissions);
 
       expect(ability.can('read', 'User')).toBe(true);
+    });
+  });
+
+  describe('fail-closed empty condition resolution', () => {
+    let warnSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    });
+
+    afterEach(() => {
+      warnSpy.mockRestore();
+    });
+
+    it.each<[string, ResolvedPermission['conditions']]>([
+      ['empty fieldMatch array', { fieldMatch: { someField: [] } }],
+      ['unknown userAttr attribute', { userAttr: { ownerId: 'unknownAttr' } }],
+      ['custom that parses to {}', { custom: '{}' }],
+      ['malformed custom JSON', { custom: '{not-valid-json' }]
+    ])(
+      'should grant nothing (not everything) for %s',
+      async (_label, conditions) => {
+        const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+        const permissions: ResolvedPermission[] = [
+          {
+            resource: 'users',
+            action: 'update',
+            permission: 'users:update',
+            conditions
+          }
+        ];
+
+        const ability = await factory.createForUser(
+          'user-1',
+          roles,
+          permissions
+        );
+
+        expect(ability.can('update', 'User')).toBe(false);
+        expect(
+          ability.can('update', {
+            __caslSubjectType__: 'User',
+            id: 'user-2'
+          } as never)
+        ).toBe(false);
+      }
+    );
+
+    it('should still grant conditionally when one branch resolves alongside an empty one', async () => {
+      const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+      const permissions: ResolvedPermission[] = [
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update:own',
+          conditions: {
+            ownership: { userField: 'createdBy' },
+            fieldMatch: { status: [] }
+          }
+        }
+      ];
+
+      const ability = await factory.createForUser('user-1', roles, permissions);
+
+      expect(
+        ability.can('update', {
+          __caslSubjectType__: 'User',
+          createdBy: 'user-1'
+        } as never)
+      ).toBe(true);
+      expect(
+        ability.can('update', {
+          __caslSubjectType__: 'User',
+          createdBy: 'user-2'
+        } as never)
+      ).toBe(false);
     });
   });
 });

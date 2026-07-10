@@ -73,11 +73,20 @@ export class CaslAbilityFactory {
         logger: this.logger
       });
 
-      if (queryResult.skipPermission) continue;
+      if (queryResult.skipPermission) {
+        // Fail closed in both directions: a vetoed allow grants nothing,
+        // while a vetoed deny must still deny everything rather than vanish.
+        if (isDeny) {
+          register(action, subject);
+        }
+        continue;
+      }
 
       if (Object.keys(queryResult.query).length > 0) {
         register(action, subject, queryResult.query);
       } else {
+        // Empty query here means the condition object carried no restriction
+        // branches at all (e.g. only `effect`) - an unconditional rule.
         register(action, subject);
       }
     }

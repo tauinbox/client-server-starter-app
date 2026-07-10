@@ -405,23 +405,38 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
       }
     }
 
-    if (conditions.custom) {
+    let vetoed = false;
+
+    if (conditions.custom !== undefined && conditions.custom !== null) {
       try {
         const parsed = JSON.parse(conditions.custom) as Record<string, unknown>;
         if (findDeniedMongoKey(parsed)) {
-          continue;
-        }
-        for (const [k, v] of Object.entries(parsed)) {
-          query[k] = v;
+          vetoed = true;
+        } else {
+          for (const [k, v] of Object.entries(parsed)) {
+            query[k] = v;
+          }
         }
       } catch {
         // ignore invalid JSON — same as server behaviour
       }
     }
 
-    if (Object.keys(query).length > 0) {
+    const hasRestrictionBranches =
+      conditions.ownership != null ||
+      conditions.fieldMatch != null ||
+      conditions.userAttr != null ||
+      conditions.custom != null;
+
+    // Mirrors the server's fail-closed semantics: restriction branches that
+    // veto or resolve to an empty query grant nothing for an allow and deny
+    // everything for a deny; only a branch-less condition (bare `effect`)
+    // registers unconditionally.
+    if (!vetoed && Object.keys(query).length > 0) {
       register(action as Actions, subject, query as MongoQuery<never>);
-    } else {
+    } else if (!vetoed && !hasRestrictionBranches) {
+      register(action as Actions, subject);
+    } else if (isDeny) {
       register(action as Actions, subject);
     }
   }
