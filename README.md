@@ -46,6 +46,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - **CASL condition editors** — all four condition types supported in the permissions dialog: `ownership` checkbox, `fieldMatch` / `userAttr` JSON editors, and a `custom` visual condition builder with field/operator/value form, nested `$or`/`$and` groups, JSON preview, and raw JSON fallback toggle
 - **Prototype-pollution-safe `custom` conditions** — the `custom` branch runs `findDeniedMongoKey()` on parsed user-supplied JSON before any merge; presence of `__proto__`/`constructor`/`prototype` keys vetoes the entire permission
 - **Condition translation** — each branch of `PermissionCondition` (ownership, fieldMatch, userAttr, custom) is translated to a MongoQuery by `resolveConditions()` in `server/src/modules/auth/casl/resolve-conditions.ts`, merged in that fixed order (later writes win). To add a new condition type, add a branch to `resolveConditions()` and extend `PermissionCondition` in `shared/src/types/role.types.ts`
+- **Fail-closed condition resolution** — a condition whose restriction branches resolve to an empty query (empty `fieldMatch` arrays, unknown `userAttr` attribute, `custom` that parses to `{}` or is invalid JSON) vetoes the permission instead of degrading into an unconditional grant; a vetoed `deny` registers as an unconditional `cannot()` so a broken deny rule never silently disappears. Only a branch-less condition object (bare `effect`) registers unconditionally
 
 ### CASL Permission Conditions
 
@@ -805,7 +806,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1259 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1270 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 185 tests passing |
 | Client unit tests | Vitest | `*.spec.ts` alongside source | 875 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 201 tests passing |

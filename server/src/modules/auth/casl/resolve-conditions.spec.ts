@@ -81,8 +81,24 @@ describe('resolveConditions', () => {
       });
     });
 
-    it('should produce an empty query for an empty record', () => {
-      expect(resolveConditions({ fieldMatch: {} }, ctx).query).toEqual({});
+    it('should veto for an empty record (fails closed, not an unconditional grant)', () => {
+      const result = resolveConditions({ fieldMatch: {} }, ctx);
+
+      expect(result.query).toEqual({});
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('empty query')
+      );
+    });
+
+    it('should veto when every field value is an empty array', () => {
+      const result = resolveConditions(
+        { fieldMatch: { status: [], department: [] } },
+        ctx
+      );
+
+      expect(result.query).toEqual({});
+      expect(result.skipPermission).toBe(true);
     });
 
     it('should drop fields whose value is an empty array', () => {
@@ -152,19 +168,25 @@ describe('resolveConditions', () => {
       expect(warnSpy).not.toHaveBeenCalled();
     });
 
-    it('should produce an empty query for an empty record', () => {
-      expect(resolveConditions({ userAttr: {} }, ctx).query).toEqual({});
-      expect(warnSpy).not.toHaveBeenCalled();
+    it('should veto for an empty record (fails closed, not an unconditional grant)', () => {
+      const result = resolveConditions({ userAttr: {} }, ctx);
+
+      expect(result.query).toEqual({});
+      expect(result.skipPermission).toBe(true);
     });
 
-    it('should skip and warn when the attribute name is unknown', () => {
+    it('should veto and warn when the only attribute name is unknown', () => {
       const result = resolveConditions({ userAttr: { ownerId: 'email' } }, ctx);
 
       expect(result.query).toEqual({});
-      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledTimes(2);
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('email'));
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('ownerId'));
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('user-42'));
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('empty query')
+      );
     });
 
     it('should skip and warn when the attribute name is not a string', () => {
@@ -217,28 +239,31 @@ describe('resolveConditions', () => {
       expect(warnSpy).not.toHaveBeenCalled();
     });
 
-    it('should contribute nothing for an empty JSON object', () => {
+    it('should veto for an empty JSON object (fails closed, not an unconditional grant)', () => {
       expect(resolveConditions({ custom: '{}' }, ctx)).toEqual({
         query: {},
-        skipPermission: false
+        skipPermission: true
       });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('empty query')
+      );
     });
 
-    it('should skip (not veto) when JSON is malformed and warn', () => {
+    it('should veto when JSON is malformed and warn', () => {
       const result = resolveConditions({ custom: '{not-valid-json' }, ctx);
 
-      expect(result).toEqual({ query: {}, skipPermission: false });
-      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ query: {}, skipPermission: true });
+      expect(warnSpy).toHaveBeenCalledTimes(2);
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Invalid JSON')
       );
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('user-1'));
     });
 
-    it('should skip (not veto) when value is an empty string', () => {
+    it('should veto when value is an empty string', () => {
       const result = resolveConditions({ custom: '' }, ctx);
 
-      expect(result).toEqual({ query: {}, skipPermission: false });
+      expect(result).toEqual({ query: {}, skipPermission: true });
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Invalid JSON')
       );
@@ -367,6 +392,49 @@ describe('resolveConditions', () => {
 
       expect(result.skipPermission).toBe(true);
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('$where'));
+    });
+  });
+
+  describe('fail-closed empty resolution', () => {
+    it('should not veto when another branch still produces a key', () => {
+      const result = resolveConditions(
+        {
+          ownership: { userField: 'createdBy' },
+          fieldMatch: { status: [] }
+        },
+        ctx
+      );
+
+      expect(result).toEqual({
+        query: { createdBy: 'user-1' },
+        skipPermission: false
+      });
+    });
+
+    it('should veto when all provided branches resolve to nothing', () => {
+      const result = resolveConditions(
+        {
+          fieldMatch: { status: [] },
+          userAttr: { ownerId: 'unknown' },
+          custom: '{}'
+        },
+        ctx
+      );
+
+      expect(result.query).toEqual({});
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('users:update')
+      );
+    });
+
+    it('should veto for a deny-effect condition whose branches resolve to nothing', () => {
+      const result = resolveConditions(
+        { effect: 'deny', fieldMatch: { status: [] } },
+        ctx
+      );
+
+      expect(result.skipPermission).toBe(true);
     });
   });
 });
