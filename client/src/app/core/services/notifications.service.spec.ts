@@ -186,6 +186,61 @@ describe('NotificationsService', () => {
     expect(featureFlags).toEqual([{ type: 'feature_flags_updated' }]);
   });
 
+  it('emits an event exactly once when its SSE frame is split across two progress chunks', () => {
+    const received: NotificationEvent[] = [];
+    service.sessionInvalidated$.subscribe((e) => received.push(e));
+
+    service.connect();
+    const req = httpController.expectOne('/api/v1/notifications/stream');
+
+    const frame = 'data: {"type":"session_invalidated","userId":"u-9"}\n\n';
+    const firstHalf = frame.slice(0, 25); // ends mid-JSON
+    req.event(makeProgressEvent(firstHalf, firstHalf.length));
+    expect(received).toHaveLength(0);
+
+    req.event(makeProgressEvent(frame, frame.length));
+
+    expect(received).toEqual([{ type: 'session_invalidated', userId: 'u-9' }]);
+  });
+
+  it('parses complete frames immediately while buffering an incomplete trailing frame', () => {
+    const received: Extract<
+      NotificationEvent,
+      { type: 'permissions_updated' }
+    >[] = [];
+    service.permissionsUpdated$.subscribe((e) => received.push(e));
+
+    service.connect();
+    const req = httpController.expectOne('/api/v1/notifications/stream');
+
+    const frameA = 'data: {"type":"permissions_updated","userId":"u-a"}\n\n';
+    const frameB = 'data: {"type":"permissions_updated","userId":"u-b"}\n\n';
+    const chunk1 = frameA + frameB.slice(0, 30);
+    req.event(makeProgressEvent(chunk1, chunk1.length));
+
+    expect(received).toHaveLength(1);
+    expect(received[0].userId).toBe('u-a');
+
+    const chunk2 = frameA + frameB;
+    req.event(makeProgressEvent(chunk2, chunk2.length));
+
+    expect(received).toHaveLength(2);
+    expect(received[1].userId).toBe('u-b');
+  });
+
+  it('does not emit anything for a chunk with no complete frame', () => {
+    const received: NotificationEvent[] = [];
+    service.userCrudEvents$.subscribe((e) => received.push(e));
+
+    service.connect();
+    const req = httpController.expectOne('/api/v1/notifications/stream');
+
+    const partial = 'data: {"type":"user_crud_events","action":"cre';
+    req.event(makeProgressEvent(partial, partial.length));
+
+    expect(received).toHaveLength(0);
+  });
+
   it('should skip malformed SSE frames without throwing', () => {
     const received: NotificationEvent[] = [];
     service.sessionInvalidated$.subscribe((e) => received.push(e));
