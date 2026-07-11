@@ -54,6 +54,7 @@ export class NotificationsService {
     if (this.#subscription) return;
 
     let lastLength = 0;
+    let pendingFrame = '';
 
     this.#subscription = this.#http
       .get(NOTIFICATIONS_STREAM_URL, {
@@ -66,6 +67,7 @@ export class NotificationsService {
         tap({
           error: () => {
             lastLength = 0;
+            pendingFrame = '';
           }
         }),
         retry({
@@ -91,10 +93,19 @@ export class NotificationsService {
 
           const progressEvent = event as HttpDownloadProgressEvent;
           const text = progressEvent.partialText ?? '';
-          const newContent = text.slice(lastLength);
+          pendingFrame += text.slice(lastLength);
           lastLength = text.length;
 
-          this.#parseAndEmit(newContent);
+          // A progress chunk can end mid-frame (TCP boundary); parse only
+          // frames terminated by \n\n and keep the incomplete tail buffered
+          // until the next chunk completes it
+          const boundary = pendingFrame.lastIndexOf('\n\n');
+          if (boundary === -1) return;
+
+          const completeFrames = pendingFrame.slice(0, boundary);
+          pendingFrame = pendingFrame.slice(boundary + 2);
+
+          this.#parseAndEmit(completeFrames);
         },
         error: () => {
           this.#subscription = null;
