@@ -80,10 +80,24 @@ function parseArrayValue(raw: string): unknown[] {
     .map(parseValue);
 }
 
+/**
+ * Thrown while parsing JSON into the visual model when the input cannot be
+ * represented without corruption (e.g. multi-operator objects would collapse
+ * to the string "[object Object]"). Caught by jsonToModel, which returns null
+ * so the dialog keeps the admin in raw-JSON mode instead of mangling the rule.
+ */
+class UnrepresentableConditionError extends Error {}
+
 /** Convert a JS value back to a display string. */
 function valueToString(val: unknown): string {
   if (val === null) return 'null';
-  if (typeof val === 'boolean') return String(val);
+  if (typeof val === 'object') {
+    // Objects and arrays would stringify to "[object Object]" / "a,b" and be
+    // persisted as that literal string on save
+    throw new UnrepresentableConditionError(
+      'Object values cannot be represented in the visual builder'
+    );
+  }
   return String(val);
 }
 
@@ -104,16 +118,20 @@ export function jsonToModel(
 }
 
 function parseGroup(obj: Record<string, unknown>): ConditionGroup {
-  if ('$or' in obj && Array.isArray(obj['$or'])) {
+  const logicKey = ['$or', '$and'].find(
+    (key) => key in obj && Array.isArray(obj[key])
+  ) as '$or' | '$and' | undefined;
+  if (logicKey) {
+    if (Object.keys(obj).length > 1) {
+      // A logical group with sibling keys (another logic key or field rules)
+      // cannot be represented: the siblings would be silently dropped
+      throw new UnrepresentableConditionError(
+        `Keys next to ${logicKey} cannot be represented in the visual builder`
+      );
+    }
     return createGroup(
-      '$or',
-      (obj['$or'] as Record<string, unknown>[]).map(parseNode)
-    );
-  }
-  if ('$and' in obj && Array.isArray(obj['$and'])) {
-    return createGroup(
-      '$and',
-      (obj['$and'] as Record<string, unknown>[]).map(parseNode)
+      logicKey,
+      (obj[logicKey] as Record<string, unknown>[]).map(parseNode)
     );
   }
   // Treat each key as a field rule, wrapped in implicit $and
@@ -141,18 +159,25 @@ function parseNode(item: Record<string, unknown>): ConditionNode {
 function parseFieldNode(field: string, val: unknown): ConditionNode {
   if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
     const opEntries = Object.entries(val as Record<string, unknown>);
-    if (opEntries.length === 1) {
-      const [op, opVal] = opEntries[0];
-      if (CONDITION_OPERATORS.includes(op as ConditionOperator)) {
-        const value = Array.isArray(opVal)
-          ? opVal.map(valueToString).join(', ')
-          : valueToString(opVal);
-        return {
-          type: 'rule',
-          rule: createRule(field, op as ConditionOperator, value)
-        };
-      }
+    if (
+      opEntries.length !== 1 ||
+      !CONDITION_OPERATORS.includes(opEntries[0][0] as ConditionOperator)
+    ) {
+      // Multi-operator (e.g. { $gte: 18, $lte: 65 }), unsupported operator
+      // (e.g. $exists) or empty object: forcing these through the single
+      // $eq fallback would persist the literal string "[object Object]"
+      throw new UnrepresentableConditionError(
+        `Value of field "${field}" cannot be represented in the visual builder`
+      );
     }
+    const [op, opVal] = opEntries[0];
+    const value = Array.isArray(opVal)
+      ? opVal.map(valueToString).join(', ')
+      : valueToString(opVal);
+    return {
+      type: 'rule',
+      rule: createRule(field, op as ConditionOperator, value)
+    };
   }
   // Simple equality: { field: value }
   return { type: 'rule', rule: createRule(field, '$eq', valueToString(val)) };
