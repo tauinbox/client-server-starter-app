@@ -142,6 +142,40 @@ describe('condition-builder types', () => {
     });
   });
 
+  describe('jsonToModel: unrepresentable input returns null (no corruption)', () => {
+    const unrepresentable: [string, Record<string, unknown>][] = [
+      ['multi-operator field', { age: { $gte: 18, $lte: 65 } }],
+      ['unsupported operator', { flag: { $exists: true } }],
+      ['empty operator object', { field: {} }],
+      ['object operand', { profile: { $eq: { nested: 1 } } }],
+      ['object element in $in array', { role: { $in: [{ a: 1 }] } }],
+      ['bare array equality', { tags: ['a', 'b'] }],
+      ['field keys next to $or', { $or: [{ a: 1 }], status: 'active' }],
+      ['$and next to $or', { $or: [{ a: 1 }], $and: [{ b: 2 }] }],
+      [
+        'unrepresentable field nested in a group',
+        { $or: [{ age: { $gte: 18, $lte: 65 } }] }
+      ]
+    ];
+
+    for (const [name, input] of unrepresentable) {
+      it(`returns null for ${name}`, () => {
+        expect(jsonToModel(input)).toBeNull();
+      });
+    }
+
+    it('never produces a model that serializes to "[object Object]"', () => {
+      for (const [, input] of unrepresentable) {
+        const model = jsonToModel(input);
+        if (model !== null) {
+          expect(JSON.stringify(modelToJson(model))).not.toContain(
+            '[object Object]'
+          );
+        }
+      }
+    });
+  });
+
   describe('modelToJson', () => {
     it('serializes a single $eq rule as flat object', () => {
       const group = createGroup('$and', [
