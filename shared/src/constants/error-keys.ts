@@ -25,6 +25,7 @@ export const ErrorKeys = {
     SESSION_INVALIDATED: 'errors.auth.sessionInvalidated',
     TOKEN_REVOKED: 'errors.auth.tokenRevoked',
     TOKEN_INVALIDATED_ROTATION: 'errors.auth.tokenInvalidatedRotation',
+    INVALID_TOKEN: 'errors.auth.invalidToken',
     INVALID_OAUTH_PROVIDER: 'errors.auth.invalidOauthProvider',
     MISSING_OAUTH_DATA: 'errors.auth.missingOauthData',
     INVALID_OAUTH_DATA: 'errors.auth.invalidOauthData',

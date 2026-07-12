@@ -97,6 +97,7 @@
       "sessionInvalidated": "Session invalidated due to key rotation. Please log in again.",
       "tokenRevoked": "Token has been revoked",
       "tokenInvalidatedRotation": "Token invalidated due to key rotation. Please log in again.",
+      "invalidToken": "Invalid authentication token",
       "invalidOauthProvider": "Invalid OAuth provider",
       "missingOauthData": "Missing OAuth data",
       "invalidOauthData": "Invalid or expired OAuth data",

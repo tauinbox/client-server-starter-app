@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { JwtStrategy } from './jwt.strategy';
 import { CustomJwtPayload } from '../types/jwt-payload';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 
 function buildConfigService(overrides: Record<string, unknown> = {}): {
   get: jest.Mock;
@@ -145,6 +146,65 @@ describe('JwtStrategy', () => {
       const result = await strategy.validate(payloadWithoutRoles);
 
       expect(result.roles).toEqual([]);
+    });
+
+    describe('missing/invalid iat claim (fail closed)', () => {
+      it('should throw 401 when iat is missing even though the user token was revoked after issue', async () => {
+        // Pre-fix: undefined < revokedAt evaluated to false, silently
+        // skipping the revocation check and accepting the token
+        mockRepository.findOne.mockResolvedValue({
+          id: 'user-1',
+          tokenRevokedAt: new Date(Date.now() + 60_000)
+        });
+        const { iat: _iat, ...payloadWithoutIat } = basePayload;
+
+        await expect(
+          strategy.validate(payloadWithoutIat as CustomJwtPayload)
+        ).rejects.toMatchObject({
+          status: 401,
+          response: { errorKey: ErrorKeys.AUTH.INVALID_TOKEN }
+        });
+        expect(mockRepository.findOne).not.toHaveBeenCalled();
+      });
+
+      it('should throw 401 when iat is NaN', async () => {
+        await expect(
+          strategy.validate({ ...basePayload, iat: NaN })
+        ).rejects.toMatchObject({
+          status: 401,
+          response: { errorKey: ErrorKeys.AUTH.INVALID_TOKEN }
+        });
+      });
+
+      it('should throw 401 when iat is missing and JWT_MIN_IAT is set (rotation check not skippable)', async () => {
+        // Pre-fix: undefined < minIat evaluated to false, skipping the
+        // rotation check entirely and validating a valid non-revoked user
+        mockRepository.findOne.mockResolvedValue({
+          id: 'user-1',
+          tokenRevokedAt: null
+        });
+        const module: TestingModule = await Test.createTestingModule({
+          providers: [
+            JwtStrategy,
+            {
+              provide: ConfigService,
+              useValue: buildConfigService({
+                JWT_MIN_IAT: Math.floor(Date.now() / 1000)
+              })
+            },
+            { provide: DataSource, useValue: mockDataSource }
+          ]
+        }).compile();
+        const rotationStrategy = module.get<JwtStrategy>(JwtStrategy);
+        const { iat: _iat, ...payloadWithoutIat } = basePayload;
+
+        await expect(
+          rotationStrategy.validate(payloadWithoutIat as CustomJwtPayload)
+        ).rejects.toMatchObject({
+          status: 401,
+          response: { errorKey: ErrorKeys.AUTH.INVALID_TOKEN }
+        });
+      });
     });
 
     describe('JWT_MIN_IAT rotation check (SRV-12)', () => {
