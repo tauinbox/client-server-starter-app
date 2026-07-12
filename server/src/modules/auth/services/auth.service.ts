@@ -61,9 +61,13 @@ export class AuthService {
     private metricsService: MetricsService
   ) {}
 
-  // Pre-computed dummy hash for constant-time rejection (prevents timing attacks)
-  private static readonly DUMMY_HASH =
-    '$2b$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012';
+  // Dummy hash for constant-time rejection (prevents timing attacks).
+  // Derived from BCRYPT_SALT_ROUNDS so its cost can never drift from real
+  // password hashes - a cost mismatch would reopen the timing oracle.
+  private static readonly DUMMY_HASH = bcrypt.hashSync(
+    'dummy-password-for-timing-equalization',
+    BCRYPT_SALT_ROUNDS
+  );
 
   async validateUser(email: string, password: string): Promise<User> {
     const user = await this.usersService.findByEmail(email);
