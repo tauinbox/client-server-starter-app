@@ -748,7 +748,7 @@ Base URL: `/api/v1`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/metadata` | Bearer | Get RBAC metadata (resources + actions); Redis-cached 60s |
+| GET | `/metadata` | `permissions:read` | Get RBAC metadata (resources + actions); Redis-cached 60s |
 | GET | `/resources` | `permissions:read` | List all resources |
 | PATCH | `/resources/:id` | `permissions:update` | Update resource display info |
 | POST | `/resources/:id/restore` | `permissions:update` | Restore orphaned resource; 400 if `@RegisterResource` controller absent |

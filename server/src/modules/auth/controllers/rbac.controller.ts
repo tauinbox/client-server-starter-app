@@ -71,11 +71,13 @@ export class RbacController {
   // ── Metadata ──────────────────────────────────────────────────────
 
   @Get('metadata')
+  @Authorize(['read', 'Permission'])
   @Throttle({ default: { ttl: 60000, limit: 30 } })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get RBAC metadata (resources and actions)' })
   @ApiOkResponse({ description: 'RBAC metadata' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden' })
   async getMetadata() {
     const cached = await this.cacheManager.get(METADATA_CACHE_KEY);
     if (cached) return cached;

@@ -45,7 +45,9 @@ export class AuthService {
     this.#notificationsService.permissionsUpdated$
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe(() => {
-        void this.fetchPermissions();
+        // Metadata fetch is permission-gated, so re-evaluate it after the
+        // refreshed rules arrive (e.g. the user was just granted admin access).
+        void this.fetchPermissions().then(() => this.fetchRbacMetadata());
         // Role change can flip role-bound feature flags for this user.
         void this.#featureFlagsStore.reload();
       });
@@ -66,10 +68,10 @@ export class AuthService {
         switchMap((response) => {
           this.#authStore.saveAuthResponse(response);
           this.scheduleTokenRefresh();
-          void this.fetchRbacMetadata();
           void this.#featureFlagsStore.load();
           return from(this.fetchPermissions()).pipe(
             tap(() => {
+              void this.fetchRbacMetadata();
               this.#notificationsService.connect();
             }),
             switchMap(() => [response])
@@ -245,6 +247,14 @@ export class AuthService {
   }
 
   fetchRbacMetadata(): Promise<void> {
+    // GET /rbac/metadata requires `read Permission` on the server; skip the
+    // doomed request (and its server-side denial audit entry) for users
+    // without it. Callers must ensure permissions are already loaded.
+    if (
+      !this.#authStore.hasPermissions({ action: 'read', subject: 'Permission' })
+    ) {
+      return Promise.resolve();
+    }
     const load = () =>
       firstValueFrom(this.#rbacMetadataService.getMetadata())
         .then((data) => {

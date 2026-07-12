@@ -677,7 +677,7 @@ API base URL: `/api/v1`
 | POST | `/roles/assign/:userId` | `roles:assign` | Assign role to user |
 | DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove role from user |
 | GET | `/notifications/stream` | Bearer | SSE stream — pushes `session_invalidated`, `permissions_updated`, `user_crud_events` |
-| GET | `/rbac/metadata` | Bearer | Get RBAC metadata (resources + actions); Redis-cached 60s |
+| GET | `/rbac/metadata` | `permissions:read` | Get RBAC metadata (resources + actions); Redis-cached 60s |
 | GET | `/rbac/resources` | `permissions:read` | List all resources |
 | PATCH | `/rbac/resources/:id` | `permissions:update` | Update resource display info |
 | POST | `/rbac/resources/:id/restore` | `permissions:update` | Restore an orphaned resource; 400 if controller not registered |
@@ -806,9 +806,9 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1274 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1275 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 185 tests passing |
-| Client unit tests | Vitest | `*.spec.ts` alongside source | 888 tests passing |
+| Client unit tests | Vitest | `*.spec.ts` alongside source | 892 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 201 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
 

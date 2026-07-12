@@ -77,6 +77,7 @@ describe('AuthService', () => {
     updateCurrentUser: ReturnType<typeof vi.fn>;
     clearSession: ReturnType<typeof vi.fn>;
     setRules: ReturnType<typeof vi.fn>;
+    hasPermissions: ReturnType<typeof vi.fn>;
   };
   let tokenServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
@@ -102,7 +103,8 @@ describe('AuthService', () => {
       saveAuthResponse: vi.fn(),
       updateCurrentUser: vi.fn(),
       clearSession: vi.fn(),
-      setRules: vi.fn()
+      setRules: vi.fn(),
+      hasPermissions: vi.fn().mockReturnValue(false)
     };
 
     tokenServiceMock = {
@@ -173,6 +175,61 @@ describe('AuthService', () => {
 
       expect(result).toEqual(mockAuth);
       expect(authStoreMock.saveAuthResponse).toHaveBeenCalledWith(mockAuth);
+    });
+
+    it('should not fetch RBAC metadata when the user lacks read Permission', async () => {
+      authStoreMock.hasPermissions.mockReturnValue(false);
+      const loginPromise = firstValueFrom(
+        service.login({ email: 'test@example.com', password: 'password' })
+      );
+
+      httpMock.expectOne(AuthApiEnum.Login).flush(createMockAuthResponse());
+      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
+      await loginPromise;
+
+      expect(rbacMetadataServiceMock.getMetadata).not.toHaveBeenCalled();
+    });
+
+    it('should fetch RBAC metadata after permissions when the user has read Permission', async () => {
+      authStoreMock.hasPermissions.mockReturnValue(true);
+      const loginPromise = firstValueFrom(
+        service.login({ email: 'test@example.com', password: 'password' })
+      );
+
+      httpMock.expectOne(AuthApiEnum.Login).flush(createMockAuthResponse());
+      expect(rbacMetadataServiceMock.getMetadata).not.toHaveBeenCalled();
+
+      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
+      await loginPromise;
+
+      expect(rbacMetadataServiceMock.getMetadata).toHaveBeenCalled();
+    });
+  });
+
+  describe('fetchRbacMetadata', () => {
+    it('skips the request when the user lacks read Permission', async () => {
+      authStoreMock.hasPermissions.mockReturnValue(false);
+
+      await service.fetchRbacMetadata();
+
+      expect(rbacMetadataServiceMock.getMetadata).not.toHaveBeenCalled();
+      expect(rbacMetadataStoreMock.setMetadata).not.toHaveBeenCalled();
+    });
+
+    it('loads and stores metadata when the user has read Permission', async () => {
+      authStoreMock.hasPermissions.mockReturnValue(true);
+      const resources = [{ id: 'r1', name: 'users' }];
+      const actions = [{ id: 'a1', name: 'read' }];
+      rbacMetadataServiceMock.getMetadata.mockReturnValue(
+        of({ resources, actions })
+      );
+
+      await service.fetchRbacMetadata();
+
+      expect(rbacMetadataStoreMock.setMetadata).toHaveBeenCalledWith(
+        resources,
+        actions
+      );
     });
   });
 

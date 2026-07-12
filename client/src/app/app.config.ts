@@ -56,8 +56,11 @@ export const appConfig: ApplicationConfig = {
       if (authService.isAuthenticated()) {
         authService.scheduleTokenRefresh();
         await Promise.all([
-          authService.fetchPermissions(),
-          authService.fetchRbacMetadata(),
+          // Metadata fetch is permission-gated, so it must run after the
+          // permission rules have been loaded.
+          authService
+            .fetchPermissions()
+            .then(() => authService.fetchRbacMetadata()),
           featureFlagsStore.load()
         ]);
         notificationsService.connect();
@@ -66,8 +69,9 @@ export const appConfig: ApplicationConfig = {
         try {
           await firstValueFrom(authService.refreshTokens());
           await Promise.all([
-            authService.fetchPermissions(),
-            authService.fetchRbacMetadata(),
+            authService
+              .fetchPermissions()
+              .then(() => authService.fetchRbacMetadata()),
             featureFlagsStore.load()
           ]);
           notificationsService.connect();
