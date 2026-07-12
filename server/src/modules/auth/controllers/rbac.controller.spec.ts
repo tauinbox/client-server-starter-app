@@ -10,6 +10,8 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { JwtAuthRequest } from '../types/auth.request';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { PermissionsGuard } from '../guards/permissions.guard';
+import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import type { AppAbility } from '../casl/app-ability';
 
 const allowAllGuard = { canActivate: () => true };
@@ -123,6 +125,21 @@ describe('RbacController', () => {
   // ── getMetadata ──────────────────────────────────────────────────
 
   describe('getMetadata', () => {
+    it('is gated by @Authorize([read, Permission]) like the sibling read endpoints', () => {
+      // Descriptor lookup instead of a direct method reference: the handler is
+      // only a Reflect metadata target here, never invoked.
+      const handler = Object.getOwnPropertyDescriptor(
+        RbacController.prototype,
+        'getMetadata'
+      )!.value as object;
+
+      const checks = Reflect.getMetadata(PERMISSIONS_KEY, handler) as unknown;
+      expect(checks).toEqual([['read', 'Permission']]);
+
+      const guards = Reflect.getMetadata(GUARDS_METADATA, handler) as unknown[];
+      expect(guards).toContain(PermissionsGuard);
+    });
+
     it('should return cached value without fetching services', async () => {
       const cached = { resources: [], actions: [] };
       cacheManagerMock.get.mockResolvedValue(cached);
