@@ -65,6 +65,12 @@ export function validateToken(token: string): DecodedToken | null {
   const decoded = decodeToken(token);
   if (!decoded) return null;
 
+  // Fail closed on a missing/invalid iat, matching the real server:
+  // the revocation check compares against iat and must not be skippable
+  if (typeof decoded.iat !== 'number' || !Number.isFinite(decoded.iat)) {
+    return null;
+  }
+
   const now = Math.floor(Date.now() / 1000);
   if (decoded.exp < now) return null;
 

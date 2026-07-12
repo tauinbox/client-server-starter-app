@@ -97,6 +97,7 @@
       "sessionInvalidated": "Сессия аннулирована из-за ротации ключей. Войдите снова.",
       "tokenRevoked": "Токен отозван",
       "tokenInvalidatedRotation": "Токен аннулирован из-за ротации ключей. Войдите снова.",
+      "invalidToken": "Недействительный токен аутентификации",
       "invalidOauthProvider": "Недопустимый OAuth-провайдер",
       "missingOauthData": "Отсутствуют данные OAuth",
       "invalidOauthData": "Недействительные или просроченные данные OAuth",

@@ -36,8 +36,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: CustomJwtPayload): Promise<PayloadFromJwt> {
+    const iat = payload.iat;
+    // Fail closed: without a trusted issue time the key-rotation and
+    // token-revocation checks below cannot be enforced
+    if (typeof iat !== 'number' || !Number.isFinite(iat)) {
+      throw new HttpException(
+        {
+          message: 'Token is missing a valid issued-at claim',
+          errorKey: ErrorKeys.AUTH.INVALID_TOKEN
+        },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+
     // SRV-12: global key rotation — reject tokens issued before the rotation timestamp
-    if (this.minIat !== undefined && payload.iat! < this.minIat) {
+    if (this.minIat !== undefined && iat < this.minIat) {
       throw new HttpException(
         {
           message:
@@ -62,10 +75,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         HttpStatus.UNAUTHORIZED
       );
     }
-    if (
-      user.tokenRevokedAt &&
-      payload.iat! < user.tokenRevokedAt.getTime() / 1000
-    ) {
+    if (user.tokenRevokedAt && iat < user.tokenRevokedAt.getTime() / 1000) {
       throw new HttpException(
         {
           message: 'Token has been revoked',
