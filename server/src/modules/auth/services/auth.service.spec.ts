@@ -8,7 +8,10 @@ import { UsersService } from '../../users/services/users.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { RoleService } from './role.service';
 import { TokenGeneratorService } from './token-generator.service';
-import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
+import {
+  BCRYPT_SALT_ROUNDS,
+  MAX_CONCURRENT_SESSIONS
+} from '@app/shared/constants/auth.constants';
 import { MailService } from '../../mail/mail.service';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -316,6 +319,13 @@ describe('AuthService', () => {
 
       // bcrypt.compare should still be called (with dummy hash) for constant-time behavior
       expect(compareSpy).toHaveBeenCalled();
+    });
+
+    it('should use a dummy hash with the same cost as real password hashes', () => {
+      // A cost mismatch makes the dummy-compare path measurably faster/slower
+      // than the real-hash path, reopening the user-enumeration timing oracle
+      const dummyHash = AuthService['DUMMY_HASH'];
+      expect(bcrypt.getRounds(dummyHash)).toBe(BCRYPT_SALT_ROUNDS);
     });
 
     it('should throw 423 when account is locked', async () => {
