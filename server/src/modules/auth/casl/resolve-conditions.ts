@@ -1,6 +1,11 @@
 import type { Logger } from '@nestjs/common';
 import type { PermissionCondition } from '@app/shared/types';
 import { findDeniedMongoKey } from '@app/shared/utils/mongo-query-safety';
+import {
+  findFieldMatchShapeError,
+  findOwnershipShapeError,
+  findUserAttrShapeError
+} from '@app/shared/utils/permission-condition-shape';
 
 /**
  * Runtime context for condition resolution. Carries the user identity used by
@@ -20,11 +25,12 @@ export interface ResolverContext {
  * custom — so when two branches write the same field key the later one wins.
  *
  * Returns `skipPermission: true` to veto the entire permission when the input
- * cannot be honored as authored: a denied MongoQuery operator in `custom`, or
- * restriction branches that resolve to an empty query (empty `fieldMatch`
- * arrays, unknown `userAttr` attributes, `custom` that parses to `{}` or not
- * at all). Registering such a permission unconditionally would silently widen
- * an intended restriction, so it fails closed instead. A condition object
+ * cannot be honored as authored: a branch whose shape is malformed (validated
+ * by the shared shape finders the DTO also uses), an unknown `userAttr`
+ * attribute, invalid/non-object/denied-operator `custom`, or restriction
+ * branches that resolve to an empty query. Dropping just the malformed part
+ * would silently widen an intended restriction (and make a deny vanish), so
+ * any unusable fragment fails the whole permission closed. A condition object
  * with no restriction branches (only `effect`) is a legitimate unconditional
  * rule and is not vetoed.
  */
@@ -35,52 +41,72 @@ export function resolveConditions(
   const query: Record<string, unknown> = {};
   const { ownership, fieldMatch, userAttr, custom } = conditions;
 
+  const veto = (
+    reason: string
+  ): { query: Record<string, unknown>; skipPermission: boolean } => {
+    ctx.logger.warn(
+      `Conditions of permission "${ctx.permissionLabel}" cannot be honored as authored for user ${ctx.userId} (${reason}) - failing closed, vetoing permission`
+    );
+    return { query, skipPermission: true };
+  };
+
   if (ownership !== undefined && ownership !== null) {
+    const shapeError = findOwnershipShapeError(ownership);
+    if (shapeError) {
+      return veto(shapeError);
+    }
     query[ownership.userField] = ctx.userId;
   }
 
   if (fieldMatch !== undefined && fieldMatch !== null) {
+    const shapeError = findFieldMatchShapeError(fieldMatch);
+    if (shapeError) {
+      return veto(shapeError);
+    }
     for (const [field, values] of Object.entries(fieldMatch)) {
-      if (Array.isArray(values) && values.length > 0) {
-        query[field] = { $in: values };
-      }
+      query[field] = { $in: values };
     }
   }
 
   if (userAttr !== undefined && userAttr !== null) {
+    const shapeError = findUserAttrShapeError(userAttr);
+    if (shapeError) {
+      return veto(shapeError);
+    }
     // userContext can be extended as more user attributes become available.
     const userContext: Record<string, unknown> = { id: ctx.userId };
     for (const [field, attrName] of Object.entries(userAttr)) {
-      if (typeof attrName === 'string' && attrName in userContext) {
-        query[field] = userContext[attrName];
-      } else {
-        ctx.logger.warn(
-          `userAttr references unknown attribute "${String(attrName)}" for user ${ctx.userId} — skipping field "${field}"`
+      const attr = attrName as string;
+      if (!Object.prototype.hasOwnProperty.call(userContext, attr)) {
+        return veto(
+          `userAttr references unknown attribute "${attr}" in field "${field}"`
         );
       }
+      query[field] = userContext[attr];
     }
   }
 
   if (custom !== undefined && custom !== null) {
-    let parsed: Record<string, unknown> | undefined;
+    let parsed: unknown;
     try {
-      parsed = JSON.parse(custom) as Record<string, unknown>;
+      parsed = JSON.parse(custom);
     } catch {
-      ctx.logger.warn(
-        `Invalid JSON in custom condition for user ${ctx.userId}: "${custom}" — skipping`
-      );
+      return veto(`invalid JSON in custom condition: "${custom}"`);
     }
 
-    if (parsed !== undefined) {
-      const denied = findDeniedMongoKey(parsed);
-      if (denied) {
-        ctx.logger.warn(
-          `Denied operator "${denied}" in custom condition for user ${ctx.userId}, permission "${ctx.permissionLabel}" — skipping entire permission`
-        );
-        return { query, skipPermission: true };
-      }
-      Object.assign(query, parsed);
+    if (
+      parsed === null ||
+      typeof parsed !== 'object' ||
+      Array.isArray(parsed)
+    ) {
+      return veto('custom condition is not a JSON object');
     }
+
+    const denied = findDeniedMongoKey(parsed);
+    if (denied) {
+      return veto(`denied operator "${denied}" in custom condition`);
+    }
+    Object.assign(query, parsed);
   }
 
   const hasRestrictionBranches =
@@ -90,10 +116,7 @@ export function resolveConditions(
     (custom !== undefined && custom !== null);
 
   if (hasRestrictionBranches && Object.keys(query).length === 0) {
-    ctx.logger.warn(
-      `Conditions of permission "${ctx.permissionLabel}" resolved to an empty query for user ${ctx.userId} - failing closed, vetoing permission`
-    );
-    return { query, skipPermission: true };
+    return veto('resolved to an empty query');
   }
 
   return { query, skipPermission: false };

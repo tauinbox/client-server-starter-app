@@ -544,7 +544,10 @@ describe('CaslAbilityFactory', () => {
       }
     );
 
-    it('should still grant conditionally when one branch resolves alongside an empty one', async () => {
+    it('should veto the whole permission when a malformed branch accompanies a resolving one', async () => {
+      // An empty fieldMatch array is malformed input: honoring only the
+      // ownership branch would drop the authored fieldMatch restriction, so
+      // the permission fails closed instead of granting a narrower rule.
       const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
       const permissions: ResolvedPermission[] = [
         {
@@ -554,6 +557,36 @@ describe('CaslAbilityFactory', () => {
           conditions: {
             ownership: { userField: 'createdBy' },
             fieldMatch: { status: [] }
+          }
+        }
+      ];
+
+      const ability = await factory.createForUser('user-1', roles, permissions);
+
+      expect(
+        ability.can('update', {
+          __caslSubjectType__: 'User',
+          createdBy: 'user-1'
+        } as never)
+      ).toBe(false);
+      expect(
+        ability.can('update', {
+          __caslSubjectType__: 'User',
+          createdBy: 'user-2'
+        } as never)
+      ).toBe(false);
+    });
+
+    it('should still grant conditionally when a benign custom "{}" accompanies a resolving branch', async () => {
+      const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+      const permissions: ResolvedPermission[] = [
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update:own',
+          conditions: {
+            ownership: { userField: 'createdBy' },
+            custom: '{}'
           }
         }
       ];

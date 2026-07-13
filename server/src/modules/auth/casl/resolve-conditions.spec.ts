@@ -45,10 +45,43 @@ describe('resolveConditions', () => {
       ).toEqual({ id: 'user-1' });
     });
 
-    it('should map an empty userField verbatim (DTO owns the non-empty contract)', () => {
-      expect(
-        resolveConditions({ ownership: { userField: '' } }, ctx).query
-      ).toEqual({ '': 'user-1' });
+    it('should veto an empty userField instead of producing a nonsense key', () => {
+      const result = resolveConditions({ ownership: { userField: '' } }, ctx);
+
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('userField')
+      );
+    });
+
+    it('should veto a non-string userField', () => {
+      const result = resolveConditions(
+        // @ts-expect-error testing invalid input shape stored before the DTO fix
+        { ownership: { userField: 5 } },
+        ctx
+      );
+
+      expect(result.skipPermission).toBe(true);
+    });
+
+    it('should veto an empty ownership object', () => {
+      const result = resolveConditions(
+        // @ts-expect-error testing invalid input shape stored before the DTO fix
+        { ownership: {} },
+        ctx
+      );
+
+      expect(result.skipPermission).toBe(true);
+    });
+
+    it('should veto ownership carrying extra keys', () => {
+      const result = resolveConditions(
+        // @ts-expect-error testing invalid input shape stored before the DTO fix
+        { ownership: { userField: 'createdBy', extra: 1 } },
+        ctx
+      );
+
+      expect(result.skipPermission).toBe(true);
     });
 
     it('should propagate the ctx.userId of the call (no caching across calls)', () => {
@@ -87,7 +120,7 @@ describe('resolveConditions', () => {
       expect(result.query).toEqual({});
       expect(result.skipPermission).toBe(true);
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('empty query')
+        expect.stringContaining('fieldMatch')
       );
     });
 
@@ -101,33 +134,47 @@ describe('resolveConditions', () => {
       expect(result.skipPermission).toBe(true);
     });
 
-    it('should drop fields whose value is an empty array', () => {
-      expect(
-        resolveConditions(
-          { fieldMatch: { status: [], department: ['eng'] } },
-          ctx
-        ).query
-      ).toEqual({ department: { $in: ['eng'] } });
+    it('should veto when one field value is an empty array (not silently narrow)', () => {
+      const result = resolveConditions(
+        { fieldMatch: { status: [], department: ['eng'] } },
+        ctx
+      );
+
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('status'));
     });
 
-    it('should drop fields whose value is not an array (malformed input)', () => {
-      expect(
-        resolveConditions(
-          // @ts-expect-error testing invalid input shape — non-array slipping past DTO
-          { fieldMatch: { status: 'active', department: ['eng'] } },
-          ctx
-        ).query
-      ).toEqual({ department: { $in: ['eng'] } });
+    it('should veto when one field value is not an array (the authored restriction must not vanish)', () => {
+      const result = resolveConditions(
+        // @ts-expect-error testing invalid input shape - non-array slipping past DTO
+        { fieldMatch: { status: 'active', department: ['eng'] } },
+        ctx
+      );
+
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('status'));
     });
 
-    it('should drop fields whose value is null/undefined', () => {
-      expect(
-        resolveConditions(
-          // @ts-expect-error testing invalid input shape
-          { fieldMatch: { a: null, b: undefined, c: ['ok'] } },
-          ctx
-        ).query
-      ).toEqual({ c: { $in: ['ok'] } });
+    it('should veto when a field value is null/undefined', () => {
+      const result = resolveConditions(
+        // @ts-expect-error testing invalid input shape
+        { fieldMatch: { a: null, b: undefined, c: ['ok'] } },
+        ctx
+      );
+
+      expect(result.skipPermission).toBe(true);
+    });
+
+    it('should veto a prototype-pollution field key', () => {
+      const result = resolveConditions(
+        { fieldMatch: { ['__proto__']: ['x'] } },
+        ctx
+      );
+
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('__proto__')
+      );
     });
 
     it('should preserve mixed primitive value types inside the array', () => {
@@ -178,46 +225,52 @@ describe('resolveConditions', () => {
     it('should veto and warn when the only attribute name is unknown', () => {
       const result = resolveConditions({ userAttr: { ownerId: 'email' } }, ctx);
 
-      expect(result.query).toEqual({});
       expect(result.skipPermission).toBe(true);
-      expect(warnSpy).toHaveBeenCalledTimes(2);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('email'));
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('ownerId'));
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('user-42'));
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('empty query')
-      );
     });
 
-    it('should skip and warn when the attribute name is not a string', () => {
+    it('should veto when an attribute name is not a string (not silently narrow)', () => {
       const result = resolveConditions(
         { userAttr: { ownerId: 123, createdBy: 'id' } },
         ctx
       );
 
-      expect(result.query).toEqual({ createdBy: 'user-42' });
-      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(result.skipPermission).toBe(true);
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('ownerId'));
     });
 
-    it('should skip and warn when the attribute name is null/undefined', () => {
+    it('should veto when an attribute name is null/undefined', () => {
       const result = resolveConditions(
         { userAttr: { a: null, b: undefined, c: 'id' } },
         ctx
       );
 
-      expect(result.query).toEqual({ c: 'user-42' });
-      expect(warnSpy).toHaveBeenCalledTimes(2);
+      expect(result.skipPermission).toBe(true);
     });
 
-    it('should mix valid and invalid attributes within the same record', () => {
+    it('should veto a mix of valid and unknown attributes (the unknown one must not vanish)', () => {
       const result = resolveConditions(
         { userAttr: { ownerId: 'id', orgId: 'unknown' } },
         ctx
       );
 
-      expect(result.query).toEqual({ ownerId: 'user-42' });
-      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('unknown attribute')
+      );
+    });
+
+    it('should veto a prototype-chain attribute name instead of resolving it', () => {
+      const result = resolveConditions(
+        { userAttr: { ownerId: 'constructor' } },
+        ctx
+      );
+
+      expect(result.skipPermission).toBe(true);
+      expect(result.query).toEqual({});
     });
 
     it('should not veto for any input', () => {
@@ -253,9 +306,9 @@ describe('resolveConditions', () => {
       const result = resolveConditions({ custom: '{not-valid-json' }, ctx);
 
       expect(result).toEqual({ query: {}, skipPermission: true });
-      expect(warnSpy).toHaveBeenCalledTimes(2);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Invalid JSON')
+        expect.stringContaining('invalid JSON')
       );
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('user-1'));
     });
@@ -265,8 +318,26 @@ describe('resolveConditions', () => {
 
       expect(result).toEqual({ query: {}, skipPermission: true });
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Invalid JSON')
+        expect.stringContaining('invalid JSON')
       );
+    });
+
+    it('should veto malformed JSON even when another branch resolved (not silently narrow)', () => {
+      const result = resolveConditions(
+        {
+          ownership: { userField: 'createdBy' },
+          custom: '{not-valid-json'
+        },
+        ctx
+      );
+
+      expect(result.skipPermission).toBe(true);
+    });
+
+    it('should veto when the JSON parses to a non-object', () => {
+      for (const custom of ['5', '"text"', '[1,2]', 'null']) {
+        expect(resolveConditions({ custom }, ctx).skipPermission).toBe(true);
+      }
     });
 
     describe('denied MongoQuery operators', () => {
@@ -395,12 +466,37 @@ describe('resolveConditions', () => {
     });
   });
 
-  describe('fail-closed empty resolution', () => {
-    it('should not veto when another branch still produces a key', () => {
+  describe('fail-closed partial resolution', () => {
+    it('should veto a partially malformed fieldMatch instead of registering the narrower query', () => {
+      // Admin forgot the array brackets on "dept" - the authored restriction
+      // must not silently disappear, leaving only the status filter.
+      const result = resolveConditions(
+        // @ts-expect-error testing invalid input shape stored before the DTO fix
+        { fieldMatch: { status: ['active'], dept: 'sales' } },
+        ctx
+      );
+
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('dept'));
+    });
+
+    it('should veto a malformed branch even when another branch resolved a key', () => {
       const result = resolveConditions(
         {
           ownership: { userField: 'createdBy' },
           fieldMatch: { status: [] }
+        },
+        ctx
+      );
+
+      expect(result.skipPermission).toBe(true);
+    });
+
+    it('should not veto when a benign custom "{}" accompanies a resolving branch', () => {
+      const result = resolveConditions(
+        {
+          ownership: { userField: 'createdBy' },
+          custom: '{}'
         },
         ctx
       );
