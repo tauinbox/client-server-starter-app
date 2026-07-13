@@ -39,7 +39,7 @@ export const DENIED_MONGO_OPERATORS = new Set([
   '$expr'
 ]);
 
-const PROTOTYPE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+export const PROTOTYPE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /**
  * Recursively checks whether an object tree contains any denied

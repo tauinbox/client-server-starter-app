@@ -31,6 +31,11 @@ import type {
   PermissionResponse,
   RoleAdminResponse
 } from '@app/shared/types/role.types';
+import {
+  findFieldMatchShapeError,
+  findOwnershipShapeError,
+  findUserAttrShapeError
+} from '@app/shared/utils/permission-condition-shape';
 import { NotifyService } from '@core/services/notify.service';
 import type { RolePermissionItem } from '../../../services/role.service';
 import { RoleService } from '../../../services/role.service';
@@ -283,9 +288,14 @@ export class RolePermissionsDialogComponent implements OnInit {
     return this.conditionsMap().get(permissionId)?.ownership?.userField ?? '';
   }
 
+  getOwnershipError(permissionId: string): string {
+    return this.jsonErrors().get(`${permissionId}:ownership`) ?? '';
+  }
+
   toggleOwnership(permissionId: string): void {
     if (this.hasOwnership(permissionId)) {
       this.#removeConditionKey(permissionId, 'ownership');
+      this.#clearJsonError(permissionId, 'ownership');
     } else {
       this.#patchCondition(permissionId, { ownership: { userField: 'id' } });
     }
@@ -294,6 +304,17 @@ export class RolePermissionsDialogComponent implements OnInit {
   setOwnershipField(permissionId: string, event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     this.#patchCondition(permissionId, { ownership: { userField: value } });
+    if (findOwnershipShapeError({ userField: value })) {
+      this.#setJsonError(
+        permissionId,
+        'ownership',
+        this.#translocoService.translate(
+          'admin.rolePermissions.invalidOwnershipField'
+        )
+      );
+    } else {
+      this.#clearJsonError(permissionId, 'ownership');
+    }
   }
 
   // ─── fieldMatch / userAttr (JSON object editors) ──────────────────────
@@ -511,7 +532,16 @@ export class RolePermissionsDialogComponent implements OnInit {
       this.#deleteEditorText(permissionId, editor);
       this.#clearJsonError(permissionId, editor);
     } else {
-      this.#patchCondition(permissionId, this.#editorPatch(editor, {}));
+      // Patch the parsed seed (not {}) so saving an untouched editor sends
+      // exactly what the textarea shows - an empty object is rejected by the
+      // server's shape validation.
+      this.#patchCondition(
+        permissionId,
+        this.#editorPatch(
+          editor,
+          JSON.parse(JSON_EDITOR_SEEDS[editor]) as Record<string, unknown[]>
+        )
+      );
       this.#setEditorText(permissionId, editor, JSON_EDITOR_SEEDS[editor]);
     }
   }
@@ -532,6 +562,22 @@ export class RolePermissionsDialogComponent implements OnInit {
 
     try {
       const parsed = JSON.parse(text) as Record<string, unknown[]>;
+      const shapeError =
+        editor === 'fieldMatch'
+          ? findFieldMatchShapeError(parsed)
+          : findUserAttrShapeError(parsed);
+      if (shapeError) {
+        this.#setJsonError(
+          permissionId,
+          editor,
+          this.#translocoService.translate(
+            editor === 'fieldMatch'
+              ? 'admin.rolePermissions.invalidFieldMatchShape'
+              : 'admin.rolePermissions.invalidUserAttrShape'
+          )
+        );
+        return;
+      }
       this.#patchCondition(permissionId, this.#editorPatch(editor, parsed));
       this.#clearJsonError(permissionId, editor);
     } catch {

@@ -505,6 +505,10 @@ describe('RolePermissionsDialogComponent', () => {
     {
       name: 'fieldMatch' as const,
       seed: '{\n  "fieldName": ["value1", "value2"]\n}',
+      seedValue: { fieldName: ['value1', 'value2'] },
+      validText: '{ "field": ["a", "b"] }',
+      validValue: { field: ['a', 'b'] },
+      invalidShapeText: '{ "status": ["active"], "dept": "sales" }',
       has: (c: Comp, id: string) => c.hasFieldMatch(id),
       getText: (c: Comp, id: string) => c.getFieldMatchText(id),
       getError: (c: Comp, id: string) => c.getFieldMatchError(id),
@@ -519,6 +523,10 @@ describe('RolePermissionsDialogComponent', () => {
     {
       name: 'userAttr' as const,
       seed: '{\n  "recordField": "id"\n}',
+      seedValue: { recordField: 'id' },
+      validText: '{ "ownerId": "id" }',
+      validValue: { ownerId: 'id' },
+      invalidShapeText: '{ "ownerId": 123 }',
       has: (c: Comp, id: string) => c.hasUserAttr(id),
       getText: (c: Comp, id: string) => c.getUserAttrText(id),
       getError: (c: Comp, id: string) => c.getUserAttrError(id),
@@ -531,14 +539,16 @@ describe('RolePermissionsDialogComponent', () => {
       })
     }
   ])('$name JSON editor', (editor) => {
-    it('toggle on seeds the default JSON template and an empty condition', () => {
+    it('toggle on seeds the default JSON template and the matching condition', () => {
       const { component } = setup([makeRolePermItem('perm-a')]);
 
       editor.toggle(component, 'perm-a');
 
       expect(editor.has(component, 'perm-a')).toBe(true);
       expect(editor.getText(component, 'perm-a')).toBe(editor.seed);
-      expect(editor.condValue(component, 'perm-a')).toEqual({});
+      // WYSIWYG: the patched condition equals the parsed seed text, so saving
+      // an untouched editor sends exactly what the textarea shows
+      expect(editor.condValue(component, 'perm-a')).toEqual(editor.seedValue);
     });
 
     it('valid JSON patches the condition and clears a previous error', () => {
@@ -546,11 +556,9 @@ describe('RolePermissionsDialogComponent', () => {
 
       editor.toggle(component, 'perm-a');
       editor.apply(component, 'perm-a', '{ not json');
-      editor.apply(component, 'perm-a', '{ "field": ["a", "b"] }');
+      editor.apply(component, 'perm-a', editor.validText);
 
-      expect(editor.condValue(component, 'perm-a')).toEqual({
-        field: ['a', 'b']
-      });
+      expect(editor.condValue(component, 'perm-a')).toEqual(editor.validValue);
       expect(editor.getError(component, 'perm-a')).toBe('');
       expect(component.canSave()).toBe(true);
     });
@@ -564,8 +572,29 @@ describe('RolePermissionsDialogComponent', () => {
       expect(editor.getError(component, 'perm-a')).not.toBe('');
       expect(component.jsonErrors().has(`perm-a:${editor.name}`)).toBe(true);
       expect(editor.getText(component, 'perm-a')).toBe('{ not json');
-      // condition keeps the last valid value (empty object from toggle)
-      expect(editor.condValue(component, 'perm-a')).toEqual({});
+      // condition keeps the last valid value (the seed from toggle)
+      expect(editor.condValue(component, 'perm-a')).toEqual(editor.seedValue);
+      expect(component.canSave()).toBe(false);
+    });
+
+    it('valid JSON with a malformed shape sets the error and does not patch', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      editor.toggle(component, 'perm-a');
+      editor.apply(component, 'perm-a', editor.invalidShapeText);
+
+      expect(editor.getError(component, 'perm-a')).not.toBe('');
+      expect(editor.condValue(component, 'perm-a')).toEqual(editor.seedValue);
+      expect(component.canSave()).toBe(false);
+    });
+
+    it('an empty object is a shape error (rejected by the server too)', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      editor.toggle(component, 'perm-a');
+      editor.apply(component, 'perm-a', '{}');
+
+      expect(editor.getError(component, 'perm-a')).not.toBe('');
       expect(component.canSave()).toBe(false);
     });
 
@@ -607,6 +636,50 @@ describe('RolePermissionsDialogComponent', () => {
         JSON.stringify({ foo: ['bar'] }, null, 2)
       );
       expect(component.isDirty()).toBe(false);
+    });
+  });
+
+  describe('ownership field validation', () => {
+    function inputEvent(value: string): Event {
+      const input = document.createElement('input');
+      input.value = value;
+      const event = new Event('input');
+      input.dispatchEvent(event);
+      return event;
+    }
+
+    it('an empty field name sets the keyed error and disables save', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      component.toggleOwnership('perm-a');
+      component.setOwnershipField('perm-a', inputEvent(''));
+
+      expect(component.getOwnershipError('perm-a')).not.toBe('');
+      expect(component.jsonErrors().has('perm-a:ownership')).toBe(true);
+      expect(component.canSave()).toBe(false);
+    });
+
+    it('a valid field name clears the error and re-enables save', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      component.toggleOwnership('perm-a');
+      component.setOwnershipField('perm-a', inputEvent(''));
+      component.setOwnershipField('perm-a', inputEvent('createdBy'));
+
+      expect(component.getOwnershipError('perm-a')).toBe('');
+      expect(component.getOwnershipField('perm-a')).toBe('createdBy');
+      expect(component.canSave()).toBe(true);
+    });
+
+    it('toggling ownership off clears the error', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      component.toggleOwnership('perm-a');
+      component.setOwnershipField('perm-a', inputEvent(''));
+      component.toggleOwnership('perm-a');
+
+      expect(component.getOwnershipError('perm-a')).toBe('');
+      expect(component.jsonErrors().size).toBe(0);
     });
   });
 });

@@ -42,6 +42,11 @@ import type {
 } from '@app/shared/types';
 import { findDeniedMongoKey } from '@app/shared/utils/mongo-query-safety';
 import {
+  findFieldMatchShapeError,
+  findOwnershipShapeError,
+  findUserAttrShapeError
+} from '@app/shared/utils/permission-condition-shape';
+import {
   seedOAuthAccounts,
   seedUsers,
   seedResources,
@@ -384,33 +389,54 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
 
     const query: Record<string, unknown> = {};
 
-    if (conditions.ownership) {
-      query[conditions.ownership.userField] = user.id;
+    // Mirrors the server's resolveConditions: any malformed branch vetoes
+    // the whole permission (fail closed) instead of being silently dropped,
+    // which would widen the effective grant.
+    let vetoed = false;
+
+    if (conditions.ownership != null) {
+      if (findOwnershipShapeError(conditions.ownership)) {
+        vetoed = true;
+      } else {
+        query[conditions.ownership.userField] = user.id;
+      }
     }
 
-    if (conditions.fieldMatch) {
-      for (const [field, values] of Object.entries(conditions.fieldMatch)) {
-        if (Array.isArray(values) && values.length > 0) {
+    if (!vetoed && conditions.fieldMatch != null) {
+      if (findFieldMatchShapeError(conditions.fieldMatch)) {
+        vetoed = true;
+      } else {
+        for (const [field, values] of Object.entries(conditions.fieldMatch)) {
           query[field] = { $in: values };
         }
       }
     }
 
-    if (conditions.userAttr) {
-      const userContext: Record<string, unknown> = { id: user.id };
-      for (const [field, attrName] of Object.entries(conditions.userAttr)) {
-        if (typeof attrName === 'string' && attrName in userContext) {
-          query[field] = userContext[attrName];
+    if (!vetoed && conditions.userAttr != null) {
+      if (findUserAttrShapeError(conditions.userAttr)) {
+        vetoed = true;
+      } else {
+        const userContext: Record<string, unknown> = { id: user.id };
+        for (const [field, attrName] of Object.entries(conditions.userAttr)) {
+          const attr = attrName as string;
+          if (!Object.prototype.hasOwnProperty.call(userContext, attr)) {
+            vetoed = true;
+            break;
+          }
+          query[field] = userContext[attr];
         }
       }
     }
 
-    let vetoed = false;
-
-    if (conditions.custom !== undefined && conditions.custom !== null) {
+    if (!vetoed && conditions.custom != null) {
       try {
-        const parsed = JSON.parse(conditions.custom) as Record<string, unknown>;
-        if (findDeniedMongoKey(parsed)) {
+        const parsed: unknown = JSON.parse(conditions.custom);
+        if (
+          parsed === null ||
+          typeof parsed !== 'object' ||
+          Array.isArray(parsed) ||
+          findDeniedMongoKey(parsed)
+        ) {
           vetoed = true;
         } else {
           for (const [k, v] of Object.entries(parsed)) {
@@ -418,7 +444,8 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
           }
         }
       } catch {
-        // ignore invalid JSON — same as server behaviour
+        // invalid JSON vetoes the permission - same as server behaviour
+        vetoed = true;
       }
     }
 

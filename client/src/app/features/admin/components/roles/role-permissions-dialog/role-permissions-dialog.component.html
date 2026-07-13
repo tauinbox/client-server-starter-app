@@ -200,9 +200,15 @@
                             (input)="setOwnershipField(permission.id, $event)"
                             placeholder="id"
                           />
-                          <mat-hint>{{
-                            t('admin.rolePermissions.ownershipFieldHint')
-                          }}</mat-hint>
+                          @if (getOwnershipError(permission.id)) {
+                            <mat-error>{{
+                              getOwnershipError(permission.id)
+                            }}</mat-error>
+                          } @else {
+                            <mat-hint>{{
+                              t('admin.rolePermissions.ownershipFieldHint')
+                            }}</mat-hint>
+                          }
                         </mat-form-field>
                       }
                     </div>

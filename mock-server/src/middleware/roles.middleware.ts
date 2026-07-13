@@ -3,6 +3,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
 import {
+  findFieldMatchShapeError,
+  findOwnershipShapeError,
+  findUserAttrShapeError
+} from '@app/shared/utils/permission-condition-shape';
+import {
   findUserById,
   getState,
   logAudit,
@@ -24,6 +29,66 @@ function validateCustomCondition(custom: string | undefined): string | null {
   } catch {
     return 'custom must be valid JSON';
   }
+}
+
+const CONDITION_KEYS = new Set([
+  'effect',
+  'ownership',
+  'fieldMatch',
+  'userAttr',
+  'custom'
+]);
+
+// Mirrors the server's PermissionConditionDto validation (ValidationPipe
+// whitelist + per-branch shape checks) so a payload the real server rejects
+// with 400 cannot pass the mock and turn an e2e run false-green.
+function findConditionShapeError(conditions: unknown): string | null {
+  if (conditions === undefined || conditions === null) return null;
+  if (typeof conditions !== 'object' || Array.isArray(conditions)) {
+    return 'conditions must be an object';
+  }
+
+  const cond = conditions as Record<string, unknown>;
+  for (const key of Object.keys(cond)) {
+    if (!CONDITION_KEYS.has(key)) {
+      return `property conditions.${key} should not exist`;
+    }
+  }
+
+  if (
+    cond['effect'] != null &&
+    cond['effect'] !== 'allow' &&
+    cond['effect'] !== 'deny'
+  ) {
+    return 'effect must be one of the following values: allow, deny';
+  }
+
+  if (cond['ownership'] != null) {
+    const error = findOwnershipShapeError(cond['ownership']);
+    if (error) return error;
+  }
+
+  if (cond['fieldMatch'] != null) {
+    const error = findFieldMatchShapeError(cond['fieldMatch']);
+    if (error) return error;
+  }
+
+  if (cond['userAttr'] != null) {
+    const error = findUserAttrShapeError(cond['userAttr']);
+    if (error) return error;
+  }
+
+  if (cond['custom'] != null) {
+    if (typeof cond['custom'] !== 'string') {
+      return 'custom must be a JSON string';
+    }
+    const error = validateCustomCondition(cond['custom']);
+    if (error) {
+      return `conditions.custom contains disallowed operator or is invalid: ${error}`;
+    }
+  }
+
+  return null;
 }
 
 // Notify every connected holder of a role that its effective permission set
@@ -333,21 +398,16 @@ router.put('/:id/permissions', adminGuard, (req, res) => {
     return;
   }
 
-  // Validate custom conditions
+  // Validate condition shapes (mirrors the server's DTO validation)
   for (const item of items) {
-    const cond = item.conditions as { custom?: string } | null | undefined;
-    if (cond?.custom) {
-      const error = validateCustomCondition(cond.custom);
-      if (error) {
-        res.status(400).json({
-          message: [
-            `conditions.custom contains disallowed operator or is invalid: ${error}`
-          ],
-          statusCode: 400,
-          error: 'Bad Request'
-        });
-        return;
-      }
+    const error = findConditionShapeError(item.conditions);
+    if (error) {
+      res.status(400).json({
+        message: [error],
+        statusCode: 400,
+        error: 'Bad Request'
+      });
+      return;
     }
   }
 
@@ -426,19 +486,15 @@ router.post('/:id/permissions', adminGuard, (req, res) => {
     return;
   }
 
-  // Validate custom condition
-  if (conditions?.custom) {
-    const error = validateCustomCondition(conditions.custom as string);
-    if (error) {
-      res.status(400).json({
-        message: [
-          `conditions.custom contains disallowed operator or is invalid: ${error}`
-        ],
-        statusCode: 400,
-        error: 'Bad Request'
-      });
-      return;
-    }
+  // Validate condition shape (mirrors the server's DTO validation)
+  const conditionError = findConditionShapeError(conditions);
+  if (conditionError) {
+    res.status(400).json({
+      message: [conditionError],
+      statusCode: 400,
+      error: 'Bad Request'
+    });
+    return;
   }
 
   // Mirror the server: unknown ids fail validation with 400 before anything

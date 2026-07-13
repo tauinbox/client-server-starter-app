@@ -2,6 +2,11 @@ import { IsIn, IsOptional, IsObject, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import type { PermissionEffect } from '@app/shared/types';
 import { IsSafeMongoQuery } from '../../../common/validators/is-safe-mongo-query.validator';
+import {
+  IsFieldMatchShape,
+  IsOwnershipShape,
+  IsUserAttrShape
+} from '../../../common/validators/permission-condition-shape.validator';
 
 export class PermissionConditionDto {
   @ApiPropertyOptional({
@@ -20,6 +25,7 @@ export class PermissionConditionDto {
   })
   @IsOptional()
   @IsObject()
+  @IsOwnershipShape()
   ownership?: { userField: string };
 
   @ApiPropertyOptional({
@@ -29,6 +35,7 @@ export class PermissionConditionDto {
   })
   @IsOptional()
   @IsObject()
+  @IsFieldMatchShape()
   fieldMatch?: Record<string, unknown[]>;
 
   @ApiPropertyOptional({
@@ -38,6 +45,7 @@ export class PermissionConditionDto {
   })
   @IsOptional()
   @IsObject()
+  @IsUserAttrShape()
   userAttr?: Record<string, unknown>;
 
   @ApiPropertyOptional({
