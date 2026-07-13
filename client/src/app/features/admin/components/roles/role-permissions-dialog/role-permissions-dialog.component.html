@@ -200,10 +200,10 @@
                             (input)="setOwnershipField(permission.id, $event)"
                             placeholder="id"
                           />
-                          @if (getOwnershipError(permission.id)) {
-                            <mat-error>{{
-                              getOwnershipError(permission.id)
-                            }}</mat-error>
+                          @let ownershipError =
+                            getOwnershipError(permission.id);
+                          @if (ownershipError) {
+                            <mat-error>{{ ownershipError }}</mat-error>
                           } @else {
                             <mat-hint>{{
                               t('admin.rolePermissions.ownershipFieldHint')
@@ -245,10 +245,10 @@
                             spellcheck="false"
                             class="json-textarea"
                           ></textarea>
-                          @if (getFieldMatchError(permission.id)) {
-                            <mat-error>{{
-                              getFieldMatchError(permission.id)
-                            }}</mat-error>
+                          @let fieldMatchError =
+                            getFieldMatchError(permission.id);
+                          @if (fieldMatchError) {
+                            <mat-error>{{ fieldMatchError }}</mat-error>
                           } @else {
                             <mat-hint>{{
                               t('admin.rolePermissions.fieldMatchJsonExample')
@@ -290,10 +290,9 @@
                             spellcheck="false"
                             class="json-textarea"
                           ></textarea>
-                          @if (getUserAttrError(permission.id)) {
-                            <mat-error>{{
-                              getUserAttrError(permission.id)
-                            }}</mat-error>
+                          @let userAttrError = getUserAttrError(permission.id);
+                          @if (userAttrError) {
+                            <mat-error>{{ userAttrError }}</mat-error>
                           } @else {
                             <mat-hint>{{
                               t(
@@ -326,9 +325,10 @@
                           [readonly]="role.isSystem || isReadonly()"
                           (valueChange)="onCustomChange(permission.id, $event)"
                         ></nxs-condition-builder>
-                        @if (getCustomError(permission.id)) {
+                        @let customError = getCustomError(permission.id);
+                        @if (customError) {
                           <mat-error class="custom-error">{{
-                            getCustomError(permission.id)
+                            customError
                           }}</mat-error>
                         }
                       }
