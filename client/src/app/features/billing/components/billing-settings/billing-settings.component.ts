@@ -4,7 +4,6 @@ import {
   Component,
   computed,
   DestroyRef,
-  DOCUMENT,
   inject
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
@@ -21,6 +20,7 @@ import { LayoutService } from '@core/services/layout.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
+import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
 import { BillingStore } from '../../store/billing.store';
 import { formatMoney, planPriceFor } from '../../utils/billing-format';
 import type {
@@ -56,7 +56,7 @@ export class BillingSettingsComponent implements OnInit {
   readonly #matDialog = inject(MatDialog);
   readonly #transloco = inject(TranslocoService);
   readonly #destroyRef = inject(DestroyRef);
-  readonly #window = inject(DOCUMENT).defaultView;
+  readonly #checkoutRedirect = inject(CheckoutRedirectService);
 
   protected readonly billingRoute = `/${AppRouteSegmentEnum.Billing}`;
   protected readonly isHandset = this.#layout.isHandset;
@@ -143,8 +143,8 @@ export class BillingSettingsComponent implements OnInit {
 
   onUpdatePaymentMethod(): void {
     void this.store.startPaymentMethodUpdate().then((session) => {
-      if (session && this.#window) {
-        this.#window.location.href = session.url;
+      if (session) {
+        this.#checkoutRedirect.redirect(session.url);
       }
     });
   }

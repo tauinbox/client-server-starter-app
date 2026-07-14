@@ -132,6 +132,7 @@
     "regionFailed": "Could not change the billing region.",
     "changeFailed": "Could not change the plan. Please try again.",
     "paymentMethodFailed": "Could not start the payment-method update. Please try again.",
-    "purchaseFailed": "Could not start the purchase. Please try again."
+    "purchaseFailed": "Could not start the purchase. Please try again.",
+    "unsafeRedirect": "Received an invalid checkout link. Please try again or contact support."
   }
 }
