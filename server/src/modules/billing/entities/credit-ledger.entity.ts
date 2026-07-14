@@ -25,8 +25,10 @@ export class CreditLedger {
   id: string;
 
   @Column({ name: 'customer_id', type: 'uuid' })
+  // RESTRICT: the ledger is an append-only audit journal and must survive any
+  // future hard-delete of a customer; erasure requires an explicit archival step
   @ForeignKey<Customer>(() => Customer, {
-    onDelete: 'CASCADE',
+    onDelete: 'RESTRICT',
     name: 'FK_billing_credit_ledger_customer_id'
   })
   customerId: string;
