@@ -15,9 +15,9 @@ export const billingAvailableGuard: CanActivateFn = async () => {
   const flagsStore = inject(FeatureFlagsStore);
   const router = inject(Router);
 
-  if (!flagsStore.loaded()) {
-    await flagsStore.load();
-  }
+  // load() resolves immediately when flags are already loaded and joins an
+  // in-flight fetch otherwise, so no duplicate request is issued.
+  await flagsStore.load();
 
   if (flagsStore.isEnabled(BILLING_FLAG_KEY)()) {
     return true;

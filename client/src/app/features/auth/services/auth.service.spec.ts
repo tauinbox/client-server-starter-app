@@ -85,6 +85,11 @@ describe('AuthService', () => {
     cancelRefresh: ReturnType<typeof vi.fn>;
     forceLogout: ReturnType<typeof vi.fn>;
   };
+  let featureFlagsStoreMock: {
+    load: ReturnType<typeof vi.fn>;
+    reload: ReturnType<typeof vi.fn>;
+    clear: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     rbacMetadataServiceMock = {
@@ -114,6 +119,12 @@ describe('AuthService', () => {
       forceLogout: vi.fn()
     };
 
+    featureFlagsStoreMock = {
+      load: vi.fn().mockResolvedValue(undefined),
+      reload: vi.fn().mockResolvedValue(undefined),
+      clear: vi.fn()
+    };
+
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -132,14 +143,7 @@ describe('AuthService', () => {
             featureFlagsUpdated$: EMPTY
           }
         },
-        {
-          provide: FeatureFlagsStore,
-          useValue: {
-            load: vi.fn().mockResolvedValue(undefined),
-            reload: vi.fn().mockResolvedValue(undefined),
-            clear: vi.fn()
-          }
-        }
+        { provide: FeatureFlagsStore, useValue: featureFlagsStoreMock }
       ]
     });
 
@@ -175,6 +179,9 @@ describe('AuthService', () => {
 
       expect(result).toEqual(mockAuth);
       expect(authStoreMock.saveAuthResponse).toHaveBeenCalledWith(mockAuth);
+      // reload(), not load(): flags loaded during the anonymous bootstrap
+      // must be re-fetched for the authenticated user.
+      expect(featureFlagsStoreMock.reload).toHaveBeenCalled();
     });
 
     it('should not fetch RBAC metadata when the user lacks read Permission', async () => {

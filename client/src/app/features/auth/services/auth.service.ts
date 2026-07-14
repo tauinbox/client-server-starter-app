@@ -68,7 +68,9 @@ export class AuthService {
         switchMap((response) => {
           this.#authStore.saveAuthResponse(response);
           this.scheduleTokenRefresh();
-          void this.#featureFlagsStore.load();
+          // reload(), not load(): flags may already be loaded from the
+          // anonymous bootstrap and the authenticated set can differ.
+          void this.#featureFlagsStore.reload();
           return from(this.fetchPermissions()).pipe(
             tap(() => {
               void this.fetchRbacMetadata();
@@ -275,7 +277,7 @@ export class AuthService {
     if (this.isAuthenticated()) {
       this.scheduleTokenRefresh();
       void this.fetchPermissions();
-      void this.#featureFlagsStore.load();
+      void this.#featureFlagsStore.reload();
     }
   }
 }

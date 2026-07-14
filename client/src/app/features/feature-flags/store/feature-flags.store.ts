@@ -23,21 +23,50 @@ export const FeatureFlagsStore = signalStore(
   withMethods((store) => {
     const service = inject(FeatureFlagService);
 
-    async function load(): Promise<void> {
-      try {
-        const response = await firstValueFrom(service.getEvaluatedFlags());
-        patchState(store, { flags: response.flags, loaded: true });
-      } catch {
-        // Best-effort — UI continues to render with `flags: {}` (everything off).
-        patchState(store, { loaded: true });
-      }
+    let inFlight: Promise<void> | null = null;
+    // Bumped by clear()/reload() so a response from an older fetch cannot
+    // overwrite state that has since been reset or re-fetched.
+    let fetchEpoch = 0;
+
+    function fetchFlags(): Promise<void> {
+      const epoch = ++fetchEpoch;
+      const request = firstValueFrom(service.getEvaluatedFlags())
+        .then((response) => {
+          if (epoch !== fetchEpoch) return;
+          patchState(store, { flags: response.flags, loaded: true });
+        })
+        .catch(() => {
+          // Transient failure: keep `loaded` false so guards and consumers
+          // retry on the next navigation instead of latching "everything
+          // off" for the rest of the session.
+        })
+        .finally(() => {
+          if (inFlight === request) inFlight = null;
+        });
+      inFlight = request;
+      return request;
     }
 
-    async function reload(): Promise<void> {
-      await load();
+    /**
+     * Ensures flags are loaded. Joins an in-flight fetch (started by
+     * bootstrap, login or a guard) instead of issuing a duplicate request;
+     * resolves immediately when flags are already loaded and no fetch is
+     * running.
+     */
+    function load(): Promise<void> {
+      if (inFlight) return inFlight;
+      if (store.loaded()) return Promise.resolve();
+      return fetchFlags();
+    }
+
+    /** Always re-fetches, e.g. after login or a flag/role change push. */
+    function reload(): Promise<void> {
+      return fetchFlags();
     }
 
     function clear(): void {
+      fetchEpoch++;
+      inFlight = null;
       patchState(store, { flags: {}, loaded: false });
     }
 
