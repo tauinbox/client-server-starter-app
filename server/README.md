@@ -144,7 +144,7 @@ src/
 │   ├── controllers/        # AuthController (includes GET /permissions), OAuthController, RbacController
 │   ├── services/           # AuthService, OAuthService, TokenGeneratorService, RefreshTokenService, OAuthAccountService, TokenCleanupService, ResourceService, ActionService, ResourceSyncService
 │   ├── strategies/         # LocalStrategy, JwtStrategy (extracts roles), GoogleStrategy, FacebookStrategy, VkStrategy
-│   ├── guards/             # LocalAuthGuard, JwtAuthGuard, Google/Facebook/VkOAuthGuard
+│   ├── guards/             # LocalAuthGuard, JwtAuthGuard, Google/Facebook/VkOAuthGuard (via createOAuthProviderGuard factory)
 │   ├── entities/           # RefreshToken, OAuthAccount, Resource, Action
 │   ├── enums/              # OAuthProvider
 │   └── dto/                # LoginDto, RegisterDto, UpdateProfileDto, VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto
