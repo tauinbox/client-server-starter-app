@@ -1,5 +1,6 @@
 import { inject } from '@angular/core';
 import { Router, type CanActivateFn } from '@angular/router';
+import { from } from 'rxjs';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { AuthService } from '../../auth/services/auth.service';
 import { AuthStore } from '../../auth/store/auth.store';
@@ -33,9 +34,16 @@ export function featureFlagGuard(
       router,
       state.url,
       () => {
-        if (flagsStore.isEnabled(key)()) return true;
-        void router.navigate([redirectTo]);
-        return false;
+        const evaluate = (): boolean => {
+          if (flagsStore.isEnabled(key)()) return true;
+          void router.navigate([redirectTo]);
+          return false;
+        };
+        // Flags are loaded fire-and-forget at login/bootstrap; without
+        // awaiting, a fast first navigation evaluates an empty flag dict
+        // and bounces an enabled route to /forbidden. load() joins the
+        // in-flight fetch (or resolves immediately when already loaded).
+        return from(flagsStore.load().then(evaluate));
       }
     );
   };

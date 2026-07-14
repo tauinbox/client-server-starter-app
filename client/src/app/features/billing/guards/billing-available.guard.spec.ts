@@ -11,7 +11,6 @@ import { billingAvailableGuard } from './billing-available.guard';
 describe('billingAvailableGuard', () => {
   const urlTree = {} as UrlTree;
   let flagsMock: {
-    loaded: ReturnType<typeof signal<boolean>>;
     load: ReturnType<typeof vi.fn>;
     isEnabled: ReturnType<typeof vi.fn>;
   };
@@ -29,7 +28,6 @@ describe('billingAvailableGuard', () => {
 
   beforeEach(() => {
     flagsMock = {
-      loaded: signal(true),
       load: vi.fn().mockResolvedValue(undefined),
       isEnabled: vi.fn().mockReturnValue(signal(true))
     };
@@ -53,9 +51,13 @@ describe('billingAvailableGuard', () => {
     expect(routerMock.createUrlTree).toHaveBeenCalledWith(['/']);
   });
 
-  it('loads flags first when not yet loaded', async () => {
-    flagsMock.loaded.set(false);
-    await run();
+  it('awaits the flags load before evaluating', async () => {
+    let flagValue = false;
+    flagsMock.load.mockImplementation(async () => {
+      flagValue = true;
+    });
+    flagsMock.isEnabled.mockImplementation(() => () => flagValue);
+    expect(await run()).toBe(true);
     expect(flagsMock.load).toHaveBeenCalled();
   });
 });
