@@ -11,6 +11,7 @@ import type {
 } from '@app/shared/types';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
+import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
 import { BillingStore } from '../../store/billing.store';
 import { readPendingPurchase } from '../../utils/pending-purchase';
 import { PricingPageComponent } from './pricing-page.component';
@@ -78,6 +79,7 @@ describe('PricingPageComponent', () => {
   };
   let authMock: { isAuthenticated: ReturnType<typeof signal<boolean>> };
   let routerMock: { navigate: ReturnType<typeof vi.fn> };
+  let redirectMock: { redirect: ReturnType<typeof vi.fn> };
 
   afterEach(() => {
     sessionStorage.clear();
@@ -105,6 +107,7 @@ describe('PricingPageComponent', () => {
     };
     authMock = { isAuthenticated: signal(authenticated) };
     routerMock = { navigate: vi.fn() };
+    redirectMock = { redirect: vi.fn() };
 
     await TestBed.configureTestingModule({
       imports: [PricingPageComponent, TranslocoTestingModuleWithLangs],
@@ -112,7 +115,8 @@ describe('PricingPageComponent', () => {
         provideNoopAnimations(),
         { provide: BillingStore, useValue: storeMock },
         { provide: AuthStore, useValue: authMock },
-        { provide: Router, useValue: routerMock }
+        { provide: Router, useValue: routerMock },
+        { provide: CheckoutRedirectService, useValue: redirectMock }
       ]
     }).compileComponents();
 
@@ -159,6 +163,43 @@ describe('PricingPageComponent', () => {
     await setup(true);
     fixture.componentInstance.onChoose('pro');
     expect(storeMock.checkout).toHaveBeenCalledWith('pro');
+  });
+
+  it('follows the checkout session through the guarded redirect', async () => {
+    await setup(true);
+    storeMock.checkout.mockResolvedValue({
+      provider: 'paddle',
+      url: 'https://checkout.paddle.com/pay/1',
+      sessionRef: 's1'
+    });
+
+    fixture.componentInstance.onChoose('pro');
+    await fixture.whenStable();
+
+    expect(redirectMock.redirect).toHaveBeenCalledWith(
+      'https://checkout.paddle.com/pay/1'
+    );
+  });
+
+  it('routes a hosted purchase URL through the guarded redirect, not the success page', async () => {
+    await setup(true, [reportPack]);
+    storeMock.purchase.mockResolvedValue({
+      provider: 'paddle',
+      url: 'https://mock-checkout.local/paddle/purchase/s9',
+      sessionRef: 's9'
+    });
+
+    fixture.componentInstance.onBuy({
+      key: reportPack.key,
+      price: '$5.00',
+      product: reportPack
+    });
+    await fixture.whenStable();
+
+    expect(redirectMock.redirect).toHaveBeenCalledWith(
+      'https://mock-checkout.local/paddle/purchase/s9'
+    );
+    expect(routerMock.navigate).not.toHaveBeenCalled();
   });
 
   it('renders the one-time section with product and donation cards for authed users', async () => {

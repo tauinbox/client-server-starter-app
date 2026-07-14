@@ -15,6 +15,7 @@ import type {
 import { LayoutService } from '@core/services/layout.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
+import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
 import { BillingStore } from '../../store/billing.store';
 import { ChangePlanDialogComponent } from '../change-plan-dialog/change-plan-dialog.component';
 import { BillingSettingsComponent } from './billing-settings.component';
@@ -106,6 +107,7 @@ describe('BillingSettingsComponent', () => {
   };
   let dialogMock: { openConfirm: ReturnType<typeof vi.fn> };
   let matDialogMock: { open: ReturnType<typeof vi.fn> };
+  let redirectMock: { redirect: ReturnType<typeof vi.fn> };
 
   async function setup(
     hasSub: boolean,
@@ -132,6 +134,7 @@ describe('BillingSettingsComponent', () => {
       startPaymentMethodUpdate: vi.fn().mockResolvedValue(null)
     };
     dialogMock = { openConfirm: vi.fn().mockReturnValue(of(true)) };
+    redirectMock = { redirect: vi.fn() };
     matDialogMock = {
       open: vi.fn().mockReturnValue({
         afterClosed: () => of({ planKey: 'business' })
@@ -146,7 +149,8 @@ describe('BillingSettingsComponent', () => {
         { provide: BillingStore, useValue: storeMock },
         { provide: AdaptiveDialogService, useValue: dialogMock },
         { provide: MatDialog, useValue: matDialogMock },
-        { provide: LayoutService, useValue: { isHandset: signal(false) } }
+        { provide: LayoutService, useValue: { isHandset: signal(false) } },
+        { provide: CheckoutRedirectService, useValue: redirectMock }
       ]
     }).compileComponents();
 
@@ -235,6 +239,22 @@ describe('BillingSettingsComponent', () => {
       ) as HTMLButtonElement
     ).click();
     expect(storeMock.startPaymentMethodUpdate).toHaveBeenCalled();
+  });
+
+  it('follows the payment-method session through the guarded redirect', async () => {
+    await setup(true);
+    storeMock.startPaymentMethodUpdate.mockResolvedValue({
+      provider: 'paddle',
+      url: 'https://checkout.paddle.com/method/1',
+      sessionRef: 'sess-1'
+    });
+
+    fixture.componentInstance.onUpdatePaymentMethod();
+    await fixture.whenStable();
+
+    expect(redirectMock.redirect).toHaveBeenCalledWith(
+      'https://checkout.paddle.com/method/1'
+    );
   });
 
   it('hides the payment-method card without a subscription', async () => {

@@ -3,7 +3,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  DOCUMENT,
   inject
 } from '@angular/core';
 import { Router } from '@angular/router';
@@ -19,6 +18,7 @@ import type {
 } from '@app/shared/types';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
+import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
 import { BillingStore } from '../../store/billing.store';
 import {
   formatMoney,
@@ -71,7 +71,7 @@ export class PricingPageComponent implements OnInit {
   readonly #authStore = inject(AuthStore);
   readonly #router = inject(Router);
   readonly #transloco = inject(TranslocoService);
-  readonly #window = inject(DOCUMENT).defaultView;
+  readonly #checkoutRedirect = inject(CheckoutRedirectService);
 
   protected readonly isAuthenticated = this.#authStore.isAuthenticated;
 
@@ -189,8 +189,8 @@ export class PricingPageComponent implements OnInit {
     }
 
     void this.store.checkout(planKey).then((session) => {
-      if (session && this.#window) {
-        this.#window.location.href = session.url;
+      if (session) {
+        this.#checkoutRedirect.redirect(session.url);
       }
     });
   }
@@ -236,8 +236,8 @@ export class PricingPageComponent implements OnInit {
     const session = await this.store.purchase(request);
     if (!session) return;
     storePendingPurchase({ ...pending, sessionRef: session.sessionRef });
-    if (session.url && this.#window) {
-      this.#window.location.href = session.url;
+    if (session.url) {
+      this.#checkoutRedirect.redirect(session.url);
       return;
     }
     void this.#router.navigate([
