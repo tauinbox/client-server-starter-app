@@ -65,6 +65,36 @@ describe('CaptchaRequiredGuard', () => {
     expect(mockService.verify).not.toHaveBeenCalled();
   });
 
+  it('throws CAPTCHA_GATE_FAILURE when X-RateLimit-Remaining header is malformed', async () => {
+    mockService.isEnabled.mockReturnValue(true);
+    const ctx = buildContext(
+      {},
+      { getHeader: jest.fn().mockReturnValue('abc') }
+    );
+    await expect(guard.canActivate(ctx)).rejects.toMatchObject({
+      response: {
+        errorKey: ErrorKeys.AUTH.CAPTCHA_GATE_FAILURE
+      },
+      status: HttpStatus.INTERNAL_SERVER_ERROR
+    });
+    expect(mockService.verify).not.toHaveBeenCalled();
+  });
+
+  it('throws CAPTCHA_GATE_FAILURE when X-RateLimit-Remaining header is a non-numeric array', async () => {
+    mockService.isEnabled.mockReturnValue(true);
+    const ctx = buildContext(
+      {},
+      { getHeader: jest.fn().mockReturnValue(['1', '2']) }
+    );
+    await expect(guard.canActivate(ctx)).rejects.toMatchObject({
+      response: {
+        errorKey: ErrorKeys.AUTH.CAPTCHA_GATE_FAILURE
+      },
+      status: HttpStatus.INTERNAL_SERVER_ERROR
+    });
+    expect(mockService.verify).not.toHaveBeenCalled();
+  });
+
   it('passes through when remaining > threshold', async () => {
     mockService.isEnabled.mockReturnValue(true);
     const ctx = buildContext({}, { getHeader: jest.fn().mockReturnValue(2) });
