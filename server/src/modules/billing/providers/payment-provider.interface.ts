@@ -92,9 +92,10 @@ export interface NormalizedInvoicePayload {
    * charge already recorded — its idempotency key, echoed back through the
    * payment's metadata. Set on the provider's confirming `payment.succeeded`
    * for any core-initiated off-session charge (renewal, trial conversion, usage
-   * close, plan-change proration). The core inserted the paid invoice and
-   * emitted `InvoicePaidEvent` itself, so the reducer reconciles onto that row
-   * and never inserts a duplicate, saves a second default card, or re-activates.
+   * close, plan-change proration). The core inserted the invoice itself (`paid`
+   * when captured synchronously, `pending` while fiscalization settles), so the
+   * reducer settles/reconciles onto that row and never inserts a duplicate,
+   * saves a second default card, or re-activates.
    */
   offSessionChargeKey?: string | null;
   /**
@@ -124,6 +125,13 @@ export interface NormalizedPaymentFailedPayload {
   providerSubscriptionId: string | null;
   /** See `NormalizedInvoicePayload.usageChargeKey` — marks the pending usage invoice failed. */
   usageChargeKey?: string | null;
+  /**
+   * See `NormalizedInvoicePayload.offSessionChargeKey`: a core-initiated
+   * off-session charge that was accepted as `pending` and then canceled at
+   * capture. The reducer flips the matching pending invoice to `failed`; the
+   * renewal scheduler picks the failure up on its next scan and walks dunning.
+   */
+  offSessionChargeKey?: string | null;
 }
 
 export type CancelMode = 'period_end' | 'immediate';
@@ -172,8 +180,16 @@ export interface OneTimePaymentSession {
   sessionRef: string;
 }
 
+/**
+ * Outcome of an off-session charge (or a reconcile lookup). `captured` means
+ * funds are confirmed; `pending` means the provider accepted the charge but it
+ * has not settled yet (YooKassa payment-after-receipt fiscalization): the
+ * caller must record it as uncaptured and let the confirming webhook (or a
+ * later reconcile) settle it, never treat it as paid.
+ */
 export interface ChargeResult {
   providerInvoiceRef: string;
+  status: 'captured' | 'pending';
 }
 
 /** Net immediate cost of a delegated plan change, from the provider's preview. */
@@ -207,11 +223,12 @@ export interface PaymentProvider {
   /**
    * Looks up a prior off-session charge posted under `chargeKey` (the key
    * `chargeOffSession` echoes through the provider's metadata), created after
-   * `createdAfter`. Returns the charge when one exists that is not a hard
-   * decline, `null` when no charge reached the provider or every attempt was
-   * declined. The renewal scheduler calls this before re-charging a dunning
-   * retry so an ambiguous failure (timeout after the provider captured funds)
-   * reconciles onto the captured payment instead of charging twice.
+   * `createdAfter`. Returns the charge (with its captured/pending status) when
+   * one exists that is not a hard decline, `null` when no charge reached the
+   * provider or every attempt was declined. The renewal scheduler calls this
+   * before re-charging a dunning retry so an ambiguous failure (timeout after
+   * the provider captured funds) reconciles onto the captured payment instead
+   * of charging twice, and to poll a previously recorded pending charge.
    * Provider-managed (Paddle) lifecycles never off-session charge and reject
    * this call.
    */

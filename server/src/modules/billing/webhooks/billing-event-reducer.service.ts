@@ -303,16 +303,57 @@ export class BillingEventReducer {
     const customerId = payload.ref.customerId;
     const selfManaged = lifecycleOwnerFor(provider) === 'self';
 
-    // The core already recorded this off-session charge's invoice (keyed by the
-    // charge key) and emitted InvoicePaidEvent; only reconcile the confirmed
-    // payment ref. Never insert here — that would claim the unique key the
-    // core's period-advance relies on.
+    // The core already recorded this off-session charge's invoice: settle a
+    // still-pending one, otherwise only reconcile the payment ref. Never
+    // insert here - that would claim the unique key the period-advance relies on.
     if (payload.offSessionChargeKey) {
-      await this.dataSource.manager.update(
-        Invoice,
-        { providerEventId: payload.offSessionChargeKey },
-        { providerInvoiceRef: payload.providerInvoiceRef }
+      const chargeKey = payload.offSessionChargeKey;
+      const settled = await withTransaction(
+        this.dataSource,
+        async (manager) => {
+          const flip = await manager.update(
+            Invoice,
+            { providerEventId: chargeKey, status: 'pending' },
+            {
+              status: 'paid',
+              providerInvoiceRef: payload.providerInvoiceRef,
+              paidAt: parseDate(payload.paidAt, new Date())
+            }
+          );
+          if (!flip.affected) {
+            await manager.update(
+              Invoice,
+              { providerEventId: chargeKey },
+              { providerInvoiceRef: payload.providerInvoiceRef }
+            );
+            return null;
+          }
+          const invoice = await manager.findOne(Invoice, {
+            where: { providerEventId: chargeKey }
+          });
+          if (!invoice) {
+            return null;
+          }
+          // The winning pending->paid flip spends the credits the charged
+          // amount was rated against - exactly once, whichever side settles.
+          if (invoice.creditUnitsApplied > 0) {
+            await this.credits.spendOnUsage(
+              manager,
+              invoice.customerId,
+              invoice.id,
+              invoice.creditUnitsApplied
+            );
+          }
+          const userId = await this.resolveUserId(manager, payload.ref);
+          return { invoiceId: invoice.id, userId };
+        }
       );
+      if (settled?.userId) {
+        this.events.emit(
+          InvoicePaidEvent.name,
+          new InvoicePaidEvent(settled.userId, settled.invoiceId)
+        );
+      }
       return;
     }
 
@@ -597,6 +638,19 @@ export class BillingEventReducer {
   private async reducePaymentFailed(
     payload: NormalizedPaymentFailedPayload
   ): Promise<void> {
+    // An off-session charge canceled at capture fails the pending invoice the
+    // core recorded, silently: the renewal scheduler observes the failed row
+    // on its next scan and walks dunning (emitting PaymentFailedEvent there);
+    // a second event here would double-notify.
+    if (payload.offSessionChargeKey) {
+      await this.dataSource.manager.update(
+        Invoice,
+        { providerEventId: payload.offSessionChargeKey, status: 'pending' },
+        { status: 'failed' }
+      );
+      return;
+    }
+
     // A failed postpaid usage charge surfaces on its pending invoice; the
     // subscription stays as the provider reports it (Paddle owns dunning).
     if (payload.usageChargeKey) {

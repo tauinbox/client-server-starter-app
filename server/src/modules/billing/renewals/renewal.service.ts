@@ -45,6 +45,12 @@ import {
  * key is stable across dunning retries of the same period — a retry after an
  * ambiguous failure (timeout after the provider captured funds) reconciles the
  * prior attempt at the provider instead of charging under a fresh key.
+ *
+ * A charge the provider accepts but has not captured (`pending`, YooKassa
+ * payment-after-receipt) is recorded as a `pending` invoice WITHOUT advancing
+ * the period: the confirming webhook or a later scan's poll settles it to
+ * `paid` (then the scan advances) or fails it into dunning. Entitlement is
+ * subscription-status based, so the deferred advance costs the user nothing.
  */
 @Injectable()
 export class RenewalService {
@@ -182,45 +188,27 @@ export class RenewalService {
     const idempotencyKey = `renewal:${subscription.id}:${anchor.getTime()}`;
 
     let charge: ChargeResult;
+    let settleStored = false;
     if (rated.amountMinor === 0) {
       // Zero-amount renewals (usage with no overage / fully credited, or a fixed
       // $0 plan like Free) aren't chargeable/fiscalizable: skip the provider but
       // still record a zero invoice whose provider_event_id advances the period.
-      charge = { providerInvoiceRef: idempotencyKey };
+      charge = { providerInvoiceRef: idempotencyKey, status: 'captured' };
     } else {
-      // A prior dunning attempt may have captured funds despite reporting
-      // failure (timeout after capture) — reconcile it before charging again.
-      let prior: ChargeResult | null = null;
-      if (subscription.dunningAttempts > 0) {
-        try {
-          prior = await provider.findOffSessionCharge(idempotencyKey, anchor);
-        } catch (error) {
-          // Prior outcome unknown — skip the cycle (dunning state untouched,
-          // the next scan retries) rather than risk a duplicate charge.
-          this.logger.error(
-            `Renewal reconcile failed for subscription ${id}: ${(error as Error).message}`
-          );
-          return;
-        }
-      }
-      if (prior) {
-        charge = prior;
-      } else {
-        try {
-          charge = await provider.chargeOffSession(
-            customer,
-            rated.amountMinor,
-            rated.receiptItems,
-            idempotencyKey
-          );
-        } catch (error) {
-          this.logger.warn(
-            `Renewal charge failed for subscription ${id}: ${(error as Error).message}`
-          );
-          await this.handleFailure(subscription, customer.userId, now);
-          return;
-        }
-      }
+      const resolved = await this.resolveDueCharge(
+        subscription,
+        customer,
+        plan,
+        provider,
+        rated,
+        creditUnitsApplied,
+        anchor,
+        idempotencyKey,
+        now
+      );
+      if (!resolved) return;
+      charge = resolved.charge;
+      settleStored = resolved.settleStored;
     }
 
     await this.handleSuccess(
@@ -232,8 +220,147 @@ export class RenewalService {
       charge,
       anchor,
       idempotencyKey,
-      now
+      now,
+      settleStored
     );
+  }
+
+  /**
+   * Resolves the money side of a due renewal to a captured charge, or `null`
+   * when this cycle must not advance the period (charge still pending at the
+   * provider, outcome unknown, or a failure that entered dunning). The invoice
+   * row under the stable per-period key is the persisted state machine:
+   * absent -> charge; pending -> poll the provider; failed -> dun once, then
+   * re-charge on the next retry; paid -> nothing left but the advance.
+   * `settleStored` marks a charge whose recorded invoice already carries the
+   * amount/credit units the provider actually charged - the settle must keep
+   * them instead of this scan's re-rated values.
+   */
+  private async resolveDueCharge(
+    subscription: Subscription,
+    customer: Customer,
+    plan: Plan,
+    provider: PaymentProvider,
+    rated: RatedAmount,
+    creditUnitsApplied: number,
+    anchor: Date,
+    idempotencyKey: string,
+    now: Date
+  ): Promise<{ charge: ChargeResult; settleStored: boolean } | null> {
+    const existing = await this.dataSource.manager.findOne(Invoice, {
+      where: { providerEventId: idempotencyKey }
+    });
+
+    if (existing?.status === 'paid' || existing?.status === 'refunded') {
+      // The confirming webhook settled the charge; only the advance remains.
+      return {
+        charge: {
+          providerInvoiceRef: existing.providerInvoiceRef,
+          status: 'captured'
+        },
+        settleStored: true
+      };
+    }
+
+    if (existing?.status === 'pending') {
+      let found: ChargeResult | null;
+      try {
+        found = await provider.findOffSessionCharge(idempotencyKey, anchor);
+      } catch (error) {
+        this.logger.error(
+          `Pending-charge poll failed for subscription ${subscription.id}: ${(error as Error).message}`
+        );
+        return null;
+      }
+      if (found?.status === 'captured') {
+        return { charge: found, settleStored: true };
+      }
+      if (found) {
+        // Still settling at the provider; the next scan re-checks.
+        return null;
+      }
+      // Canceled at capture. The gated flip runs fail-and-dun exactly once
+      // against a concurrent scan or the webhook reducer's own flip.
+      const flip = await this.dataSource.manager.update(
+        Invoice,
+        { providerEventId: idempotencyKey, status: 'pending' },
+        { status: 'failed' }
+      );
+      if (flip.affected) {
+        await this.handleFailure(subscription, customer.userId, now);
+      }
+      return null;
+    }
+
+    if (existing?.status === 'failed' && subscription.dunningAttempts === 0) {
+      // The webhook recorded the capture-time decline before any scan did:
+      // enter dunning without re-charging (the stable key would only replay
+      // the declined payment inside the provider's idempotence window).
+      await this.handleFailure(subscription, customer.userId, now);
+      return null;
+    }
+
+    // A prior dunning attempt may have captured funds despite reporting
+    // failure (timeout after capture) — reconcile it before charging again.
+    let prior: ChargeResult | null = null;
+    if (subscription.dunningAttempts > 0) {
+      try {
+        prior = await provider.findOffSessionCharge(idempotencyKey, anchor);
+      } catch (error) {
+        // Prior outcome unknown — skip the cycle (dunning state untouched,
+        // the next scan retries) rather than risk a duplicate charge.
+        this.logger.error(
+          `Renewal reconcile failed for subscription ${subscription.id}: ${(error as Error).message}`
+        );
+        return null;
+      }
+    }
+    if (prior?.status === 'captured') {
+      return { charge: prior, settleStored: false };
+    }
+    if (prior) {
+      await this.recordPendingCharge(
+        subscription,
+        customer,
+        plan,
+        rated,
+        creditUnitsApplied,
+        prior.providerInvoiceRef,
+        anchor,
+        idempotencyKey
+      );
+      return null;
+    }
+
+    let result: ChargeResult;
+    try {
+      result = await provider.chargeOffSession(
+        customer,
+        rated.amountMinor,
+        rated.receiptItems,
+        idempotencyKey
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Renewal charge failed for subscription ${subscription.id}: ${(error as Error).message}`
+      );
+      await this.handleFailure(subscription, customer.userId, now);
+      return null;
+    }
+    if (result.status === 'pending') {
+      await this.recordPendingCharge(
+        subscription,
+        customer,
+        plan,
+        rated,
+        creditUnitsApplied,
+        result.providerInvoiceRef,
+        anchor,
+        idempotencyKey
+      );
+      return null;
+    }
+    return { charge: result, settleStored: false };
   }
 
   /** The moment a subscription is due for its next self-managed charge. */
@@ -245,6 +372,83 @@ export class RenewalService {
     return null;
   }
 
+  /**
+   * A fixed invoice covers the period being prepaid; a usage invoice covers
+   * the metered period that just closed.
+   */
+  private invoicePeriodFor(
+    subscription: Subscription,
+    plan: Plan,
+    anchor: Date
+  ): { start: Date; end: Date } {
+    return subscription.billingMode === 'usage'
+      ? { start: subscription.currentPeriodStart, end: anchor }
+      : { start: anchor, end: addInterval(anchor, plan.interval) };
+  }
+
+  /**
+   * Records a provider-accepted but not yet captured charge as a `pending`
+   * invoice under the stable per-period key, without advancing the period —
+   * the confirming webhook or a later scan's poll settles or fails it. The
+   * rated amount and the credit units it assumed are persisted so the settle
+   * spends exactly what the charge was computed from, immune to balance drift.
+   */
+  private async recordPendingCharge(
+    subscription: Subscription,
+    customer: Customer,
+    plan: Plan,
+    rated: RatedAmount,
+    creditUnitsApplied: number,
+    providerInvoiceRef: string,
+    anchor: Date,
+    idempotencyKey: string
+  ): Promise<void> {
+    const period = this.invoicePeriodFor(subscription, plan, anchor);
+    await withTransaction(this.dataSource, async (manager) => {
+      const insert = await manager
+        .createQueryBuilder()
+        .insert()
+        .into(Invoice)
+        .values({
+          customerId: subscription.customerId,
+          subscriptionId: subscription.id,
+          provider: subscription.provider,
+          providerEventId: idempotencyKey,
+          providerInvoiceRef,
+          amountMinor: Money.fromMinor(rated.amountMinor),
+          currency: customer.currency,
+          status: 'pending',
+          billingMode: subscription.billingMode,
+          periodStart: period.start,
+          periodEnd: period.end,
+          paidAt: null,
+          receiptRef: null,
+          creditUnitsApplied
+        })
+        .orIgnore()
+        .returning(['id'])
+        .execute();
+      const rows = insert.raw as Array<{ id: string }>;
+      if (rows.length === 0) {
+        // A dunning retry reuses the period key: refresh the failed row with
+        // the values this new attempt actually charged.
+        await manager.update(
+          Invoice,
+          { providerEventId: idempotencyKey, status: 'failed' },
+          {
+            status: 'pending',
+            providerInvoiceRef,
+            amountMinor: Money.fromMinor(rated.amountMinor),
+            creditUnitsApplied
+          }
+        );
+      }
+    });
+    this.logger.log(
+      `Renewal charge for subscription ${subscription.id} is pending capture; period advance deferred`
+    );
+  }
+
   private async handleSuccess(
     subscription: Subscription,
     customer: Customer,
@@ -254,16 +458,12 @@ export class RenewalService {
     charge: ChargeResult,
     anchor: Date,
     idempotencyKey: string,
-    now: Date
+    now: Date,
+    settleStored: boolean
   ): Promise<void> {
     const newPeriodStart = anchor;
     const newPeriodEnd = addInterval(anchor, plan.interval);
-    // A fixed invoice covers the period being prepaid; a usage invoice covers
-    // the metered period that just closed.
-    const invoicePeriod =
-      subscription.billingMode === 'usage'
-        ? { start: subscription.currentPeriodStart, end: anchor }
-        : { start: newPeriodStart, end: newPeriodEnd };
+    const invoicePeriod = this.invoicePeriodFor(subscription, plan, anchor);
 
     const result = await withTransaction(this.dataSource, async (manager) => {
       const insert = await manager
@@ -283,52 +483,96 @@ export class RenewalService {
           periodStart: invoicePeriod.start,
           periodEnd: invoicePeriod.end,
           paidAt: now,
-          receiptRef: null
+          receiptRef: null,
+          creditUnitsApplied
         })
         .orIgnore()
         .returning(['id'])
         .execute();
-
-      // orIgnore returns no row when this exact attempt's invoice already
-      // exists — the period was already advanced, so this replay is a no-op.
       const rows = insert.raw as Array<{ id: string }>;
-      if (rows.length === 0) return null;
 
-      // Credits offset this period's billable units; the deduction commits
-      // with the winning insert, so a replayed scan spends nothing.
-      if (creditUnitsApplied > 0) {
+      let paidInvoiceId = rows[0]?.id ?? null;
+      let unitsToSpend = paidInvoiceId ? creditUnitsApplied : 0;
+      if (!paidInvoiceId) {
+        // The stable per-period key already has a row: settle it while still
+        // uncaptured. A settle of a recorded pending charge keeps the stored
+        // amount/credit units (what the provider actually charged); a fresh
+        // retry charge overwrites a failed row with its own values.
+        const existing = await manager.findOne(Invoice, {
+          where: { providerEventId: idempotencyKey }
+        });
+        if (
+          existing &&
+          (existing.status === 'pending' || existing.status === 'failed')
+        ) {
+          const flip = await manager.update(
+            Invoice,
+            { id: existing.id, status: existing.status },
+            {
+              status: 'paid',
+              paidAt: now,
+              providerInvoiceRef: charge.providerInvoiceRef,
+              ...(settleStored
+                ? {}
+                : {
+                    amountMinor: Money.fromMinor(rated.amountMinor),
+                    creditUnitsApplied
+                  })
+            }
+          );
+          if (flip.affected) {
+            paidInvoiceId = existing.id;
+            unitsToSpend = settleStored
+              ? existing.creditUnitsApplied
+              : creditUnitsApplied;
+          }
+        }
+      }
+
+      // Credits commit with the winning insert/flip, so a replayed scan (or
+      // the webhook reducer's own settle) spends nothing a second time.
+      if (paidInvoiceId && unitsToSpend > 0) {
         await this.credits.spendOnUsage(
           manager,
           subscription.customerId,
-          rows[0].id,
-          creditUnitsApplied
+          paidInvoiceId,
+          unitsToSpend
         );
       }
 
-      const fresh = await manager.findOne(Subscription, {
-        where: { id: subscription.id }
-      });
-      if (!fresh) return null;
-      fresh.status = 'active';
-      fresh.currentPeriodStart = newPeriodStart;
-      fresh.currentPeriodEnd = newPeriodEnd;
-      fresh.trialEnd = null;
-      fresh.dunningAttempts = 0;
-      fresh.nextRenewalAttemptAt = null;
-      await manager.save(fresh);
+      // CAS on the period end read at scan start: the advance (and its event)
+      // runs exactly once even against a concurrent scan.
+      const advance = await manager.update(
+        Subscription,
+        {
+          id: subscription.id,
+          currentPeriodEnd: subscription.currentPeriodEnd
+        },
+        {
+          status: 'active',
+          currentPeriodStart: newPeriodStart,
+          currentPeriodEnd: newPeriodEnd,
+          trialEnd: null,
+          dunningAttempts: 0,
+          nextRenewalAttemptAt: null
+        }
+      );
 
-      return { invoiceId: rows[0].id };
+      return { paidInvoiceId, advanced: advance.affected === 1 };
     });
 
-    if (!result) return;
-    this.events.emit(
-      InvoicePaidEvent.name,
-      new InvoicePaidEvent(customer.userId, result.invoiceId)
-    );
-    this.events.emit(
-      SubscriptionRenewedEvent.name,
-      new SubscriptionRenewedEvent(customer.userId, subscription.id)
-    );
+    if (result.paidInvoiceId) {
+      this.events.emit(
+        InvoicePaidEvent.name,
+        new InvoicePaidEvent(customer.userId, result.paidInvoiceId)
+      );
+    }
+    if (result.advanced) {
+      this.events.emit(
+        SubscriptionRenewedEvent.name,
+        new SubscriptionRenewedEvent(customer.userId, subscription.id)
+      );
+    }
   }
 
   private async handleFailure(

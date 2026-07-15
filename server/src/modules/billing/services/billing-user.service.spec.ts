@@ -141,9 +141,10 @@ function provider(
     previewChangePlan: jest
       .fn()
       .mockResolvedValue({ amountMinor: 1700, currency: 'USD' }),
-    chargeOffSession: jest
-      .fn()
-      .mockResolvedValue({ providerInvoiceRef: 'pay_change' }),
+    chargeOffSession: jest.fn().mockResolvedValue({
+      providerInvoiceRef: 'pay_change',
+      status: 'captured'
+    }),
     refund: jest.fn().mockResolvedValue(undefined)
   };
 }
@@ -971,6 +972,44 @@ describe('BillingUserService', () => {
       expect(ctx.emit).toHaveBeenCalledWith(
         PlanChangedEvent.name,
         expect.objectContaining({ fromPlanKey: 'pro', toPlanKey: 'business' })
+      );
+    });
+
+    it('records an uncaptured proration charge as pending and defers InvoicePaid to the webhook', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      ctx.subscriptions.save.mockImplementation((s: object) =>
+        Promise.resolve(s)
+      );
+      ctx.invoices.findOne.mockResolvedValue(null);
+      const yoo = provider('yookassa', false);
+      yoo.chargeOffSession.mockResolvedValue({
+        providerInvoiceRef: 'pay_change',
+        status: 'pending'
+      });
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      const result = await ctx.service.changePlan('user-1', 'business');
+
+      // Funds are not captured yet: the invoice must not read as paid, and the
+      // paid event must wait for the confirming webhook.
+      expect(ctx.insertedInvoices[0]).toMatchObject({
+        amountMinor: Money.fromMinor(116000),
+        status: 'pending',
+        paidAt: null
+      });
+      expect(
+        ctx.emit.mock.calls.filter(
+          (call: unknown[]) => call[0] === InvoicePaidEvent.name
+        )
+      ).toHaveLength(0);
+      // The switch itself still applies.
+      expect(result.planKey).toBe('business');
+      expect(ctx.emit).toHaveBeenCalledWith(
+        PlanChangedEvent.name,
+        expect.objectContaining({ toPlanKey: 'business' })
       );
     });
 

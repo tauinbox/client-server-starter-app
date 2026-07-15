@@ -166,6 +166,19 @@ function makeManager(stores: Stores) {
         for (const c of matches) Object.assign(c, set);
         return Promise.resolve({ affected: matches.length });
       }
+      if (entity === Subscription) {
+        // The period advance is a compare-and-swap on the period end read at
+        // scan start, so the criterion carries a Date.
+        const matches = stores.subscriptions.filter(
+          (s) =>
+            s.id === where['id'] &&
+            (where['currentPeriodEnd'] === undefined ||
+              s.currentPeriodEnd.getTime() ===
+                (where['currentPeriodEnd'] as Date).getTime())
+        );
+        for (const s of matches) Object.assign(s, set);
+        return Promise.resolve({ affected: matches.length });
+      }
       return Promise.resolve({ affected: 0 });
     },
     create: (_entity: unknown, data: object) => ({ ...data }),

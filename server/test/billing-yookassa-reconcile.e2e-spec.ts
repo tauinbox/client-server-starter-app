@@ -38,14 +38,21 @@ interface Store {
   paymentMethods: PaymentMethod[];
 }
 
-function findWhere<T extends object>(rows: T[], where: Partial<T>): T | null {
-  return (
-    rows.find((row) =>
-      Object.entries(where).every(
-        ([k, v]) => (row as Record<string, unknown>)[k] === v
-      )
-    ) ?? null
+/** Column equality with Date support (the period-advance CAS matches on one). */
+function columnEquals(actual: unknown, expected: unknown): boolean {
+  return actual instanceof Date && expected instanceof Date
+    ? actual.getTime() === expected.getTime()
+    : actual === expected;
+}
+
+function rowMatches(row: object, where: Record<string, unknown>): boolean {
+  return Object.entries(where).every(([k, v]) =>
+    columnEquals((row as Record<string, unknown>)[k], v)
   );
+}
+
+function findWhere<T extends object>(rows: T[], where: Partial<T>): T | null {
+  return rows.find((row) => rowMatches(row, where)) ?? null;
 }
 
 function makeManager(store: Store) {
@@ -68,12 +75,12 @@ function makeManager(store: Store) {
       set: Record<string, unknown>
     ) => {
       const rows: object[] =
-        entity === Invoice ? store.invoices : store.paymentMethods;
-      const matches = rows.filter((row) =>
-        Object.entries(where).every(
-          ([k, v]) => (row as Record<string, unknown>)[k] === v
-        )
-      );
+        entity === Invoice
+          ? store.invoices
+          : entity === Subscription
+            ? store.subscriptions
+            : store.paymentMethods;
+      const matches = rows.filter((row) => rowMatches(row, where));
       for (const row of matches) Object.assign(row, set);
       return Promise.resolve({ affected: matches.length });
     },

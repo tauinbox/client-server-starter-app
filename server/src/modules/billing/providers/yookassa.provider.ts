@@ -367,16 +367,18 @@ export class YooKassaProvider implements PaymentProvider {
       idempotencyKey ?? randomUUID()
     );
 
-    // `canceled` is a hard decline. `pending`/`waiting_for_capture` mean the
-    // charge was accepted but fiscalization (payment-after-receipt) has not
-    // settled yet — it resolves to `succeeded` via a later webhook, so both
-    // count as success here.
+    // `canceled` is a hard decline; anything short of `succeeded` (the
+    // payment-after-receipt fiscalization window) may still cancel at capture,
+    // so it is reported as `pending`, never as captured funds.
     if (payment.status === 'canceled') {
       throw new ServiceUnavailableException(
         `YooKassa charge for customer "${customer.id}" was declined`
       );
     }
-    return { providerInvoiceRef: payment.id };
+    return {
+      providerInvoiceRef: payment.id,
+      status: payment.status === 'succeeded' ? 'captured' : 'pending'
+    };
   }
 
   /**
@@ -408,7 +410,10 @@ export class YooKassaProvider implements PaymentProvider {
           payment.status !== 'canceled'
       );
       if (match) {
-        return { providerInvoiceRef: match.id };
+        return {
+          providerInvoiceRef: match.id,
+          status: match.status === 'succeeded' ? 'captured' : 'pending'
+        };
       }
       if (!list.next_cursor) {
         return null;
@@ -562,19 +567,21 @@ export class YooKassaProvider implements PaymentProvider {
     }
 
     if (payment.status === 'canceled') {
-      // None of these feed dunning: a method-update/one-time has nothing pending
-      // locally, and an off-session decline is already handled by the scheduler's
-      // own dunning (a second PaymentFailedEvent would be spurious).
+      // A method-update/one-time has nothing pending locally to fail.
       if (
         isMethodUpdate(payment.metadata) ||
-        oneTimeFromMetadata(payment.metadata) ||
-        offSessionChargeKeyFrom(payment.metadata)
+        oneTimeFromMetadata(payment.metadata)
       ) {
         return null;
       }
+      // An off-session charge canceled at capture (accepted as `pending`, then
+      // declined) must fail the pending invoice the core recorded. For a
+      // synchronous decline (chargeOffSession threw, nothing recorded) the
+      // reducer's status-gated flip makes this a no-op.
       const payload: NormalizedPaymentFailedPayload = {
         ref,
-        providerSubscriptionId: null
+        providerSubscriptionId: null,
+        offSessionChargeKey: offSessionChargeKeyFrom(payment.metadata)
       };
       return { ...base, type: 'payment.failed', payload };
     }

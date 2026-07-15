@@ -11,6 +11,7 @@ import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import type { INestApplication } from '@nestjs/common';
 import type { BillingProviderId } from '@app/shared/types';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
+import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { BILLING_PROVIDERS } from '../src/modules/billing/providers/payment-provider.interface';
@@ -23,11 +24,20 @@ import { EntitlementCacheListener } from '../src/modules/billing/listeners/entit
 import { EntitlementService } from '../src/modules/billing/entitlements/entitlement.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 
+interface StoredInvoice {
+  [column: string]: unknown;
+  id: string;
+  providerEventId: string | null;
+  status?: string;
+  providerInvoiceRef?: string;
+  creditUnitsApplied?: number;
+}
+
 interface Store {
   subscriptions: Subscription[];
   customers: Customer[];
   plans: Plan[];
-  invoices: Array<{ id: string; providerEventId: string | null }>;
+  invoices: StoredInvoice[];
 }
 
 const NOW = new Date('2026-06-08T00:00:00Z');
@@ -58,13 +68,55 @@ function makeSub(overrides: Partial<Subscription> = {}): Subscription {
 function makeManager(store: Store) {
   let seq = 0;
   return {
-    findOne: (entity: unknown, opts: { where: { id: string } }) =>
-      Promise.resolve(
-        entity === Subscription
-          ? (store.subscriptions.find((s) => s.id === opts.where.id) ?? null)
-          : null
-      ),
+    findOne: (
+      entity: unknown,
+      opts: { where: { id?: string; providerEventId?: string } }
+    ) => {
+      if (entity === Subscription) {
+        return Promise.resolve(
+          store.subscriptions.find((s) => s.id === opts.where.id) ?? null
+        );
+      }
+      if (entity === Invoice) {
+        return Promise.resolve(
+          store.invoices.find(
+            (i) =>
+              (opts.where.providerEventId === undefined ||
+                i.providerEventId === opts.where.providerEventId) &&
+              (opts.where.id === undefined || i.id === opts.where.id)
+          ) ?? null
+        );
+      }
+      return Promise.resolve(null);
+    },
     save: (entity: Subscription) => Promise.resolve(entity),
+    update: (
+      entity: unknown,
+      where: Record<string, unknown>,
+      set: Record<string, unknown>
+    ) => {
+      if (entity === Subscription) {
+        // The period advance compare-and-swaps on the period end read at scan
+        // start, so the criterion carries a Date.
+        const matches = store.subscriptions.filter(
+          (s) =>
+            s.id === where['id'] &&
+            (where['currentPeriodEnd'] === undefined ||
+              s.currentPeriodEnd.getTime() ===
+                (where['currentPeriodEnd'] as Date).getTime())
+        );
+        for (const s of matches) Object.assign(s, set);
+        return Promise.resolve({ affected: matches.length });
+      }
+      if (entity === Invoice) {
+        const matches = store.invoices.filter((i) =>
+          Object.entries(where).every(([k, v]) => i[k] === v)
+        );
+        for (const i of matches) Object.assign(i, set);
+        return Promise.resolve({ affected: matches.length });
+      }
+      return Promise.resolve({ affected: 0 });
+    },
     createQueryBuilder: () => {
       const captured: { values?: Record<string, unknown> } = {};
       const builder = {
@@ -88,7 +140,10 @@ function makeManager(store: Store) {
           const id = `inv-${++seq}`;
           store.invoices.push({
             id,
-            providerEventId: (v['providerEventId'] as string) ?? null
+            providerEventId: (v['providerEventId'] as string) ?? null,
+            status: v['status'] as string,
+            providerInvoiceRef: v['providerInvoiceRef'] as string,
+            creditUnitsApplied: (v['creditUnitsApplied'] as number) ?? 0
           });
           return Promise.resolve({ raw: [{ id }] });
         }
@@ -173,7 +228,7 @@ describe('Billing renewal scheduler (e2e)', () => {
     invalidateUser = jest.fn().mockResolvedValue(undefined);
     chargeOffSession = jest
       .fn()
-      .mockResolvedValue({ providerInvoiceRef: 'pay_1' });
+      .mockResolvedValue({ providerInvoiceRef: 'pay_1', status: 'captured' });
     usageSum = jest.fn().mockResolvedValue(null);
 
     const manager = makeManager(store);
@@ -227,7 +282,8 @@ describe('Billing renewal scheduler (e2e)', () => {
         {
           provide: getDataSourceToken(),
           useValue: {
-            transaction: (cb: (m: typeof manager) => unknown) => cb(manager)
+            transaction: (cb: (m: typeof manager) => unknown) => cb(manager),
+            manager
           }
         },
         {
