@@ -72,6 +72,20 @@ function parsePaginationParams(
   return { page, limit, sortBy, sortOrder };
 }
 
+// Mirrors the real server's @IsString() DTO validation: an array-valued
+// query param (?q[]=a&q[]=b) must be rejected 400, not coerced.
+const STRING_FILTER_PARAMS = ['q', 'email', 'firstName', 'lastName', 'role'];
+
+function findNonStringFilterParam(
+  query: Record<string, unknown>
+): string | null {
+  for (const key of STRING_FILTER_PARAMS) {
+    const value = query[key];
+    if (value !== undefined && typeof value !== 'string') return key;
+  }
+  return null;
+}
+
 function compareValues(a: unknown, b: unknown): number {
   if (typeof a === 'boolean' && typeof b === 'boolean') {
     return Number(a) - Number(b);
@@ -310,6 +324,15 @@ router.post('/', adminGuard, (req, res) => {
 
 // GET /api/v1/users
 router.get('/', adminGuard, (req, res) => {
+  const badFilter = findNonStringFilterParam(
+    req.query as Record<string, unknown>
+  );
+  if (badFilter) {
+    res
+      .status(400)
+      .json({ message: `${badFilter} must be a string`, statusCode: 400 });
+    return;
+  }
   const includeDeleted = String(req.query['includeDeleted']) === 'true';
   let allUsers = Array.from(getState().users.values());
   if (!includeDeleted) {
@@ -323,6 +346,15 @@ router.get('/', adminGuard, (req, res) => {
 
 // GET /api/v1/users/search
 router.get('/search', adminGuard, (req, res) => {
+  const badFilter = findNonStringFilterParam(
+    req.query as Record<string, unknown>
+  );
+  if (badFilter) {
+    res
+      .status(400)
+      .json({ message: `${badFilter} must be a string`, statusCode: 400 });
+    return;
+  }
   const { q, email, firstName, lastName, role, isActive } = req.query;
   const includeDeleted = String(req.query['includeDeleted']) === 'true';
   let users = Array.from(getState().users.values());
@@ -370,6 +402,15 @@ router.get('/search', adminGuard, (req, res) => {
 
 // GET /api/v1/users/cursor
 router.get('/cursor', adminGuard, (req, res) => {
+  const badFilter = findNonStringFilterParam(
+    req.query as Record<string, unknown>
+  );
+  if (badFilter) {
+    res
+      .status(400)
+      .json({ message: `${badFilter} must be a string`, statusCode: 400 });
+    return;
+  }
   const includeDeleted = String(req.query['includeDeleted']) === 'true';
   let allUsers = Array.from(getState().users.values());
   if (!includeDeleted) {
@@ -385,6 +426,15 @@ router.get('/cursor', adminGuard, (req, res) => {
 
 // GET /api/v1/users/search/cursor
 router.get('/search/cursor', adminGuard, (req, res) => {
+  const badFilter = findNonStringFilterParam(
+    req.query as Record<string, unknown>
+  );
+  if (badFilter) {
+    res
+      .status(400)
+      .json({ message: `${badFilter} must be a string`, statusCode: 400 });
+    return;
+  }
   const { q, email, firstName, lastName, role, isActive } = req.query;
   const includeDeleted = String(req.query['includeDeleted']) === 'true';
   let users = Array.from(getState().users.values());

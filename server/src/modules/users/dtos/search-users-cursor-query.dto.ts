@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsOptional } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
 import { ALLOWED_USER_SORT_COLUMNS } from '@app/shared/constants/user.constants';
 import { CursorPaginationQueryDto } from '../../../common/dtos';
 
@@ -18,18 +18,22 @@ export class SearchUsersCursorQueryDto extends CursorPaginationQueryDto {
       'Unified substring search across id, email, firstName, lastName (case-insensitive). Combined with the other filters via AND.'
   })
   @IsOptional()
+  @IsString()
   q?: string;
 
   @ApiPropertyOptional({ description: 'Filter by email (partial match)' })
   @IsOptional()
+  @IsString()
   email?: string;
 
   @ApiPropertyOptional({ description: 'Filter by first name (partial match)' })
   @IsOptional()
+  @IsString()
   firstName?: string;
 
   @ApiPropertyOptional({ description: 'Filter by last name (partial match)' })
   @IsOptional()
+  @IsString()
   lastName?: string;
 
   @ApiPropertyOptional({
@@ -37,6 +41,7 @@ export class SearchUsersCursorQueryDto extends CursorPaginationQueryDto {
       'Filter by role name (users having a role with this exact name)'
   })
   @IsOptional()
+  @IsString()
   role?: string;
 
   @ApiPropertyOptional({ description: 'Filter by active status' })
