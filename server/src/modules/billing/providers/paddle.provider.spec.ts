@@ -704,6 +704,15 @@ describe('PaddleProvider', () => {
     });
   });
 
+  describe('findOffSessionCharge', () => {
+    it('is not applicable (provider-managed lifecycle)', async () => {
+      const { provider } = await build({});
+      expect(() => provider.findOffSessionCharge()).toThrow(
+        NotImplementedException
+      );
+    });
+  });
+
   describe('refund', () => {
     it('issues a full refund when the amount covers the transaction total', async () => {
       const { provider, client } = await build({});

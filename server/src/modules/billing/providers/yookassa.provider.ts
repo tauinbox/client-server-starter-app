@@ -379,6 +379,47 @@ export class YooKassaProvider implements PaymentProvider {
     return { providerInvoiceRef: payment.id };
   }
 
+  /**
+   * YooKassa cannot look a payment up by its `Idempotence-Key` (the key store
+   * lives ~24h, far shorter than the 3-day dunning spacing), so the prior
+   * attempt is found by scanning the payment list for the `chargeKey` echoed
+   * through `metadata` by `chargeOffSession`. `canceled` payments are skipped —
+   * a hard decline legitimately re-charges. The scan is bounded: if the key is
+   * not settled within the page cap, the lookup fails loudly (the renewal
+   * scheduler skips the cycle and retries) rather than green-lighting a charge
+   * that may duplicate a captured payment.
+   */
+  async findOffSessionCharge(
+    chargeKey: string,
+    createdAfter: Date
+  ): Promise<ChargeResult | null> {
+    const yoo = this.requireClient();
+    const maxPages = 20;
+    let cursor: string | undefined;
+    for (let page = 0; page < maxPages; page++) {
+      const list = await yoo.getPaymentList({
+        created_at: { value: createdAfter.toISOString(), mode: 'gte' },
+        limit: 100,
+        ...(cursor ? { cursor } : {})
+      });
+      const match = (list.items ?? []).find(
+        (payment) =>
+          offSessionChargeKeyFrom(payment.metadata) === chargeKey &&
+          payment.status !== 'canceled'
+      );
+      if (match) {
+        return { providerInvoiceRef: match.id };
+      }
+      if (!list.next_cursor) {
+        return null;
+      }
+      cursor = list.next_cursor;
+    }
+    throw new ServiceUnavailableException(
+      `YooKassa payment scan for charge key "${chargeKey}" exceeded ${maxPages} pages without a definitive answer`
+    );
+  }
+
   cancel(_providerSubscriptionId: string, _mode: CancelMode): Promise<void> {
     // Self-managed: there is no provider-side subscription to cancel. The core
     // stops the renewal loop and downgrades entitlements; the saved card is

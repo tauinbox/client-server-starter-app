@@ -18,6 +18,7 @@ function yooMock() {
   return {
     createPayment: jest.fn(),
     getPayment: jest.fn(),
+    getPaymentList: jest.fn(),
     createRefund: jest.fn()
   };
 }
@@ -454,7 +455,7 @@ describe('YooKassaProvider', () => {
         savedCustomer,
         99000,
         items,
-        'renewal:sub-1:123:0'
+        'renewal:sub-1:123'
       );
 
       const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
@@ -462,7 +463,7 @@ describe('YooKassaProvider', () => {
         customerId: 'cust-1',
         userId: 'user-1',
         purpose: 'off_session',
-        chargeKey: 'renewal:sub-1:123:0'
+        chargeKey: 'renewal:sub-1:123'
       });
     });
 
@@ -478,6 +479,96 @@ describe('YooKassaProvider', () => {
       const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
       expect(payload.metadata).not.toHaveProperty('purpose');
       expect(payload.metadata).not.toHaveProperty('chargeKey');
+    });
+  });
+
+  describe('findOffSessionCharge', () => {
+    const CHARGE_KEY = 'renewal:sub-1:123';
+    const CREATED_AFTER = new Date('2026-06-01T00:00:00Z');
+    const offSession = (
+      id: string,
+      status: string,
+      chargeKey = CHARGE_KEY
+    ) => ({
+      id,
+      status,
+      metadata: { purpose: 'off_session', chargeKey }
+    });
+
+    it('returns the non-canceled payment matching the charge key', async () => {
+      const { provider, client } = await build();
+      client!.getPaymentList.mockResolvedValue({
+        items: [
+          offSession('pay-other', 'succeeded', 'renewal:sub-9:456'),
+          { id: 'pay-plain', status: 'succeeded', metadata: {} },
+          offSession('pay-hit', 'succeeded')
+        ]
+      });
+
+      await expect(
+        provider.findOffSessionCharge(CHARGE_KEY, CREATED_AFTER)
+      ).resolves.toEqual({ providerInvoiceRef: 'pay-hit' });
+      expect(client!.getPaymentList).toHaveBeenCalledWith({
+        created_at: { value: CREATED_AFTER.toISOString(), mode: 'gte' },
+        limit: 100
+      });
+    });
+
+    it('ignores a canceled attempt (a hard decline legitimately re-charges)', async () => {
+      const { provider, client } = await build();
+      client!.getPaymentList.mockResolvedValue({
+        items: [offSession('pay-declined', 'canceled')]
+      });
+
+      await expect(
+        provider.findOffSessionCharge(CHARGE_KEY, CREATED_AFTER)
+      ).resolves.toBeNull();
+    });
+
+    it('follows the cursor to a match on a later page', async () => {
+      const { provider, client } = await build();
+      client!.getPaymentList
+        .mockResolvedValueOnce({ items: [], next_cursor: 'cur-2' })
+        .mockResolvedValueOnce({
+          items: [offSession('pay-deep', 'succeeded')]
+        });
+
+      await expect(
+        provider.findOffSessionCharge(CHARGE_KEY, CREATED_AFTER)
+      ).resolves.toEqual({ providerInvoiceRef: 'pay-deep' });
+      expect(client!.getPaymentList).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ cursor: 'cur-2' })
+      );
+    });
+
+    it('returns null when the scan exhausts without a match', async () => {
+      const { provider, client } = await build();
+      client!.getPaymentList.mockResolvedValue({ items: [] });
+
+      await expect(
+        provider.findOffSessionCharge(CHARGE_KEY, CREATED_AFTER)
+      ).resolves.toBeNull();
+    });
+
+    it('fails loudly instead of green-lighting a charge when the page cap is hit', async () => {
+      const { provider, client } = await build();
+      client!.getPaymentList.mockResolvedValue({
+        items: [],
+        next_cursor: 'more'
+      });
+
+      await expect(
+        provider.findOffSessionCharge(CHARGE_KEY, CREATED_AFTER)
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      expect(client!.getPaymentList).toHaveBeenCalledTimes(20);
+    });
+
+    it('throws when YooKassa is not configured', async () => {
+      const { provider } = await build({ client: null });
+      await expect(
+        provider.findOffSessionCharge(CHARGE_KEY, CREATED_AFTER)
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
   });
 
