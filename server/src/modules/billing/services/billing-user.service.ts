@@ -587,6 +587,7 @@ export class BillingUserService {
     // never be held inside an open transaction. Both keys are stable across
     // retries so a replay reconciles instead of charging/refunding twice.
     let chargeRef: string | null = null;
+    let chargeCaptured = true;
     if (quote && quote.chargeMinor > 0) {
       const charge = await provider.chargeOffSession(
         customer,
@@ -595,6 +596,10 @@ export class BillingUserService {
         chargeKey
       );
       chargeRef = charge.providerInvoiceRef;
+      // An accepted-but-uncaptured charge (payment-after-receipt) is recorded
+      // as a pending invoice; the confirming webhook settles it to paid (and
+      // emits InvoicePaidEvent) or fails it. The switch itself proceeds.
+      chargeCaptured = charge.status === 'captured';
     }
 
     let refundIssued = false;
@@ -630,7 +635,7 @@ export class BillingUserService {
             providerEventId: chargeKey,
             providerInvoiceRef: chargeRef,
             amountMinor: chargeAmount,
-            status: 'paid',
+            status: chargeCaptured ? 'paid' : 'pending',
             billingMode: toPlan.billingMode
           });
         }
@@ -667,7 +672,7 @@ export class BillingUserService {
       PlanChangedEvent.name,
       new PlanChangedEvent(customer.userId, saved.id, fromPlan.key, toPlan.key)
     );
-    if (chargeInvoiceId) {
+    if (chargeInvoiceId && chargeCaptured) {
       this.events.emit(
         InvoicePaidEvent.name,
         new InvoicePaidEvent(userId, chargeInvoiceId)
@@ -878,7 +883,7 @@ export class BillingUserService {
       providerEventId: string;
       providerInvoiceRef: string;
       amountMinor: number;
-      status: 'paid' | 'refunded';
+      status: 'paid' | 'refunded' | 'pending';
       billingMode: Plan['billingMode'];
     }
   ): Promise<string | null> {
@@ -900,7 +905,7 @@ export class BillingUserService {
         billingMode: args.billingMode,
         periodStart: now,
         periodEnd: subscription.currentPeriodEnd,
-        paidAt: now,
+        paidAt: args.status === 'pending' ? null : now,
         receiptRef: null
       })
       .orIgnore()

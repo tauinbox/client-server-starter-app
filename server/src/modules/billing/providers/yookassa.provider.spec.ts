@@ -364,7 +364,10 @@ describe('YooKassaProvider', () => {
         vat_code: 1
       });
       expect(idempotencyKey).toBe('idem-key-1');
-      expect(result).toEqual({ providerInvoiceRef: 'pay-4' });
+      expect(result).toEqual({
+        providerInvoiceRef: 'pay-4',
+        status: 'captured'
+      });
     });
 
     it('formats a large minor amount without float drift (bigint money path)', async () => {
@@ -388,7 +391,7 @@ describe('YooKassaProvider', () => {
       expect(payload.receipt!.items[0].amount.value).toBe('25000000.00');
     });
 
-    it('treats a pending (payment-after-receipt) charge as accepted', async () => {
+    it('reports a pending (payment-after-receipt) charge as accepted but uncaptured', async () => {
       const { provider, client } = await build();
       client!.createPayment.mockResolvedValue({
         id: 'pay-5',
@@ -397,7 +400,7 @@ describe('YooKassaProvider', () => {
 
       await expect(
         provider.chargeOffSession(savedCustomer, 99000, items)
-      ).resolves.toEqual({ providerInvoiceRef: 'pay-5' });
+      ).resolves.toEqual({ providerInvoiceRef: 'pay-5', status: 'pending' });
     });
 
     it('throws when the charge is declined (canceled)', async () => {
@@ -507,7 +510,7 @@ describe('YooKassaProvider', () => {
 
       await expect(
         provider.findOffSessionCharge(CHARGE_KEY, CREATED_AFTER)
-      ).resolves.toEqual({ providerInvoiceRef: 'pay-hit' });
+      ).resolves.toEqual({ providerInvoiceRef: 'pay-hit', status: 'captured' });
       expect(client!.getPaymentList).toHaveBeenCalledWith({
         created_at: { value: CREATED_AFTER.toISOString(), mode: 'gte' },
         limit: 100
@@ -535,7 +538,10 @@ describe('YooKassaProvider', () => {
 
       await expect(
         provider.findOffSessionCharge(CHARGE_KEY, CREATED_AFTER)
-      ).resolves.toEqual({ providerInvoiceRef: 'pay-deep' });
+      ).resolves.toEqual({
+        providerInvoiceRef: 'pay-deep',
+        status: 'captured'
+      });
       expect(client!.getPaymentList).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({ cursor: 'cur-2' })
@@ -897,7 +903,7 @@ describe('YooKassaProvider', () => {
       expect(payload.savedPaymentMethod).toBeNull();
     });
 
-    it('ignores a canceled off-session charge (the scheduler owns dunning)', async () => {
+    it('maps a canceled off-session charge to payment.failed with the reconcile key', async () => {
       const { provider, client } = await build();
       client!.getPayment.mockResolvedValue({
         id: 'pay-os',
@@ -905,16 +911,26 @@ describe('YooKassaProvider', () => {
         amount: { value: '990.00', currency: 'RUB' },
         metadata: {
           customerId: 'cust-1',
+          userId: 'user-1',
           purpose: 'off_session',
           chargeKey: 'renewal:sub-1:123:0'
         }
       });
 
-      expect(
-        await provider.verifyAndParseWebhook(
-          notification('payment.canceled', 'pay-os')
-        )
-      ).toBeNull();
+      // A pending charge later declined at capture must surface, so the core
+      // can fail the pending invoice instead of leaving it paid forever.
+      const result = await provider.verifyAndParseWebhook(
+        notification('payment.canceled', 'pay-os')
+      );
+
+      expect(result).toMatchObject({
+        type: 'payment.failed',
+        payload: {
+          providerSubscriptionId: null,
+          offSessionChargeKey: 'renewal:sub-1:123:0',
+          ref: { customerId: 'cust-1', userId: 'user-1' }
+        }
+      });
     });
   });
 });

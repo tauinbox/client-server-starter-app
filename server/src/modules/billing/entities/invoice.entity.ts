@@ -83,6 +83,13 @@ export class Invoice {
   @Column({ type: 'varchar', length: 16 })
   status: InvoiceStatus;
 
+  // Prepaid credit units this invoice's amount was rated against. Persisted on
+  // a pending (uncaptured) charge so the later settle spends exactly the units
+  // the charged amount assumed, even if the live balance drifted meanwhile.
+  @Column({ name: 'credit_units_applied', type: 'int', default: 0 })
+  @Exclude()
+  creditUnitsApplied: number;
+
   @Column({ name: 'billing_mode', type: 'varchar', length: 16 })
   billingMode: BillingMode;
 

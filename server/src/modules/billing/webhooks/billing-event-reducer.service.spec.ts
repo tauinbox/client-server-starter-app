@@ -102,7 +102,10 @@ async function build(stubs: Partial<ManagerStubs> = {}) {
     transaction: jest.fn((cb: (m: typeof manager) => unknown) => cb(manager)),
     manager
   };
-  const credits = { addPurchase: jest.fn().mockResolvedValue(undefined) };
+  const credits = {
+    addPurchase: jest.fn().mockResolvedValue(undefined),
+    spendOnUsage: jest.fn().mockResolvedValue(undefined)
+  };
 
   const module = await Test.createTestingModule({
     providers: [
@@ -582,20 +585,84 @@ describe('BillingEventReducer', () => {
       offSessionChargeKey: 'renewal:sub-1:123:0'
     };
 
-    it('reconciles onto the core-recorded invoice without inserting, activating, or emitting', async () => {
-      const { reducer, manager, emit } = await build({ updateAffected: 1 });
+    it('settles the core-recorded pending invoice and emits InvoicePaid, without inserting or activating', async () => {
+      const { reducer, manager, emit } = await build({
+        updateAffected: 1,
+        invoice: {
+          id: 'inv-1',
+          customerId: 'cust-1',
+          status: 'pending',
+          creditUnitsApplied: 0
+        } as Invoice
+      });
 
       await reducer.reduce(
         event('invoice.paid', offSessionPayload, 'yookassa')
       );
 
+      // The flip is status-gated so it settles exactly once against the
+      // scheduler's own poll.
       expect(manager.update).toHaveBeenCalledWith(
+        Invoice,
+        { providerEventId: 'renewal:sub-1:123:0', status: 'pending' },
+        {
+          status: 'paid',
+          providerInvoiceRef: 'pay-1',
+          paidAt: new Date('2026-06-08T00:01:00Z')
+        }
+      );
+      expect(manager.execute).not.toHaveBeenCalled();
+      expect(manager.create).not.toHaveBeenCalled();
+      expect(emit).toHaveBeenCalledWith(
+        InvoicePaidEvent.name,
+        expect.objectContaining({ userId: 'user-1', invoiceId: 'inv-1' })
+      );
+    });
+
+    it('spends the credit units the pending charge was rated against on settle', async () => {
+      const { reducer, credits } = await build({
+        updateAffected: 1,
+        invoice: {
+          id: 'inv-1',
+          customerId: 'cust-1',
+          status: 'pending',
+          creditUnitsApplied: 10
+        } as Invoice
+      });
+
+      await reducer.reduce(
+        event('invoice.paid', offSessionPayload, 'yookassa')
+      );
+
+      expect(credits.spendOnUsage).toHaveBeenCalledWith(
+        expect.anything(),
+        'cust-1',
+        'inv-1',
+        10
+      );
+    });
+
+    it('only reconciles the payment ref when the invoice was already settled', async () => {
+      const { reducer, manager, emit, credits } = await build({
+        updateAffected: 0,
+        invoice: {
+          id: 'inv-1',
+          customerId: 'cust-1',
+          status: 'paid',
+          creditUnitsApplied: 10
+        } as Invoice
+      });
+
+      await reducer.reduce(
+        event('invoice.paid', offSessionPayload, 'yookassa')
+      );
+
+      expect(manager.update).toHaveBeenLastCalledWith(
         Invoice,
         { providerEventId: 'renewal:sub-1:123:0' },
         { providerInvoiceRef: 'pay-1' }
       );
-      expect(manager.execute).not.toHaveBeenCalled();
-      expect(manager.create).not.toHaveBeenCalled();
+      expect(credits.spendOnUsage).not.toHaveBeenCalled();
       expect(emit).not.toHaveBeenCalled();
     });
   });
@@ -930,6 +997,31 @@ describe('BillingEventReducer', () => {
         PaymentFailedEvent.name,
         expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
       );
+    });
+
+    it('fails the pending off-session invoice silently — the scheduler owns renewal dunning', async () => {
+      const payload: NormalizedPaymentFailedPayload = {
+        ref: { customerId: 'cust-1', userId: 'user-1' },
+        providerSubscriptionId: null,
+        offSessionChargeKey: 'renewal:sub-1:123:0'
+      };
+      const { reducer, manager, emit } = await build({
+        subscription: { id: 'sub-1' } as Subscription,
+        updateAffected: 1
+      });
+
+      await reducer.reduce(event('payment.failed', payload));
+
+      // Without this flip a pending charge canceled at capture would keep the
+      // invoice pending forever and never re-dun.
+      expect(manager.update).toHaveBeenCalledWith(
+        Invoice,
+        { providerEventId: 'renewal:sub-1:123:0', status: 'pending' },
+        { status: 'failed' }
+      );
+      // The renewal scan emits PaymentFailedEvent when it walks dunning; a
+      // second one here would double-notify.
+      expect(emit).not.toHaveBeenCalled();
     });
   });
 });
