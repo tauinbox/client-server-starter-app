@@ -33,22 +33,22 @@ export class CaptchaRequiredGuard implements CanActivate {
     const res = httpCtx.getResponse<Response>();
 
     const remainingHeader = res.getHeader('X-RateLimit-Remaining');
-    if (remainingHeader === undefined || remainingHeader === null) {
-      // Throttler did not run for this route — the captcha gate has no
-      // rate-limit signal to evaluate. Fail closed: the global ThrottlerGuard
-      // is registered as APP_GUARD in CoreModule and is expected to set this
-      // header on every captcha-protected route, so a missing header indicates
-      // configuration drift (guard removed, @SkipThrottle() applied, header
-      // renamed in a future Throttler version, etc.). Surfacing this at
-      // request time is preferable to silently weakening the captcha gate.
+    const remaining = Number(remainingHeader);
+    if (
+      remainingHeader === undefined ||
+      remainingHeader === null ||
+      !Number.isFinite(remaining)
+    ) {
+      // Missing or unparseable header means the gate has no rate-limit
+      // signal: the APP_GUARD ThrottlerGuard should have set it, so this is
+      // configuration drift. Fail closed rather than silently skip captcha.
       throw new InternalServerErrorException({
         message: 'Captcha gate cannot evaluate rate-limit state',
         errorKey: ErrorKeys.AUTH.CAPTCHA_GATE_FAILURE
       });
     }
 
-    const remaining = Number(remainingHeader);
-    if (!Number.isFinite(remaining) || remaining > CAPTCHA_THRESHOLD) {
+    if (remaining > CAPTCHA_THRESHOLD) {
       return true;
     }
 
