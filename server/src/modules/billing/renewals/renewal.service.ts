@@ -39,9 +39,12 @@ import {
  * subscriptions are skipped — their renewals arrive as webhooks.
  *
  * Safety against double charges and multi-instance / replayed scans rests on two
- * idempotency layers, not row locks: the per-attempt `Idempotence-Key` the
+ * idempotency layers, not row locks: the per-period `Idempotence-Key` the
  * provider honours, and the unique `provider_event_id` on the renewal `Invoice`
- * (set to that same key) which gates the period advance to exactly once.
+ * (set to that same key) which gates the period advance to exactly once. The
+ * key is stable across dunning retries of the same period — a retry after an
+ * ambiguous failure (timeout after the provider captured funds) reconciles the
+ * prior attempt at the provider instead of charging under a fresh key.
  */
 @Injectable()
 export class RenewalService {
@@ -174,7 +177,9 @@ export class RenewalService {
     const rated: RatedAmount =
       usageSummary ?? this.fixedRating.amountForPeriod(subscription, plan);
     const creditUnitsApplied = usageSummary?.creditUnitsApplied ?? 0;
-    const idempotencyKey = `renewal:${subscription.id}:${anchor.getTime()}:${subscription.dunningAttempts}`;
+    // Stable per (subscription, period): a per-attempt key would defeat the
+    // provider's dedup and double-charge a retried timeout-after-capture.
+    const idempotencyKey = `renewal:${subscription.id}:${anchor.getTime()}`;
 
     let charge: ChargeResult;
     if (rated.amountMinor === 0) {
@@ -183,19 +188,38 @@ export class RenewalService {
       // still record a zero invoice whose provider_event_id advances the period.
       charge = { providerInvoiceRef: idempotencyKey };
     } else {
-      try {
-        charge = await provider.chargeOffSession(
-          customer,
-          rated.amountMinor,
-          rated.receiptItems,
-          idempotencyKey
-        );
-      } catch (error) {
-        this.logger.warn(
-          `Renewal charge failed for subscription ${id}: ${(error as Error).message}`
-        );
-        await this.handleFailure(subscription, customer.userId, now);
-        return;
+      // A prior dunning attempt may have captured funds despite reporting
+      // failure (timeout after capture) — reconcile it before charging again.
+      let prior: ChargeResult | null = null;
+      if (subscription.dunningAttempts > 0) {
+        try {
+          prior = await provider.findOffSessionCharge(idempotencyKey, anchor);
+        } catch (error) {
+          // Prior outcome unknown — skip the cycle (dunning state untouched,
+          // the next scan retries) rather than risk a duplicate charge.
+          this.logger.error(
+            `Renewal reconcile failed for subscription ${id}: ${(error as Error).message}`
+          );
+          return;
+        }
+      }
+      if (prior) {
+        charge = prior;
+      } else {
+        try {
+          charge = await provider.chargeOffSession(
+            customer,
+            rated.amountMinor,
+            rated.receiptItems,
+            idempotencyKey
+          );
+        } catch (error) {
+          this.logger.warn(
+            `Renewal charge failed for subscription ${id}: ${(error as Error).message}`
+          );
+          await this.handleFailure(subscription, customer.userId, now);
+          return;
+        }
       }
     }
 

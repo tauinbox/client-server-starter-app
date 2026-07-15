@@ -239,6 +239,7 @@ describe('Billing renewal scheduler (e2e)', () => {
               ensureCustomer: jest.fn(),
               startCheckout: jest.fn(),
               chargeOffSession,
+              findOffSessionCharge: jest.fn().mockResolvedValue(null),
               cancel: jest.fn(),
               refund: jest.fn(),
               verifyAndParseWebhook: jest.fn()

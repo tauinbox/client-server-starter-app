@@ -295,7 +295,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
     // Scheduler charged once and stamped the off-session marker carrying the
     // invoice key, so the confirming webhook is recognizable.
     expect(createPayment).toHaveBeenCalledTimes(1);
-    const renewalKey = `renewal:sub-1:${new Date('2026-06-01T00:00:00Z').getTime()}:0`;
+    const renewalKey = `renewal:sub-1:${new Date('2026-06-01T00:00:00Z').getTime()}`;
     expect(capturedMetadata).toMatchObject({
       purpose: 'off_session',
       chargeKey: renewalKey

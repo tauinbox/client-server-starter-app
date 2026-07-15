@@ -239,6 +239,13 @@ export class PaddleProvider implements PaymentProvider {
     );
   }
 
+  findOffSessionCharge(): Promise<ChargeResult | null> {
+    // No off-session charges exist to reconcile (see chargeOffSession).
+    throw new NotImplementedException(
+      'PaddleProvider.findOffSessionCharge is not applicable (provider-managed lifecycle)'
+    );
+  }
+
   /**
    * Posts the period's usage total as a one-time charge on the subscription
    * (postpaid at the billing-cycle boundary, no Paddle

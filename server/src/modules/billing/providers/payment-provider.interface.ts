@@ -205,6 +205,21 @@ export interface PaymentProvider {
     idempotencyKey?: string
   ): Promise<ChargeResult>;
   /**
+   * Looks up a prior off-session charge posted under `chargeKey` (the key
+   * `chargeOffSession` echoes through the provider's metadata), created after
+   * `createdAfter`. Returns the charge when one exists that is not a hard
+   * decline, `null` when no charge reached the provider or every attempt was
+   * declined. The renewal scheduler calls this before re-charging a dunning
+   * retry so an ambiguous failure (timeout after the provider captured funds)
+   * reconciles onto the captured payment instead of charging twice.
+   * Provider-managed (Paddle) lifecycles never off-session charge and reject
+   * this call.
+   */
+  findOffSessionCharge(
+    chargeKey: string,
+    createdAfter: Date
+  ): Promise<ChargeResult | null>;
+  /**
    * Starts a standalone one-time payment — no subscription, no
    * saved payment method. Paddle: `transactions.create` with the catalog
    * `paddlePriceId` or an inline price; YooKassa: `createPayment` with a 54-FZ
