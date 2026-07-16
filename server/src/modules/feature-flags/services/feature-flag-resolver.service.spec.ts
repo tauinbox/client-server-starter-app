@@ -257,6 +257,58 @@ describe('FeatureFlagResolverService', () => {
     }
   });
 
+  it('concurrent evaluations share one DB load (single-flight)', async () => {
+    let resolveFind!: (flags: Partial<FeatureFlag>[]) => void;
+    flagRepo.find.mockReturnValue(
+      new Promise<Partial<FeatureFlag>[]>((resolve) => {
+        resolveFind = resolve;
+      })
+    );
+    ruleRepo.find.mockResolvedValue([]);
+
+    const first = service.evaluateAnonymous('anon-1', fakeReq);
+    const second = service.evaluateAnonymous('anon-2', fakeReq);
+    resolveFind([
+      { id: 'f1', key: 'pub', enabled: true, environments: [], public: true }
+    ]);
+    const [a, b] = await Promise.all([first, second]);
+
+    expect(flagRepo.find).toHaveBeenCalledTimes(1);
+    expect(a.flags['pub']).toBe(true);
+    expect(b.flags['pub']).toBe(true);
+  });
+
+  it('a load overlapped by invalidateAll does not repopulate the all-flags cache', async () => {
+    let resolveFind!: (flags: Partial<FeatureFlag>[]) => void;
+    flagRepo.find.mockReturnValueOnce(
+      new Promise<Partial<FeatureFlag>[]>((resolve) => {
+        resolveFind = resolve;
+      })
+    );
+    ruleRepo.find.mockResolvedValue([]);
+
+    const inFlight = service.evaluateAnonymous('anon-1', fakeReq);
+    // Let the load pass its cache-miss check and reach the (pending) DB read
+    // before invalidating, so the invalidation genuinely overlaps it.
+    await new Promise((resolve) => setImmediate(resolve));
+    await service.invalidateAll();
+    resolveFind([
+      { id: 'f1', key: 'stale', enabled: true, environments: [], public: true }
+    ]);
+    await inFlight;
+
+    // The superseded load must not write pre-invalidation rows into the cache.
+    expect(cacheStore.has('featureflags:all')).toBe(false);
+
+    // The next evaluation starts a fresh DB load instead of joining the
+    // detached stale one.
+    seedFlags([{ id: 'f2', key: 'fresh', enabled: true, public: true }]);
+    flagRepo.find.mockClear();
+    const result = await service.evaluateAnonymous('anon-1', fakeReq);
+    expect(flagRepo.find).toHaveBeenCalledTimes(1);
+    expect(result.flags['fresh']).toBe(true);
+  });
+
   it('invalidateUser deletes that user’s current cache key', async () => {
     seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
     await service.evaluateForUser(

@@ -46,6 +46,9 @@ const USER_FLAGS_TTL_MS = 60_000;
 
 @Injectable()
 export class FeatureFlagResolverService {
+  #loadAllInFlight: Promise<CachedFlag[]> | null = null;
+  #loadAllGeneration = 0;
+
   constructor(
     @InjectRepository(FeatureFlag)
     private readonly flagRepo: Repository<FeatureFlag>,
@@ -118,6 +121,11 @@ export class FeatureFlagResolverService {
    * version counter, so they orphan naturally without an explicit SCAN+DEL.
    */
   async invalidateAll(): Promise<void> {
+    // A load that started before this invalidation holds pre-change rows: bump
+    // the generation so its cache write is skipped, and detach the in-flight
+    // promise so the next miss starts a fresh DB load.
+    this.#loadAllGeneration++;
+    this.#loadAllInFlight = null;
     await this.cacheManager.del(ALL_FLAGS_KEY);
     await this.bumpVersion();
   }
@@ -135,9 +143,25 @@ export class FeatureFlagResolverService {
     );
     if (cached) return cached;
 
+    // Single-flight: the flag-change broadcast triggers a synchronized refetch
+    // from every connected client, so concurrent misses must share one DB load
+    // instead of stampeding the flags table.
+    if (!this.#loadAllInFlight) {
+      const load = this.#loadAllFlagsFromDb().finally(() => {
+        if (this.#loadAllInFlight === load) this.#loadAllInFlight = null;
+      });
+      this.#loadAllInFlight = load;
+    }
+    return this.#loadAllInFlight;
+  }
+
+  async #loadAllFlagsFromDb(): Promise<CachedFlag[]> {
+    const generation = this.#loadAllGeneration;
     const flags = await this.flagRepo.find({ order: { key: 'ASC' } });
     if (flags.length === 0) {
-      await this.cacheManager.set(ALL_FLAGS_KEY, [], ALL_FLAGS_TTL_MS);
+      if (generation === this.#loadAllGeneration) {
+        await this.cacheManager.set(ALL_FLAGS_KEY, [], ALL_FLAGS_TTL_MS);
+      }
       return [];
     }
     const rules = await this.ruleRepo.find({
@@ -162,7 +186,9 @@ export class FeatureFlagResolverService {
         payload: r.payload
       }))
     }));
-    await this.cacheManager.set(ALL_FLAGS_KEY, projected, ALL_FLAGS_TTL_MS);
+    if (generation === this.#loadAllGeneration) {
+      await this.cacheManager.set(ALL_FLAGS_KEY, projected, ALL_FLAGS_TTL_MS);
+    }
     return projected;
   }
 

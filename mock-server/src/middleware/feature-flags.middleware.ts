@@ -402,8 +402,17 @@ function parseIfMatch(
   return { ok: true, version: parsed };
 }
 
+// Mirrors the real server's coalescing: a burst of flag changes collapses
+// into one delayed broadcast instead of one synchronized refetch per change.
+const FLAGS_BROADCAST_COALESCE_MS = 500;
+let broadcastTimer: ReturnType<typeof setTimeout> | null = null;
+
 function broadcastFlagsUpdated(): void {
-  pushToAll({ type: 'feature_flags_updated' });
+  if (broadcastTimer) return;
+  broadcastTimer = setTimeout(() => {
+    broadcastTimer = null;
+    pushToAll({ type: 'feature_flags_updated' });
+  }, FLAGS_BROADCAST_COALESCE_MS);
 }
 
 function findFlagByKey(key: string): MockFeatureFlag | undefined {
