@@ -198,6 +198,15 @@ describe('MailService', () => {
       queuedService = moduleRef.get<MailService>(MailService);
     });
 
+    it('resolves without throwing when the queue is unavailable (Redis down)', async () => {
+      add.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+
+      await expect(
+        queuedService.sendPasswordReset('user@example.com', 'tok-123', 'en')
+      ).resolves.toBeUndefined();
+      expect(add).toHaveBeenCalledTimes(1);
+    });
+
     it('enqueues a rendered send job instead of delivering inline', async () => {
       await queuedService.sendEmailVerification(
         'user@example.com',

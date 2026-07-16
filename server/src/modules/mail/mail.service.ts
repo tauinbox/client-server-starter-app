@@ -181,12 +181,22 @@ export class MailService {
     };
 
     if (this.queue) {
-      await this.queue.add(MAIL_SEND_JOB, data, {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 2000 },
-        removeOnComplete: true,
-        removeOnFail: 50
-      });
+      // Mail is best-effort for every caller (register, password reset,
+      // email change): a Redis/BullMQ outage must not fail the user's
+      // primary action, matching the non-fatal direct-delivery path below.
+      try {
+        await this.queue.add(MAIL_SEND_JOB, data, {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+          removeOnComplete: true,
+          removeOnFail: 50
+        });
+      } catch (error) {
+        this.logger.error(
+          `Failed to enqueue "${message.subject}" to ${to}`,
+          error
+        );
+      }
       return;
     }
 
