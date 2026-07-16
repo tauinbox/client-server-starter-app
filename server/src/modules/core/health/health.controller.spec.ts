@@ -14,6 +14,7 @@ describe('HealthController', () => {
   let redisMock: { isHealthy: jest.Mock };
   let mailServiceMock: { isSmtpConfigured: jest.Mock };
   let configMock: { get: jest.Mock };
+  let configValues: Record<string, string | undefined>;
 
   beforeEach(async () => {
     healthServiceMock = {
@@ -38,8 +39,9 @@ describe('HealthController', () => {
       isSmtpConfigured: jest.fn().mockReturnValue(false)
     };
 
+    configValues = { ENVIRONMENT: 'local' };
     configMock = {
-      get: jest.fn().mockReturnValue('local')
+      get: jest.fn((key: string) => configValues[key])
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -69,7 +71,7 @@ describe('HealthController', () => {
 
   describe('ready', () => {
     it('should call health.check with db ping when not production and SMTP not configured', () => {
-      configMock.get.mockReturnValue('local');
+      configValues['ENVIRONMENT'] = 'local';
       mailServiceMock.isSmtpConfigured.mockReturnValue(false);
 
       void controller.ready();
@@ -81,7 +83,7 @@ describe('HealthController', () => {
     });
 
     it('should include Redis check when environment is production', () => {
-      configMock.get.mockReturnValue('production');
+      configValues['ENVIRONMENT'] = 'production';
       mailServiceMock.isSmtpConfigured.mockReturnValue(false);
 
       void controller.ready();
@@ -92,8 +94,8 @@ describe('HealthController', () => {
       expect(checks).toHaveLength(2);
     });
 
-    it('should not include Redis check when environment is not production', () => {
-      configMock.get.mockReturnValue('development');
+    it('should not include Redis check when not production and REDIS_URL is unset', () => {
+      configValues['ENVIRONMENT'] = 'development';
       mailServiceMock.isSmtpConfigured.mockReturnValue(false);
 
       void controller.ready();
@@ -104,8 +106,21 @@ describe('HealthController', () => {
       expect(checks).toHaveLength(1);
     });
 
+    it('should include Redis check when REDIS_URL is set outside production', () => {
+      configValues['ENVIRONMENT'] = 'development';
+      configValues['REDIS_URL'] = 'redis://localhost:6379';
+      mailServiceMock.isSmtpConfigured.mockReturnValue(false);
+
+      void controller.ready();
+
+      const [[checks]] = healthServiceMock.check.mock.calls as [
+        [(() => unknown)[]]
+      ];
+      expect(checks).toHaveLength(2);
+    });
+
     it('should include SMTP check when SMTP is configured', () => {
-      configMock.get.mockReturnValue('local');
+      configValues['ENVIRONMENT'] = 'local';
       mailServiceMock.isSmtpConfigured.mockReturnValue(true);
 
       void controller.ready();
@@ -117,7 +132,7 @@ describe('HealthController', () => {
     });
 
     it('should include Redis and SMTP checks when production and SMTP configured', () => {
-      configMock.get.mockReturnValue('production');
+      configValues['ENVIRONMENT'] = 'production';
       mailServiceMock.isSmtpConfigured.mockReturnValue(true);
 
       void controller.ready();

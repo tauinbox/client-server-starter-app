@@ -46,7 +46,13 @@ export class HealthController {
     const checks: HealthIndicatorFunction[] = [
       () => this.db.pingCheck('database')
     ];
-    if (this.config.get('ENVIRONMENT') === 'production') {
+    // Production always reports on Redis (missing REDIS_URL degrades to a
+    // warning inside the indicator); elsewhere only a configured Redis is
+    // probed so local no-Redis runs stay silent.
+    if (
+      this.config.get('ENVIRONMENT') === 'production' ||
+      this.config.get<string>('REDIS_URL')
+    ) {
       checks.push(() => this.redis.isHealthy('redis'));
     }
     if (this.mailService.isSmtpConfigured()) {
