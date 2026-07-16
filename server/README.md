@@ -131,7 +131,8 @@ src/
 │   ├── cache/              # @nestjs/cache-manager
 │   ├── database/           # TypeORM + PostgreSQL config
 │   ├── filters/            # GlobalExceptionFilter (standardized error responses, DB error mapping)
-│   ├── health/             # HealthModule (GET /api/health/live, /api/health/ready — DB ping + Redis/SMTP degrade to a warning, never fail readiness)
+│   ├── health/             # HealthModule (GET /api/health/live, /api/health/ready — DB ping + Redis PING when REDIS_URL set or production;
+│   │                       #   dead Redis fails readiness (2 s timeout), missing REDIS_URL in production and SMTP failures degrade to a warning)
 │   ├── metrics/            # MetricsModule (@Global) — Prometheus metrics via @willsoto/nestjs-prometheus
 │   │                       #   GET /metrics (excluded from /api prefix); http_requests_total,
 │   │                       #   http_request_duration_seconds, auth_events_total,
