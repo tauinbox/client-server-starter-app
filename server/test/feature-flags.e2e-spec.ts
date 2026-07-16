@@ -31,7 +31,10 @@ import { FeatureFlagRule } from '../src/modules/feature-flags/entities/feature-f
 import { FeatureFlagService } from '../src/modules/feature-flags/services/feature-flag.service';
 import { FeatureFlagResolverService } from '../src/modules/feature-flags/services/feature-flag-resolver.service';
 import { AttributeRegistryService } from '../src/modules/feature-flags/services/attribute-registry.service';
-import { FeatureFlagChangedListener } from '../src/modules/feature-flags/listeners/feature-flag-changed.listener';
+import {
+  FeatureFlagChangedListener,
+  FLAGS_BROADCAST_COALESCE_MS
+} from '../src/modules/feature-flags/listeners/feature-flag-changed.listener';
 import { FeatureFlagChangedEvent } from '../src/modules/feature-flags/events/feature-flag-changed.event';
 import { FeatureFlagGuard } from '../src/modules/feature-flags/guards/feature-flag.guard';
 import { RequireFeature } from '../src/modules/feature-flags/decorators/require-feature.decorator';
@@ -501,6 +504,12 @@ describe('Feature flags end-to-end', () => {
     );
 
     expect(cache.store.has('featureflags:all')).toBe(false);
+    // The broadcast is coalesced: nothing is pushed until the window elapses.
+    expect(notifications.pushToAll).not.toHaveBeenCalled();
+    await new Promise((resolve) =>
+      setTimeout(resolve, FLAGS_BROADCAST_COALESCE_MS + 100)
+    );
+    expect(notifications.pushToAll).toHaveBeenCalledTimes(1);
     expect(notifications.pushToAll).toHaveBeenCalledWith({
       type: 'feature_flags_updated'
     });

@@ -777,11 +777,11 @@ Base URL: `/api/v1`
 | POST | `/admin/feature-flags/:id/toggle` | `manage:FeatureFlag` | Flip `enabled` and increment version (audited as `FEATURE_FLAG_TOGGLE`) |
 
 **Caching:**
-- `featureflags:all` — full flag/rule set, TTL 300 s
+- `featureflags:all` — full flag/rule set, TTL 300 s. Reloads are single-flight: concurrent cache misses share one DB load, and a load overlapped by an invalidation skips its cache write (generation guard) so pre-change rows are never re-cached
 - `featureflags:version` — monotonic counter, bumped on any change; appended to per-user keys so old entries orphan naturally
 - `featureflags:user:<userId>:v<version>` — evaluated map, TTL 60 s. Anonymous callers are not cached
 
-**Real-time updates:** `FeatureFlagChangedListener` broadcasts `{ type: 'feature_flags_updated' }` over SSE on flag change. `UserRoleChangedEvent` and `UserDeletedEvent` invalidate just the affected user's cache. Cross-module communication via `EventEmitter2`, not `forwardRef`.
+**Real-time updates:** `FeatureFlagChangedListener` broadcasts `{ type: 'feature_flags_updated' }` over SSE on flag change. The cache is invalidated per change, but the broadcast is coalesced (500 ms window) so a burst of changes — e.g. one dialog save emitting update + rules-replaced — triggers a single synchronized client refetch instead of one per change. `UserRoleChangedEvent` and `UserDeletedEvent` invalidate just the affected user's cache. Cross-module communication via `EventEmitter2`, not `forwardRef`.
 
 **Anonymous bucketing:** `AnonIdMiddleware` issues the `nxs_anon_id` cookie on first request to any route (`SameSite=Lax`, `Secure` in production, 1-year `maxAge`, `httpOnly: false`). The cookie value seeds the percentage-bucket hash so a 10 % rollout of a public flag converges on the same 10 % of anonymous browsers across reloads.
 
