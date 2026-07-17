@@ -183,6 +183,34 @@ describe('BillingStore', () => {
     expect(store.loading()).toBe(false);
   });
 
+  it('loadSettings keeps the slices that loaded when one request fails', async () => {
+    billingMock.getCredits.mockReturnValue(throwError(() => new Error('503')));
+    const store = createStore();
+    await store.loadSettings();
+
+    expect(store.credits()).toBeNull();
+    expect(store.plans()).toHaveLength(1);
+    expect(store.subscription()).toEqual(activeSub);
+    expect(store.invoices()).toHaveLength(1);
+    expect(store.usage()).toEqual(usageSummary);
+    expect(store.loading()).toBe(false);
+    expect(notifyMock.error).toHaveBeenCalledTimes(1);
+    expect(notifyMock.error).toHaveBeenCalledWith(
+      expect.anything(),
+      'billing.errors.loadFailed'
+    );
+  });
+
+  it('loadSettings reports a single toast when several requests fail', async () => {
+    billingMock.getCredits.mockReturnValue(throwError(() => new Error('503')));
+    billingMock.getUsage.mockReturnValue(throwError(() => new Error('503')));
+    const store = createStore();
+    await store.loadSettings();
+
+    expect(store.plans()).toHaveLength(1);
+    expect(notifyMock.error).toHaveBeenCalledTimes(1);
+  });
+
   it('loadPricing skips authed-only calls for anonymous visitors', async () => {
     const store = createStore();
     await store.loadPricing(false);
