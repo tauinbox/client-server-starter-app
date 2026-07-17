@@ -83,8 +83,11 @@ export class AuthController {
   ) {}
 
   private setRefreshTokenCookie(res: Response, token: string): void {
+    // getOrThrow: a missing value must fail loudly, not silently downgrade
+    // the refresh cookie to a session cookie via a NaN maxAge.
     const maxAge =
-      Number(this.configService.get<string>('JWT_REFRESH_EXPIRATION')) * 1000;
+      Number(this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION')) *
+      1000;
     res.cookie(REFRESH_TOKEN_COOKIE, token, {
       httpOnly: true,
       secure: this.configService.get('ENVIRONMENT') === 'production',

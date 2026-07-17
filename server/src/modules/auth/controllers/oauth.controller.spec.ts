@@ -65,6 +65,7 @@ describe('OAuthController', () => {
   let usersServiceMock: {
     findOne: jest.Mock;
   };
+  let configValues: Record<string, string | undefined>;
 
   beforeEach(async () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation();
@@ -89,6 +90,11 @@ describe('OAuthController', () => {
       findOne: jest.fn()
     };
 
+    configValues = {
+      CLIENT_URL: 'http://localhost:4200',
+      JWT_REFRESH_EXPIRATION: '604800'
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OAuthController],
       providers: [
@@ -107,9 +113,16 @@ describe('OAuthController', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockImplementation((key: string) => {
-              if (key === 'CLIENT_URL') return 'http://localhost:4200';
-              if (key === 'JWT_REFRESH_EXPIRATION') return '604800';
-              return undefined;
+              return configValues[key];
+            }),
+            getOrThrow: jest.fn().mockImplementation((key: string) => {
+              const value = configValues[key];
+              if (value === undefined) {
+                throw new TypeError(
+                  `Configuration key "${key}" does not exist`
+                );
+              }
+              return value;
             })
           }
         }
@@ -488,6 +501,32 @@ describe('OAuthController', () => {
       expect(() => controller.exchangeOAuthData(req, res)).toThrow(
         'Missing OAuth data'
       );
+    });
+
+    // Regression: a missing JWT_REFRESH_EXPIRATION must fail loudly. The
+    // pre-fix code computed a NaN maxAge and silently set a session cookie.
+    it('should throw a configuration error and set no cookie when JWT_REFRESH_EXPIRATION is missing', () => {
+      delete configValues['JWT_REFRESH_EXPIRATION'];
+      jwtServiceMock.verify.mockReturnValue({
+        data: {
+          tokens: {
+            access_token: 'token',
+            refresh_token: 'refresh',
+            expires_in: 3600
+          },
+          user: { id: '1', email: 'test@example.com' }
+        }
+      });
+
+      const req = mockExpressRequest({} as OAuthUserProfile, {
+        oauth_data: 'signed-jwt'
+      });
+      const res = mockResponse();
+
+      expect(() => controller.exchangeOAuthData(req, res)).toThrow(
+        'JWT_REFRESH_EXPIRATION'
+      );
+      expect(res.cookie).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException when JWT is expired', () => {

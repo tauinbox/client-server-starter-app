@@ -269,6 +269,13 @@ export class OAuthController {
       );
     }
 
+    // getOrThrow, outside the try: a missing value must fail loudly (500),
+    // not silently downgrade the refresh cookie to a session cookie via a
+    // NaN maxAge or get masked as an invalid-OAuth-data 400.
+    const maxAge =
+      Number(this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION')) *
+      1000;
+
     try {
       const payload = this.jwtService.verify<{
         data: {
@@ -281,8 +288,6 @@ export class OAuthController {
         };
       }>(cookie);
       const { refresh_token, ...publicTokens } = payload.data.tokens;
-      const maxAge =
-        Number(this.configService.get<string>('JWT_REFRESH_EXPIRATION')) * 1000;
       res.cookie('refresh_token', refresh_token, {
         httpOnly: true,
         secure: this.configService.get('ENVIRONMENT') === 'production',

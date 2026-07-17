@@ -84,7 +84,7 @@ function conditionalProvider(
           };
         }
         return {
-          secret: configService.get('JWT_SECRET'),
+          secret: configService.getOrThrow<string>('JWT_SECRET'),
           signOptions: { expiresIn: expiration, algorithm: 'HS256' }
         };
       }

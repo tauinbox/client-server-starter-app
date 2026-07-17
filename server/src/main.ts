@@ -9,6 +9,7 @@ import helmet from 'helmet';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import * as cookieParser from 'cookie-parser';
+import { ConfigService } from '@nestjs/config';
 import { corsOptions } from './cors-options';
 import { applyTrustProxy } from './modules/core/trust-proxy.util';
 
@@ -122,9 +123,9 @@ async function bootstrap() {
     });
   }
 
-  const port = process.env['APPLICATION_PORT']
-    ? Number(process.env['APPLICATION_PORT'])
-    : 3000;
+  // Read through ConfigService so the Joi-validated, coerced value is used
+  // (a malformed APPLICATION_PORT fails bootstrap; the default is 3000).
+  const port = app.get(ConfigService).getOrThrow<number>('APPLICATION_PORT');
 
   // Allow BullMQ workers (and other lifecycle hooks) to close cleanly on SIGTERM
   app.enableShutdownHooks();
