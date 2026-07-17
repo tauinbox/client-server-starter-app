@@ -147,7 +147,17 @@ export class YooKassaProvider implements PaymentProvider {
   ) {
     // 54-FZ requires a VAT code on every receipt line; the correct value is
     // deployment-specific (tax regime), so it is configurable. `1` = "без НДС".
-    this.vatCode = Number(config.get<string>('YOOKASSA_VAT_CODE') ?? '1');
+    // The Joi schema already gates this at bootstrap; the guard here keeps a
+    // NaN or out-of-range value out of receipts even if that gate changes.
+    const vatCode = Number(config.get<string>('YOOKASSA_VAT_CODE') ?? '1');
+    if (!Number.isInteger(vatCode) || vatCode < 1 || vatCode > 6) {
+      throw new Error(
+        `YOOKASSA_VAT_CODE must be an integer between 1 and 6, got "${String(
+          config.get<string>('YOOKASSA_VAT_CODE')
+        )}"`
+      );
+    }
+    this.vatCode = vatCode;
   }
 
   private requireClient(): YooCheckout {

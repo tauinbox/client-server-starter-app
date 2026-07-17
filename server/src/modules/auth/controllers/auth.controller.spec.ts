@@ -110,6 +110,7 @@ describe('AuthController', () => {
   let auditServiceMock: {
     log: jest.Mock;
   };
+  let configValues: Record<string, string | undefined>;
 
   const mockAuthResult = {
     tokens: {
@@ -171,6 +172,11 @@ describe('AuthController', () => {
       log: jest.fn().mockResolvedValue(undefined)
     };
 
+    configValues = {
+      JWT_REFRESH_EXPIRATION: '604800',
+      ENVIRONMENT: 'development'
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
@@ -187,9 +193,16 @@ describe('AuthController', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockImplementation((key: string) => {
-              if (key === 'JWT_REFRESH_EXPIRATION') return '604800';
-              if (key === 'ENVIRONMENT') return 'development';
-              return undefined;
+              return configValues[key];
+            }),
+            getOrThrow: jest.fn().mockImplementation((key: string) => {
+              const value = configValues[key];
+              if (value === undefined) {
+                throw new TypeError(
+                  `Configuration key "${key}" does not exist`
+                );
+              }
+              return value;
             })
           }
         }
@@ -268,6 +281,19 @@ describe('AuthController', () => {
           maxAge: 604800 * 1000
         })
       );
+    });
+
+    // Regression: a missing JWT_REFRESH_EXPIRATION must fail loudly. The
+    // pre-fix code computed a NaN maxAge and silently set a session cookie.
+    it('should fail loudly and set no cookie when JWT_REFRESH_EXPIRATION is missing', async () => {
+      delete configValues['JWT_REFRESH_EXPIRATION'];
+      const req = mockLocalAuthRequest() as LocalAuthRequest;
+      const res = mockResponse();
+
+      await expect(controller.login(req, res)).rejects.toThrow(
+        'JWT_REFRESH_EXPIRATION'
+      );
+      expect(res.cookie).not.toHaveBeenCalled();
     });
 
     // Login response.user.roles must be RoleResponse[] objects — the client

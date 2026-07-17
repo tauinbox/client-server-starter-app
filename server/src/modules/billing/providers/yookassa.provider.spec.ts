@@ -29,7 +29,9 @@ const USER_EMAIL = 'buyer@example.com';
 
 const SAVED_METHOD_REF = 'pm-token';
 
-async function build(opts: { client?: YooMock | null } = {}): Promise<{
+async function build(
+  opts: { client?: YooMock | null; vatCode?: string } = {}
+): Promise<{
   provider: YooKassaProvider;
   client: YooMock | null;
   users: { findOne: jest.Mock };
@@ -51,7 +53,8 @@ async function build(opts: { client?: YooMock | null } = {}): Promise<{
       {
         provide: ConfigService,
         useValue: {
-          get: (key: string) => (key === 'YOOKASSA_VAT_CODE' ? '1' : undefined)
+          get: (key: string) =>
+            key === 'YOOKASSA_VAT_CODE' ? (opts.vatCode ?? '1') : undefined
         }
       }
     ]
@@ -84,6 +87,30 @@ const urls = {
 };
 
 describe('YooKassaProvider', () => {
+  describe('constructor VAT code guard', () => {
+    // Regression: the pre-fix code put NaN (or any out-of-range value)
+    // straight into the 54-FZ receipt vat_code.
+    it('rejects a non-numeric YOOKASSA_VAT_CODE', async () => {
+      await expect(build({ vatCode: 'not-a-number' })).rejects.toThrow(
+        'YOOKASSA_VAT_CODE'
+      );
+    });
+
+    it('rejects an out-of-range YOOKASSA_VAT_CODE', async () => {
+      await expect(build({ vatCode: '0' })).rejects.toThrow(
+        'YOOKASSA_VAT_CODE'
+      );
+      await expect(build({ vatCode: '7' })).rejects.toThrow(
+        'YOOKASSA_VAT_CODE'
+      );
+    });
+
+    it('accepts a valid YOOKASSA_VAT_CODE', async () => {
+      const { provider } = await build({ vatCode: '6' });
+      expect(provider).toBeDefined();
+    });
+  });
+
   describe('ensureCustomer', () => {
     it('returns the existing provider customer id when present', async () => {
       const { provider } = await build();

@@ -127,7 +127,7 @@ src/
 │   └── upload/             # createDiskStorageOptions() — reusable multer disk storage factory (destination, allowedExtensions, maxFileSizeBytes); validates both file extension and MIME type to block rename attacks
 └── modules/
 ├── core/                   # Dynamic root module
-│   ├── config/             # @nestjs/config, loads .env
+│   ├── config/             # @nestjs/config, loads .env; config-validation.schema.ts - Joi bootstrap validation (coerced types + defaults; a malformed or missing required env var aborts startup)
 │   ├── cache/              # @nestjs/cache-manager
 │   ├── database/           # TypeORM + PostgreSQL config
 │   ├── filters/            # GlobalExceptionFilter (standardized error responses, DB error mapping)
