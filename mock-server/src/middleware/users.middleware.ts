@@ -575,6 +575,13 @@ router.patch('/:id', adminGuard, (req, res) => {
       res.status(400).json({ message: pwMinErr || pwMaxErr, statusCode: 400 });
       return;
     }
+    // Regex must be checked with the rest of the DTO validation, before any
+    // field assignment: the real server validates the whole DTO first and
+    // never partially mutates on a 400.
+    if (!PASSWORD_REGEX.test(password)) {
+      res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });
+      return;
+    }
   }
 
   if (isActive !== undefined && typeof isActive !== 'boolean') {
@@ -622,10 +629,6 @@ router.patch('/:id', adminGuard, (req, res) => {
   if (firstName !== undefined) user.firstName = firstName;
   if (lastName !== undefined) user.lastName = lastName;
   if (password !== undefined) {
-    if (!PASSWORD_REGEX.test(password)) {
-      res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });
-      return;
-    }
     user.password = password;
     // Invalidate target user's sessions so attacker cannot keep access after admin password reset
     user.tokenRevokedAt = new Date().toISOString();

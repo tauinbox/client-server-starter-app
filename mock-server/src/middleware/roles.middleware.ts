@@ -557,7 +557,16 @@ router.delete('/:id/permissions/:permissionId', adminGuard, (req, res) => {
   const state = getState();
   const role = state.roles.get(id);
 
-  if (role?.isSystem && !isActorSuper(req)) {
+  if (!role) {
+    res.status(404).json({
+      message: 'Role not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.ROLES.NOT_FOUND
+    });
+    return;
+  }
+
+  if (role.isSystem && !isActorSuper(req)) {
     res.status(400).json({
       message: 'Cannot modify system roles',
       statusCode: 400,
@@ -570,7 +579,7 @@ router.delete('/:id/permissions/:permissionId', adminGuard, (req, res) => {
     (rp) => !(rp.roleId === id && rp.permissionId === permissionId)
   );
 
-  if (role) notifyRoleHolders(role.name);
+  notifyRoleHolders(role.name);
 
   const actor = (req as AuthenticatedRequest).user;
   logAudit('PERMISSION_UNASSIGN', {

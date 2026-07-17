@@ -730,6 +730,14 @@ router.patch('/profile', authGuard, (req, res) => {
       return;
     }
 
+    // Regex is part of DTO validation on the real server: it fails before the
+    // currentPassword business check and before any field assignment, so a 400
+    // must leave the profile unchanged.
+    if (!PASSWORD_REGEX.test(password)) {
+      res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });
+      return;
+    }
+
     // OAuth-only users (no password set) may set their first password without
     // currentPassword. Users with an existing password must supply a matching one.
     if (user.password !== null) {
@@ -749,10 +757,6 @@ router.patch('/profile', authGuard, (req, res) => {
   if (lastName !== undefined) user.lastName = lastName;
   if (locale !== undefined) user.locale = locale as string;
   if (password !== undefined) {
-    if (!PASSWORD_REGEX.test(password)) {
-      res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });
-      return;
-    }
     user.password = password;
     user.tokenRevokedAt = new Date().toISOString();
 
