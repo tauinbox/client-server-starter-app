@@ -123,40 +123,52 @@ export const BillingStore = signalStore(
       patchState(store, { loading: false });
     }
 
-    /** Settings page: subscription + invoices + payment method + usage + credits + plans + region. */
+    /**
+     * Settings page: subscription + invoices + payment method + usage +
+     * credits + plans + region. Requests settle independently so a single
+     * failure keeps the slices that did load; the first failure is reported
+     * once.
+     */
     async function loadSettings(): Promise<void> {
       patchState(store, { loading: true });
-      try {
-        const [
-          subscription,
-          invoices,
-          paymentMethod,
-          usage,
-          credits,
-          plans,
-          region
-        ] = await Promise.all([
-          firstValueFrom(billing.getSubscription()),
-          firstValueFrom(billing.getInvoices()),
-          firstValueFrom(billing.getPaymentMethod()),
-          firstValueFrom(billing.getUsage()),
-          firstValueFrom(billing.getCredits()),
-          firstValueFrom(billing.getPlans()),
-          firstValueFrom(billing.getRegion())
-        ]);
-        patchState(store, {
-          subscription,
-          invoices,
-          paymentMethod,
-          usage,
-          credits,
-          plans,
-          region
-        });
-      } catch (error) {
-        notify.error(error as HttpErrorResponse, 'billing.errors.loadFailed');
-      } finally {
-        patchState(store, { loading: false });
+      const results = await Promise.allSettled([
+        firstValueFrom(billing.getSubscription()),
+        firstValueFrom(billing.getInvoices()),
+        firstValueFrom(billing.getPaymentMethod()),
+        firstValueFrom(billing.getUsage()),
+        firstValueFrom(billing.getCredits()),
+        firstValueFrom(billing.getPlans()),
+        firstValueFrom(billing.getRegion())
+      ]);
+      const [
+        subscription,
+        invoices,
+        paymentMethod,
+        usage,
+        credits,
+        plans,
+        region
+      ] = results;
+      const patch: Partial<BillingState> = { loading: false };
+      if (subscription.status === 'fulfilled')
+        patch.subscription = subscription.value;
+      if (invoices.status === 'fulfilled') patch.invoices = invoices.value;
+      if (paymentMethod.status === 'fulfilled')
+        patch.paymentMethod = paymentMethod.value;
+      if (usage.status === 'fulfilled') patch.usage = usage.value;
+      if (credits.status === 'fulfilled') patch.credits = credits.value;
+      if (plans.status === 'fulfilled') patch.plans = plans.value;
+      if (region.status === 'fulfilled') patch.region = region.value;
+      patchState(store, patch);
+      const failed = results.find(
+        (result): result is PromiseRejectedResult =>
+          result.status === 'rejected'
+      );
+      if (failed) {
+        notify.error(
+          failed.reason as HttpErrorResponse,
+          'billing.errors.loadFailed'
+        );
       }
     }
 
