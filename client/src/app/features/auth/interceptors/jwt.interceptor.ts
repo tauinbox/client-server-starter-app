@@ -1,4 +1,4 @@
-import { inject } from '@angular/core';
+import { DOCUMENT, inject } from '@angular/core';
 import type {
   HttpErrorResponse,
   HttpHandlerFn,
@@ -13,6 +13,7 @@ import { isAuthExcludedUrl } from '@features/auth/utils/is-auth-excluded-urls';
 import { isTokenRefreshExcludedUrl } from '@features/auth/utils/is-token-refresh-excluded-urls';
 import { shouldAttemptTokenRefresh } from '@features/auth/utils/should-attempt-token-refresh';
 import { addTokenToRequest } from '@features/auth/utils/add-token-to-request';
+import { isSameOriginUrl } from '@features/auth/utils/is-same-origin-url';
 
 export const jwtInterceptor: HttpInterceptorFn = (
   request: HttpRequest<unknown>,
@@ -22,10 +23,12 @@ export const jwtInterceptor: HttpInterceptorFn = (
   const router = inject(Router);
   const authStore = inject(AuthStore);
   const token = authStore.getAccessToken();
+  const baseOrigin = inject(DOCUMENT).defaultView?.location.origin ?? '';
+  const isCrossOrigin = !isSameOriginUrl(request, baseOrigin);
   const isAuthExcluded = isAuthExcludedUrl(request);
   const isTokenRefreshExcluded = isTokenRefreshExcludedUrl(request);
 
-  if (token && !isAuthExcluded) {
+  if (token && !isAuthExcluded && !isCrossOrigin) {
     request = addTokenToRequest(request, token);
   }
 
@@ -34,7 +37,7 @@ export const jwtInterceptor: HttpInterceptorFn = (
       if (
         shouldAttemptTokenRefresh(
           error,
-          isAuthExcluded || isTokenRefreshExcluded
+          isAuthExcluded || isTokenRefreshExcluded || isCrossOrigin
         )
       ) {
         const handleError = () => {

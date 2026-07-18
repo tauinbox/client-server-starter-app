@@ -99,6 +99,47 @@ describe('jwtInterceptor', () => {
     req.flush({});
   });
 
+  it('should not attach token to an absolute cross-origin request', () => {
+    authStoreMock.getAccessToken.mockReturnValue('my-access-token');
+
+    http.get('https://external.example.com/data').subscribe();
+
+    const req = httpMock.expectOne('https://external.example.com/data');
+    expect(req.request.headers.has('Authorization')).toBe(false);
+    req.flush({});
+  });
+
+  it('should attach token to an absolute same-origin request', () => {
+    authStoreMock.getAccessToken.mockReturnValue('my-access-token');
+    const url = `${window.location.origin}/api/v1/users`;
+
+    http.get(url).subscribe();
+
+    const req = httpMock.expectOne(url);
+    expect(req.request.headers.get('Authorization')).toBe(
+      'Bearer my-access-token'
+    );
+    req.flush([]);
+  });
+
+  it('should not attempt refresh on 401 from a cross-origin request', () => {
+    authStoreMock.getAccessToken.mockReturnValue('my-access-token');
+    let caughtError: HttpErrorResponse | null = null;
+
+    http.get('https://external.example.com/data').subscribe({
+      error: (err) => (caughtError = err)
+    });
+
+    const req = httpMock.expectOne('https://external.example.com/data');
+    req.flush(
+      { message: 'Unauthorized' },
+      { status: 401, statusText: 'Unauthorized' }
+    );
+
+    expect(caughtError!.status).toBe(401);
+    expect(tokenServiceMock.refreshTokens).not.toHaveBeenCalled();
+  });
+
   it('should not add header when no token exists', () => {
     authStoreMock.getAccessToken.mockReturnValue(null);
 
