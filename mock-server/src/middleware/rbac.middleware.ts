@@ -88,6 +88,46 @@ router.patch('/resources/:id', adminGuard, (req, res) => {
 
   const { displayName, description, allowedActionNames } = req.body;
 
+  // Validate before any mutation so a rejected request leaves the resource
+  // untouched, matching the server's whole-DTO validation.
+  if (allowedActionNames !== undefined && allowedActionNames !== null) {
+    if (!Array.isArray(allowedActionNames)) {
+      res.status(400).json({
+        message: 'allowedActionNames must be an array',
+        statusCode: 400
+      });
+      return;
+    }
+    if (allowedActionNames.length > 100) {
+      res.status(400).json({
+        message: 'allowedActionNames must contain no more than 100 elements',
+        statusCode: 400
+      });
+      return;
+    }
+    const nonString = (allowedActionNames as unknown[]).some(
+      (name) => typeof name !== 'string'
+    );
+    if (nonString) {
+      res.status(400).json({
+        message: 'each value in allowedActionNames must be a string',
+        statusCode: 400
+      });
+      return;
+    }
+    const tooLong = (allowedActionNames as string[]).some(
+      (name) => name.length > 50
+    );
+    if (tooLong) {
+      res.status(400).json({
+        message:
+          'each value in allowedActionNames must be shorter than or equal to 50 characters',
+        statusCode: 400
+      });
+      return;
+    }
+  }
+
   if (displayName !== undefined) {
     if (typeof displayName !== 'string' || displayName.trim().length === 0) {
       res.status(400).json({

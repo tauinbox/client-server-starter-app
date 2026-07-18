@@ -1,4 +1,6 @@
 import {
+  ArrayMaxSize,
+  ArrayNotEmpty,
   IsArray,
   IsNotEmpty,
   IsOptional,
@@ -16,7 +18,8 @@ export class AssignPermissionsDto {
     example: ['uuid-1', 'uuid-2']
   })
   @IsArray()
-  @IsNotEmpty()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(500)
   @IsUUID('4', { each: true })
   permissionIds: string[];
 
@@ -49,6 +52,7 @@ export class SetPermissionsDto {
     type: [PermissionItemDto]
   })
   @IsArray()
+  @ArrayMaxSize(500)
   @ValidateNested({ each: true })
   @Type(() => PermissionItemDto)
   items: PermissionItemDto[];

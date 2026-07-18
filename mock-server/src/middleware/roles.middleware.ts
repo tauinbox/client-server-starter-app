@@ -398,6 +398,14 @@ router.put('/:id/permissions', adminGuard, (req, res) => {
     return;
   }
 
+  if (items.length > 500) {
+    res.status(400).json({
+      message: 'items must contain no more than 500 elements',
+      statusCode: 400
+    });
+    return;
+  }
+
   // Validate condition shapes (mirrors the server's DTO validation)
   for (const item of items) {
     const error = findConditionShapeError(item.conditions);
@@ -483,6 +491,22 @@ router.post('/:id/permissions', adminGuard, (req, res) => {
     res
       .status(400)
       .json({ message: 'permissionIds must be an array', statusCode: 400 });
+    return;
+  }
+
+  if (permissionIds.length === 0) {
+    res.status(400).json({
+      message: 'permissionIds should not be empty',
+      statusCode: 400
+    });
+    return;
+  }
+
+  if (permissionIds.length > 500) {
+    res.status(400).json({
+      message: 'permissionIds must contain no more than 500 elements',
+      statusCode: 400
+    });
     return;
   }
 
