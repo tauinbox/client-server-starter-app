@@ -33,6 +33,16 @@ describe('canAccessAdminPanel', () => {
     expect(canAccessAdminPanel(store)).toBe(true);
   });
 
+  it('returns true when user can manage FeatureFlag', () => {
+    const store = makeAuthStore([{ action: 'manage', subject: 'FeatureFlag' }]);
+    expect(canAccessAdminPanel(store)).toBe(true);
+  });
+
+  it('returns true when user can manage Billing', () => {
+    const store = makeAuthStore([{ action: 'manage', subject: 'Billing' }]);
+    expect(canAccessAdminPanel(store)).toBe(true);
+  });
+
   it('returns false when user has none of the required permissions', () => {
     const store = makeAuthStore([]);
     expect(canAccessAdminPanel(store)).toBe(false);
