@@ -439,17 +439,66 @@ describe('resolveConditions', () => {
       });
     });
 
-    it('should let a later branch overwrite an earlier branch on the same key', () => {
-      // ownership writes `field` first; custom (last) overwrites it.
+    it('should veto when a custom key collides with ownership.userField (no row-scope widening)', () => {
+      // A custom fragment like {"ownerId":{"$ne":null}} would replace the
+      // owner binding with a broad predicate - must fail closed instead.
       const result = resolveConditions(
         {
-          ownership: { userField: 'field' },
-          custom: '{"field":"override"}'
+          ownership: { userField: 'ownerId' },
+          custom: '{"ownerId":{"$ne":null}}'
         },
         ctx
       );
 
-      expect(result.query).toEqual({ field: 'override' });
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('collides with ownership.userField')
+      );
+    });
+
+    it('should veto when a fieldMatch key collides with ownership.userField', () => {
+      const result = resolveConditions(
+        {
+          ownership: { userField: 'ownerId' },
+          fieldMatch: { ownerId: ['a', 'b'] }
+        },
+        ctx
+      );
+
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('collides with ownership.userField')
+      );
+    });
+
+    it('should veto when a userAttr key collides with ownership.userField', () => {
+      const result = resolveConditions(
+        {
+          ownership: { userField: 'ownerId' },
+          userAttr: { ownerId: 'id' }
+        },
+        ctx
+      );
+
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('collides with ownership.userField')
+      );
+    });
+
+    it('should still let later branches overwrite each other on non-ownership keys', () => {
+      // Only the ownership key is protected; fieldMatch -> custom keeps
+      // documented later-wins semantics.
+      const result = resolveConditions(
+        {
+          fieldMatch: { status: ['active'] },
+          custom: '{"status":"archived"}'
+        },
+        ctx
+      );
+
+      expect(result.query).toEqual({ status: 'archived' });
+      expect(result.skipPermission).toBe(false);
     });
 
     it('should veto and discard earlier merges when custom is unsafe', () => {

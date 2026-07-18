@@ -389,16 +389,18 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
 
     const query: Record<string, unknown> = {};
 
-    // Mirrors the server's resolveConditions: any malformed branch vetoes
-    // the whole permission (fail closed) instead of being silently dropped,
-    // which would widen the effective grant.
+    // Mirrors the server's resolveConditions: a malformed branch, or a later
+    // branch colliding with the protected ownership key, vetoes the whole
+    // permission (fail closed) instead of widening the effective grant.
     let vetoed = false;
+    let ownershipField: string | undefined;
 
     if (conditions.ownership != null) {
       if (findOwnershipShapeError(conditions.ownership)) {
         vetoed = true;
       } else {
-        query[conditions.ownership.userField] = user.id;
+        ownershipField = conditions.ownership.userField;
+        query[ownershipField] = user.id;
       }
     }
 
@@ -407,6 +409,10 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
         vetoed = true;
       } else {
         for (const [field, values] of Object.entries(conditions.fieldMatch)) {
+          if (field === ownershipField) {
+            vetoed = true;
+            break;
+          }
           query[field] = { $in: values };
         }
       }
@@ -419,7 +425,10 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
         const userContext: Record<string, unknown> = { id: user.id };
         for (const [field, attrName] of Object.entries(conditions.userAttr)) {
           const attr = attrName as string;
-          if (!Object.prototype.hasOwnProperty.call(userContext, attr)) {
+          if (
+            !Object.prototype.hasOwnProperty.call(userContext, attr) ||
+            field === ownershipField
+          ) {
             vetoed = true;
             break;
           }
@@ -435,7 +444,9 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
           parsed === null ||
           typeof parsed !== 'object' ||
           Array.isArray(parsed) ||
-          findDeniedMongoKey(parsed)
+          findDeniedMongoKey(parsed) ||
+          (ownershipField !== undefined &&
+            Object.prototype.hasOwnProperty.call(parsed, ownershipField))
         ) {
           vetoed = true;
         } else {

@@ -177,6 +177,24 @@ describe('condition shape parity with server', () => {
       expect(editorUserRules().granted).toBe(false);
     });
 
+    it('vetoes a permission whose custom key collides with ownership.userField', () => {
+      grantToEditor({
+        ownership: { userField: 'ownerId' },
+        custom: '{"ownerId":{"$ne":null}}'
+      });
+
+      expect(editorUserRules().granted).toBe(false);
+    });
+
+    it('vetoes a permission whose fieldMatch key collides with ownership.userField', () => {
+      grantToEditor({
+        ownership: { userField: 'ownerId' },
+        fieldMatch: { ownerId: ['a', 'b'] }
+      });
+
+      expect(editorUserRules().granted).toBe(false);
+    });
+
     it('grants the permission when the stored condition is valid (control)', () => {
       grantToEditor({ fieldMatch: { status: ['active'] } });
 
