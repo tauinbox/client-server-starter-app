@@ -22,7 +22,10 @@ export interface ResolverContext {
  * Translates a `PermissionCondition` into a single MongoQuery conditions object.
  *
  * Branches are merged in a fixed order — ownership → fieldMatch → userAttr →
- * custom — so when two branches write the same field key the later one wins.
+ * custom — so when two branches write the same field key the later one wins,
+ * with one exception: the `ownership` key is protected. A later branch that
+ * writes `ownership.userField` would silently replace the owner-scoping
+ * predicate with a broader one, so such a collision vetoes the permission.
  *
  * Returns `skipPermission: true` to veto the entire permission when the input
  * cannot be honored as authored: a branch whose shape is malformed (validated
@@ -50,12 +53,14 @@ export function resolveConditions(
     return { query, skipPermission: true };
   };
 
+  let ownershipField: string | undefined;
   if (ownership !== undefined && ownership !== null) {
     const shapeError = findOwnershipShapeError(ownership);
     if (shapeError) {
       return veto(shapeError);
     }
-    query[ownership.userField] = ctx.userId;
+    ownershipField = ownership.userField;
+    query[ownershipField] = ctx.userId;
   }
 
   if (fieldMatch !== undefined && fieldMatch !== null) {
@@ -64,6 +69,11 @@ export function resolveConditions(
       return veto(shapeError);
     }
     for (const [field, values] of Object.entries(fieldMatch)) {
+      if (field === ownershipField) {
+        return veto(
+          `fieldMatch key "${field}" collides with ownership.userField`
+        );
+      }
       query[field] = { $in: values };
     }
   }
@@ -80,6 +90,11 @@ export function resolveConditions(
       if (!Object.prototype.hasOwnProperty.call(userContext, attr)) {
         return veto(
           `userAttr references unknown attribute "${attr}" in field "${field}"`
+        );
+      }
+      if (field === ownershipField) {
+        return veto(
+          `userAttr key "${field}" collides with ownership.userField`
         );
       }
       query[field] = userContext[attr];
@@ -105,6 +120,14 @@ export function resolveConditions(
     const denied = findDeniedMongoKey(parsed);
     if (denied) {
       return veto(`denied operator "${denied}" in custom condition`);
+    }
+    if (
+      ownershipField !== undefined &&
+      Object.prototype.hasOwnProperty.call(parsed, ownershipField)
+    ) {
+      return veto(
+        `custom condition key "${ownershipField}" collides with ownership.userField`
+      );
     }
     Object.assign(query, parsed);
   }

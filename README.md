@@ -45,7 +45,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - **Billing console** — "Billing" tab at `/admin/billing` (requires `manage:Billing`, hidden behind the public `billing` flag). Read-only tables of every customer's subscriptions and invoices (desktop table / handset cards) with the two M1 mutations: cancel a subscription (end-of-period or immediate, via a confirm dialog) and refund a paid invoice. Fully internationalized (EN / RU)
 - **CASL condition editors** — all four condition types supported in the permissions dialog: `ownership` checkbox, `fieldMatch` / `userAttr` JSON editors, and a `custom` visual condition builder with field/operator/value form, nested `$or`/`$and` groups, JSON preview, and raw JSON fallback toggle. The `ownership` / `fieldMatch` / `userAttr` editors validate the condition shape inline (shared `permission-condition-shape.ts` finders — the same rules the server DTO enforces), so a malformed condition (e.g. a `fieldMatch` value that is not a non-empty array) blocks save with a translated error instead of a 400 round-trip
 - **Prototype-pollution-safe `custom` conditions** — the `custom` branch runs `findDeniedMongoKey()` on parsed user-supplied JSON before any merge; presence of `__proto__`/`constructor`/`prototype` keys vetoes the entire permission
-- **Condition translation** — each branch of `PermissionCondition` (ownership, fieldMatch, userAttr, custom) is translated to a MongoQuery by `resolveConditions()` in `server/src/modules/auth/casl/resolve-conditions.ts`, merged in that fixed order (later writes win). To add a new condition type, add a branch to `resolveConditions()` and extend `PermissionCondition` in `shared/src/types/role.types.ts`
+- **Condition translation** — each branch of `PermissionCondition` (ownership, fieldMatch, userAttr, custom) is translated to a MongoQuery by `resolveConditions()` in `server/src/modules/auth/casl/resolve-conditions.ts`, merged in that fixed order (later writes win, except the protected `ownership.userField` key — a collision on it vetoes the permission). To add a new condition type, add a branch to `resolveConditions()` and extend `PermissionCondition` in `shared/src/types/role.types.ts`
 - **Fail-closed condition resolution** — a condition that cannot be honored as authored vetoes the whole permission instead of degrading into a wider grant: a malformed branch shape (non-array / empty-array `fieldMatch` values, non-string `userAttr` attributes, empty or non-string `ownership.userField`, prototype-pollution keys), an unknown `userAttr` attribute, invalid/non-object `custom` JSON, or restriction branches that resolve to an empty query. Partial resolution is never registered — dropping just the malformed part would silently widen the intended restriction. A vetoed `deny` registers as an unconditional `cannot()` so a broken deny rule never silently disappears; only a branch-less condition object (bare `effect`) registers unconditionally
 - **Condition shape validation at input** — `PermissionConditionDto` enforces the inner shape of `ownership` / `fieldMatch` / `userAttr` (shared finders in `shared/src/utils/permission-condition-shape.ts`, also used by the client editors and the mock server), so a partially malformed condition (e.g. `{"status": ["active"], "dept": "sales"}` — forgotten array brackets) is rejected with 400 at authoring time instead of silently registering a wider rule
 
@@ -189,7 +189,7 @@ can('update', 'User', {
 
 Meaning: user can update only their own record, only if it's active, and only if the email matches the company domain.
 
-**Conflict resolution:** if the same field key appears in multiple condition types, later types overwrite earlier ones. Processing order: ownership → fieldMatch → userAttr → custom.
+**Conflict resolution:** if the same field key appears in multiple condition types, later types overwrite earlier ones. Processing order: ownership → fieldMatch → userAttr → custom. Exception: the `ownership.userField` key is protected — a `fieldMatch`, `userAttr`, or `custom` entry on that key would replace the owner-scoping predicate with a broader one, so the whole permission is vetoed (fail closed) instead.
 
 #### Practical Examples
 
@@ -807,7 +807,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1378 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1381 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 198 tests passing |
 | Client unit tests | Vitest | `*.spec.ts` alongside source | 917 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 201 tests passing |
