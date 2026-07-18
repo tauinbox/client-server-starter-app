@@ -11,6 +11,7 @@ export class ForgotPasswordDto {
     typeof value === 'string' ? value.trim().toLowerCase() : value
   )
   @IsEmail()
+  @MaxLength(255)
   email: string;
 
   @ApiPropertyOptional({

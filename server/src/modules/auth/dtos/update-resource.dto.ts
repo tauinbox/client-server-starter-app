@@ -1,4 +1,10 @@
-import { IsArray, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsOptional,
+  IsString,
+  MaxLength
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateResourceDto {
@@ -29,6 +35,8 @@ export class UpdateResourceDto {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(100)
   @IsString({ each: true })
+  @MaxLength(50, { each: true })
   allowedActionNames?: string[] | null;
 }

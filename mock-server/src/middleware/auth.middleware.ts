@@ -339,6 +339,12 @@ router.post('/verify-email', (req, res) => {
     return;
   }
 
+  const tokenLenError = validateMaxLength(token, 512, 'token');
+  if (tokenLenError) {
+    res.status(400).json({ message: tokenLenError, statusCode: 400 });
+    return;
+  }
+
   const state = getState();
   const userId = state.emailVerificationTokens.get(token);
 
@@ -381,6 +387,12 @@ router.post('/resend-verification', (req, res) => {
     res
       .status(400)
       .json({ message: 'email must be an email', statusCode: 400 });
+    return;
+  }
+
+  const emailLenError = validateMaxLength(email, 255, 'email');
+  if (emailLenError) {
+    res.status(400).json({ message: emailLenError, statusCode: 400 });
     return;
   }
 
@@ -441,6 +453,12 @@ router.post('/forgot-password', (req, res) => {
     return;
   }
 
+  const emailLenError = validateMaxLength(email, 255, 'email');
+  if (emailLenError) {
+    res.status(400).json({ message: emailLenError, statusCode: 400 });
+    return;
+  }
+
   const user = findUserByEmail(email);
 
   // Always return success to prevent email enumeration
@@ -483,6 +501,12 @@ router.post('/reset-password', (req, res) => {
     res
       .status(400)
       .json({ message: 'Token and password are required', statusCode: 400 });
+    return;
+  }
+
+  const tokenLenError = validateMaxLength(token, 512, 'token');
+  if (tokenLenError) {
+    res.status(400).json({ message: tokenLenError, statusCode: 400 });
     return;
   }
 
@@ -912,6 +936,12 @@ router.post('/profile/email/confirm', (req, res) => {
 
   if (!token || typeof token !== 'string') {
     res.status(400).json({ message: 'Token is required', statusCode: 400 });
+    return;
+  }
+
+  const tokenLenError = validateMaxLength(token, 512, 'token');
+  if (tokenLenError) {
+    res.status(400).json({ message: tokenLenError, statusCode: 400 });
     return;
   }
 
