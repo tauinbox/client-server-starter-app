@@ -127,13 +127,11 @@ export class BillingAdminService {
   }
 
   async refundInvoice(id: string, amountMinor?: number): Promise<Invoice> {
-    // Row-lock the invoice for the whole refund so concurrent refunds of the
-    // same invoice serialize: the second waits, then sees the bumped
-    // `refundedMinor` / flipped `refunded` status instead of double-clawing
-    // credits or over-refunding off a stale read.
-    const { saved, invalidateUserId } = await withTransaction(
-      this.dataSource,
-      async (manager) => {
+    // Price the leg under a short row lock, released before the provider leg:
+    // a provider HTTP call held inside an open transaction pins a pool
+    // connection for the whole round-trip.
+    const { alreadyRefunded, refundAmount, cumulativeRefunded, providerRef } =
+      await withTransaction(this.dataSource, async (manager) => {
         const invoice = await manager.findOne(Invoice, {
           where: { id },
           lock: { mode: 'pessimistic_write' }
@@ -158,25 +156,64 @@ export class BillingAdminService {
           );
         }
 
-        const cumulativeRefunded = alreadyRefunded.add(refundAmount);
+        return {
+          alreadyRefunded,
+          refundAmount,
+          cumulativeRefunded: alreadyRefunded.add(refundAmount),
+          providerRef: {
+            provider: invoice.provider,
+            invoiceRef: invoice.providerInvoiceRef
+          }
+        };
+      });
 
-        const provider = this.billing.getProviderById(invoice.provider);
-        if (provider) {
-          // Keying on the cumulative-after total makes a post-crash retry reuse
-          // the same key and dedup at the provider.
-          await provider.refund(
-            invoice.providerInvoiceRef,
-            refundAmount.toNumber(),
-            `refund-${invoice.id}-${cumulativeRefunded.toMinorString()}`
-          );
+    const provider = this.billing.getProviderById(providerRef.provider);
+    if (provider) {
+      // Keying on the cumulative-after total makes a post-crash retry reuse
+      // the same key and dedup at the provider.
+      await provider.refund(
+        providerRef.invoiceRef,
+        refundAmount.toNumber(),
+        `refund-${id}-${cumulativeRefunded.toMinorString()}`
+      );
+    }
+
+    // Re-lock and reconcile against whatever landed while the lock was
+    // released.
+    const { saved, invalidateUserId } = await withTransaction(
+      this.dataSource,
+      async (manager) => {
+        const invoice = await manager.findOne(Invoice, {
+          where: { id },
+          lock: { mode: 'pessimistic_write' }
+        });
+        if (!invoice) {
+          throw new NotFoundException('Invoice not found');
         }
 
-        invoice.refundedMinor = cumulativeRefunded;
+        // A concurrent leg from the same base with the same amount shared our
+        // idempotency key, so the provider collapsed both calls into one money
+        // move already recorded by that leg - recording ours would double it.
+        const interleaved = invoice.refundedMinor.sub(alreadyRefunded);
+        if (interleaved.compare(refundAmount) === 0) {
+          return { saved: invoice, invalidateUserId: null };
+        }
 
-        // The one-way `paid → refunded` flip keeps grant revoke / credit
+        const newCumulative = invoice.refundedMinor.add(refundAmount);
+        if (newCumulative.compare(invoice.amountMinor) > 0) {
+          throw new ConflictException(
+            'Concurrent refunds exceeded the invoice total; reconcile against the provider'
+          );
+        }
+        invoice.refundedMinor = newCumulative;
+
+        // The one-way `paid -> refunded` flip keeps grant revoke / credit
         // clawback exactly-once across multiple partial legs.
         let invalidateUserId: string | null = null;
-        if (cumulativeRefunded.compare(invoice.amountMinor) >= 0) {
+        if (
+          newCumulative.compare(invoice.amountMinor) >= 0 &&
+          invoice.status === 'paid'
+        ) {
           invoice.status = 'refunded';
           invalidateUserId = await this.revokeOneTimeGrants(manager, invoice);
           await this.clawbackCreditPurchase(manager, invoice);
