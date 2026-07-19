@@ -1563,5 +1563,42 @@ describe('BillingUserService', () => {
       );
       expect(ctx.customers.save).not.toHaveBeenCalled();
     });
+
+    it('returns the winner when concurrent first requests race customer creation (23505)', async () => {
+      const ctx = await build();
+      const winner = {
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'RU',
+        providerOverride: null
+      };
+      // First lookup: no customer yet -> proceed to insert. Insert hits the
+      // unique constraint on user_id, so the post-violation lookup returns
+      // the concurrent winner.
+      ctx.customers.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(winner);
+      ctx.users.findOne.mockResolvedValue({ id: 'user-1', locale: 'ru' });
+      ctx.customers.save.mockRejectedValueOnce({ code: '23505' });
+      ctx.subscriptions.findOne.mockResolvedValue(null);
+
+      const region = await ctx.service.setRegion('user-1', 'ru');
+
+      expect(region.region).toBe('ru');
+      expect(ctx.customers.save).toHaveBeenCalledWith(
+        expect.objectContaining({ providerOverride: 'yookassa' })
+      );
+    });
+
+    it('rethrows non-unique-violation errors from customer creation', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue(null);
+      ctx.users.findOne.mockResolvedValue({ id: 'user-1', locale: 'ru' });
+      ctx.customers.save.mockRejectedValue(new Error('connection lost'));
+
+      await expect(ctx.service.setRegion('user-1', 'ru')).rejects.toThrow(
+        'connection lost'
+      );
+    });
   });
 });
