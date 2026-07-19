@@ -986,17 +986,28 @@ export class BillingUserService {
       throw new NotFoundException('User not found');
     }
     const { country, currency } = geoFromLocale(user.locale);
-    return this.customers.save(
-      this.customers.create({
-        userId,
-        provider: this.billing.geoDefaultFor(country),
-        providerOverride: null,
-        country,
-        currency,
-        providerCustomerId: null,
-        defaultPaymentMethodId: null
-      })
-    );
+    try {
+      return await this.customers.save(
+        this.customers.create({
+          userId,
+          provider: this.billing.geoDefaultFor(country),
+          providerOverride: null,
+          country,
+          currency,
+          providerCustomerId: null,
+          defaultPaymentMethodId: null
+        })
+      );
+    } catch (error: unknown) {
+      // Lost the insert race against a concurrent first billing action:
+      // the unique constraint on user_id rejected the second row. Return
+      // the row the winner created.
+      if ((error as { code?: string }).code === PG_UNIQUE_VIOLATION) {
+        const winner = await this.customers.findOne({ where: { userId } });
+        if (winner) return winner;
+      }
+      throw error;
+    }
   }
 
   private async findCurrentSubscription(
