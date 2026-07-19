@@ -259,7 +259,7 @@ describe('BillingAdminService', () => {
       );
     });
 
-    it('row-locks the invoice and runs the whole refund in one transaction', async () => {
+    it('row-locks the invoice in both the pricing and the settling transaction', async () => {
       const ctx = await build();
       ctx.invoices.findOne.mockResolvedValue(
         makeInvoice({
@@ -278,12 +278,18 @@ describe('BillingAdminService', () => {
 
       await ctx.service.refundInvoice('inv-1');
 
-      // Without the transaction + row lock two concurrent refunds both read
-      // `paid` and double-claw; the read must happen under a pessimistic write
-      // lock inside the transaction, and the clawback must join that same
+      // Both the validate/price read and the settle read must happen under a
+      // pessimistic write lock, and the clawback must join the settling
       // transaction (same manager) so it commits atomically with the flip.
-      expect(ctx.dataSource.transaction).toHaveBeenCalledTimes(1);
-      expect(ctx.manager.findOne).toHaveBeenCalledWith(
+      expect(ctx.dataSource.transaction).toHaveBeenCalledTimes(2);
+      expect(ctx.manager.findOne).toHaveBeenCalledTimes(3);
+      expect(ctx.manager.findOne).toHaveBeenNthCalledWith(
+        1,
+        Invoice,
+        expect.objectContaining({ lock: { mode: 'pessimistic_write' } })
+      );
+      expect(ctx.manager.findOne).toHaveBeenNthCalledWith(
+        2,
         Invoice,
         expect.objectContaining({ lock: { mode: 'pessimistic_write' } })
       );
@@ -293,6 +299,88 @@ describe('BillingAdminService', () => {
         'inv-1',
         500
       );
+    });
+
+    it('calls the provider outside any open transaction', async () => {
+      const ctx = await build();
+      ctx.invoices.findOne.mockResolvedValue(makeInvoice());
+      let openTransactions = 0;
+      const seenDuringRefund: number[] = [];
+      ctx.dataSource.transaction.mockImplementation(async (cb) => {
+        openTransactions++;
+        try {
+          return await cb(ctx.manager);
+        } finally {
+          openTransactions--;
+        }
+      });
+      const yoo = providerStub('yookassa');
+      yoo.refund.mockImplementation(() => {
+        seenDuringRefund.push(openTransactions);
+        return Promise.resolve();
+      });
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await ctx.service.refundInvoice('inv-1');
+
+      // A slow provider round-trip must not pin a pool connection or hold the
+      // invoice row lock.
+      expect(seenDuringRefund).toEqual([0]);
+    });
+
+    it('records a concurrent same-amount refund once (provider dedups the shared idempotency key)', async () => {
+      const ctx = await build();
+      ctx.invoices.findOne.mockResolvedValue(
+        makeInvoice({
+          kind: 'one_time',
+          subscriptionId: null,
+          productId: 'prod-cr',
+          amountMinor: Money.fromMinor(49000)
+        })
+      );
+      ctx.products.findOne.mockResolvedValue({
+        id: 'prod-cr',
+        type: 'credits',
+        grant: { credits: 500 }
+      });
+      const yoo = providerStub('yookassa');
+      let releaseFirst!: () => void;
+      yoo.refund
+        .mockImplementationOnce(
+          () => new Promise<void>((resolve) => (releaseFirst = resolve))
+        )
+        .mockResolvedValue(undefined);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      // First refund parks inside the provider call (row lock released);
+      // a second full refund of the same invoice runs to completion meanwhile.
+      const firstPromise = ctx.service.refundInvoice('inv-1');
+      await new Promise((resolve) => setImmediate(resolve));
+      const second = await ctx.service.refundInvoice('inv-1');
+      releaseFirst();
+      const first = await firstPromise;
+
+      // Both legs priced from the same base with the same amount, so they sent
+      // the same idempotency key: the provider deduped them into one money
+      // move, and the first leg must not add it to the books again.
+      expect(yoo.refund).toHaveBeenCalledTimes(2);
+      expect(yoo.refund).toHaveBeenNthCalledWith(
+        1,
+        'pay_1',
+        49000,
+        'refund-inv-1-49000'
+      );
+      expect(yoo.refund).toHaveBeenNthCalledWith(
+        2,
+        'pay_1',
+        49000,
+        'refund-inv-1-49000'
+      );
+      expect(second.refundedMinor.toMinorString()).toBe('49000');
+      expect(first.refundedMinor.toMinorString()).toBe('49000');
+      expect(first.status).toBe('refunded');
+      expect(ctx.invoices.save).toHaveBeenCalledTimes(1);
+      expect(ctx.credits.clawbackPurchase).toHaveBeenCalledTimes(1);
     });
 
     it('rejects a repeat full refund and claws credits back exactly once', async () => {
