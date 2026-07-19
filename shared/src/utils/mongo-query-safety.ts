@@ -42,13 +42,27 @@ export const DENIED_MONGO_OPERATORS = new Set([
 export const PROTOTYPE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /**
+ * Maximum object-nesting depth accepted by the recursive safety checks.
+ * No legitimate RBAC condition approaches this; without a cap a crafted
+ * deeply nested body overflows the call stack (RangeError -> 500) instead
+ * of being rejected as invalid input.
+ */
+export const MAX_MONGO_QUERY_DEPTH = 32;
+
+/**
  * Recursively checks whether an object tree contains any denied
  * MongoQuery operator or prototype-pollution key.
  *
- * @returns The offending key name, or `null` if the tree is safe.
+ * @returns The offending key name, a descriptive sentinel when the
+ * nesting depth limit is exceeded (fail-closed), or `null` if the tree
+ * is safe.
  */
-export function findDeniedMongoKey(obj: unknown): string | null {
+export function findDeniedMongoKey(obj: unknown, depth = 0): string | null {
   if (obj === null || typeof obj !== 'object') return null;
+
+  if (depth >= MAX_MONGO_QUERY_DEPTH) {
+    return `nesting deeper than ${MAX_MONGO_QUERY_DEPTH} levels`;
+  }
 
   const entries = Array.isArray(obj)
     ? obj.map((v, i) => [String(i), v] as const)
@@ -58,7 +72,7 @@ export function findDeniedMongoKey(obj: unknown): string | null {
     if (PROTOTYPE_KEYS.has(key)) return key;
     if (DENIED_MONGO_OPERATORS.has(key)) return key;
 
-    const nested = findDeniedMongoKey(value);
+    const nested = findDeniedMongoKey(value, depth + 1);
     if (nested) return nested;
   }
 
@@ -73,9 +87,14 @@ export function findDeniedMongoKey(obj: unknown): string | null {
  */
 export function validateMongoQueryKeys(
   obj: unknown,
-  path = ''
+  path = '',
+  depth = 0
 ): string | null {
   if (obj === null || typeof obj !== 'object') return null;
+
+  if (depth >= MAX_MONGO_QUERY_DEPTH) {
+    return `Nesting deeper than ${MAX_MONGO_QUERY_DEPTH} levels at ${path || '<root>'}`;
+  }
 
   const entries = Array.isArray(obj)
     ? obj.map((v, i) => [String(i), v] as const)
@@ -96,7 +115,7 @@ export function validateMongoQueryKeys(
     }
 
     const childPath = path ? `${path}.${key}` : key;
-    const childError = validateMongoQueryKeys(value, childPath);
+    const childError = validateMongoQueryKeys(value, childPath, depth + 1);
     if (childError) return childError;
   }
 
