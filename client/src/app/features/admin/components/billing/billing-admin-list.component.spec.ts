@@ -50,6 +50,7 @@ const paidInvoice: InvoiceResponse = {
 describe('BillingAdminListComponent', () => {
   let storeMock: {
     loading: ReturnType<typeof signal<boolean>>;
+    working: ReturnType<typeof signal<boolean>>;
     subscriptions: ReturnType<typeof signal<SubscriptionResponse[]>>;
     invoices: ReturnType<typeof signal<InvoiceResponse[]>>;
     load: ReturnType<typeof vi.fn>;
@@ -87,6 +88,7 @@ describe('BillingAdminListComponent', () => {
   beforeEach(() => {
     storeMock = {
       loading: signal(false),
+      working: signal(false),
       subscriptions: signal([activeSub]),
       invoices: signal([paidInvoice]),
       load: vi.fn(),
@@ -157,6 +159,49 @@ describe('BillingAdminListComponent', () => {
     fixture.detectChanges();
     fixture.componentInstance.confirmRefund(paidInvoice);
     expect(storeMock.refundInvoice).toHaveBeenCalledWith('inv-1');
+  });
+
+  it('ignores cancel and refund while a mutation is in flight', async () => {
+    const fixture = await setup();
+    fixture.detectChanges();
+    storeMock.working.set(true);
+
+    fixture.componentInstance.confirmCancel(activeSub, 'immediate');
+    fixture.componentInstance.confirmRefund(paidInvoice);
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(storeMock.cancelSubscription).not.toHaveBeenCalled();
+    expect(storeMock.refundInvoice).not.toHaveBeenCalled();
+  });
+
+  it('does not dispatch when a mutation starts while the dialog is open', async () => {
+    const fixture = await setup();
+    fixture.detectChanges();
+    // The dialog resolves only after another action has flipped `working`.
+    confirmSpy.mockImplementation(() => {
+      storeMock.working.set(true);
+      return of(true);
+    });
+
+    fixture.componentInstance.confirmRefund(paidInvoice);
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(storeMock.refundInvoice).not.toHaveBeenCalled();
+  });
+
+  it('disables the action controls while a mutation is in flight', async () => {
+    const fixture = await setup();
+    fixture.detectChanges();
+    storeMock.working.set(true);
+    fixture.detectChanges();
+
+    const actionButtons = Array.from(
+      (
+        fixture.nativeElement as HTMLElement
+      ).querySelectorAll<HTMLButtonElement>('button[matIconButton]')
+    );
+    expect(actionButtons.length).toBe(2);
+    expect(actionButtons.every((button) => button.disabled)).toBe(true);
   });
 
   it('hides action buttons without the manage permission', async () => {

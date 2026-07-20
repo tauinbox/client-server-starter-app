@@ -41,6 +41,7 @@
                   <button
                     matIconButton
                     [matMenuTriggerFor]="subMenu"
+                    [disabled]="working()"
                     [matTooltip]="t('admin.billing.actions')"
                     [attr.aria-label]="t('admin.billing.actions')"
                   >
@@ -135,6 +136,7 @@
                   <button
                     matIconButton
                     [matMenuTriggerFor]="rowSubMenu"
+                    [disabled]="working()"
                     [matTooltip]="t('admin.billing.actions')"
                     [attr.aria-label]="t('admin.billing.actions')"
                   >
@@ -206,6 +208,7 @@
                   <button
                     matIconButton
                     (click)="confirmRefund(inv)"
+                    [disabled]="working()"
                     [matTooltip]="t('admin.billing.refund')"
                     [attr.aria-label]="t('admin.billing.refund')"
                   >
@@ -277,6 +280,7 @@
                   <button
                     matIconButton
                     (click)="confirmRefund(inv)"
+                    [disabled]="working()"
                     [matTooltip]="t('admin.billing.refund')"
                     [attr.aria-label]="t('admin.billing.refund')"
                   >
