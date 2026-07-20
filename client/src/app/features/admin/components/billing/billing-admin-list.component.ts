@@ -88,6 +88,7 @@ export class BillingAdminListComponent implements OnInit {
   protected readonly authStore = inject(AuthStore);
 
   readonly loading = this.#store.loading;
+  readonly working = this.#store.working;
   readonly subscriptions = this.#store.subscriptions;
   readonly invoices = this.#store.invoices;
 
@@ -141,6 +142,10 @@ export class BillingAdminListComponent implements OnInit {
   }
 
   confirmCancel(subscription: SubscriptionResponse, mode: CancelMode): void {
+    if (this.working()) {
+      return;
+    }
+
     this.#adaptiveDialog
       .openConfirm({
         title: this.#transloco.translate('admin.billing.cancelTitle'),
@@ -155,13 +160,18 @@ export class BillingAdminListComponent implements OnInit {
       })
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((confirmed) => {
-        if (confirmed) {
+        // Re-check: another mutation may have started while the dialog was open.
+        if (confirmed && !this.working()) {
           void this.#store.cancelSubscription(subscription.id, mode);
         }
       });
   }
 
   confirmRefund(invoice: InvoiceResponse): void {
+    if (this.working()) {
+      return;
+    }
+
     this.#adaptiveDialog
       .openConfirm({
         title: this.#transloco.translate('admin.billing.refundTitle'),
@@ -174,7 +184,8 @@ export class BillingAdminListComponent implements OnInit {
       })
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((confirmed) => {
-        if (confirmed) {
+        // Re-check: another mutation may have started while the dialog was open.
+        if (confirmed && !this.working()) {
           void this.#store.refundInvoice(invoice.id);
         }
       });
