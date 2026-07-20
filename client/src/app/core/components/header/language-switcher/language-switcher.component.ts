@@ -13,6 +13,9 @@ type LanguageOption = {
   flag: string;
 };
 
+// Labels are endonyms: each language is named in itself so the option is
+// recognisable whatever the currently active language is. They stay out of the
+// translation files on purpose - translating them would defeat that.
 const LANGUAGES: LanguageOption[] = [
   { code: 'en', label: 'English', flag: 'flag-en' },
   { code: 'ru', label: 'Русский', flag: 'flag-ru' }

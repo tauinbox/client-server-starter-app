@@ -35,6 +35,7 @@ import { OAUTH_URLS } from '../../constants/auth-api.const';
 import type { LockoutErrorData } from '../../models/auth.types';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { OAUTH_PROVIDER_FLAGS } from '@app/shared/constants';
 
@@ -200,13 +201,11 @@ export class LoginComponent implements OnInit, OnDestroy {
   }
 
   #handleLoginError(err: HttpErrorResponse): void {
-    const errorKey = err.error?.errorKey as string | undefined;
-
     if (err.status === 423) {
       const data = err.error as LockoutErrorData;
       this.#startLockoutCountdown(data.retryAfter);
       this.error.set(
-        errorKey ? this.#translocoService.translate(errorKey) : data.message
+        this.#resolveErrorMessage(err, 'errors.auth.accountLocked')
       );
       return;
     }
@@ -214,18 +213,18 @@ export class LoginComponent implements OnInit, OnDestroy {
     if (err.status === 403 && err.error?.errorCode === 'EMAIL_NOT_VERIFIED') {
       this.emailNotVerified.set(true);
       this.error.set(
-        errorKey
-          ? this.#translocoService.translate(errorKey)
-          : err.error.message
+        this.#resolveErrorMessage(err, 'errors.auth.emailNotVerified')
       );
       return;
     }
 
     this.error.set(
-      errorKey
-        ? this.#translocoService.translate(errorKey)
-        : this.#translocoService.translate('auth.login.errorCredentialsInvalid')
+      this.#resolveErrorMessage(err, 'auth.login.errorCredentialsInvalid')
     );
+  }
+
+  #resolveErrorMessage(err: HttpErrorResponse, fallbackKey: string): string {
+    return parseHttpErrorMessage(err, this.#translocoService, fallbackKey);
   }
 
   #startLockoutCountdown(seconds: number): void {

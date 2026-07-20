@@ -34,7 +34,7 @@
               {{ t('admin.roles.tableHeaderDescription') }}
             </th>
             <td mat-cell *matCellDef="let role">
-              {{ role.description ?? '—' }}
+              {{ role.description ?? t('common.emptyPlaceholder') }}
             </td>
           </ng-container>
 

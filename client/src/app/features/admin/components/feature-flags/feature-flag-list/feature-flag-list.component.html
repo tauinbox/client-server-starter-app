@@ -148,7 +148,7 @@
               {{ t('admin.featureFlags.tableHeaderDescription') }}
             </th>
             <td mat-cell *matCellDef="let flag">
-              {{ flag.description ?? '—' }}
+              {{ flag.description ?? t('common.emptyPlaceholder') }}
             </td>
           </ng-container>
 
@@ -196,7 +196,7 @@
               @if (flag.public) {
                 <mat-chip>{{ t('common.yes') }}</mat-chip>
               } @else {
-                <span class="muted">—</span>
+                <span class="muted">{{ t('common.emptyPlaceholder') }}</span>
               }
             </td>
           </ng-container>

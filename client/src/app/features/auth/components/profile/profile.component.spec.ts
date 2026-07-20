@@ -137,9 +137,9 @@ describe('ProfileComponent', () => {
       expect(component.profileForm().dirty()).toBe(false);
     });
 
-    it('should set error on profile load failure', () => {
+    it('should show the translated server error on profile load failure', () => {
       const httpError = new HttpErrorResponse({
-        error: { message: 'Unauthorized' },
+        error: { errorKey: 'errors.users.notFound', message: 'Unauthorized' },
         status: 401
       });
       authServiceMock.getProfile.mockReturnValue(throwError(() => httpError));
@@ -147,7 +147,7 @@ describe('ProfileComponent', () => {
       fixture.detectChanges();
 
       expect(component['loading']()).toBe(false);
-      expect(component['error']()).toBe('Unauthorized');
+      expect(component['error']()).toBe('User not found');
     });
 
     it('should show fallback error message when no server message', () => {
@@ -417,7 +417,9 @@ describe('ProfileComponent', () => {
       await fixture.whenStable();
       component.onSubmit();
 
-      expect(component['error']()).toBe('Update failed');
+      expect(component['error']()).toBe(
+        'Failed to update profile. Please try again.'
+      );
       expect(component['saving']()).toBe(false);
     });
 

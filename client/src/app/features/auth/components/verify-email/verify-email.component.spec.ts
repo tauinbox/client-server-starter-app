@@ -100,7 +100,10 @@ describe('VerifyEmailComponent', () => {
 
     it('should set error from server on failure', () => {
       const httpError = new HttpErrorResponse({
-        error: { message: 'Token expired' },
+        error: {
+          errorKey: 'errors.auth.verificationTokenExpired',
+          message: 'Token expired'
+        },
         status: 400
       });
       authServiceMock.verifyEmail.mockReturnValue(throwError(() => httpError));
@@ -108,7 +111,9 @@ describe('VerifyEmailComponent', () => {
 
       expect(component['loading']()).toBe(false);
       expect(component['success']()).toBe(false);
-      expect(component['error']()).toBe('Token expired');
+      expect(component['error']()).toBe(
+        'Verification token has expired. Please request a new one.'
+      );
     });
 
     it('should show fallback error when no server message on failure', () => {

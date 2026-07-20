@@ -47,7 +47,7 @@
               {{ t('admin.resources.tableHeaderDescription') }}
             </th>
             <td mat-cell *matCellDef="let resource">
-              {{ resource.description ?? '—' }}
+              {{ resource.description ?? t('common.emptyPlaceholder') }}
             </td>
           </ng-container>
 

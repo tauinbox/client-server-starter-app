@@ -21,6 +21,8 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import type { HttpErrorResponse } from '@angular/common/http';
+import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import type {
   ActionResponse,
   ResourceResponse
@@ -172,13 +174,14 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
           this.#notify.success('admin.resources.successUpdated');
           this.#dialogRef.close(true);
         },
-        error: (err: { error?: { message?: string } }) => {
+        error: (err: HttpErrorResponse) => {
           this.isLoading.set(false);
           this.errorMessage.set(
-            err.error?.message ??
-              this.#translocoService.translate(
-                'admin.resources.errorUpdateFailed'
-              )
+            parseHttpErrorMessage(
+              err,
+              this.#translocoService,
+              'admin.resources.errorUpdateFailed'
+            )
           );
         }
       });

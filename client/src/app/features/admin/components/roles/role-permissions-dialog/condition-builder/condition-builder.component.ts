@@ -182,11 +182,14 @@ export class ConditionBuilderComponent implements OnChanges, OnInit {
     }
   }
 
-  getValuePlaceholder(operator: ConditionOperator): string {
+  getValuePlaceholder(
+    operator: ConditionOperator,
+    t: (key: string) => string
+  ): string {
     switch (operator) {
       case '$in':
       case '$nin':
-        return 'val1, val2, val3';
+        return t('admin.conditionBuilder.valuePlaceholderList');
       default:
         return '';
     }

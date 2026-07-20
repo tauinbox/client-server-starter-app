@@ -24,6 +24,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import type { HttpErrorResponse } from '@angular/common/http';
+import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import type { ActionResponse } from '@app/shared/types/rbac.types';
 import type {
   CreateAction,
@@ -139,13 +141,14 @@ export class ActionFormDialogComponent implements OnInit, OnDestroy {
             this.#notify.success('admin.actions.successUpdated');
             this.#dialogRef.close(true);
           },
-          error: (err: { error?: { message?: string } }) => {
+          error: (err: HttpErrorResponse) => {
             this.isLoading.set(false);
             this.errorMessage.set(
-              err.error?.message ??
-                this.#translocoService.translate(
-                  'admin.actions.errorUpdateFailed'
-                )
+              parseHttpErrorMessage(
+                err,
+                this.#translocoService,
+                'admin.actions.errorUpdateFailed'
+              )
             );
           }
         });
@@ -163,13 +166,14 @@ export class ActionFormDialogComponent implements OnInit, OnDestroy {
             this.#notify.success('admin.actions.successCreated');
             this.#dialogRef.close(true);
           },
-          error: (err: { error?: { message?: string } }) => {
+          error: (err: HttpErrorResponse) => {
             this.isLoading.set(false);
             this.errorMessage.set(
-              err.error?.message ??
-                this.#translocoService.translate(
-                  'admin.actions.errorCreateFailed'
-                )
+              parseHttpErrorMessage(
+                err,
+                this.#translocoService,
+                'admin.actions.errorCreateFailed'
+              )
             );
           }
         });

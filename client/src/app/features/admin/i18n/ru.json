@@ -172,7 +172,11 @@
     "emptyGroup": "Нет правил — нажмите +, чтобы добавить",
     "preview": "Предпросмотр JSON",
     "rawLabel": "Сырой JSON MongoQuery",
-    "parseError": "Невозможно разобрать в визуальный режим — исправьте JSON или останьтесь в режиме JSON"
+    "parseError": "Невозможно разобрать в визуальный режим — исправьте JSON или останьтесь в режиме JSON",
+    "logicAnd": "И",
+    "logicOr": "ИЛИ",
+    "fieldPlaceholder": "status",
+    "valuePlaceholderList": "знач1, знач2, знач3"
   },
   "rolePermissions": {
     "title": "Разрешения: {{ name }}",

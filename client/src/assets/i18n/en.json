@@ -19,7 +19,8 @@
     "created": "Created",
     "actions": "Actions",
     "back": "Back",
-    "skipToContent": "Skip to main content"
+    "skipToContent": "Skip to main content",
+    "emptyPlaceholder": "—"
   },
   "header": {
     "login": "Login",
@@ -143,7 +144,8 @@
       "resourceNotFound": "The requested resource was not found",
       "internalServerError": "Internal server error",
       "tooManyRequests": "Too many requests. Please slow down and try again.",
-      "tooManyRequestsRetry": "Too many requests. Please try again in {{ seconds }} s."
+      "tooManyRequestsRetry": "Too many requests. Please try again in {{ seconds }} s.",
+      "validationFailed": "Some of the submitted values are invalid. Please check the form and try again."
     }
   }
 }

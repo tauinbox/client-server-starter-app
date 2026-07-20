@@ -71,7 +71,7 @@
                       <mat-chip
                         class="condition-chip"
                         [matTooltip]="
-                          activeConditionTypes(permission.id).join(', ')
+                          activeConditionTypesLabel(permission.id, t)
                         "
                       >
                         <mat-icon class="chip-icon">rule</mat-icon>
@@ -137,7 +137,7 @@
                       track type
                     ) {
                       <mat-chip class="inline-chip" highlighted>
-                        {{ type }}
+                        {{ conditionTypeLabel(type, t) }}
                       </mat-chip>
                     }
                   } @else if (!isDeny(permission.id)) {

@@ -88,6 +88,26 @@ describe('NotifyService', () => {
       );
     });
 
+    it('shows a translated generic message for ValidationPipe array payloads', () => {
+      const httpError = new HttpErrorResponse({
+        error: {
+          message: [
+            'isActive must be a boolean value',
+            'email must be an email'
+          ]
+        },
+        status: 400
+      });
+
+      service.error(httpError);
+
+      const [message] = snackBarMock.open.mock.calls[0];
+      expect(message).toBe(
+        'Some of the submitted values are invalid. Please check the form and try again.'
+      );
+      expect(message).not.toContain('isActive');
+    });
+
     it('falls back to HttpErrorResponse.message when payload has no message', () => {
       const httpError = new HttpErrorResponse({
         error: null,

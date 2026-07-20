@@ -10,7 +10,6 @@ import {
 } from '@angular/material/dialog';
 import { MatIcon } from '@angular/material/icon';
 import { MatButton } from '@angular/material/button';
-import { TranslocoDirective } from '@jsverse/transloco';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 
 export type ConfirmDialogData = {
@@ -29,8 +28,7 @@ export type ConfirmDialogData = {
     MatIcon,
     MatDialogActions,
     MatButton,
-    MatDialogClose,
-    TranslocoDirective
+    MatDialogClose
   ],
   templateUrl: './confirm-dialog.component.html',
   styleUrl: './confirm-dialog.component.scss',

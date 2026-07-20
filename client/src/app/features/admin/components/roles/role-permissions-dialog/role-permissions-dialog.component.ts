@@ -57,6 +57,13 @@ export type PermissionGroup = {
  */
 type JsonObjectEditor = 'fieldMatch' | 'userAttr';
 
+const CONDITION_TYPE_LABEL_KEYS: Record<string, string> = {
+  ownership: 'admin.rolePermissions.ownership',
+  fieldMatch: 'admin.rolePermissions.fieldMatch',
+  userAttr: 'admin.rolePermissions.userAttribute',
+  custom: 'admin.rolePermissions.custom'
+};
+
 const JSON_EDITOR_SEEDS: Record<JsonObjectEditor, string> = {
   fieldMatch: '{\n  "fieldName": ["value1", "value2"]\n}',
   userAttr: '{\n  "recordField": "id"\n}'
@@ -232,6 +239,19 @@ export class RolePermissionsDialogComponent implements OnInit {
 
   hasAnyCondition(permissionId: string): boolean {
     return this.activeConditionTypes(permissionId).length > 0;
+  }
+
+  conditionTypeLabel(type: string, t: (key: string) => string): string {
+    return t(CONDITION_TYPE_LABEL_KEYS[type] ?? type);
+  }
+
+  activeConditionTypesLabel(
+    permissionId: string,
+    t: (key: string) => string
+  ): string {
+    return this.activeConditionTypes(permissionId)
+      .map((type) => this.conditionTypeLabel(type, t))
+      .join(', ');
   }
 
   activeConditionTypes(permissionId: string): string[] {
