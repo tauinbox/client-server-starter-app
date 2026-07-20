@@ -1,5 +1,6 @@
 import { Seeder } from '@jorgebodega/typeorm-seeding';
-import { DataSource } from 'typeorm';
+import { DataSource, DeepPartial, ObjectLiteral, Repository } from 'typeorm';
+import type { PermissionCondition } from '@app/shared/types';
 import { Role } from '../modules/auth/entities/role.entity';
 import { Permission } from '../modules/auth/entities/permission.entity';
 import { RolePermission } from '../modules/auth/entities/role-permission.entity';
@@ -79,7 +80,62 @@ const DEFAULT_ACTIONS: {
   }
 ];
 
+const DEFAULT_ROLES = [
+  {
+    name: 'admin',
+    description: 'System administrator with full access',
+    isSystem: true,
+    isSuper: true
+  },
+  {
+    name: 'user',
+    description: 'Regular user with basic access',
+    isSystem: true,
+    isSuper: false
+  }
+];
+
+type NamedRow = ObjectLiteral & { name: string };
+
+/**
+ * Inserts only the seeds whose `name` is not already stored and returns the
+ * rows for every seed — pre-existing ones untouched, so an admin's edits to a
+ * seeded row survive a re-run.
+ */
+async function ensureRows<T extends NamedRow>(
+  repo: Repository<T>,
+  seeds: (DeepPartial<T> & { name: string })[]
+): Promise<T[]> {
+  const stored = new Map((await repo.find()).map((row) => [row.name, row]));
+  const missing = seeds.filter((seed) => !stored.has(seed.name));
+  const created = missing.length
+    ? await repo.save(missing.map((seed) => repo.create(seed)))
+    : [];
+
+  return [
+    ...seeds
+      .map((seed) => stored.get(seed.name))
+      .filter((row) => row !== undefined),
+    ...created
+  ];
+}
+
+const permissionKey = (resourceId: string, actionId: string) =>
+  `${resourceId}:${actionId}`;
+
+const rolePermissionKey = (roleId: string, permissionId: string) =>
+  `${roleId}:${permissionId}`;
+
+type RolePermissionSeed = {
+  roleId: string;
+  permissionId: string;
+  conditions?: PermissionCondition;
+};
+
 export default class RbacSeeder extends Seeder {
+  // Additive and idempotent at every level (rows, permission matrix,
+  // role-permission grants): a re-run inserts only what is missing instead of
+  // hitting the unique constraints on resource/action/role name.
   async run(dataSource: DataSource) {
     const roleRepo = dataSource.getRepository(Role);
     const permissionRepo = dataSource.getRepository(Permission);
@@ -87,91 +143,105 @@ export default class RbacSeeder extends Seeder {
     const resourceRepo = dataSource.getRepository(Resource);
     const actionRepo = dataSource.getRepository(Action);
 
-    // Create default resources
-    const savedResources = await resourceRepo.save(
-      DEFAULT_RESOURCES.map((r) =>
-        resourceRepo.create({
-          ...r,
-          isSystem: true,
-          lastSyncedAt: new Date()
-        })
-      )
+    const resources = await ensureRows(
+      resourceRepo,
+      DEFAULT_RESOURCES.map((r) => ({
+        ...r,
+        isSystem: true,
+        lastSyncedAt: new Date()
+      }))
     );
+    const actions = await ensureRows(
+      actionRepo,
+      DEFAULT_ACTIONS.map((a) => ({ ...a, isDefault: a.isDefault ?? true }))
+    );
+    const roles = await ensureRows(roleRepo, DEFAULT_ROLES);
 
-    // Create default actions
-    const savedActions = await actionRepo.save(
-      DEFAULT_ACTIONS.map((a) =>
-        actionRepo.create({ ...a, isDefault: a.isDefault ?? true })
-      )
-    );
-
-    // Create system roles
-    const adminRole = roleRepo.create({
-      name: 'admin',
-      description: 'System administrator with full access',
-      isSystem: true,
-      isSuper: true
-    });
-    const userRole = roleRepo.create({
-      name: 'user',
-      description: 'Regular user with basic access',
-      isSystem: true,
-      isSuper: false
-    });
-    await roleRepo.save([adminRole, userRole]);
-
-    // Create all permissions (full resource × action matrix)
-    const permissionEntries = savedResources.flatMap((resource) =>
-      savedActions.map((action) =>
-        permissionRepo.create({
-          resourceId: resource.id,
-          actionId: action.id
-        })
-      )
-    );
-    const savedPermissions = await permissionRepo.save(permissionEntries);
-
-    // Admin gets all permissions
-    const adminRolePermissions = savedPermissions.map((perm) =>
-      rolePermissionRepo.create({
-        roleId: adminRole.id,
-        permissionId: perm.id
-      })
-    );
-    await rolePermissionRepo.save(adminRolePermissions);
-
-    // User gets profile:read, profile:update, and update:User (own record only)
-    const profileResource = savedResources.find((r) => r.name === 'profile');
-    const usersResource = savedResources.find((r) => r.name === 'users');
-    const readAction = savedActions.find((a) => a.name === 'read');
-    const updateAction = savedActions.find((a) => a.name === 'update');
-    const profilePermissions = savedPermissions.filter(
-      (p) =>
-        p.resourceId === profileResource?.id &&
-        (p.actionId === readAction?.id || p.actionId === updateAction?.id)
-    );
-    const userRolePermissions = profilePermissions.map((perm) =>
-      rolePermissionRepo.create({
-        roleId: userRole.id,
-        permissionId: perm.id
-      })
-    );
-
-    // update:User with ownership condition so regular users can only update their own record
-    const updateUserPermission = savedPermissions.find(
-      (p) =>
-        p.resourceId === usersResource?.id && p.actionId === updateAction?.id
-    );
-    if (updateUserPermission) {
-      userRolePermissions.push(
-        rolePermissionRepo.create({
-          roleId: userRole.id,
-          permissionId: updateUserPermission.id,
-          conditions: { ownership: { userField: 'id' } }
-        })
-      );
+    const adminRole = roles.find((r) => r.name === 'admin');
+    const userRole = roles.find((r) => r.name === 'user');
+    if (!adminRole || !userRole) {
+      throw new Error('RBAC seeder: system roles could not be resolved');
     }
 
-    await rolePermissionRepo.save(userRolePermissions);
+    // Full resource x action matrix.
+    const permissionsByKey = new Map(
+      (await permissionRepo.find()).map((p) => [
+        permissionKey(p.resourceId, p.actionId),
+        p
+      ])
+    );
+    const missingPermissions = resources.flatMap((resource) =>
+      actions
+        .filter(
+          (action) =>
+            !permissionsByKey.has(permissionKey(resource.id, action.id))
+        )
+        .map((action) =>
+          permissionRepo.create({
+            resourceId: resource.id,
+            actionId: action.id
+          })
+        )
+    );
+    const createdPermissions = missingPermissions.length
+      ? await permissionRepo.save(missingPermissions)
+      : [];
+    for (const permission of createdPermissions) {
+      permissionsByKey.set(
+        permissionKey(permission.resourceId, permission.actionId),
+        permission
+      );
+    }
+    const seededPermissions = resources.flatMap((resource) =>
+      actions
+        .map((action) =>
+          permissionsByKey.get(permissionKey(resource.id, action.id))
+        )
+        .filter((permission) => permission !== undefined)
+    );
+
+    const grants: RolePermissionSeed[] = seededPermissions.map(
+      (permission) => ({ roleId: adminRole.id, permissionId: permission.id })
+    );
+
+    // User gets profile:read, profile:update, and update:User (own record only)
+    const profileResource = resources.find((r) => r.name === 'profile');
+    const usersResource = resources.find((r) => r.name === 'users');
+    const readAction = actions.find((a) => a.name === 'read');
+    const updateAction = actions.find((a) => a.name === 'update');
+    for (const permission of seededPermissions) {
+      if (
+        permission.resourceId === profileResource?.id &&
+        (permission.actionId === readAction?.id ||
+          permission.actionId === updateAction?.id)
+      ) {
+        grants.push({ roleId: userRole.id, permissionId: permission.id });
+      }
+      if (
+        permission.resourceId === usersResource?.id &&
+        permission.actionId === updateAction?.id
+      ) {
+        grants.push({
+          roleId: userRole.id,
+          permissionId: permission.id,
+          conditions: { ownership: { userField: 'id' } }
+        });
+      }
+    }
+
+    const storedGrants = new Set(
+      (await rolePermissionRepo.find()).map((rp) =>
+        rolePermissionKey(rp.roleId, rp.permissionId)
+      )
+    );
+    const missingGrants = grants.filter(
+      (grant) =>
+        !storedGrants.has(rolePermissionKey(grant.roleId, grant.permissionId))
+    );
+    if (missingGrants.length === 0) return;
+
+    await rolePermissionRepo.save(
+      missingGrants.map((grant) => rolePermissionRepo.create(grant))
+    );
   }
 }
