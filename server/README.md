@@ -347,6 +347,8 @@ Billing tables (subscriptions foundation; money is always stored in minor units)
 
 Migration and seed commands operate on compiled JS in `dist/` — always run `npm run build` first.
 
+All seeders in `src/seeders/` (RBAC, feature flags, billing plans and products) are idempotent: they look rows up by their natural key (`name` / `key`) and insert only what is missing, so `npm run seed:run` is safe to re-run against an already-seeded database. Rows an admin has since edited are left untouched, and feature-flag rules are seeded only alongside a newly created flag so a deleted rule is not resurrected.
+
 ## Deployment behind a reverse proxy
 
 When the app runs behind nginx, Caddy, a Kubernetes ingress, or Cloudflare, the
