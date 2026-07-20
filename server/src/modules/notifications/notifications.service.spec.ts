@@ -4,19 +4,43 @@ import {
   type SseConnectionsRef
 } from '../core/metrics/metrics.module';
 import { NotificationsService } from './notifications.service';
+import { PermissionService } from '../auth/services/permission.service';
+import { CaslAbilityFactory } from '../auth/casl/casl-ability.factory';
 
 const mockSseRef: SseConnectionsRef = { getCount: () => 0 };
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
+  let permissionService: {
+    getRolesForUser: jest.Mock;
+    getPermissionsForUser: jest.Mock;
+  };
+  let caslAbilityFactory: { createForUser: jest.Mock };
+  /** userIds the mocked ability grants search:User to */
+  let usersWithListAccess: Set<string>;
 
   beforeEach(async () => {
     mockSseRef.getCount = () => 0;
+    usersWithListAccess = new Set<string>();
+
+    permissionService = {
+      getRolesForUser: jest.fn().mockResolvedValue([]),
+      getPermissionsForUser: jest.fn().mockResolvedValue([])
+    };
+    caslAbilityFactory = {
+      createForUser: jest
+        .fn()
+        .mockImplementation((userId: string) =>
+          Promise.resolve({ can: () => usersWithListAccess.has(userId) })
+        )
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationsService,
-        { provide: SSE_CONNECTIONS_REF, useValue: mockSseRef }
+        { provide: SSE_CONNECTIONS_REF, useValue: mockSseRef },
+        { provide: PermissionService, useValue: permissionService },
+        { provide: CaslAbilityFactory, useValue: caslAbilityFactory }
       ]
     }).compile();
 
@@ -84,6 +108,57 @@ describe('NotificationsService', () => {
 
     expect(receivedA).toHaveLength(1);
     expect(receivedB).toHaveLength(1);
+  });
+
+  describe('pushToAuthorized', () => {
+    const crudEvent = {
+      type: 'user_crud_events',
+      action: 'created',
+      userId: 'new-user'
+    } as const;
+
+    it('should deliver only to users whose ability satisfies the check', async () => {
+      const adminSub = service.getOrCreateStream('admin-1', 'conn-1');
+      const basicSub = service.getOrCreateStream('basic-1', 'conn-1');
+      usersWithListAccess.add('admin-1');
+
+      const adminReceived: unknown[] = [];
+      const basicReceived: unknown[] = [];
+      adminSub.subscribe((e) => adminReceived.push(e));
+      basicSub.subscribe((e) => basicReceived.push(e));
+
+      await service.pushToAuthorized(crudEvent, ['search', 'User']);
+
+      expect(adminReceived).toEqual([{ data: crudEvent }]);
+      expect(basicReceived).toEqual([]);
+    });
+
+    it('should fail closed when ability resolution throws', async () => {
+      const subject = service.getOrCreateStream('admin-2', 'conn-1');
+      usersWithListAccess.add('admin-2');
+      caslAbilityFactory.createForUser.mockRejectedValue(new Error('db down'));
+
+      const received: unknown[] = [];
+      subject.subscribe((e) => received.push(e));
+
+      await expect(
+        service.pushToAuthorized(crudEvent, ['search', 'User'])
+      ).resolves.toBeUndefined();
+      expect(received).toEqual([]);
+    });
+
+    it('should resolve abilities per push so permission changes take effect', async () => {
+      const subject = service.getOrCreateStream('user-a', 'conn-1');
+      const received: unknown[] = [];
+      subject.subscribe((e) => received.push(e));
+
+      await service.pushToAuthorized(crudEvent, ['search', 'User']);
+      expect(received).toHaveLength(0);
+
+      usersWithListAccess.add('user-a');
+      await service.pushToAuthorized(crudEvent, ['search', 'User']);
+      expect(received).toHaveLength(1);
+    });
   });
 
   it('should complete the stream and remove the entry on closeStream', () => {

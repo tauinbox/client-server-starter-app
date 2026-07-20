@@ -11,12 +11,17 @@ import { RolePermissionsChangedEvent } from '../auth/events/role-permissions-cha
 
 describe('NotificationsListener', () => {
   let listener: NotificationsListener;
-  let service: { push: jest.Mock; pushToAll: jest.Mock };
+  let service: {
+    push: jest.Mock;
+    pushToAll: jest.Mock;
+    pushToAuthorized: jest.Mock;
+  };
 
   beforeEach(async () => {
     service = {
       push: jest.fn(),
-      pushToAll: jest.fn()
+      pushToAll: jest.fn(),
+      pushToAuthorized: jest.fn().mockResolvedValue(undefined)
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -29,18 +34,26 @@ describe('NotificationsListener', () => {
     listener = module.get<NotificationsListener>(NotificationsListener);
   });
 
-  it('should push session_invalidated and user_crud_events deleted on UserDeletedEvent', () => {
-    listener.handleUserDeleted(new UserDeletedEvent('user-1'));
+  it('should push session_invalidated and user_crud_events deleted on UserDeletedEvent', async () => {
+    await listener.handleUserDeleted(new UserDeletedEvent('user-1'));
 
     expect(service.push).toHaveBeenCalledWith('user-1', {
       type: 'session_invalidated',
       userId: 'user-1'
     });
-    expect(service.pushToAll).toHaveBeenCalledWith({
-      type: 'user_crud_events',
-      action: 'deleted',
-      userId: 'user-1'
-    });
+    expect(service.pushToAuthorized).toHaveBeenCalledWith(
+      { type: 'user_crud_events', action: 'deleted', userId: 'user-1' },
+      ['search', 'User']
+    );
+  });
+
+  it('should never broadcast user_crud_events to every connected client', async () => {
+    await listener.handleUserCreated(new UserCreatedEvent('user-x'));
+    await listener.handleUserUpdated(new UserUpdatedEvent('user-x'));
+    await listener.handleUserDeleted(new UserDeletedEvent('user-x'));
+    await listener.handleUserRestored(new UserRestoredEvent('user-x'));
+
+    expect(service.pushToAll).not.toHaveBeenCalled();
   });
 
   it('should push session_invalidated on UserPasswordChangedByAdminEvent', () => {
@@ -52,37 +65,34 @@ describe('NotificationsListener', () => {
       type: 'session_invalidated',
       userId: 'user-2'
     });
-    expect(service.pushToAll).not.toHaveBeenCalled();
+    expect(service.pushToAuthorized).not.toHaveBeenCalled();
   });
 
-  it('should pushToAll user_crud_events created on UserCreatedEvent', () => {
-    listener.handleUserCreated(new UserCreatedEvent('user-3'));
+  it('should push user_crud_events created to user-list viewers on UserCreatedEvent', async () => {
+    await listener.handleUserCreated(new UserCreatedEvent('user-3'));
 
-    expect(service.pushToAll).toHaveBeenCalledWith({
-      type: 'user_crud_events',
-      action: 'created',
-      userId: 'user-3'
-    });
+    expect(service.pushToAuthorized).toHaveBeenCalledWith(
+      { type: 'user_crud_events', action: 'created', userId: 'user-3' },
+      ['search', 'User']
+    );
   });
 
-  it('should pushToAll user_crud_events updated on UserUpdatedEvent', () => {
-    listener.handleUserUpdated(new UserUpdatedEvent('user-4'));
+  it('should push user_crud_events updated to user-list viewers on UserUpdatedEvent', async () => {
+    await listener.handleUserUpdated(new UserUpdatedEvent('user-4'));
 
-    expect(service.pushToAll).toHaveBeenCalledWith({
-      type: 'user_crud_events',
-      action: 'updated',
-      userId: 'user-4'
-    });
+    expect(service.pushToAuthorized).toHaveBeenCalledWith(
+      { type: 'user_crud_events', action: 'updated', userId: 'user-4' },
+      ['search', 'User']
+    );
   });
 
-  it('should pushToAll user_crud_events restored on UserRestoredEvent', () => {
-    listener.handleUserRestored(new UserRestoredEvent('user-5'));
+  it('should push user_crud_events restored to user-list viewers on UserRestoredEvent', async () => {
+    await listener.handleUserRestored(new UserRestoredEvent('user-5'));
 
-    expect(service.pushToAll).toHaveBeenCalledWith({
-      type: 'user_crud_events',
-      action: 'restored',
-      userId: 'user-5'
-    });
+    expect(service.pushToAuthorized).toHaveBeenCalledWith(
+      { type: 'user_crud_events', action: 'restored', userId: 'user-5' },
+      ['search', 'User']
+    );
   });
 
   it('should push permissions_updated on UserRoleChangedEvent', () => {
