@@ -46,6 +46,19 @@ export function pushToUser(userId: string, event: NotificationEvent): void {
   }
 }
 
+/** Deliver only to connected users the predicate accepts. */
+export function pushToUsersMatching(
+  predicate: (userId: string) => boolean,
+  event: NotificationEvent
+): void {
+  for (const [userId, userConns] of connections) {
+    if (!predicate(userId)) continue;
+    for (const res of userConns.values()) {
+      sendEvent(res, event);
+    }
+  }
+}
+
 export function pushToAll(event: NotificationEvent): void {
   for (const userConns of connections.values()) {
     for (const res of userConns.values()) {

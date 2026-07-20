@@ -771,7 +771,7 @@ Base URL: `/api/v1`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/stream` | Bearer | SSE stream — pushes `session_invalidated`, `permissions_updated`, `user_crud_events`, and `feature_flags_updated` events |
+| GET | `/stream` | Bearer | SSE stream — pushes `session_invalidated`, `permissions_updated`, `user_crud_events` (only to clients with `users:search`), and `feature_flags_updated` events |
 
 ### Feature Flags (`/api/v1`)
 

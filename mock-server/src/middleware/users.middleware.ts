@@ -38,7 +38,20 @@ import {
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
 import { cancelSubscriptionsForDeletedUser } from './billing.middleware';
 import type { AuthenticatedRequest, MockUser } from '../types';
-import { pushToAll, pushToUser } from '../sse-hub';
+import { pushToUser, pushToUsersMatching } from '../sse-hub';
+
+type UserCrudAction = 'created' | 'updated' | 'deleted' | 'restored';
+
+// user_crud_events only drive the admin user list, so they are limited to
+// clients that may list users - a broadcast would leak user IDs and the fact
+// that an account was created/updated/deleted to every authenticated client.
+function pushUserCrudEvent(action: UserCrudAction, userId: string): void {
+  pushToUsersMatching(
+    (connectedUserId) =>
+      findUserById(connectedUserId)?.roles?.includes('admin') === true,
+    { type: 'user_crud_events', action, userId }
+  );
+}
 
 interface PaginationParams {
   page: number;
@@ -318,7 +331,7 @@ router.post('/', adminGuard, (req, res) => {
     ip: req.ip
   });
 
-  pushToAll({ type: 'user_crud_events', action: 'created', userId: user.id });
+  pushUserCrudEvent('created', user.id);
   res.status(201).json(toAdminUserResponse(user));
 });
 
@@ -681,7 +694,7 @@ router.patch('/:id', adminGuard, (req, res) => {
     pushToUser(id, { type: 'session_invalidated', userId: id });
   }
 
-  pushToAll({ type: 'user_crud_events', action: 'updated', userId: id });
+  pushUserCrudEvent('updated', id);
   res.json(toAdminUserResponse(user));
 });
 
@@ -738,7 +751,7 @@ router.delete('/:id', adminGuard, (req, res) => {
   });
 
   pushToUser(id, { type: 'session_invalidated', userId: id });
-  pushToAll({ type: 'user_crud_events', action: 'deleted', userId: id });
+  pushUserCrudEvent('deleted', id);
   res.json({});
 });
 
@@ -769,7 +782,7 @@ router.post('/:id/restore', adminGuard, (req, res) => {
     ip: req.ip
   });
 
-  pushToAll({ type: 'user_crud_events', action: 'restored', userId: id });
+  pushUserCrudEvent('restored', id);
   res.json(toAdminUserResponse(targetUser));
 });
 

@@ -8,22 +8,30 @@ import { UserUpdatedEvent } from '../users/events/user-updated.event';
 import { UserRestoredEvent } from '../users/events/user-restored.event';
 import { UserRoleChangedEvent } from '../auth/events/user-role-changed.event';
 import { RolePermissionsChangedEvent } from '../auth/events/role-permissions-changed.event';
+import type { PermissionCheck } from '../auth/casl/app-ability';
+import type { NotificationEvent } from '@app/shared/types';
+
+type UserCrudAction = Extract<
+  NotificationEvent,
+  { type: 'user_crud_events' }
+>['action'];
+
+// user_crud_events only drive the admin user list, so they are limited to
+// clients that may list users - a broadcast would leak user IDs and the fact
+// that an account was created/updated/deleted to every authenticated client.
+const USER_LIST_ACCESS: PermissionCheck = ['search', 'User'];
 
 @Injectable()
 export class NotificationsListener {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @OnEvent(UserDeletedEvent.name)
-  handleUserDeleted(event: UserDeletedEvent): void {
+  async handleUserDeleted(event: UserDeletedEvent): Promise<void> {
     this.notificationsService.push(event.userId, {
       type: 'session_invalidated',
       userId: event.userId
     });
-    this.notificationsService.pushToAll({
-      type: 'user_crud_events',
-      action: 'deleted',
-      userId: event.userId
-    });
+    await this.#pushUserCrudEvent('deleted', event.userId);
   }
 
   @OnEvent(UserPasswordChangedByAdminEvent.name)
@@ -35,30 +43,18 @@ export class NotificationsListener {
   }
 
   @OnEvent(UserCreatedEvent.name)
-  handleUserCreated(event: UserCreatedEvent): void {
-    this.notificationsService.pushToAll({
-      type: 'user_crud_events',
-      action: 'created',
-      userId: event.userId
-    });
+  async handleUserCreated(event: UserCreatedEvent): Promise<void> {
+    await this.#pushUserCrudEvent('created', event.userId);
   }
 
   @OnEvent(UserUpdatedEvent.name)
-  handleUserUpdated(event: UserUpdatedEvent): void {
-    this.notificationsService.pushToAll({
-      type: 'user_crud_events',
-      action: 'updated',
-      userId: event.userId
-    });
+  async handleUserUpdated(event: UserUpdatedEvent): Promise<void> {
+    await this.#pushUserCrudEvent('updated', event.userId);
   }
 
   @OnEvent(UserRestoredEvent.name)
-  handleUserRestored(event: UserRestoredEvent): void {
-    this.notificationsService.pushToAll({
-      type: 'user_crud_events',
-      action: 'restored',
-      userId: event.userId
-    });
+  async handleUserRestored(event: UserRestoredEvent): Promise<void> {
+    await this.#pushUserCrudEvent('restored', event.userId);
   }
 
   @OnEvent(UserRoleChangedEvent.name)
@@ -77,5 +73,12 @@ export class NotificationsListener {
         userId
       });
     }
+  }
+
+  #pushUserCrudEvent(action: UserCrudAction, userId: string): Promise<void> {
+    return this.notificationsService.pushToAuthorized(
+      { type: 'user_crud_events', action, userId },
+      USER_LIST_ACCESS
+    );
   }
 }
