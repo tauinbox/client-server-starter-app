@@ -116,8 +116,13 @@ describe('RequestLoggingMiddleware', () => {
     );
   });
 
-  it('should skip logging for /api/v1/health', () => {
-    req.originalUrl = '/api/v1/health';
+  it.each([
+    '/api/health/ready',
+    '/api/health/live',
+    '/api/health/ready?verbose=1',
+    '/metrics'
+  ])('should skip logging for observability poll %s', (url) => {
+    req.originalUrl = url;
 
     middleware.use(req as Request, res, next);
     res.emit('finish');
@@ -126,6 +131,17 @@ describe('RequestLoggingMiddleware', () => {
     expect(logSpy).not.toHaveBeenCalled();
     expect(warnSpy).not.toHaveBeenCalled();
     expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it('should still log non-health API requests', () => {
+    req.originalUrl = '/api/v1/users';
+
+    middleware.use(req as Request, res, next);
+    res.emit('finish');
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('GET /api/v1/users 200')
+    );
   });
 
   describe('REQUEST_LOG_LEVEL', () => {

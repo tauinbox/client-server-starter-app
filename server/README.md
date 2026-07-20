@@ -132,9 +132,11 @@ src/
 │   ├── database/           # TypeORM + PostgreSQL config
 │   ├── filters/            # GlobalExceptionFilter (standardized error responses, DB error mapping)
 │   ├── health/             # HealthModule (GET /api/health/live, /api/health/ready — DB ping + Redis PING when REDIS_URL set or production;
-│   │                       #   dead Redis fails readiness (2 s timeout), missing REDIS_URL in production and SMTP failures degrade to a warning)
+│   │                       #   dead Redis fails readiness (2 s timeout), missing REDIS_URL in production and SMTP failures degrade to a generic
+│   │                       #   warning — the raw SMTP error is logged server-side, never returned to the public endpoint)
 │   ├── metrics/            # MetricsModule (@Global) — Prometheus metrics via @willsoto/nestjs-prometheus
-│   │                       #   GET /metrics (excluded from /api prefix); http_requests_total,
+│   │                       #   GET /metrics (excluded from /api prefix, gated by InternalNetworkGuard — loopback/private/
+│   │                       #   unique-local req.ip only, 403 otherwise); http_requests_total,
 │   │                       #   http_request_duration_seconds, auth_events_total,
 │   │                       #   rbac_permission_denied_total{action,subject,level},
 │   │                       #   mail_queue_jobs{state}, mail_jobs_processed_total{outcome},
@@ -549,8 +551,13 @@ protection against single-IP brute force. If you observe spam in
 ### Prometheus metrics
 
 The `MetricsModule` (`src/modules/core/metrics/metrics.module.ts`) exposes
-`GET /metrics` (excluded from the `/api` prefix, reachable without auth via
-`@Public()`). Counters and histograms:
+`GET /metrics` (excluded from the `/api` prefix). It carries no bearer token
+(`@Public()`), so access is instead gated by `InternalNetworkGuard`
+(`src/modules/core/metrics/internal-network.guard.ts`): only requests whose
+`req.ip` resolves to a loopback/private/unique-local address are served; every
+other source gets `403`. `req.ip` honors `trust proxy` (`TRUSTED_PROXIES`), so
+this cannot be bypassed via a spoofed `X-Forwarded-For` from an untrusted
+peer. Counters and histograms:
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
