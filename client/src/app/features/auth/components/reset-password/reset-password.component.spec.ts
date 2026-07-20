@@ -173,7 +173,10 @@ describe('ResetPasswordComponent', () => {
 
     it('should set error from server on failure', async () => {
       const httpError = new HttpErrorResponse({
-        error: { message: 'Token expired' },
+        error: {
+          errorKey: 'errors.auth.resetTokenExpired',
+          message: 'Token expired'
+        },
         status: 400
       });
       authServiceMock.resetPassword.mockReturnValue(
@@ -187,7 +190,9 @@ describe('ResetPasswordComponent', () => {
 
       component.onSubmit();
 
-      expect(component['error']()).toBe('Token expired');
+      expect(component['error']()).toBe(
+        'Password reset token has expired. Please request a new one.'
+      );
       expect(component['loading']()).toBe(false);
     });
 

@@ -172,7 +172,11 @@
     "emptyGroup": "No rules yet — click + to add one",
     "preview": "JSON preview",
     "rawLabel": "Raw JSON MongoQuery",
-    "parseError": "Cannot parse into visual builder — fix JSON or stay in raw mode"
+    "parseError": "Cannot parse into visual builder — fix JSON or stay in raw mode",
+    "logicAnd": "AND",
+    "logicOr": "OR",
+    "fieldPlaceholder": "status",
+    "valuePlaceholderList": "val1, val2, val3"
   },
   "rolePermissions": {
     "title": "Permissions: {{ name }}",

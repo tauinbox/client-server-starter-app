@@ -6,13 +6,12 @@ import {
 } from '@angular/material/bottom-sheet';
 import { MatIcon } from '@angular/material/icon';
 import { MatButton } from '@angular/material/button';
-import { TranslocoDirective } from '@jsverse/transloco';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import type { ConfirmDialogData } from './confirm-dialog.component';
 
 @Component({
   selector: 'nxs-confirm-bottom-sheet',
-  imports: [MatIcon, MatButton, TranslocoDirective],
+  imports: [MatIcon, MatButton],
   templateUrl: './confirm-bottom-sheet.component.html',
   styleUrl: './confirm-bottom-sheet.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

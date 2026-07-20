@@ -25,6 +25,7 @@ import { PasswordToggleComponent } from '@shared/components/password-toggle/pass
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
 import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 
 type ResetPasswordData = {
   password: string;
@@ -120,8 +121,11 @@ export class ResetPasswordComponent implements OnInit {
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           this.error.set(
-            err.error?.message ||
-              this.#translocoService.translate('auth.resetPassword.errorFailed')
+            parseHttpErrorMessage(
+              err,
+              this.#translocoService,
+              'auth.resetPassword.errorFailed'
+            )
           );
         }
       });

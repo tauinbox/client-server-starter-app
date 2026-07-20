@@ -68,8 +68,12 @@
           [disabled]="readonly()"
           class="logic-toggle"
         >
-          <mat-button-toggle value="$and">AND</mat-button-toggle>
-          <mat-button-toggle value="$or">OR</mat-button-toggle>
+          <mat-button-toggle value="$and">{{
+            t('admin.conditionBuilder.logicAnd')
+          }}</mat-button-toggle>
+          <mat-button-toggle value="$or">{{
+            t('admin.conditionBuilder.logicOr')
+          }}</mat-button-toggle>
         </mat-button-toggle-group>
 
         @if (!readonly()) {
@@ -114,7 +118,7 @@
                 [value]="child.rule.field"
                 [readonly]="readonly()"
                 (input)="setField(child, $any($event.target).value)"
-                placeholder="status"
+                [placeholder]="t('admin.conditionBuilder.fieldPlaceholder')"
               />
             </mat-form-field>
 
@@ -142,7 +146,7 @@
                 [value]="child.rule.value"
                 [readonly]="readonly()"
                 (input)="setValue(child, $any($event.target).value)"
-                [placeholder]="getValuePlaceholder(child.rule.operator)"
+                [placeholder]="getValuePlaceholder(child.rule.operator, t)"
               />
             </mat-form-field>
 

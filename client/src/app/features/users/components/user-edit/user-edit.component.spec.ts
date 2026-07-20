@@ -155,9 +155,9 @@ describe('UserEditComponent', () => {
       expect(component.userForm().dirty()).toBe(false);
     });
 
-    it('should set error on load failure', () => {
+    it('should show the translated server error on load failure', () => {
       const httpError = new HttpErrorResponse({
-        error: { message: 'Not found' },
+        error: { errorKey: 'errors.users.notFound', message: 'Not found' },
         status: 404
       });
       userServiceMock.getById.mockReturnValue(throwError(() => httpError));
@@ -165,7 +165,7 @@ describe('UserEditComponent', () => {
       fixture.detectChanges();
 
       expect(component['loading']()).toBe(false);
-      expect(component['error']()).toBe('Not found');
+      expect(component['error']()).toBe('User not found');
     });
 
     it('should show fallback error when no server message', () => {
@@ -546,7 +546,9 @@ describe('UserEditComponent', () => {
       await fixture.whenStable();
       component.onSubmit();
 
-      expect(component['error']()).toBe('Update failed');
+      expect(component['error']()).toBe(
+        'Failed to update user. Please try again.'
+      );
       expect(component['saving']()).toBe(false);
     });
 

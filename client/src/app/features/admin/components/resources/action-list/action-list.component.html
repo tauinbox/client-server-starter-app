@@ -42,7 +42,7 @@
               {{ t('admin.actions.tableHeaderDescription') }}
             </th>
             <td mat-cell *matCellDef="let action">
-              {{ action.description || '—' }}
+              {{ action.description || t('common.emptyPlaceholder') }}
             </td>
           </ng-container>
 

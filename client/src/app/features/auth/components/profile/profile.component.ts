@@ -44,6 +44,7 @@ import {
   sortRolesForDisplay
 } from '@shared/utils/role-display.utils';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import {
   MatButtonToggle,
   MatButtonToggleGroup
@@ -276,10 +277,13 @@ export class ProfileComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          const errorMessage =
-            err.error?.message ||
-            this.#transloco.translate('auth.profile.errorLoadFailed');
-          this.error.set(errorMessage);
+          this.error.set(
+            parseHttpErrorMessage(
+              err,
+              this.#transloco,
+              'auth.profile.errorLoadFailed'
+            )
+          );
         }
       });
   }
@@ -437,10 +441,13 @@ export class ProfileComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          const errorMessage =
-            err.error?.message ||
-            this.#transloco.translate('auth.profile.errorEmailChangeFailed');
-          this.error.set(errorMessage);
+          this.error.set(
+            parseHttpErrorMessage(
+              err,
+              this.#transloco,
+              'auth.profile.errorEmailChangeFailed'
+            )
+          );
         }
       });
   }
@@ -483,10 +490,13 @@ export class ProfileComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          const errorMessage =
-            err.error?.message ||
-            this.#transloco.translate('auth.profile.errorUpdateFailed');
-          this.error.set(errorMessage);
+          this.error.set(
+            parseHttpErrorMessage(
+              err,
+              this.#transloco,
+              'auth.profile.errorUpdateFailed'
+            )
+          );
         }
       });
   }

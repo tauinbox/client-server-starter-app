@@ -39,6 +39,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import { catchError, forkJoin, of, tap } from 'rxjs';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { UsersStore } from '../../store/users.store';
@@ -230,8 +231,11 @@ export class UserEditComponent implements OnInit, OnDestroy {
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           this.error.set(
-            err.error?.message ||
-              this.#translocoService.translate('users.edit.errorLoadFailed')
+            parseHttpErrorMessage(
+              err,
+              this.#translocoService,
+              'users.edit.errorLoadFailed'
+            )
           );
           this.#notify.error(err, 'users.edit.errorLoadFailed');
         }
@@ -365,8 +369,11 @@ export class UserEditComponent implements OnInit, OnDestroy {
   #handleUpdateError(err: HttpErrorResponse): void {
     this.saving.set(false);
     this.error.set(
-      err.error?.message ||
-        this.#translocoService.translate('users.edit.errorUpdateFailed')
+      parseHttpErrorMessage(
+        err,
+        this.#translocoService,
+        'users.edit.errorUpdateFailed'
+      )
     );
   }
 

@@ -20,6 +20,7 @@ import { AuthService } from '../../services/auth.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 
 @Component({
   selector: 'nxs-verify-email',
@@ -70,8 +71,11 @@ export class VerifyEmailComponent implements OnInit {
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           this.error.set(
-            err.error?.message ||
-              this.#transloco.translate('auth.verifyEmail.errorFailed')
+            parseHttpErrorMessage(
+              err,
+              this.#transloco,
+              'auth.verifyEmail.errorFailed'
+            )
           );
         }
       });

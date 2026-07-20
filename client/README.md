@@ -101,7 +101,8 @@ src/app/
     ├── forms/              # AppFormFieldComponent (Signal Forms wrapper), ChipsAutocompleteComponent (mat-chip-grid + mat-autocomplete: free-text mode or static/async option lists), AriaErrorDirective, DEFAULT_ERROR_KEYS registry
     ├── models/             # user.types
     ├── services/           # AdaptiveDialogService — opens confirm dialogs as bottom sheets (handset) or dialogs (desktop)
-    └── utils/              # css.utils, dialog.utils (DialogSize enum + dialogSizeConfig())
+    └── utils/              # css.utils, dialog.utils (DialogSize enum + dialogSizeConfig()),
+                            # http-error.utils (parseHttpErrorMessage - single server-error text funnel)
 ```
 
 ### Routes
@@ -288,7 +289,7 @@ npm test
 - Test structure: organized by module in `e2e/auth/`, `e2e/users/`, and `e2e/admin/`
 - **Accessibility**: `e2e/a11y.spec.ts` runs `@axe-core/playwright` (WCAG 2.1 AA) against every major route; `e2e/keyboard-nav.spec.ts` verifies keyboard-only flows (login, sidenav, user-edit, dialog focus trap)
 - **Live RBAC + auth regression net**: refresh-token reuse detection (`refresh-token-reuse.spec.ts`), SSE-driven role revocation hides admin link (`role-revocation-via-sse.spec.ts`), admin-on-/admin auto-redirect to /forbidden (`admin/admin-panel-permission-loss.spec.ts`), reactive 401 → refresh → retry (`reactive-token-refresh.spec.ts`), logout + browser Back navigation (`logout-back-button.spec.ts`), OAuth unlink-last-provider safety (`oauth-unlink-last-provider.spec.ts`), wire-contract assertion that `auth_user.roles` is `RoleResponse[]` (`post-login-admin-badge.spec.ts`), SSE-driven feature-flag toggle propagation (`admin/feature-flags.spec.ts`)
-- Coverage: 201 Playwright tests across auth/users/admin/billing/a11y/keyboard suites; 931 Vitest unit tests covering login, register, profile (incl. self-service email change), session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search (including admin email-change confirmation dialog), admin roles/resources/feature-flags management, effective-permissions preview, admin-panel auto-redirect when permissions are revoked mid-session, a11y audit, keyboard navigation. Error translation tests verify `errorKey` → Transloco pipeline for login, register, and global interceptor snackbar.
+- Coverage: 201 Playwright tests across auth/users/admin/billing/a11y/keyboard suites; 937 Vitest unit tests covering login, register, profile (incl. self-service email change), session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search (including admin email-change confirmation dialog), admin roles/resources/feature-flags management, effective-permissions preview, admin-panel auto-redirect when permissions are revoked mid-session, a11y audit, keyboard navigation. Error translation tests verify `errorKey` → Transloco pipeline for login, register, and global interceptor snackbar.
 - Workers: 4 (fully parallel, per-worker mock-server instances on dynamic ports)
 
 ```bash
