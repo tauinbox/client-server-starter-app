@@ -319,10 +319,10 @@ Core tables managed via TypeORM migrations:
 | Table | Description |
 |-------|-------------|
 | `users` | UUID PK, email (unique), name, bcrypt password (nullable for OAuth-only), isActive, isEmailVerified, `locale` (email language, default `en`), failedLoginAttempts, lockedUntil, verification/reset token fields, `deleted_at TIMESTAMPTZ NULL` (soft delete); ManyToMany to roles via user_roles |
-| `oauth_accounts` | UUID PK, provider + provider_id (unique), FK to users (CASCADE) |
-| `refresh_tokens` | UUID PK, token (SHA-256 hashed), FK to users (CASCADE), expires_at, revoked |
+| `oauth_accounts` | UUID PK, provider + provider_id (unique), FK to users (CASCADE, indexed) |
+| `refresh_tokens` | UUID PK, token (SHA-256 hashed, unique, `@Exclude`-d from the wire), FK to users (CASCADE), expires_at, revoked |
 | `roles` | UUID PK, name (unique), description, isSystem flag, isSuper flag |
-| `resources` | UUID PK, name (unique), displayName, description, isSystem flag, `is_orphaned` boolean (marked true when controller removed; excluded from CASL subject map until restored), `allowed_action_names text[]` |
+| `resources` | UUID PK, name (unique), `subject` (unique — CASL cannot resolve an ambiguous subject; enforced in CI by `check:permissions`), displayName, description, isSystem flag, `is_orphaned` boolean (marked true when controller removed; excluded from CASL subject map until restored), `allowed_action_names text[]` |
 | `actions` | UUID PK, name (unique), displayName, description, isSystem flag, sortOrder |
 | `permissions` | UUID PK, resource_id + action_id (unique constraint, FKs to resources and actions) |
 | `role_permissions` | FK to roles + permissions, optional jsonb `conditions` |
@@ -335,15 +335,15 @@ Billing tables (subscriptions foundation; money is always stored in minor units)
 |-------|-------------|
 | `plans` | UUID PK, key (unique), name, `billing_mode` (`fixed`/`usage`), `interval`, `meter_key` (usage), `entitlements text[]` (GIN-indexed), `limits jsonb`, `trial_days`, `active`, `prices jsonb` (per-provider `{ currency, amountMinor, unitPriceMinor?, includedUnits? }`) |
 | `billing_customers` | UUID PK, `user_id` (unique FK to users, CASCADE), `provider`, `provider_override` (manual region override), `provider_customer_id`, `country`, `currency`, `default_payment_method_id` (FK to billing_payment_methods, SET NULL) |
-| `billing_payment_methods` | UUID PK, `customer_id` (FK, CASCADE), `provider`, `provider_method_ref`, `brand`, `last4`, `is_default` |
+| `billing_payment_methods` | UUID PK, `customer_id` (FK, CASCADE), `provider`, `provider_method_ref`, `brand`, `last4`, `is_default` (partial unique on `customer_id WHERE is_default` — at most one default per customer) |
 | `subscriptions` | UUID PK, `customer_id` (FK, CASCADE), `plan_key`, `provider`, `billing_mode`, `status`, `lifecycle_owner` (`provider`/`self`), current-period bounds, `cancel_at_period_end`, `trial_end`, `provider_subscription_id`, `payment_method_id` (FK, SET NULL) |
 | `billing_invoices` | UUID PK, `customer_id` (FK, RESTRICT — financial records must survive customer deletion), `subscription_id` (FK, SET NULL), `provider`, `provider_event_id` (unique, webhook idempotency), `provider_invoice_ref`, `amount_minor`, `refunded_minor` (cumulative refunded units — full vs partial is `refunded_minor` vs `amount_minor`; @Exclude-d from the wire), `currency`, `status`, `billing_mode`, `kind` (`subscription`/`one_time`), `product_id` (FK to billing_products, SET NULL — one-time purchases), period bounds, `paid_at`, `receipt_ref` (54-FZ) |
 | `billing_products` | UUID PK, key (unique), name, description, `type` (`sku`/`credits`/`custom`), `prices jsonb` (per-provider `{ currency, amountMinor?, paddlePriceId? }` for fixed-price, `{ currency, minAmountMinor, maxAmountMinor }` for custom), `grant jsonb` (`{ credits }` or `{ entitlement, durationDays? }`, null for custom), `active` |
 | `billing_customer_grants` | UUID PK, `customer_id` (FK, CASCADE, indexed), `entitlement`, `source_invoice_id` (FK to billing_invoices, CASCADE — idempotency + refund revocation), `expires_at`, `revoked_at` |
 | `billing_credit_balances` | `customer_id` PK (FK, CASCADE), `balance_units` (may go negative after a refund clawback — blocks usage until topped up), `updated_at` |
 | `billing_credit_ledger` | UUID PK, `customer_id` (FK, RESTRICT — audit journal must survive customer deletion, indexed), `delta`, `reason` (`purchase`/`usage`/`refund`), `ref_invoice_id` (FK to billing_invoices, SET NULL) — append-only journal of every balance change |
-| `billing_usage_records` | UUID PK, `customer_id` (FK, CASCADE), `subscription_id` (FK, CASCADE), `meter_key`, `quantity`, `occurred_at`, `idempotency_key` (unique), `recorded_at` |
-| `billing_webhook_events` | UUID PK, `provider`, `provider_event_id`, `type`, `payload_hash`, `payload` (jsonb, nullable — the verified NormalizedEvent, replayed by the reconciliation sweep), `status` (`received`/`processed`/`dead_letter`), `attempts`, `last_error`, `received_at`, `processed_at`; unique `(provider, provider_event_id)` makes a `processed` replay a no-op while a stuck `received` row is reprocessed/swept. A delivery that fails the sweep `WEBHOOK_MAX_REPLAY_ATTEMPTS` times is quarantined as `dead_letter` (stops churning, alerts once) and stays replayable via `POST /admin/billing/webhook-events/:id/replay` or a provider redelivery |
+| `billing_usage_records` | UUID PK, `customer_id` (FK, CASCADE, indexed), `subscription_id` (FK, CASCADE, indexed), `meter_key`, `quantity`, `occurred_at`, `idempotency_key` (unique), `recorded_at` |
+| `billing_webhook_events` | UUID PK, `provider`, `provider_event_id`, `type`, `payload_hash`, `payload` (jsonb, nullable — the verified NormalizedEvent, replayed by the reconciliation sweep), `status` (`received`/`processed`/`dead_letter`, indexed with `received_at` for the reconciliation sweep), `attempts`, `last_error`, `received_at`, `processed_at`; unique `(provider, provider_event_id)` makes a `processed` replay a no-op while a stuck `received` row is reprocessed/swept. A delivery that fails the sweep `WEBHOOK_MAX_REPLAY_ATTEMPTS` times is quarantined as `dead_letter` (stops churning, alerts once) and stays replayable via `POST /admin/billing/webhook-events/:id/replay` or a provider redelivery |
 
 Migration and seed commands operate on compiled JS in `dist/` — always run `npm run build` first.
 

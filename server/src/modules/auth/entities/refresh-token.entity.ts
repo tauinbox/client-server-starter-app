@@ -6,6 +6,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn
 } from 'typeorm';
+import { Exclude } from 'class-transformer';
 import { User } from '../../users/entities/user.entity';
 
 @Entity('refresh_tokens')
@@ -13,7 +14,8 @@ export class RefreshToken {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column({ unique: true })
+  @Exclude()
   token: string;
 
   @Column({ name: 'user_id' })

@@ -15,7 +15,7 @@ export class Resource {
   @Column({ unique: true })
   name: string;
 
-  @Column()
+  @Column({ unique: true })
   subject: string;
 
   @Column({ name: 'display_name' })
