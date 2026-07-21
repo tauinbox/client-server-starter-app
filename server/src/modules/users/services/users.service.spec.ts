@@ -706,9 +706,28 @@ describe('UsersService', () => {
   });
 
   describe('remove', () => {
+    interface RemoveManagerMock {
+      update: jest.Mock;
+      softRemove: jest.Mock;
+    }
+
+    function mockRemoveTransaction(
+      overrides: Partial<RemoveManagerMock> = {}
+    ): RemoveManagerMock {
+      const manager: RemoveManagerMock = {
+        update: jest.fn().mockResolvedValue(undefined),
+        softRemove: jest.fn().mockResolvedValue(undefined),
+        ...overrides
+      };
+      mockDataSource.transaction.mockImplementation(
+        (cb: (m: RemoveManagerMock) => Promise<void>) => cb(manager)
+      );
+      return manager;
+    }
+
     it('should soft-delete an existing user', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
-      mockRepository.softRemove.mockResolvedValue(undefined);
+      const manager = mockRemoveTransaction();
 
       await service.remove('user-1');
 
@@ -716,7 +735,38 @@ describe('UsersService', () => {
         where: { id: 'user-1' },
         relations: ['roles']
       });
-      expect(mockRepository.softRemove).toHaveBeenCalledWith(mockUser);
+      expect(manager.softRemove).toHaveBeenCalledWith(mockUser);
+    });
+
+    it('should clear pending email fields and soft-delete in one transaction', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      const manager = mockRemoveTransaction();
+
+      await service.remove('user-1');
+
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(manager.update).toHaveBeenCalledWith(User, 'user-1', {
+        pendingEmail: null,
+        pendingEmailToken: null,
+        pendingEmailExpiresAt: null
+      });
+      // The pending-field clear must not run outside the transaction.
+      expect(mockRepository.update).not.toHaveBeenCalled();
+      expect(mockRepository.softRemove).not.toHaveBeenCalled();
+    });
+
+    it('should roll back the pending-field clear when soft-delete fails', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      const manager = mockRemoveTransaction({
+        softRemove: jest.fn().mockRejectedValue(new Error('db down'))
+      });
+
+      await expect(service.remove('user-1')).rejects.toThrow('db down');
+
+      // The clear was issued on the transactional manager, so the rejection
+      // propagating out of the callback rolls it back with the soft-delete.
+      expect(manager.update).toHaveBeenCalled();
+      expect(mockRepository.update).not.toHaveBeenCalled();
     });
 
     it('should throw HttpException when user not found', async () => {
@@ -741,7 +791,7 @@ describe('UsersService', () => {
 
     it('should proceed when ability allows delete', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
-      mockRepository.softRemove.mockResolvedValue(undefined);
+      const manager = mockRemoveTransaction();
       const canSpy = jest.fn().mockReturnValue(true);
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: canSpy };
@@ -749,7 +799,7 @@ describe('UsersService', () => {
       await service.remove('user-1', ability);
 
       expect(canSpy).toHaveBeenCalledWith('delete', mockUser);
-      expect(mockRepository.softRemove).toHaveBeenCalledWith(mockUser);
+      expect(manager.softRemove).toHaveBeenCalledWith(mockUser);
     });
   });
 

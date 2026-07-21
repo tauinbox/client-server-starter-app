@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, In, Repository, UpdateResult } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import type { FeatureFlagPreviewResult } from '@app/shared/types';
 import {
@@ -26,6 +26,27 @@ import {
 } from '../dtos/preview-flag-context.dto';
 import { validateRulePayload } from '../utils/validate-rule-payload.util';
 import { AttributeRegistryService } from './attribute-registry.service';
+
+const PG_UNIQUE_VIOLATION = '23505';
+
+function isUniqueViolation(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const { code, driverError } = error as {
+    code?: string;
+    driverError?: { code?: string };
+  };
+  return (code ?? driverError?.code) === PG_UNIQUE_VIOLATION;
+}
+
+function keyExistsConflict(): HttpException {
+  return new HttpException(
+    {
+      message: 'Feature flag with this key already exists',
+      errorKey: ErrorKeys.FEATURE_FLAGS.KEY_EXISTS
+    },
+    HttpStatus.CONFLICT
+  );
+}
 
 @Injectable()
 export class FeatureFlagService {
@@ -85,13 +106,7 @@ export class FeatureFlagService {
   ): Promise<FeatureFlag> {
     const existing = await this.flagRepo.findOne({ where: { key: dto.key } });
     if (existing) {
-      throw new HttpException(
-        {
-          message: 'Feature flag with this key already exists',
-          errorKey: ErrorKeys.FEATURE_FLAGS.KEY_EXISTS
-        },
-        HttpStatus.CONFLICT
-      );
+      throw keyExistsConflict();
     }
     const flag = this.flagRepo.create({
       key: dto.key,
@@ -102,7 +117,16 @@ export class FeatureFlagService {
       version: 1,
       updatedByUserId: actorId
     });
-    const saved = await this.flagRepo.save(flag);
+    // The check above races a concurrent create against UQ_feature_flags_key.
+    // The loser gets a unique violation, which the global filter would report
+    // as a generic conflict - map it to the flag-specific key instead.
+    let saved: FeatureFlag;
+    try {
+      saved = await this.flagRepo.save(flag);
+    } catch (error: unknown) {
+      if (isUniqueViolation(error)) throw keyExistsConflict();
+      throw error;
+    }
     return this.findOne(saved.id);
   }
 
@@ -116,16 +140,10 @@ export class FeatureFlagService {
     if (dto.key !== undefined) {
       const conflict = await this.flagRepo.findOne({ where: { key: dto.key } });
       if (conflict && conflict.id !== id) {
-        throw new HttpException(
-          {
-            message: 'Feature flag with this key already exists',
-            errorKey: ErrorKeys.FEATURE_FLAGS.KEY_EXISTS
-          },
-          HttpStatus.CONFLICT
-        );
+        throw keyExistsConflict();
       }
     }
-    const result = await this.flagRepo
+    const qb = this.flagRepo
       .createQueryBuilder()
       .update(FeatureFlag)
       .set({
@@ -144,8 +162,17 @@ export class FeatureFlagService {
       .where('id = :id AND version = :expected', {
         id,
         expected: expectedVersion
-      })
-      .execute();
+      });
+
+    // Same race as in create(): a concurrent writer may take the key between
+    // the check above and this statement.
+    let result: UpdateResult;
+    try {
+      result = await qb.execute();
+    } catch (error: unknown) {
+      if (isUniqueViolation(error)) throw keyExistsConflict();
+      throw error;
+    }
 
     if (result.affected === 0) {
       throw new HttpException(
