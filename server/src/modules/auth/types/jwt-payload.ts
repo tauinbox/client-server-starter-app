@@ -3,6 +3,7 @@ import { UserResponseDto } from '../../users/dtos/user-response.dto';
 
 export type CustomJwtPayload = JwtPayload & { email: string } & {
   roles?: string[];
+  purpose?: string;
 };
 export type PayloadFromJwt = {
   userId: UserResponseDto['id'];

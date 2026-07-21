@@ -21,7 +21,8 @@ export function anonIdMiddleware(
   const value = randomUUID();
   const isProduction = process.env['ENVIRONMENT'] === 'production';
   res.cookie(ANON_ID_COOKIE, value, {
-    httpOnly: false,
+    // Matches the real server: bucketing is resolved server-side from the cookie
+    httpOnly: true,
     sameSite: 'lax',
     secure: isProduction,
     maxAge: COOKIE_MAX_AGE_MS,

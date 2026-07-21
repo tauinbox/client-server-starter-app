@@ -27,7 +27,8 @@ describe('AnonIdMiddleware', () => {
       expect.stringMatching(/^[0-9a-f-]{36}$/i),
       expect.objectContaining({
         sameSite: 'lax',
-        httpOnly: false,
+        // Bucketing is server-side; no browser script reads this cookie
+        httpOnly: true,
         path: '/'
       })
     );

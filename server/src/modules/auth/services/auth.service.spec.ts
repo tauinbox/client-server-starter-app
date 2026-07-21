@@ -15,6 +15,7 @@ import {
 import { MailService } from '../../mail/mail.service';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { MetricsService } from '../../core/metrics/metrics.service';
 
 describe('AuthService', () => {
@@ -720,6 +721,23 @@ describe('AuthService', () => {
       await expect(
         service.resetPassword('invalid-token', 'NewPassword1')
       ).rejects.toThrow(HttpException);
+    });
+
+    // Regression: forgotPassword already refuses deactivated accounts, but a
+    // token issued while the account was still active stayed redeemable
+    it('should reject a still-valid token once the account is deactivated', async () => {
+      mockUsersService.findByPasswordResetToken.mockResolvedValue({
+        ...mockUser,
+        isActive: false,
+        passwordResetExpiresAt: new Date(Date.now() + 3600000)
+      });
+
+      await expect(
+        service.resetPassword('valid-token', 'NewPassword1')
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN }
+      });
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
     });
 
     it('should throw 400 when token is expired', async () => {

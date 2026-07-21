@@ -12,6 +12,7 @@ import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { ErrorKeys } from '@app/shared/constants';
+import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
 
 function mockJwtRequest(userId: string): {
   user: JwtAuthRequest['user'];
@@ -73,7 +74,9 @@ describe('OAuthController', () => {
 
     jwtServiceMock = {
       sign: jest.fn().mockReturnValue('signed-link-token'),
-      verify: jest.fn().mockReturnValue({ sub: 'user-1' })
+      verify: jest
+        .fn()
+        .mockReturnValue({ sub: 'user-1', purpose: TOKEN_PURPOSE.OAUTH_LINK })
     };
 
     oauthServiceMock = {
@@ -240,7 +243,7 @@ describe('OAuthController', () => {
       const result = controller.initOAuthLink(req as JwtAuthRequest, res);
 
       expect(jwtServiceMock.sign).toHaveBeenCalledWith(
-        { sub: 'user-1' },
+        { sub: 'user-1', purpose: TOKEN_PURPOSE.OAUTH_LINK },
         { expiresIn: 300 }
       );
       expect(res.cookie).toHaveBeenCalledWith(
@@ -283,7 +286,7 @@ describe('OAuthController', () => {
       await controller.googleCallback(mockExpressRequest(profile), res);
 
       expect(jwtServiceMock.sign).toHaveBeenCalledWith(
-        { data: mockAuthResponse },
+        { data: mockAuthResponse, purpose: TOKEN_PURPOSE.OAUTH_DATA },
         { expiresIn: 60 }
       );
       expect(res.cookie).toHaveBeenCalledWith(
@@ -402,6 +405,35 @@ describe('OAuthController', () => {
       );
     });
 
+    // Regression: every token is signed with the same key, so the link flow
+    // must reject one minted for a different purpose rather than trusting `sub`
+    it('should not link the account when the token was minted for another purpose', async () => {
+      jwtServiceMock.verify.mockReturnValue({
+        sub: 'user-1',
+        purpose: TOKEN_PURPOSE.ACCESS
+      });
+
+      const res = mockResponse();
+      const profile: OAuthUserProfile = {
+        provider: OAuthProvider.GOOGLE,
+        providerId: '456',
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        emailVerified: true
+      };
+
+      await controller.googleCallback(
+        mockExpressRequest(profile, { oauth_link: 'access-token' }),
+        res
+      );
+
+      expect(oauthServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://localhost:4200/profile?oauth_error=link_failed'
+      );
+    });
+
     it('should redirect to profile with error when link token is invalid', async () => {
       jwtServiceMock.verify.mockImplementation(() => {
         throw new Error('invalid token');
@@ -466,7 +498,10 @@ describe('OAuthController', () => {
         },
         user: { id: '1', email: 'test@example.com' }
       };
-      jwtServiceMock.verify.mockReturnValue({ data: mockPayloadData });
+      jwtServiceMock.verify.mockReturnValue({
+        data: mockPayloadData,
+        purpose: TOKEN_PURPOSE.OAUTH_DATA
+      });
 
       const req = mockExpressRequest({} as OAuthUserProfile, {
         oauth_data: 'signed-jwt'
@@ -515,7 +550,8 @@ describe('OAuthController', () => {
             expires_in: 3600
           },
           user: { id: '1', email: 'test@example.com' }
-        }
+        },
+        purpose: TOKEN_PURPOSE.OAUTH_DATA
       });
 
       const req = mockExpressRequest({} as OAuthUserProfile, {

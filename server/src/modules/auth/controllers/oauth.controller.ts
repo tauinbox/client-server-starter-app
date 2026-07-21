@@ -36,6 +36,7 @@ import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
 
 @ApiTags('OAuth API')
 @Controller({
@@ -89,7 +90,7 @@ export class OAuthController {
     @Res({ passthrough: true }) res: Response
   ) {
     const linkToken = this.jwtService.sign(
-      { sub: req.user.userId },
+      { sub: req.user.userId, purpose: TOKEN_PURPOSE.OAUTH_LINK },
       { expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS }
     );
 
@@ -278,6 +279,7 @@ export class OAuthController {
 
     try {
       const payload = this.jwtService.verify<{
+        purpose?: string;
         data: {
           tokens: {
             refresh_token: string;
@@ -287,6 +289,9 @@ export class OAuthController {
           user: unknown;
         };
       }>(cookie);
+      if (payload.purpose !== TOKEN_PURPOSE.OAUTH_DATA) {
+        throw new Error('Unexpected token purpose');
+      }
       const { refresh_token, ...publicTokens } = payload.data.tokens;
       res.cookie('refresh_token', refresh_token, {
         httpOnly: true,
@@ -332,7 +337,7 @@ export class OAuthController {
       const authResponse = await this.oauthService.loginWithOAuth(profile);
 
       const signedData = this.jwtService.sign(
-        { data: authResponse },
+        { data: authResponse, purpose: TOKEN_PURPOSE.OAUTH_DATA },
         { expiresIn: OAuthController.OAUTH_DATA_MAX_AGE_SECONDS }
       );
 
@@ -372,7 +377,13 @@ export class OAuthController {
     });
 
     try {
-      const payload = this.jwtService.verify<{ sub: string }>(linkToken);
+      const payload = this.jwtService.verify<{
+        sub: string;
+        purpose?: string;
+      }>(linkToken);
+      if (payload.purpose !== TOKEN_PURPOSE.OAUTH_LINK) {
+        throw new Error('Unexpected token purpose');
+      }
       const userId = payload.sub;
 
       await this.oauthService.linkOAuthToUser(

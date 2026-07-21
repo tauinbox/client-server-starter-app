@@ -197,6 +197,18 @@ export class UsersService {
   }
 
   async findOne(id: string): Promise<User> {
+    // A falsy id would be dropped from the WHERE clause and silently resolve to
+    // an arbitrary user rather than matching nothing.
+    if (!id) {
+      throw new HttpException(
+        {
+          message: 'User id is required',
+          errorKey: ErrorKeys.USERS.NOT_FOUND
+        },
+        HttpStatus.NOT_FOUND
+      );
+    }
+
     const user = await this.userRepository.findOne({
       where: { id },
       relations: ['roles']

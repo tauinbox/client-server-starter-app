@@ -23,6 +23,12 @@ export class PermissionService {
   ) {}
 
   async getPermissionsForUser(userId: string): Promise<ResolvedPermission[]> {
+    // A falsy id is dropped from the WHERE clause and would resolve to an
+    // arbitrary user's permissions instead of none.
+    if (!userId) {
+      return [];
+    }
+
     const cacheKey = `${CACHE_PREFIX}${userId}`;
     const cached = await this.cacheManager.get<ResolvedPermission[]>(cacheKey);
     this.metrics.recordCacheAccess('permissions', cached ? 'hit' : 'miss');
@@ -75,6 +81,12 @@ export class PermissionService {
   }
 
   async getRolesForUser(userId: string): Promise<RoleInfo[]> {
+    // See getPermissionsForUser: a falsy id must resolve to no roles, not to
+    // whichever user the unconstrained query happens to return.
+    if (!userId) {
+      return [];
+    }
+
     const cacheKey = `${ROLES_CACHE_PREFIX}${userId}`;
     const cached = await this.cacheManager.get<RoleInfo[]>(cacheKey);
     this.metrics.recordCacheAccess('roles', cached ? 'hit' : 'miss');

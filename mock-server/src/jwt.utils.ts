@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
 import type { MockUser } from './types';
 
 function base64url(obj: Record<string, unknown>): string {
@@ -18,6 +19,7 @@ export function generateAccessToken(
     sub: user.id,
     email: user.email,
     roles: user.roles,
+    purpose: TOKEN_PURPOSE.ACCESS,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + expiresInSeconds
   });
@@ -43,6 +45,7 @@ export interface DecodedToken {
   sub: string;
   email: string;
   roles: string[];
+  purpose?: string;
   iat: number;
   exp: number;
 }
@@ -68,6 +71,15 @@ export function validateToken(token: string): DecodedToken | null {
   // Fail closed on a missing/invalid iat, matching the real server:
   // the revocation check compares against iat and must not be skippable
   if (typeof decoded.iat !== 'number' || !Number.isFinite(decoded.iat)) {
+    return null;
+  }
+
+  // Matching the real server: only an access-purpose token authenticates, and a
+  // missing subject fails closed rather than resolving to an arbitrary user
+  if (decoded.purpose !== TOKEN_PURPOSE.ACCESS) {
+    return null;
+  }
+  if (typeof decoded.sub !== 'string' || decoded.sub === '') {
     return null;
   }
 

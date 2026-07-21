@@ -31,6 +31,8 @@ export class CaptchaService {
   }
 
   async verify(token: string, remoteIp?: string): Promise<boolean> {
+    // Captcha is switched off for this deployment - nothing to verify against.
+    // The only pass-through: with a secret present every path below fails closed.
     if (!this.secretKey) return true;
     if (!token) return false;
 
