@@ -14,12 +14,13 @@
   @if (useRawJson()) {
     <mat-form-field appearance="outline" class="raw-json-field">
       <textarea
+        #rawJsonInput
         matInput
         rows="6"
         spellcheck="false"
         [placeholder]="t('admin.featureFlagPreview.advancedJsonPlaceholder')"
         [value]="rawJson()"
-        (input)="rawJson.set($any($event.target).value)"
+        (input)="rawJson.set(rawJsonInput.value)"
       ></textarea>
     </mat-form-field>
   } @else {
@@ -49,10 +50,11 @@
           t('admin.featureFlagPreview.environmentLabel')
         }}</mat-label>
         <input
+          #envInput
           matInput
           [placeholder]="t('admin.featureFlagPreview.environmentPlaceholder')"
           [value]="env()"
-          (input)="env.set($any($event.target).value)"
+          (input)="env.set(envInput.value)"
         />
       </mat-form-field>
 
@@ -61,11 +63,12 @@
           t('admin.featureFlagPreview.attributesLabel')
         }}</mat-label>
         <textarea
+          #attributesInput
           matInput
           rows="4"
           spellcheck="false"
           [value]="attributesJson()"
-          (input)="attributesJson.set($any($event.target).value)"
+          (input)="attributesJson.set(attributesInput.value)"
         ></textarea>
       </mat-form-field>
     </div>
