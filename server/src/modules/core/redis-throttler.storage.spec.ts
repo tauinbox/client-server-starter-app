@@ -1,3 +1,5 @@
+import { Test } from '@nestjs/testing';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { RedisThrottlerStorage } from './redis-throttler.storage';
 
 let redisMock: {
@@ -58,6 +60,33 @@ describe('RedisThrottlerStorage', () => {
     it('should call redis.disconnect()', () => {
       storage.disconnect();
       expect(redisMock.disconnect).toHaveBeenCalled();
+    });
+
+    it('disconnects on module destroy so the connection cannot outlive shutdown', () => {
+      storage.onModuleDestroy();
+      expect(redisMock.disconnect).toHaveBeenCalledTimes(1);
+    });
+
+    // The hook only helps if Nest actually invokes it. ThrottlerModule
+    // registers the instance under the ThrottlerStorage token, so shutting the
+    // app down must close the connection.
+    it('is disconnected by Nest when the application shuts down', async () => {
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          ThrottlerModule.forRootAsync({
+            useFactory: () => ({
+              throttlers: [{ ttl: 1000, limit: 5 }],
+              storage
+            })
+          })
+        ]
+      }).compile();
+      const app = moduleRef.createNestApplication();
+      await app.init();
+
+      expect(redisMock.disconnect).not.toHaveBeenCalled();
+      await app.close();
+      expect(redisMock.disconnect).toHaveBeenCalledTimes(1);
     });
   });
 
