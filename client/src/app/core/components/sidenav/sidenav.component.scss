@@ -81,7 +81,7 @@ $indicator-radius: func.rem(28); // full pill
   flex-direction: column;
   align-items: center;
   padding: vars.$spacing-xs vars.$spacing-xxs;
-  border-top: 1px solid var(--mat-sys-outline-variant);
+  border-top: func.rem(1) solid var(--mat-sys-outline-variant);
 
   .nav-link {
     margin-bottom: 0;
@@ -106,7 +106,7 @@ $indicator-radius: func.rem(28); // full pill
   color: var(--mat-sidenav-container-text-color, var(--mat-sys-on-surface));
   cursor: pointer;
   background-color: var(--mat-sidenav-container-background-color, var(--mat-sys-surface-container));
-  border: 1px solid var(--mat-sys-outline-variant);
+  border: func.rem(1) solid var(--mat-sys-outline-variant);
   border-radius: 50%;
   transition: left vars.$transition-medium ease;
 

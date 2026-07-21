@@ -47,11 +47,14 @@ $z-index-modal: 1050;
 $z-index-popover: 1060;
 $z-index-tooltip: 1070;
 
-// Breakpoints (typically kept in px for media queries)
+// Breakpoints stay in px - Angular Material and browsers evaluate media
+// queries in px, so rem here would shift with the user's root font size.
+/* stylelint-disable unit-disallowed-list */
 $breakpoint-xs: 599px;
 $breakpoint-sm: 959px;
 $breakpoint-md: 1279px;
 $breakpoint-lg: 1919px;
+/* stylelint-enable unit-disallowed-list */
 
 // Layout
 $container-max-width: func.rem(1280); // 80rem

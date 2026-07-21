@@ -8,9 +8,9 @@ import { rem } from './css.utils';
  * `client/src/styles/components/_dialogs.scss`.
  */
 export enum DialogSize {
-  /** Yes/no confirmations and simple alerts. ~350px */
+  /** Yes/no confirmations and simple alerts. maxWidth 400px */
   Confirm = 'confirm',
-  /** Single-entity forms (create / edit). ~480px */
+  /** Single-entity forms (create / edit). maxWidth 560px */
   Form = 'form',
   /** Rich / multi-section dialogs. 90vw, max ~1000px */
   Wide = 'wide'

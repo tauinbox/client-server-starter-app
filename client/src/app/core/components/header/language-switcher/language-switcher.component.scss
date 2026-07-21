@@ -1,4 +1,5 @@
 @use 'abstracts/functions' as func;
+@use 'abstracts/variables' as vars;
 
 .flag-btn-icon {
   display: flex;
@@ -13,7 +14,7 @@
 }
 
 .active-language {
-  font-weight: 500;
+  font-weight: vars.$font-weight-medium;
   background-color: var(--mat-menu-item-hover-state-layer-color);
 }
 

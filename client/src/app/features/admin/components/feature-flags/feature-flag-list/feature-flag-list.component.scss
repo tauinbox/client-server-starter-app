@@ -36,7 +36,7 @@
 
 .flag-key {
   font-family: monospace;
-  font-weight: 500;
+  font-weight: vars.$font-weight-medium;
 }
 
 .rules-warning {
@@ -100,7 +100,7 @@
 
   dt {
     margin: 0;
-    font-weight: 500;
+    font-weight: vars.$font-weight-medium;
     color: var(--mat-sys-on-surface-variant);
   }
 

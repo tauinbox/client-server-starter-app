@@ -54,6 +54,6 @@ mat-card-header {
 code {
   padding: func.rem(2) func.rem(6);
   font-family: monospace;
-  background: rgb(0 0 0 / 4%);
+  background: color-mix(in srgb, var(--mat-sys-on-surface) 6%, transparent);
   border-radius: vars.$border-radius-sm;
 }
