@@ -128,7 +128,10 @@ src/
 └── modules/
 ├── core/                   # Dynamic root module
 │   ├── config/             # @nestjs/config, loads .env; config-validation.schema.ts - Joi bootstrap validation (coerced types + defaults; a malformed or missing required env var aborts startup)
-│   ├── cache/              # @nestjs/cache-manager
+│   ├── cache/              # @nestjs/cache-manager; redis-cache.store.ts registers the @keyv/redis adapter under the
+│   │                       #   `stores` (plural) option — a singular `store` is silently ignored by the provider factory
+│   │                       #   and degrades to a per-process in-memory cache. Falls back to in-memory when REDIS_URL is unset;
+│   │                       #   a 1 s connection timeout keeps an unreachable Redis from hanging requests (serves uncached)
 │   ├── database/           # TypeORM + PostgreSQL config
 │   ├── filters/            # GlobalExceptionFilter (standardized error responses, DB error mapping)
 │   ├── health/             # HealthModule (GET /api/health/live, /api/health/ready — DB ping + Redis PING when REDIS_URL set or production;
@@ -930,7 +933,8 @@ This package's version is kept in sync with `client/` and `mock-server/` via `co
 | class-validator | 0.14.4 |
 | @nestjs/swagger | 11.2.6 |
 | @nestjs/schedule | 6.1.1 |
-| cache-manager-redis-yet | 5.1.5 |
+| cache-manager | 6.4.3 |
+| @keyv/redis | 5.1.6 |
 | ioredis | 5.10.1 |
 | TypeScript | 5.9.3 |
 | Jest | 30.2.0 |
