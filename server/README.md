@@ -930,7 +930,8 @@ This package's version is kept in sync with `client/` and `mock-server/` via `co
 | class-validator | 0.14.4 |
 | @nestjs/swagger | 11.2.6 |
 | @nestjs/schedule | 6.1.1 |
-| cache-manager-redis-yet | 5.1.5 |
+| cache-manager | 6.4.3 |
+| @keyv/redis | 5.1.6 |
 | ioredis | 5.10.1 |
 | TypeScript | 5.9.3 |
 | Jest | 30.2.0 |
