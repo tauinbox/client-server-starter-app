@@ -33,7 +33,7 @@
         [matChipInputAddOnBlur]="allowFreeText()"
         [placeholder]="placeholder() ? t(placeholder()) : ''"
         (matChipInputTokenEnd)="addFromTokenEnd($event)"
-        (input)="onInput($any($event.target).value)"
+        (input)="onInput(chipInput.value)"
       />
     </mat-chip-grid>
     <mat-autocomplete

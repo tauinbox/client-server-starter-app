@@ -114,10 +114,11 @@
                 t('admin.conditionBuilder.fieldLabel')
               }}</mat-label>
               <input
+                #fieldInput
                 matInput
                 [value]="child.rule.field"
                 [readonly]="readonly()"
-                (input)="setField(child, $any($event.target).value)"
+                (input)="setField(child, fieldInput.value)"
                 [placeholder]="t('admin.conditionBuilder.fieldPlaceholder')"
               />
             </mat-form-field>
@@ -142,10 +143,11 @@
                 t('admin.conditionBuilder.valueLabel')
               }}</mat-label>
               <input
+                #valueInput
                 matInput
                 [value]="child.rule.value"
                 [readonly]="readonly()"
-                (input)="setValue(child, $any($event.target).value)"
+                (input)="setValue(child, valueInput.value)"
                 [placeholder]="getValuePlaceholder(child.rule.operator, t)"
               />
             </mat-form-field>

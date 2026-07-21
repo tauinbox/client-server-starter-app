@@ -124,11 +124,10 @@
                   t('admin.featureFlagRule.customKey')
                 }}</mat-label>
                 <input
+                  #customKeyInput
                   matInput
                   [value]="attributeCustomKey"
-                  (input)="
-                    onAttributeCustomKeyChange($any($event.target).value)
-                  "
+                  (input)="onAttributeCustomKeyChange(customKeyInput.value)"
                 />
               </mat-form-field>
             }
@@ -169,9 +168,10 @@
                   t('admin.featureFlagRule.attributeValue')
                 }}</mat-label>
                 <input
+                  #attributeValueInput
                   matInput
                   [value]="attributeValueText"
-                  (input)="onAttributeValueChange($any($event.target).value)"
+                  (input)="onAttributeValueChange(attributeValueInput.value)"
                   [placeholder]="t('admin.featureFlagRule.valuePlaceholder')"
                 />
               </mat-form-field>

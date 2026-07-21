@@ -1,5 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
+import { readStorageValue, writeStorageValue } from './web-storage';
+import type { StorageValueGuard } from './web-storage';
 
 @Injectable({
   providedIn: 'root'
@@ -7,24 +9,12 @@ import { DOCUMENT } from '@angular/common';
 export class SessionStorageService {
   readonly #storage = inject(DOCUMENT).defaultView?.sessionStorage ?? null;
 
-  getItem<T>(key: string): T | null {
-    const raw = this.#storage?.getItem(key) ?? null;
-
-    if (raw === null) {
-      return null;
-    }
-
-    try {
-      return JSON.parse(raw) as T;
-    } catch {
-      return raw as T;
-    }
+  getItem<T>(key: string, isValid?: StorageValueGuard<T>): T | null {
+    return readStorageValue(this.#storage, key, isValid);
   }
 
   setItem<T>(key: string, value: T): void {
-    const serialized =
-      typeof value === 'string' ? value : JSON.stringify(value);
-    this.#storage?.setItem(key, serialized);
+    writeStorageValue(this.#storage, key, value);
   }
 
   removeItem(key: string): void {

@@ -5,6 +5,10 @@ import { LocalStorageService } from './local-storage.service';
 export type ThemeMode = 'light' | 'dark';
 
 const THEME_KEY = 'preferred-theme';
+const THEME_MODES: readonly string[] = ['light', 'dark'];
+
+const isThemeMode = (value: unknown): value is ThemeMode =>
+  typeof value === 'string' && THEME_MODES.includes(value);
 
 @Injectable({
   providedIn: 'root'
@@ -27,7 +31,7 @@ export class ThemeService {
 
     if (mediaQuery) {
       const handler = (e: MediaQueryListEvent) => {
-        if (!this.#storage.getItem(THEME_KEY)) {
+        if (!this.#storage.getItem(THEME_KEY, isThemeMode)) {
           this.#themeSignal.set(e.matches ? 'dark' : 'light');
         }
       };
@@ -51,7 +55,7 @@ export class ThemeService {
   }
 
   #getInitialTheme(): ThemeMode {
-    const savedTheme = this.#storage.getItem<ThemeMode>(THEME_KEY);
+    const savedTheme = this.#storage.getItem(THEME_KEY, isThemeMode);
     const prefersDark =
       this.#window?.matchMedia('(prefers-color-scheme: dark)').matches ?? false;
     return savedTheme || (prefersDark ? 'dark' : 'light');
