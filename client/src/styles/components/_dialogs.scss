@@ -49,7 +49,7 @@
 // (rich admin dialogs with embedded editors — feature-flag form-dialog, etc).
 // Uses 100dvh (dynamic viewport height) so the iOS soft keyboard does not
 // cover the focused input — chip-grid / textarea inputs stay reachable.
-@media (width <= 599px) {
+@media (max-width: vars.$breakpoint-xs) {
   .app-dialog-fullscreen-mobile .mat-mdc-dialog-container {
     width: 100vw;
     max-width: none;
@@ -85,6 +85,8 @@
     z-index: 2;
 
     // base inset (env() is 0, not the fallback, without a home indicator) + safe-area
+    // env() needs a typed zero fallback; rem(0) would not parse inside calc().
+    /* stylelint-disable-next-line unit-disallowed-list */
     padding-bottom: calc(#{vars.$spacing-md} + env(safe-area-inset-bottom, 0px));
     background: var(--mat-sys-surface);
   }

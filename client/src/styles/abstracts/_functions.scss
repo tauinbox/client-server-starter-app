@@ -1,10 +1,13 @@
 @use 'sass:math';
 
+// The px->rem conversion itself is the one place px is the input unit.
+/* stylelint-disable-next-line unit-disallowed-list */
 $base-font-size: 16px;
 
 @function rem($pixels) {
   // If $pixels has no unit, assume it's pixels
   @if math.is-unitless($pixels) {
+    /* stylelint-disable-next-line unit-disallowed-list */
     $pixels: $pixels * 1px;
   }
 

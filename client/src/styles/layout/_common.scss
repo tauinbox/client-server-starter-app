@@ -25,7 +25,7 @@ mat-sidenav .mat-drawer-inner-container {
 
 // Separate sidenav from page content with a hairline border.
 mat-sidenav.mat-drawer {
-  border-right: 1px solid var(--mat-sys-outline-variant);
+  border-right: func.rem(1) solid var(--mat-sys-outline-variant);
 }
 
 // mat-sidenav-content receives margin-left via Angular style binding (not Material's

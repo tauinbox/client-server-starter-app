@@ -25,7 +25,7 @@
 .bottom-sheet-title {
   margin: 0 0 vars.$spacing-xs;
   font-size: vars.$font-size-lg;
-  font-weight: 500;
+  font-weight: vars.$font-weight-medium;
 }
 
 .bottom-sheet-message {

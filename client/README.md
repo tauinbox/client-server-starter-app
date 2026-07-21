@@ -238,7 +238,7 @@ State + HTTP live in `features/admin/{store,services}`:
 - **Angular Material** + Angular CDK for UI components
 - **SCSS architecture** with themes, utilities, and component styles
 - **Light/dark theming** via Material M3 system tokens (`--mat-sys-*`) + app-level semantic tokens (`--app-*` for success/info/warning/text-tertiary/color-scheme)
-- **Stylelint** with recess property order
+- **Stylelint** with recess property order and a `unit-disallowed-list` rule that rejects `px` units (breakpoint media features excepted)
 
 ```
 src/styles/
@@ -250,7 +250,7 @@ src/styles/
 └── utilities/        # Flex, spacing, text, visibility helpers
 ```
 
-All size values use `func.rem(N)` (pixels → rem conversion) — never hardcoded `px`/`rem` literals. Global dialog styles live in `_dialogs.scss` (title padding, `::before` reset, bug #26352 fix, plus opt-in panel classes: `.app-dialog-fullscreen-mobile` for edge-to-edge handset dialogs and `.app-dialog-tall` which raises the content `max-height` cap from 65vh to 80vh). Dialog sizes are managed via `DialogSize` enum + `dialogSizeConfig()` in `shared/utils/dialog.utils.ts`.
+All size values use `func.rem(N)` (pixels → rem conversion) — never hardcoded `px`/`rem` literals; Stylelint enforces this via `unit-disallowed-list`, with narrow opt-outs for the `rem()` helper itself, the `$breakpoint-*` definitions, and the `env(safe-area-inset-bottom, 0px)` fallback. Breakpoints stay in `px` because browsers and Angular Material evaluate media queries in `px`. Global dialog styles live in `_dialogs.scss` (title padding, `::before` reset, bug #26352 fix, plus opt-in panel classes: `.app-dialog-fullscreen-mobile` for edge-to-edge handset dialogs and `.app-dialog-tall` which raises the content `max-height` cap from 65vh to 80vh). Dialog sizes are managed via `DialogSize` enum + `dialogSizeConfig()` in `shared/utils/dialog.utils.ts`.
 
 **Spacing tokens** — `_variables.scss` exposes both a primitive scale (`$spacing-xxs/xs/sm/md/lg/xl/xxl`) and a semantic layer on top (`$space-component-gap`, `$space-form-row-gap`, `$space-section-gap`). Mixins and shared component styles use the semantic tokens so the scale can be re-tuned in one place; primitives remain available for one-off / non-semantic spots.
 

@@ -1,14 +1,7 @@
 @use 'abstracts/variables' as vars;
-@use 'abstracts/functions' as func;
 
 form {
   margin-top: vars.$spacing-md;
-}
-
-.full-width {
-  display: block;
-  width: 100%;
-  margin-bottom: vars.$spacing-xs;
 }
 
 .hint-button {

@@ -42,7 +42,7 @@
       var(--mat-sys-surface-container-low) 50%,
       transparent
     );
-    border: 1px dashed var(--mat-sys-outline-variant);
+    border: func.rem(1) dashed var(--mat-sys-outline-variant);
     border-radius: vars.$border-radius-sm;
   }
 }

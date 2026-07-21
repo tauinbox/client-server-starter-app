@@ -58,7 +58,7 @@
     dt {
       align-self: center;
       font-size: vars.$font-size-sm;
-      font-weight: 500;
+      font-weight: vars.$font-weight-medium;
       color: var(--mat-sys-on-surface-variant);
     }
 

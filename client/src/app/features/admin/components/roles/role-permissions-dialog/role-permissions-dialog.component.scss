@@ -8,10 +8,6 @@
   flex-wrap: wrap;
   gap: vars.$spacing-xs;
   align-items: center;
-
-  .role-name {
-    font-weight: vars.$font-weight-bold;
-  }
 }
 
 // ── Dialog content: two-column layout ─────────────────────────────────────
@@ -59,7 +55,7 @@ $panel-max-height: calc(65vh - #{func.rem(124)});
   max-height: $panel-max-height;
   padding: vars.$spacing-sm vars.$spacing-md;
   overflow-y: auto;
-  border-right: 1px solid var(--mat-sys-outline-variant);
+  border-right: func.rem(1) solid var(--mat-sys-outline-variant);
 }
 
 .panel-notice {
@@ -190,7 +186,7 @@ mat-divider {
 .condition-row {
   margin-bottom: vars.$spacing-xs;
   overflow: hidden;
-  border: 1px solid var(--mat-sys-outline-variant);
+  border: func.rem(1) solid var(--mat-sys-outline-variant);
   border-radius: vars.$border-radius-md;
 }
 
@@ -257,12 +253,12 @@ mat-divider {
   flex-direction: column;
   gap: vars.$spacing-md;
   padding: vars.$spacing-sm vars.$spacing-md vars.$spacing-md;
-  border-top: 1px solid var(--mat-sys-outline-variant);
+  border-top: func.rem(1) solid var(--mat-sys-outline-variant);
 }
 
 .condition-effect {
   padding-bottom: vars.$spacing-sm;
-  border-bottom: 1px dashed var(--mat-sys-outline-variant);
+  border-bottom: func.rem(1) dashed var(--mat-sys-outline-variant);
 }
 
 // ── Individual condition block ─────────────────────────────────────────────

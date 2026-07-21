@@ -16,7 +16,7 @@
       minmax(func.rem(250), 2fr)
       minmax(func.rem(160), 1fr)
       minmax(func.rem(160), 1fr);
-    gap: 0 vars.$spacing-md; // row-gap 0 + column-gap; AppFormFieldComponent host margin owns row rhythm
+    column-gap: vars.$spacing-md; // AppFormFieldComponent host margin owns row rhythm
     align-items: start;
 
     // Raw <mat-form-field> selects (Role, Status) don't carry the
@@ -60,7 +60,7 @@
   }
 
   .scroll-sentinel {
-    height: 1px;
+    height: func.rem(1);
   }
 
   .load-more-container {
@@ -70,7 +70,7 @@
   }
 
   .skeleton-table {
-    border-top: 1px solid var(--mat-sys-outline-variant);
+    border-top: func.rem(1) solid var(--mat-sys-outline-variant);
   }
 
   .skeleton-row {
@@ -78,7 +78,7 @@
     gap: vars.$spacing-md;
     align-items: center;
     padding: vars.$spacing-sm vars.$spacing-md;
-    border-bottom: 1px solid var(--mat-sys-outline-variant);
+    border-bottom: func.rem(1) solid var(--mat-sys-outline-variant);
   }
 
   .skeleton-cell {
