@@ -3,7 +3,6 @@ import { DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
-import configuration from './configuration';
 import { configValidationSchema } from './config-validation.schema';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
@@ -50,7 +49,6 @@ export class CoreModule implements NestModule {
       global: true,
       imports: [
         ConfigModule.forRoot({
-          load: [configuration],
           isGlobal: true,
           validationSchema: configValidationSchema,
           validationOptions: {

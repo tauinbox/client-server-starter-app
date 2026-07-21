@@ -98,7 +98,7 @@ src/app/
     │   ├── password-strength/         # PasswordStrengthComponent — 4-bar meter + aria-live label, score 0..4 mapped to PASSWORD_REGEX rules; used in register, profile, reset-password
     │   ├── password-toggle/           # PasswordToggleComponent (reusable password visibility toggle)
     │   └── captcha-widget/            # CaptchaWidgetComponent — Cloudflare Turnstile soft-trigger widget (renders only when register/forgot-password backend returns CAPTCHA_REQUIRED, fed by CaptchaService config + lazy script loader)
-    ├── forms/              # AppFormFieldComponent (Signal Forms wrapper), ChipsAutocompleteComponent (mat-chip-grid + mat-autocomplete: free-text mode or static/async option lists), AriaErrorDirective, DEFAULT_ERROR_KEYS registry
+    ├── forms/              # AppFormFieldComponent (Signal Forms wrapper), ChipsAutocompleteComponent (mat-chip-grid + mat-autocomplete: free-text mode or static/async option lists), DEFAULT_ERROR_KEYS registry
     ├── models/             # user.types
     ├── services/           # AdaptiveDialogService — opens confirm dialogs as bottom sheets (handset) or dialogs (desktop)
     └── utils/              # css.utils, dialog.utils (DialogSize enum + dialogSizeConfig()),

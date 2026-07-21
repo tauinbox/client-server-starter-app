@@ -179,8 +179,6 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
   readonly #userSearch$ = new Subject<string>();
 
-  protected readonly typeLabel = computed(() => this.rule().type);
-
   protected get percentValue(): number {
     const p = this.rule().payload;
     return p.type === 'percentage' ? p.percent : 0;
