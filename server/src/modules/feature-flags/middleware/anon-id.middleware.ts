@@ -21,7 +21,9 @@ export class AnonIdMiddleware implements NestMiddleware {
     const isProduction =
       this.configService.get<string>('ENVIRONMENT') === 'production';
     res.cookie(ANON_ID_COOKIE, value, {
-      httpOnly: false,
+      // Bucketing is resolved server-side from the cookie, so no browser script
+      // needs to read it.
+      httpOnly: true,
       sameSite: 'lax',
       secure: isProduction,
       maxAge: COOKIE_MAX_AGE_MS,

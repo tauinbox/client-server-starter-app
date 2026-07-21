@@ -100,6 +100,30 @@ describe('CookieStateStore', () => {
       });
     });
 
+    // The comparison is constant-time, so it must not throw on a length
+    // mismatch (timingSafeEqual rejects unequal buffers) nor short-circuit
+    it('should return false for a same-length near-match', (done) => {
+      const store = new CookieStateStore(false);
+      const { req } = mockReqRes({ oauth_state: 'abc123' });
+
+      store.verify(req, 'abc124', (err, ok) => {
+        expect(err).toBeNull();
+        expect(ok).toBe(false);
+        done();
+      });
+    });
+
+    it('should return false for a differing-length state without throwing', (done) => {
+      const store = new CookieStateStore(false);
+      const { req } = mockReqRes({ oauth_state: 'abc123' });
+
+      store.verify(req, 'abc123-much-longer', (err, ok) => {
+        expect(err).toBeNull();
+        expect(ok).toBe(false);
+        done();
+      });
+    });
+
     it('should return false when cookie is missing', (done) => {
       const store = new CookieStateStore(false);
       const { req } = mockReqRes({});

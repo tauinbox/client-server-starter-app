@@ -44,6 +44,8 @@ export class AuditLogInterceptor implements NestInterceptor {
           ? (opts.targetIdFromResponse(response) ?? null)
           : (params[opts.targetIdParam ?? 'id'] ?? null);
 
+        // `details` receives the raw body: it must project named fields only.
+        // Returning the body wholesale would persist credentials into audit_logs.
         const details = opts.details
           ? opts.details({
               request: req,

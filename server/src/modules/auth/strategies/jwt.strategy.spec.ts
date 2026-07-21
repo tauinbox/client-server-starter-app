@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { JwtStrategy } from './jwt.strategy';
 import { CustomJwtPayload } from '../types/jwt-payload';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
 
 function buildConfigService(overrides: Record<string, unknown> = {}): {
   get: jest.Mock;
@@ -66,6 +67,7 @@ describe('JwtStrategy', () => {
       sub: 'user-1',
       email: 'test@example.com',
       roles: ['user'],
+      purpose: TOKEN_PURPOSE.ACCESS,
       iat: Math.floor(Date.now() / 1000) - 60, // issued 60 seconds ago
       exp: Math.floor(Date.now() / 1000) + 3540
     };
@@ -139,6 +141,7 @@ describe('JwtStrategy', () => {
       const payloadWithoutRoles: CustomJwtPayload = {
         sub: 'user-1',
         email: 'test@example.com',
+        purpose: TOKEN_PURPOSE.ACCESS,
         iat: basePayload.iat,
         exp: basePayload.exp
       };
@@ -146,6 +149,77 @@ describe('JwtStrategy', () => {
       const result = await strategy.validate(payloadWithoutRoles);
 
       expect(result.roles).toEqual([]);
+    });
+
+    describe('token purpose and subject (fail closed)', () => {
+      it('should throw 401 for an OAuth-data token presented as a bearer token', async () => {
+        // Pre-fix: this payload has no `sub`, so the user lookup ran with an
+        // undefined id. TypeORM drops an undefined value from the WHERE clause,
+        // so the query degraded to "first row" and authenticated the caller as
+        // an arbitrary user - on a fresh deployment, the seeded admin.
+        const firstUserInTable = { id: 'admin-1', tokenRevokedAt: null };
+        mockRepository.findOne.mockResolvedValue(firstUserInTable);
+
+        const oauthDataPayload = {
+          purpose: TOKEN_PURPOSE.OAUTH_DATA,
+          data: { tokens: {}, user: {} },
+          iat: basePayload.iat,
+          exp: basePayload.exp
+        };
+
+        // @ts-expect-error - an OAuth-data token carries no email or sub claim
+        const validated = strategy.validate(oauthDataPayload);
+
+        await expect(validated).rejects.toMatchObject({
+          status: 401,
+          response: { errorKey: ErrorKeys.AUTH.INVALID_TOKEN }
+        });
+      });
+
+      it('should throw 401 when the subject claim is missing', async () => {
+        mockRepository.findOne.mockResolvedValue({
+          id: 'admin-1',
+          tokenRevokedAt: null
+        });
+        const { sub: _sub, ...payloadWithoutSub } = basePayload;
+
+        await expect(
+          strategy.validate(payloadWithoutSub as CustomJwtPayload)
+        ).rejects.toMatchObject({
+          status: 401,
+          response: { errorKey: ErrorKeys.AUTH.INVALID_TOKEN }
+        });
+        expect(mockRepository.findOne).not.toHaveBeenCalled();
+      });
+
+      it('should throw 401 for an OAuth-link token even though it carries a subject', async () => {
+        mockRepository.findOne.mockResolvedValue({
+          id: 'user-1',
+          tokenRevokedAt: null
+        });
+
+        await expect(
+          strategy.validate({
+            ...basePayload,
+            purpose: TOKEN_PURPOSE.OAUTH_LINK
+          })
+        ).rejects.toMatchObject({
+          status: 401,
+          response: { errorKey: ErrorKeys.AUTH.INVALID_TOKEN }
+        });
+      });
+
+      it('should throw 401 when the purpose claim is absent (legacy token)', async () => {
+        mockRepository.findOne.mockResolvedValue({
+          id: 'user-1',
+          tokenRevokedAt: null
+        });
+        const { purpose: _purpose, ...legacyPayload } = basePayload;
+
+        await expect(
+          strategy.validate(legacyPayload as CustomJwtPayload)
+        ).rejects.toMatchObject({ status: 401 });
+      });
     });
 
     describe('missing/invalid iat claim (fail closed)', () => {

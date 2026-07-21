@@ -365,7 +365,10 @@ export class AuthService {
     const hashedToken = hashToken(token);
     const user = await this.usersService.findByPasswordResetToken(hashedToken);
 
-    if (!user) {
+    // Deactivation must also void a reset token issued while the account was
+    // still active, matching the isActive gate in forgotPassword. The response
+    // stays identical to the not-found case so it reveals no account state.
+    if (!user || !user.isActive) {
       throw new HttpException(
         {
           message: 'Invalid or expired password reset token',

@@ -6,6 +6,11 @@ import { DataSource } from 'typeorm';
 import { CustomJwtPayload, PayloadFromJwt } from '../types/jwt-payload';
 import { User } from '../../users/entities/user.entity';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
+import {
+  JWT_AUDIENCE,
+  JWT_ISSUER,
+  TOKEN_PURPOSE
+} from '@app/shared/constants/auth.constants';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -28,7 +33,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey,
-      algorithms: [algorithm as 'HS256' | 'RS256']
+      algorithms: [algorithm as 'HS256' | 'RS256'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE
     });
 
     const rawMinIat = this.configService.get<number>('JWT_MIN_IAT');
@@ -36,6 +43,31 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: CustomJwtPayload): Promise<PayloadFromJwt> {
+    // Every token this service issues is signed with the same key, so a token
+    // minted for another flow (OAuth link/data) would otherwise be accepted
+    // here. Requiring the access purpose keeps those flows non-interchangeable.
+    if (payload.purpose !== TOKEN_PURPOSE.ACCESS) {
+      throw new HttpException(
+        {
+          message: 'Token is not an access token',
+          errorKey: ErrorKeys.AUTH.INVALID_TOKEN
+        },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+
+    // Fail closed: a missing subject would leave the lookup below unconstrained,
+    // which resolves to an arbitrary user instead of failing
+    if (typeof payload.sub !== 'string' || payload.sub === '') {
+      throw new HttpException(
+        {
+          message: 'Token is missing a valid subject claim',
+          errorKey: ErrorKeys.AUTH.INVALID_TOKEN
+        },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+
     const iat = payload.iat;
     // Fail closed: without a trusted issue time the key-rotation and
     // token-revocation checks below cannot be enforced
@@ -61,7 +93,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       );
     }
 
-    const userId = payload.sub!;
+    const userId = payload.sub;
     const user = await this.dataSource
       .getRepository(User)
       .findOne({ where: { id: userId }, select: ['id', 'tokenRevokedAt'] });

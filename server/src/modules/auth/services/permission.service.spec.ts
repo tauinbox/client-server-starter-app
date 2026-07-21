@@ -83,6 +83,15 @@ describe('PermissionService', () => {
   });
 
   describe('getPermissionsForUser', () => {
+    // Regression: an absent id is dropped from the WHERE clause, so the lookup
+    // used to resolve to an arbitrary user's permissions instead of none
+    it('should return no permissions for an empty user id without querying', async () => {
+      const result = await service.getPermissionsForUser('');
+
+      expect(result).toEqual([]);
+      expect(mockUserRepository.findOne).not.toHaveBeenCalled();
+    });
+
     it('should return cached permissions if available', async () => {
       const cachedPermissions = [
         {
@@ -212,6 +221,15 @@ describe('PermissionService', () => {
   });
 
   describe('getRolesForUser', () => {
+    // Regression: without this guard an absent id resolved to the first user in
+    // the table - on a fresh deployment, the seeded admin
+    it('should return no roles for an empty user id without querying', async () => {
+      const result = await service.getRolesForUser('');
+
+      expect(result).toEqual([]);
+      expect(mockUserRepository.findOne).not.toHaveBeenCalled();
+    });
+
     it('should return cached roles if available', async () => {
       const cachedRoles = [{ name: 'admin', isSuper: true }];
       mockCacheManager.get.mockResolvedValue(cachedRoles);

@@ -1,5 +1,6 @@
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
 import { TokenGeneratorService } from './token-generator.service';
 
 describe('TokenGeneratorService', () => {
@@ -21,7 +22,12 @@ describe('TokenGeneratorService', () => {
 
     expect(configService.getOrThrow).toHaveBeenCalledWith('JWT_EXPIRATION');
     expect(jwtService.sign).toHaveBeenCalledWith(
-      { sub: 'user-1', email: 'a@b.c', roles: ['admin'] },
+      {
+        sub: 'user-1',
+        email: 'a@b.c',
+        roles: ['admin'],
+        purpose: TOKEN_PURPOSE.ACCESS
+      },
       { expiresIn: 3600 }
     );
     expect(result.access_token).toBe('signed-jwt');
