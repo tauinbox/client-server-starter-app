@@ -5,7 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
 import { configValidationSchema } from './config-validation.schema';
 import { CacheModule } from '@nestjs/cache-manager';
-import { redisStore } from 'cache-manager-redis-yet';
+import { buildCacheOptions } from './redis-cache.store';
 import { RedisThrottlerStorage } from './redis-throttler.storage';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { postgresConfig } from '../../postgres.config';
@@ -78,14 +78,8 @@ export class CoreModule implements NestModule {
         CacheModule.registerAsync({
           isGlobal: true,
           inject: [ConfigService],
-          useFactory: async (config: ConfigService) => {
-            const redisUrl = config.get<string>('REDIS_URL');
-            if (!redisUrl) {
-              return {};
-            }
-            const store = await redisStore({ url: redisUrl });
-            return { store };
-          }
+          useFactory: (config: ConfigService) =>
+            buildCacheOptions(config.get<string>('REDIS_URL'))
         }),
         ScheduleModule.forRoot(),
         ThrottlerModule.forRootAsync({
