@@ -186,13 +186,22 @@ function main(): void {
 
   // Build lookup: subject → resource
   const subjectToResource = new Map<string, RegisteredResource>();
+  const errors: string[] = [];
   for (const r of allResources) {
+    const clash = subjectToResource.get(r.subject);
+    if (clash) {
+      // The DB enforces UQ_resources_subject; without this check the collision
+      // would only surface as a failed migration or a failed bootstrap sync.
+      errors.push(
+        `  ${r.file}: subject "${r.subject}" is already registered by resource "${clash.name}" in ${clash.file} — CASL cannot resolve an ambiguous subject`
+      );
+      continue;
+    }
     subjectToResource.set(r.subject, r);
   }
 
   // Track which registered subjects are actually used in @Authorize
   const usedSubjects = new Set<string>();
-  const errors: string[] = [];
 
   for (const usage of allAuthorizeUsages) {
     usedSubjects.add(usage.subject);
@@ -210,7 +219,7 @@ function main(): void {
     console.error(`✗ check:permissions found ${errors.length} issue${errors.length === 1 ? '' : 's'}:\n`);
     errors.forEach((e) => console.error(e));
     console.error(
-      '\n  → Either add @RegisterResource to the controller for that subject, or fix the subject name in @Authorize.\n'
+      '\n  → Add @RegisterResource to the controller for that subject, fix the subject name in @Authorize, or give the colliding resources distinct subjects.\n'
     );
     process.exit(1);
   }
