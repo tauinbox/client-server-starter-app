@@ -1,12 +1,22 @@
+import type { OnModuleDestroy } from '@nestjs/common';
 import type { ThrottlerStorage } from '@nestjs/throttler';
 import type { ThrottlerStorageRecord } from '@nestjs/throttler/dist/throttler-storage-record.interface';
 import Redis from 'ioredis';
 
-export class RedisThrottlerStorage implements ThrottlerStorage {
+export class RedisThrottlerStorage
+  implements ThrottlerStorage, OnModuleDestroy
+{
   private readonly redis: Redis;
 
   constructor(url: string) {
     this.redis = new Redis(url, { lazyConnect: false });
+  }
+
+  // ThrottlerModule registers this instance under the ThrottlerStorage token,
+  // so Nest owns its lifecycle. Without the hook the connection outlives
+  // shutdown and keeps the process alive.
+  onModuleDestroy(): void {
+    this.disconnect();
   }
 
   disconnect(): void {
