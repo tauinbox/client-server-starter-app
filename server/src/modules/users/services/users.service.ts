@@ -416,13 +416,17 @@ export class UsersService {
     }
 
     // Clear pending email-change fields BEFORE soft-delete so a stale token
-    // cannot outlive deletedAt and confirm against a soft-removed row.
-    await this.userRepository.update(id, {
-      pendingEmail: null,
-      pendingEmailToken: null,
-      pendingEmailExpiresAt: null
+    // cannot outlive deletedAt and confirm against a soft-removed row. Both
+    // writes share one transaction so a failing soft-delete cannot leave a
+    // live row stripped of its pending email change.
+    await withTransaction(this.dataSource, async (manager) => {
+      await manager.update(User, id, {
+        pendingEmail: null,
+        pendingEmailToken: null,
+        pendingEmailExpiresAt: null
+      });
+      await manager.softRemove(user);
     });
-    await this.userRepository.softRemove(user);
   }
 
   async restore(id: string, ability?: AppAbility): Promise<User> {
