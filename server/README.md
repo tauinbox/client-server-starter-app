@@ -128,7 +128,10 @@ src/
 └── modules/
 ├── core/                   # Dynamic root module
 │   ├── config/             # @nestjs/config, loads .env; config-validation.schema.ts - Joi bootstrap validation (coerced types + defaults; a malformed or missing required env var aborts startup)
-│   ├── cache/              # @nestjs/cache-manager
+│   ├── cache/              # @nestjs/cache-manager; redis-cache.store.ts registers the @keyv/redis adapter under the
+│   │                       #   `stores` (plural) option — a singular `store` is silently ignored by the provider factory
+│   │                       #   and degrades to a per-process in-memory cache. Falls back to in-memory when REDIS_URL is unset;
+│   │                       #   a 1 s connection timeout keeps an unreachable Redis from hanging requests (serves uncached)
 │   ├── database/           # TypeORM + PostgreSQL config
 │   ├── filters/            # GlobalExceptionFilter (standardized error responses, DB error mapping)
 │   ├── health/             # HealthModule (GET /api/health/live, /api/health/ready — DB ping + Redis PING when REDIS_URL set or production;
