@@ -7,7 +7,6 @@ import {
 import { MatCard, MatCardContent } from '@angular/material/card';
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
-import { MatChipsModule } from '@angular/material/chips';
 import { TranslocoDirective } from '@jsverse/transloco';
 import type { PlanResponse } from '@app/shared/types';
 
@@ -18,14 +17,7 @@ import type { PlanResponse } from '@app/shared/types';
  */
 @Component({
   selector: 'nxs-plan-card',
-  imports: [
-    MatCard,
-    MatCardContent,
-    MatButton,
-    MatIcon,
-    MatChipsModule,
-    TranslocoDirective
-  ],
+  imports: [MatCard, MatCardContent, MatButton, MatIcon, TranslocoDirective],
   templateUrl: './plan-card.component.html',
   styleUrl: './plan-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
