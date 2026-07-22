@@ -1,4 +1,5 @@
 import * as Joi from 'joi';
+import { APP_ENVIRONMENTS } from '@app/shared/constants';
 
 // Validated by ConfigModule at bootstrap: a malformed value or a missing
 // required key aborts startup instead of degrading behavior at runtime.
@@ -7,7 +8,7 @@ import * as Joi from 'joi';
 export const configValidationSchema = Joi.object({
   APPLICATION_PORT: Joi.number().default(3000),
   ENVIRONMENT: Joi.string()
-    .valid('local', 'development', 'staging', 'production')
+    .valid(...APP_ENVIRONMENTS)
     .default('production'),
   DB_HOST: Joi.string().required(),
   DB_PORT: Joi.number().default(5432),

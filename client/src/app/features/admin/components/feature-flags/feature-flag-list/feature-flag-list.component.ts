@@ -217,14 +217,11 @@ export class FeatureFlagListComponent implements OnInit {
     const panelClass = this.layout.isHandset()
       ? 'app-dialog-fullscreen-mobile'
       : [];
-    const knownEnvironments = Array.from(
-      new Set(this.flags().flatMap((f) => f.environments))
-    );
     this.#dialog
       .open(FeatureFlagFormDialogComponent, {
         ...sizing,
         panelClass,
-        data: { ...data, knownEnvironments }
+        data
       })
       .afterClosed()
       .pipe(takeUntilDestroyed(this.#destroyRef))

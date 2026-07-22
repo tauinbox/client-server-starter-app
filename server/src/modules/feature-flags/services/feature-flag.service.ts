@@ -80,6 +80,12 @@ export class FeatureFlagService {
   /**
    * Single-flag lookup by unique key (no rules loaded). Returns null when the
    * key is absent. Used by hot-path admin toggles that only read `enabled`.
+   *
+   * NOT an access evaluation: the raw `enabled` column ignores environments and
+   * every targeting rule, so a caller acting on it grants access the evaluator
+   * would deny. Only safe for fail-closed kill switches that treat "not enabled"
+   * as off for everyone - see `BillingService.isProviderEnabled`. Anything
+   * user-facing must go through `FeatureFlagResolverService`.
    */
   async findByKey(key: string): Promise<FeatureFlag | null> {
     return this.flagRepo.findOne({ where: { key } });

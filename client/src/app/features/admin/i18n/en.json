@@ -52,7 +52,7 @@
     "keyHint": "Lowercase letters, digits and hyphens. Example: new-dashboard",
     "descriptionLabel": "Description",
     "environmentsLabel": "Environments (leave empty for all)",
-    "environmentsPlaceholder": "Add environment, press Enter",
+    "environmentsPlaceholder": "Pick an environment from the list",
     "enabledLabel": "Enabled",
     "publicLabel": "Visible to anonymous callers",
     "publicHint": "Visibility to anonymous (logged-out) visitors only. Targeting is controlled by rules. An enabled flag with no include rules is on for every signed-in user.",

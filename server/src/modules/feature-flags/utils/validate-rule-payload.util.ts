@@ -5,6 +5,7 @@ import type {
   FeatureFlagRulePayload,
   FeatureFlagRuleType
 } from '@app/shared/types';
+import { attributeValueError } from '@app/shared/utils/feature-flag-attribute-value';
 
 const ATTRIBUTE_FIELDS: FeatureFlagAttributeField[] = [
   'email',
@@ -105,6 +106,11 @@ export function validateRulePayload(
           );
         }
       }
+      const valueError = attributeValueError(
+        op as FeatureFlagAttributeOp,
+        value
+      );
+      if (valueError) throw new BadRequestException(valueError);
       return {
         type: 'attribute',
         field: field as FeatureFlagAttributeField,

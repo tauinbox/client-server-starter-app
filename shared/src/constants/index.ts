@@ -25,6 +25,12 @@ export {
   type SupportedLocale
 } from './locale.constants';
 
+export {
+  APP_ENVIRONMENTS,
+  normalizeEnvironmentList,
+  type AppEnvironment
+} from './environment.constants';
+
 export { ErrorKeys } from './error-keys';
 
 export {

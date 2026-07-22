@@ -4,7 +4,6 @@ import {
   Component,
   DestroyRef,
   ElementRef,
-  computed,
   inject,
   signal,
   viewChild
@@ -32,6 +31,7 @@ import type {
   FeatureFlagRuleInput
 } from '../../../services/feature-flags-admin.service';
 import type { FeatureFlagResponse } from '@app/shared/types';
+import { APP_ENVIRONMENTS } from '@app/shared/constants';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
@@ -43,12 +43,6 @@ import { FeatureFlagPreviewComponent } from '../feature-flag-preview/feature-fla
 
 export type FeatureFlagFormDialogData = {
   flag?: FeatureFlagResponse;
-  /**
-   * Environment names already used by other flags in the list. The dialog merges
-   * these with a baseline (`development`, `staging`, `production`) to feed the
-   * Environments chip-autocomplete suggestions; free-text Enter still works.
-   */
-  knownEnvironments?: string[];
 };
 
 export type FeatureFlagFormDialogResult = {
@@ -63,7 +57,6 @@ type FlagFormData = {
 };
 
 const KEY_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
-const BASELINE_ENVIRONMENTS = ['development', 'staging', 'production'];
 
 function envToChip(name: string): ChipOption {
   return { value: name, label: name };
@@ -113,13 +106,10 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
     (this.data.flag?.environments ?? []).map(envToChip)
   );
 
-  protected readonly environmentOptions = computed<ChipOption[]>(() => {
-    const merged = new Set<string>([
-      ...BASELINE_ENVIRONMENTS,
-      ...(this.data.knownEnvironments ?? [])
-    ]);
-    return Array.from(merged).sort().map(envToChip);
-  });
+  // Free text is deliberately off: the API rejects anything the server cannot
+  // run as, so an invented name would only surface as a save-time 400.
+  protected readonly environmentOptions: ChipOption[] =
+    APP_ENVIRONMENTS.map(envToChip);
 
   readonly rules = signal<FeatureFlagRuleDraft[]>(
     (this.data.flag?.rules ?? []).map((r) => ({

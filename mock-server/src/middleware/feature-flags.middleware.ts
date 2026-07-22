@@ -17,10 +17,13 @@ import type {
 } from '@app/shared/types';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import {
+  APP_ENVIRONMENTS,
   BILLING_CONFIGURED_ATTRIBUTE,
   BILLING_PROVIDER_FLAGS,
+  normalizeEnvironmentList,
   OAUTH_PROVIDER_FLAGS
 } from '@app/shared/constants';
+import { attributeValueError } from '@app/shared/utils/feature-flag-attribute-value';
 import { adminGuard, authenticateRequest } from '../helpers/auth.helpers';
 import { pushToAll } from '../sse-hub';
 import { getState, logAudit, toFeatureFlagResponse } from '../state';
@@ -102,6 +105,28 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((v) => typeof v === 'string');
 }
 
+// Mirrors the server DTO: normalize first (trim/lowercase/dedupe), then reject
+// anything outside the deployable environment names.
+function validateEnvironments(
+  input: unknown
+): { ok: true; environments: string[] } | { ok: false; message: string } {
+  if (!Array.isArray(input)) {
+    return { ok: false, message: 'environments must be a string array' };
+  }
+  const normalized = normalizeEnvironmentList(input);
+  if (!isStringArray(normalized)) {
+    return { ok: false, message: 'environments must be a string array' };
+  }
+  const allowed: readonly string[] = APP_ENVIRONMENTS;
+  if (normalized.some((e) => !allowed.includes(e))) {
+    return {
+      ok: false,
+      message: `each environment must be one of: ${APP_ENVIRONMENTS.join(', ')}`
+    };
+  }
+  return { ok: true, environments: normalized };
+}
+
 type CreateData = {
   key: string;
   description: string | null;
@@ -136,19 +161,11 @@ function validateCreate(
   if (body.enabled !== undefined && typeof body.enabled !== 'boolean') {
     return { ok: false, message: 'enabled must be a boolean' };
   }
+  let environments: string[] = [];
   if (body.environments !== undefined) {
-    if (!isStringArray(body.environments) || body.environments.length > 16) {
-      return {
-        ok: false,
-        message: 'environments must be a string array (max 16 entries)'
-      };
-    }
-    if (body.environments.some((e) => e.length > 32)) {
-      return {
-        ok: false,
-        message: 'each environment entry must be ≤ 32 chars'
-      };
-    }
+    const validated = validateEnvironments(body.environments);
+    if (!validated.ok) return validated;
+    environments = validated.environments;
   }
   if (body.public !== undefined && typeof body.public !== 'boolean') {
     return { ok: false, message: 'public must be a boolean' };
@@ -159,7 +176,7 @@ function validateCreate(
       key,
       description: (body.description as string | null | undefined) ?? null,
       enabled: (body.enabled as boolean | undefined) ?? false,
-      environments: (body.environments as string[] | undefined) ?? [],
+      environments,
       isPublic: (body.public as boolean | undefined) ?? false
     }
   };
@@ -204,19 +221,9 @@ function validateUpdate(
     patch.enabled = body.enabled;
   }
   if (body.environments !== undefined) {
-    if (!isStringArray(body.environments) || body.environments.length > 16) {
-      return {
-        ok: false,
-        message: 'environments must be a string array (max 16 entries)'
-      };
-    }
-    if (body.environments.some((e) => e.length > 32)) {
-      return {
-        ok: false,
-        message: 'each environment entry must be ≤ 32 chars'
-      };
-    }
-    patch.environments = body.environments;
+    const validated = validateEnvironments(body.environments);
+    if (!validated.ok) return validated;
+    patch.environments = validated.environments;
   }
   if (body.public !== undefined) {
     if (typeof body.public !== 'boolean') {
@@ -316,6 +323,13 @@ function validateRulePayload(
             message: `customKey "${customKey}" is not registered (mock-server has no DI registry)`
           };
         }
+      }
+      const valueError = attributeValueError(
+        op as FeatureFlagAttributeOp,
+        value
+      );
+      if (valueError) {
+        return { ok: false, message: valueError };
       }
       return {
         ok: true,

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
+import KeyvRedis from '@keyv/redis';
 import type { Request } from 'express';
 import { FeatureFlagResolverService } from './feature-flag-resolver.service';
 import { AttributeRegistryService } from './attribute-registry.service';
@@ -16,7 +17,12 @@ describe('FeatureFlagResolverService', () => {
   let flagRepo: { find: jest.Mock };
   let ruleRepo: { find: jest.Mock };
   let cacheStore: Map<string, unknown>;
-  let cacheManager: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
+  let cacheManager: {
+    get: jest.Mock;
+    set: jest.Mock;
+    del: jest.Mock;
+    stores: { store?: unknown }[];
+  };
   let configService: { get: jest.Mock };
   let permissionService: { getRoleNamesForUser: jest.Mock };
   let usersService: { findOne: jest.Mock };
@@ -35,7 +41,9 @@ describe('FeatureFlagResolverService', () => {
       del: jest.fn((k: string) => {
         cacheStore.delete(k);
         return Promise.resolve();
-      })
+      }),
+      // In-memory fallback wiring: no Redis adapter behind the cache.
+      stores: [{}]
     };
     flagRepo = { find: jest.fn() };
     ruleRepo = { find: jest.fn() };
@@ -307,6 +315,120 @@ describe('FeatureFlagResolverService', () => {
     const result = await service.evaluateAnonymous('anon-1', fakeReq);
     expect(flagRepo.find).toHaveBeenCalledTimes(1);
     expect(result.flags['fresh']).toBe(true);
+  });
+
+  describe('version counter with a Redis-backed cache', () => {
+    let redis: {
+      get: jest.Mock;
+      incr: jest.Mock;
+      on: jest.Mock;
+    };
+    let counter: number | null;
+
+    async function setupRedisBacked(): Promise<FeatureFlagResolverService> {
+      counter = null;
+      redis = {
+        get: jest.fn(() =>
+          Promise.resolve(counter === null ? null : String(counter))
+        ),
+        incr: jest.fn(() => {
+          counter = (counter ?? 0) + 1;
+          return Promise.resolve(counter);
+        }),
+        on: jest.fn()
+      };
+      // Nest wraps the configured adapter in a Keyv, so the service reaches the
+      // adapter at stores[0].store - a real KeyvRedis is required for the
+      // instanceof narrowing, but no connection is opened.
+      const adapter = new KeyvRedis('redis://localhost:6379');
+      // @ts-expect-error stand-in for the node-redis client: only get/incr/on
+      // are exercised, and widening the production type for a mock is banned.
+      adapter.client = redis;
+      cacheManager.stores = [{ store: adapter }];
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          FeatureFlagResolverService,
+          { provide: getRepositoryToken(FeatureFlag), useValue: flagRepo },
+          { provide: getRepositoryToken(FeatureFlagRule), useValue: ruleRepo },
+          { provide: CACHE_MANAGER, useValue: cacheManager },
+          {
+            provide: AttributeRegistryService,
+            useValue: new AttributeRegistryService()
+          },
+          { provide: ConfigService, useValue: configService },
+          { provide: PermissionService, useValue: permissionService },
+          { provide: UsersService, useValue: usersService },
+          { provide: MetricsService, useValue: metrics }
+        ]
+      }).compile();
+      return module.get(FeatureFlagResolverService);
+    }
+
+    function userCacheVersions(): string[] {
+      return cacheManager.set.mock.calls
+        .map((c: unknown[]) => c[0] as string)
+        .filter((k) => k.startsWith('featureflags:user:u1:v'))
+        .map((k) => k.slice('featureflags:user:u1:v'.length));
+    }
+
+    it('bumps the version with an atomic INCR instead of a read-modify-write', async () => {
+      const svc = await setupRedisBacked();
+      seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
+
+      await svc.invalidateAll();
+
+      expect(redis.incr).toHaveBeenCalledWith('featureflags:version:counter');
+      // The racy get -> compute -> set on the version key must be gone.
+      expect(cacheManager.set).not.toHaveBeenCalledWith(
+        'featureflags:version',
+        expect.anything(),
+        expect.anything()
+      );
+    });
+
+    it('gives concurrent invalidations distinct, strictly increasing versions', async () => {
+      const svc = await setupRedisBacked();
+      seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
+
+      await Promise.all([
+        svc.invalidateAll(),
+        svc.invalidateAll(),
+        svc.invalidateAll()
+      ]);
+
+      // Three INCRs means three distinct versions; the pre-fix read-then-write
+      // could observe the same previous value and collapse them into one.
+      expect(redis.incr).toHaveBeenCalledTimes(3);
+      expect(counter).toBe(3);
+    });
+
+    it('reads the counter for the per-user cache key and starts at 0', async () => {
+      const svc = await setupRedisBacked();
+      seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
+      const user = { userId: 'u1', email: null, createdAt: null, roles: [] };
+
+      await svc.evaluateForUser(user, fakeReq);
+      expect(userCacheVersions()).toEqual(['0']);
+
+      await svc.invalidateAll();
+      await svc.evaluateForUser(user, fakeReq);
+      expect(userCacheVersions()).toEqual(['0', '1']);
+    });
+
+    it('falls back to the cache-manager counter when Redis rejects', async () => {
+      const svc = await setupRedisBacked();
+      seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
+      redis.incr.mockRejectedValue(new Error('connection refused'));
+      redis.get.mockRejectedValue(new Error('connection refused'));
+
+      await expect(svc.invalidateAll()).resolves.toBeUndefined();
+      expect(cacheManager.set).toHaveBeenCalledWith(
+        'featureflags:version',
+        expect.any(Number),
+        0
+      );
+    });
   });
 
   it('invalidateUser deletes that user’s current cache key', async () => {
