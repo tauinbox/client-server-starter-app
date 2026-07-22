@@ -3,7 +3,10 @@ import { TestBed } from '@angular/core/testing';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
-import type { FeatureFlagRuleResponse } from '@app/shared/types';
+import type {
+  FeatureFlagRulePayload,
+  FeatureFlagRuleResponse
+} from '@app/shared/types';
 import { APP_ENVIRONMENTS } from '@app/shared/constants';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
@@ -57,6 +60,40 @@ describe('FeatureFlagFormDialogComponent', () => {
     fixture.detectChanges();
     return fixture;
   };
+
+  const attributeRulePayload = {
+    type: 'attribute',
+    field: 'emailDomain',
+    op: 'endsWith',
+    value: '@acme.com'
+  } satisfies FeatureFlagRulePayload;
+
+  const flagWithAttributeRule = (
+    payload: FeatureFlagRulePayload = attributeRulePayload
+  ): Record<string, unknown> => ({
+    flag: {
+      id: 'flag-1',
+      key: 'new-dashboard',
+      description: 'rollout',
+      enabled: true,
+      environments: ['production'],
+      public: false,
+      version: 3,
+      updatedByUserId: null,
+      createdAt: '2026-05-19T10:00:00Z',
+      updatedAt: '2026-05-19T10:00:00Z',
+      rules: [
+        {
+          id: 'rule-1',
+          flagId: 'flag-1',
+          effect: 'include',
+          payload,
+          createdAt: '2026-05-19T10:00:00Z',
+          updatedAt: '2026-05-19T10:00:00Z'
+        }
+      ] satisfies FeatureFlagRuleResponse[]
+    }
+  });
 
   it('opens in create mode with empty fields', async () => {
     const fixture = await setup({});
@@ -201,6 +238,44 @@ describe('FeatureFlagFormDialogComponent', () => {
     cmp.submit();
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(closeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports rules as unchanged when a payload only differs in key order', async () => {
+    const fixture = await setup(flagWithAttributeRule());
+    const cmp = fixture.componentInstance;
+    cmp.updateRule(0, {
+      id: 'rule-1',
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        value: '@acme.com',
+        op: 'endsWith',
+        field: 'emailDomain',
+        type: 'attribute'
+      }
+    });
+    cmp.submit();
+    const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
+    expect(result.rulesChanged).toBe(false);
+  });
+
+  it('reports rules as changed when a payload value differs', async () => {
+    const fixture = await setup(flagWithAttributeRule());
+    const cmp = fixture.componentInstance;
+    cmp.updateRule(0, {
+      id: 'rule-1',
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        value: '@other.com',
+        op: 'endsWith',
+        field: 'emailDomain',
+        type: 'attribute'
+      }
+    });
+    cmp.submit();
+    const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
+    expect(result.rulesChanged).toBe(true);
   });
 
   it('submit() skips the confirmation when the flag is disabled', async () => {

@@ -35,6 +35,7 @@ import { APP_ENVIRONMENTS } from '@app/shared/constants';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { deepEqual } from '@shared/utils/deep-equal.utils';
 import type { ChipOption } from '@shared/forms';
 import { ChipsAutocompleteComponent } from '@shared/forms';
 import type { FeatureFlagRuleDraft } from '../feature-flag-rule-row/feature-flag-rule-row.component';
@@ -249,6 +250,6 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
       effect: r.effect,
       payload: r.payload
     }));
-    return JSON.stringify(original) !== JSON.stringify(current);
+    return !deepEqual(original, current);
   }
 }

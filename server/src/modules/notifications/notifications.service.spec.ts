@@ -48,17 +48,17 @@ describe('NotificationsService', () => {
   });
 
   it('should create a stream for a new userId/connectionId', () => {
-    const subject = service.getOrCreateStream('user-1', 'conn-1');
+    const subject = service.createStream('user-1', 'conn-1');
     expect(subject).toBeDefined();
   });
 
   it('should wire getCount to return live connection count', () => {
-    service.getOrCreateStream('user-1', 'conn-1');
+    service.createStream('user-1', 'conn-1');
     expect(mockSseRef.getCount()).toBe(1);
   });
 
   it('should emit events pushed to a specific user', (done) => {
-    const subject = service.getOrCreateStream('user-2', 'conn-2');
+    const subject = service.createStream('user-2', 'conn-2');
     const received: unknown[] = [];
 
     subject.subscribe({
@@ -77,8 +77,8 @@ describe('NotificationsService', () => {
   });
 
   it('should fan out to multiple connections for the same user', () => {
-    const subject1 = service.getOrCreateStream('user-3', 'conn-a');
-    const subject2 = service.getOrCreateStream('user-3', 'conn-b');
+    const subject1 = service.createStream('user-3', 'conn-a');
+    const subject2 = service.createStream('user-3', 'conn-b');
 
     const received1: unknown[] = [];
     const received2: unknown[] = [];
@@ -92,8 +92,8 @@ describe('NotificationsService', () => {
   });
 
   it('should push to all connections via pushToAll', () => {
-    const subA = service.getOrCreateStream('user-4', 'conn-1');
-    const subB = service.getOrCreateStream('user-5', 'conn-1');
+    const subA = service.createStream('user-4', 'conn-1');
+    const subB = service.createStream('user-5', 'conn-1');
 
     const receivedA: unknown[] = [];
     const receivedB: unknown[] = [];
@@ -118,8 +118,8 @@ describe('NotificationsService', () => {
     } as const;
 
     it('should deliver only to users whose ability satisfies the check', async () => {
-      const adminSub = service.getOrCreateStream('admin-1', 'conn-1');
-      const basicSub = service.getOrCreateStream('basic-1', 'conn-1');
+      const adminSub = service.createStream('admin-1', 'conn-1');
+      const basicSub = service.createStream('basic-1', 'conn-1');
       usersWithListAccess.add('admin-1');
 
       const adminReceived: unknown[] = [];
@@ -134,7 +134,7 @@ describe('NotificationsService', () => {
     });
 
     it('should fail closed when ability resolution throws', async () => {
-      const subject = service.getOrCreateStream('admin-2', 'conn-1');
+      const subject = service.createStream('admin-2', 'conn-1');
       usersWithListAccess.add('admin-2');
       caslAbilityFactory.createForUser.mockRejectedValue(new Error('db down'));
 
@@ -148,7 +148,7 @@ describe('NotificationsService', () => {
     });
 
     it('should resolve abilities per push so permission changes take effect', async () => {
-      const subject = service.getOrCreateStream('user-a', 'conn-1');
+      const subject = service.createStream('user-a', 'conn-1');
       const received: unknown[] = [];
       subject.subscribe((e) => received.push(e));
 
@@ -162,7 +162,7 @@ describe('NotificationsService', () => {
   });
 
   it('should complete the stream and remove the entry on closeStream', () => {
-    const subject = service.getOrCreateStream('user-6', 'conn-1');
+    const subject = service.createStream('user-6', 'conn-1');
 
     let completed = false;
     subject.subscribe({
@@ -182,8 +182,8 @@ describe('NotificationsService', () => {
   });
 
   it('should reflect actual connection count across multiple open/close cycles', () => {
-    service.getOrCreateStream('user-8', 'conn-1');
-    service.getOrCreateStream('user-8', 'conn-2');
+    service.createStream('user-8', 'conn-1');
+    service.createStream('user-8', 'conn-2');
     expect(mockSseRef.getCount()).toBe(2);
 
     service.closeStream('user-8', 'conn-1');
@@ -194,7 +194,7 @@ describe('NotificationsService', () => {
   });
 
   it('should not change count when closing a non-existent connection', () => {
-    service.getOrCreateStream('user-9', 'conn-1');
+    service.createStream('user-9', 'conn-1');
     expect(mockSseRef.getCount()).toBe(1);
 
     service.closeStream('unknown-user', 'conn-1');

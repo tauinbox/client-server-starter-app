@@ -34,7 +34,7 @@ export class NotificationsController {
     // before calling the controller via lazy Observable subscription, so
     // res.setHeader() must not be called here — it would throw ERR_HTTP_HEADERS_SENT.
     const connectionId = randomUUID();
-    const subject = this.notificationsService.getOrCreateStream(
+    const subject = this.notificationsService.createStream(
       req.user.userId,
       connectionId
     );

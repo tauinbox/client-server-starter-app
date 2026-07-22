@@ -7,17 +7,14 @@ import type { JwtAuthRequest } from '../auth/types/auth.request';
 
 describe('NotificationsController', () => {
   let controller: NotificationsController;
-  let service: Pick<
-    NotificationsService,
-    'getOrCreateStream' | 'closeStream'
-  > & {
-    getOrCreateStream: jest.Mock;
+  let service: Pick<NotificationsService, 'createStream' | 'closeStream'> & {
+    createStream: jest.Mock;
     closeStream: jest.Mock;
   };
 
   beforeEach(() => {
     service = {
-      getOrCreateStream: jest.fn(),
+      createStream: jest.fn(),
       closeStream: jest.fn()
     };
     // @ts-expect-error partial mock
@@ -54,14 +51,14 @@ describe('NotificationsController', () => {
 
   it('creates a stream for the authenticated user and emits subject values', async () => {
     const subject = new Subject<MessageEvent>();
-    service.getOrCreateStream.mockReturnValue(subject);
+    service.createStream.mockReturnValue(subject);
 
     const req = buildReq('user-1');
     const res = buildRes();
     // @ts-expect-error partial Response mock
     const stream$ = controller.stream(req, res);
 
-    expect(service.getOrCreateStream).toHaveBeenCalledWith(
+    expect(service.createStream).toHaveBeenCalledWith(
       'user-1',
       expect.any(String)
     );
@@ -73,17 +70,14 @@ describe('NotificationsController', () => {
 
   it('closes the stream on response close using the same connectionId', () => {
     const subject = new Subject<MessageEvent>();
-    service.getOrCreateStream.mockReturnValue(subject);
+    service.createStream.mockReturnValue(subject);
 
     const req = buildReq('user-2');
     const res = buildRes();
     // @ts-expect-error partial Response mock
     controller.stream(req, res);
 
-    const firstCall = service.getOrCreateStream.mock.calls[0] as [
-      string,
-      string
-    ];
+    const firstCall = service.createStream.mock.calls[0] as [string, string];
     const connectionId = firstCall[1];
     res.emitter.emit('close');
 

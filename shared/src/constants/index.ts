@@ -1,6 +1,16 @@
 export { PASSWORD_REGEX, PASSWORD_ERROR } from './password.constants';
 
-export { MAX_FAILED_ATTEMPTS, LOCKOUT_DURATION_MS } from './auth.constants';
+export {
+  MAX_FAILED_ATTEMPTS,
+  LOCKOUT_DURATION_MS,
+  MAX_CONCURRENT_SESSIONS,
+  BCRYPT_SALT_ROUNDS,
+  EMAIL_CHANGE_TOKEN_EXPIRY_MS,
+  JWT_ISSUER,
+  JWT_AUDIENCE,
+  TOKEN_PURPOSE,
+  type TokenPurpose
+} from './auth.constants';
 
 export {
   DEFAULT_PAGE,
