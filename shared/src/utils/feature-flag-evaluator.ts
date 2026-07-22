@@ -110,7 +110,11 @@ function matchesAttributeOp(
   }
 }
 
-function toTimestamp(value: unknown): number | null {
+/**
+ * Canonical parser for the `before` / `after` operands. Exported so payload
+ * validation accepts exactly the shapes evaluation can compare.
+ */
+export function toTimestamp(value: unknown): number | null {
   if (value instanceof Date) return value.getTime();
   if (typeof value === 'string') {
     const parsed = Date.parse(value);
@@ -121,6 +125,8 @@ function toTimestamp(value: unknown): number | null {
 }
 
 export function percentageBucket(id: string, flagKey: string): number {
+  // `% 100` skews buckets 0..95 by ~2e-8 (2^32 leaves a remainder of 96).
+  // Correcting it would re-bucket every existing user for no measurable gain.
   const digest = createHash('sha256').update(`${id}:${flagKey}`).digest();
   return digest.readUInt32BE(0) % 100;
 }

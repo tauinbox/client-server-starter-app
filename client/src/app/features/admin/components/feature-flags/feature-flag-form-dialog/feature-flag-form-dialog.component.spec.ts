@@ -4,6 +4,7 @@ import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import type { FeatureFlagRuleResponse } from '@app/shared/types';
+import { APP_ENVIRONMENTS } from '@app/shared/constants';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
@@ -106,14 +107,12 @@ describe('FeatureFlagFormDialogComponent', () => {
     expect(fixture.componentInstance.rules()[0].type).toBe('percentage');
   });
 
-  it('environmentOptions merges baseline suggestions with knownEnvironments', async () => {
-    const fixture = await setup({
-      knownEnvironments: ['qa', 'production']
-    });
-    const opts = fixture.componentInstance['environmentOptions']().map(
+  it('environmentOptions offers exactly the environments the API accepts', async () => {
+    const fixture = await setup({});
+    const opts = fixture.componentInstance['environmentOptions'].map(
       (c) => c.value
     );
-    expect(opts).toEqual(['development', 'production', 'qa', 'staging'].sort());
+    expect(opts).toEqual([...APP_ENVIRONMENTS]);
   });
 
   it('addRule + removeRule mutate the rules signal', async () => {

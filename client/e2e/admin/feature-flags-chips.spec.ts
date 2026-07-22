@@ -17,27 +17,31 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
 
-    // Environments — chip-grid combobox accepts free text via Enter.
-    // Focus can be stolen between fill()'s internal focus and text insertion
-    // (observed in CI: the filled text landed in the Key field while the chip
-    // input stayed empty), so verify the value reached the chip input before
-    // committing with Enter, and retry the whole add if it leaked elsewhere.
-    // Retrying is safe: the chip component ignores duplicate values, and
-    // waiting for the chip row also serializes the adds (a second token-end
-    // racing the first can clobber it — both build on the same stale list).
+    // Option-only: the API accepts just the names the server can run as. The
+    // retry guards a CI focus steal that dropped the text into the Key field.
     const envInput = dialog.getByRole('combobox', { name: /Environments/i });
     const addEnvironment = async (env: string) => {
       await expect(async () => {
         await envInput.fill(env);
         await expect(envInput).toHaveValue(env, { timeout: 1000 });
-        await envInput.press('Enter');
+        await page
+          .getByRole('option')
+          .filter({ hasText: new RegExp(`^${env}$`) })
+          .first()
+          .click({ timeout: 2000 });
         await expect(dialog.getByRole('row', { name: env })).toBeVisible({
           timeout: 2000
         });
       }).toPass({ timeout: 15_000 });
     };
     await addEnvironment('production');
-    await addEnvironment('qa-eu');
+    await addEnvironment('staging');
+
+    // A name outside the list cannot be committed as free text any more.
+    await envInput.fill('qa-eu');
+    await envInput.press('Enter');
+    await expect(dialog.getByRole('row', { name: 'qa-eu' })).toHaveCount(0);
+    await envInput.fill('');
     // Its overlay sits over the rule row and would swallow the Type-select click.
     await envInput.press('Escape');
     await expect(page.locator('.mat-mdc-autocomplete-panel')).toHaveCount(0);
@@ -86,7 +90,7 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
       key: string;
     };
     expect(created.key).toBe('chips-rollout');
-    expect(created.environments.sort()).toEqual(['production', 'qa-eu']);
+    expect(created.environments.sort()).toEqual(['production', 'staging']);
 
     const rulesBody = (await (await rulesResp).request().postDataJSON()) as {
       rules: {
