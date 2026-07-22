@@ -1,9 +1,10 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
 import { In, IsNull, Repository } from 'typeorm';
 import type { SubscriptionStatus } from '@app/shared/types';
+import { CacheVersionCounter } from '../../../common/utils/cache-version-counter';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { Customer } from '../entities/customer.entity';
 import { CustomerGrant } from '../entities/customer-grant.entity';
@@ -27,10 +28,14 @@ const ENTITLED_STATUSES: SubscriptionStatus[] = [
 ];
 
 const VERSION_KEY = 'entitlements:version';
+const VERSION_COUNTER_KEY = 'entitlements:version:counter';
 const USER_TTL_MS = 60_000;
 
 @Injectable()
 export class EntitlementService {
+  readonly #logger = new Logger(EntitlementService.name);
+  readonly #version: CacheVersionCounter;
+
   constructor(
     @InjectRepository(Customer)
     private readonly customers: Repository<Customer>,
@@ -42,7 +47,14 @@ export class EntitlementService {
     private readonly grants: Repository<CustomerGrant>,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
     private readonly metrics: MetricsService
-  ) {}
+  ) {
+    this.#version = new CacheVersionCounter(
+      cache,
+      VERSION_COUNTER_KEY,
+      VERSION_KEY,
+      this.#logger
+    );
+  }
 
   /**
    * Resolves the capability set + limits in effect for a user. Cached per-user,
@@ -142,24 +154,11 @@ export class EntitlementService {
     };
   }
 
-  private async getVersion(): Promise<number> {
-    const cached = await this.cache.get<number>(VERSION_KEY);
-    if (typeof cached === 'number') return cached;
-    const initial = Date.now();
-    await this.cache.set(VERSION_KEY, initial, 0);
-    return initial;
+  private getVersion(): Promise<number> {
+    return this.#version.read();
   }
 
-  private async bumpVersion(): Promise<void> {
-    // Monotonic: Date.now() has millisecond granularity, so two invalidations in
-    // the same millisecond (fast CI, multi-instance race) would re-emit the same
-    // version and leave stale per-user keys reachable. max(prev + 1) keeps the
-    // suffix strictly fresh.
-    const previous = await this.cache.get<number>(VERSION_KEY);
-    const next = Math.max(
-      Date.now(),
-      (typeof previous === 'number' ? previous : 0) + 1
-    );
-    await this.cache.set(VERSION_KEY, next, 0);
+  private bumpVersion(): Promise<void> {
+    return this.#version.bump();
   }
 }

@@ -398,7 +398,9 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
     amountMinor = price.amountMinor;
   } else {
     const { minAmountMinor, maxAmountMinor } = price;
-    if (!minAmountMinor || !maxAmountMinor) {
+    // `== null`, not falsy: a configured lower bound of 0 (any amount the
+    // request already has to be >= 1 for) is legitimate, not "unconfigured".
+    if (minAmountMinor == null || maxAmountMinor == null) {
       res.status(503).json({
         message: `Product "${product.key}" has no amount bounds configured`,
         statusCode: 503

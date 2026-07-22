@@ -1,4 +1,22 @@
-import { Money } from '@app/shared/utils/money';
+import { Money, minorUnitScale } from '@app/shared/utils/money';
+
+describe('minorUnitScale', () => {
+  it('reads the scale from the currency', () => {
+    expect(minorUnitScale('USD')).toBe(2);
+    expect(minorUnitScale('RUB')).toBe(2);
+    expect(minorUnitScale('JPY')).toBe(0);
+    expect(minorUnitScale('KWD')).toBe(3);
+  });
+
+  it('is case-insensitive', () => {
+    expect(minorUnitScale('jpy')).toBe(0);
+  });
+
+  it('falls back to 2 for an unknown code instead of throwing', () => {
+    expect(minorUnitScale('ZZZ')).toBe(2);
+    expect(minorUnitScale('not-a-currency')).toBe(2);
+  });
+});
 
 describe('Money', () => {
   describe('fromMinor', () => {

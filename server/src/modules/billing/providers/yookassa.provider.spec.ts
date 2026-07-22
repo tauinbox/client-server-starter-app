@@ -418,6 +418,30 @@ describe('YooKassaProvider', () => {
       expect(payload.receipt!.items[0].amount.value).toBe('25000000.00');
     });
 
+    it('formats the amount at the currency scale, not a fixed two decimals', async () => {
+      const { provider, client } = await build();
+      client!.createPayment.mockResolvedValue({
+        id: 'pay-jpy',
+        status: 'succeeded'
+      });
+
+      // JPY has no minor unit: 1500 minor is 1500 yen. A hardcoded scale of 2
+      // would send '15.00' and undercharge by two orders of magnitude.
+      await provider.chargeOffSession(
+        { ...savedCustomer, currency: 'JPY' } as Customer,
+        1500,
+        [{ description: 'Pro renewal', amountMinor: 1500, quantity: 1 }],
+        'idem-jpy'
+      );
+
+      const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
+      expect(payload.amount).toEqual({ value: '1500', currency: 'JPY' });
+      expect(payload.receipt!.items[0].amount).toEqual({
+        value: '1500',
+        currency: 'JPY'
+      });
+    });
+
     it('reports a pending (payment-after-receipt) charge as accepted but uncaptured', async () => {
       const { provider, client } = await build();
       client!.createPayment.mockResolvedValue({
@@ -747,6 +771,27 @@ describe('YooKassaProvider', () => {
         currency: 'RUB',
         paidAt: '2026-06-01T00:05:00Z'
       });
+    });
+
+    it('parses the webhook amount at the currency scale', async () => {
+      const { provider, client } = await build();
+      client!.getPayment.mockResolvedValue({
+        id: 'pay-jpy',
+        status: 'succeeded',
+        amount: { value: '1500', currency: 'JPY' },
+        captured_at: '2026-06-01T00:05:00Z',
+        created_at: '2026-06-01T00:00:00Z',
+        metadata: { customerId: 'cust-1', userId: 'user-1', planKey: 'pro' }
+      });
+
+      const result = await provider.verifyAndParseWebhook(
+        notification('payment.succeeded')
+      );
+
+      // A fixed scale of 2 would reject '1500' as unparseable-with-decimals or
+      // read it as 150000 minor; the currency scale keeps it 1500.
+      const payload = result!.payload as NormalizedInvoicePayload;
+      expect(payload).toMatchObject({ amountMinor: 1500, currency: 'JPY' });
     });
 
     it('maps a succeeded method-update re-bind to payment_method.updated', async () => {

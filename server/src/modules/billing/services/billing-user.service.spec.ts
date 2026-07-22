@@ -384,6 +384,45 @@ describe('BillingUserService', () => {
       }
     );
 
+    it('treats a zero lower bound as configured, not as missing bounds', async () => {
+      // `!minAmountMinor` rejected a legitimate 0 lower bound as unconfigured
+      // and answered 503 for every donation to such a product.
+      const { ctx, yoo } = await setupPurchase(
+        makeDonation({
+          prices: {
+            yookassa: {
+              currency: 'RUB',
+              minAmountMinor: 0,
+              maxAmountMinor: 5000000
+            }
+          }
+        })
+      );
+
+      await ctx.service.purchase('user-1', {
+        productKey: 'donation',
+        amountMinor: 500
+      });
+
+      expect(yoo.createOneTimePayment).toHaveBeenCalledWith(
+        RU_CUSTOMER,
+        expect.objectContaining({ amountMinor: 500 })
+      );
+    });
+
+    it('still rejects a custom product with no bounds configured with 503', async () => {
+      const { ctx } = await setupPurchase(
+        makeDonation({ prices: { yookassa: { currency: 'RUB' } } })
+      );
+
+      await expect(
+        ctx.service.purchase('user-1', {
+          productKey: 'donation',
+          amountMinor: 500
+        })
+      ).rejects.toThrow(ServiceUnavailableException);
+    });
+
     it('charges a bounded custom amount with the sanitized note on the receipt', async () => {
       const { ctx, yoo } = await setupPurchase(makeDonation());
 

@@ -1,3 +1,4 @@
+import { minorUnitScale } from '@app/shared/utils/money';
 import type {
   BillingProviderId,
   PlanPrice,
@@ -70,28 +71,24 @@ export function formatUnits(units: number, locale: string): string {
   return new Intl.NumberFormat(locale).format(units);
 }
 
-/** The currency's minor-unit scale (2 for RUB/USD, 0 for e.g. JPY). */
-export function minorUnitScale(currency: string): number {
-  return (
-    new Intl.NumberFormat('en', {
-      style: 'currency',
-      currency
-    }).resolvedOptions().maximumFractionDigits ?? 2
-  );
-}
-
 /**
  * Parse a user-typed major-unit amount ("1500", "1500.50", RU "1500,50")
  * into integer minor units, or `null` when the text is not a plain positive
- * number. Validation against the product bounds is the caller's.
+ * number. The accepted number of fraction digits follows the currency's own
+ * scale, so a zero-decimal currency rejects "1500.5" instead of silently
+ * rounding it, and a three-decimal one accepts "1.234". Validation against the
+ * product bounds is the caller's.
  */
 export function parseAmountToMinor(
   text: string,
   currency: string
 ): number | null {
+  const scale = minorUnitScale(currency);
   const normalized = text.trim().replace(',', '.');
-  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return null;
+  const pattern =
+    scale > 0 ? new RegExp(`^\\d+(\\.\\d{1,${scale}})?$`) : /^\d+$/;
+  if (!pattern.test(normalized)) return null;
   const major = Number(normalized);
   if (!Number.isFinite(major) || major <= 0) return null;
-  return Math.round(major * 10 ** minorUnitScale(currency));
+  return Math.round(major * 10 ** scale);
 }

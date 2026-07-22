@@ -9,7 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Money } from '@app/shared/utils/money';
+import { Money, minorUnitScale } from '@app/shared/utils/money';
 import type {
   ICreatePayment,
   ICreateRefund,
@@ -61,14 +61,18 @@ const ONE_TIME_PURPOSE = 'one_time';
  */
 const OFF_SESSION_PURPOSE = 'off_session';
 
-/** Minor units (kopecks) → YooKassa decimal string, e.g. `99000` → `'990.00'`. */
-function toAmountValue(amountMinor: number): string {
-  return Money.fromMinor(amountMinor).toMajorString(2);
+/**
+ * Minor units -> YooKassa decimal string, e.g. `99000` RUB -> `'990.00'`. The
+ * decimal scale comes from the currency, not a fixed 2, so a zero- or
+ * three-decimal currency is not shifted by two orders of magnitude.
+ */
+function toAmountValue(amountMinor: number, currency: string): string {
+  return Money.fromMinor(amountMinor).toMajorString(minorUnitScale(currency));
 }
 
-/** YooKassa decimal string → minor units, e.g. `'990.00'` → `99000`. */
-function toMinor(value: string): number {
-  return Money.fromMajorString(value, 2).toNumber();
+/** YooKassa decimal string -> minor units, e.g. `'990.00'` RUB -> `99000`. */
+function toMinor(value: string, currency: string): number {
+  return Money.fromMajorString(value, minorUnitScale(currency)).toNumber();
 }
 
 /** Whether a payment is a method-update re-bind (per its metadata marker). */
@@ -222,7 +226,7 @@ export class YooKassaProvider implements PaymentProvider {
     // period creates a real payment with a 54-FZ receipt.
     const payload: ICreatePayment = {
       amount: {
-        value: toAmountValue(isTrial ? 0 : price.amountMinor),
+        value: toAmountValue(isTrial ? 0 : price.amountMinor, price.currency),
         currency: price.currency
       },
       capture: true,
@@ -272,7 +276,7 @@ export class YooKassaProvider implements PaymentProvider {
     const yoo = this.requireClient();
     const payload: ICreatePayment = {
       amount: {
-        value: toAmountValue(params.amountMinor),
+        value: toAmountValue(params.amountMinor, params.currency),
         currency: params.currency
       },
       capture: true,
@@ -315,7 +319,10 @@ export class YooKassaProvider implements PaymentProvider {
   ): Promise<CheckoutSession> {
     const yoo = this.requireClient();
     const payload: ICreatePayment = {
-      amount: { value: toAmountValue(0), currency: customer.currency },
+      amount: {
+        value: toAmountValue(0, customer.currency),
+        currency: customer.currency
+      },
       capture: true,
       save_payment_method: true,
       confirmation: { type: 'redirect', return_url: urls.successUrl },
@@ -349,7 +356,7 @@ export class YooKassaProvider implements PaymentProvider {
 
     const payload: ICreatePayment = {
       amount: {
-        value: toAmountValue(amountMinor),
+        value: toAmountValue(amountMinor, customer.currency),
         currency: customer.currency
       },
       capture: true,
@@ -454,12 +461,12 @@ export class YooKassaProvider implements PaymentProvider {
     const payment = await yoo.getPayment(providerInvoiceRef);
     const currency = payment.amount?.currency ?? 'RUB';
     const refundMinor =
-      amountMinor > 0 ? amountMinor : toMinor(payment.amount.value);
+      amountMinor > 0 ? amountMinor : toMinor(payment.amount.value, currency);
     const userId = refFromMetadata(payment.metadata).userId;
 
     const payload: ICreateRefund = {
       payment_id: providerInvoiceRef,
-      amount: { value: toAmountValue(refundMinor), currency },
+      amount: { value: toAmountValue(refundMinor, currency), currency },
       receipt: await this.buildReceipt(
         userId,
         [
@@ -548,7 +555,7 @@ export class YooKassaProvider implements PaymentProvider {
           ref,
           providerInvoiceRef: payment.id,
           providerSubscriptionId: null,
-          amountMinor: toMinor(payment.amount.value),
+          amountMinor: toMinor(payment.amount.value, payment.amount.currency),
           currency: payment.amount.currency,
           periodStart: null,
           periodEnd: null,
@@ -565,7 +572,7 @@ export class YooKassaProvider implements PaymentProvider {
         ref,
         providerInvoiceRef: payment.id,
         providerSubscriptionId: null,
-        amountMinor: toMinor(payment.amount.value),
+        amountMinor: toMinor(payment.amount.value, payment.amount.currency),
         currency: payment.amount.currency,
         periodStart: null,
         periodEnd: null,
@@ -615,7 +622,7 @@ export class YooKassaProvider implements PaymentProvider {
       description: item.description,
       quantity: String(item.quantity),
       amount: {
-        value: toAmountValue(item.amountMinor),
+        value: toAmountValue(item.amountMinor, currency),
         currency
       },
       vat_code: this.vatCode
