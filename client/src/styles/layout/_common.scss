@@ -2,6 +2,14 @@
 @use 'abstracts/mixins' as mix;
 @use 'abstracts/functions' as func;
 
+// Sidenav widths are published as custom properties because the drawer width and
+// the content offset are applied from TypeScript (SidenavStateService.width) while
+// the rail itself is styled in SCSS. Both read these, so the two stay in step.
+:root {
+  --nav-width-narrow: #{vars.$nav-width-narrow};
+  --nav-width-wide: #{vars.$nav-width-wide};
+}
+
 .container {
   // The mixin's display:flex + justify-content:center was designed for centering small
   // child elements (cards, forms). As the main page wrapper we need children to

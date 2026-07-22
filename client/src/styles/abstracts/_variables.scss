@@ -57,6 +57,8 @@ $breakpoint-lg: 1919px;
 /* stylelint-enable unit-disallowed-list */
 
 // Layout
+$nav-width-narrow: func.rem(64); // 4rem — icon-only navigation rail
+$nav-width-wide: func.rem(220); // 13.75rem — rail expanded with labels
 $container-max-width: func.rem(1280); // 80rem
 $card-width-sm: func.rem(400); // 25rem
 $card-width-md: func.rem(600); // 37.5rem

@@ -16,8 +16,10 @@ import { LocalStorageService } from './local-storage.service';
 
 const WIDE_KEY = (userId: string) => `sidenav_wide_${userId}`;
 
-const NAV_WIDTH_NARROW = '4rem';
-const NAV_WIDTH_WIDE = '13.75rem';
+// Widths come from the custom properties published in styles/layout/_common.scss
+// so the drawer, the content offset and the rail itself share one definition.
+const NAV_WIDTH_NARROW = 'var(--nav-width-narrow)';
+const NAV_WIDTH_WIDE = 'var(--nav-width-wide)';
 
 export type NavLink = {
   readonly route: string;

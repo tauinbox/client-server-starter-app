@@ -29,13 +29,7 @@ import { MatSlider, MatSliderThumb } from '@angular/material/slider';
 import { MatTooltip } from '@angular/material/tooltip';
 import { TranslocoDirective } from '@jsverse/transloco';
 import { forkJoin, of, Subject } from 'rxjs';
-import {
-  catchError,
-  debounceTime,
-  distinctUntilChanged,
-  map,
-  switchMap
-} from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 import type {
   FeatureFlagAttributeField,
   FeatureFlagAttributeOp,
@@ -49,6 +43,14 @@ import { ChipsAutocompleteComponent } from '@shared/forms';
 import { RoleService } from '../../../services/role.service';
 import { UserService } from '../../../../users/services/user.service';
 import type { User } from '../../../../users/models/user.types';
+import {
+  debouncedUserSearch,
+  roleToChip,
+  searchUsersPage,
+  USER_SEARCH_LIMIT,
+  USER_SEARCH_MIN_CHARS,
+  userToChip
+} from '../../../utils/user-chip-search';
 
 export type FeatureFlagRuleDraft = {
   id?: string;
@@ -80,18 +82,7 @@ const ATTRIBUTE_OPS: FeatureFlagAttributeOp[] = [
   'after'
 ];
 
-const USER_SEARCH_DEBOUNCE_MS = 350;
-const USER_SEARCH_MIN_CHARS = 3;
-const USER_SEARCH_LIMIT = 10;
 const PERCENT_STEP = 5;
-
-function userToChip(user: User): ChipOption {
-  return {
-    value: user.id,
-    label: `${user.firstName} ${user.lastName}`.trim() || user.email,
-    sub: user.email
-  };
-}
 
 function userMatchesTerm(user: User, lowered: string): boolean {
   return (
@@ -228,9 +219,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
     this.#userSearch$
       .pipe(
-        debounceTime(USER_SEARCH_DEBOUNCE_MS),
-        distinctUntilChanged(),
-        switchMap((term) => this.#searchUsers(term)),
+        debouncedUserSearch((term) => this.#searchUsers(term)),
         takeUntilDestroyed(this.#destroyRef)
       )
       .subscribe((users) => {
@@ -252,11 +241,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
         const cache = new Map(this.#roleLabelCache());
         const opts: ChipOption[] = [];
         for (const r of roles) {
-          const chip: ChipOption = {
-            value: r.name,
-            label: r.name,
-            sub: r.description ?? undefined
-          };
+          const chip = roleToChip(r);
           cache.set(chip.value, chip);
           opts.push(chip);
         }
@@ -328,25 +313,16 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
       return of(filtered);
     }
 
-    return this.#userService
-      .searchCursor(
-        { q: trimmed },
-        {
-          limit: USER_SEARCH_LIMIT,
-          sortBy: 'createdAt',
-          sortOrder: 'desc'
-        }
-      )
-      .pipe(
-        map((r) => {
-          this.#lastSearch = {
-            term: trimmed,
-            results: r.data,
-            isComplete: r.data.length < USER_SEARCH_LIMIT
-          };
-          return r.data;
-        })
-      );
+    return searchUsersPage(this.#userService, trimmed).pipe(
+      map((users) => {
+        this.#lastSearch = {
+          term: trimmed,
+          results: users,
+          isComplete: users.length < USER_SEARCH_LIMIT
+        };
+        return users;
+      })
+    );
   }
 
   onTypeChange(type: FeatureFlagRuleType): void {
