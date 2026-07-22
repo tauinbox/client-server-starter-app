@@ -17,32 +17,21 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { of, Subject } from 'rxjs';
-import {
-  debounceTime,
-  distinctUntilChanged,
-  map,
-  switchMap
-} from 'rxjs/operators';
 import type { FeatureFlagPreviewResult } from '@app/shared/types';
 import { ChipsAutocompleteComponent, type ChipOption } from '@shared/forms';
 import { NotifyService } from '@core/services/notify.service';
 import { RoleService } from '../../../services/role.service';
 import { UserService } from '../../../../users/services/user.service';
 import type { User } from '../../../../users/models/user.types';
+import {
+  debouncedUserSearch,
+  roleToChip,
+  searchUsersPage,
+  USER_SEARCH_MIN_CHARS,
+  userToChip
+} from '../../../utils/user-chip-search';
 import type { PreviewFlagContext } from '../../../services/feature-flags-admin.service';
 import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.service';
-
-const USER_SEARCH_DEBOUNCE_MS = 350;
-const USER_SEARCH_MIN_CHARS = 3;
-const USER_SEARCH_LIMIT = 10;
-
-function userToChip(user: User): ChipOption {
-  return {
-    value: user.id,
-    label: `${user.firstName} ${user.lastName}`.trim() || user.email,
-    sub: user.email
-  };
-}
 
 @Component({
   selector: 'nxs-feature-flag-preview',
@@ -104,13 +93,7 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: (roles) => {
-          this.roleOptions.set(
-            roles.map((r) => ({
-              value: r.name,
-              label: r.name,
-              sub: r.description ?? undefined
-            }))
-          );
+          this.roleOptions.set(roles.map(roleToChip));
         },
         error: () => {
           // Roles are optional for preview — silently degrade to free-text input.
@@ -119,9 +102,7 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
 
     this.#userSearch$
       .pipe(
-        debounceTime(USER_SEARCH_DEBOUNCE_MS),
-        distinctUntilChanged(),
-        switchMap((term) => this.#searchUsers(term)),
+        debouncedUserSearch((term) => this.#searchUsers(term)),
         takeUntilDestroyed(this.#destroyRef)
       )
       .subscribe((users) => {
@@ -151,12 +132,7 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
   #searchUsers(term: string) {
     const trimmed = term.trim();
     if (trimmed.length < USER_SEARCH_MIN_CHARS) return of([] as User[]);
-    return this.#userService
-      .searchCursor(
-        { q: trimmed },
-        { limit: USER_SEARCH_LIMIT, sortBy: 'createdAt', sortOrder: 'desc' }
-      )
-      .pipe(map((r) => r.data));
+    return searchUsersPage(this.#userService, trimmed);
   }
 
   onRolesChange(next: ChipOption[]): void {

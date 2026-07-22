@@ -10,7 +10,7 @@ import { MatCard, MatCardContent } from '@angular/material/card';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { UsageSummaryResponse } from '@app/shared/types';
-import { formatMoney } from '../../utils/billing-format';
+import { formatMoney, formatUnits } from '../../utils/billing-format';
 
 /**
  * Current-period usage meter. Plans with included units get a
@@ -54,15 +54,15 @@ export class UsageMeterComponent {
   );
 
   protected readonly totalLabel = computed(() =>
-    this.#formatUnits(this.usage().totalUnits)
+    formatUnits(this.usage().totalUnits, this.#lang())
   );
 
   protected readonly includedLabel = computed(() =>
-    this.#formatUnits(this.usage().includedUnits)
+    formatUnits(this.usage().includedUnits, this.#lang())
   );
 
   protected readonly billableLabel = computed(() =>
-    this.#formatUnits(this.usage().billableUnits)
+    formatUnits(this.usage().billableUnits, this.#lang())
   );
 
   protected readonly unitPriceLabel = computed(() =>
@@ -76,8 +76,4 @@ export class UsageMeterComponent {
   protected readonly accruedLabel = computed(() =>
     formatMoney(this.usage().amountMinor, this.usage().currency, this.#lang())
   );
-
-  #formatUnits(units: number): string {
-    return new Intl.NumberFormat(this.#lang()).format(units);
-  }
 }

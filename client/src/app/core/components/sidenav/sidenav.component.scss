@@ -1,9 +1,6 @@
 @use 'abstracts/variables' as vars;
 @use 'abstracts/functions' as func;
 
-$nav-width-narrow: func.rem(64); // 64px
-$nav-width-wide: func.rem(220); // 220px
-
 // footer height = padding-top(8px) + nav-link(56px) + padding-bottom(8px) = 72px
 // toggle btn center on border-top divider: bottom = footer-height - btn-half(12px) = 60px
 $footer-height: func.rem(72);
@@ -23,13 +20,13 @@ $indicator-radius: func.rem(28); // full pill
 .nav-container {
   display: flex;
   flex-direction: column;
-  width: $nav-width-narrow;
+  width: var(--nav-width-narrow);
   height: 100%;
   overflow: hidden;
   transition: width vars.$transition-medium ease;
 
   &.wide {
-    width: $nav-width-wide;
+    width: var(--nav-width-wide);
   }
 }
 
@@ -94,7 +91,7 @@ $indicator-radius: func.rem(28); // full pill
   // can create a stacking context and break fixed positioning.
   position: absolute;
   bottom: $footer-height - $toggle-btn-size * 0.5; // = 2.75rem
-  left: calc(#{$nav-width-narrow} - #{$toggle-btn-size} * 0.5); // = 3.25rem
+  left: calc(var(--nav-width-narrow) - #{$toggle-btn-size} * 0.5); // = 3.25rem
   z-index: 10;
   display: flex;
   align-items: center;
@@ -121,6 +118,6 @@ $indicator-radius: func.rem(28); // full pill
   }
 
   &.wide {
-    left: calc(#{$nav-width-wide} - #{$toggle-btn-size} * 0.5); // = 13rem
+    left: calc(var(--nav-width-wide) - #{$toggle-btn-size} * 0.5); // = 13rem
   }
 }
