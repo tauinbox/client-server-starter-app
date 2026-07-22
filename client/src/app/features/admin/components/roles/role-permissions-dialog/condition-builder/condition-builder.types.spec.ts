@@ -5,7 +5,9 @@ import {
   resetIdCounter,
   parseValue,
   jsonToModel,
-  modelToJson
+  modelToJson,
+  updateGroup,
+  updateRule
 } from './condition-builder.types';
 
 describe('condition-builder types', () => {
@@ -246,6 +248,66 @@ describe('condition-builder types', () => {
     it('serializes empty group as empty object', () => {
       const group = createGroup('$and', []);
       expect(modelToJson(group)).toEqual({});
+    });
+  });
+
+  describe('updateGroup / updateRule', () => {
+    function tree() {
+      const nestedRule = createRule('age', '$gt', '18');
+      const nested = createGroup('$or', [{ type: 'rule', rule: nestedRule }]);
+      const topRule = createRule('status', '$eq', 'active');
+      const root = createGroup('$and', [
+        { type: 'rule', rule: topRule },
+        { type: 'group', group: nested }
+      ]);
+      return { root, nested, nestedRule, topRule };
+    }
+
+    it('applies the update to a nested group without mutating the old tree', () => {
+      const { root, nested } = tree();
+
+      const next = updateGroup(root, nested, (group) => ({
+        ...group,
+        logic: '$and'
+      }));
+
+      expect(next).not.toBe(root);
+      expect(nested.logic).toBe('$or');
+      expect(root.children).toHaveLength(2);
+      expect(
+        (next.children[1] as { type: 'group'; group: { logic: string } }).group
+          .logic
+      ).toBe('$and');
+    });
+
+    it('keeps the identity of branches that did not change', () => {
+      const { root, nested } = tree();
+
+      const next = updateGroup(root, nested, (group) => ({
+        ...group,
+        children: []
+      }));
+
+      expect(next.children[0]).toBe(root.children[0]);
+    });
+
+    it('returns the same root when the target is not in the tree', () => {
+      const { root } = tree();
+      const orphan = createGroup('$and', []);
+
+      expect(updateGroup(root, orphan, (group) => group)).toBe(root);
+      expect(updateRule(root, createRule(), { field: 'x' })).toBe(root);
+    });
+
+    it('patches a nested rule without mutating the original', () => {
+      const { root, nestedRule } = tree();
+
+      const next = updateRule(root, nestedRule, { value: '21' });
+
+      expect(nestedRule.value).toBe('18');
+      expect(modelToJson(next)).toEqual({
+        $and: [{ status: 'active' }, { $or: [{ age: { $gt: 21 } }] }]
+      });
     });
   });
 

@@ -19,6 +19,7 @@ import type {
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { FeatureFlagService } from '@features/feature-flags/services/feature-flag.service';
+import { SessionStorageService } from '@core/services/session-storage.service';
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
@@ -226,6 +227,43 @@ describe('LoginComponent', () => {
       expect(newRouter.navigateByUrl).toHaveBeenCalledWith('/dashboard');
     });
 
+    it('should fall back to "/" when returnUrl points off-site', async () => {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        imports: [LoginComponent, TranslocoTestingModuleWithLangs],
+        providers: [
+          provideRouter([]),
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          provideNoopAnimations(),
+          { provide: AuthService, useValue: authServiceMock },
+          {
+            provide: ActivatedRoute,
+            useValue: {
+              snapshot: { queryParams: { returnUrl: '//evil.example' } }
+            }
+          }
+        ]
+      });
+
+      const newFixture = TestBed.createComponent(LoginComponent);
+      const newComponent = newFixture.componentInstance;
+      const newRouter = TestBed.inject(Router);
+      vi.spyOn(newRouter, 'navigateByUrl');
+      newFixture.detectChanges();
+
+      authServiceMock.login.mockReturnValue(of(mockAuthResponse));
+
+      newComponent.loginModel.set({
+        email: 'test@example.com',
+        password: 'password123'
+      });
+      await newFixture.whenStable();
+      newComponent.onSubmit();
+
+      expect(newRouter.navigateByUrl).toHaveBeenCalledWith('/');
+    });
+
     it('should show fallback translation on login failure without errorKey', async () => {
       const httpError = new HttpErrorResponse({
         error: { message: 'Invalid credentials' },
@@ -325,6 +363,16 @@ describe('LoginComponent', () => {
         'vk'
       ]);
       expect(oauthButtonCount()).toBe(2);
+    });
+
+    it('ignores a provider that is not a known OAuth provider', () => {
+      const sessionStorage = TestBed.inject(SessionStorageService);
+      const setItem = vi.spyOn(sessionStorage, 'setItem');
+
+      component.onOAuthLogin('constructor');
+      component.onOAuthLogin('twitter');
+
+      expect(setItem).not.toHaveBeenCalled();
     });
   });
 });

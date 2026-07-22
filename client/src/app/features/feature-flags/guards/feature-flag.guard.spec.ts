@@ -15,6 +15,7 @@ describe('featureFlagGuard', () => {
   let authStoreMock: {
     isAuthenticated: ReturnType<typeof vi.fn>;
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
+    hasPersistedUser: ReturnType<typeof vi.fn>;
     clearSession: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: { refreshTokens: ReturnType<typeof vi.fn> };
@@ -42,6 +43,7 @@ describe('featureFlagGuard', () => {
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(true),
       isAccessTokenExpired: vi.fn().mockReturnValue(false),
+      hasPersistedUser: vi.fn().mockReturnValue(true),
       clearSession: vi.fn()
     };
     authServiceMock = { refreshTokens: vi.fn().mockReturnValue(of(null)) };

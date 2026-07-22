@@ -1,8 +1,8 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  inject,
-  LOCALE_ID
+  computed,
+  inject
 } from '@angular/core';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -16,10 +16,10 @@ import { ThemeToggleComponent } from './theme-toggle/theme-toggle.component';
 import { LanguageSwitcherComponent } from './language-switcher/language-switcher.component';
 import { TranslocoDirective } from '@jsverse/transloco';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
-import { formatDate } from '@angular/common';
 import { APP_VERSION, BUILD_HASH, BUILD_DATE } from '@environments/version';
 import { environment } from '@environments/environment';
 import { SidenavStateService } from '@core/services/sidenav-state.service';
+import { LanguageService } from '@core/services/language.service';
 
 @Component({
   selector: 'nxs-header',
@@ -43,9 +43,19 @@ export class HeaderComponent {
   protected readonly authStore = inject(AuthStore);
   protected readonly sidenavState = inject(SidenavStateService);
   protected readonly routes = AppRouteSegmentEnum;
-  readonly #locale = inject(LOCALE_ID);
+  readonly #language = inject(LanguageService).language;
   protected readonly appName = environment.appName;
-  protected readonly appVersion = `v${APP_VERSION} (${BUILD_HASH}) · ${formatDate(BUILD_DATE, 'short', this.#locale)}`;
+
+  // Intl rather than Angular's formatDate: the build date must follow the
+  // language the user picked at runtime, and Intl needs no locale data to be
+  // registered up front (LanguageService imports it lazily).
+  protected readonly appVersion = computed(() => {
+    const builtAt = new Intl.DateTimeFormat(this.#language(), {
+      dateStyle: 'short',
+      timeStyle: 'short'
+    }).format(new Date(BUILD_DATE));
+    return `v${APP_VERSION} (${BUILD_HASH}) · ${builtAt}`;
+  });
 
   readonly #authService = inject(AuthService);
 

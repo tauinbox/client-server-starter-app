@@ -8,6 +8,7 @@ describe('ensureAuthenticated', () => {
   let authStoreMock: {
     isAuthenticated: ReturnType<typeof vi.fn>;
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
+    hasPersistedUser: ReturnType<typeof vi.fn>;
     clearSession: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
@@ -25,6 +26,7 @@ describe('ensureAuthenticated', () => {
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(false),
       isAccessTokenExpired: vi.fn().mockReturnValue(true),
+      hasPersistedUser: vi.fn().mockReturnValue(true),
       clearSession: vi.fn()
     };
 
@@ -68,6 +70,24 @@ describe('ensureAuthenticated', () => {
     expect(result).toBeInstanceOf(Observable);
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(true);
+  });
+
+  it('should skip the refresh round-trip when no user was ever persisted', () => {
+    authStoreMock.hasPersistedUser.mockReturnValue(false);
+
+    const result = ensureAuthenticated(
+      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
+      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
+      router,
+      '/dashboard',
+      () => true
+    );
+
+    expect(result).toBe(false);
+    expect(authServiceMock.refreshTokens).not.toHaveBeenCalled();
+    expect(navigateSpy).toHaveBeenCalledWith(['/login'], {
+      queryParams: { returnUrl: '/dashboard' }
+    });
   });
 
   it('should refresh tokens when authenticated but token expired', async () => {

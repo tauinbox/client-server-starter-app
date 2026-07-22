@@ -34,7 +34,7 @@ import type { UserResponse } from '@app/shared/types';
 import type { UpdateProfile } from '../../models/auth.types';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { OAUTH_URLS } from '../../constants/auth-api.const';
+import { isOAuthProvider, OAUTH_URLS } from '../../constants/auth-api.const';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
 import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
@@ -336,6 +336,8 @@ export class ProfileComponent implements OnInit {
   }
 
   connectProvider(provider: string): void {
+    if (!isOAuthProvider(provider)) return;
+
     this.oauthLoading.set(true);
     this.#authService
       .initOAuthLink()
@@ -344,8 +346,7 @@ export class ProfileComponent implements OnInit {
         next: () => {
           this.#sessionStorage.setItem('oauth_return_url', '/profile');
           if (this.#window) {
-            this.#window.location.href =
-              OAUTH_URLS[provider as keyof typeof OAUTH_URLS];
+            this.#window.location.href = OAUTH_URLS[provider];
           }
         },
         error: (err: HttpErrorResponse) => {

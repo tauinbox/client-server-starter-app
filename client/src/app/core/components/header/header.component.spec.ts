@@ -6,12 +6,17 @@ import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloc
 import { HeaderComponent } from './header.component';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AuthService } from '@features/auth/services/auth.service';
+import type { AppLanguage } from '@core/services/language.service';
+import { LanguageService } from '@core/services/language.service';
+import { signal } from '@angular/core';
 
 describe('HeaderComponent', () => {
   let component: HeaderComponent;
   let fixture: ComponentFixture<HeaderComponent>;
+  const language = signal<AppLanguage>('en');
 
   beforeEach(async () => {
+    language.set('en');
     await TestBed.configureTestingModule({
       imports: [HeaderComponent, TranslocoTestingModuleWithLangs],
       providers: [
@@ -27,6 +32,10 @@ describe('HeaderComponent', () => {
         {
           provide: AuthService,
           useValue: { logout: vi.fn() }
+        },
+        {
+          provide: LanguageService,
+          useValue: { language: language.asReadonly() }
         }
       ]
     }).compileComponents();
@@ -38,5 +47,14 @@ describe('HeaderComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('should reformat the build date when the active language changes', () => {
+    const inEnglish = component['appVersion']();
+    language.set('ru');
+    const inRussian = component['appVersion']();
+
+    expect(inEnglish).not.toBe(inRussian);
+    expect(inRussian).toContain('v');
   });
 });
