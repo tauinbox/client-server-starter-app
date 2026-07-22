@@ -5,6 +5,7 @@ import { navigateToLogin } from './navigate-to-login';
 type AuthStoreLike = {
   isAuthenticated: () => boolean;
   isAccessTokenExpired: () => boolean;
+  hasPersistedUser: () => boolean;
   clearSession: () => void;
 };
 
@@ -21,6 +22,15 @@ export function ensureAuthenticated(
 ): boolean | Observable<boolean> {
   if (authStore.isAuthenticated() && !authStore.isAccessTokenExpired()) {
     return onAuthenticated();
+  }
+
+  // Without a persisted user there is no session to refresh: the refresh cookie
+  // belongs to a session we never had, so the round-trip is a guaranteed 401 on
+  // every guarded navigation an anonymous visitor makes.
+  if (!authStore.hasPersistedUser()) {
+    authStore.clearSession();
+    navigateToLogin(router, returnUrl);
+    return false;
   }
 
   return authService.refreshTokens().pipe(

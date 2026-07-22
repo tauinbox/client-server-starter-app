@@ -14,6 +14,7 @@ describe('permissionGuard', () => {
   let authStoreMock: {
     isAuthenticated: ReturnType<typeof vi.fn>;
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
+    hasPersistedUser: ReturnType<typeof vi.fn>;
     hasPermissions: ReturnType<typeof vi.fn>;
     clearSession: ReturnType<typeof vi.fn>;
   };
@@ -28,6 +29,7 @@ describe('permissionGuard', () => {
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(true),
       isAccessTokenExpired: vi.fn().mockReturnValue(false),
+      hasPersistedUser: vi.fn().mockReturnValue(true),
       hasPermissions: vi.fn().mockReturnValue(false),
       clearSession: vi.fn()
     };
@@ -127,6 +129,7 @@ describe('instancePermissionGuard', () => {
   let authStoreMock: {
     isAuthenticated: ReturnType<typeof vi.fn>;
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
+    hasPersistedUser: ReturnType<typeof vi.fn>;
     hasPermissions: ReturnType<typeof vi.fn>;
     clearSession: ReturnType<typeof vi.fn>;
   };
@@ -143,6 +146,7 @@ describe('instancePermissionGuard', () => {
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(true),
       isAccessTokenExpired: vi.fn().mockReturnValue(false),
+      hasPersistedUser: vi.fn().mockReturnValue(true),
       hasPermissions: vi.fn().mockReturnValue(false),
       clearSession: vi.fn()
     };

@@ -31,7 +31,8 @@ import { SessionStorageService } from '@core/services/session-storage.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { take } from 'rxjs/operators';
-import { OAUTH_URLS } from '../../constants/auth-api.const';
+import { isOAuthProvider, OAUTH_URLS } from '../../constants/auth-api.const';
+import { isSafeReturnUrl } from '../../utils/is-safe-return-url';
 import type { LockoutErrorData } from '../../models/auth.types';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
@@ -145,13 +146,11 @@ export class LoginComponent implements OnInit, OnDestroy {
   }
 
   onOAuthLogin(provider: string): void {
-    this.#sessionStorage.setItem(
-      'oauth_return_url',
-      this.#route.snapshot.queryParams['returnUrl'] || '/'
-    );
+    if (!isOAuthProvider(provider)) return;
+
+    this.#sessionStorage.setItem('oauth_return_url', this.#returnUrl());
     if (this.#window) {
-      this.#window.location.href =
-        this.oauthUrls[provider as keyof typeof OAUTH_URLS];
+      this.#window.location.href = this.oauthUrls[provider];
     }
   }
 
@@ -170,9 +169,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           this.loading.set(false);
-          const returnUrl =
-            this.#route.snapshot.queryParams['returnUrl'] || '/';
-          void this.#router.navigateByUrl(returnUrl);
+          void this.#router.navigateByUrl(this.#returnUrl());
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
@@ -198,6 +195,12 @@ export class LoginComponent implements OnInit, OnDestroy {
           this.resendingVerification.set(false);
         }
       });
+  }
+
+  /** Attacker-supplied `?returnUrl=` is only followed when app-internal. */
+  #returnUrl(): string {
+    const returnUrl = this.#route.snapshot.queryParams['returnUrl'] as unknown;
+    return isSafeReturnUrl(returnUrl) ? returnUrl : '/';
   }
 
   #handleLoginError(err: HttpErrorResponse): void {

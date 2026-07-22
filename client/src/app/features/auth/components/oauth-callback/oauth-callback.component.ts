@@ -6,6 +6,7 @@ import { AuthStore } from '../../store/auth.store';
 import { AuthService } from '../../services/auth.service';
 import { SessionStorageService } from '@core/services/session-storage.service';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
+import { isSafeReturnUrl } from '../../utils/is-safe-return-url';
 import { TranslocoDirective } from '@jsverse/transloco';
 
 @Component({
@@ -54,10 +55,9 @@ export class OAuthCallbackComponent implements OnInit {
           this.#sessionStorage.getItem<string>('oauth_return_url');
         this.#sessionStorage.removeItem('oauth_return_url');
 
-        const safeUrl =
-          returnUrl && returnUrl.startsWith('/') && !returnUrl.includes('//')
-            ? returnUrl
-            : `/${AppRouteSegmentEnum.Profile}`;
+        const safeUrl = isSafeReturnUrl(returnUrl)
+          ? returnUrl
+          : `/${AppRouteSegmentEnum.Profile}`;
 
         void this.#router.navigateByUrl(safeUrl, { replaceUrl: true });
       },

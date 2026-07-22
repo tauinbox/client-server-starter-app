@@ -166,6 +166,49 @@ describe('ConditionBuilderComponent', () => {
     });
   });
 
+  describe('immutability', () => {
+    it('does not mutate the previous tree when a rule is added', () => {
+      const { component } = setup('');
+      const before = component.rootGroup();
+
+      component.addRule(before);
+
+      expect(before.children).toHaveLength(0);
+      expect(component.rootGroup()).not.toBe(before);
+      expect(component.rootGroup().children).toHaveLength(1);
+    });
+
+    it('does not mutate the previous rule when its value changes', () => {
+      const { component } = setup('{"status": "active"}');
+      const before = component.rootGroup();
+      const beforeRule = (
+        before.children[0] as { type: 'rule'; rule: { value: string } }
+      ).rule;
+
+      component.setValue(before.children[0], 'inactive');
+
+      expect(beforeRule.value).toBe('active');
+      expect(
+        (
+          component.rootGroup().children[0] as {
+            type: 'rule';
+            rule: { value: string };
+          }
+        ).rule.value
+      ).toBe('inactive');
+    });
+
+    it('does not mutate the previous group logic', () => {
+      const { component } = setup('{"status": "active"}');
+      const before = component.rootGroup();
+
+      component.setGroupLogic(before, '$or');
+
+      expect(before.logic).toBe('$and');
+      expect(component.rootGroup().logic).toBe('$or');
+    });
+  });
+
   describe('mode toggle', () => {
     it('switches to raw mode and populates rawText', () => {
       const { component } = setup('{"status": "active"}');

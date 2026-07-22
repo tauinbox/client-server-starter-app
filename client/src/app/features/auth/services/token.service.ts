@@ -3,9 +3,9 @@ import { DOCUMENT } from '@angular/common';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import type { Observable, Subscription } from 'rxjs';
 import {
+  defer,
   finalize,
   firstValueFrom,
-  from,
   shareReplay,
   switchMap,
   timer
@@ -39,7 +39,9 @@ export class TokenService {
       return this.#refreshInFlight$;
     }
 
-    this.#refreshInFlight$ = from(this.#acquireRefreshLock()).pipe(
+    // defer, not from: the lock is taken and the request fired on the first
+    // subscription, so a caller that never subscribes costs nothing.
+    this.#refreshInFlight$ = defer(() => this.#acquireRefreshLock()).pipe(
       finalize(() => {
         this.#refreshInFlight$ = null;
       }),

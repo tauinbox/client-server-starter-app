@@ -22,12 +22,13 @@ export interface RecordUsageInput {
   meterKey: string;
   quantity: number;
   idempotencyKey: string;
-  occurredAt?: Date;
+  /** ISO 8601 string (HTTP ingest) or Date (in-process producers). Now if omitted. */
+  occurredAt?: Date | string;
 }
 
 /**
  * Metering ingest. Records raw usage events against a customer's
- * active subscription; aggregation/rating happens later (UsageRating, BKL-076).
+ * active subscription; aggregation/rating happens later in UsageRating.
  *
  * Ingest is idempotent on `idempotencyKey` (unique column): a replay of the same
  * key returns the original record without inserting a duplicate, so an at-least-
@@ -80,7 +81,7 @@ export class UsageService {
       subscriptionId: subscription.id,
       meterKey: input.meterKey,
       quantity: Money.fromMinor(input.quantity),
-      occurredAt: input.occurredAt ?? new Date(),
+      occurredAt: input.occurredAt ? new Date(input.occurredAt) : new Date(),
       idempotencyKey: input.idempotencyKey
     });
 

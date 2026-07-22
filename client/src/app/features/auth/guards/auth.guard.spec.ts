@@ -14,6 +14,7 @@ describe('authGuard', () => {
   let authStoreMock: {
     isAuthenticated: ReturnType<typeof vi.fn>;
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
+    hasPersistedUser: ReturnType<typeof vi.fn>;
     clearSession: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
@@ -27,6 +28,7 @@ describe('authGuard', () => {
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(false),
       isAccessTokenExpired: vi.fn().mockReturnValue(true),
+      hasPersistedUser: vi.fn().mockReturnValue(true),
       clearSession: vi.fn()
     };
 
@@ -66,6 +68,22 @@ describe('authGuard', () => {
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(false);
     expect(authStoreMock.clearSession).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
+      queryParams: { returnUrl: '/protected' }
+    });
+  });
+
+  it('should redirect an anonymous visitor without attempting a refresh', () => {
+    authStoreMock.hasPersistedUser.mockReturnValue(false);
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate');
+
+    const result = TestBed.runInInjectionContext(() =>
+      authGuard(mockRoute, mockState)
+    );
+
+    expect(result).toBe(false);
+    expect(authServiceMock.refreshTokens).not.toHaveBeenCalled();
     expect(router.navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/protected' }
     });

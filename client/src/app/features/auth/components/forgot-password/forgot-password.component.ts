@@ -4,7 +4,7 @@ import {
   DestroyRef,
   inject,
   signal,
-  ViewChild,
+  viewChild,
   type ElementRef
 } from '@angular/core';
 import {
@@ -60,7 +60,8 @@ export class ForgotPasswordComponent {
   readonly #destroyRef = inject(DestroyRef);
   readonly #translocoService = inject(TranslocoService);
 
-  @ViewChild('successHeading') successHeading?: ElementRef<HTMLElement>;
+  readonly successHeading =
+    viewChild<ElementRef<HTMLElement>>('successHeading');
 
   protected readonly loading = signal(false);
   protected readonly success = signal(false);
@@ -100,7 +101,7 @@ export class ForgotPasswordComponent {
         next: () => {
           this.loading.set(false);
           this.success.set(true);
-          setTimeout(() => this.successHeading?.nativeElement.focus());
+          setTimeout(() => this.successHeading()?.nativeElement.focus());
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);

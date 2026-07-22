@@ -24,3 +24,15 @@ export const OAUTH_URLS = {
   facebook: `${AUTH_API_V1}/oauth/facebook`,
   vk: `${AUTH_API_V1}/oauth/vk`
 } as const;
+
+export type OAuthProvider = keyof typeof OAUTH_URLS;
+
+/**
+ * Providers arrive as plain strings (feature flags, route params), and an
+ * unknown one would index OAUTH_URLS to `undefined` and navigate the window to
+ * the literal "undefined". Own-property check only - `in` would accept
+ * inherited keys such as "constructor".
+ */
+export function isOAuthProvider(value: string): value is OAuthProvider {
+  return Object.hasOwn(OAUTH_URLS, value);
+}

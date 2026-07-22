@@ -1,4 +1,4 @@
-import type { OnChanges, OnInit } from '@angular/core';
+import type { OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -19,14 +19,17 @@ import { TranslocoDirective } from '@jsverse/transloco';
 import type {
   ConditionGroup,
   ConditionNode,
-  ConditionOperator
+  ConditionOperator,
+  ConditionRule
 } from './condition-builder.types';
 import {
   CONDITION_OPERATORS,
   createGroup,
   createRule,
   jsonToModel,
-  modelToJson
+  modelToJson,
+  updateGroup,
+  updateRule
 } from './condition-builder.types';
 
 @Component({
@@ -46,7 +49,7 @@ import {
   styleUrl: './condition-builder.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ConditionBuilderComponent implements OnChanges, OnInit {
+export class ConditionBuilderComponent implements OnInit {
   readonly value = input<string>('');
   readonly readonly = input<boolean>(false);
   readonly valueChange = output<string>();
@@ -63,21 +66,11 @@ export class ConditionBuilderComponent implements OnChanges, OnInit {
     return JSON.stringify(json, null, 2);
   });
 
-  /** Track whether we've initialized from the input value. */
-  #initialized = false;
-
-  ngOnChanges(): void {
-    if (!this.#initialized) {
-      this.#initialized = true;
-      this.#loadFromInput();
-    }
-  }
-
+  // Seeded once from the input: from here on the model is the source of truth
+  // and the parent is fed through valueChange, so later echoes of our own value
+  // must not reset the tree mid-edit.
   ngOnInit(): void {
-    if (!this.#initialized) {
-      this.#initialized = true;
-      this.#loadFromInput();
-    }
+    this.#loadFromInput();
   }
 
   // ─── Mode toggle ──────────────────────────────────────────────────────
@@ -139,47 +132,43 @@ export class ConditionBuilderComponent implements OnChanges, OnInit {
   // ─── Group operations ─────────────────────────────────────────────────
 
   setGroupLogic(group: ConditionGroup, logic: '$and' | '$or'): void {
-    group.logic = logic;
-    this.#emitFromModel();
+    this.#patchGroup(group, (target) => ({ ...target, logic }));
   }
 
   addRule(group: ConditionGroup): void {
-    group.children.push({ type: 'rule', rule: createRule() });
-    this.#emitFromModel();
+    this.#patchGroup(group, (target) => ({
+      ...target,
+      children: [...target.children, { type: 'rule', rule: createRule() }]
+    }));
   }
 
   addGroup(parent: ConditionGroup): void {
     const child = createGroup('$and', [{ type: 'rule', rule: createRule() }]);
-    parent.children.push({ type: 'group', group: child });
-    this.#emitFromModel();
+    this.#patchGroup(parent, (target) => ({
+      ...target,
+      children: [...target.children, { type: 'group', group: child }]
+    }));
   }
 
   removeChild(parent: ConditionGroup, index: number): void {
-    parent.children.splice(index, 1);
-    this.#emitFromModel();
+    this.#patchGroup(parent, (target) => ({
+      ...target,
+      children: target.children.filter((_, i) => i !== index)
+    }));
   }
 
   // ─── Rule operations ──────────────────────────────────────────────────
 
   setField(node: ConditionNode, value: string): void {
-    if (node.type === 'rule') {
-      node.rule.field = value;
-      this.#emitFromModel();
-    }
+    this.#patchRule(node, { field: value });
   }
 
   setOperator(node: ConditionNode, op: ConditionOperator): void {
-    if (node.type === 'rule') {
-      node.rule.operator = op;
-      this.#emitFromModel();
-    }
+    this.#patchRule(node, { operator: op });
   }
 
   setValue(node: ConditionNode, value: string): void {
-    if (node.type === 'rule') {
-      node.rule.value = value;
-      this.#emitFromModel();
-    }
+    this.#patchRule(node, { value });
   }
 
   getValuePlaceholder(
@@ -222,9 +211,25 @@ export class ConditionBuilderComponent implements OnChanges, OnInit {
     }
   }
 
+  #patchGroup(
+    target: ConditionGroup,
+    update: (group: ConditionGroup) => ConditionGroup
+  ): void {
+    this.rootGroup.update((root) => updateGroup(root, target, update));
+    this.#emitFromModel();
+  }
+
+  #patchRule(
+    node: ConditionNode,
+    patch: Partial<Omit<ConditionRule, 'id'>>
+  ): void {
+    if (node.type !== 'rule') return;
+    const target = node.rule;
+    this.rootGroup.update((root) => updateRule(root, target, patch));
+    this.#emitFromModel();
+  }
+
   #emitFromModel(): void {
-    // Force signal update by creating new ref
-    this.rootGroup.set({ ...this.rootGroup() });
     const json = modelToJson(this.rootGroup());
     const text =
       Object.keys(json).length > 0 ? JSON.stringify(json, null, 2) : '';

@@ -46,6 +46,8 @@ export class LanguageSwitcherComponent {
   }
 
   protected switchLanguage(lang: AppLanguage): void {
-    this.#languageService.setLanguage(lang);
+    // The active language is applied synchronously; only the lazy locale-data
+    // import is awaited, and it already falls back on its own.
+    void this.#languageService.setLanguage(lang);
   }
 }

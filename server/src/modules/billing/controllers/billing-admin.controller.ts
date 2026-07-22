@@ -141,12 +141,6 @@ export class BillingAdminController {
   @ApiCreatedResponse({ type: UsageResponseDto })
   @ApiNotFoundResponse({ description: 'No active subscription for customer' })
   recordUsage(@Body() body: RecordUsageRequestDto) {
-    return this.usage.record({
-      customerId: body.customerId,
-      meterKey: body.meterKey,
-      quantity: body.quantity,
-      idempotencyKey: body.idempotencyKey,
-      occurredAt: body.occurredAt ? new Date(body.occurredAt) : undefined
-    });
+    return this.usage.record(body);
   }
 }

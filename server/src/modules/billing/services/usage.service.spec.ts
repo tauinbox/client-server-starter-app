@@ -94,6 +94,19 @@ describe('UsageService', () => {
     expect(captured?.occurredAt).toBeInstanceOf(Date);
   });
 
+  it('parses an ISO occurredAt coming straight off the HTTP payload', async () => {
+    subscriptions.findOne.mockResolvedValue(makeSubscription());
+    let captured: Partial<UsageRecord> | undefined;
+    usageRecords.create.mockImplementation((entity: Partial<UsageRecord>) => {
+      captured = entity;
+      return entity;
+    });
+
+    await service.record({ ...INPUT, occurredAt: '2026-01-02T03:04:05.000Z' });
+
+    expect(captured?.occurredAt).toEqual(new Date('2026-01-02T03:04:05.000Z'));
+  });
+
   it('is idempotent: a replayed key returns the existing record without re-inserting', async () => {
     const existing = { id: 'usage-1', idempotencyKey: 'evt-1' } as UsageRecord;
     usageRecords.findOne.mockResolvedValue(existing);

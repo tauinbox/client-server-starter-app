@@ -55,6 +55,55 @@ export function resetIdCounter(): void {
   nextId = 1;
 }
 
+// ─── Immutable tree updates ─────────────────────────────────────────────────
+
+/**
+ * Rebuild the tree with `update` applied to the group matched by reference.
+ * Only the nodes on the path to the target are cloned; untouched branches keep
+ * their identity, and an unmatched target returns `root` itself so a signal
+ * holding the tree does not notify on a no-op.
+ */
+export function updateGroup(
+  root: ConditionGroup,
+  target: ConditionGroup,
+  update: (group: ConditionGroup) => ConditionGroup
+): ConditionGroup {
+  if (root === target) return update(root);
+
+  let changed = false;
+  const children: ConditionNode[] = root.children.map((child) => {
+    if (child.type !== 'group') return child;
+    const group = updateGroup(child.group, target, update);
+    if (group === child.group) return child;
+    changed = true;
+    return { type: 'group', group };
+  });
+
+  return changed ? { ...root, children } : root;
+}
+
+/** Same as {@link updateGroup}, but patches the rule matched by reference. */
+export function updateRule(
+  root: ConditionGroup,
+  target: ConditionRule,
+  patch: Partial<Omit<ConditionRule, 'id'>>
+): ConditionGroup {
+  let changed = false;
+  const children: ConditionNode[] = root.children.map((child) => {
+    if (child.type === 'rule') {
+      if (child.rule !== target) return child;
+      changed = true;
+      return { type: 'rule', rule: { ...child.rule, ...patch } };
+    }
+    const group = updateRule(child.group, target, patch);
+    if (group === child.group) return child;
+    changed = true;
+    return { type: 'group', group };
+  });
+
+  return changed ? { ...root, children } : root;
+}
+
 /**
  * Parse a raw value string into the appropriate JS type.
  * Handles booleans, numbers, null, and falls back to string.
