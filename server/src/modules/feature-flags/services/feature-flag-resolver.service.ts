@@ -2,7 +2,6 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import KeyvRedis, { type RedisClientConnectionType } from '@keyv/redis';
 import type { Cache } from 'cache-manager';
 import type { Request } from 'express';
 import { In, Repository } from 'typeorm';
@@ -13,6 +12,7 @@ import {
   type FeatureFlagEvaluationContext
 } from '@app/shared/utils/feature-flag-evaluator';
 import type { EvaluatedFeatureFlagsResponse } from '@app/shared/types';
+import { CacheVersionCounter } from '../../../common/utils/cache-version-counter';
 import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
 import { AttributeRegistryService } from './attribute-registry.service';
@@ -42,20 +42,16 @@ interface CachedFlag {
 
 const ALL_FLAGS_KEY = 'featureflags:all';
 const VERSION_KEY = 'featureflags:version';
-// Read and written with the raw Redis client rather than through cache-manager:
-// Keyv stores every value inside a JSON envelope, which INCR cannot operate on.
-// Kept separate from VERSION_KEY so the two representations never collide.
 const VERSION_COUNTER_KEY = 'featureflags:version:counter';
 const ALL_FLAGS_TTL_MS = 300_000;
 const USER_FLAGS_TTL_MS = 60_000;
-const COUNTER_ERROR_LOG_THROTTLE_MS = 30_000;
 
 @Injectable()
 export class FeatureFlagResolverService {
   #loadAllInFlight: Promise<CachedFlag[]> | null = null;
   #loadAllGeneration = 0;
   readonly #logger = new Logger(FeatureFlagResolverService.name);
-  #counterErrorLoggedAt = 0;
+  readonly #version: CacheVersionCounter;
 
   constructor(
     @InjectRepository(FeatureFlag)
@@ -68,7 +64,14 @@ export class FeatureFlagResolverService {
     private readonly permissionService: PermissionService,
     private readonly usersService: UsersService,
     private readonly metrics: MetricsService
-  ) {}
+  ) {
+    this.#version = new CacheVersionCounter(
+      cacheManager,
+      VERSION_COUNTER_KEY,
+      VERSION_KEY,
+      this.#logger
+    );
+  }
 
   /**
    * Assembles the evaluation context for a user id: looks up the user record
@@ -255,74 +258,11 @@ export class FeatureFlagResolverService {
     };
   }
 
-  /**
-   * The Redis client behind the cache, or null when the cache is the in-memory
-   * fallback (no REDIS_URL) - there a single process owns the counter and the
-   * read-modify-write below cannot lose to another instance. Nest wraps the
-   * configured adapter in a Keyv, so the adapter sits at `stores[0].store`.
-   * Probed defensively because `stores` is an implementation detail of the
-   * injected cache: a partial stand-in must degrade, not break evaluation.
-   */
-  #redisClient(): RedisClientConnectionType | null {
-    const store: unknown = this.cacheManager.stores?.[0]?.store;
-    return store instanceof KeyvRedis ? store.client : null;
+  private getVersion(): Promise<number> {
+    return this.#version.read();
   }
 
-  #logCounterFailure(error: unknown): void {
-    const now = Date.now();
-    if (now - this.#counterErrorLoggedAt < COUNTER_ERROR_LOG_THROTTLE_MS)
-      return;
-    this.#counterErrorLoggedAt = now;
-    this.#logger.warn(
-      `Feature-flag version counter unavailable, falling back to the cache-manager counter: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
-  }
-
-  private async getVersion(): Promise<number> {
-    const redis = this.#redisClient();
-    if (redis) {
-      try {
-        const raw = await redis.get(VERSION_COUNTER_KEY);
-        // Nothing invalidated yet, so nothing to orphan: 0 is a valid suffix and
-        // skips the initializing write that used to race across instances.
-        if (raw === null) return 0;
-        const parsed = Number(raw);
-        if (Number.isFinite(parsed)) return parsed;
-      } catch (error: unknown) {
-        this.#logCounterFailure(error);
-      }
-    }
-
-    const cached = await this.cacheManager.get<number>(VERSION_KEY);
-    if (typeof cached === 'number') return cached;
-    const initial = Date.now();
-    await this.cacheManager.set(VERSION_KEY, initial, 0);
-    return initial;
-  }
-
-  private async bumpVersion(): Promise<void> {
-    const redis = this.#redisClient();
-    if (redis) {
-      try {
-        // Atomic, so simultaneous invalidations across instances cannot read the
-        // same previous value and write back the same next one.
-        await redis.incr(VERSION_COUNTER_KEY);
-        return;
-      } catch (error: unknown) {
-        this.#logCounterFailure(error);
-      }
-    }
-
-    // Date.now() has millisecond granularity, so two invalidations inside one
-    // millisecond would re-emit the same version and leave stale per-user cache
-    // keys reachable; max(prev + 1) keeps the suffix strictly fresh.
-    const previous = await this.cacheManager.get<number>(VERSION_KEY);
-    const next = Math.max(
-      Date.now(),
-      (typeof previous === 'number' ? previous : 0) + 1
-    );
-    await this.cacheManager.set(VERSION_KEY, next, 0);
+  private bumpVersion(): Promise<void> {
+    return this.#version.bump();
   }
 }

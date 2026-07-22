@@ -1,6 +1,8 @@
+import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken } from '@nestjs/typeorm';
+import { Money } from '@app/shared/utils/money';
 import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { Plan } from '../entities/plan.entity';
@@ -98,9 +100,21 @@ async function build(stubs: Partial<ManagerStubs> = {}) {
     ...stubs
   });
   const emit = jest.fn();
+  // Deliberately a different stub from the transactional `manager`: any write
+  // that reaches `dataSource.manager` ran outside a transaction, and the tests
+  // assert it stays untouched.
+  const bareManager = buildManager({
+    subscription: null,
+    plan: null,
+    customer: null,
+    invoice: null,
+    product: null,
+    invoiceInsertRows: [],
+    updateAffected: 0
+  });
   const dataSource = {
     transaction: jest.fn((cb: (m: typeof manager) => unknown) => cb(manager)),
-    manager
+    manager: bareManager
   };
   const credits = {
     addPurchase: jest.fn().mockResolvedValue(undefined),
@@ -116,7 +130,14 @@ async function build(stubs: Partial<ManagerStubs> = {}) {
     ]
   }).compile();
 
-  return { reducer: module.get(BillingEventReducer), manager, emit, credits };
+  return {
+    reducer: module.get(BillingEventReducer),
+    manager,
+    bareManager,
+    dataSource,
+    emit,
+    credits
+  };
 }
 
 const subPayload = (
@@ -592,6 +613,8 @@ describe('BillingEventReducer', () => {
           id: 'inv-1',
           customerId: 'cust-1',
           status: 'pending',
+          amountMinor: Money.fromMinor(99000),
+          currency: 'RUB',
           creditUnitsApplied: 0
         } as Invoice
       });
@@ -626,6 +649,8 @@ describe('BillingEventReducer', () => {
           id: 'inv-1',
           customerId: 'cust-1',
           status: 'pending',
+          amountMinor: Money.fromMinor(99000),
+          currency: 'RUB',
           creditUnitsApplied: 10
         } as Invoice
       });
@@ -664,6 +689,65 @@ describe('BillingEventReducer', () => {
       );
       expect(credits.spendOnUsage).not.toHaveBeenCalled();
       expect(emit).not.toHaveBeenCalled();
+    });
+
+    it('logs a mismatch between the charged and the recorded amount, and still settles', async () => {
+      const { reducer, emit } = await build({
+        updateAffected: 1,
+        invoice: {
+          id: 'inv-1',
+          customerId: 'cust-1',
+          status: 'pending',
+          // The core rated and receipted 99000; the provider reports 88000.
+          amountMinor: Money.fromMinor(88000),
+          currency: 'RUB',
+          creditUnitsApplied: 0
+        } as Invoice
+      });
+      const logged = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+
+      await reducer.reduce(
+        event('invoice.paid', offSessionPayload, 'yookassa')
+      );
+
+      expect(logged).toHaveBeenCalledWith(
+        expect.stringContaining('mismatched amount')
+      );
+      // Refusing to settle would leave the invoice pending forever and make the
+      // scheduler dun a customer whose money already moved.
+      expect(emit).toHaveBeenCalledWith(
+        InvoicePaidEvent.name,
+        expect.objectContaining({ invoiceId: 'inv-1' })
+      );
+      logged.mockRestore();
+    });
+
+    it('logs a currency mismatch as well as an amount mismatch', async () => {
+      const { reducer } = await build({
+        updateAffected: 1,
+        invoice: {
+          id: 'inv-1',
+          customerId: 'cust-1',
+          status: 'pending',
+          amountMinor: Money.fromMinor(99000),
+          currency: 'USD',
+          creditUnitsApplied: 0
+        } as Invoice
+      });
+      const logged = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+
+      await reducer.reduce(
+        event('invoice.paid', offSessionPayload, 'yookassa')
+      );
+
+      expect(logged).toHaveBeenCalledWith(
+        expect.stringContaining('recorded 99000 USD')
+      );
+      logged.mockRestore();
     });
   });
 
@@ -1022,6 +1106,32 @@ describe('BillingEventReducer', () => {
       // The renewal scan emits PaymentFailedEvent when it walks dunning; a
       // second one here would double-notify.
       expect(emit).not.toHaveBeenCalled();
+    });
+
+    it('performs every write inside a transaction, never on the bare manager', async () => {
+      const offSession: NormalizedPaymentFailedPayload = {
+        ref: { customerId: 'cust-1', userId: 'user-1' },
+        providerSubscriptionId: null,
+        offSessionChargeKey: 'renewal:sub-1:123:0'
+      };
+      const usage: NormalizedPaymentFailedPayload = {
+        ref: { customerId: 'cust-1', userId: 'user-1' },
+        providerSubscriptionId: 'sub_123',
+        usageChargeKey: 'usage:sub-1:1780272000000'
+      };
+
+      for (const payload of [offSession, usage]) {
+        const { reducer, bareManager, dataSource } = await build({
+          subscription: { id: 'sub-1' } as Subscription,
+          updateAffected: 1
+        });
+
+        await reducer.reduce(event('payment.failed', payload));
+
+        expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+        expect(bareManager.update).not.toHaveBeenCalled();
+        expect(bareManager.findOne).not.toHaveBeenCalled();
+      }
     });
   });
 });

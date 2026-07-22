@@ -35,6 +35,15 @@ export interface ProrationQuote {
  * each leg is fiscalized separately (refund receipt + payment receipt). Usage
  * plans have a zero fixed price, so a leg on a usage plan contributes nothing —
  * metered overage is settled by the usage-invoicing path, not here.
+ *
+ * Rounding policy (deliberate, applies to both legs symmetrically): each leg is
+ * floored to whole minor units, so the sub-minor-unit remainder of each leg
+ * stays with the merchant. Flooring the refund alone would favour the merchant
+ * twice; rounding the refund up instead would let a repeated upgrade/downgrade
+ * cycle skim a minor unit per switch. Flooring both caps the buyer's worst-case
+ * loss at one minor unit per leg and keeps the arithmetic exact integer math.
+ * Day counting is intentionally generous the other way: a started day counts as
+ * remaining (`ceil`), so the buyer is refunded for the day of the switch.
  */
 @Injectable()
 export class ProrationCalculator {

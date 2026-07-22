@@ -7,7 +7,7 @@ import type {
   PurchaseSessionResponse
 } from '@app/shared/types';
 import { createApp } from '../app';
-import { resetState } from '../state';
+import { getState, resetState } from '../state';
 
 let server: Server;
 let baseUrl: string;
@@ -129,6 +129,27 @@ describe('POST /billing/purchase', () => {
       expect(body.message).toBe('amountMinor must be between 100 and 50000');
     }
   );
+
+  it('treats a zero lower bound as configured, not as missing bounds', async () => {
+    // Mirrors the server: `!minAmountMinor` answered 503 for a legitimate 0
+    // lower bound, so no donation to such a product could ever be started.
+    const donation = [...getState().billingProducts.values()].find(
+      (p) => p.key === 'donation'
+    )!;
+    donation.prices.paddle = {
+      currency: 'USD',
+      minAmountMinor: 0,
+      maxAmountMinor: 50000
+    };
+
+    const token = await login();
+    const res = await postPurchase(token, {
+      productKey: 'donation',
+      amountMinor: 500
+    });
+
+    expect(res.status).toBe(200);
+  });
 
   it('opens a provider session for an sku at the catalog price', async () => {
     const token = await login();

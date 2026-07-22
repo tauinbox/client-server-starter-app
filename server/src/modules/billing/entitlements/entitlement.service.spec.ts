@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import KeyvRedis from '@keyv/redis';
 import { In, IsNull } from 'typeorm';
 import type { SubscriptionStatus } from '@app/shared/types';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -256,6 +257,111 @@ describe('EntitlementService', () => {
       await service.invalidateAll();
       await service.capabilitiesFor('user-1');
       expect(customers.findOne).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('version counter with a Redis-backed cache', () => {
+    let redis: { get: jest.Mock; incr: jest.Mock; on: jest.Mock };
+    let counter: number | null;
+
+    async function setupRedisBacked(): Promise<EntitlementService> {
+      counter = null;
+      redis = {
+        get: jest.fn(() =>
+          Promise.resolve(counter === null ? null : String(counter))
+        ),
+        incr: jest.fn(() => {
+          counter = (counter ?? 0) + 1;
+          return Promise.resolve(counter);
+        }),
+        on: jest.fn()
+      };
+      // Nest wraps the configured adapter in a Keyv, so the counter reaches the
+      // adapter at stores[0].store - a real KeyvRedis is required for the
+      // instanceof narrowing, but no connection is opened.
+      const adapter = new KeyvRedis('redis://localhost:6379');
+      // @ts-expect-error stand-in for the node-redis client: only get/incr/on
+      // are exercised, and widening the production type for a mock is banned.
+      adapter.client = redis;
+      const redisCache = { ...cache, stores: [{ store: adapter }] };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          EntitlementService,
+          { provide: getRepositoryToken(Customer), useValue: customers },
+          {
+            provide: getRepositoryToken(Subscription),
+            useValue: subscriptions
+          },
+          { provide: getRepositoryToken(Plan), useValue: plans },
+          { provide: getRepositoryToken(CustomerGrant), useValue: grants },
+          { provide: CACHE_MANAGER, useValue: redisCache },
+          { provide: MetricsService, useValue: metrics }
+        ]
+      }).compile();
+      return module.get(EntitlementService);
+    }
+
+    function userCacheVersions(): string[] {
+      const prefix = 'entitlements:user:user-1:v';
+      return cache.set.mock.calls
+        .map((c: unknown[]) => c[0] as string)
+        .filter((k) => k.startsWith(prefix))
+        .map((k) => k.slice(prefix.length));
+    }
+
+    it('bumps the version with an atomic INCR instead of a read-modify-write', async () => {
+      const svc = await setupRedisBacked();
+
+      await svc.invalidateAll();
+
+      expect(redis.incr).toHaveBeenCalledWith('entitlements:version:counter');
+      // The racy get -> compute -> set on the version key must be gone.
+      expect(cache.set).not.toHaveBeenCalledWith(
+        'entitlements:version',
+        expect.anything(),
+        expect.anything()
+      );
+    });
+
+    it('gives concurrent invalidations distinct, strictly increasing versions', async () => {
+      const svc = await setupRedisBacked();
+
+      await Promise.all([
+        svc.invalidateAll(),
+        svc.invalidateAll(),
+        svc.invalidateAll()
+      ]);
+
+      // Three INCRs means three distinct versions; the pre-fix read-then-write
+      // could observe the same previous value and collapse them into one.
+      expect(redis.incr).toHaveBeenCalledTimes(3);
+      expect(counter).toBe(3);
+    });
+
+    it('reads the counter for the per-user cache key and starts at 0', async () => {
+      const svc = await setupRedisBacked();
+      withProSubscription('active');
+
+      await svc.capabilitiesFor('user-1');
+      expect(userCacheVersions()).toEqual(['0']);
+
+      await svc.invalidateAll();
+      await svc.capabilitiesFor('user-1');
+      expect(userCacheVersions()).toEqual(['0', '1']);
+    });
+
+    it('falls back to the cache-manager counter when Redis rejects', async () => {
+      const svc = await setupRedisBacked();
+      redis.incr.mockRejectedValue(new Error('connection refused'));
+      redis.get.mockRejectedValue(new Error('connection refused'));
+
+      await expect(svc.invalidateAll()).resolves.toBeUndefined();
+      expect(cache.set).toHaveBeenCalledWith(
+        'entitlements:version',
+        expect.any(Number),
+        0
+      );
     });
   });
 });

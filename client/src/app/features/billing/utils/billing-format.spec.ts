@@ -3,10 +3,10 @@ import type {
   PlanResponse,
   ProductResponse
 } from '@app/shared/types';
+import { minorUnitScale } from '@app/shared/utils/money';
 import {
   formatMoney,
   formatUnits,
-  minorUnitScale,
   parseAmountToMinor,
   planPriceFor,
   productPriceFor,
@@ -140,6 +140,16 @@ describe('billing-format', () => {
       expect(parseAmountToMinor('0', 'USD')).toBeNull();
       expect(parseAmountToMinor('1.234', 'USD')).toBeNull();
       expect(parseAmountToMinor('', 'USD')).toBeNull();
+    });
+
+    it('follows the currency scale instead of assuming two decimals', () => {
+      // Zero-decimal: the minor unit IS the major unit, and a fractional
+      // amount must be rejected rather than silently rounded to 1501.
+      expect(parseAmountToMinor('1500', 'JPY')).toBe(1500);
+      expect(parseAmountToMinor('1500.5', 'JPY')).toBeNull();
+      // Three-decimal: 1.234 KWD is 1234 fils, not invalid input.
+      expect(parseAmountToMinor('1.234', 'KWD')).toBe(1234);
+      expect(parseAmountToMinor('1.2345', 'KWD')).toBeNull();
     });
   });
 });

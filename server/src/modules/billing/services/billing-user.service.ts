@@ -316,7 +316,9 @@ export class BillingUserService {
     }
 
     const { minAmountMinor, maxAmountMinor } = price;
-    if (!minAmountMinor || !maxAmountMinor) {
+    // `== null`, not falsy: a configured lower bound of 0 (any amount the
+    // request DTO already accepts) is a legitimate setting, not "unconfigured".
+    if (minAmountMinor == null || maxAmountMinor == null) {
       throw new ServiceUnavailableException(
         `Product "${product.key}" has no amount bounds configured`
       );

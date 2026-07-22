@@ -289,6 +289,31 @@ export class BillingEventReducer {
     }
   }
 
+  /**
+   * Compares what the provider says it captured against what the core recorded
+   * for that charge. A divergence means the money moved is not the money billed
+   * (a mis-rated charge, a provider-side amount edit, or a chargeKey collision),
+   * which no automated path can safely resolve: the recorded amount is the one
+   * that was receipted, so it is kept and the settle proceeds - the mismatch is
+   * surfaced for an operator instead of being silently absorbed.
+   */
+  private reconcileChargeAmount(
+    invoice: Invoice,
+    payload: NormalizedInvoicePayload
+  ): void {
+    const recorded = invoice.amountMinor.toNumber();
+    const reported = payload.amountMinor;
+    const sameCurrency =
+      invoice.currency.toUpperCase() === payload.currency.toUpperCase();
+    if (recorded === reported && sameCurrency) {
+      return;
+    }
+    this.logger.error(
+      `Invoice ${invoice.id} settled from ${payload.providerInvoiceRef} with a mismatched amount: ` +
+        `recorded ${recorded} ${invoice.currency}, provider reported ${reported} ${payload.currency}`
+    );
+  }
+
   private async reduceInvoice(
     provider: BillingProviderId,
     providerEventId: string,
@@ -334,6 +359,7 @@ export class BillingEventReducer {
           if (!invoice) {
             return null;
           }
+          this.reconcileChargeAmount(invoice, payload);
           // The winning pending->paid flip spends the credits the charged
           // amount was rated against - exactly once, whichever side settles.
           if (invoice.creditUnitsApplied > 0) {
@@ -643,40 +669,47 @@ export class BillingEventReducer {
     // on its next scan and walks dunning (emitting PaymentFailedEvent there);
     // a second event here would double-notify.
     if (payload.offSessionChargeKey) {
-      await this.dataSource.manager.update(
-        Invoice,
-        { providerEventId: payload.offSessionChargeKey, status: 'pending' },
-        { status: 'failed' }
+      const chargeKey = payload.offSessionChargeKey;
+      await withTransaction(this.dataSource, (manager) =>
+        manager.update(
+          Invoice,
+          { providerEventId: chargeKey, status: 'pending' },
+          { status: 'failed' }
+        )
       );
       return;
     }
 
-    // A failed postpaid usage charge surfaces on its pending invoice; the
-    // subscription stays as the provider reports it (Paddle owns dunning).
-    if (payload.usageChargeKey) {
-      await this.dataSource.manager.update(
-        Invoice,
-        { providerEventId: payload.usageChargeKey, status: 'pending' },
-        { status: 'failed' }
-      );
-    }
+    const failed = await withTransaction(this.dataSource, async (manager) => {
+      // A failed postpaid usage charge surfaces on its pending invoice; the
+      // subscription stays as the provider reports it (Paddle owns dunning).
+      if (payload.usageChargeKey) {
+        await manager.update(
+          Invoice,
+          { providerEventId: payload.usageChargeKey, status: 'pending' },
+          { status: 'failed' }
+        );
+      }
 
-    const userId = await withTransaction(this.dataSource, (manager) =>
-      this.resolveUserId(manager, payload.ref)
-    );
-    if (!userId) {
+      const userId = await this.resolveUserId(manager, payload.ref);
+      if (!userId) {
+        return null;
+      }
+      const subscription = payload.providerSubscriptionId
+        ? await manager.findOne(Subscription, {
+            where: { providerSubscriptionId: payload.providerSubscriptionId }
+          })
+        : null;
+      return { userId, subscriptionId: subscription?.id ?? null };
+    });
+
+    if (!failed) {
       return;
     }
-
-    const subscription = payload.providerSubscriptionId
-      ? await this.dataSource.manager.findOne(Subscription, {
-          where: { providerSubscriptionId: payload.providerSubscriptionId }
-        })
-      : null;
 
     this.events.emit(
       PaymentFailedEvent.name,
-      new PaymentFailedEvent(userId, subscription?.id ?? null)
+      new PaymentFailedEvent(failed.userId, failed.subscriptionId)
     );
   }
 }

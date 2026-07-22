@@ -1,3 +1,32 @@
+const DEFAULT_MINOR_UNIT_SCALE = 2;
+
+const minorUnitScaleCache = new Map<string, number>();
+
+/**
+ * The number of decimal digits a currency's minor unit carries: 2 for
+ * RUB/USD/EUR, 0 for JPY/KRW, 3 for BHD/KWD. Resolved from `Intl` so the table
+ * does not have to be maintained by hand, memoized because the lookup builds a
+ * formatter. An unknown or malformed code falls back to 2 rather than throwing -
+ * a bad code must not take down a price render or a payment payload.
+ */
+export function minorUnitScale(currency: string): number {
+  const code = currency.toUpperCase();
+  const cached = minorUnitScaleCache.get(code);
+  if (cached !== undefined) return cached;
+  let scale = DEFAULT_MINOR_UNIT_SCALE;
+  try {
+    scale =
+      new Intl.NumberFormat('en', {
+        style: 'currency',
+        currency: code
+      }).resolvedOptions().maximumFractionDigits ?? DEFAULT_MINOR_UNIT_SCALE;
+  } catch {
+    scale = DEFAULT_MINOR_UNIT_SCALE;
+  }
+  minorUnitScaleCache.set(code, scale);
+  return scale;
+}
+
 /**
  * Money value object over BigInt minor units (e.g. cents, kopecks).
  *
