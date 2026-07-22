@@ -30,6 +30,7 @@ export type {
   PermissionCondition,
   PermissionEffect,
   ResolvedPermission,
+  PackedRules,
   UserPermissionsResponse,
   UserEffectivePermissionsResponse
 } from './role.types';

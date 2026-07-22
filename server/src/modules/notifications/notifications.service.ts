@@ -23,10 +23,7 @@ export class NotificationsService {
     this.sseRef.getCount = () => this.#countConnections();
   }
 
-  getOrCreateStream(
-    userId: string,
-    connectionId: string
-  ): Subject<MessageEvent> {
+  createStream(userId: string, connectionId: string): Subject<MessageEvent> {
     if (!this.#connections.has(userId)) {
       this.#connections.set(userId, new Map());
     }

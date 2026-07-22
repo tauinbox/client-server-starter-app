@@ -1,8 +1,7 @@
-// Side-effect import pulls type-only test assertions into compilation so
-// any consumer of @app/shared/types (server build, client build, mock-server
-// tsc) surfaces broken structural-diff invariants as compile errors. The
-// imported module has no runtime exports; type-only consumers erase it.
-import './__tests__/structural-diff.test-d';
+// Joins the imported assertions to every consumer's program, so a broken
+// structural-diff invariant fails their build. `import type` is erased at emit,
+// keeping the test module out of production bundles.
+import type {} from './__tests__/structural-diff.test-d';
 
 /**
  * Recursively converts Date fields to string to match the JSON wire format.

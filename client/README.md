@@ -102,7 +102,9 @@ src/app/
     ├── models/             # user.types
     ├── services/           # AdaptiveDialogService — opens confirm dialogs as bottom sheets (handset) or dialogs (desktop)
     └── utils/              # css.utils, dialog.utils (DialogSize enum + dialogSizeConfig()),
-                            # http-error.utils (parseHttpErrorMessage - single server-error text funnel)
+                            # http-error.utils (parseHttpErrorMessage - single server-error text funnel),
+                            # deep-equal.utils (key-order-insensitive structural compare for JSON-shaped values),
+                            # role-display.utils (roleIcon, isAdminRole, sortRolesForDisplay, overflowRoleNames)
 ```
 
 ### Routes
