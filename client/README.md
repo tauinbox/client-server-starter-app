@@ -296,6 +296,7 @@ npm test
 - **Design-token regression net**: `e2e/visual/m3-colors.spec.ts` asserts destructive utilities resolve to `--mat-sys-error`; `e2e/visual/sidenav-width.spec.ts` asserts the drawer, rail and content offset all resolve to the `--nav-width-*` custom properties (an undeclared token would silently collapse the layout)
 - Coverage: 203 Playwright tests across auth/users/admin/billing/a11y/keyboard/visual suites; 981 Vitest unit tests covering login, register, profile (incl. self-service email change), session-restore, lockout, email verification, password reset (with password confirmation), users list/detail/edit/search (including admin email-change confirmation dialog), admin roles/resources/feature-flags management, effective-permissions preview, admin-panel auto-redirect when permissions are revoked mid-session, a11y audit, keyboard navigation. Error translation tests verify `errorKey` → Transloco pipeline for login, register, and global interceptor snackbar.
 - Workers: 4 (fully parallel, per-worker mock-server instances on dynamic ports)
+- Web server startup: `webServer.timeout` is set to 180 s. Locally Playwright boots `ng serve`, whose first build on an empty `.angular/cache` can take far longer than Playwright's 60 s default on a slow or loaded machine; CI serves the prebuilt `dist/` and starts in seconds, so the extra headroom is inert there
 
 ```bash
 npm run test:e2e           # Headless

@@ -31,6 +31,8 @@ export default defineConfig({
         ? `npx serve -s dist/client/browser -l ${port}`
         : `npx ng serve --host 127.0.0.1 --port ${port}`,
       url: baseURL,
+      // A cold `ng serve` (empty .angular/cache) can exceed Playwright's 60s default.
+      timeout: 180_000,
       reuseExistingServer: !process.env['CI']
     }
   ]
