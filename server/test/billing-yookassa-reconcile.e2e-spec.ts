@@ -7,7 +7,6 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import type { YooCheckout } from '@a2seven/yoo-checkout';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { PaymentMethod } from '../src/modules/billing/entities/payment-method.entity';
@@ -192,7 +191,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
         metadata: capturedMetadata
       })
     );
-    const yoo = { createPayment, getPayment } as unknown as YooCheckout;
+    const yoo = { createPayment, getPayment };
     emit = jest.fn();
     const manager = makeManager(store);
 

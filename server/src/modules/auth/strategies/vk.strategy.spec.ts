@@ -1,20 +1,15 @@
-import { ConfigService } from '@nestjs/config';
 import { VkStrategy } from './vk.strategy';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import type { OAuthUserProfile } from '../types/oauth-profile';
+import { createMockConfigService } from '../../../common/testing/config-service.mock';
 
 function makeStrategy(): VkStrategy {
-  const config = {
-    getOrThrow: jest.fn().mockImplementation((key: string) => {
-      const map: Record<string, string> = {
-        VK_CLIENT_ID: 'test-client-id',
-        VK_CLIENT_SECRET: 'test-client-secret'
-      };
-      return map[key];
-    }),
-    get: jest.fn().mockReturnValue('development')
-  } as unknown as ConfigService;
-  return new VkStrategy(config);
+  return new VkStrategy(
+    createMockConfigService({
+      VK_CLIENT_ID: 'test-client-id',
+      VK_CLIENT_SECRET: 'test-client-secret'
+    })
+  );
 }
 
 describe('VkStrategy.validate', () => {

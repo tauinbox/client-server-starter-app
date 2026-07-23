@@ -1,20 +1,15 @@
-import { ConfigService } from '@nestjs/config';
 import { FacebookStrategy } from './facebook.strategy';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import type { OAuthUserProfile } from '../types/oauth-profile';
+import { createMockConfigService } from '../../../common/testing/config-service.mock';
 
 function makeStrategy(): FacebookStrategy {
-  const config = {
-    getOrThrow: jest.fn().mockImplementation((key: string) => {
-      const map: Record<string, string> = {
-        FACEBOOK_CLIENT_ID: 'test-client-id',
-        FACEBOOK_CLIENT_SECRET: 'test-client-secret'
-      };
-      return map[key];
-    }),
-    get: jest.fn().mockReturnValue('development')
-  } as unknown as ConfigService;
-  return new FacebookStrategy(config);
+  return new FacebookStrategy(
+    createMockConfigService({
+      FACEBOOK_CLIENT_ID: 'test-client-id',
+      FACEBOOK_CLIENT_SECRET: 'test-client-secret'
+    })
+  );
 }
 
 describe('FacebookStrategy.validate', () => {

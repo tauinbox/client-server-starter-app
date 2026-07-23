@@ -785,6 +785,7 @@ Nine tables managed via TypeORM migrations:
 |------|-------|--------|
 | ESLint | Client (angular-eslint, unused-imports, import cycles) | `eslint.config.mjs` |
 | ESLint | Server (@typescript-eslint + prettier) | `eslint.config.ts` |
+| ESLint | Shared rules for both workspaces (incl. a `no-restricted-syntax` ban on `as unknown as T` double casts) | `eslint.base.config.mjs` |
 | Prettier | Both (single quotes, no trailing commas) | `.prettierrc` |
 | Stylelint | Client SCSS (recess property order, no `px` units outside breakpoints) | `.stylelintrc.json` |
 | Husky + lint-staged | Pre-commit hook (auto-fix staged files) | `.lintstagedrc.mjs` |

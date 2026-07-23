@@ -3,27 +3,25 @@ import { Reflector } from '@nestjs/core';
 import type { JwtAuthRequest } from '../../auth/types/auth.request';
 import { EntitlementGuard } from './entitlement.guard';
 import { EntitlementService } from './entitlement.service';
+import { createMockExecutionContext } from '../../../common/testing/execution-context.mock';
 
 describe('EntitlementGuard', () => {
   let guard: EntitlementGuard;
-  let reflector: { getAllAndOverride: jest.Mock };
-  let entitlements: { has: jest.Mock };
+  let reflector: jest.Mocked<Pick<Reflector, 'getAllAndOverride'>>;
+  let entitlements: jest.Mocked<Pick<EntitlementService, 'has'>>;
 
   function contextFor(userId: string | undefined): ExecutionContext {
     const req = { user: userId ? { userId } : undefined } as JwtAuthRequest;
-    return {
-      switchToHttp: () => ({ getRequest: () => req }),
-      getHandler: () => undefined,
-      getClass: () => undefined
-    } as unknown as ExecutionContext;
+    return createMockExecutionContext({ request: req });
   }
 
   beforeEach(() => {
     reflector = { getAllAndOverride: jest.fn() };
     entitlements = { has: jest.fn() };
     guard = new EntitlementGuard(
-      reflector as unknown as Reflector,
-      entitlements as unknown as EntitlementService
+      // @ts-expect-error - partial mock: only Reflector.getAllAndOverride is used
+      reflector,
+      entitlements
     );
   });
 

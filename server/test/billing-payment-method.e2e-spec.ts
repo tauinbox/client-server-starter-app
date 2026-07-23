@@ -186,7 +186,9 @@ function makeManager(stores: Stores) {
       if ('providerMethodRef' in entity) {
         if (!entity['id']) {
           entity['id'] = `pm-new-${++methodSeq}`;
-          stores.paymentMethods.push(entity as unknown as PaymentMethod);
+          // @ts-expect-error - partial PaymentMethod fake from the save() payload
+          const paymentMethod: PaymentMethod = entity;
+          stores.paymentMethods.push(paymentMethod);
         }
       }
       return Promise.resolve(entity);

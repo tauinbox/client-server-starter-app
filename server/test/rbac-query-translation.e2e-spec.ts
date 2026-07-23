@@ -28,7 +28,8 @@ interface RecordedCall {
 
 function fakeQb(): { qb: SelectQueryBuilder<User>; calls: RecordedCall[] } {
   const calls: RecordedCall[] = [];
-  const qb = {
+  // @ts-expect-error - partial SelectQueryBuilder fake: only where methods used
+  const qb: SelectQueryBuilder<User> = {
     andWhere: jest.fn((arg: unknown, params?: unknown) => {
       if (typeof arg === 'string') {
         calls.push({ sql: arg, params: params as Record<string, unknown> });
@@ -59,7 +60,7 @@ function fakeQb(): { qb: SelectQueryBuilder<User>; calls: RecordedCall[] } {
       calls.push({ sql, params: params as Record<string, unknown> });
       return qb;
     })
-  } as unknown as SelectQueryBuilder<User>;
+  };
   return { qb, calls };
 }
 

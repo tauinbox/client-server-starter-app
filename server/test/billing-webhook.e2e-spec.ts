@@ -157,7 +157,9 @@ function makeManager(stores: Stores) {
           );
           if (dup) return Promise.resolve({ raw: [] });
           const id = `inv-${++seq}`;
-          stores.invoices.push({ id, ...v } as unknown as Invoice);
+          // @ts-expect-error - partial Invoice fake assembled from insert().values()
+          const invoice: Invoice = { id, ...v };
+          stores.invoices.push(invoice);
           return Promise.resolve({ raw: [{ id }] });
         }
       };
@@ -651,7 +653,9 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
             );
             if (dup) return Promise.resolve({ raw: [] });
             const id = `inv-${++seq}`;
-            stores.invoices.push({ id, ...v } as unknown as Invoice);
+            // @ts-expect-error - partial Invoice fake assembled from insert().values()
+            const invoice: Invoice = { id, ...v };
+            stores.invoices.push(invoice);
             return Promise.resolve({ raw: [{ id }] });
           }
         };

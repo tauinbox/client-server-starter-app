@@ -2,6 +2,7 @@ import { Reflector } from '@nestjs/core';
 import { ExecutionContext, NotFoundException } from '@nestjs/common';
 import { FeatureFlagGuard } from './feature-flag.guard';
 import { FeatureFlagResolverService } from '../services/feature-flag-resolver.service';
+import { createMockExecutionContext } from '../../../common/testing/execution-context.mock';
 
 function makeContext(userId: string | undefined): ExecutionContext {
   const handler = function handler() {};
@@ -9,17 +10,15 @@ function makeContext(userId: string | undefined): ExecutionContext {
   const req = {
     user: userId ? { userId } : undefined
   };
-  return {
-    switchToHttp: () => ({ getRequest: () => req }),
-    getHandler: () => handler,
-    getClass: () => cls
-  } as unknown as ExecutionContext;
+  return createMockExecutionContext({ request: req, handler, class: cls });
 }
 
 describe('FeatureFlagGuard', () => {
   let guard: FeatureFlagGuard;
-  let reflector: { getAllAndOverride: jest.Mock };
-  let resolver: { buildResolverUser: jest.Mock; isEnabledForUser: jest.Mock };
+  let reflector: jest.Mocked<Pick<Reflector, 'getAllAndOverride'>>;
+  let resolver: jest.Mocked<
+    Pick<FeatureFlagResolverService, 'buildResolverUser' | 'isEnabledForUser'>
+  >;
 
   beforeEach(() => {
     reflector = { getAllAndOverride: jest.fn() };
@@ -33,8 +32,9 @@ describe('FeatureFlagGuard', () => {
       isEnabledForUser: jest.fn()
     };
     guard = new FeatureFlagGuard(
-      reflector as unknown as Reflector,
-      resolver as unknown as FeatureFlagResolverService
+      // @ts-expect-error - partial mock: only Reflector.getAllAndOverride is used
+      reflector,
+      resolver
     );
   });
 

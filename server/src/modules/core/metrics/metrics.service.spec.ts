@@ -3,8 +3,12 @@ import { getToken } from '@willsoto/nestjs-prometheus';
 import type { Counter, Histogram } from 'prom-client';
 import { MetricsService } from './metrics.service';
 
-const mockCounter = { inc: jest.fn() };
-const mockHistogram = { observe: jest.fn() };
+const mockCounter: jest.Mocked<Pick<Counter<string>, 'inc'>> = {
+  inc: jest.fn()
+};
+const mockHistogram: jest.Mocked<Pick<Histogram<string>, 'observe'>> = {
+  observe: jest.fn()
+};
 
 describe('MetricsService', () => {
   let service: MetricsService;
@@ -17,15 +21,15 @@ describe('MetricsService', () => {
         MetricsService,
         {
           provide: getToken('http_requests_total'),
-          useValue: mockCounter as unknown as Counter<string>
+          useValue: mockCounter
         },
         {
           provide: getToken('http_request_duration_seconds'),
-          useValue: mockHistogram as unknown as Histogram<string>
+          useValue: mockHistogram
         },
         {
           provide: getToken('auth_events_total'),
-          useValue: mockCounter as unknown as Counter<string>
+          useValue: mockCounter
         },
         {
           provide: getToken('rbac_permission_denied_total'),

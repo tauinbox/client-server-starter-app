@@ -215,14 +215,14 @@ describe('RolePermissionsDialogComponent', () => {
       // The client receives { id, roleId, permissionId: undefined, ... } which means
       // selectedIds gets populated with `undefined` as a key, and the PUT payload
       // would contain { conditions: null } with no permissionId field.
-      const brokenItems = [
+      const brokenItems: RolePermissionItem[] = [
+        // @ts-expect-error regression fixture — permissionId deliberately absent, as the mock-server bug produced
         {
-          // permissionId deliberately absent — as the mock-server bug produced
           id: 'rp-broken',
           roleId: mockRole.id,
           conditions: null,
           permission: mockPermissionA
-        } as unknown as RolePermissionItem
+        }
       ];
 
       const { component, roleServiceMock } = setup(brokenItems);

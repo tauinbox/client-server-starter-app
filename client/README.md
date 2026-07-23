@@ -274,6 +274,7 @@ All size values use `func.rem(N)` (pixels → rem conversion) — never hardcode
 - Environment: jsdom
 - Setup file: `src/test-setup.ts` (matchMedia polyfill)
 - Pattern: `*.spec.ts` alongside source files
+- **Test mocks**: partial mocks are typed against the real type or use a scoped `// @ts-expect-error`; `as unknown as T` double casts are banned by a `no-restricted-syntax` ESLint rule (the selector is appended to the array in `eslint.config.mjs`, since flat config replaces rather than merges rule options)
 
 ```bash
 npm test

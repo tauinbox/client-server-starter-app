@@ -1,20 +1,15 @@
-import { ConfigService } from '@nestjs/config';
 import { GoogleStrategy } from './google.strategy';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import type { OAuthUserProfile } from '../types/oauth-profile';
+import { createMockConfigService } from '../../../common/testing/config-service.mock';
 
 function makeStrategy(): GoogleStrategy {
-  const config = {
-    getOrThrow: jest.fn().mockImplementation((key: string) => {
-      const map: Record<string, string> = {
-        GOOGLE_CLIENT_ID: 'test-client-id',
-        GOOGLE_CLIENT_SECRET: 'test-client-secret'
-      };
-      return map[key];
-    }),
-    get: jest.fn().mockReturnValue('development')
-  } as unknown as ConfigService;
-  return new GoogleStrategy(config);
+  return new GoogleStrategy(
+    createMockConfigService({
+      GOOGLE_CLIENT_ID: 'test-client-id',
+      GOOGLE_CLIENT_SECRET: 'test-client-secret'
+    })
+  );
 }
 
 describe('GoogleStrategy.validate', () => {
