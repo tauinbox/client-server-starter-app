@@ -11,6 +11,9 @@ import { AuthStore } from '@features/auth/store/auth.store';
 import { TokenService } from '@features/auth/services/token.service';
 import type { NotificationEvent } from '@app/shared/types';
 
+const RECYCLE_MIN_DELAY_MS = 4 * 60 * 60 * 1000;
+const RECYCLE_MAX_DELAY_MS = 8 * 60 * 60 * 1000;
+
 function makeProgressEvent(
   partialText: string,
   loaded: number
@@ -295,6 +298,120 @@ describe('NotificationsService', () => {
 
     httpController.expectNone('/api/v1/notifications/stream');
 
+    vi.useRealTimers();
+  });
+
+  it('should not reconnect after disconnect() when a reconnect is already pending', () => {
+    vi.useFakeTimers();
+
+    service.connect();
+    // Server closes the connection, which schedules a reconnect
+    httpController.expectOne('/api/v1/notifications/stream').flush('');
+
+    service.disconnect();
+    vi.advanceTimersByTime(10_000);
+
+    httpController.expectNone('/api/v1/notifications/stream');
+
+    vi.useRealTimers();
+  });
+
+  it('should reopen the stream once the recycle interval elapses', () => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    service.connect();
+    const first = httpController.expectOne('/api/v1/notifications/stream');
+
+    vi.advanceTimersByTime(RECYCLE_MIN_DELAY_MS);
+
+    expect(first.cancelled).toBe(true);
+    const second = httpController.expectOne('/api/v1/notifications/stream');
+    expect(second.cancelled).toBe(false);
+
+    // The recycled connection schedules the next recycle in turn
+    vi.advanceTimersByTime(RECYCLE_MIN_DELAY_MS);
+    expect(second.cancelled).toBe(true);
+    httpController.expectOne('/api/v1/notifications/stream');
+
+    randomSpy.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it('should still emit events received on the recycled connection', () => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const received: NotificationEvent[] = [];
+    service.userCrudEvents$.subscribe((e) => received.push(e));
+
+    service.connect();
+    httpController.expectOne('/api/v1/notifications/stream');
+
+    vi.advanceTimersByTime(RECYCLE_MIN_DELAY_MS);
+
+    const recycled = httpController.expectOne('/api/v1/notifications/stream');
+    const chunk =
+      'data: {"type":"user_crud_events","action":"deleted","userId":"u-7"}\n\n';
+    recycled.event(makeProgressEvent(chunk, chunk.length));
+
+    expect(received).toEqual([
+      { type: 'user_crud_events', action: 'deleted', userId: 'u-7' }
+    ]);
+
+    randomSpy.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it('should not recycle after an explicit disconnect()', () => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    service.connect();
+    httpController.expectOne('/api/v1/notifications/stream');
+    service.disconnect();
+
+    vi.advanceTimersByTime(RECYCLE_MAX_DELAY_MS);
+
+    httpController.expectNone('/api/v1/notifications/stream');
+
+    randomSpy.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it('should not recycle while the user is not authenticated', () => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    service.connect();
+    const req = httpController.expectOne('/api/v1/notifications/stream');
+
+    isAuthenticatedSignal.set(false);
+    vi.advanceTimersByTime(RECYCLE_MAX_DELAY_MS);
+
+    expect(req.cancelled).toBe(false);
+    httpController.expectNone('/api/v1/notifications/stream');
+
+    randomSpy.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it('should drop the recycle timer of a connection the server has closed', () => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    service.connect();
+    httpController.expectOne('/api/v1/notifications/stream').flush('');
+
+    vi.advanceTimersByTime(5000);
+    httpController.expectOne('/api/v1/notifications/stream');
+
+    // Only the reconnected stream owns a recycle timer, so this window must
+    // produce exactly one new connection, not one per stale timer
+    vi.advanceTimersByTime(RECYCLE_MIN_DELAY_MS);
+    httpController.expectOne('/api/v1/notifications/stream');
+
+    randomSpy.mockRestore();
     vi.useRealTimers();
   });
 
