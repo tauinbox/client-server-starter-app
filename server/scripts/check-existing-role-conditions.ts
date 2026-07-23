@@ -96,11 +96,7 @@ function checkConditionsNode(node: unknown, path = ''): CheckResult {
   return { ok: true };
 }
 
-function checkLogicalOp(
-  op: string,
-  value: unknown,
-  path: string
-): CheckResult {
+function checkLogicalOp(op: string, value: unknown, path: string): CheckResult {
   if (op === '$not') {
     return checkConditionsNode(value, path);
   }
@@ -163,9 +159,7 @@ async function main(): Promise<void> {
   const ds = new DataSource({
     type: 'postgres',
     host: process.env['DB_HOST'],
-    port: process.env['DB_PORT']
-      ? Number(process.env['DB_PORT'])
-      : 5432,
+    port: process.env['DB_PORT'] ? Number(process.env['DB_PORT']) : 5432,
     username: process.env['DB_USER'],
     password: process.env['DB_PASSWORD'],
     database: process.env['DB_NAME'],

@@ -81,9 +81,10 @@ function stringLiteral(node: ts.Expression): string | undefined {
   return ts.isStringLiteral(node) ? node.text : undefined;
 }
 
-function parseControllerArgs(
-  d: ts.Decorator
-): { controllerPath: string; version: string | null } {
+function parseControllerArgs(d: ts.Decorator): {
+  controllerPath: string;
+  version: string | null;
+} {
   const args = decoratorArgs(d);
   if (!args?.length) return { controllerPath: '', version: null };
 

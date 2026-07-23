@@ -699,6 +699,8 @@ API base URL: `/api/v1`
 
 ## Available Commands
 
+> `format` / `format:check` cover every TypeScript and ESM file the workspace owns, not just `src/` — root-level configs (`eslint.config.*`, `playwright.config.ts`, `proxy.conf.mjs`, …) and `scripts/` are included. The `shared/` module and root-level `*.mjs` configs are formatted from `server/`, since they belong to no single workspace.
+
 ### Mock Server (`cd mock-server`)
 
 ```bash
@@ -799,6 +801,11 @@ A pre-commit hook (via [husky](https://typicode.github.io/husky/)) runs **lint-s
 | `client/src/**/*.scss` | Stylelint |
 | `server/src/**/*.ts` | Prettier + ESLint (@typescript-eslint) |
 | `mock-server/src/**/*.ts` | Prettier + ESLint (@typescript-eslint) |
+| `client/{*.{ts,mjs},scripts/*.mjs}` | Prettier |
+| `server/{*.ts,scripts/*.ts}` | Prettier |
+| `mock-server/*.ts` | Prettier |
+| `shared/src/**/*.ts` | Prettier |
+| `{.lintstagedrc.mjs,eslint.base.config.mjs}` | Prettier |
 
 A commit-msg hook (`client/.husky/commit-msg`) additionally runs **commitlint** to enforce [Conventional Commits](https://www.conventionalcommits.org/) format.
 

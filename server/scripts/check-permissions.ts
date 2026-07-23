@@ -61,7 +61,9 @@ function stringLiteral(node: ts.Expression): string | undefined {
 /**
  * Extract { name, subject } from @RegisterResource({ name: '...', subject: '...' })
  */
-function parseRegisterResource(d: ts.Decorator): { name: string; subject: string } | undefined {
+function parseRegisterResource(
+  d: ts.Decorator
+): { name: string; subject: string } | undefined {
   const args = decoratorArgs(d);
   if (!args?.length) return undefined;
 
@@ -83,7 +85,9 @@ function parseRegisterResource(d: ts.Decorator): { name: string; subject: string
 /**
  * Extract all [action, Subject] pairs from @Authorize(['action', 'Subject'], ...)
  */
-function parseAuthorize(d: ts.Decorator): Array<{ action: string; subject: string }> {
+function parseAuthorize(
+  d: ts.Decorator
+): Array<{ action: string; subject: string }> {
   const args = decoratorArgs(d);
   if (!args?.length) return [];
 
@@ -213,10 +217,14 @@ function main(): void {
   }
 
   // Registered subjects never used in @Authorize (informational warning)
-  const unusedResources = allResources.filter((r) => !usedSubjects.has(r.subject));
+  const unusedResources = allResources.filter(
+    (r) => !usedSubjects.has(r.subject)
+  );
 
   if (errors.length > 0) {
-    console.error(`✗ check:permissions found ${errors.length} issue${errors.length === 1 ? '' : 's'}:\n`);
+    console.error(
+      `✗ check:permissions found ${errors.length} issue${errors.length === 1 ? '' : 's'}:\n`
+    );
     errors.forEach((e) => console.error(e));
     console.error(
       '\n  → Add @RegisterResource to the controller for that subject, fix the subject name in @Authorize, or give the colliding resources distinct subjects.\n'
@@ -229,11 +237,15 @@ function main(): void {
   );
 
   if (unusedResources.length > 0) {
-    console.warn(`\n  ⚠ Resources registered but never referenced in @Authorize:`);
+    console.warn(
+      `\n  ⚠ Resources registered but never referenced in @Authorize:`
+    );
     for (const r of unusedResources) {
       console.warn(`    "${r.subject}" (${r.name}) in ${r.file}`);
     }
-    console.warn('  → These may be intentional (resources protected by role-level guards or super-admin only).\n');
+    console.warn(
+      '  → These may be intentional (resources protected by role-level guards or super-admin only).\n'
+    );
   }
 }
 

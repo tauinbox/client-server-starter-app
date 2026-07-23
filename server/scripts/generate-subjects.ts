@@ -146,7 +146,10 @@ function extractFromFile(filePath: string): {
 // ─── codegen ─────────────────────────────────────────────────────────────────
 
 function buildUnion(items: string[]): string {
-  return [...new Set(items)].sort().map((s) => `  | '${s}'`).join('\n');
+  return [...new Set(items)]
+    .sort()
+    .map((s) => `  | '${s}'`)
+    .join('\n');
 }
 
 function buildFileContent(subjects: string[], actions: string[]): string {
@@ -159,7 +162,7 @@ function buildFileContent(subjects: string[], actions: string[]): string {
     '',
     '// prettier-ignore',
     `export type KnownActions =\n${buildUnion(actions)};`,
-    '',
+    ''
   ].join('\n');
 }
 

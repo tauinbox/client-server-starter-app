@@ -9,7 +9,9 @@ export const DEFAULT_LOCALE: SupportedLocale = 'en';
  * client-supplied preference) to a supported locale, falling back to the
  * default. Only the primary subtag is considered (`ru-RU` → `ru`).
  */
-export function normalizeLocale(input: string | null | undefined): SupportedLocale {
+export function normalizeLocale(
+  input: string | null | undefined
+): SupportedLocale {
   if (!input) return DEFAULT_LOCALE;
   const primary = input.split(',')[0].trim().split('-')[0].toLowerCase();
   return (SUPPORTED_LOCALES as readonly string[]).includes(primary)

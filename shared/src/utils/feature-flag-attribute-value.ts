@@ -46,7 +46,9 @@ export function attributeValueError(
     case 'before':
     case 'after':
       return (typeof value === 'string' || typeof value === 'number') &&
-        !(typeof value === 'string' && value.length > ATTRIBUTE_VALUE_MAX_LENGTH) &&
+        !(
+          typeof value === 'string' && value.length > ATTRIBUTE_VALUE_MAX_LENGTH
+        ) &&
         toTimestamp(value) !== null
         ? null
         : `attribute rule with op=${op} requires value: an ISO date string or an epoch-millisecond number`;

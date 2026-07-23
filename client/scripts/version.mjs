@@ -13,9 +13,13 @@ if (process.env.COMMIT_HASH) {
   hash = process.env.COMMIT_HASH;
 } else {
   try {
-    hash = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf-8' }).trim();
+    hash = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+      encoding: 'utf-8'
+    }).trim();
   } catch (e) {
-    console.warn(`[version.mjs] Could not read git hash: ${e.message.trim()}. Set COMMIT_HASH env var to override.`);
+    console.warn(
+      `[version.mjs] Could not read git hash: ${e.message.trim()}. Set COMMIT_HASH env var to override.`
+    );
   }
 }
 
