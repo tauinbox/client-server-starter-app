@@ -5,6 +5,8 @@
   "testRegex": ".e2e-spec.ts$",
   "testTimeout": 30000,
   "forceExit": true,
+  "globalSetup": "<rootDir>/global-setup.ts",
+  "globalTeardown": "<rootDir>/global-teardown.ts",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },

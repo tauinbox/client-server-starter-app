@@ -98,6 +98,7 @@ Copy `.env.example` to `.env` and configure:
 | `SMTP_PASS` | - | SMTP password |
 | `SMTP_FROM` | `noreply@example.com` | Sender email address |
 | `REDIS_URL` | - | Redis connection URL (optional; enables distributed rate limiting and shared permission cache for multi-instance deployments) |
+| `E2E_REDIS_DB` | `15` | Test-only: logical Redis database `npm run test:e2e` is pinned to and wipes before each run. Must not be `0`. See [E2E Tests](#e2e-tests-jest) |
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to retain audit log entries before nightly deletion |
 | `TURNSTILE_SITE_KEY` | - | Cloudflare Turnstile site key (public). Both Turnstile keys must be set to enable CAPTCHA; see [Enabling CAPTCHA in production](#enabling-captcha-in-production) |
 | `TURNSTILE_SECRET_KEY` | - | Cloudflare Turnstile secret key. CAPTCHA stays disabled while either key is empty |
@@ -906,6 +907,15 @@ npx jest --testPathPattern=auth   # Run specific tests
 ```bash
 npm run test:e2e
 ```
+
+**Redis isolation.** When a Redis URL is configured (environment or `.env`), the
+run is pinned to a dedicated logical database (`E2E_REDIS_DB`, default `15`) and
+that database is wiped before the first test and after the last one. Without it,
+throttler counters written by one run outlive it - the login throttler window is
+`LOCKOUT_DURATION_MS` - and a later run eventually gets a `429` where it expects
+a `401`. Database `0`, which holds the dev cache and queues, is rejected as a
+target. Run with `REDIS_URL=` empty to exercise the in-memory throttler instead,
+which is what CI does (no Redis service in the workflows).
 
 ## Shared Module
 
