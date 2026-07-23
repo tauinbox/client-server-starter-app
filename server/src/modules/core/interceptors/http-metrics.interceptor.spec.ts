@@ -1,29 +1,29 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
-import type { CallHandler, ExecutionContext } from '@nestjs/common';
+import type { CallHandler } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 import { HttpMetricsInterceptor } from './http-metrics.interceptor';
 import type { MetricsService } from '../metrics/metrics.service';
+import { createMockExecutionContext } from '../../../common/testing/execution-context.mock';
 
-const mockMetricsService = {
+const mockMetricsService: jest.Mocked<
+  Pick<MetricsService, 'recordHttpRequest'>
+> = {
   recordHttpRequest: jest.fn()
 };
 
 const makeContext = (path: string, method = 'GET', statusCode = 200) =>
-  ({
-    switchToHttp: () => ({
-      getRequest: () => ({ path, method }),
-      getResponse: () => ({ statusCode })
-    })
-  }) as unknown as ExecutionContext;
+  createMockExecutionContext({
+    request: { path, method },
+    response: { statusCode }
+  });
 
 describe('HttpMetricsInterceptor', () => {
   let interceptor: HttpMetricsInterceptor;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    interceptor = new HttpMetricsInterceptor(
-      mockMetricsService as unknown as MetricsService
-    );
+    // @ts-expect-error - partial mock: only recordHttpRequest is used
+    interceptor = new HttpMetricsInterceptor(mockMetricsService);
   });
 
   it('records successful request with correct route and status', (done) => {

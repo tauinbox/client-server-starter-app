@@ -1,6 +1,5 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import type { EntityManager } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { CreditBalance } from '../entities/credit-balance.entity';
 import { CreditLedger } from '../entities/credit-ledger.entity';
@@ -78,7 +77,8 @@ describe('CreditService', () => {
       const { service, manager } = await build();
 
       await service.addPurchase(
-        manager as unknown as EntityManager,
+        // @ts-expect-error - partial EntityManager mock: uses query/create/save
+        manager,
         'cust-1',
         'inv-1',
         500
@@ -101,7 +101,8 @@ describe('CreditService', () => {
       const { service, manager } = await build();
 
       await service.spendOnUsage(
-        manager as unknown as EntityManager,
+        // @ts-expect-error - partial EntityManager mock: uses query/create/save
+        manager,
         'cust-1',
         'inv-2',
         42
@@ -123,7 +124,8 @@ describe('CreditService', () => {
       const { service, manager } = await build();
 
       await service.clawbackPurchase(
-        manager as unknown as EntityManager,
+        // @ts-expect-error - partial EntityManager mock: uses query/create/save
+        manager,
         'cust-1',
         'inv-1',
         500

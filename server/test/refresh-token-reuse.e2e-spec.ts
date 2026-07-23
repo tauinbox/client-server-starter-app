@@ -30,7 +30,9 @@ function createStore(): InMemoryStore {
   return { tokens: new Map(), userRevokedAt: new Map() };
 }
 
-function makeRefreshTokenRepoMock(store: InMemoryStore) {
+function makeRefreshTokenRepoMock(
+  store: InMemoryStore
+): Repository<RefreshToken> {
   let idSeq = 0;
   const repo = {
     create: (data: Partial<RefreshToken>) => {
@@ -75,7 +77,8 @@ function makeRefreshTokenRepoMock(store: InMemoryStore) {
       })
     }))
   };
-  return repo as unknown as Repository<RefreshToken>;
+  // @ts-expect-error - partial RefreshToken repository fake: only used methods
+  return repo;
 }
 
 function makeDataSourceMock(
@@ -111,7 +114,7 @@ function makeDataSourceMock(
     })
   };
 
-  return {
+  const dataSource = {
     transaction: jest.fn((cb: (m: typeof manager) => Promise<unknown>) =>
       cb(manager)
     ),
@@ -119,10 +122,13 @@ function makeDataSourceMock(
       if (entity === User) return userRepo;
       return rtRepo;
     })
-  } as unknown as DataSource;
+  };
+  // @ts-expect-error - partial DataSource fake: only transaction/getRepository
+  return dataSource;
 }
 
 describe('Refresh token reuse detection (e2e — BKL-009)', () => {
+  // @ts-expect-error - partial User fixture: only the fields the flow reads
   const userRecord: User = {
     id: 'user-1',
     email: 'alice@example.com',
@@ -147,7 +153,7 @@ describe('Refresh token reuse detection (e2e — BKL-009)', () => {
         updatedAt: new Date()
       }
     ]
-  } as unknown as User;
+  };
 
   let auth: AuthService;
   let store: InMemoryStore;

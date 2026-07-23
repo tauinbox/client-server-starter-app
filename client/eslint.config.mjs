@@ -96,6 +96,15 @@ export default tseslint.config(
             "CallExpression[callee.property.name='includes'] > Literal[value='admin']",
           message:
             "Use SYSTEM_ROLES.ADMIN from '@app/shared/constants' instead of the 'admin' literal."
+        },
+        {
+          // Ban `x as unknown as T` double casts. Flat config replaces this
+          // rule's options, so this selector is appended here rather than
+          // inherited from eslint.base.config.mjs.
+          selector:
+            'TSAsExpression > TSAsExpression.expression > TSUnknownKeyword.typeAnnotation',
+          message:
+            'Do not use `as unknown as T` double casts. Fix the type at its root (widen the parameter, use a typed partial mock), or use `// @ts-expect-error` in tests.'
         }
       ]
     }

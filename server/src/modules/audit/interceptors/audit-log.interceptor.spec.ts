@@ -5,23 +5,16 @@ import { AuditLogInterceptor } from './audit-log.interceptor';
 import { AuditService } from '../audit.service';
 import { LogAuditOptions } from '../decorators/log-audit.decorator';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { createMockExecutionContext } from '../../../common/testing/execution-context.mock';
 
 function makeContext(req: Record<string, unknown>): ExecutionContext {
-  return {
-    switchToHttp: () => ({
-      getRequest: () => req,
-      getResponse: () => ({}),
-      getNext: () => undefined
-    }),
-    getHandler: () => ({}),
-    getClass: () => ({})
-  } as unknown as ExecutionContext;
+  return createMockExecutionContext({ request: req });
 }
 
 describe('AuditLogInterceptor', () => {
   let interceptor: AuditLogInterceptor;
-  let reflector: { get: jest.Mock };
-  let auditService: { logFireAndForget: jest.Mock; log: jest.Mock };
+  let reflector: jest.Mocked<Pick<Reflector, 'get'>>;
+  let auditService: jest.Mocked<Pick<AuditService, 'logFireAndForget' | 'log'>>;
 
   beforeEach(() => {
     reflector = { get: jest.fn() };
@@ -30,8 +23,9 @@ describe('AuditLogInterceptor', () => {
       log: jest.fn().mockResolvedValue(undefined)
     };
     interceptor = new AuditLogInterceptor(
-      reflector as unknown as Reflector,
-      auditService as unknown as AuditService
+      // @ts-expect-error - partial mock: only Reflector.get is used
+      reflector,
+      auditService
     );
   });
 

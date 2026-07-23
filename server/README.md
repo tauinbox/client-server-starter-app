@@ -892,6 +892,7 @@ Admin UIs can then write rules referencing `{ field: 'custom', customKey: 'tenan
 
 - Test files: `*.spec.ts` alongside source files
 - Environment: Node
+- **Test mocks**: partial mocks are typed against the real type (`jest.Mocked<Pick<T, ...>>`) or, where the real type is impractically large (`ExecutionContext`, `EntityManager`, `DataSource`, `Repository<T>`), a scoped `// @ts-expect-error`. `as unknown as T` double casts are banned by a `no-restricted-syntax` ESLint rule. Reusable context/config/Express fakes live in `src/common/testing/` (excluded from the production build).
 
 ```bash
 npm test                   # Run all

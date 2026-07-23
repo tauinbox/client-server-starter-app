@@ -2,18 +2,13 @@ import { ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
 import { ErrorKeys } from '@app/shared/constants';
 import { CaptchaRequiredGuard } from './captcha-required.guard';
 import type { CaptchaService } from './captcha.service';
+import { createMockExecutionContext } from '../../../common/testing/execution-context.mock';
 
 type MockReq = { body?: { captchaToken?: unknown }; ip?: string };
 type MockRes = { getHeader: jest.Mock };
 
 function buildContext(req: MockReq, res: MockRes): ExecutionContext {
-  return {
-    switchToHttp: () => ({
-      getRequest: <T>() => req as unknown as T,
-      getResponse: <T>() => res as unknown as T,
-      getNext: () => undefined
-    })
-  } as unknown as ExecutionContext;
+  return createMockExecutionContext({ request: req, response: res });
 }
 
 describe('CaptchaRequiredGuard', () => {
@@ -25,7 +20,8 @@ describe('CaptchaRequiredGuard', () => {
       isEnabled: jest.fn(),
       verify: jest.fn()
     };
-    guard = new CaptchaRequiredGuard(mockService as unknown as CaptchaService);
+    // @ts-expect-error - partial mock: only isEnabled/verify are used
+    guard = new CaptchaRequiredGuard(mockService);
   });
 
   it('passes through when captcha service is disabled', async () => {

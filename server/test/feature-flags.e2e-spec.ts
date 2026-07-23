@@ -188,7 +188,7 @@ function makeRuleRepoMock(stores: Stores) {
 }
 
 function makeDataSourceMock(stores: Stores): DataSource {
-  return {
+  const dataSource = {
     transaction: jest.fn(
       async (cb: (em: TransactionalEntityManager) => Promise<unknown>) => {
         const em: TransactionalEntityManager = {
@@ -252,7 +252,9 @@ function makeDataSourceMock(stores: Stores): DataSource {
         return cb(em);
       }
     )
-  } as unknown as DataSource;
+  };
+  // @ts-expect-error - partial DataSource fake: only transaction is used
+  return dataSource;
 }
 
 interface TransactionalEntityManager {

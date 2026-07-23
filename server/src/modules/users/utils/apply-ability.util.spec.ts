@@ -10,9 +10,13 @@ import type { AppAbility } from '../../auth/casl/app-ability';
 import type { SelectQueryBuilder } from 'typeorm';
 import type { User } from '../entities/user.entity';
 
-function fakeQb() {
+function fakeQb(): {
+  qb: SelectQueryBuilder<User>;
+  calls: { sql: string; params?: unknown }[];
+} {
   const calls: { sql: string; params?: unknown }[] = [];
-  const qb = {
+  // @ts-expect-error - partial SelectQueryBuilder fake: only where methods used
+  const qb: SelectQueryBuilder<User> = {
     andWhere: jest.fn((arg: unknown, params?: unknown) => {
       if (typeof arg === 'string') {
         calls.push({ sql: arg, params });
@@ -44,7 +48,7 @@ function fakeQb() {
       calls.push({ sql, params });
       return qb;
     })
-  } as unknown as SelectQueryBuilder<User>;
+  };
   return { qb, calls };
 }
 

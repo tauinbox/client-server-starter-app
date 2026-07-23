@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import type { Request } from 'express';
 import { FeatureFlagsController } from './feature-flags.controller';
+import { createMockRequest } from '../../../common/testing/express.mock';
 import {
   FeatureFlagResolverService,
   type ResolverUser
@@ -44,12 +44,10 @@ describe('FeatureFlagsController', () => {
   });
 
   it('routes authenticated requests through buildResolverUser + evaluateForUser', async () => {
-    const req = {
+    const req = createMockRequest({
       user: { userId: 'user-1', email: 'a@b.com' },
       cookies: {}
-    } as unknown as Request & {
-      user?: { userId?: string; email?: string };
-    };
+    });
 
     const result = await controller.evaluate(req);
 
@@ -60,11 +58,9 @@ describe('FeatureFlagsController', () => {
   });
 
   it('falls back to evaluateAnonymous (with anon-id cookie) when req.user is undefined', async () => {
-    const req = {
+    const req = createMockRequest({
       cookies: { [ANON_ID_COOKIE]: 'anon-xyz' }
-    } as unknown as Request & {
-      user?: { userId?: string; email?: string };
-    };
+    });
 
     await controller.evaluate(req);
 
@@ -73,9 +69,7 @@ describe('FeatureFlagsController', () => {
   });
 
   it('passes null anonId when the cookie is absent', async () => {
-    const req = { cookies: {} } as unknown as Request & {
-      user?: { userId?: string; email?: string };
-    };
+    const req = createMockRequest({ cookies: {} });
 
     await controller.evaluate(req);
 

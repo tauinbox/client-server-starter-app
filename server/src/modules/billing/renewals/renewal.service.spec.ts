@@ -175,10 +175,12 @@ function makeManager(store: Store) {
           );
           if (dup) return Promise.resolve({ raw: [] });
           const id = `inv-${++seq}`;
-          store.invoices.push({
+          // @ts-expect-error - partial Invoice fake assembled from insert().values()
+          const row: Invoice & { providerEventId: string | null } = {
             id,
             ...v
-          } as unknown as Invoice & { providerEventId: string | null });
+          };
+          store.invoices.push(row);
           return Promise.resolve({ raw: [{ id }] });
         }
       };
@@ -911,13 +913,15 @@ describe('RenewalService', () => {
     // is paid (InvoicePaidEvent already emitted by the reducer), only the
     // period advance is left for the scan.
     const anchorMs = new Date('2026-06-01T00:00:00Z').getTime();
-    store.invoices.push({
+    // @ts-expect-error - partial Invoice fake for this scenario
+    const preInvoice: Invoice & { providerEventId: string | null } = {
       id: 'inv-pre',
       providerEventId: `renewal:sub-1:${anchorMs}`,
       status: 'paid',
       providerInvoiceRef: 'pay_wh',
       creditUnitsApplied: 0
-    } as unknown as Invoice & { providerEventId: string | null });
+    };
+    store.invoices.push(preInvoice);
     const charge = jest.fn();
     const { service, emit, credits } = await build(store, charge);
 
@@ -1058,13 +1062,15 @@ describe('RenewalService', () => {
       const sub = makeSub();
       const store = baseStore(sub);
       const anchorMs = new Date('2026-06-01T00:00:00Z').getTime();
-      store.invoices.push({
+      // @ts-expect-error - partial Invoice fake for this scenario
+      const preInvoice: Invoice & { providerEventId: string | null } = {
         id: 'inv-pre',
         providerEventId: `renewal:sub-1:${anchorMs}`,
         status: 'failed',
         providerInvoiceRef: 'pay_pend',
         creditUnitsApplied: 0
-      } as unknown as Invoice & { providerEventId: string | null });
+      };
+      store.invoices.push(preInvoice);
       const charge = jest.fn();
       const { service, emit } = await build(store, charge);
 

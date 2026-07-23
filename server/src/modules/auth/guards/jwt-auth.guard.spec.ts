@@ -3,26 +3,27 @@ import { Reflector } from '@nestjs/core';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { IS_OPTIONAL_AUTH_KEY } from '../decorators/optional-auth.decorator';
+import { createMockExecutionContext } from '../../../common/testing/execution-context.mock';
+
+const handlerRef = () => 'handler-ref';
+class ClassRef {}
 
 describe('JwtAuthGuard', () => {
   let guard: JwtAuthGuard;
   let getAllAndOverride: jest.Mock;
-  let reflector: Reflector;
+  let reflector: jest.Mocked<Pick<Reflector, 'getAllAndOverride'>>;
   let context: ExecutionContext;
   let superCanActivate: jest.SpyInstance;
 
   function buildContext(): ExecutionContext {
-    return {
-      getHandler: jest.fn(() => 'handler-ref'),
-      getClass: jest.fn(() => 'class-ref'),
-      switchToHttp: jest.fn()
-    } as unknown as ExecutionContext;
+    return createMockExecutionContext({ handler: handlerRef, class: ClassRef });
   }
 
   beforeEach(() => {
     getAllAndOverride = jest.fn();
-    reflector = { getAllAndOverride } as unknown as Reflector;
+    reflector = { getAllAndOverride };
 
+    // @ts-expect-error - partial mock: only Reflector.getAllAndOverride is used
     guard = new JwtAuthGuard(reflector);
     context = buildContext();
 
@@ -47,8 +48,8 @@ describe('JwtAuthGuard', () => {
 
     expect(result).toBe(true);
     expect(getAllAndOverride).toHaveBeenCalledWith(IS_PUBLIC_KEY, [
-      'handler-ref',
-      'class-ref'
+      handlerRef,
+      ClassRef
     ]);
     expect(superCanActivate).not.toHaveBeenCalled();
   });
@@ -71,7 +72,7 @@ describe('JwtAuthGuard', () => {
 
     expect(getAllAndOverride).toHaveBeenCalledWith(
       IS_PUBLIC_KEY,
-      expect.arrayContaining(['handler-ref', 'class-ref'])
+      expect.arrayContaining([handlerRef, ClassRef])
     );
   });
 

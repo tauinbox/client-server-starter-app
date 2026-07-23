@@ -137,9 +137,10 @@ describe('instancePermissionGuard', () => {
     refreshTokens: ReturnType<typeof vi.fn>;
   };
 
-  const mockRoute = {
+  // @ts-expect-error testing mock — minimal ActivatedRouteSnapshot with params
+  const mockRoute: ActivatedRouteSnapshot = {
     params: { id: 'user-1' }
-  } as unknown as ActivatedRouteSnapshot;
+  };
   const mockState = { url: '/admin/users/user-1/edit' } as RouterStateSnapshot;
 
   beforeEach(() => {

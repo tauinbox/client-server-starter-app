@@ -224,9 +224,10 @@ describe('ConditionBuilderComponent', () => {
 
       component.setMode('raw');
       // Simulate typing valid JSON
-      component.onRawInput({
-        target: { value: '{"role": "admin"}' }
-      } as unknown as Event);
+      component.onRawInput(
+        // @ts-expect-error testing mock — minimal Event with target.value
+        { target: { value: '{"role": "admin"}' } }
+      );
       component.setMode('visual');
 
       expect(component.mode()).toBe('visual');
@@ -237,9 +238,10 @@ describe('ConditionBuilderComponent', () => {
       const { component } = setup('');
 
       component.setMode('raw');
-      component.onRawInput({
-        target: { value: 'invalid json' }
-      } as unknown as Event);
+      component.onRawInput(
+        // @ts-expect-error testing mock — minimal Event with target.value
+        { target: { value: 'invalid json' } }
+      );
       component.setMode('visual');
 
       expect(component.parseError()).toBe(true);

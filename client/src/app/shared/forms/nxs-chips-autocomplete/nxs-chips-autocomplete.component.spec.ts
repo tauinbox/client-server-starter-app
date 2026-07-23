@@ -70,11 +70,10 @@ describe('ChipsAutocompleteComponent', () => {
 
     const cmp = fixture.debugElement.children[0]
       .componentInstance as ChipsAutocompleteComponent;
-    cmp['addFromTokenEnd']({
-      value: 'qa-eu',
-      input: null,
-      chipInput: null
-    } as unknown as Parameters<(typeof cmp)['addFromTokenEnd']>[0]);
+    cmp['addFromTokenEnd'](
+      // @ts-expect-error testing mock — minimal MatChipInputEvent with value
+      { value: 'qa-eu', input: null, chipInput: null }
+    );
 
     expect(fixture.componentInstance.lastEmitted).toEqual([
       { value: 'qa-eu', label: 'qa-eu' }
@@ -88,11 +87,10 @@ describe('ChipsAutocompleteComponent', () => {
 
     const cmp = fixture.debugElement.children[0]
       .componentInstance as ChipsAutocompleteComponent;
-    cmp['addFromTokenEnd']({
-      value: 'qa-eu',
-      input: null,
-      chipInput: null
-    } as unknown as Parameters<(typeof cmp)['addFromTokenEnd']>[0]);
+    cmp['addFromTokenEnd'](
+      // @ts-expect-error testing mock — minimal MatChipInputEvent with value
+      { value: 'qa-eu', input: null, chipInput: null }
+    );
 
     expect(fixture.componentInstance.lastEmitted).toBeNull();
   });
@@ -107,11 +105,10 @@ describe('ChipsAutocompleteComponent', () => {
 
     const cmp = fixture.debugElement.children[0]
       .componentInstance as ChipsAutocompleteComponent;
-    cmp['addFromTokenEnd']({
-      value: 'production',
-      input: null,
-      chipInput: null
-    } as unknown as Parameters<(typeof cmp)['addFromTokenEnd']>[0]);
+    cmp['addFromTokenEnd'](
+      // @ts-expect-error testing mock — minimal MatChipInputEvent with value
+      { value: 'production', input: null, chipInput: null }
+    );
 
     expect(fixture.componentInstance.lastEmitted).toBeNull();
   });
