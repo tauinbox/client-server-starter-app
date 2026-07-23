@@ -6,7 +6,9 @@ import { tmpdir } from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const pkg = JSON.parse(readFileSync(resolve(__dirname, '..', 'package.json'), 'utf-8'));
+const pkg = JSON.parse(
+  readFileSync(resolve(__dirname, '..', 'package.json'), 'utf-8')
+);
 const version = pkg.version;
 const tag = `v${version}`;
 
@@ -16,7 +18,9 @@ const changelog = readFileSync(changelogPath, 'utf-8');
 
 const sectionStart = changelog.indexOf(`## [${version}]`);
 if (sectionStart === -1) {
-  console.error(`Error: section for version ${version} not found in CHANGELOG.md`);
+  console.error(
+    `Error: section for version ${version} not found in CHANGELOG.md`
+  );
   process.exit(1);
 }
 
@@ -31,7 +35,9 @@ writeFileSync(notesFile, notes, 'utf-8');
 try {
   execFileSync('git', ['rev-parse', tag], { stdio: 'pipe' });
 } catch {
-  console.error(`Error: tag ${tag} does not exist locally. Run "npm run release" first.`);
+  console.error(
+    `Error: tag ${tag} does not exist locally. Run "npm run release" first.`
+  );
   process.exit(1);
 }
 
@@ -41,8 +47,12 @@ execFileSync('git', ['push', '--follow-tags'], { stdio: 'inherit' });
 
 // Create GitHub Release
 console.log(`Creating GitHub Release ${tag}...`);
-execFileSync('gh', ['release', 'create', tag, '--title', tag, '--notes-file', notesFile], {
-  stdio: 'inherit',
-});
+execFileSync(
+  'gh',
+  ['release', 'create', tag, '--title', tag, '--notes-file', notesFile],
+  {
+    stdio: 'inherit'
+  }
+);
 
 console.log(`\nRelease ${tag} published.`);

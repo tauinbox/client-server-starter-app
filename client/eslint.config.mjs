@@ -11,9 +11,7 @@ import baseRules from '../eslint.base.config.mjs';
 
 export default tseslint.config(
   {
-    ignores: [
-      'src/index.html'
-    ]
+    ignores: ['src/index.html']
   },
   {
     ignores: [
@@ -84,14 +82,12 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         {
-          selector:
-            "BinaryExpression[operator='==='] > Literal[value='admin']",
+          selector: "BinaryExpression[operator='==='] > Literal[value='admin']",
           message:
             "Use SYSTEM_ROLES.ADMIN from '@app/shared/constants' instead of the 'admin' literal."
         },
         {
-          selector:
-            "BinaryExpression[operator='!=='] > Literal[value='admin']",
+          selector: "BinaryExpression[operator='!=='] > Literal[value='admin']",
           message:
             "Use SYSTEM_ROLES.ADMIN from '@app/shared/constants' instead of the 'admin' literal."
         },

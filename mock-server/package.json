@@ -8,8 +8,8 @@
     "start:dev": "ts-node-dev -r tsconfig-paths/register --respawn --transpile-only src/index.ts",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
-    "format": "prettier --write \"src/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\" \"*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"*.ts\"",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "audit:ci": "npm audit --audit-level=high --omit=dev"

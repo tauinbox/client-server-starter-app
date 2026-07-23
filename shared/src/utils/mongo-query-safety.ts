@@ -33,13 +33,13 @@ export const ALLOWED_MONGO_OPERATORS = new Set([
   '$not'
 ]);
 
-export const DENIED_MONGO_OPERATORS = new Set([
-  '$where',
-  '$function',
-  '$expr'
-]);
+export const DENIED_MONGO_OPERATORS = new Set(['$where', '$function', '$expr']);
 
-export const PROTOTYPE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+export const PROTOTYPE_KEYS = new Set([
+  '__proto__',
+  'constructor',
+  'prototype'
+]);
 
 /**
  * Maximum object-nesting depth accepted by the recursive safety checks.

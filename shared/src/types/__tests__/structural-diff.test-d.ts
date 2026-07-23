@@ -28,10 +28,7 @@ type _Match_ManyKeys = Expect<
   >
 >;
 type _Match_Nested = Expect<
-  Equal<
-    StructuralDiff<{ a: { b: number } }, { a: { b: number } }>,
-    never
-  >
+  Equal<StructuralDiff<{ a: { b: number } }, { a: { b: number } }>, never>
 >;
 
 // ── 2. Extra key in A → that key reported ───────────────────────────────────
@@ -50,10 +47,7 @@ type _Type_ArrayElement = Expect<
   Equal<StructuralDiff<{ a: string[] }, { a: number[] }>, 'a'>
 >;
 type _Type_ObjectShape = Expect<
-  Equal<
-    StructuralDiff<{ a: { b: number } }, { a: { b: string } }>,
-    'a'
-  >
+  Equal<StructuralDiff<{ a: { b: number } }, { a: { b: string } }>, 'a'>
 >;
 
 // ── 4. Optional vs required asymmetry is normalised ─────────────────────────
@@ -61,16 +55,10 @@ type _Type_ObjectShape = Expect<
 //     the same field optional. StructuralDiff strips `undefined` so this
 //     does not register as drift.
 type _Optional_NotReportedWhenValueMatches = Expect<
-  Equal<
-    StructuralDiff<{ a: string | null }, { a?: string | null }>,
-    never
-  >
+  Equal<StructuralDiff<{ a: string | null }, { a?: string | null }>, never>
 >;
 type _Optional_NotReportedReverse = Expect<
-  Equal<
-    StructuralDiff<{ a?: string | null }, { a: string | null }>,
-    never
-  >
+  Equal<StructuralDiff<{ a?: string | null }, { a: string | null }>, never>
 >;
 
 // ── 5. WireType normalises Date → string recursively ────────────────────────

@@ -36,7 +36,9 @@ for (const rel of files) {
   const lines = readFileSync(resolve(srcDir, rel), 'utf-8').split('\n');
   for (let i = 0; i < lines.length; i++) {
     if (PATTERN.test(lines[i])) {
-      violations.push(`${rel.replaceAll('\\', '/')}:${i + 1}: ${lines[i].trim()}`);
+      violations.push(
+        `${rel.replaceAll('\\', '/')}:${i + 1}: ${lines[i].trim()}`
+      );
     }
   }
 }

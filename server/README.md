@@ -38,8 +38,8 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Build | `npm run build` |
 | Lint | `npm run lint` |
 | Lint fix | `npm run lint:fix` |
-| Format check | `npm run format:check` |
-| Format | `npm run format` |
+| Format check | `npm run format:check` — covers `src/`, `test/`, `scripts/`, root configs, plus `shared/src/` and the root-level `*.mjs` configs |
+| Format | `npm run format` — same scope, writes fixes |
 | Unit tests | `npm test` |
 | Single test | `npx jest --testPathPattern=<pattern>` |
 | Test watch | `npm run test:watch` |

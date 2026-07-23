@@ -25,7 +25,7 @@ const ALLOWED_PATTERNS = [
   /user-list[\\/]/,
   /user-edit[\\/]/,
   /role-permissions-dialog[\\/]/,
-  /condition-builder[\\/]/,
+  /condition-builder[\\/]/
 ];
 
 // Find all .html files under src/app
