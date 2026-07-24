@@ -323,9 +323,9 @@ describe('applyAbilityToUserQuery', () => {
     });
   });
 
-  // ─── fail-closed regression (the BKL-008 critical test) ────────────────────
+  // ─── fail-closed regression (the critical test) ────────────────────────────
 
-  it('SKIPS THE WHOLE RULE on mixed translatable + unknown operator (regression for BKL-008)', () => {
+  it('SKIPS THE WHOLE RULE on mixed translatable + unknown operator', () => {
     const { qb, calls } = fakeQb();
     applyAbilityToUserQuery(
       qb,

@@ -1,4 +1,4 @@
-// Integration regression for OAuth 2.0 BCP refresh-token reuse detection (BKL-009).
+// Integration regression for OAuth 2.0 BCP refresh-token reuse detection.
 //
 // Wires real AuthService + RefreshTokenService against an in-memory Repository
 // stand-in so the full login → rotate → reuse flow runs end-to-end (token
@@ -127,7 +127,7 @@ function makeDataSourceMock(
   return dataSource;
 }
 
-describe('Refresh token reuse detection (e2e — BKL-009)', () => {
+describe('Refresh token reuse detection (e2e)', () => {
   // @ts-expect-error - partial User fixture: only the fields the flow reads
   const userRecord: User = {
     id: 'user-1',

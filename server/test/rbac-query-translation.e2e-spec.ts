@@ -1,4 +1,4 @@
-// Integration regression for BKL-008: end-to-end CASL ability → SQL query
+// Integration regression for end-to-end CASL ability → SQL query
 // translation. Wires the real CaslAbilityFactory, builds abilities for several
 // scenarios (custom $or, $ne, mixed translatable + untranslatable), and asserts
 // the translator produces SQL that filters users to the expected subset —
@@ -130,7 +130,7 @@ const SAMPLE_USERS = [
   { id: 'u-3', email: 'carol@x.io', isActive: false }
 ];
 
-describe('CASL → SQL query translation (e2e — BKL-008)', () => {
+describe('CASL → SQL query translation (e2e)', () => {
   let warnSpy: jest.SpyInstance;
 
   beforeEach(() => {

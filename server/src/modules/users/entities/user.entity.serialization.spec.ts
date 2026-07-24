@@ -2,8 +2,8 @@ import { instanceToPlain } from 'class-transformer';
 import { User } from './user.entity';
 import { Role } from '../../auth/entities/role.entity';
 
-// Regression for BKL-006: sensitive fields must be hidden from non-privileged
-// callers. lockedUntil and Role.isSystem/isSuper are gated by the 'privileged'
+// Sensitive fields must be hidden from non-privileged callers.
+// lockedUntil and Role.isSystem/isSuper are gated by the 'privileged'
 // class-transformer group; failedLoginAttempts is fully @Exclude()-d.
 //
 // Verifies the entity-level decorators behave as the AuthController (no group)
@@ -49,7 +49,7 @@ function createUser(overrides: Partial<User> = {}): User {
   });
 }
 
-describe('User entity serialization (BKL-006 regression)', () => {
+describe('User entity serialization', () => {
   describe('public form (AuthController — no groups)', () => {
     it('hides failedLoginAttempts (always @Exclude()d)', () => {
       const plain = instanceToPlain(createUser());

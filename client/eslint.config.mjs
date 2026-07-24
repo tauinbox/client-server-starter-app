@@ -76,7 +76,7 @@ export default tseslint.config(
         }
       ],
       'import/no-cycle': 'error',
-      // BKL-007: never compare a role.name against the raw 'admin' literal —
+      // Never compare a role.name against the raw 'admin' literal —
       // always go through SYSTEM_ROLES.ADMIN from @app/shared/constants so the
       // system role can be renamed without breaking client RBAC checks.
       'no-restricted-syntax': [
