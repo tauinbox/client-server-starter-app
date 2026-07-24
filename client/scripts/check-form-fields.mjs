@@ -8,6 +8,8 @@
  *  - user-edit              — mat-select for roles
  *  - role-permissions-dialog — mat-select fields in admin
  *  - condition-builder      — mat-select/input in admin condition builder
+ *  - feature-flag-rule-row  — admin rule editor; all fields set subscriptSizing="dynamic", no app-form-field siblings
+ *  - feature-flag-preview   — admin dry-run preview; standalone JSON/attribute inputs, no app-form-field siblings
  *
  * Exit code 1 if violations found.
  */
@@ -25,7 +27,9 @@ const ALLOWED_PATTERNS = [
   /user-list[\\/]/,
   /user-edit[\\/]/,
   /role-permissions-dialog[\\/]/,
-  /condition-builder[\\/]/
+  /condition-builder[\\/]/,
+  /feature-flag-rule-row[\\/]/,
+  /feature-flag-preview[\\/]/
 ];
 
 // Find all .html files under src/app

@@ -13,7 +13,7 @@
     "test:cov": "ng test --coverage",
     "format": "prettier --write \"src/**/*.ts\" \"e2e/**/*.ts\" \"scripts/*.mjs\" \"*.ts\" \"*.mjs\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"e2e/**/*.ts\" \"scripts/*.mjs\" \"*.ts\" \"*.mjs\"",
-    "lint": "ng lint && npm run lint:styles && npm run lint:no-mat-color",
+    "lint": "ng lint && npm run lint:styles && npm run lint:no-mat-color && npm run check:form-fields",
     "lint:fix": "ng lint --fix && npm run lint:styles -- --fix",
     "lint:styles": "stylelint \"src/**/*.scss\"",
     "lint:no-mat-color": "node scripts/lint-no-mat-color.mjs",
