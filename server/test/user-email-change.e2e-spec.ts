@@ -1,5 +1,5 @@
-// Integration regression for BKL-006b — admin email change must reset
-// isEmailVerified, issue a fresh verification token, and dispatch the email.
+// Integration regression: admin email change must reset isEmailVerified,
+// issue a fresh verification token, and dispatch the email.
 
 import { Test } from '@nestjs/testing';
 import { HttpStatus, HttpException } from '@nestjs/common';
@@ -84,7 +84,7 @@ function makeUserRepoMock(store: UserStore) {
   };
 }
 
-describe('UsersService.update — email change side effects (BKL-006b)', () => {
+describe('UsersService.update — email change side effects', () => {
   let usersService: UsersService;
   let store: UserStore;
   let mailService: { sendEmailVerification: jest.Mock };

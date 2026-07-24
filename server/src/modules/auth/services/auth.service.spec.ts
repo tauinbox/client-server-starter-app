@@ -402,8 +402,8 @@ describe('AuthService', () => {
     });
 
     it('should record running failedLoginAttempts in invalid_credentials audit', async () => {
-      // Regression for BKL-006: failedLoginAttempts is hidden from API
-      // responses, so the audit log must carry the running count for ops.
+      // failedLoginAttempts is hidden from API responses, so the audit log
+      // must carry the running count for ops visibility.
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       mockUsersService.incrementFailedAttemptsAndLockIfNeeded.mockResolvedValue(
         { failedLoginAttempts: 2, lockedUntil: null }
@@ -842,7 +842,7 @@ describe('AuthService', () => {
       );
     });
 
-    describe('reuse detection (BKL-009)', () => {
+    describe('reuse detection', () => {
       it('should revoke ALL user sessions, audit and meter on revoked-but-not-expired token', async () => {
         // OAuth 2.0 BCP: a revoked token presented before its natural expiry
         // signals possible compromise — kill the whole session for the user.

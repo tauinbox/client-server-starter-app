@@ -219,7 +219,7 @@ function translate(
  * Fail-closed: if a rule contains any unknown operator, unknown field, or
  * unsupported value shape, the ENTIRE rule is dropped (and a warn logged).
  * Partial translation would produce SQL strictly less restrictive than the
- * source rule and silently over-share — see BKL-008.
+ * source rule and silently over-share.
  */
 export function applyAbilityToUserQuery(
   qb: SelectQueryBuilder<User>,

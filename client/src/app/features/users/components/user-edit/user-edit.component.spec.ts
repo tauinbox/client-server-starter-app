@@ -876,7 +876,7 @@ describe('UserEditComponent', () => {
   // The delete button must carry the `app-btn-danger` utility class so the
   // M3 destructive tone (mapped to `--mat-sys-error`) is applied. Without
   // the class, the button silently renders in the default neutral text tone
-  // — exactly the BKL-018 silent regression. Computed-style verification
+  // — the exact silent regression this guards against. Computed-style verification
   // against the resolved palette runs in the Playwright visual regression
   // spec (jsdom does not load global stylesheets).
   describe('destructive button class regression', () => {

@@ -1,4 +1,4 @@
-// Integration regression for BKL-026 — type-level @Authorize bypass on
+// Integration regression for a type-level @Authorize bypass on
 // single-entity endpoints. Conditional CASL rules (e.g. `read:User` with
 // `{ id: '${user.id}' }`) pass the type-level check but MUST be re-evaluated
 // against the loaded entity, otherwise any conditional grant becomes an
@@ -94,7 +94,7 @@ interface FixtureMocks {
   };
 }
 
-describe('Instance-level @Authorize re-check (BKL-026)', () => {
+describe('Instance-level @Authorize re-check', () => {
   let app: INestApplication;
   let mocks: FixtureMocks;
   let holder: AbilityHolder;

@@ -1,5 +1,5 @@
 /**
- * Pre-deploy check for BKL-008.
+ * Pre-deploy check for the fail-closed CASL query translator.
  *
  * Connects to the configured database and inspects every row in
  * `role_permissions.conditions` to flag any that contain operators or fields
@@ -8,7 +8,7 @@
  * deny-all under the fail-closed translator.
  *
  * Run against a staging dump (or any environment with realistic data) before
- * merging the BKL-008 fix:
+ * merging the fail-closed translator:
  *
  *   npm run build
  *   ts-node scripts/check-existing-role-conditions.ts
