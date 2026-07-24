@@ -237,4 +237,29 @@ describe('FeatureFlagPreviewComponent', () => {
       expect(cmp['reasonKey'](reason)).toBe(expected);
     }
   });
+
+  it('projects the idle play icon into the button leading-icon slot', async () => {
+    const fixture = await setup();
+    const button = fixture.nativeElement.querySelector(
+      '.preview-actions button'
+    ) as HTMLElement;
+    const icon = button.querySelector('mat-icon') as HTMLElement;
+    expect(icon.textContent?.trim()).toBe('play_arrow');
+    // The icon must be a direct child of the button so Angular Material projects
+    // it into the leading-icon slot. When it is nested inside .mdc-button__label
+    // it lands in the default content slot with no icon spacing.
+    expect(icon.parentElement).toBe(button);
+    expect(icon.closest('.mdc-button__label')).toBeNull();
+  });
+
+  it('shows the loading spinner inline in place of the icon while running', async () => {
+    const fixture = await setup();
+    fixture.componentInstance['loading'].set(true);
+    fixture.detectChanges();
+    const button = fixture.nativeElement.querySelector(
+      '.preview-actions button'
+    ) as HTMLElement;
+    expect(button.querySelector('mat-spinner.run-indicator')).not.toBeNull();
+    expect(button.querySelector('mat-icon')).toBeNull();
+  });
 });

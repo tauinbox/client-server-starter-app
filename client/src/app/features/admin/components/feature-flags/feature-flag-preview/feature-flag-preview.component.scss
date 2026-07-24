@@ -44,6 +44,16 @@
   display: flex;
   justify-content: flex-end;
   margin-bottom: vars.$spacing-sm;
+
+  // The loading branch shares the button's label slot with the text (the play
+  // icon uses the button's leading-icon slot in the idle branch). A spinner
+  // host is block-level and would wrap onto its own line, so keep it inline
+  // and give it the same gap the icon slot provides.
+  .run-indicator {
+    display: inline-flex;
+    margin-right: vars.$space-component-gap;
+    vertical-align: middle;
+  }
 }
 
 .preview-result {
