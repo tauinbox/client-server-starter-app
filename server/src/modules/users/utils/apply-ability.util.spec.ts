@@ -6,46 +6,70 @@ import {
   LOGICAL_OPERATORS
 } from './apply-ability.util';
 import { ALLOWED_MONGO_OPERATORS } from '@app/shared/utils/mongo-query-safety';
+import { subject } from '@casl/ability';
+import {
+  AbilityBuilder,
+  createMongoAbility
+} from '../../auth/casl/app-ability';
 import type { AppAbility } from '../../auth/casl/app-ability';
 import type { SelectQueryBuilder } from 'typeorm';
 import type { User } from '../entities/user.entity';
 
+type Connector = 'where' | 'andWhere' | 'orWhere';
+
+interface RecordedCall {
+  sql: string;
+  params?: unknown;
+  connector: Connector;
+}
+
 function fakeQb(): {
   qb: SelectQueryBuilder<User>;
-  calls: { sql: string; params?: unknown }[];
+  calls: RecordedCall[];
 } {
-  const calls: { sql: string; params?: unknown }[] = [];
+  const calls: RecordedCall[] = [];
   // @ts-expect-error - partial SelectQueryBuilder fake: only where methods used
   const qb: SelectQueryBuilder<User> = {
     andWhere: jest.fn((arg: unknown, params?: unknown) => {
       if (typeof arg === 'string') {
-        calls.push({ sql: arg, params });
+        calls.push({ sql: arg, params, connector: 'andWhere' });
       } else if (
         typeof arg === 'object' &&
         arg !== null &&
         'whereFactory' in (arg as Record<string, unknown>)
       ) {
-        // Brackets — invoke its factory against a sub-recorder
+        // Brackets — invoke its factory against a sub-recorder. The connector
+        // each sub-call used matters: allow rules are ORed, a deny is ANDed on
+        // top as a negation, so rendering everything with OR would hide the
+        // difference between "subtracts the deny" and "ignores it".
         const sub = fakeQb();
         (arg as { whereFactory: (q: typeof sub.qb) => void }).whereFactory(
           sub.qb
         );
+        const rendered = sub.calls
+          .map((c, i) =>
+            i === 0
+              ? c.sql
+              : `${c.connector === 'orWhere' ? 'OR' : 'AND'} ${c.sql}`
+          )
+          .join(' ');
         calls.push({
-          sql: `(${sub.calls.map((c) => c.sql).join(' OR ')})`,
+          sql: `(${rendered})`,
           params: sub.calls.reduce(
             (acc, c) => ({ ...acc, ...(c.params as object) }),
             {}
-          )
+          ),
+          connector: 'andWhere'
         });
       }
       return qb;
     }),
     where: jest.fn((sql: string, params?: unknown) => {
-      calls.push({ sql, params });
+      calls.push({ sql, params, connector: 'where' });
       return qb;
     }),
     orWhere: jest.fn((sql: string, params?: unknown) => {
-      calls.push({ sql, params });
+      calls.push({ sql, params, connector: 'orWhere' });
       return qb;
     })
   };
@@ -145,7 +169,9 @@ describe('applyAbilityToUserQuery', () => {
     expect(calls[0].sql).toMatch(/user\.id = :abFilter_0.*OR.*user\.isActive/);
   });
 
-  it('skips inverted rules', () => {
+  // ─── deny (inverted) rules ─────────────────────────────────────────────────
+
+  it('subtracts inverted rules instead of ignoring them', () => {
     const { qb, calls } = fakeQb();
     applyAbilityToUserQuery(
       qb,
@@ -157,8 +183,104 @@ describe('applyAbilityToUserQuery', () => {
       }),
       'search'
     );
-    expect(calls[0].sql).toContain('user.id = :abFilter_0');
-    expect(calls[0].params).toMatchObject({ abFilter_0: 'u-2' });
+    expect(calls[0].sql).toBe(
+      '(user.id = :abFilter_0 AND NOT (user.id = :abFilter_1))'
+    );
+    expect(calls[0].params).toMatchObject({
+      abFilter_0: 'u-2',
+      abFilter_1: 'u-1'
+    });
+  });
+
+  it('applies a deny on top of an unconditional allow', () => {
+    const { qb, calls } = fakeQb();
+    applyAbilityToUserQuery(
+      qb,
+      ability({
+        rules: [
+          { conditions: undefined },
+          { conditions: { isActive: false }, inverted: true }
+        ]
+      }),
+      'search'
+    );
+    expect(calls[0].sql).toBe('(NOT (user.isActive = :abFilter_0))');
+    expect(calls[0].params).toMatchObject({ abFilter_0: false });
+  });
+
+  it('ORs multiple denies together before negating them', () => {
+    const { qb, calls } = fakeQb();
+    applyAbilityToUserQuery(
+      qb,
+      ability({
+        rules: [
+          { conditions: undefined },
+          { conditions: { id: 'u-1' }, inverted: true },
+          { conditions: { isActive: false }, inverted: true }
+        ]
+      }),
+      'search'
+    );
+    expect(calls[0].sql).toBe(
+      '(NOT ((user.id = :abFilter_0 OR user.isActive = :abFilter_1)))'
+    );
+    expect(calls[0].params).toMatchObject({
+      abFilter_0: 'u-1',
+      abFilter_1: false
+    });
+  });
+
+  it('emits 1 = 0 for an unconditional deny', () => {
+    const { qb, calls } = fakeQb();
+    applyAbilityToUserQuery(
+      qb,
+      ability({
+        rules: [
+          { conditions: undefined },
+          { conditions: undefined, inverted: true }
+        ]
+      }),
+      'search'
+    );
+    expect(calls).toHaveLength(1);
+    expect(calls[0].sql).toBe('1 = 0');
+  });
+
+  it('FAILS CLOSED to 1 = 0 when a deny is untranslatable', () => {
+    const { qb, calls } = fakeQb();
+    applyAbilityToUserQuery(
+      qb,
+      ability({
+        rules: [
+          { conditions: { id: 'u-1' } },
+          { conditions: { legacyField: 'x' }, inverted: true }
+        ]
+      }),
+      'search'
+    );
+    // Dropping a deny would WIDEN the result set, so the whole query must deny.
+    expect(calls).toHaveLength(1);
+    expect(calls[0].sql).toBe('1 = 0');
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it('keeps the deny when one of several denies is untranslatable', () => {
+    const { qb, calls } = fakeQb();
+    applyAbilityToUserQuery(
+      qb,
+      ability({
+        rules: [
+          { conditions: undefined },
+          { conditions: { id: 'u-1' }, inverted: true },
+          { conditions: { legacyField: 'x' }, inverted: true }
+        ]
+      }),
+      'search'
+    );
+    // Even a partially translatable deny set fails closed: the untranslatable
+    // half would otherwise silently expose the rows it was written to hide.
+    expect(calls[0].sql).toBe('1 = 0');
+    expect(warnSpy).toHaveBeenCalled();
   });
 
   it('denies by default when conditions reference unknown fields', () => {
@@ -443,6 +565,42 @@ describe('applyAbilityToUserQuery', () => {
     );
     expect(calls[0].sql).toBe('(1 = 0)');
     expect(warnSpy).toHaveBeenCalled();
+  });
+});
+
+describe('deny parity between in-memory can() and the SQL projection', () => {
+  // Built through the real CASL ability rather than the rulesFor stub, because
+  // the AND-NOT translation is only equivalent to CASL's "last declared
+  // matching rule wins" while every deny is registered after every allow —
+  // the ordering CaslAbilityFactory guarantees.
+  function realAbility(): AppAbility {
+    const { can, cannot, build } = new AbilityBuilder<AppAbility>(
+      createMongoAbility
+    );
+    can('search', 'User');
+    cannot('search', 'User', { isActive: false });
+    return build();
+  }
+
+  it('rulesFor returns denies ahead of allows', () => {
+    const rules = realAbility().rulesFor('search', 'User');
+    expect(rules.map((r) => !!r.inverted)).toEqual([true, false]);
+  });
+
+  it('excludes from the query exactly the row can() rejects', () => {
+    const ab = realAbility();
+    expect(
+      ab.can('search', subject('User', { id: 'u-1', isActive: true }))
+    ).toBe(true);
+    expect(
+      ab.can('search', subject('User', { id: 'u-2', isActive: false }))
+    ).toBe(false);
+
+    const { qb, calls } = fakeQb();
+    applyAbilityToUserQuery(qb, ab, 'search');
+
+    expect(calls[0].sql).toBe('(NOT (user.isActive = :abFilter_0))');
+    expect(calls[0].params).toMatchObject({ abFilter_0: false });
   });
 });
 
