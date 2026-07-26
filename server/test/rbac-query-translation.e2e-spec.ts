@@ -1,12 +1,10 @@
-// Integration regression for end-to-end CASL ability → SQL query
-// translation. Wires the real CaslAbilityFactory, builds abilities for several
-// scenarios (custom $or, $ne, mixed translatable + untranslatable), and asserts
-// the translator produces SQL that filters users to the expected subset —
-// including the fail-closed path where any untranslatable fragment causes the
-// entire rule to be dropped.
+// Integration regression for CASL ability → SQL translation through the real
+// CaslAbilityFactory: allow conditions, deny conditions, and the asymmetric
+// fail-closed paths (a dropped allow narrows, a dropped deny would widen).
 
 import { Logger } from '@nestjs/common';
 import type { ResolvedPermission } from '@app/shared/types';
+import { subject } from '@casl/ability';
 import type { SelectQueryBuilder } from 'typeorm';
 import {
   CaslAbilityFactory,
@@ -24,6 +22,7 @@ const SUBJECT_MAP: Record<string, string> = {
 interface RecordedCall {
   sql: string;
   params?: Record<string, unknown>;
+  connector: 'where' | 'andWhere' | 'orWhere';
 }
 
 function fakeQb(): { qb: SelectQueryBuilder<User>; calls: RecordedCall[] } {
@@ -32,7 +31,11 @@ function fakeQb(): { qb: SelectQueryBuilder<User>; calls: RecordedCall[] } {
   const qb: SelectQueryBuilder<User> = {
     andWhere: jest.fn((arg: unknown, params?: unknown) => {
       if (typeof arg === 'string') {
-        calls.push({ sql: arg, params: params as Record<string, unknown> });
+        calls.push({
+          sql: arg,
+          params: params as Record<string, unknown>,
+          connector: 'andWhere'
+        });
       } else if (
         typeof arg === 'object' &&
         arg !== null &&
@@ -42,22 +45,40 @@ function fakeQb(): { qb: SelectQueryBuilder<User>; calls: RecordedCall[] } {
         (arg as { whereFactory: (q: typeof sub.qb) => void }).whereFactory(
           sub.qb
         );
+        // Render with the connector each sub-call actually used: allow rules
+        // are ORed, a deny is ANDed on as a negation, so a fixed OR join would
+        // make a subtracted deny look identical to an ignored one.
         calls.push({
-          sql: `(${sub.calls.map((c) => c.sql).join(' OR ')})`,
+          sql: `(${sub.calls
+            .map((c, i) =>
+              i === 0
+                ? c.sql
+                : `${c.connector === 'orWhere' ? 'OR' : 'AND'} ${c.sql}`
+            )
+            .join(' ')})`,
           params: sub.calls.reduce(
             (acc, c) => ({ ...acc, ...(c.params ?? {}) }),
             {} as Record<string, unknown>
-          )
+          ),
+          connector: 'andWhere'
         });
       }
       return qb;
     }),
     where: jest.fn((sql: string, params?: unknown) => {
-      calls.push({ sql, params: params as Record<string, unknown> });
+      calls.push({
+        sql,
+        params: params as Record<string, unknown>,
+        connector: 'where'
+      });
       return qb;
     }),
     orWhere: jest.fn((sql: string, params?: unknown) => {
-      calls.push({ sql, params: params as Record<string, unknown> });
+      calls.push({
+        sql,
+        params: params as Record<string, unknown>,
+        connector: 'orWhere'
+      });
       return qb;
     })
   };
@@ -260,6 +281,114 @@ describe('CASL → SQL query translation (e2e)', () => {
     expect(calls[0].sql).toContain('user.id = :abFilter_0');
     expect(calls[0].params).toMatchObject({ abFilter_0: 'u-2' });
     expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it('subtracts a deny permission from an unconditional allow', async () => {
+    const factory = buildFactory();
+    const permissions: ResolvedPermission[] = [
+      {
+        resource: 'users',
+        action: 'search',
+        permission: 'users:search:all',
+        conditions: null
+      },
+      {
+        resource: 'users',
+        action: 'search',
+        permission: 'users:search:deny-inactive',
+        conditions: {
+          effect: 'deny',
+          custom: JSON.stringify({ isActive: false })
+        }
+      }
+    ];
+
+    const ability = await factory.createForUser(
+      'caller-1',
+      NON_SUPER,
+      permissions
+    );
+
+    // The instance-level check the single-entity endpoints run: the inactive
+    // row is rejected, the active ones are not.
+    expect(ability.can('search', subject('User', SAMPLE_USERS[0]))).toBe(true);
+    expect(ability.can('search', subject('User', SAMPLE_USERS[2]))).toBe(false);
+
+    const { qb, calls } = fakeQb();
+    applyAbilityToUserQuery(qb, ability, 'search');
+
+    // Pre-fix the deny was filtered out before translation, the allow was
+    // unconditional, and the query came back unrestricted — so the very rows
+    // the deny was written to hide were listed with the full admin projection.
+    expect(calls).toHaveLength(1);
+    expect(calls[0].sql).toBe('(NOT (user.isActive = :abFilter_0))');
+    expect(calls[0].params).toMatchObject({ abFilter_0: false });
+  });
+
+  it('untranslatable deny drops the whole query to no rows (fail-closed)', async () => {
+    const factory = buildFactory();
+    const permissions: ResolvedPermission[] = [
+      {
+        resource: 'users',
+        action: 'search',
+        permission: 'users:search:all',
+        conditions: null
+      },
+      {
+        resource: 'users',
+        action: 'search',
+        permission: 'users:search:deny-legacy',
+        conditions: {
+          effect: 'deny',
+          custom: JSON.stringify({ legacyField: 'x' }) // unknown field
+        }
+      }
+    ];
+
+    const ability = await factory.createForUser(
+      'caller-1',
+      NON_SUPER,
+      permissions
+    );
+
+    const { qb, calls } = fakeQb();
+    applyAbilityToUserQuery(qb, ability, 'search');
+
+    // Dropping an allow only narrows, but dropping a deny would widen, so the
+    // untranslatable deny must take the whole query down rather than vanish.
+    expect(calls[0].sql).toBe('1 = 0');
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it('vetoed deny (malformed conditions) still blocks every row', async () => {
+    const factory = buildFactory();
+    const permissions: ResolvedPermission[] = [
+      {
+        resource: 'users',
+        action: 'search',
+        permission: 'users:search:all',
+        conditions: null
+      },
+      {
+        resource: 'users',
+        action: 'search',
+        permission: 'users:search:deny-broken',
+        conditions: { effect: 'deny', custom: '{ not json' }
+      }
+    ];
+
+    const ability = await factory.createForUser(
+      'caller-1',
+      NON_SUPER,
+      permissions
+    );
+
+    // The factory turns a vetoed deny into an unconditional cannot(); the
+    // translator has to honour that rather than treat it as absent.
+    const { qb, calls } = fakeQb();
+    applyAbilityToUserQuery(qb, ability, 'search');
+
+    expect(calls[0].sql).toBe('1 = 0');
   });
 
   it('translates fieldMatch ($in) to SQL IN clause', async () => {
