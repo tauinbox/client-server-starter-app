@@ -165,6 +165,8 @@ The value is a **JSON string** (stringified MongoDB query). It is parsed and mer
 Security: prototype pollution keys (`__proto__`, `constructor`, `prototype`) are silently skipped during parsing.
 
 > **Server-side SQL translation (`apply-ability.util.ts`)** — when CASL conditions are translated into SQL `WHERE` fragments for the `GET /users` listing, the translator supports exactly the operators above (`$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$and`, `$or`, `$nor`, `$not`) against the user fields `id`, `email`, `firstName`, `lastName`, `isActive`. Input validation rejects any other operator up front, so the accepted set and the translatable set are identical (a drift-guard test enforces this). As defense-in-depth for pre-existing data, any rule using an unsupported operator or field is still **dropped entirely** (fail-closed) and a warning is logged. Run `npm run check:role-conditions` (in `server/`) against a staging dump to surface any existing rows that would be affected.
+>
+> `deny` rules are translated too: allow and deny groups are built separately and combined as `allow AND NOT deny`, so a deny narrows the listing exactly as it narrows a single-record check. An unconditional deny reduces the listing to no rows. The fail-closed rule is asymmetric — dropping an untranslatable allow only narrows the result, but dropping a deny would widen it, so an untranslatable deny reduces the whole query to no rows instead of being skipped.
 
 #### Combining Multiple Condition Types
 
@@ -816,8 +818,8 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1510 tests passing |
-| Server E2E tests | Jest | Separate config in `test/` | 234 tests passing (22 skip without Postgres/Redis/Mailpit) |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1517 tests passing |
+| Server E2E tests | Jest | Separate config in `test/` | 237 tests passing (22 skip without Postgres/Redis/Mailpit) |
 | Client unit tests | Vitest | `*.spec.ts` alongside source | 983 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 203 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
