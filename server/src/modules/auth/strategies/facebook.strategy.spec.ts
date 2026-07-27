@@ -57,6 +57,25 @@ describe('FacebookStrategy.validate', () => {
     expect(profile.emailVerified).toBe(false);
   });
 
+  // A provider-cased address would otherwise miss the exact-match lookup in
+  // loginWithOAuth and create a case-variant duplicate account.
+  it('canonicalizes the address the provider asserts', () => {
+    strategy.validate(
+      'access',
+      'refresh',
+      {
+        id: 'fb-4',
+        emails: [{ value: ' John@Example.COM ' }],
+        name: { givenName: 'John', familyName: 'Doe' },
+        _json: { verified: true }
+      },
+      done
+    );
+
+    const profile = (done.mock.calls[0] as [unknown, OAuthUserProfile])[1];
+    expect(profile.email).toBe('john@example.com');
+  });
+
   it('sets emailVerified=false when _json is missing', () => {
     strategy.validate(
       'access',

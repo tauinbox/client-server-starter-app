@@ -11,6 +11,7 @@ import { TokenGeneratorService } from './token-generator.service';
 import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
+import { User } from '../../users/entities/user.entity';
 import { ErrorKeys } from '@app/shared/constants';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
 
@@ -310,6 +311,60 @@ describe('OAuthService', () => {
           errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
         }
       });
+    });
+
+    // The duplicate check is an exact-match lookup, so a provider-cased
+    // address has to be canonicalized before it can find the local account.
+    it('canonicalizes a provider-cased email before the duplicate check', async () => {
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
+        null
+      );
+      mockUsersService.findByEmail.mockImplementation((email: string) =>
+        Promise.resolve(
+          email === 'oauth@example.com' ? { ...mockUser, email } : null
+        )
+      );
+
+      await expect(
+        service.loginWithOAuth({
+          ...oauthProfile,
+          email: ' OAuth@Example.COM '
+        })
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: {
+          errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
+        }
+      });
+
+      expect(mockUsersService.findByEmail).toHaveBeenCalledWith(
+        'oauth@example.com'
+      );
+      expect(mockManager.save).not.toHaveBeenCalled();
+    });
+
+    it('stores a canonical address when creating the user', async () => {
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
+        null
+      );
+      mockUsersService.findByEmail.mockResolvedValue(null);
+      mockManager.save.mockResolvedValueOnce(oauthUser).mockResolvedValueOnce({
+        id: 'oauth-account-1',
+        userId: 'oauth-user-1',
+        provider: 'google',
+        providerId: 'google-123'
+      });
+      mockUsersService.findOne.mockResolvedValue(oauthUser);
+
+      await service.loginWithOAuth({
+        ...oauthProfile,
+        email: ' OAuth@Example.COM '
+      });
+
+      expect(mockManager.save).toHaveBeenCalledWith(
+        User,
+        expect.objectContaining({ email: 'oauth@example.com' })
+      );
     });
 
     it('should create new verified user when provider asserts emailVerified=true', async () => {

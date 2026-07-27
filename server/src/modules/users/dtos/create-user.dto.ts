@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
+import { normalizeEmail } from '@app/shared/utils/email';
 import {
   PASSWORD_REGEX,
   PASSWORD_ERROR
@@ -20,9 +21,7 @@ export class CreateUserDto {
     description: 'The email of the user',
     example: 'user@example.com'
   })
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim().toLowerCase() : value
-  )
+  @Transform(({ value }: { value: unknown }) => normalizeEmail(value) ?? value)
   @IsEmail()
   @MaxLength(255)
   email: string;

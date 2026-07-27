@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import type { StrategyOptions } from 'passport-facebook';
 import { Strategy } from 'passport-facebook';
 import { ConfigService } from '@nestjs/config';
+import { normalizeEmail } from '@app/shared/utils/email';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { CookieStateStore } from '../utils/cookie-state-store';
@@ -37,7 +38,7 @@ export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
     const oauthProfile: OAuthUserProfile = {
       provider: OAuthProvider.FACEBOOK,
       providerId: profile.id,
-      email: profile.emails?.[0]?.value || '',
+      email: normalizeEmail(profile.emails?.[0]?.value) ?? '',
       firstName: profile.name?.givenName || '',
       lastName: profile.name?.familyName || '',
       emailVerified: profile._json?.verified === true

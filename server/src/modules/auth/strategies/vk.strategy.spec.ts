@@ -33,4 +33,22 @@ describe('VkStrategy.validate', () => {
     expect(profile.provider).toBe(OAuthProvider.VK);
     expect(profile.email).toBe('a@example.com');
   });
+
+  // A provider-cased address would otherwise miss the exact-match lookup in
+  // loginWithOAuth and create a case-variant duplicate account.
+  it('canonicalizes the address the provider asserts', () => {
+    const strategy = makeStrategy();
+    const done = jest.fn();
+
+    strategy.validate(
+      'access',
+      'refresh',
+      { email: ' John@Mail.RU ' },
+      { id: '12345', name: { givenName: 'John', familyName: 'Doe' } },
+      done
+    );
+
+    const profile = (done.mock.calls[0] as [unknown, OAuthUserProfile])[1];
+    expect(profile.email).toBe('john@mail.ru');
+  });
 });

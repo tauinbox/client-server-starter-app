@@ -17,6 +17,7 @@ import { hashToken } from '../../../common/utils/hash-token';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { SYSTEM_ROLES, ErrorKeys } from '@app/shared/constants';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
+import { normalizeEmail } from '@app/shared/utils/email';
 
 const VERIFICATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
@@ -64,8 +65,12 @@ export class OAuthService {
         user.isEmailVerified = true;
       }
     } else {
-      // 2. Check if user exists by email
-      const existingUser = await this.usersService.findByEmail(profile.email);
+      // 2. Check if user exists by email.
+      // Canonicalized again here rather than trusted from the strategy: this is
+      // the only writer of OAuth-created users, and a provider-cased address
+      // would create a duplicate the conflict check below can never see.
+      const email = normalizeEmail(profile.email) ?? '';
+      const existingUser = await this.usersService.findByEmail(email);
 
       if (existingUser) {
         // Do NOT auto-link OAuth to a pre-existing local account.
@@ -102,7 +107,7 @@ export class OAuthService {
         this.dataSource,
         async (manager) => {
           const newUser = await manager.save(User, {
-            email: profile.email,
+            email,
             firstName: profile.firstName,
             lastName: profile.lastName,
             password: null,
@@ -132,10 +137,10 @@ export class OAuthService {
 
       if (rawVerificationToken) {
         this.mailService
-          .sendEmailVerification(profile.email, rawVerificationToken)
+          .sendEmailVerification(email, rawVerificationToken)
           .catch((err) =>
             this.logger.error(
-              `Failed to send OAuth verification email to ${profile.email}`,
+              `Failed to send OAuth verification email to ${email}`,
               err
             )
           );
