@@ -285,9 +285,15 @@ export class RolesController {
   removePermission(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('permissionId', ParseUUIDPipe) permissionId: string,
-    @CurrentAbility() ability: AppAbility
+    @CurrentAbility() ability: AppAbility,
+    @Req() req: JwtAuthRequest
   ) {
-    return this.roleService.removePermissionFromRole(id, permissionId, ability);
+    return this.roleService.removePermissionFromRole(
+      id,
+      permissionId,
+      ability,
+      req.user?.userId
+    );
   }
 
   @Post('assign/:userId')
