@@ -120,6 +120,27 @@ export class RoleService {
     }
   }
 
+  /**
+   * Re-evaluate a conditional `update:Role` grant against the loaded row.
+   * The route-level @Authorize check is type-level only, so without this a
+   * caller scoped to one role could mutate any other role's permission set.
+   */
+  private assertCanUpdateRole(
+    role: Role,
+    ability?: AppAbility,
+    actorId?: string
+  ): void {
+    if (!ability) return;
+    assertCan(
+      ability,
+      'update',
+      subject('Role', role),
+      this.auditService,
+      { actorId, targetId: role.id, targetType: 'Role' },
+      this.metricsService
+    );
+  }
+
   private assertNotSystem(role: Role, ability?: AppAbility): void {
     if (!role.isSystem) return;
     if (ability && ability.can('manage', 'all')) return;
@@ -348,6 +369,7 @@ export class RoleService {
     actorId?: string
   ): Promise<void> {
     const role = await this.findOne(roleId);
+    this.assertCanUpdateRole(role, ability, actorId);
     this.assertNotSystem(role, ability);
     await this.assertGrantAllowed(ability, items, { actorId, roleId });
     await this.rolePermissionRepository.manager.transaction(async (em) => {
@@ -374,6 +396,7 @@ export class RoleService {
     actorId?: string
   ): Promise<void> {
     const role = await this.findOne(roleId);
+    this.assertCanUpdateRole(role, ability, actorId);
     this.assertNotSystem(role, ability);
     const items = permissionIds.map((permissionId) => ({
       permissionId,
@@ -394,9 +417,11 @@ export class RoleService {
   async removePermissionFromRole(
     roleId: string,
     permissionId: string,
-    ability?: AppAbility
+    ability?: AppAbility,
+    actorId?: string
   ): Promise<void> {
     const role = await this.findOne(roleId);
+    this.assertCanUpdateRole(role, ability, actorId);
     this.assertNotSystem(role, ability);
     await this.rolePermissionRepository.delete({ roleId, permissionId });
     await this.invalidateUsersWithRole(roleId);

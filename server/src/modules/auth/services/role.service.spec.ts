@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ForbiddenException, HttpException } from '@nestjs/common';
+import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { RoleService } from './role.service';
 import { Role } from '../entities/role.entity';
 import { Permission } from '../entities/permission.entity';
@@ -728,7 +729,7 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockPermissionRepo.find.mockResolvedValue([permCreateRole]);
       const { ability } = abilityMock({
-        canMatrix: { 'create:Role': false }
+        canMatrix: { 'update:*': true, 'create:Role': false }
       });
 
       await expect(
@@ -764,7 +765,7 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockPermissionRepo.find.mockResolvedValue([permUpdateUser]);
       const { ability } = abilityMock({
-        canMatrix: { 'update:User': true },
+        canMatrix: { 'update:*': true, 'update:User': true },
         rulesMatrix: {
           'update:User': [{ conditions: { id: 'caller-1' } }]
         }
@@ -798,7 +799,7 @@ describe('RoleService', () => {
       mockRolePermissionRepo.save.mockResolvedValue([]);
       mockPermissionRepo.find.mockResolvedValue([permCreateRole]);
       const { ability } = abilityMock({
-        canMatrix: { 'create:Role': true },
+        canMatrix: { 'update:*': true, 'create:Role': true },
         rulesMatrix: { 'create:Role': [{ conditions: undefined }] }
       });
 
@@ -817,7 +818,7 @@ describe('RoleService', () => {
     it('setPermissionsForRole runs the same check', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockPermissionRepo.find.mockResolvedValue([permCreateRole]);
-      const { ability } = abilityMock({});
+      const { ability } = abilityMock({ canMatrix: { 'update:*': true } });
 
       await expect(
         service.setPermissionsForRole(
@@ -826,7 +827,10 @@ describe('RoleService', () => {
           ability,
           'actor-1'
         )
-      ).rejects.toMatchObject({ status: 403 });
+      ).rejects.toMatchObject({
+        status: 403,
+        response: { errorKey: 'errors.roles.cannotGrantPermission' }
+      });
     });
 
     it('assignRoleToUser blocks indirect escalation via role permissions', async () => {
@@ -851,13 +855,142 @@ describe('RoleService', () => {
     });
   });
 
+  // ── Instance-level update:Role on permission-set mutations ────────
+
+  describe('instance-level update:Role check', () => {
+    // Real CASL ability: the route-level @Authorize check passes for any
+    // `update:Role` rule, so only an instance check catches a caller whose
+    // grant is scoped to a different role.
+    function abilityForRoleNamed(name: string): AppAbility {
+      const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
+      builder.can('update', 'Role', { name });
+      return builder.build();
+    }
+
+    function expectDenialRecorded(): void {
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PERMISSION_CHECK_FAILURE',
+          actorId: 'actor-1',
+          targetId: 'role-2',
+          targetType: 'Role'
+        })
+      );
+      expect(mockMetricsService.recordPermissionDenied).toHaveBeenCalledWith(
+        'instance',
+        'update',
+        'Role'
+      );
+    }
+
+    beforeEach(() => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRolePermissionRepo.save.mockResolvedValue([]);
+      mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
+    });
+
+    it('setPermissionsForRole rejects a role outside the caller scope', async () => {
+      await expect(
+        service.setPermissionsForRole(
+          'role-2',
+          [],
+          abilityForRoleNamed('viewer'),
+          'actor-1'
+        )
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(mockRolePermissionRepo.manager.transaction).not.toHaveBeenCalled();
+      expectDenialRecorded();
+    });
+
+    it('setPermissionsForRole proceeds when the condition matches the role', async () => {
+      await service.setPermissionsForRole(
+        'role-2',
+        [],
+        abilityForRoleNamed('editor'),
+        'actor-1'
+      );
+
+      expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
+    });
+
+    it('assignPermissionsToRole rejects a role outside the caller scope', async () => {
+      await expect(
+        service.assignPermissionsToRole(
+          'role-2',
+          [],
+          undefined,
+          abilityForRoleNamed('viewer'),
+          'actor-1'
+        )
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(mockRolePermissionRepo.save).not.toHaveBeenCalled();
+      expectDenialRecorded();
+    });
+
+    it('assignPermissionsToRole proceeds when the condition matches the role', async () => {
+      await service.assignPermissionsToRole(
+        'role-2',
+        [],
+        undefined,
+        abilityForRoleNamed('editor'),
+        'actor-1'
+      );
+
+      expect(mockRolePermissionRepo.save).toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
+    });
+
+    it('removePermissionFromRole rejects a role outside the caller scope', async () => {
+      await expect(
+        service.removePermissionFromRole(
+          'role-2',
+          'perm-1',
+          abilityForRoleNamed('viewer'),
+          'actor-1'
+        )
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(mockRolePermissionRepo.delete).not.toHaveBeenCalled();
+      expectDenialRecorded();
+    });
+
+    it('removePermissionFromRole proceeds when the condition matches the role', async () => {
+      await service.removePermissionFromRole(
+        'role-2',
+        'perm-1',
+        abilityForRoleNamed('editor'),
+        'actor-1'
+      );
+
+      expect(mockRolePermissionRepo.delete).toHaveBeenCalledWith({
+        roleId: 'role-2',
+        permissionId: 'perm-1'
+      });
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
+    });
+  });
+
   // ── RBAC-SEC-3: system-role lock on permission mutations ──────────
 
   describe('isSystem permission-mutation guard', () => {
+    // Allows the instance-level update:Role check (subject instance) while
+    // failing `manage:all` (plain string subject), so these cases exercise the
+    // system-role guard rather than the ABAC re-check that now precedes it.
+    function nonSuperAbility(): AppAbility {
+      const can = jest.fn(
+        (_action: string, subj: unknown) => typeof subj === 'object'
+      );
+      // @ts-expect-error partial mock — only `can` is exercised
+      const ability: AppAbility = { can };
+      return ability;
+    }
+
     it('setPermissionsForRole rejects on system role for non-super caller', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
-      // @ts-expect-error partial mock
-      const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
+      const ability = nonSuperAbility();
 
       await expect(
         service.setPermissionsForRole('role-1', [], ability, 'actor-1')
@@ -869,8 +1002,7 @@ describe('RoleService', () => {
 
     it('assignPermissionsToRole rejects on system role for non-super caller', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
-      // @ts-expect-error partial mock
-      const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
+      const ability = nonSuperAbility();
 
       await expect(
         service.assignPermissionsToRole(
@@ -888,8 +1020,7 @@ describe('RoleService', () => {
 
     it('removePermissionFromRole rejects on system role for non-super caller', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
-      // @ts-expect-error partial mock
-      const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
+      const ability = nonSuperAbility();
 
       await expect(
         service.removePermissionFromRole('role-1', 'perm-1', ability)

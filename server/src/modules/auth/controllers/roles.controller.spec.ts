@@ -314,13 +314,19 @@ describe('RolesController', () => {
   });
 
   describe('removePermission', () => {
-    it('should call roleService.removePermissionFromRole with role id and permission id', async () => {
-      await controller.removePermission('role-1', 'perm-5', mockAbility);
+    it('should call roleService.removePermissionFromRole with role id, permission id and actor', async () => {
+      await controller.removePermission(
+        'role-1',
+        'perm-5',
+        mockAbility,
+        mockReq
+      );
 
       expect(roleServiceMock.removePermissionFromRole).toHaveBeenCalledWith(
         'role-1',
         'perm-5',
-        mockAbility
+        mockAbility,
+        'actor-1'
       );
     });
   });
