@@ -1,7 +1,7 @@
 import type { AddressInfo } from 'net';
 import type { Server } from 'http';
 import { createApp } from '../app';
-import { resetState } from '../state';
+import { getState, resetState } from '../state';
 
 let server: Server;
 let baseUrl: string;
@@ -152,6 +152,33 @@ describe('POST /__control/billing/advance-renewal', () => {
   it('returns 404 when there is no subscription to advance', async () => {
     const { id } = await login('user@example.com');
     const res = await control('advance-renewal', { userId: id });
+    expect(res.status).toBe(404);
+  });
+
+  it('advances a subscription addressed by id', async () => {
+    const { id } = await login('user@example.com');
+    const { id: subscriptionId } = await activate(id, 'pro');
+
+    const res = await control('advance-renewal', { subscriptionId });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as Record<string, unknown>)['status']).toBe(
+      'active'
+    );
+  });
+
+  it('refuses to advance a canceled subscription addressed by id', async () => {
+    const { id } = await login('user@example.com');
+    const { id: subscriptionId } = await activate(id, 'pro');
+
+    // Three declined attempts exhaust the dunning ladder.
+    for (let i = 0; i < 3; i++) {
+      await control('advance-renewal', { subscriptionId, outcome: 'failure' });
+    }
+    expect(getState().billingSubscriptions.get(subscriptionId)?.status).toBe(
+      'canceled'
+    );
+
+    const res = await control('advance-renewal', { subscriptionId });
     expect(res.status).toBe(404);
   });
 

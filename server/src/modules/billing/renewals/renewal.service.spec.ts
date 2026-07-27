@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
@@ -139,7 +140,8 @@ function makeManager(store: Store) {
             s.id === criteria['id'] &&
             (criteria['currentPeriodEnd'] === undefined ||
               s.currentPeriodEnd.getTime() ===
-                (criteria['currentPeriodEnd'] as Date).getTime())
+                (criteria['currentPeriodEnd'] as Date).getTime()) &&
+            (statuses === null || statuses.includes(s.status))
         );
         if (match) Object.assign(match, values);
         return Promise.resolve({ affected: match ? 1 : 0 });
@@ -904,6 +906,49 @@ describe('RenewalService', () => {
         (call: unknown[]) => call[0] === InvoicePaidEvent.name
       )
     ).toHaveLength(1);
+  });
+
+  it('does not resurrect a subscription canceled while the charge was in flight', async () => {
+    const sub = makeSub();
+    const store = baseStore(sub);
+    // The cancel commits during the provider round-trip; it leaves
+    // currentPeriodEnd untouched, so only the status guard can stop the advance.
+    const charge = jest.fn().mockImplementation(() => {
+      sub.status = 'canceled';
+      return Promise.resolve({
+        providerInvoiceRef: 'pay_1',
+        status: 'captured'
+      });
+    });
+    const warn = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+    const { service, emit } = await build(store, charge);
+
+    await service.runDueRenewals(NOW);
+
+    expect(sub.status).toBe('canceled');
+    expect(sub.currentPeriodStart).toEqual(new Date('2026-05-01T00:00:00Z'));
+    expect(sub.currentPeriodEnd).toEqual(new Date('2026-06-01T00:00:00Z'));
+    // The money moved, so the paid invoice stays on the books (refundable).
+    expect(store.invoices).toHaveLength(1);
+    expect(store.invoices[0]).toMatchObject({
+      status: 'paid',
+      amountMinor: Money.fromMinor(99000)
+    });
+    expect(emit).toHaveBeenCalledWith(
+      InvoicePaidEvent.name,
+      expect.objectContaining({ userId: 'user-1' })
+    );
+    expect(
+      emit.mock.calls.filter(
+        (call: unknown[]) => call[0] === SubscriptionRenewedEvent.name
+      )
+    ).toHaveLength(0);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('captured after it became canceled')
+    );
+    warn.mockRestore();
   });
 
   it('advances without charging when the webhook already settled the invoice', async () => {

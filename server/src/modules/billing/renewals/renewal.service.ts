@@ -1,7 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { Brackets, DataSource, Repository } from 'typeorm';
+import { Brackets, DataSource, In, Repository } from 'typeorm';
+import type { SubscriptionStatus } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { User } from '../../users/entities/user.entity';
@@ -30,6 +31,13 @@ import {
   DUNNING_MAX_ATTEMPTS,
   DUNNING_RETRY_DELAY_MS
 } from './renewal-queue.constants';
+
+/**
+ * Statuses a scan may charge and advance - the set `findDue` selects on, and
+ * the guard on the period advance. `cancelAtPeriodEnd` is deliberately absent:
+ * the period just paid for should still open, and the flag stops the next one.
+ */
+const CHARGEABLE_STATUSES = ['trialing', 'active', 'past_due'] as const;
 
 /**
  * Drives the self-managed (YooKassa) subscription lifecycle the core owns:
@@ -540,13 +548,15 @@ export class RenewalService {
         );
       }
 
-      // CAS on the period end read at scan start: the advance (and its event)
-      // runs exactly once even against a concurrent scan.
+      // CAS on the period end and status read at scan start: cancel writers
+      // leave `currentPeriodEnd` untouched, so a cancel landing during the
+      // provider round-trip would otherwise be flipped back to `active`.
       const advance = await manager.update(
         Subscription,
         {
           id: subscription.id,
-          currentPeriodEnd: subscription.currentPeriodEnd
+          currentPeriodEnd: subscription.currentPeriodEnd,
+          status: In([...CHARGEABLE_STATUSES])
         },
         {
           status: 'active',
@@ -558,9 +568,29 @@ export class RenewalService {
         }
       );
 
-      return { paidInvoiceId, advanced: advance.affected === 1 };
+      // A concurrent scan winning the CAS is expected and silent; a charge
+      // against a no-longer-chargeable row needs an operator.
+      let blockedBy: SubscriptionStatus | null = null;
+      if (advance.affected !== 1) {
+        const current = await manager.findOne(Subscription, {
+          where: { id: subscription.id }
+        });
+        if (
+          current &&
+          !(CHARGEABLE_STATUSES as readonly string[]).includes(current.status)
+        ) {
+          blockedBy = current.status;
+        }
+      }
+
+      return { paidInvoiceId, advanced: advance.affected === 1, blockedBy };
     });
 
+    if (result.blockedBy) {
+      this.logger.warn(
+        `Renewal charge for subscription ${subscription.id} captured after it became ${result.blockedBy}; period not advanced, invoice ${result.paidInvoiceId ?? idempotencyKey} left recorded and refundable`
+      );
+    }
     if (result.paidInvoiceId) {
       this.events.emit(
         InvoicePaidEvent.name,

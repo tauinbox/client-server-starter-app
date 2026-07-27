@@ -608,6 +608,10 @@ router.post('/billing/complete-purchase', (req, res) => {
 // Mirrors the server's dunning policy (renewal-queue.constants).
 const DUNNING_MAX_ATTEMPTS = 3;
 
+// Mirrors RenewalService.CHARGEABLE_STATUSES: the statuses a scan may charge
+// and advance. A canceled row is not addressable by either lookup branch.
+const CHARGEABLE_STATUSES = ['trialing', 'active', 'past_due'];
+
 // POST /__control/billing/advance-renewal — renewal-clock advance for E2E:
 // treats the subscription's current period as due NOW and runs one scheduler
 // pass on it, mirroring the server's period-close semantics. `outcome:
@@ -633,9 +637,11 @@ router.post('/billing/advance-renewal', (req, res) => {
   }
 
   const state = getState();
-  let subscription = subscriptionId
+  const byId = subscriptionId
     ? state.billingSubscriptions.get(subscriptionId)
     : undefined;
+  let subscription =
+    byId && CHARGEABLE_STATUSES.includes(byId.status) ? byId : undefined;
   if (!subscription && userId) {
     const customer = [...state.billingCustomers.values()].find(
       (c) => c.userId === userId
@@ -645,7 +651,7 @@ router.post('/billing/advance-renewal', (req, res) => {
           .filter(
             (s) =>
               s.customerId === customer.id &&
-              ['trialing', 'active', 'past_due'].includes(s.status)
+              CHARGEABLE_STATUSES.includes(s.status)
           )
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
       : undefined;
