@@ -818,7 +818,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1517 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1523 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 237 tests passing (22 skip without Postgres/Redis/Mailpit) |
 | Client unit tests | Vitest | `*.spec.ts` alongside source | 983 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 203 tests passing |
@@ -850,7 +850,7 @@ Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file
 - **HttpOnly refresh token cookie** (`SameSite=Strict`, `path=/api/v1/auth`, 7d expiry) — JavaScript cannot read or steal the token (XSS-proof); rotated on every use. **Reuse detection** (OAuth 2.0 BCP / RFC 6819): a revoked refresh token presented before its natural expiry triggers a full session purge for the user, a `TOKEN_REUSE_DETECTED` audit row, and `auth_events_total{event="token_reuse_detected"}` metric increment
 - JWT access tokens (1h) stored in Angular signals only — never written to `localStorage`; user info persisted to `localStorage` (`auth_user` key) only to detect prior sessions on page reload
 - `@Exclude()` decorator hides password in API responses
-- **RBAC** — dynamic resources and actions with `@RegisterResource` auto-discovery; typed CASL permission checks via `PermissionsGuard` + `@Authorize(['action', 'Subject'])`; instance-level ownership enforcement on user mutations (`update`, `delete`, `restore`) and role assignment (super-role escalation prevention); CASL ability hydrated at bootstrap before route activation; permissions cached per user (5 min); `isSuper` flag on roles bypasses all checks; `*appRequirePermissions="{ action, subject }"` directive for template-level visibility
+- **RBAC** — dynamic resources and actions with `@RegisterResource` auto-discovery; typed CASL permission checks via `PermissionsGuard` + `@Authorize(['action', 'Subject'])`; instance-level ownership enforcement on user mutations (`update`, `delete`, `restore`), role assignment (super-role escalation prevention) and role permission-set mutations; CASL ability hydrated at bootstrap before route activation; permissions cached per user (5 min); `isSuper` flag on roles bypasses all checks; `*appRequirePermissions="{ action, subject }"` directive for template-level visibility
 - **Audit logging** — 20 security-sensitive actions (login, register, password change/reset, user/role/permission CRUD, OAuth link/unlink, logout, token refresh failures) written to a dedicated `audit_logs` table with actor, target, IP, and request ID
 - **`X-Request-Id` shape validation** — incoming `x-request-id` headers must match `^[A-Za-z0-9_-]{1,64}$`; non-conforming values are replaced with a fresh UUID before reaching audit rows, log lines, or Prometheus labels (prevents log injection and high-cardinality label abuse)
 - `class-validator` on server DTOs with `whitelist: true` and `forbidNonWhitelisted: true` — unknown properties are stripped and requests with undeclared fields are rejected (prevents mass-assignment attacks); Angular `Validators` on client forms
