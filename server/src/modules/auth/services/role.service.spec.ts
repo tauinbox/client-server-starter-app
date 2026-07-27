@@ -121,7 +121,9 @@ describe('RoleService', () => {
             args.length > 0 ? mockUserQueryBuilder : mockRelationQueryBuilder
           ),
         update: jest.fn().mockResolvedValue(undefined),
-        findOne: jest.fn().mockResolvedValue(null)
+        // Role membership writes now resolve the target user first, so the
+        // default is an existing row; absence is opted into per test.
+        findOne: jest.fn().mockResolvedValue({ id: 'user-1' })
       },
       createQueryBuilder: jest.fn().mockReturnValue(mockRoleRepoQB)
     };
@@ -419,6 +421,29 @@ describe('RoleService', () => {
       expect(canSpy).toHaveBeenCalledWith('update', targetUser);
       expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
     });
+
+    it('should throw 404 without writing membership when the target user is unknown or soft-deleted', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRoleRepo.manager.findOne.mockResolvedValue(null);
+      const canSpy = jest.fn().mockReturnValue(false);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: canSpy };
+
+      await expect(
+        service.assignRoleToUser('user-99', 'role-2', ability)
+      ).rejects.toMatchObject({
+        status: 404,
+        response: { errorKey: 'errors.users.notFound' }
+      });
+
+      // The lookup must stay scoped to live rows so a soft-deleted account
+      // cannot be modified without being restored first.
+      expect(mockRoleRepo.manager.findOne).toHaveBeenCalledWith(User, {
+        where: { id: 'user-99' }
+      });
+      expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
+      expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
+    });
   });
 
   describe('removeRoleFromUser', () => {
@@ -470,6 +495,27 @@ describe('RoleService', () => {
 
       expect(canSpy).toHaveBeenCalledWith('update', targetUser);
       expect(mockRelationQueryBuilder.remove).toHaveBeenCalledWith('role-2');
+    });
+
+    it('should throw 404 without writing membership when the target user is unknown or soft-deleted', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRoleRepo.manager.findOne.mockResolvedValue(null);
+      const canSpy = jest.fn().mockReturnValue(false);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: canSpy };
+
+      await expect(
+        service.removeRoleFromUser('user-99', 'role-2', ability)
+      ).rejects.toMatchObject({
+        status: 404,
+        response: { errorKey: 'errors.users.notFound' }
+      });
+
+      expect(mockRoleRepo.manager.findOne).toHaveBeenCalledWith(User, {
+        where: { id: 'user-99' }
+      });
+      expect(mockRelationQueryBuilder.remove).not.toHaveBeenCalled();
+      expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
 
     it('should remove super role and invalidate cache (token revocation handled by listener)', async () => {

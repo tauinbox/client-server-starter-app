@@ -256,12 +256,37 @@ export class RoleService {
     await this.roleRepository.remove(role);
   }
 
+  /**
+   * Membership writes go straight to `user_roles`, which accepts a soft-deleted
+   * user and answers an unknown one with an opaque FK-violation 409. Resolving
+   * the target up front turns both into a 404 and guarantees the instance-level
+   * check below always has a row to run against. Soft-deleted users are not
+   * mutable through the admin API (same rule as UsersService.update) - restore
+   * the account first.
+   */
+  private async loadRoleAssignmentTarget(userId: string): Promise<User> {
+    const targetUser = await this.roleRepository.manager.findOne(User, {
+      where: { id: userId }
+    });
+    if (!targetUser) {
+      throw new HttpException(
+        {
+          message: `User with ID ${userId} not found`,
+          errorKey: ErrorKeys.USERS.NOT_FOUND
+        },
+        HttpStatus.NOT_FOUND
+      );
+    }
+    return targetUser;
+  }
+
   async assignRoleToUser(
     userId: string,
     roleId: string,
     ability?: AppAbility,
     actorId?: string
   ): Promise<void> {
+    const targetUser = await this.loadRoleAssignmentTarget(userId);
     const role = await this.findOne(roleId);
 
     if (ability) {
@@ -273,19 +298,14 @@ export class RoleService {
         );
         throw new ForbiddenException('Cannot assign super roles');
       }
-      const targetUser = await this.roleRepository.manager.findOne(User, {
-        where: { id: userId }
-      });
-      if (targetUser) {
-        assertCan(
-          ability,
-          'update',
-          subject('User', targetUser),
-          this.auditService,
-          { actorId, targetId: userId, targetType: 'User' },
-          this.metricsService
-        );
-      }
+      assertCan(
+        ability,
+        'update',
+        subject('User', targetUser),
+        this.auditService,
+        { actorId, targetId: userId, targetType: 'User' },
+        this.metricsService
+      );
 
       // Prevent indirect escalation: caller must hold every permission
       // carried by the role they are assigning.
@@ -312,6 +332,7 @@ export class RoleService {
     roleId: string,
     ability?: AppAbility
   ): Promise<void> {
+    const targetUser = await this.loadRoleAssignmentTarget(userId);
     const role = await this.findOne(roleId);
 
     if (ability) {
@@ -323,19 +344,14 @@ export class RoleService {
         );
         throw new ForbiddenException('Cannot remove super roles');
       }
-      const targetUser = await this.roleRepository.manager.findOne(User, {
-        where: { id: userId }
-      });
-      if (targetUser) {
-        assertCan(
-          ability,
-          'update',
-          subject('User', targetUser),
-          this.auditService,
-          { targetId: userId, targetType: 'User' },
-          this.metricsService
-        );
-      }
+      assertCan(
+        ability,
+        'update',
+        subject('User', targetUser),
+        this.auditService,
+        { targetId: userId, targetType: 'User' },
+        this.metricsService
+      );
     }
 
     await this.roleRepository.manager
