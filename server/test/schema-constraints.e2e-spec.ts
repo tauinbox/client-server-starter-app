@@ -30,7 +30,8 @@ runWithInfra('schema hardening constraints (e2e)', () => {
     ['billing_webhook_events', 'IDX_billing_webhook_events_status_received_at'],
     ['resources', 'UQ_resources_subject'],
     ['refresh_tokens', 'UQ_refresh_tokens_token'],
-    ['billing_payment_methods', 'UQ_billing_payment_methods_customer_default']
+    ['billing_payment_methods', 'UQ_billing_payment_methods_customer_default'],
+    ['users', 'UQ_users_email_lower']
   ])('%s carries %s', async (table, index) => {
     expect(await indexNames(table)).toContain(index);
   });
@@ -60,6 +61,25 @@ runWithInfra('schema hardening constraints (e2e)', () => {
       await expect(
         runner.query(insert, [token, userId, expiresAt])
       ).rejects.toThrow(/UQ_refresh_tokens_token/);
+    } finally {
+      await runner.rollbackTransaction();
+      await runner.release();
+    }
+  });
+
+  it('rejects a second account whose address differs only by case', async () => {
+    const runner = ds.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      const address = `uq-case-${Date.now()}@example.com`;
+      const insert = `INSERT INTO users (email, "firstName", "lastName")
+         VALUES ($1, $2, $3)`;
+      await runner.query(insert, [address, 'Uq', 'Case']);
+
+      await expect(
+        runner.query(insert, [address.toUpperCase(), 'Uq', 'Case'])
+      ).rejects.toThrow(/UQ_users_email_lower/);
     } finally {
       await runner.rollbackTransaction();
       await runner.release();

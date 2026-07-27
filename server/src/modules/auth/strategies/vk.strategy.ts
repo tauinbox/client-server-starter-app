@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-vkontakte';
 import { ConfigService } from '@nestjs/config';
+import { normalizeEmail } from '@app/shared/utils/email';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { CookieStateStore } from '../utils/cookie-state-store';
@@ -34,7 +35,7 @@ export class VkStrategy extends PassportStrategy(Strategy, 'vkontakte') {
     const oauthProfile: OAuthUserProfile = {
       provider: OAuthProvider.VK,
       providerId: String(profile.id),
-      email: params.email || '',
+      email: normalizeEmail(params.email) ?? '',
       firstName: profile.name?.givenName || '',
       lastName: profile.name?.familyName || '',
       // VK OAuth does not expose an email-verification flag.

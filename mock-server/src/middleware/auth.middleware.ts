@@ -12,6 +12,7 @@ import {
   PASSWORD_ERROR
 } from '@app/shared/constants/password.constants';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { normalizeEmail } from '@app/shared/utils/email';
 import {
   isValidEmail,
   validateLocale,
@@ -94,7 +95,7 @@ router.post('/register', (req, res) => {
   }
 
   const { firstName, lastName, password } = req.body;
-  const email = req.body.email?.trim().toLowerCase();
+  const email = normalizeEmail(req.body.email) ?? '';
 
   if (!email || !firstName || !lastName || !password) {
     res
@@ -190,31 +191,11 @@ router.post('/register', (req, res) => {
 
 // POST /api/v1/auth/login
 router.post('/login', (req, res) => {
-  const email = req.body.email?.trim().toLowerCase();
+  // No DTO validation here: the real login route has no `@Body()` parameter
+  // (guards run before pipes), so a malformed address or an over-long password
+  // is just another failed credential - 401, never 400.
+  const email = normalizeEmail(req.body.email) ?? '';
   const { password } = req.body;
-
-  if (email && !isValidEmail(email)) {
-    res
-      .status(400)
-      .json({ message: 'email must be an email', statusCode: 400 });
-    return;
-  }
-
-  if (email) {
-    const emailMaxErr = validateMaxLength(email, 255, 'email');
-    if (emailMaxErr) {
-      res.status(400).json({ message: emailMaxErr, statusCode: 400 });
-      return;
-    }
-  }
-
-  if (password) {
-    const pwMaxErr = validateMaxLength(password, 128, 'password');
-    if (pwMaxErr) {
-      res.status(400).json({ message: pwMaxErr, statusCode: 400 });
-      return;
-    }
-  }
 
   const user = findUserByEmail(email);
 
@@ -373,7 +354,7 @@ router.post('/verify-email', (req, res) => {
 
 // POST /api/v1/auth/resend-verification
 router.post('/resend-verification', (req, res) => {
-  const email = req.body.email?.trim().toLowerCase();
+  const email = normalizeEmail(req.body.email) ?? '';
 
   const successMessage =
     'If an account with that email exists and is not yet verified, a verification email has been sent.';
@@ -436,7 +417,7 @@ router.post('/forgot-password', (req, res) => {
     return;
   }
 
-  const email = req.body.email?.trim().toLowerCase();
+  const email = normalizeEmail(req.body.email) ?? '';
 
   const successMessage =
     'If an account with that email exists, a password reset link has been sent.';
@@ -816,7 +797,7 @@ router.patch('/profile', authGuard, (req, res) => {
 router.post('/profile/email/initiate', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword } = req.body;
-  const newEmail = req.body.newEmail?.trim().toLowerCase();
+  const newEmail = normalizeEmail(req.body.newEmail) ?? '';
 
   const successMessage =
     'If the new email is available, a confirmation link has been sent to it.';

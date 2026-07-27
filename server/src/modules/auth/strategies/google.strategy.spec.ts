@@ -72,6 +72,24 @@ describe('GoogleStrategy.validate', () => {
     expect(profile.emailVerified).toBe(false);
   });
 
+  // A provider-cased address would otherwise miss the exact-match lookup in
+  // loginWithOAuth and create a case-variant duplicate account.
+  it('canonicalizes the address the provider asserts', () => {
+    strategy.validate(
+      'access',
+      'refresh',
+      {
+        id: 'google-5',
+        emails: [{ value: ' John@GMAIL.com ', verified: true }],
+        name: { givenName: 'John', familyName: 'Doe' }
+      },
+      done
+    );
+
+    const profile = (done.mock.calls[0] as [unknown, OAuthUserProfile])[1];
+    expect(profile.email).toBe('john@gmail.com');
+  });
+
   it('sets emailVerified=false when emails array is missing', () => {
     strategy.validate(
       'access',

@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import type { StrategyOptions } from 'passport-google-oauth20';
 import { Strategy, VerifyCallback } from 'passport-google-oauth20';
 import { ConfigService } from '@nestjs/config';
+import { normalizeEmail } from '@app/shared/utils/email';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { CookieStateStore } from '../utils/cookie-state-store';
@@ -36,7 +37,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     const oauthProfile: OAuthUserProfile = {
       provider: OAuthProvider.GOOGLE,
       providerId: profile.id,
-      email: primaryEmail?.value || '',
+      email: normalizeEmail(primaryEmail?.value) ?? '',
       firstName: profile.name?.givenName || '',
       lastName: profile.name?.familyName || '',
       emailVerified: primaryEmail?.verified === true

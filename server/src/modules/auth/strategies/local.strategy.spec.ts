@@ -45,6 +45,35 @@ describe('LocalStrategy', () => {
       expect(result).toBe(mockUser);
     });
 
+    // Login has no DTO (guards run before pipes), so the strategy is the only
+    // place the raw body can be canonicalized.
+    it('lowercases and trims the address before the lookup', async () => {
+      await strategy.validate('  Test@Example.COM ', 'Password1');
+
+      expect(authServiceMock.validateUser).toHaveBeenCalledWith(
+        'test@example.com',
+        'Password1'
+      );
+    });
+
+    it('collapses a non-string email to an ordinary failed credential', async () => {
+      await strategy.validate({ $ne: null }, 'Password1');
+
+      expect(authServiceMock.validateUser).toHaveBeenCalledWith(
+        '',
+        'Password1'
+      );
+    });
+
+    it('collapses a non-string password to an ordinary failed credential', async () => {
+      await strategy.validate('test@example.com', { $ne: null });
+
+      expect(authServiceMock.validateUser).toHaveBeenCalledWith(
+        'test@example.com',
+        ''
+      );
+    });
+
     it('should rethrow HttpException from authService', async () => {
       authServiceMock.validateUser.mockRejectedValue(
         new UnauthorizedException('Invalid credentials')

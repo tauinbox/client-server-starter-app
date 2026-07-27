@@ -1,15 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { normalizeEmail } from '@app/shared/utils/email';
 
 export class ForgotPasswordDto {
   @ApiProperty({
     description: 'Email address to send password reset link to',
     example: 'user@example.com'
   })
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim().toLowerCase() : value
-  )
+  @Transform(({ value }: { value: unknown }) => normalizeEmail(value) ?? value)
   @IsEmail()
   @MaxLength(255)
   email: string;

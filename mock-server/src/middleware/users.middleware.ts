@@ -5,6 +5,7 @@ import {
   PASSWORD_REGEX
 } from '@app/shared/constants/password.constants';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { normalizeEmail } from '@app/shared/utils/email';
 import {
   isValidEmail,
   validateLocale,
@@ -245,7 +246,7 @@ const router = Router();
 // POST /api/v1/users
 router.post('/', adminGuard, (req, res) => {
   const { firstName, lastName, password } = req.body;
-  const email = req.body.email?.trim().toLowerCase();
+  const email = normalizeEmail(req.body.email) ?? '';
 
   if (!email || !firstName || !lastName || !password) {
     res
@@ -549,7 +550,9 @@ router.patch('/:id', adminGuard, (req, res) => {
   }
 
   const { firstName, lastName, password, isActive, unlockAccount } = req.body;
-  const email = req.body.email?.trim().toLowerCase();
+  // null is treated as absent, matching @IsOptional() on the server DTO.
+  const email =
+    req.body.email == null ? undefined : (normalizeEmail(req.body.email) ?? '');
 
   if (email !== undefined) {
     if (!isValidEmail(email)) {
