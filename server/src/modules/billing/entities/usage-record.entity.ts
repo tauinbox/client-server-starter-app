@@ -16,7 +16,10 @@ import {
 } from '../../../common/utils/money-column.transformer';
 
 @Entity('billing_usage_records')
-@Unique('UQ_billing_usage_records_idempotency_key', ['idempotencyKey'])
+@Unique('UQ_billing_usage_records_customer_idempotency_key', [
+  'customerId',
+  'idempotencyKey'
+])
 export class UsageRecord {
   @PrimaryGeneratedColumn('uuid')
   id: string;

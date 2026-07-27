@@ -30,9 +30,12 @@ export interface RecordUsageInput {
  * Metering ingest. Records raw usage events against a customer's
  * active subscription; aggregation/rating happens later in UsageRating.
  *
- * Ingest is idempotent on `idempotencyKey` (unique column): a replay of the same
- * key returns the original record without inserting a duplicate, so an at-least-
- * once producer (retrying webhook/queue) never double-counts. There is no public
+ * Ingest is idempotent on `(customerId, idempotencyKey)` (unique constraint): a
+ * replay of the same key returns the original record without inserting a
+ * duplicate, so an at-least-once producer (retrying webhook/queue) never
+ * double-counts. The key is scoped to the customer because producers namespace
+ * their sequences per tenant, and a shared key across customers would otherwise
+ * discard the second customer's event. There is no public
  * meter endpoint — the only HTTP surface is the `manage Billing`-gated admin
  * route; this service is also called in-process by usage producers.
  */
@@ -50,7 +53,10 @@ export class UsageService {
 
   async record(input: RecordUsageInput): Promise<UsageRecord> {
     const existing = await this.usageRecords.findOne({
-      where: { idempotencyKey: input.idempotencyKey }
+      where: {
+        customerId: input.customerId,
+        idempotencyKey: input.idempotencyKey
+      }
     });
     if (existing) {
       return existing;
@@ -94,7 +100,10 @@ export class UsageService {
       const code = (error as { code?: string }).code;
       if (code === PG_UNIQUE_VIOLATION) {
         const winner = await this.usageRecords.findOne({
-          where: { idempotencyKey: input.idempotencyKey }
+          where: {
+            customerId: input.customerId,
+            idempotencyKey: input.idempotencyKey
+          }
         });
         if (winner) {
           this.logger.debug(

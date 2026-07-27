@@ -1116,9 +1116,11 @@ billingAdminRouter.post('/usage', adminGuard, (req: Request, res: Response) => {
 
   const state = getState();
 
-  // Idempotent replay: a record already exists for this key — return it as-is.
+  // Idempotent replay: this customer already has a record for the key — return
+  // it as-is. Scoped to the customer, like the server's unique constraint: the
+  // same key from another customer is a distinct event, not a replay.
   const existing = [...state.billingUsageRecords.values()].find(
-    (r) => r.idempotencyKey === idempotencyKey
+    (r) => r.customerId === customerId && r.idempotencyKey === idempotencyKey
   );
   if (existing) {
     res.status(201).json(toUsageResponse(existing));
