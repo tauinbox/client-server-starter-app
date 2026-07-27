@@ -757,8 +757,8 @@ Base URL: `/api/v1`
 | PUT | `/:id/permissions` | `roles:update` | Bulk-replace the full permission set for a role |
 | POST | `/:id/permissions` | `roles:update` | Assign permissions to role |
 | DELETE | `/:id/permissions/:permissionId` | `roles:update` | Remove permission from role |
-| POST | `/assign/:userId` | `roles:assign` | Assign role to user |
-| DELETE | `/assign/:userId/:roleId` | `roles:assign` | Remove role from user |
+| POST | `/assign/:userId` | `roles:assign` | Assign role to user (404 when the user is unknown or soft-deleted) |
+| DELETE | `/assign/:userId/:roleId` | `roles:assign` | Remove role from user (404 when the user is unknown or soft-deleted) |
 
 ### RBAC (`/api/v1/rbac`)
 

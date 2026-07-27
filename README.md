@@ -678,8 +678,8 @@ API base URL: `/api/v1`
 | PUT | `/roles/:id/permissions` | `roles:update` | Bulk-replace the full permission set for a role |
 | POST | `/roles/:id/permissions` | `roles:update` | Assign permissions to role |
 | DELETE | `/roles/:id/permissions/:permId` | `roles:update` | Remove permission from role |
-| POST | `/roles/assign/:userId` | `roles:assign` | Assign role to user |
-| DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove role from user |
+| POST | `/roles/assign/:userId` | `roles:assign` | Assign role to user (404 when the user is unknown or soft-deleted) |
+| DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove role from user (404 when the user is unknown or soft-deleted) |
 | GET | `/notifications/stream` | Bearer | SSE stream — pushes `session_invalidated`, `permissions_updated`, `user_crud_events` (only to clients with `users:search`) |
 | GET | `/rbac/metadata` | `permissions:read` | Get RBAC metadata (resources + actions); Redis-cached 60s |
 | GET | `/rbac/resources` | `permissions:read` | List all resources |
@@ -818,7 +818,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1536 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1538 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 241 tests passing (26 skip without Postgres/Redis/Mailpit) |
 | Client unit tests | Vitest | `*.spec.ts` alongside source | 983 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 203 tests passing |

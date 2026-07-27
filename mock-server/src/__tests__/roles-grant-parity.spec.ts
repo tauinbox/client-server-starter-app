@@ -38,6 +38,16 @@ async function loginAsAdmin(): Promise<string> {
   return body.tokens.access_token;
 }
 
+// A well-formed id the seed never issues: the server route parses the param as
+// a UUID, so an unknown id must be one to reach the not-found path there too.
+const UNKNOWN_ID = '00000000-0000-4000-8000-000000000000';
+
+function softDeleteUser(id: string): void {
+  const user = getState().users.get(id);
+  if (!user) throw new Error(`Seed user ${id} is missing`);
+  user.deletedAt = new Date().toISOString();
+}
+
 function editorPermissionIds(): string[] {
   return getState()
     .rolePermissions.filter((rp) => rp.roleId === 'role-editor')
@@ -177,6 +187,75 @@ describe('role grant error parity with server', () => {
       expect(
         getState().auditLogs.filter((log) => log.action === 'ROLE_ASSIGN')
       ).toHaveLength(1);
+    });
+
+    it('returns 404 USERS.NOT_FOUND for an unknown user id', async () => {
+      const token = await loginAsAdmin();
+
+      const res = await fetch(`${baseUrl}/api/v1/roles/assign/${UNKNOWN_ID}`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ roleId: 'role-editor' })
+      });
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { errorKey: string };
+      expect(body.errorKey).toBe('errors.users.notFound');
+    });
+
+    it('returns 404 USERS.NOT_FOUND for a soft-deleted user without changing roles', async () => {
+      const token = await loginAsAdmin();
+      softDeleteUser('2');
+
+      const res = await fetch(`${baseUrl}/api/v1/roles/assign/2`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ roleId: 'role-editor' })
+      });
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { errorKey: string };
+      expect(body.errorKey).toBe('errors.users.notFound');
+      expect(getState().users.get('2')?.roles).toEqual(['user']);
+    });
+  });
+
+  describe('DELETE /api/v1/roles/assign/:userId/:roleId', () => {
+    it('returns 404 USERS.NOT_FOUND for an unknown user id', async () => {
+      const token = await loginAsAdmin();
+
+      const res = await fetch(
+        `${baseUrl}/api/v1/roles/assign/${UNKNOWN_ID}/role-user`,
+        {
+          method: 'DELETE',
+          headers: { authorization: `Bearer ${token}` }
+        }
+      );
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { errorKey: string };
+      expect(body.errorKey).toBe('errors.users.notFound');
+    });
+
+    it('returns 404 USERS.NOT_FOUND for a soft-deleted user without changing roles', async () => {
+      const token = await loginAsAdmin();
+      softDeleteUser('2');
+
+      const res = await fetch(`${baseUrl}/api/v1/roles/assign/2/role-user`, {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${token}` }
+      });
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { errorKey: string };
+      expect(body.errorKey).toBe('errors.users.notFound');
+      expect(getState().users.get('2')?.roles).toEqual(['user']);
     });
   });
 });

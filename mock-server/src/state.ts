@@ -67,7 +67,9 @@ let state: State;
 
 export function resetState(): void {
   state = {
-    users: new Map(seedUsers.map((u) => [u.id, { ...u }])),
+    // `roles` is copied too: assigning a role pushes into the array, so a
+    // shallow copy would let one test's assignment survive the next reset.
+    users: new Map(seedUsers.map((u) => [u.id, { ...u, roles: [...u.roles] }])),
     oauthAccounts: new Map(
       Array.from(seedOAuthAccounts.entries()).map(([k, v]) => [
         k,
