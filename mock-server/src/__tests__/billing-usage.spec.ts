@@ -204,6 +204,35 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     expect(second.quantity).toBe(10);
   });
 
+  it('scopes idempotency to the customer: the same key from another customer records a separate event', async () => {
+    const token = await login('admin@example.com');
+    const { customerId: first } = await activateSubscription(
+      'admin@example.com',
+      'pro'
+    );
+    const { customerId: second } = await activateSubscription(
+      'user@example.com',
+      'pro'
+    );
+    const payload = {
+      meterKey: 'api_calls',
+      quantity: 10,
+      idempotencyKey: 'req-1001'
+    };
+
+    const a = (await (
+      await postUsage(token, { ...payload, customerId: first })
+    ).json()) as Record<string, unknown>;
+    const b = (await (
+      await postUsage(token, { ...payload, customerId: second, quantity: 25 })
+    ).json()) as Record<string, unknown>;
+
+    expect(b['id']).not.toBe(a['id']);
+    expect(a['customerId']).toBe(first);
+    expect(b['customerId']).toBe(second);
+    expect(b['quantity']).toBe(25);
+  });
+
   it('returns 404 when the customer has no active subscription', async () => {
     const token = await login('admin@example.com');
 

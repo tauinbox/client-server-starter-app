@@ -118,6 +118,37 @@ describe('UsageService', () => {
     expect(usageRecords.save).not.toHaveBeenCalled();
   });
 
+  it('treats the same key from another customer as a distinct event', async () => {
+    const foreign = {
+      id: 'usage-foreign',
+      customerId: 'cust-2',
+      idempotencyKey: 'evt-1'
+    } as UsageRecord;
+    subscriptions.findOne.mockResolvedValue(makeSubscription());
+    // Emulates the unique constraint's lookup semantics: a column absent from
+    // `where` is unconstrained, so an unscoped query matches the foreign row.
+    usageRecords.findOne.mockImplementation(
+      ({ where }: { where: Partial<UsageRecord> }) =>
+        Promise.resolve(
+          [foreign].find(
+            (r) =>
+              r.idempotencyKey === where.idempotencyKey &&
+              (where.customerId === undefined ||
+                r.customerId === where.customerId)
+          ) ?? null
+        )
+    );
+
+    const result = await service.record(INPUT);
+
+    expect(usageRecords.findOne).toHaveBeenCalledWith({
+      where: { customerId: 'cust-1', idempotencyKey: 'evt-1' }
+    });
+    expect(usageRecords.save).toHaveBeenCalledTimes(1);
+    expect(result).not.toBe(foreign);
+    expect(result).toMatchObject({ customerId: 'cust-1' });
+  });
+
   it('returns the winner when an insert loses the unique-key race (23505)', async () => {
     const winner = { id: 'usage-1', idempotencyKey: 'evt-1' } as UsageRecord;
     subscriptions.findOne.mockResolvedValue(makeSubscription());
@@ -131,6 +162,10 @@ describe('UsageService', () => {
     const result = await service.record(INPUT);
 
     expect(result).toBe(winner);
+    // The recovery lookup is scoped like the constraint that rejected the insert.
+    expect(usageRecords.findOne).toHaveBeenLastCalledWith({
+      where: { customerId: 'cust-1', idempotencyKey: 'evt-1' }
+    });
   });
 
   it('rethrows a non-unique save failure', async () => {

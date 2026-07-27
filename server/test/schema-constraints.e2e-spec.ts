@@ -25,7 +25,10 @@ runWithInfra('schema hardening constraints (e2e)', () => {
   }
 
   it.each([
-    ['billing_usage_records', 'IDX_billing_usage_records_customer_id'],
+    [
+      'billing_usage_records',
+      'UQ_billing_usage_records_customer_idempotency_key'
+    ],
     ['oauth_accounts', 'IDX_oauth_accounts_user_id'],
     ['billing_webhook_events', 'IDX_billing_webhook_events_status_received_at'],
     ['resources', 'UQ_resources_subject'],
@@ -40,6 +43,65 @@ runWithInfra('schema hardening constraints (e2e)', () => {
     expect(await indexNames('refresh_tokens')).not.toContain(
       'idx_refresh_tokens_token'
     );
+  });
+
+  it('dropped the standalone usage customer index covered by the scoped unique key', async () => {
+    expect(await indexNames('billing_usage_records')).not.toContain(
+      'IDX_billing_usage_records_customer_id'
+    );
+  });
+
+  it('accepts one usage idempotency key per customer but rejects its replay', async () => {
+    const runner = ds.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      const stamp = Date.now();
+      const subscriptionIds: string[] = [];
+      const customerIds: string[] = [];
+
+      for (const suffix of ['a', 'b']) {
+        const [{ id: userId }] = (await runner.query(
+          `INSERT INTO users (email, "firstName", "lastName")
+           VALUES ($1, $2, $3) RETURNING id`,
+          [`uq-usage-${suffix}-${stamp}@example.com`, 'Uq', 'Usage']
+        )) as Array<{ id: string }>;
+
+        const [{ id: customerId }] = (await runner.query(
+          `INSERT INTO billing_customers (user_id, provider, country, currency)
+           VALUES ($1, 'paddle', 'US', 'USD') RETURNING id`,
+          [userId]
+        )) as Array<{ id: string }>;
+
+        const [{ id: subscriptionId }] = (await runner.query(
+          `INSERT INTO subscriptions
+             (customer_id, plan_key, provider, billing_mode, status,
+              lifecycle_owner, current_period_start, current_period_end)
+           VALUES ($1, 'usage', 'paddle', 'usage', 'active', 'provider', now(), now() + interval '30 days')
+           RETURNING id`,
+          [customerId]
+        )) as Array<{ id: string }>;
+
+        customerIds.push(customerId);
+        subscriptionIds.push(subscriptionId);
+      }
+
+      const key = `req-${stamp}`;
+      const insert = `INSERT INTO billing_usage_records
+          (customer_id, subscription_id, meter_key, quantity, occurred_at, idempotency_key)
+        VALUES ($1, $2, 'api_calls', 1, now(), $3)`;
+
+      // The same producer key from two customers is two distinct events.
+      await runner.query(insert, [customerIds[0], subscriptionIds[0], key]);
+      await runner.query(insert, [customerIds[1], subscriptionIds[1], key]);
+
+      await expect(
+        runner.query(insert, [customerIds[0], subscriptionIds[0], key])
+      ).rejects.toThrow(/UQ_billing_usage_records_customer_idempotency_key/);
+    } finally {
+      await runner.rollbackTransaction();
+      await runner.release();
+    }
   });
 
   it('rejects a second row with the same refresh-token hash', async () => {
