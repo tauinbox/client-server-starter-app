@@ -232,7 +232,8 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 
 ### Authentication
 
-- **LocalStrategy** — validates email/password via bcrypt on login
+- **LocalStrategy** — validates email/password via bcrypt on login. `POST /auth/login` has no `@Body()` DTO (guards run before pipes, so a DTO would never execute), which makes the strategy the single place raw credentials are canonicalized: the address goes through the shared `normalizeEmail` (`shared/src/utils/email.ts`) and a non-string credential collapses to the empty string, so login answers 401 and never 400
+- **Email canonicalization** — trim + lowercase via `normalizeEmail`, applied by the DTO `@Transform`s, by `LocalStrategy`, by the three OAuth strategies and once more inside `loginWithOAuth` (the only writer of OAuth-created users). Backstopped in the schema by `UQ_users_email_lower`
 - **JwtStrategy** — verifies Bearer-token signature, pins issuer/audience and the signing algorithm, requires the `access` token purpose and a non-empty `sub`, enforces `JWT_MIN_IAT` and per-user `tokenRevokedAt` cutoffs, returns `PayloadFromJwt` (`{ userId, email, roles }`) — no `isAdmin` flag
 - **Token purpose** — every token the service signs (access, OAuth link, OAuth data) uses the same key, so each carries an explicit `purpose` claim and each consumer accepts only its own. Without it a token minted for one flow authenticates on another; an OAuth-data token in particular carries no `sub`, and an id-less user lookup resolves to an arbitrary row rather than failing. Issuer/audience are pinned on both signing and verification from a single factory (`jwt-module-options.factory.ts`) so the two cannot drift apart
 - **GoogleStrategy / FacebookStrategy / VkStrategy** — OAuth2 login (conditionally registered when env vars are set)
@@ -323,7 +324,7 @@ Core tables managed via TypeORM migrations:
 
 | Table | Description |
 |-------|-------------|
-| `users` | UUID PK, email (unique), name, bcrypt password (nullable for OAuth-only), isActive, isEmailVerified, `locale` (email language, default `en`), failedLoginAttempts, lockedUntil, verification/reset token fields, `deleted_at TIMESTAMPTZ NULL` (soft delete); ManyToMany to roles via user_roles |
+| `users` | UUID PK, email (unique, plus the `UQ_users_email_lower` functional unique index on `lower(email)` — two accounts may not differ only by case), name, bcrypt password (nullable for OAuth-only), isActive, isEmailVerified, `locale` (email language, default `en`), failedLoginAttempts, lockedUntil, verification/reset token fields, `deleted_at TIMESTAMPTZ NULL` (soft delete); ManyToMany to roles via user_roles |
 | `oauth_accounts` | UUID PK, provider + provider_id (unique), FK to users (CASCADE, indexed) |
 | `refresh_tokens` | UUID PK, token (SHA-256 hashed, unique, `@Exclude`-d from the wire), FK to users (CASCADE), expires_at, revoked |
 | `roles` | UUID PK, name (unique), description, isSystem flag, isSuper flag |
