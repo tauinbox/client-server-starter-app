@@ -7,6 +7,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { FindOperator } from 'typeorm';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { PaymentMethod } from '../src/modules/billing/entities/payment-method.entity';
@@ -37,8 +38,14 @@ interface Store {
   paymentMethods: PaymentMethod[];
 }
 
-/** Column equality with Date support (the period-advance CAS matches on one). */
+/**
+ * Column equality with Date support (the period-advance CAS matches on one)
+ * and `In([...])` support (it also matches on the chargeable statuses).
+ */
 function columnEquals(actual: unknown, expected: unknown): boolean {
+  if (expected instanceof FindOperator) {
+    return (expected.value as unknown[]).includes(actual);
+  }
   return actual instanceof Date && expected instanceof Date
     ? actual.getTime() === expected.getTime()
     : actual === expected;
