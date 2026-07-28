@@ -1,4 +1,9 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import {
+  expect,
+  loginViaUi,
+  openedDialog,
+  test
+} from '../fixtures/base.fixture';
 
 test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () => {
   test('Environments and role-rule chips persist a created flag', async ({
@@ -14,11 +19,11 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
     await page.goto('/admin/feature-flags');
     await page.getByRole('button', { name: /^New flag$/ }).click();
 
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
+    const dialog = await openedDialog(page);
 
     // Option-only: the API accepts just the names the server can run as. The
-    // retry guards a CI focus steal that dropped the text into the Key field.
+    // retry absorbs a slow autocomplete panel, not the focus steal that
+    // openedDialog() now rules out.
     const envInput = dialog.getByRole('combobox', { name: /Environments/i });
     const addEnvironment = async (env: string) => {
       await expect(async () => {
@@ -64,9 +69,9 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
       .click();
     await expect(ruleRow.getByRole('row', { name: /^user/i })).toBeVisible();
 
-    // Fill Key last: it is the dialog's first tabbable element, so text leaked
-    // by a focus steal during the chip interactions lands here — an
-    // authoritative fill now overwrites anything that may have leaked.
+    // Key is the dialog's first tabbable element and was where the historical
+    // focus steal dumped text; filling it last keeps the assertion below
+    // authoritative.
     const keyInput = dialog.getByRole('textbox', { name: 'Key' });
     await keyInput.fill('chips-rollout');
     await expect(keyInput).toHaveValue('chips-rollout');

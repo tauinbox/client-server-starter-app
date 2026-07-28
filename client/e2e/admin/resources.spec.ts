@@ -3,6 +3,7 @@ import {
   expectAuthRedirect,
   expectForbiddenRedirect,
   loginViaUi,
+  openedDialog,
   test
 } from '../fixtures/base.fixture';
 
@@ -104,7 +105,7 @@ test.describe('Admin Resources page', () => {
       .getByRole('button', { name: /^Edit Resource / })
       .first()
       .click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    await openedDialog(page);
 
     const displayNameInput = page.getByLabel('Display Name');
     await displayNameInput.clear();

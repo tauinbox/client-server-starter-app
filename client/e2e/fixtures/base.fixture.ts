@@ -219,5 +219,6 @@ export {
   loginViaUi,
   loginViaUiKeepSse,
   expectAuthRedirect,
-  expectForbiddenRedirect
+  expectForbiddenRedirect,
+  openedDialog
 } from './helpers';
