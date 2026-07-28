@@ -20,7 +20,8 @@ function yooMock() {
     createPayment: jest.fn(),
     getPayment: jest.fn(),
     getPaymentList: jest.fn(),
-    createRefund: jest.fn()
+    createRefund: jest.fn(),
+    getRefundList: jest.fn().mockResolvedValue({ items: [] })
   };
 }
 
@@ -731,6 +732,123 @@ describe('YooKassaProvider', () => {
 
       const [payload] = client!.createRefund.mock.calls[0] as [ICreateRefund];
       expect(payload.amount).toEqual({ value: '25000000.00', currency: 'RUB' });
+    });
+
+    describe('app-level idempotency', () => {
+      const paidPayment = {
+        id: 'pay-idem',
+        amount: { value: '990.00', currency: 'RUB' },
+        description: 'Pro',
+        metadata: { userId: 'user-1' }
+      };
+
+      it('carries the idempotency key in the refund description', async () => {
+        const { provider, client } = await build();
+        client!.getPayment.mockResolvedValue(paidPayment);
+        client!.createRefund.mockResolvedValue({ id: 'ref-1' });
+
+        await provider.refund('pay-idem', 50000, 'idem-refund-1');
+
+        const [payload] = client!.createRefund.mock.calls[0] as [ICreateRefund];
+        expect(payload.description).toBe('Refund idem-refund-1');
+        expect(client!.getRefundList).toHaveBeenCalledWith({
+          payment_id: 'pay-idem',
+          limit: 100
+        });
+      });
+
+      it('no-ops when a refund with the same key already exists (stale key window)', async () => {
+        const { provider, client } = await build();
+        client!.getPayment.mockResolvedValue(paidPayment);
+        client!.getRefundList.mockResolvedValue({
+          items: [
+            {
+              id: 'ref-other',
+              status: 'succeeded',
+              description: 'Refund idem-refund-9'
+            },
+            {
+              id: 'ref-done',
+              status: 'succeeded',
+              description: 'Refund idem-refund-1'
+            }
+          ]
+        });
+
+        await provider.refund('pay-idem', 50000, 'idem-refund-1');
+
+        expect(client!.createRefund).not.toHaveBeenCalled();
+      });
+
+      it('re-issues when the only matching refund was canceled (no money moved)', async () => {
+        const { provider, client } = await build();
+        client!.getPayment.mockResolvedValue(paidPayment);
+        client!.createRefund.mockResolvedValue({ id: 'ref-2' });
+        client!.getRefundList.mockResolvedValue({
+          items: [
+            {
+              id: 'ref-canceled',
+              status: 'canceled',
+              description: 'Refund idem-refund-1'
+            }
+          ]
+        });
+
+        await provider.refund('pay-idem', 50000, 'idem-refund-1');
+
+        expect(client!.createRefund).toHaveBeenCalledTimes(1);
+      });
+
+      it('follows the cursor to a match on a later page', async () => {
+        const { provider, client } = await build();
+        client!.getPayment.mockResolvedValue(paidPayment);
+        client!.getRefundList
+          .mockResolvedValueOnce({ items: [], next_cursor: 'cur-2' })
+          .mockResolvedValueOnce({
+            items: [
+              {
+                id: 'ref-deep',
+                status: 'succeeded',
+                description: 'Refund idem-refund-1'
+              }
+            ]
+          });
+
+        await provider.refund('pay-idem', 50000, 'idem-refund-1');
+
+        expect(client!.getRefundList).toHaveBeenNthCalledWith(
+          2,
+          expect.objectContaining({ cursor: 'cur-2' })
+        );
+        expect(client!.createRefund).not.toHaveBeenCalled();
+      });
+
+      it('fails loudly instead of refunding again when the page cap is hit', async () => {
+        const { provider, client } = await build();
+        client!.getPayment.mockResolvedValue(paidPayment);
+        client!.getRefundList.mockResolvedValue({
+          items: [],
+          next_cursor: 'more'
+        });
+
+        await expect(
+          provider.refund('pay-idem', 50000, 'idem-refund-1')
+        ).rejects.toBeInstanceOf(ServiceUnavailableException);
+        expect(client!.getRefundList).toHaveBeenCalledTimes(20);
+        expect(client!.createRefund).not.toHaveBeenCalled();
+      });
+
+      it('skips the scan when no idempotency key is supplied', async () => {
+        const { provider, client } = await build();
+        client!.getPayment.mockResolvedValue(paidPayment);
+        client!.createRefund.mockResolvedValue({ id: 'ref-3' });
+
+        await provider.refund('pay-idem', 50000);
+
+        expect(client!.getRefundList).not.toHaveBeenCalled();
+        const [payload] = client!.createRefund.mock.calls[0] as [ICreateRefund];
+        expect(payload.description).toBe('Refund');
+      });
     });
   });
 

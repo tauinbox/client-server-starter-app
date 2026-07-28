@@ -456,6 +456,16 @@ export class YooKassaProvider implements PaymentProvider {
   ): Promise<void> {
     const yoo = this.requireClient();
 
+    // The Idempotence-Key header only dedups inside YooKassa's ~24h key store,
+    // far shorter than the gap a post-crash retry can take, so the key also
+    // rides in the refund description and a later replay finds it here.
+    if (
+      idempotencyKey &&
+      (await this.hasRefundWithKey(yoo, providerInvoiceRef, idempotencyKey))
+    ) {
+      return;
+    }
+
     // Re-fetch the original payment for the buyer (receipt email) and the
     // currency/description to fiscalize the refund.
     const payment = await yoo.getPayment(providerInvoiceRef);
@@ -467,6 +477,7 @@ export class YooKassaProvider implements PaymentProvider {
     const payload: ICreateRefund = {
       payment_id: providerInvoiceRef,
       amount: { value: toAmountValue(refundMinor, currency), currency },
+      description: idempotencyKey ? `Refund ${idempotencyKey}` : 'Refund',
       receipt: await this.buildReceipt(
         userId,
         [
@@ -481,6 +492,44 @@ export class YooKassaProvider implements PaymentProvider {
     };
 
     await yoo.createRefund(payload, idempotencyKey ?? randomUUID());
+  }
+
+  /**
+   * Whether a refund carrying `idempotencyKey` in its description already
+   * exists on the payment. `canceled` refunds do not count - no money moved,
+   * so a retry legitimately re-issues. The scan is bounded like
+   * `findOffSessionCharge`: an inconclusive answer fails loudly rather than
+   * green-lighting a refund that may duplicate one already paid out.
+   */
+  private async hasRefundWithKey(
+    yoo: YooCheckout,
+    paymentId: string,
+    idempotencyKey: string
+  ): Promise<boolean> {
+    const maxPages = 20;
+    let cursor: string | undefined;
+    for (let page = 0; page < maxPages; page++) {
+      const list = await yoo.getRefundList({
+        payment_id: paymentId,
+        limit: 100,
+        ...(cursor ? { cursor } : {})
+      });
+      const match = (list.items ?? []).find(
+        (refund) =>
+          refund.status !== 'canceled' &&
+          (refund.description ?? '').includes(idempotencyKey)
+      );
+      if (match) {
+        return true;
+      }
+      if (!list.next_cursor) {
+        return false;
+      }
+      cursor = list.next_cursor;
+    }
+    throw new ServiceUnavailableException(
+      `YooKassa refund scan for payment "${paymentId}" exceeded ${maxPages} pages without a definitive answer`
+    );
   }
 
   async verifyAndParseWebhook(
