@@ -1,4 +1,9 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import {
+  expect,
+  loginViaUi,
+  openedDialog,
+  test
+} from '../fixtures/base.fixture';
 
 test.describe('Admin Actions page', () => {
   test('should display "Actions" heading', async ({ _mockServer, page }) => {
@@ -92,17 +97,34 @@ test.describe('Admin Actions page', () => {
     await page.goto('/admin/actions');
 
     await page.getByRole('button', { name: 'Add', exact: true }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    const dialog = await openedDialog(page);
 
     await page.getByLabel('Internal Name').fill('publish');
     await page.getByLabel('Display Name').fill('Publish');
 
-    await page
-      .getByRole('dialog')
-      .getByRole('button', { name: 'Add', exact: true })
-      .click();
+    await dialog.getByRole('button', { name: 'Add', exact: true }).click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible();
     await expect(page.locator('mat-snack-bar-container')).toBeVisible();
+  });
+
+  // Guards the flake where both values landed in the first field: the focus
+  // trap fires ~150ms after the dialog turns visible and a fill() started
+  // before that has its text inserted wherever focus ends up.
+  test('focus stays put once the dialog focus trap has settled', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await page.goto('/admin/actions');
+
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await openedDialog(page);
+
+    const displayName = page.getByLabel('Display Name');
+    await displayName.focus();
+    // Timer-driven: only elapsed time proves the trap will not steal focus back.
+    await page.waitForTimeout(500);
+    await expect(displayName).toBeFocused();
   });
 });

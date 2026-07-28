@@ -1,4 +1,9 @@
-import { expect, loginViaUi, test } from './fixtures/base.fixture';
+import {
+  expect,
+  loginViaUi,
+  openedDialog,
+  test
+} from './fixtures/base.fixture';
 
 /**
  * Keyboard navigation tests — verifies that core flows are fully operable
@@ -121,8 +126,7 @@ test.describe('Keyboard navigation', () => {
 
     // Open the delete confirmation dialog
     await page.getByRole('button', { name: 'Delete', exact: true }).click();
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
+    const dialog = await openedDialog(page);
 
     const cancelButton = dialog.getByRole('button', { name: 'Cancel' });
     const deleteButton = dialog.getByRole('button', { name: 'Delete' });

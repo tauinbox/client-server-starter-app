@@ -1,7 +1,36 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
 import type { MockUser } from './mock-data';
+
+/**
+ * Wait for a freshly opened dialog to be visible AND for its CDK focus trap to
+ * have moved focus inside it. Use instead of a bare
+ * `expect(page.getByRole('dialog')).toBeVisible()` before typing into a dialog.
+ *
+ * A dialog becomes visible ~150ms before it is safe to type into: MatDialog
+ * defers `_trapFocus()` to `_openAnimationDone` (delayFocusTrap is true by
+ * default), which then focuses the dialog's first tabbable element. Playwright's
+ * `fill()` is two round trips - an in-page `select() + focus()`, then a separate
+ * `Input.insertText` that goes to whatever holds focus at that later moment. A
+ * trap firing between the two appends the text to the first field and leaves the
+ * intended one empty but touched, i.e. showing a "required" error. Waiting for
+ * the trap first closes that window.
+ *
+ * Focus landing inside the dialog is a reliable signal that the trap has run:
+ * no dialog in this app declares `cdkFocusInitial` or focuses a control itself,
+ * so nothing else moves focus off the trigger button.
+ */
+export async function openedDialog(page: Page): Promise<Locator> {
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await expect
+    .poll(() =>
+      dialog.evaluate((el) => el.contains(el.ownerDocument.activeElement))
+    )
+    .toBe(true);
+  return dialog;
+}
 
 /**
  * Seed a test user in mock-server state and log in via the UI.
