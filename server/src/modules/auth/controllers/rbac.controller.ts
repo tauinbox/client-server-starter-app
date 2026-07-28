@@ -79,6 +79,8 @@ export class RbacController {
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden' })
   async getMetadata() {
+    // Admin catalog, deliberately unscoped by ABAC: a display-name lookup
+    // over every resource/action. Conditions apply on mutations and reads by id.
     const cached = await this.cacheManager.get(METADATA_CACHE_KEY);
     if (cached) return cached;
 
@@ -101,6 +103,7 @@ export class RbacController {
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden' })
   findAllResources() {
+    // Admin catalog, deliberately unscoped by ABAC; see getMetadata().
     return this.resourceService.findAll();
   }
 
@@ -204,6 +207,7 @@ export class RbacController {
   @ApiOperation({ summary: 'List all actions' })
   @ApiOkResponse({ description: 'List of actions' })
   findAllActions() {
+    // Admin catalog, deliberately unscoped by ABAC; see getMetadata().
     return this.actionService.findAll();
   }
 
