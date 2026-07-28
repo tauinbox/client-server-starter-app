@@ -151,9 +151,6 @@ export class OAuthService {
       user = await this.usersService.findOne(createdUserId);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...userWithoutPassword } = user;
-
     const roleNames = user.roles.map((r) => r.name);
     const tokens = this.tokenGenerator.generateTokens(
       user.id,
@@ -175,9 +172,11 @@ export class OAuthService {
       MAX_CONCURRENT_SESSIONS
     );
 
+    // Entity, not a spread: a plain object carries no class-transformer
+    // metadata, so @Exclude() fields could not be stripped downstream.
     return {
       tokens,
-      user: userWithoutPassword
+      user
     };
   }
 

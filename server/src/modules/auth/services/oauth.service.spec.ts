@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { instanceToPlain } from 'class-transformer';
 import { OAuthService } from './oauth.service';
 import { UsersService } from '../../users/services/users.service';
 import { RefreshTokenService } from './refresh-token.service';
@@ -224,6 +225,26 @@ describe('OAuthService', () => {
       );
       // OAuth response must carry roles as RoleResponse[] (not string[]).
       expect(result.user.roles).toEqual([mockUserRole]);
+    });
+
+    it('should return the User entity instance so @Exclude() fields can be stripped downstream', async () => {
+      const entity = Object.assign(new User(), oauthUser, {
+        emailVerificationToken: 'hashed-verification-token'
+      });
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        id: '1',
+        provider: 'google',
+        providerId: 'google-123',
+        userId: 'oauth-user-1'
+      });
+      mockUsersService.findOne.mockResolvedValue(entity);
+
+      const result = await service.loginWithOAuth(oauthProfile);
+
+      expect(result.user).toBe(entity);
+      expect(instanceToPlain(result.user)).not.toHaveProperty(
+        'emailVerificationToken'
+      );
     });
 
     it('should auto-verify email for returning OAuth user', async () => {

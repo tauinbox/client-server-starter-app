@@ -543,13 +543,13 @@ export class AuthService {
       });
     });
 
-    const { password: _, ...userWithoutPassword } = user;
-
     this.metricsService.recordAuthEvent('token_refresh_success');
 
+    // Entity, not a spread: a plain object carries no class-transformer
+    // metadata, so ClassSerializerInterceptor could not strip @Exclude() fields.
     return {
       tokens,
-      user: userWithoutPassword
+      user
     };
   }
 

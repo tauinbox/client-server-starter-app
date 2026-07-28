@@ -2,8 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { instanceToPlain } from 'class-transformer';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
+import { User } from '../../users/entities/user.entity';
 import { UsersService } from '../../users/services/users.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { RoleService } from './role.service';
@@ -822,6 +824,21 @@ describe('AuthService', () => {
           email: 'test@example.com',
           roles: [mockUserRole]
         })
+      );
+    });
+
+    it('should return the User entity instance so @Exclude() fields can be stripped downstream', async () => {
+      const entity = Object.assign(new User(), mockUser, {
+        passwordResetToken: 'hashed-reset-token'
+      });
+      mockRefreshTokenService.findByToken.mockResolvedValue(mockTokenDoc);
+      mockUsersService.findOne.mockResolvedValue(entity);
+
+      const result = await service.refreshTokens('valid-refresh-token');
+
+      expect(result.user).toBe(entity);
+      expect(instanceToPlain(result.user)).not.toHaveProperty(
+        'passwordResetToken'
       );
     });
 
