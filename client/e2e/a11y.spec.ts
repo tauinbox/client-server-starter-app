@@ -23,6 +23,12 @@ function seriousOrCritical(violations: Result[]): Result[] {
 }
 
 test.describe('Accessibility (axe-core)', () => {
+  // An axe scan is CPU-bound and competes with the other parallel workers, so
+  // these tests cost ~3x more in a full run than on their own: the heaviest
+  // page (the users list) measures ~9s with a single worker and ~21-28s under
+  // the parallel suite, which repeatedly grazed the 30s default.
+  test.describe.configure({ timeout: 60_000 });
+
   /* ------------------------------------------------------------------
    * Public routes (no auth required)
    * ----------------------------------------------------------------*/
