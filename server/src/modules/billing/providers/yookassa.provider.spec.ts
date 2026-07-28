@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ServiceUnavailableException } from '@nestjs/common';
 import type { ICreatePayment, ICreateRefund } from '@a2seven/yoo-checkout';
+import type { FindOneOptions } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { YooKassaProvider } from './yookassa.provider';
 import { YOOKASSA_CLIENT } from './yookassa.client';
@@ -372,7 +373,7 @@ describe('YooKassaProvider', () => {
       );
 
       expect(paymentMethods.findOne).toHaveBeenCalledWith({
-        where: { id: 'pmrow-1' }
+        where: { id: 'pmrow-1', customerId: 'cust-1', provider: 'yookassa' }
       });
       const [payload, idempotencyKey] = client!.createPayment.mock.calls[0] as [
         ICreatePayment,
@@ -496,6 +497,36 @@ describe('YooKassaProvider', () => {
       await expect(
         provider.chargeOffSession(savedCustomer, 99000, items)
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+
+    it('never charges a saved method that belongs to another customer', async () => {
+      const { provider, client, paymentMethods } = await build();
+      client!.createPayment.mockResolvedValue({
+        id: 'pay-foreign',
+        status: 'succeeded'
+      });
+      const foreignMethod = {
+        id: 'pmrow-1',
+        customerId: 'cust-2',
+        provider: 'yookassa',
+        providerMethodRef: 'foreign-token'
+      };
+      // Behaves like the real repository: the row is returned only when every
+      // predicate matches, so an unscoped lookup would resolve the foreign card.
+      paymentMethods.findOne.mockImplementation(
+        ({ where }: FindOneOptions<PaymentMethod>) =>
+          Object.entries(where as Record<string, unknown>).every(
+            ([key, value]) =>
+              foreignMethod[key as keyof typeof foreignMethod] === value
+          )
+            ? foreignMethod
+            : null
+      );
+
+      await expect(
+        provider.chargeOffSession(savedCustomer, 99000, items)
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      expect(client!.createPayment).not.toHaveBeenCalled();
     });
 
     it('stamps the off-session marker carrying the invoice key so the webhook is reconcilable', async () => {

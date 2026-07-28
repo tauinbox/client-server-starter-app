@@ -646,8 +646,10 @@ export class YooKassaProvider implements PaymentProvider {
         `Customer "${customer.id}" has no saved YooKassa payment method`
       );
     }
+    // Scoped to the owner (and this provider) so a mis-pointed default can never
+    // charge another customer's card token - it fails loudly instead.
     const method = await this.paymentMethods.findOne({
-      where: { id: methodId }
+      where: { id: methodId, customerId: customer.id, provider: this.id }
     });
     if (!method) {
       throw new ServiceUnavailableException(
