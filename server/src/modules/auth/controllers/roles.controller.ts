@@ -71,6 +71,8 @@ export class RolesController {
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   findAll() {
+    // Admin catalog, deliberately unscoped by ABAC: it backs the assign-role
+    // picker. Conditions apply on mutations and on /roles/:id.
     return this.roleService.findAll();
   }
 
@@ -80,6 +82,7 @@ export class RolesController {
   @ApiOperation({ summary: 'List all available permissions' })
   @ApiOkResponse({ description: 'List of permissions' })
   findAllPermissions() {
+    // Admin catalog, deliberately unscoped by ABAC; see findAll().
     return this.roleService.findAllPermissions();
   }
 
