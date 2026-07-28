@@ -1,4 +1,5 @@
 import {
+  ClassSerializerInterceptor,
   Controller,
   Delete,
   Get,
@@ -9,7 +10,8 @@ import {
   Post,
   Request,
   Res,
-  UseGuards
+  UseGuards,
+  UseInterceptors
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -19,6 +21,7 @@ import {
   ApiTags
 } from '@nestjs/swagger';
 import { Request as ExpressRequest, Response } from 'express';
+import { instanceToPlain } from 'class-transformer';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Throttle } from '@nestjs/throttler';
@@ -43,6 +46,7 @@ import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
   path: 'auth/oauth',
   version: '1'
 })
+@UseInterceptors(ClassSerializerInterceptor)
 export class OAuthController {
   private readonly logger = new Logger(OAuthController.name);
   private readonly clientUrl: string;
@@ -334,10 +338,15 @@ export class OAuthController {
         return;
       }
 
-      const authResponse = await this.oauthService.loginWithOAuth(profile);
+      const { tokens, user } = await this.oauthService.loginWithOAuth(profile);
 
+      // Serialize here, not at /exchange: the cookie payload is plain JSON, so
+      // an entity signed as-is would be echoed verbatim past any interceptor.
       const signedData = this.jwtService.sign(
-        { data: authResponse, purpose: TOKEN_PURPOSE.OAUTH_DATA },
+        {
+          data: { tokens, user: instanceToPlain(user) },
+          purpose: TOKEN_PURPOSE.OAUTH_DATA
+        },
         { expiresIn: OAuthController.OAUTH_DATA_MAX_AGE_SECONDS }
       );
 
