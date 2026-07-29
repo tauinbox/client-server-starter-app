@@ -31,7 +31,6 @@ export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
       id: string;
       emails?: { value: string }[];
       name?: { givenName?: string; familyName?: string };
-      _json?: { verified?: boolean };
     },
     done: (error: Error | null, user?: OAuthUserProfile) => void
   ): void {
@@ -41,7 +40,11 @@ export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
       email: normalizeEmail(profile.emails?.[0]?.value) ?? '',
       firstName: profile.name?.givenName || '',
       lastName: profile.name?.familyName || '',
-      emailVerified: profile._json?.verified === true
+      // Facebook exposes no per-email verification flag. The account-level
+      // `verified` field this used to read says the account passed Facebook's
+      // own identity check, not that the person owns this mailbox - and it is
+      // not even in `profileFields`, so it was always undefined here.
+      emailVerified: false
     };
 
     done(null, oauthProfile);

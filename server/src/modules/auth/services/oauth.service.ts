@@ -48,7 +48,9 @@ export class OAuthService {
     let user: User;
 
     if (existingOAuth) {
-      // Returning OAuth user
+      // `lockedUntil` is deliberately not consulted: it counts password
+      // guesses, and locking the provider path too would let an attacker deny
+      // the owner every way in.
       user = await this.usersService.findOne(existingOAuth.userId);
       if (!user.isActive) {
         throw new HttpException(
