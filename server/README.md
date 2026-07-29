@@ -152,6 +152,7 @@ src/
 │   ├── services/           # AuthService, OAuthService, TokenGeneratorService, RefreshTokenService, OAuthAccountService, TokenCleanupService, ResourceService, ActionService, ResourceSyncService
 │   ├── strategies/         # LocalStrategy, JwtStrategy (extracts roles), GoogleStrategy, FacebookStrategy, VkStrategy
 │   ├── guards/             # LocalAuthGuard, JwtAuthGuard, Google/Facebook/VkOAuthGuard (via createOAuthProviderGuard factory)
+│   ├── listeners/          # SessionRevocationListener (on UserSessionRevocationRequiredEvent: deletes refresh tokens + stamps tokenRevokedAt; registered with suppressErrors:false and emitted via emitAsync, so a failed revocation fails the caller's request), UserDeletedListener (pending email-change cleanup), UserRoleChangedListener (revocation + permission-cache invalidation on role change)
 │   ├── entities/           # RefreshToken, OAuthAccount, Resource, Action
 │   ├── enums/              # OAuthProvider
 │   └── dto/                # LoginDto, RegisterDto, UpdateProfileDto, VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto

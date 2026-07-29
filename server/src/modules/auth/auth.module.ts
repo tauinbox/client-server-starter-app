@@ -33,6 +33,7 @@ import { Resource } from './entities/resource.entity';
 import { Action } from './entities/action.entity';
 import { UserDeletedListener } from './listeners/user-deleted.listener';
 import { UserRoleChangedListener } from './listeners/user-role-changed.listener';
+import { SessionRevocationListener } from './listeners/session-revocation.listener';
 
 function conditionalProvider(
   envVar: string,
@@ -93,7 +94,8 @@ function conditionalProvider(
     conditionalProvider('FACEBOOK_CLIENT_ID', FacebookStrategy),
     conditionalProvider('VK_CLIENT_ID', VkStrategy),
     UserDeletedListener,
-    UserRoleChangedListener
+    UserRoleChangedListener,
+    SessionRevocationListener
   ],
   exports: [AuthService, OAuthService, CaslModule, RoleService, CaptchaModule]
 })

@@ -17,6 +17,7 @@ import { UpdateUserDto } from '../dtos/update-user.dto';
 import { SearchUsersQueryDto } from '../dtos/search-users-query.dto';
 import { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto';
 import { UserPasswordChangedByAdminEvent } from '../events/user-password-changed-by-admin.event';
+import { UserSessionRevocationRequiredEvent } from '../events/user-session-revocation-required.event';
 import type { AppAbility } from '../../auth/casl/app-ability';
 
 const allowAllGuard = { canActivate: () => true };
@@ -53,7 +54,7 @@ describe('UsersController', () => {
     remove: jest.Mock;
     restore: jest.Mock;
   };
-  let eventEmitterMock: { emit: jest.Mock };
+  let eventEmitterMock: { emit: jest.Mock; emitAsync: jest.Mock };
   let auditServiceMock: { log: jest.Mock; logFireAndForget: jest.Mock };
   let metricsServiceMock: { recordPermissionDenied: jest.Mock };
   let permissionServiceMock: {
@@ -73,7 +74,10 @@ describe('UsersController', () => {
       restore: jest.fn()
     };
 
-    eventEmitterMock = { emit: jest.fn() };
+    eventEmitterMock = {
+      emit: jest.fn(),
+      emitAsync: jest.fn().mockResolvedValue([])
+    };
 
     auditServiceMock = {
       log: jest.fn().mockResolvedValue(undefined),
@@ -388,6 +392,40 @@ describe('UsersController', () => {
       );
     });
 
+    it('should await session revocation when dto contains password', async () => {
+      const dto: UpdateUserDto = { firstName: 'Updated', password: 'NewPass1' };
+      usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req, mockAbility);
+
+      expect(eventEmitterMock.emitAsync).toHaveBeenCalledWith(
+        UserSessionRevocationRequiredEvent.name,
+        expect.objectContaining({ userId: 'user-5' })
+      );
+    });
+
+    it('should NOT request session revocation when dto does not contain password', async () => {
+      const dto: UpdateUserDto = { firstName: 'Updated' };
+      usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req, mockAbility);
+
+      expect(eventEmitterMock.emitAsync).not.toHaveBeenCalled();
+    });
+
+    it('should fail the request when session revocation fails', async () => {
+      const dto: UpdateUserDto = { firstName: 'Updated', password: 'NewPass1' };
+      usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+      eventEmitterMock.emitAsync.mockRejectedValue(new Error('db down'));
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await expect(
+        controller.update('user-5', dto, req, mockAbility)
+      ).rejects.toThrow('db down');
+    });
+
     it('should log USER_UPDATE and PASSWORD_CHANGE when dto contains password', async () => {
       const dto: UpdateUserDto = { firstName: 'Updated', password: 'NewPass1' };
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
@@ -478,6 +516,36 @@ describe('UsersController', () => {
         [string, UserDeletedEvent]
       ];
       expect(emittedEvent.userId).toBe('user-7');
+    });
+
+    it('should await session revocation for the deleted user', async () => {
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-7',
+        email: 'del@example.com'
+      });
+      usersServiceMock.remove.mockResolvedValue(undefined);
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.remove('user-7', req, mockAbility);
+
+      expect(eventEmitterMock.emitAsync).toHaveBeenCalledWith(
+        UserSessionRevocationRequiredEvent.name,
+        expect.objectContaining({ userId: 'user-7' })
+      );
+    });
+
+    it('should fail the request when session revocation fails', async () => {
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-7',
+        email: 'del@example.com'
+      });
+      usersServiceMock.remove.mockResolvedValue(undefined);
+      eventEmitterMock.emitAsync.mockRejectedValue(new Error('db down'));
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await expect(
+        controller.remove('user-7', req, mockAbility)
+      ).rejects.toThrow('db down');
     });
 
     it('should log USER_DELETE with targetEmail from the found user', async () => {
