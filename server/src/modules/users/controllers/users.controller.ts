@@ -50,6 +50,7 @@ import { MetricsService } from '../../core/metrics/metrics.service';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { JwtAuthRequest } from '../../auth/types/auth.request';
 import { UserPasswordChangedByAdminEvent } from '../events/user-password-changed-by-admin.event';
+import { UserSessionRevocationRequiredEvent } from '../events/user-session-revocation-required.event';
 import { UserCreatedEvent } from '../events/user-created.event';
 import { UserUpdatedEvent } from '../events/user-updated.event';
 import { UserRestoredEvent } from '../events/user-restored.event';
@@ -297,6 +298,10 @@ export class UsersController {
         details: { source: 'admin' },
         context: extractAuditContext(req)
       });
+      await this.eventEmitter.emitAsync(
+        UserSessionRevocationRequiredEvent.name,
+        new UserSessionRevocationRequiredEvent(id)
+      );
     }
 
     this.eventEmitter.emit(UserUpdatedEvent.name, new UserUpdatedEvent(id));
@@ -329,6 +334,10 @@ export class UsersController {
       details: { targetEmail: user.email },
       context: extractAuditContext(req)
     });
+    await this.eventEmitter.emitAsync(
+      UserSessionRevocationRequiredEvent.name,
+      new UserSessionRevocationRequiredEvent(id)
+    );
     return {};
   }
 
