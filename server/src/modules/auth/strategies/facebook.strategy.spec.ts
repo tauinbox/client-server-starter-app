@@ -21,8 +21,6 @@ describe('FacebookStrategy.validate', () => {
     done = jest.fn();
   });
 
-  // Facebook's account-level `verified` is not an email-ownership assertion,
-  // so no Facebook profile may claim a verified address.
   it('never reports the address as verified', () => {
     strategy.validate(
       'access',
@@ -40,8 +38,6 @@ describe('FacebookStrategy.validate', () => {
     expect(profile.provider).toBe(OAuthProvider.FACEBOOK);
   });
 
-  // An account-level flag smuggled in alongside the requested fields must not
-  // reach `emailVerified`.
   it('ignores an account-level verified flag on the raw profile', () => {
     strategy.validate(
       'access',

@@ -48,9 +48,8 @@ export class OAuthService {
     let user: User;
 
     if (existingOAuth) {
-      // `lockedUntil` is deliberately not consulted: it counts password
-      // guesses, and locking the provider path too would let an attacker deny
-      // the owner every way in.
+      // `lockedUntil` counts password guesses; locking the provider path too
+      // would let an attacker deny the owner every way in.
       user = await this.usersService.findOne(existingOAuth.userId);
       if (!user.isActive) {
         throw new HttpException(
@@ -61,9 +60,9 @@ export class OAuthService {
           HttpStatus.UNAUTHORIZED
         );
       }
-      // Verifying unconditionally would void the verification mail sent at
-      // creation for providers that assert nothing (VK), opening password
-      // login on an address whose ownership was never proven.
+      // Verifying unconditionally would void the mail sent at creation for
+      // providers that assert nothing (VK), opening password login on an
+      // unproven address.
       if (
         !user.isEmailVerified &&
         profile.emailVerified &&
@@ -188,11 +187,7 @@ export class OAuthService {
     };
   }
 
-  /**
-   * Whether the provider asserted the same address the account is registered
-   * under. A provider vouching for a *different* mailbox says nothing about
-   * the one stored here, so it must not verify it.
-   */
+  /** A provider vouching for a different mailbox says nothing about this one. */
   private assertsSameEmail(profile: OAuthUserProfile, user: User): boolean {
     const asserted = normalizeEmail(profile.email);
     return !!asserted && asserted === normalizeEmail(user.email);
@@ -236,15 +231,10 @@ export class OAuthService {
   }
 
   /**
-   * Links a provider account to an already-authenticated user.
-   *
-   * A linked provider is an authentication factor and never an email
-   * assertion: the provider's address is deliberately not passed in and not
-   * compared to `user.email`, because linking a provider whose profile carries
-   * a different mailbox is a legitimate flow (the session already proves who
-   * the user is). Nothing here touches `isEmailVerified`, and a later login
-   * through this account only verifies the address if the provider vouches for
-   * that exact address - see `assertsSameEmail`.
+   * A linked provider is an authentication factor, never an email assertion:
+   * the provider's address is deliberately not passed in, because linking a
+   * provider whose profile carries a different mailbox is legitimate - the
+   * session already proves identity.
    */
   async linkOAuthToUser(
     userId: string,

@@ -40,10 +40,9 @@ export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
       email: normalizeEmail(profile.emails?.[0]?.value) ?? '',
       firstName: profile.name?.givenName || '',
       lastName: profile.name?.familyName || '',
-      // Facebook exposes no per-email verification flag. The account-level
-      // `verified` field this used to read says the account passed Facebook's
-      // own identity check, not that the person owns this mailbox - and it is
-      // not even in `profileFields`, so it was always undefined here.
+      // Facebook exposes no per-email verification flag: its account-level
+      // `verified` says the account passed Facebook's identity check, not that
+      // the person owns this mailbox.
       emailVerified: false
     };
 
