@@ -5,11 +5,13 @@ import {
   Get,
   HttpException,
   HttpStatus,
+  Inject,
   Logger,
   Param,
   Post,
   Request,
   Res,
+  UseFilters,
   UseGuards,
   UseInterceptors
 } from '@nestjs/common';
@@ -40,6 +42,8 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
+import { CLIENT_URL } from '../providers/client-url.provider';
+import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authentication-exception.filter';
 
 @ApiTags('OAuth API')
 @Controller({
@@ -47,9 +51,9 @@ import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
   version: '1'
 })
 @UseInterceptors(ClassSerializerInterceptor)
+@UseFilters(OAuthAuthenticationExceptionFilter)
 export class OAuthController {
   private readonly logger = new Logger(OAuthController.name);
-  private readonly clientUrl: string;
 
   private static readonly OAUTH_LINK_COOKIE = 'oauth_link';
   private static readonly OAUTH_LINK_MAX_AGE_SECONDS = 300;
@@ -62,27 +66,9 @@ export class OAuthController {
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
-    private readonly auditService: AuditService
-  ) {
-    const url = this.configService.get<string>('CLIENT_URL');
-    if (!url) {
-      throw new Error('CLIENT_URL environment variable is not configured');
-    }
-    try {
-      const parsed = new URL(url);
-      if (!['http:', 'https:'].includes(parsed.protocol)) {
-        throw new Error(
-          `CLIENT_URL must use http or https protocol, got: ${parsed.protocol}`
-        );
-      }
-    } catch (error) {
-      if (error instanceof TypeError) {
-        throw new Error(`CLIENT_URL is not a valid URL: ${url}`);
-      }
-      throw error;
-    }
-    this.clientUrl = url;
-  }
+    private readonly auditService: AuditService,
+    @Inject(CLIENT_URL) private readonly clientUrl: string
+  ) {}
 
   // --- Link initiation ---
 

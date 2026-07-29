@@ -34,6 +34,8 @@ import { Action } from './entities/action.entity';
 import { UserDeletedListener } from './listeners/user-deleted.listener';
 import { UserRoleChangedListener } from './listeners/user-role-changed.listener';
 import { SessionRevocationListener } from './listeners/session-revocation.listener';
+import { clientUrlProvider } from './providers/client-url.provider';
+import { OAuthAuthenticationExceptionFilter } from './filters/oauth-authentication-exception.filter';
 
 function conditionalProvider(
   envVar: string,
@@ -95,7 +97,9 @@ function conditionalProvider(
     conditionalProvider('VK_CLIENT_ID', VkStrategy),
     UserDeletedListener,
     UserRoleChangedListener,
-    SessionRevocationListener
+    SessionRevocationListener,
+    clientUrlProvider,
+    OAuthAuthenticationExceptionFilter
   ],
   exports: [AuthService, OAuthService, CaslModule, RoleService, CaptchaModule]
 })

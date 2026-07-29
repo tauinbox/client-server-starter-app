@@ -20,6 +20,10 @@ import { AuthGuard } from '@nestjs/passport';
 import { GoogleOAuthGuard } from './google-oauth.guard';
 import { FacebookOAuthGuard } from './facebook-oauth.guard';
 import { VkOAuthGuard } from './vk-oauth.guard';
+import {
+  OAUTH_ERROR_AUTH_FAILED,
+  OAuthAuthenticationFailedException
+} from '../exceptions/oauth-authentication-failed.exception';
 
 const context = {} as ExecutionContext;
 
@@ -63,6 +67,48 @@ describe.each([
     await expect(new GuardClass().canActivate(context)).rejects.toBe(
       callbackError
     );
+  });
+
+  describe('handleRequest', () => {
+    it('raises a redirectable failure when Passport rejects the request', () => {
+      expect(() =>
+        new GuardClass().handleRequest<unknown>(null, false, undefined, context)
+      ).toThrow(OAuthAuthenticationFailedException);
+    });
+
+    it('carries the underlying error as the reason', () => {
+      const cause = new Error('Failed to obtain access token');
+
+      let thrown: unknown;
+      try {
+        new GuardClass().handleRequest<unknown>(
+          cause,
+          undefined,
+          undefined,
+          context
+        );
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(OAuthAuthenticationFailedException);
+      const failure = thrown as OAuthAuthenticationFailedException;
+      expect(failure.reason).toBe(cause);
+      expect(failure.oauthError).toBe(OAUTH_ERROR_AUTH_FAILED);
+    });
+
+    it('returns the authenticated profile untouched', () => {
+      const profile = { email: 'user@example.com' };
+
+      expect(
+        new GuardClass().handleRequest<unknown>(
+          null,
+          profile,
+          undefined,
+          context
+        )
+      ).toBe(profile);
+    });
   });
 
   it('rethrows a non-configuration error unchanged instead of masking it as 404', async () => {

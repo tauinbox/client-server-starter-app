@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Request as ExpressRequest, Response } from 'express';
 import { OAuthController } from './oauth.controller';
+import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
 import { UsersService } from '../../users/services/users.service';
@@ -101,6 +102,7 @@ describe('OAuthController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OAuthController],
       providers: [
+        { provide: CLIENT_URL, useValue: configValues['CLIENT_URL'] },
         { provide: JwtService, useValue: jwtServiceMock },
         { provide: OAuthService, useValue: oauthServiceMock },
         { provide: OAuthAccountService, useValue: oauthAccountServiceMock },
