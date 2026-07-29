@@ -31,6 +31,7 @@ import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
+import { CLIENT_URL } from '../src/modules/auth/providers/client-url.provider';
 
 const PUBLIC_USER_FIELDS = [
   'id',
@@ -153,6 +154,7 @@ describe('Auth response serialization (e2e)', () => {
       providers: [
         AuthService,
         OAuthService,
+        { provide: CLIENT_URL, useValue: configValues['CLIENT_URL'] },
         {
           provide: DataSource,
           useValue: {
