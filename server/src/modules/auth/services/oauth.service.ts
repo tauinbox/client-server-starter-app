@@ -48,7 +48,8 @@ export class OAuthService {
     let user: User;
 
     if (existingOAuth) {
-      // Returning OAuth user
+      // `lockedUntil` counts password guesses; locking the provider path too
+      // would let an attacker deny the owner every way in.
       user = await this.usersService.findOne(existingOAuth.userId);
       if (!user.isActive) {
         throw new HttpException(
@@ -59,8 +60,14 @@ export class OAuthService {
           HttpStatus.UNAUTHORIZED
         );
       }
-      // Auto-verify email for OAuth users
-      if (!user.isEmailVerified) {
+      // Verifying unconditionally would void the mail sent at creation for
+      // providers that assert nothing (VK), opening password login on an
+      // unproven address.
+      if (
+        !user.isEmailVerified &&
+        profile.emailVerified &&
+        this.assertsSameEmail(profile, user)
+      ) {
         await this.usersService.markEmailVerified(user.id);
         user.isEmailVerified = true;
       }
@@ -180,6 +187,12 @@ export class OAuthService {
     };
   }
 
+  /** A provider vouching for a different mailbox says nothing about this one. */
+  private assertsSameEmail(profile: OAuthUserProfile, user: User): boolean {
+    const asserted = normalizeEmail(profile.email);
+    return !!asserted && asserted === normalizeEmail(user.email);
+  }
+
   private async safeCreateOAuthAccount(
     userId: string,
     provider: string,
@@ -217,6 +230,12 @@ export class OAuthService {
     }
   }
 
+  /**
+   * A linked provider is an authentication factor, never an email assertion:
+   * the provider's address is deliberately not passed in, because linking a
+   * provider whose profile carries a different mailbox is legitimate - the
+   * session already proves identity.
+   */
   async linkOAuthToUser(
     userId: string,
     provider: string,

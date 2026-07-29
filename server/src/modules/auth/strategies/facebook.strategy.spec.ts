@@ -21,26 +21,24 @@ describe('FacebookStrategy.validate', () => {
     done = jest.fn();
   });
 
-  // emailVerified must propagate from `_json.verified`.
-  it('sets emailVerified=true when Facebook asserts _json.verified=true', () => {
+  it('never reports the address as verified', () => {
     strategy.validate(
       'access',
       'refresh',
       {
         id: 'fb-1',
         emails: [{ value: 'a@example.com' }],
-        name: { givenName: 'A', familyName: 'B' },
-        _json: { verified: true }
+        name: { givenName: 'A', familyName: 'B' }
       },
       done
     );
 
     const profile = (done.mock.calls[0] as [unknown, OAuthUserProfile])[1];
-    expect(profile.emailVerified).toBe(true);
+    expect(profile.emailVerified).toBe(false);
     expect(profile.provider).toBe(OAuthProvider.FACEBOOK);
   });
 
-  it('sets emailVerified=false when Facebook asserts _json.verified=false', () => {
+  it('ignores an account-level verified flag on the raw profile', () => {
     strategy.validate(
       'access',
       'refresh',
@@ -48,7 +46,8 @@ describe('FacebookStrategy.validate', () => {
         id: 'fb-2',
         emails: [{ value: 'b@example.com' }],
         name: { givenName: 'B', familyName: 'C' },
-        _json: { verified: false }
+        // @ts-expect-error the strategy deliberately does not accept `_json`
+        _json: { verified: true }
       },
       done
     );
@@ -66,29 +65,12 @@ describe('FacebookStrategy.validate', () => {
       {
         id: 'fb-4',
         emails: [{ value: ' John@Example.COM ' }],
-        name: { givenName: 'John', familyName: 'Doe' },
-        _json: { verified: true }
+        name: { givenName: 'John', familyName: 'Doe' }
       },
       done
     );
 
     const profile = (done.mock.calls[0] as [unknown, OAuthUserProfile])[1];
     expect(profile.email).toBe('john@example.com');
-  });
-
-  it('sets emailVerified=false when _json is missing', () => {
-    strategy.validate(
-      'access',
-      'refresh',
-      {
-        id: 'fb-3',
-        emails: [{ value: 'c@example.com' }],
-        name: { givenName: 'C', familyName: 'D' }
-      },
-      done
-    );
-
-    const profile = (done.mock.calls[0] as [unknown, OAuthUserProfile])[1];
-    expect(profile.emailVerified).toBe(false);
   });
 });

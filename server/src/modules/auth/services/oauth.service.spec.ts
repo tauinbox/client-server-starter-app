@@ -263,7 +263,77 @@ describe('OAuthService', () => {
       );
       mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
 
-      await service.loginWithOAuth(oauthProfile);
+      const result = await service.loginWithOAuth(oauthProfile);
+
+      expect(mockUsersService.markEmailVerified).toHaveBeenCalledWith(
+        'oauth-user-1'
+      );
+      expect(result.user.isEmailVerified).toBe(true);
+    });
+
+    it('should not verify a returning OAuth user when the provider asserts nothing', async () => {
+      const unverifiedOauthUser = {
+        ...oauthUser,
+        isEmailVerified: false
+      };
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        id: '1',
+        provider: 'vkontakte',
+        providerId: 'vk-123',
+        userId: 'oauth-user-1'
+      });
+      mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
+
+      const result = await service.loginWithOAuth({
+        ...oauthProfile,
+        provider: 'vkontakte',
+        providerId: 'vk-123',
+        emailVerified: false
+      });
+
+      expect(mockUsersService.markEmailVerified).not.toHaveBeenCalled();
+      expect(result.user.isEmailVerified).toBe(false);
+    });
+
+    it('should not verify a returning OAuth user when the provider vouches for a different address', async () => {
+      const unverifiedOauthUser = {
+        ...oauthUser,
+        isEmailVerified: false
+      };
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        id: '1',
+        provider: 'google',
+        providerId: 'google-123',
+        userId: 'oauth-user-1'
+      });
+      mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
+
+      const result = await service.loginWithOAuth({
+        ...oauthProfile,
+        email: 'someone-else@example.com'
+      });
+
+      expect(mockUsersService.markEmailVerified).not.toHaveBeenCalled();
+      expect(result.user.isEmailVerified).toBe(false);
+    });
+
+    it('should verify a returning OAuth user whose asserted address differs only in case', async () => {
+      const unverifiedOauthUser = {
+        ...oauthUser,
+        isEmailVerified: false
+      };
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        id: '1',
+        provider: 'google',
+        providerId: 'google-123',
+        userId: 'oauth-user-1'
+      });
+      mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
+
+      await service.loginWithOAuth({
+        ...oauthProfile,
+        email: 'OAuth@Example.com'
+      });
 
       expect(mockUsersService.markEmailVerified).toHaveBeenCalledWith(
         'oauth-user-1'
