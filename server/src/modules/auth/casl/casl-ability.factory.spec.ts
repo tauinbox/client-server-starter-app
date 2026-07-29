@@ -457,6 +457,38 @@ describe('CaslAbilityFactory', () => {
       warnSpy.mockRestore();
     });
 
+    it('should register a blanket deny when a deny condition owns a "$"-prefixed field', async () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+      const permissions: ResolvedPermission[] = [
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update',
+          conditions: null
+        },
+        {
+          resource: 'users',
+          action: 'update',
+          permission: 'users:update',
+          conditions: { effect: 'deny', ownership: { userField: '$or' } }
+        }
+      ];
+
+      const ability = await factory.createForUser('user-1', roles, permissions);
+
+      // Without the veto the deny would be registered as `{ $or: 'user-1' }`,
+      // which ucast can never match - the deny would silently stop denying.
+      expect(
+        ability.can('update', {
+          __caslSubjectType__: 'User',
+          createdBy: 'user-1'
+        } as never)
+      ).toBe(false);
+
+      warnSpy.mockRestore();
+    });
+
     it('should register a blanket deny when a deny condition resolves to an empty query', async () => {
       const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
       const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];

@@ -671,6 +671,17 @@ describe('RolePermissionsDialogComponent', () => {
       expect(component.canSave()).toBe(true);
     });
 
+    it('a "$"-prefixed field name sets the keyed error and disables save', () => {
+      const { component } = setup([makeRolePermItem('perm-a')]);
+
+      component.toggleOwnership('perm-a');
+      component.setOwnershipField('perm-a', inputEvent('$or'));
+
+      expect(component.getOwnershipError('perm-a')).not.toBe('');
+      expect(component.jsonErrors().has('perm-a:ownership')).toBe(true);
+      expect(component.canSave()).toBe(false);
+    });
+
     it('toggling ownership off clears the error', () => {
       const { component } = setup([makeRolePermItem('perm-a')]);
 

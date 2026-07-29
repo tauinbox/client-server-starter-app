@@ -515,6 +515,52 @@ describe('resolveConditions', () => {
     });
   });
 
+  describe('"$"-prefixed keys in the structured branches', () => {
+    // Such a key lands in field position of the MongoQuery, where CASL reads it
+    // as an operator: the rule matches no record and the SQL translator drops
+    // it, so an allow would grant nothing and a deny would stop denying.
+    it('should veto a "$"-prefixed ownership.userField', () => {
+      const result = resolveConditions(
+        { ownership: { userField: '$or' } },
+        ctx
+      );
+
+      expect(result.query).toEqual({});
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('$or'));
+    });
+
+    it('should veto a "$"-prefixed fieldMatch key', () => {
+      const result = resolveConditions(
+        { fieldMatch: { status: ['active'], $where: ['x'] } },
+        ctx
+      );
+
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('$where'));
+    });
+
+    it('should veto a "$"-prefixed userAttr key', () => {
+      const result = resolveConditions({ userAttr: { $expr: 'id' } }, ctx);
+
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('$expr'));
+    });
+
+    it('should veto a "$"-prefixed userAttr attribute name', () => {
+      const result = resolveConditions({ userAttr: { ownerId: '$or' } }, ctx);
+
+      expect(result.skipPermission).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('$or'));
+    });
+
+    it('should still resolve a field name whose "$" does not lead', () => {
+      expect(
+        resolveConditions({ ownership: { userField: 'a$b' } }, ctx)
+      ).toEqual({ query: { a$b: 'user-1' }, skipPermission: false });
+    });
+  });
+
   describe('fail-closed partial resolution', () => {
     it('should veto a partially malformed fieldMatch instead of registering the narrower query', () => {
       // Admin forgot the array brackets on "dept" - the authored restriction
