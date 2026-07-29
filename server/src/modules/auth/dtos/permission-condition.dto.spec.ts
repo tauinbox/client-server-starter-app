@@ -87,6 +87,13 @@ describe('PermissionConditionDto shape validation', () => {
     it('rejects a non-object fieldMatch', async () => {
       await expectSetRejected({ fieldMatch: 5 }, 'fieldMatch');
     });
+
+    it('rejects a "$"-prefixed field key mixed with a valid one', async () => {
+      await expectSetRejected(
+        { fieldMatch: { status: ['active'], $where: ['x'] } },
+        '$where'
+      );
+    });
   });
 
   describe('ownership', () => {
@@ -114,6 +121,10 @@ describe('PermissionConditionDto shape validation', () => {
         'exactly one key'
       );
     });
+
+    it('rejects a "$"-prefixed userField (would become a MongoQuery operator)', async () => {
+      await expectSetRejected({ ownership: { userField: '$or' } }, '$or');
+    });
   });
 
   describe('userAttr', () => {
@@ -127,6 +138,14 @@ describe('PermissionConditionDto shape validation', () => {
 
     it('rejects an empty object', async () => {
       await expectSetRejected({ userAttr: {} }, 'at least one field');
+    });
+
+    it('rejects a "$"-prefixed field key', async () => {
+      await expectSetRejected({ userAttr: { $expr: 'id' } }, '$expr');
+    });
+
+    it('rejects a "$"-prefixed attribute name', async () => {
+      await expectSetRejected({ userAttr: { ownerId: '$or' } }, '$or');
     });
   });
 

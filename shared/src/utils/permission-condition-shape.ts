@@ -42,6 +42,13 @@ function findKeyError(branch: string, key: string): string | null {
   if (PROTOTYPE_KEYS.has(key)) {
     return `Prototype pollution key "${key}" in ${branch}`;
   }
+  // The structured branches write their keys into field position of the
+  // MongoQuery, where a leading "$" turns the key into an operator. CASL then
+  // builds a rule that matches no record while the SQL translator drops it, so
+  // an allow silently grants nothing and a deny silently stops denying.
+  if (key.startsWith('$')) {
+    return `MongoQuery operator key "${key}" is not allowed in ${branch}`;
+  }
   return null;
 }
 

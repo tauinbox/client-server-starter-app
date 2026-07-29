@@ -90,6 +90,17 @@ describe('condition shape parity with server', () => {
         { unknownBranch: {} },
         'should not exist'
       ],
+      [
+        'a "$"-prefixed ownership.userField',
+        { ownership: { userField: '$or' } },
+        '$or'
+      ],
+      [
+        'a "$"-prefixed fieldMatch key',
+        { fieldMatch: { status: ['active'], $where: ['x'] } },
+        '$where'
+      ],
+      ['a "$"-prefixed userAttr key', { userAttr: { $expr: 'id' } }, '$expr'],
       ['a non-string custom', { custom: 5 }, 'JSON string']
     ])('rejects %s with 400 and no write', async (_label, conditions, part) => {
       const res = await putConditions(conditions);
@@ -191,6 +202,12 @@ describe('condition shape parity with server', () => {
         ownership: { userField: 'ownerId' },
         fieldMatch: { ownerId: ['a', 'b'] }
       });
+
+      expect(editorUserRules().granted).toBe(false);
+    });
+
+    it('vetoes a permission whose stored condition has a "$"-prefixed key', () => {
+      grantToEditor({ ownership: { userField: '$or' } });
 
       expect(editorUserRules().granted).toBe(false);
     });
