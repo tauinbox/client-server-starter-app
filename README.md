@@ -839,6 +839,8 @@ GitHub Actions runs on every push and pull request to `master` with 5 jobs:
 
 Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file required — all tests run against mocks.
 
+The `audit (high)` step in all three jobs runs `npm run audit:ci`, which wraps `npm audit --audit-level=high --omit=dev` in `scripts/audit-ci.mjs`. The wrapper exists because `npm audit` POSTs to the registry's advisory endpoint and the underlying fetch layer never retries POST requests, so a single 5xx from the registry reds the job with no source change. It retries up to 3 times, 15 s apart, **only** when the output carries `audit endpoint returned an error`; a genuine high-severity finding still fails on the first attempt.
+
 ## Security
 
 - Passwords hashed with **bcrypt** (cost factor = 12)
