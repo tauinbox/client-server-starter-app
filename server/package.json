@@ -7,8 +7,8 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/*.ts\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../.lintstagedrc.mjs\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/*.ts\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../.lintstagedrc.mjs\"",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/*.ts\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../scripts/*.mjs\" \"../.lintstagedrc.mjs\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/*.ts\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../scripts/*.mjs\" \"../.lintstagedrc.mjs\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -30,7 +30,7 @@
     "check:i18n": "ts-node scripts/check-i18n-keys.ts",
     "check:role-conditions": "ts-node scripts/check-existing-role-conditions.ts",
     "generate:subjects": "ts-node scripts/generate-subjects.ts",
-    "audit:ci": "npm audit --audit-level=high --omit=dev"
+    "audit:ci": "node ../scripts/audit-ci.mjs"
   },
   "dependencies": {
     "@a2seven/yoo-checkout": "^1.1.4",
