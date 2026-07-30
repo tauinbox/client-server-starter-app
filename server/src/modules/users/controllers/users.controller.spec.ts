@@ -426,6 +426,76 @@ describe('UsersController', () => {
       ).rejects.toThrow('db down');
     });
 
+    it('should await session revocation when the admin changes the email', async () => {
+      const dto: UpdateUserDto = { email: 'new@example.com' };
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-5',
+        email: 'old@example.com'
+      });
+      usersServiceMock.update.mockResolvedValue({
+        id: 'user-5',
+        email: 'new@example.com'
+      });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req, mockAbility);
+
+      expect(eventEmitterMock.emitAsync).toHaveBeenCalledWith(
+        UserSessionRevocationRequiredEvent.name,
+        expect.objectContaining({ userId: 'user-5' })
+      );
+    });
+
+    it('should NOT request session revocation when the submitted email is unchanged', async () => {
+      const dto: UpdateUserDto = {
+        email: 'same@example.com',
+        firstName: 'Updated'
+      };
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-5',
+        email: 'same@example.com'
+      });
+      usersServiceMock.update.mockResolvedValue({
+        id: 'user-5',
+        email: 'same@example.com'
+      });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req, mockAbility);
+
+      expect(eventEmitterMock.emitAsync).not.toHaveBeenCalled();
+    });
+
+    it('should request session revocation once when email and password change together', async () => {
+      const dto: UpdateUserDto = {
+        email: 'new@example.com',
+        password: 'NewPass1'
+      };
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-5',
+        email: 'old@example.com'
+      });
+      usersServiceMock.update.mockResolvedValue({
+        id: 'user-5',
+        email: 'new@example.com'
+      });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req, mockAbility);
+
+      expect(eventEmitterMock.emitAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not read the pre-image when the dto carries no email', async () => {
+      const dto: UpdateUserDto = { firstName: 'Updated' };
+      usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req, mockAbility);
+
+      expect(usersServiceMock.findOne).not.toHaveBeenCalled();
+    });
+
     it('should log USER_UPDATE and PASSWORD_CHANGE when dto contains password', async () => {
       const dto: UpdateUserDto = { firstName: 'Updated', password: 'NewPass1' };
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });

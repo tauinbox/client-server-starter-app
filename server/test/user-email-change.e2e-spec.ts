@@ -1,15 +1,24 @@
 // Integration regression: admin email change must reset isEmailVerified,
-// issue a fresh verification token, and dispatch the email.
+// issue a fresh verification token, dispatch the email, and revoke every
+// session of the target.
 
-import { Test } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { HttpStatus, HttpException } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { UsersController } from '../src/modules/users/controllers/users.controller';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { MailService } from '../src/modules/mail/mail.service';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
+import { PermissionService } from '../src/modules/auth/services/permission.service';
+import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
+import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
+import { SessionRevocationListener } from '../src/modules/auth/listeners/session-revocation.listener';
 import { User } from '../src/modules/users/entities/user.entity';
+import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
+import type { AppAbility } from '../src/modules/auth/casl/app-ability';
 
 interface UserStore {
   rows: Map<string, User>;
@@ -203,5 +212,113 @@ describe('UsersService.update — email change side effects', () => {
     // Original record untouched
     expect(store.rows.get('user-1')?.email).toBe('before@example.com');
     expect(store.rows.get('user-1')?.isEmailVerified).toBe(true);
+  });
+});
+
+// The revocation runs through the real event bus and the real listener, so
+// this covers the whole chain the endpoint depends on: an admin email change
+// must leave the previous holder with neither a usable access token nor a
+// refresh token.
+describe('Admin email change - session revocation through the real event bus', () => {
+  let module: TestingModule;
+  let controller: UsersController;
+  let store: UserStore;
+  let refreshTokenService: { deleteByUserId: jest.Mock };
+  let userUpdate: jest.Mock;
+
+  // @ts-expect-error partial mock - the update path reads only user/ip/headers
+  const adminRequest: JwtAuthRequest = {
+    user: { userId: 'admin-1', email: 'admin@example.com', roles: [] },
+    ip: '127.0.0.1',
+    headers: {}
+  };
+
+  // @ts-expect-error partial mock - only `can` is exercised by the update path
+  const ability: AppAbility = { can: jest.fn().mockReturnValue(true) };
+
+  beforeEach(async () => {
+    store = createStore();
+    store.rows.set('user-1', buildSeedUser());
+
+    refreshTokenService = {
+      deleteByUserId: jest.fn().mockResolvedValue(undefined)
+    };
+    userUpdate = jest.fn((id: string, patch: Partial<User>) => {
+      const row = store.rows.get(id);
+      if (row) Object.assign(row, patch);
+      return Promise.resolve({});
+    });
+    const dataSource = {
+      getRepository: jest.fn().mockReturnValue({ update: userUpdate })
+    };
+
+    module = await Test.createTestingModule({
+      imports: [EventEmitterModule.forRoot()],
+      controllers: [UsersController],
+      providers: [
+        UsersService,
+        SessionRevocationListener,
+        {
+          provide: getRepositoryToken(User),
+          useValue: makeUserRepoMock(store)
+        },
+        { provide: DataSource, useValue: dataSource },
+        { provide: RefreshTokenService, useValue: refreshTokenService },
+        {
+          provide: AuditService,
+          useValue: {
+            log: jest.fn().mockResolvedValue(undefined),
+            logFireAndForget: jest.fn()
+          }
+        },
+        {
+          provide: MetricsService,
+          useValue: { recordPermissionDenied: jest.fn() }
+        },
+        {
+          provide: MailService,
+          useValue: {
+            sendEmailVerification: jest.fn().mockResolvedValue(undefined)
+          }
+        },
+        { provide: PermissionService, useValue: {} },
+        { provide: CaslAbilityFactory, useValue: {} }
+      ]
+    }).compile();
+
+    await module.init();
+    controller = module.get(UsersController);
+  });
+
+  afterEach(async () => {
+    await module.close();
+  });
+
+  it('stamps tokenRevokedAt and deletes the refresh tokens of the target', async () => {
+    await controller.update(
+      'user-1',
+      { email: 'after@example.com' },
+      adminRequest,
+      ability
+    );
+
+    expect(store.rows.get('user-1')?.email).toBe('after@example.com');
+    expect(refreshTokenService.deleteByUserId).toHaveBeenCalledWith('user-1');
+    expect(userUpdate).toHaveBeenCalledWith('user-1', {
+      tokenRevokedAt: expect.any(Date) as Date
+    });
+    expect(store.rows.get('user-1')?.tokenRevokedAt).toBeInstanceOf(Date);
+  });
+
+  it('leaves sessions alone when the submitted email is unchanged', async () => {
+    await controller.update(
+      'user-1',
+      { email: 'before@example.com', firstName: 'Updated' },
+      adminRequest,
+      ability
+    );
+
+    expect(refreshTokenService.deleteByUserId).not.toHaveBeenCalled();
+    expect(store.rows.get('user-1')?.tokenRevokedAt).toBeNull();
   });
 });

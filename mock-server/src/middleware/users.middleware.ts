@@ -54,6 +54,24 @@ function pushUserCrudEvent(action: UserCrudAction, userId: string): void {
   );
 }
 
+// Mirrors the server's session-revocation listener: the stamp alone kills
+// access tokens only, and dropping the refresh rows alone leaves issued access
+// tokens valid until they expire, so both legs are required.
+function revokeUserSessions(user: MockUser): void {
+  user.tokenRevokedAt = new Date().toISOString();
+  const sessionState = getState();
+  for (const [token, uid] of sessionState.refreshTokens.entries()) {
+    if (uid === user.id) {
+      sessionState.refreshTokens.delete(token);
+    }
+  }
+  for (const [token, uid] of sessionState.revokedRefreshTokens.entries()) {
+    if (uid === user.id) {
+      sessionState.revokedRefreshTokens.delete(token);
+    }
+  }
+}
+
 interface PaginationParams {
   page: number;
   limit: number;
@@ -639,6 +657,9 @@ router.patch('/:id', adminGuard, (req, res) => {
       user.pendingEmail = null;
       user.pendingEmailToken = null;
       user.pendingEmailExpiresAt = null;
+      // The address is moved to recover an account; the previous holder must
+      // not keep authenticating with the tokens issued before the move.
+      revokeUserSessions(user);
     }
     user.email = email;
   }
@@ -647,18 +668,7 @@ router.patch('/:id', adminGuard, (req, res) => {
   if (password !== undefined) {
     user.password = password;
     // Invalidate target user's sessions so attacker cannot keep access after admin password reset
-    user.tokenRevokedAt = new Date().toISOString();
-    const sessionState = getState();
-    for (const [token, uid] of sessionState.refreshTokens.entries()) {
-      if (uid === user.id) {
-        sessionState.refreshTokens.delete(token);
-      }
-    }
-    for (const [token, uid] of sessionState.revokedRefreshTokens.entries()) {
-      if (uid === user.id) {
-        sessionState.revokedRefreshTokens.delete(token);
-      }
-    }
+    revokeUserSessions(user);
   }
   if (isActive !== undefined) {
     if (isActive === false && user.isActive !== false) {
