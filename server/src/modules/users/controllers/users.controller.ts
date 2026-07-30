@@ -266,11 +266,21 @@ export class UsersController {
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
+    // The service rewrites the address only when it actually differs, so the
+    // pre-image is the only way to tell a real change from a form resubmit -
+    // and revoking on a resubmit would log the target out for nothing.
+    const previousEmail =
+      updateUserDto.email === undefined
+        ? undefined
+        : (await this.usersService.findOne(id)).email;
+
     const updatedUser = await this.usersService.update(
       id,
       updateUserDto,
       ability
     );
+    const emailChanged =
+      previousEmail !== undefined && updatedUser.email !== previousEmail;
     const changedFields = Object.keys(updateUserDto).filter(
       (k) => k !== 'password'
     );
@@ -298,6 +308,12 @@ export class UsersController {
         details: { source: 'admin' },
         context: extractAuditContext(req)
       });
+    }
+
+    // An admin email change exists to recover an account whose address is
+    // attacker-controlled; leaving the holder's issued tokens alive would
+    // defeat it. Mirrors the self-service confirm path, which revokes too.
+    if (updateUserDto.password || emailChanged) {
       await this.eventEmitter.emitAsync(
         UserSessionRevocationRequiredEvent.name,
         new UserSessionRevocationRequiredEvent(id)

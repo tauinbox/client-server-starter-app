@@ -665,7 +665,7 @@ API base URL: `/api/v1`
 | GET | `/users/:id` | `users:read` | Get user by ID |
 | GET | `/users/:id/permissions` | `users:read` | Get effective permissions (roles + resolved permissions + packed CASL rules) |
 | POST | `/users` | `users:create` | Create user |
-| PATCH | `/users/:id` | `users:update` | Update user (email, name, password, `isActive` deactivate/reactivate, `unlockAccount`) |
+| PATCH | `/users/:id` | `users:update` | Update user (email, name, password, `isActive` deactivate/reactivate, `unlockAccount`); a password or email change revokes the target's sessions |
 | DELETE | `/users/:id` | `users:delete` | Soft-delete user (sets `deleted_at`, revokes sessions) |
 | POST | `/users/:id/restore` | `users:delete` | Restore soft-deleted user (clears `deleted_at`, sets `isActive=true`) |
 | POST | `/roles` | `roles:create` | Create role |
@@ -818,8 +818,8 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1602 tests passing |
-| Server E2E tests | Jest | Separate config in `test/` | 245 tests passing (21 skip without Postgres/Redis/Mailpit) |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1606 tests passing |
+| Server E2E tests | Jest | Separate config in `test/` | 247 tests passing (21 skip without Postgres/Redis/Mailpit) |
 | Client unit tests | Vitest | `*.spec.ts` alongside source | 984 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 204 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
@@ -848,6 +848,7 @@ The `audit (high)` step in all three jobs runs `npm run audit:ci`, which wraps `
 - **Email verification** required before first login
 - **Password reset tokens** are single-use with 30-minute expiry; reset revokes all sessions
 - **Admin password change** immediately revokes all sessions for the target user
+- **Admin email change** does the same — the endpoint exists to recover an account whose address is attacker-controlled, so the previous holder must not keep authenticating with the tokens issued before the move. A resubmitted, unchanged address revokes nothing
 - **Self-service password change** (`PATCH /auth/profile`) requires `currentPassword` to mitigate token theft → permanent account takeover; OAuth-only accounts (no password set) may omit the field when establishing their first password
 - **HttpOnly refresh token cookie** (`SameSite=Strict`, `path=/api/v1/auth`, 7d expiry) — JavaScript cannot read or steal the token (XSS-proof); rotated on every use. **Reuse detection** (OAuth 2.0 BCP / RFC 6819): a revoked refresh token presented before its natural expiry triggers a full session purge for the user, a `TOKEN_REUSE_DETECTED` audit row, and `auth_events_total{event="token_reuse_detected"}` metric increment
 - JWT access tokens (1h) stored in Angular signals only — never written to `localStorage`; user info persisted to `localStorage` (`auth_user` key) only to detect prior sessions on page reload
