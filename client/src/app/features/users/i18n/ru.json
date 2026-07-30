@@ -6,12 +6,18 @@
     "roleAll": "Все роли",
     "filterStatus": "Статус",
     "statusAll": "Все",
+    "filterIncludeDeleted": "Показывать удалённых",
     "noUsers": "Пользователи не найдены",
     "noUsersMessage": "Нет пользователей, соответствующих фильтрам.",
     "confirmDeleteTitle": "Подтверждение удаления",
     "confirmDeleteMessage": "Вы уверены, что хотите удалить пользователя {{ firstName }} {{ lastName }}?",
     "successDeleted": "Пользователь успешно удалён",
-    "errorDeleteFailed": "Не удалось удалить пользователя. Попробуйте снова."
+    "errorDeleteFailed": "Не удалось удалить пользователя. Попробуйте снова.",
+    "actionRestore": "Восстановить",
+    "confirmRestoreTitle": "Подтверждение восстановления",
+    "confirmRestoreMessage": "Восстановить пользователя {{ firstName }} {{ lastName }}? Аккаунт перестанет быть удалённым, но сохранит текущий статус активности.",
+    "successRestored": "Пользователь успешно восстановлен",
+    "errorRestoreFailed": "Не удалось восстановить пользователя. Попробуйте снова."
   },
   "detail": {
     "title": "Данные пользователя",
@@ -66,6 +72,7 @@
     "columnEmail": "Электронная почта",
     "columnName": "Имя",
     "columnStatus": "Статус",
+    "statusDeleted": "Удалён",
     "columnRole": "Роль",
     "rolesMore": "ещё ролей: {{ count }}",
     "columnCreated": "Создан",
@@ -73,7 +80,9 @@
     "actionViewDetails": "Подробнее",
     "actionViewDetailsAria": "Подробнее о {{ firstName }} {{ lastName }}",
     "actionEditAria": "Редактировать {{ firstName }} {{ lastName }}",
-    "actionDeleteAria": "Удалить {{ firstName }} {{ lastName }}"
+    "actionDeleteAria": "Удалить {{ firstName }} {{ lastName }}",
+    "actionRestore": "Восстановить",
+    "actionRestoreAria": "Восстановить {{ firstName }} {{ lastName }}"
   },
   "store": {
     "errorLoadFailed": "Не удалось загрузить пользователей. Попробуйте снова.",

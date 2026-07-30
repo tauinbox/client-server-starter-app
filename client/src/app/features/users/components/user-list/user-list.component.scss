@@ -44,8 +44,16 @@
 
   .filter-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: vars.$spacing-xs;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .filter-buttons {
+    display: flex;
+    gap: vars.$spacing-xs;
+    margin-left: auto;
   }
 
   // mat-divider host has its own margin: 0 with attribute-encapsulation

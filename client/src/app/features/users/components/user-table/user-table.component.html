@@ -40,7 +40,11 @@
         {{ t('users.table.columnStatus') }}
       </th>
       <td mat-cell *matCellDef="let user">
-        @if (user.isActive) {
+        @if (user.deletedAt) {
+          <mat-chip highlighted class="app-chip-danger">{{
+            t('users.table.statusDeleted')
+          }}</mat-chip>
+        } @else if (user.isActive) {
           <mat-chip highlighted>{{ t('common.active') }}</mat-chip>
         } @else {
           <mat-chip highlighted class="app-chip-danger">{{
@@ -96,62 +100,88 @@
         {{ t('users.table.columnActions') }}
       </th>
       <td mat-cell *matCellDef="let user">
-        <button
-          matIconButton
-          [routerLink]="['/admin/users', user.id]"
-          [matTooltip]="t('users.table.actionViewDetails')"
-          [attr.aria-label]="
-            t('users.table.actionViewDetailsAria', {
-              firstName: user.firstName,
-              lastName: user.lastName
-            })
-          "
-        >
-          <mat-icon>visibility</mat-icon>
-        </button>
-        <ng-container
-          *nxsRequirePermissions="{
-            action: 'update',
-            subject: 'User',
-            instance: user
-          }"
-        >
+        @if (user.deletedAt) {
+          <!-- The detail and edit endpoints exclude soft-deleted rows, so
+               restoring is the only action a deleted user can carry. -->
+          <ng-container
+            *nxsRequirePermissions="{
+              action: 'delete',
+              subject: 'User',
+              instance: user
+            }"
+          >
+            <button
+              matIconButton
+              (click)="restoreUser.emit(user)"
+              [matTooltip]="t('users.table.actionRestore')"
+              [attr.aria-label]="
+                t('users.table.actionRestoreAria', {
+                  firstName: user.firstName,
+                  lastName: user.lastName
+                })
+              "
+            >
+              <mat-icon>restore_from_trash</mat-icon>
+            </button>
+          </ng-container>
+        } @else {
           <button
             matIconButton
-            [routerLink]="['/admin/users', user.id, 'edit']"
-            [matTooltip]="t('common.edit')"
+            [routerLink]="['/admin/users', user.id]"
+            [matTooltip]="t('users.table.actionViewDetails')"
             [attr.aria-label]="
-              t('users.table.actionEditAria', {
+              t('users.table.actionViewDetailsAria', {
                 firstName: user.firstName,
                 lastName: user.lastName
               })
             "
           >
-            <mat-icon>edit</mat-icon>
+            <mat-icon>visibility</mat-icon>
           </button>
-        </ng-container>
-        <ng-container
-          *nxsRequirePermissions="{
-            action: 'delete',
-            subject: 'User',
-            instance: user
-          }"
-        >
-          <button
-            matIconButton
-            class="app-btn-danger"
-            (click)="deleteUser.emit(user)"
-            [matTooltip]="t('common.delete')"
-            [attr.aria-label]="
-              t('users.table.actionDeleteAria', {
-                firstName: user.firstName,
-                lastName: user.lastName
-              })
-            "
+          <ng-container
+            *nxsRequirePermissions="{
+              action: 'update',
+              subject: 'User',
+              instance: user
+            }"
           >
-            <mat-icon>delete</mat-icon>
-          </button>
-        </ng-container>
+            <button
+              matIconButton
+              [routerLink]="['/admin/users', user.id, 'edit']"
+              [matTooltip]="t('common.edit')"
+              [attr.aria-label]="
+                t('users.table.actionEditAria', {
+                  firstName: user.firstName,
+                  lastName: user.lastName
+                })
+              "
+            >
+              <mat-icon>edit</mat-icon>
+            </button>
+          </ng-container>
+          <ng-container
+            *nxsRequirePermissions="{
+              action: 'delete',
+              subject: 'User',
+              instance: user
+            }"
+          >
+            <button
+              matIconButton
+              class="app-btn-danger"
+              (click)="deleteUser.emit(user)"
+              [matTooltip]="t('common.delete')"
+              [attr.aria-label]="
+                t('users.table.actionDeleteAria', {
+                  firstName: user.firstName,
+                  lastName: user.lastName
+                })
+              "
+            >
+              <mat-icon>delete</mat-icon>
+            </button>
+          </ng-container>
+        }
       </td>
     </ng-container>
 

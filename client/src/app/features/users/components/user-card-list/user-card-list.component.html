@@ -38,7 +38,11 @@
 
           <dt>{{ t('users.table.columnStatus') }}</dt>
           <dd>
-            @if (user.isActive) {
+            @if (user.deletedAt) {
+              <mat-chip highlighted class="app-chip-danger">{{
+                t('users.table.statusDeleted')
+              }}</mat-chip>
+            } @else if (user.isActive) {
               <mat-chip highlighted>{{ t('common.active') }}</mat-chip>
             } @else {
               <mat-chip highlighted class="app-chip-danger">{{
@@ -68,62 +72,89 @@
 
   <mat-menu #actionsMenu="matMenu">
     <ng-template matMenuContent let-user="user">
-      <a
-        mat-menu-item
-        [routerLink]="['/admin/users', user.id]"
-        [attr.aria-label]="
-          t('users.table.actionViewDetailsAria', {
-            firstName: user.firstName,
-            lastName: user.lastName
-          })
-        "
-      >
-        <mat-icon>visibility</mat-icon>
-        <span>{{ t('users.table.actionViewDetails') }}</span>
-      </a>
-      <ng-container
-        *nxsRequirePermissions="{
-          action: 'update',
-          subject: 'User',
-          instance: user
-        }"
-      >
+      @if (user.deletedAt) {
+        <!-- The detail and edit endpoints exclude soft-deleted rows, so
+             restoring is the only action a deleted user can carry. -->
+        <ng-container
+          *nxsRequirePermissions="{
+            action: 'delete',
+            subject: 'User',
+            instance: user
+          }"
+        >
+          <button
+            mat-menu-item
+            type="button"
+            (click)="restoreUser.emit(user)"
+            [attr.aria-label]="
+              t('users.table.actionRestoreAria', {
+                firstName: user.firstName,
+                lastName: user.lastName
+              })
+            "
+          >
+            <mat-icon>restore_from_trash</mat-icon>
+            <span>{{ t('users.table.actionRestore') }}</span>
+          </button>
+        </ng-container>
+      } @else {
         <a
           mat-menu-item
-          [routerLink]="['/admin/users', user.id, 'edit']"
+          [routerLink]="['/admin/users', user.id]"
           [attr.aria-label]="
-            t('users.table.actionEditAria', {
+            t('users.table.actionViewDetailsAria', {
               firstName: user.firstName,
               lastName: user.lastName
             })
           "
         >
-          <mat-icon>edit</mat-icon>
-          <span>{{ t('common.edit') }}</span>
+          <mat-icon>visibility</mat-icon>
+          <span>{{ t('users.table.actionViewDetails') }}</span>
         </a>
-      </ng-container>
-      <ng-container
-        *nxsRequirePermissions="{
-          action: 'delete',
-          subject: 'User',
-          instance: user
-        }"
-      >
-        <button
-          mat-menu-item
-          type="button"
-          (click)="deleteUser.emit(user)"
-          [attr.aria-label]="
-            t('users.table.actionDeleteAria', {
-              firstName: user.firstName,
-              lastName: user.lastName
-            })
-          "
+        <ng-container
+          *nxsRequirePermissions="{
+            action: 'update',
+            subject: 'User',
+            instance: user
+          }"
         >
-          <mat-icon>delete</mat-icon>
-          <span>{{ t('common.delete') }}</span>
-        </button>
-      </ng-container>
+          <a
+            mat-menu-item
+            [routerLink]="['/admin/users', user.id, 'edit']"
+            [attr.aria-label]="
+              t('users.table.actionEditAria', {
+                firstName: user.firstName,
+                lastName: user.lastName
+              })
+            "
+          >
+            <mat-icon>edit</mat-icon>
+            <span>{{ t('common.edit') }}</span>
+          </a>
+        </ng-container>
+        <ng-container
+          *nxsRequirePermissions="{
+            action: 'delete',
+            subject: 'User',
+            instance: user
+          }"
+        >
+          <button
+            mat-menu-item
+            type="button"
+            (click)="deleteUser.emit(user)"
+            [attr.aria-label]="
+              t('users.table.actionDeleteAria', {
+                firstName: user.firstName,
+                lastName: user.lastName
+              })
+            "
+          >
+            <mat-icon>delete</mat-icon>
+            <span>{{ t('common.delete') }}</span>
+          </button>
+        </ng-container>
+      }
     </ng-template>
   </mat-menu>
 </div>

@@ -468,10 +468,11 @@ export class UsersService {
       );
     }
 
-    await withTransaction(this.dataSource, async (manager) => {
-      await manager.restore(User, id);
-      await manager.update(User, id, { isActive: true });
-    });
+    // Lift the soft-delete only. `isActive` is an independent administrative
+    // state gated by the `update` action, so reactivating here would let a
+    // principal holding just `delete` re-enable a deactivated account by
+    // deleting and restoring it.
+    await this.userRepository.restore(id);
     return this.findOne(id);
   }
 }

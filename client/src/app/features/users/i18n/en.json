@@ -6,12 +6,18 @@
     "roleAll": "All roles",
     "filterStatus": "Status",
     "statusAll": "All",
+    "filterIncludeDeleted": "Include deleted users",
     "noUsers": "No Users Found",
     "noUsersMessage": "No users match the current filters.",
     "confirmDeleteTitle": "Confirm Delete",
     "confirmDeleteMessage": "Are you sure you want to delete user {{ firstName }} {{ lastName }}?",
     "successDeleted": "User deleted successfully",
-    "errorDeleteFailed": "Failed to delete user. Please try again."
+    "errorDeleteFailed": "Failed to delete user. Please try again.",
+    "actionRestore": "Restore",
+    "confirmRestoreTitle": "Confirm Restore",
+    "confirmRestoreMessage": "Restore user {{ firstName }} {{ lastName }}? The account stops being deleted but keeps its current active or inactive status.",
+    "successRestored": "User restored successfully",
+    "errorRestoreFailed": "Failed to restore user. Please try again."
   },
   "detail": {
     "title": "User Details",
@@ -66,6 +72,7 @@
     "columnEmail": "Email",
     "columnName": "Name",
     "columnStatus": "Status",
+    "statusDeleted": "Deleted",
     "columnRole": "Role",
     "rolesMore": "{{ count }} more roles",
     "columnCreated": "Created",
@@ -73,7 +80,9 @@
     "actionViewDetails": "View",
     "actionViewDetailsAria": "View details for {{ firstName }} {{ lastName }}",
     "actionEditAria": "Edit {{ firstName }} {{ lastName }}",
-    "actionDeleteAria": "Delete {{ firstName }} {{ lastName }}"
+    "actionDeleteAria": "Delete {{ firstName }} {{ lastName }}",
+    "actionRestore": "Restore",
+    "actionRestoreAria": "Restore {{ firstName }} {{ lastName }}"
   },
   "store": {
     "errorLoadFailed": "Failed to load users. Please try again.",

@@ -41,19 +41,30 @@
 
         <div class="filter-actions">
           @let isLoading = loading();
-          <button matButton="filled" type="submit" [disabled]="isLoading">
-            <mat-icon>search</mat-icon>
-            {{ t('common.search') }}
-          </button>
-
-          <button
-            matButton="text"
-            type="button"
-            (click)="resetForm()"
+          <mat-checkbox
+            class="include-deleted-toggle"
+            [checked]="includeDeletedFilter()"
+            (change)="includeDeletedFilter.set($event.checked)"
             [disabled]="isLoading"
           >
-            {{ t('common.clear') }}
-          </button>
+            {{ t('users.list.filterIncludeDeleted') }}
+          </mat-checkbox>
+
+          <div class="filter-buttons">
+            <button matButton="filled" type="submit" [disabled]="isLoading">
+              <mat-icon>search</mat-icon>
+              {{ t('common.search') }}
+            </button>
+
+            <button
+              matButton="text"
+              type="button"
+              (click)="resetForm()"
+              [disabled]="isLoading"
+            >
+              {{ t('common.clear') }}
+            </button>
+          </div>
         </div>
       </form>
 
@@ -83,12 +94,14 @@
         <nxs-user-card-list
           [users]="displayedUsers()"
           (deleteUser)="confirmDelete($event)"
+          (restoreUser)="confirmRestore($event)"
         />
       } @else {
         <nxs-user-table
           [users]="displayedUsers()"
           (sortChange)="sortData($event)"
           (deleteUser)="confirmDelete($event)"
+          (restoreUser)="confirmRestore($event)"
         />
       }
 

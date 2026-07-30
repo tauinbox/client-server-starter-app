@@ -154,11 +154,27 @@ describe('UserCardListComponent', () => {
       expect(text).toContain('Test User');
       expect(text).toContain('test@example.com');
     });
+
+    it('should render the deleted chip for a soft-deleted user', () => {
+      componentRef.setInput('users', [
+        { ...mockUser, deletedAt: '2024-02-01T00:00:00.000Z' }
+      ]);
+      fixture.detectChanges();
+
+      const chip = fixture.nativeElement.querySelector(
+        'dd mat-chip.app-chip-danger'
+      );
+      expect(chip.textContent.trim()).toBe('Deleted');
+    });
   });
 
   describe('outputs', () => {
     it('should have deleteUser output', () => {
       expect(component.deleteUser).toBeDefined();
+    });
+
+    it('should have restoreUser output', () => {
+      expect(component.restoreUser).toBeDefined();
     });
   });
 });

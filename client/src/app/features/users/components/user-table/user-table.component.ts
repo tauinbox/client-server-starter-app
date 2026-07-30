@@ -75,6 +75,7 @@ export class UserTableComponent {
 
   readonly sortChange = output<Sort>();
   readonly deleteUser = output<User>();
+  readonly restoreUser = output<User>();
 
   readonly displayedColumns: string[] = [
     'id',
