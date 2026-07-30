@@ -18,6 +18,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       scope: ['email', 'profile'],
       state: true,
       store: new CookieStateStore(
+        OAuthProvider.GOOGLE,
         configService.get('ENVIRONMENT') === 'production'
       )
     } as StrategyOptions);

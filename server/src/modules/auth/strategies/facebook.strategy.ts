@@ -19,6 +19,7 @@ export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
       profileFields: ['id', 'emails', 'name'],
       state: true,
       store: new CookieStateStore(
+        OAuthProvider.FACEBOOK,
         configService.get('ENVIRONMENT') === 'production'
       )
     } as StrategyOptions);

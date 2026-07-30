@@ -17,6 +17,7 @@ export class VkStrategy extends PassportStrategy(Strategy, 'vkontakte') {
       scope: ['email'],
       state: true,
       store: new CookieStateStore(
+        OAuthProvider.VK,
         configService.get('ENVIRONMENT') === 'production'
       )
     } as ConstructorParameters<typeof Strategy>[0] & { scope: string[] });
