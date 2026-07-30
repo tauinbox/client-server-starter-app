@@ -266,8 +266,8 @@ To apply multiple restrictions simultaneously, either use `$and` in a single `cu
 - **Unified Manage Users page** — inline filter form (single unified search field, role select, status) on the same page as the user list; empty filters load all users, filled filters trigger a search via `GET /users/search`. The `q` search is OR-matched across id/email/firstName/lastName; the `role` filter narrows to users having a role with that exact name
 - **Infinite scroll** with column sorting — loads 20 users at a time; `IntersectionObserver` sentinel triggers additional pages automatically as the user scrolls
 - User detail, edit, and **soft delete** — records are preserved with a `deleted_at` timestamp; all active sessions are revoked on delete; count decremented inline (no reload)
-- **Restore** soft-deleted users via `POST /users/:id/restore` — reactivates the account
-- `includeDeleted=true` query param shows soft-deleted users in list and search
+- **Restore** soft-deleted users via `POST /users/:id/restore` — clears `deleted_at` only. An account deactivated before deletion comes back deactivated; reactivation stays a `PATCH /users/:id { "isActive": true }` operation, so holding `users:delete` alone cannot re-enable a disabled account through a delete/restore round trip
+- **"Include deleted users"** checkbox in the list filter form (`includeDeleted=true` on list and search). A deleted row shows a "Deleted" status chip and offers restore as its only action — the detail and edit endpoints exclude soft-deleted rows. Deleting a user while the filter is on flips the row in place instead of removing it
 - Role assignment in user edit form — multi-select field (visible to users with `assign:Role` permission); diffs initial vs selected roles and issues `POST /roles/assign/:userId` / `DELETE /roles/assign/:userId/:roleId` calls on save
 - **Effective permissions preview** — read-only `/admin/users/:id/permissions` page (linked from user detail) showing assigned roles, allow/deny/conditional summary chips, and a resource-grouped `mat-accordion` list of resolved permissions with per-rule action + effect chip and expandable CASL condition JSON; super-role users see a single "full access" note
 - Pagination response envelope: `{ data: User[], meta: { page, limit, total, totalPages } }`
@@ -667,7 +667,7 @@ API base URL: `/api/v1`
 | POST | `/users` | `users:create` | Create user |
 | PATCH | `/users/:id` | `users:update` | Update user (email, name, password, `isActive` deactivate/reactivate, `unlockAccount`); a password or email change revokes the target's sessions |
 | DELETE | `/users/:id` | `users:delete` | Soft-delete user (sets `deleted_at`, revokes sessions) |
-| POST | `/users/:id/restore` | `users:delete` | Restore soft-deleted user (clears `deleted_at`, sets `isActive=true`) |
+| POST | `/users/:id/restore` | `users:delete` | Restore soft-deleted user (clears `deleted_at`; leaves `isActive` untouched) |
 | POST | `/roles` | `roles:create` | Create role |
 | GET | `/roles` | `roles:read` | List roles with permissions |
 | GET | `/roles/:id` | `roles:read` | Get role by ID |
@@ -818,10 +818,10 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1606 tests passing |
-| Server E2E tests | Jest | Separate config in `test/` | 247 tests passing (21 skip without Postgres/Redis/Mailpit) |
-| Client unit tests | Vitest | `*.spec.ts` alongside source | 984 tests passing |
-| Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 204 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1607 tests passing |
+| Server E2E tests | Jest | Separate config in `test/` | 247 tests passing (28 skip without Postgres/Redis/Mailpit) |
+| Client unit tests | Vitest | `*.spec.ts` alongside source | 1004 tests passing |
+| Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 208 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
 
 ## CI/CD

@@ -56,6 +56,7 @@ describe('UserListComponent', () => {
     setSorting: ReturnType<typeof vi.fn>;
     setFilters: ReturnType<typeof vi.fn>;
     deleteUser: ReturnType<typeof vi.fn>;
+    restoreUser: ReturnType<typeof vi.fn>;
   };
   let notifyMock: {
     success: ReturnType<typeof vi.fn>;
@@ -89,7 +90,8 @@ describe('UserListComponent', () => {
       loadMore: vi.fn(),
       setSorting: vi.fn(),
       setFilters: vi.fn(),
-      deleteUser: vi.fn().mockReturnValue(of(void 0))
+      deleteUser: vi.fn().mockReturnValue(of(void 0)),
+      restoreUser: vi.fn().mockReturnValue(of(mockUser))
     };
 
     notifyMock = {
@@ -239,6 +241,24 @@ describe('UserListComponent', () => {
         expect.not.objectContaining({ role: expect.anything() })
       );
     });
+
+    it('should set includeDeleted when the toggle is checked', () => {
+      component.includeDeletedFilter.set(true);
+      component.onSubmit();
+
+      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
+        expect.objectContaining({ includeDeleted: true })
+      );
+    });
+
+    it('should exclude includeDeleted when the toggle is unchecked', () => {
+      component.includeDeletedFilter.set(false);
+      component.onSubmit();
+
+      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
+        expect.not.objectContaining({ includeDeleted: expect.anything() })
+      );
+    });
   });
 
   describe('resetForm', () => {
@@ -253,6 +273,14 @@ describe('UserListComponent', () => {
       expect(component.filterModel()).toEqual({ q: '' });
       expect(component.isActiveFilter()).toBe('');
       expect(component.roleFilter()).toBe('');
+    });
+
+    it('should clear the include-deleted toggle', () => {
+      component.includeDeletedFilter.set(true);
+      component.resetForm();
+
+      expect(component.includeDeletedFilter()).toBe(false);
+      expect(usersStoreMock.setFilters).toHaveBeenCalledWith({});
     });
   });
 
@@ -307,6 +335,52 @@ describe('UserListComponent', () => {
 
       expect(notifyMock.error).toHaveBeenCalledWith(
         'users.list.errorDeleteFailed'
+      );
+    });
+  });
+
+  describe('confirmRestore', () => {
+    const deletedUser: User = {
+      ...mockUser,
+      deletedAt: '2024-02-01T00:00:00.000Z'
+    };
+
+    it('should restore inline (no reload) when the dialog is confirmed', () => {
+      dialogMock.open.mockReturnValue({
+        afterClosed: vi.fn().mockReturnValue(of(true))
+      });
+
+      component.confirmRestore(deletedUser);
+
+      expect(usersStoreMock.restoreUser).toHaveBeenCalledWith('user-1');
+      expect(notifyMock.success).toHaveBeenCalledWith(
+        'users.list.successRestored'
+      );
+      expect(usersStoreMock.load).toHaveBeenCalledTimes(1); // only on init
+    });
+
+    it('should not restore when the dialog is cancelled', () => {
+      dialogMock.open.mockReturnValue({
+        afterClosed: vi.fn().mockReturnValue(of(false))
+      });
+
+      component.confirmRestore(deletedUser);
+
+      expect(usersStoreMock.restoreUser).not.toHaveBeenCalled();
+    });
+
+    it('should show an error snackbar when restore fails', () => {
+      usersStoreMock.restoreUser.mockReturnValue(
+        throwError(() => new Error('Network error'))
+      );
+      dialogMock.open.mockReturnValue({
+        afterClosed: vi.fn().mockReturnValue(of(true))
+      });
+
+      component.confirmRestore(deletedUser);
+
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        'users.list.errorRestoreFailed'
       );
     });
   });

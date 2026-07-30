@@ -810,7 +810,7 @@ describe('UsersService', () => {
       isActive: false
     } as User;
 
-    it('should restore a soft-deleted user inside a transaction', async () => {
+    it('should lift the soft-delete without reactivating a deactivated user', async () => {
       const mockManager = {
         restore: jest.fn().mockResolvedValue(undefined),
         update: jest.fn().mockResolvedValue(undefined)
@@ -818,9 +818,10 @@ describe('UsersService', () => {
       mockDataSource.transaction.mockImplementation(
         (cb: (manager: typeof mockManager) => Promise<void>) => cb(mockManager)
       );
+      const restoredUser = { ...deletedUser, deletedAt: null } as User;
       mockRepository.findOne
         .mockResolvedValueOnce(deletedUser) // withDeleted lookup
-        .mockResolvedValueOnce(mockUser); // final findOne after restore
+        .mockResolvedValueOnce(restoredUser); // final findOne after restore
 
       const result = await service.restore('user-1');
 
@@ -829,12 +830,28 @@ describe('UsersService', () => {
         relations: ['roles'],
         withDeleted: true
       });
-      expect(mockDataSource.transaction).toHaveBeenCalled();
-      expect(mockManager.restore).toHaveBeenCalledWith(User, 'user-1');
-      expect(mockManager.update).toHaveBeenCalledWith(User, 'user-1', {
-        isActive: true
-      });
-      expect(result).toEqual(mockUser);
+      expect(mockRepository.restore).toHaveBeenCalledWith('user-1');
+      // `isActive` is gated by the `update` action, which this endpoint does
+      // not require, so restoring must never write it.
+      expect(mockRepository.update).not.toHaveBeenCalled();
+      expect(mockManager.update).not.toHaveBeenCalled();
+      expect(result.isActive).toBe(false);
+    });
+
+    it('should keep an active user active after restore', async () => {
+      const deletedActiveUser = {
+        ...mockUser,
+        deletedAt: new Date('2025-06-01')
+      } as User;
+      mockRepository.findOne
+        .mockResolvedValueOnce(deletedActiveUser)
+        .mockResolvedValueOnce(mockUser);
+
+      const result = await service.restore('user-1');
+
+      expect(mockRepository.restore).toHaveBeenCalledWith('user-1');
+      expect(result.isActive).toBe(true);
+      expect(result.deletedAt).toBeNull();
     });
 
     it('should throw HttpException when user does not exist', async () => {
@@ -858,13 +875,6 @@ describe('UsersService', () => {
     });
 
     it('should proceed when ability allows restore', async () => {
-      const mockManager = {
-        restore: jest.fn().mockResolvedValue(undefined),
-        update: jest.fn().mockResolvedValue(undefined)
-      };
-      mockDataSource.transaction.mockImplementation(
-        (cb: (manager: typeof mockManager) => Promise<void>) => cb(mockManager)
-      );
       mockRepository.findOne
         .mockResolvedValueOnce(deletedUser)
         .mockResolvedValueOnce(mockUser);

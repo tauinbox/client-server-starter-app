@@ -22,6 +22,7 @@ import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatOption, MatSelect } from '@angular/material/select';
 import { MatButton } from '@angular/material/button';
+import { MatCheckbox } from '@angular/material/checkbox';
 import { MatDivider } from '@angular/material/divider';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import type { Sort } from '@angular/material/sort';
@@ -63,6 +64,7 @@ const INITIAL_FILTER: FilterModel = {
     MatSelect,
     MatOption,
     MatButton,
+    MatCheckbox,
     MatDivider,
     MatProgressSpinner,
     UserTableComponent,
@@ -91,6 +93,7 @@ export class UserListComponent implements OnInit {
 
   readonly isActiveFilter = signal('');
   readonly roleFilter = signal('');
+  readonly includeDeletedFilter = signal(false);
   readonly roles = signal<RoleAdminResponse[]>([]);
 
   readonly loading = this.#usersStore.loading;
@@ -182,6 +185,8 @@ export class UserListComponent implements OnInit {
     const isActive = this.isActiveFilter();
     if (isActive !== '') filters.isActive = isActive === 'true';
 
+    if (this.includeDeletedFilter()) filters.includeDeleted = true;
+
     this.#usersStore.setFilters(filters);
     this.#usersStore.load();
   }
@@ -190,6 +195,7 @@ export class UserListComponent implements OnInit {
     this.filterModel.set({ ...INITIAL_FILTER });
     this.isActiveFilter.set('');
     this.roleFilter.set('');
+    this.includeDeletedFilter.set(false);
     this.filterForm().reset();
     this.#usersStore.setFilters({});
     this.#usersStore.load();
@@ -212,6 +218,43 @@ export class UserListComponent implements OnInit {
       .subscribe((result) => {
         if (result) {
           this.#deleteUser(user.id);
+        }
+      });
+  }
+
+  confirmRestore(user: User): void {
+    this.#adaptiveDialog
+      .openConfirm({
+        title: this.#translocoService.translate(
+          'users.list.confirmRestoreTitle'
+        ),
+        message: this.#translocoService.translate(
+          'users.list.confirmRestoreMessage',
+          { firstName: user.firstName, lastName: user.lastName }
+        ),
+        confirmButton: this.#translocoService.translate(
+          'users.list.actionRestore'
+        ),
+        cancelButton: this.#translocoService.translate('common.cancel')
+      })
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe((result) => {
+        if (result) {
+          this.#restoreUser(user.id);
+        }
+      });
+  }
+
+  #restoreUser(id: string): void {
+    this.#usersStore
+      .restoreUser(id)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.#notify.success('users.list.successRestored');
+        },
+        error: () => {
+          this.#notify.error('users.list.errorRestoreFailed');
         }
       });
   }

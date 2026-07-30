@@ -150,6 +150,87 @@ describe('UserTableComponent', () => {
     it('should have deleteUser output', () => {
       expect(component.deleteUser).toBeDefined();
     });
+
+    it('should have restoreUser output', () => {
+      expect(component.restoreUser).toBeDefined();
+    });
+  });
+
+  describe('soft-deleted rows', () => {
+    const deletedUser: User = {
+      ...mockUser,
+      id: 'deleted-user-id',
+      deletedAt: '2024-02-01T00:00:00.000Z'
+    };
+
+    const findRestoreButton = (root: HTMLElement): HTMLElement | null =>
+      Array.from(root.querySelectorAll<HTMLElement>('button')).find(
+        (b) =>
+          b.querySelector('mat-icon')?.textContent?.trim() ===
+          'restore_from_trash'
+      ) ?? null;
+
+    it('renders the deleted chip instead of the active status', () => {
+      componentRef.setInput('users', [deletedUser]);
+      fixture.detectChanges();
+
+      const chip = fixture.nativeElement.querySelector(
+        'td mat-chip.app-chip-danger'
+      );
+      expect(chip.textContent.trim()).toBe('Deleted');
+    });
+
+    it('offers restore instead of view, edit and delete', () => {
+      authStoreMock.hasPermissions.mockReturnValue(true);
+      componentRef.setInput('users', [deletedUser]);
+      fixture.detectChanges();
+
+      const root = fixture.nativeElement as HTMLElement;
+      const icons = Array.from(
+        root.querySelectorAll<HTMLElement>('td mat-icon')
+      ).map((i) => i.textContent?.trim());
+
+      expect(findRestoreButton(root)).toBeTruthy();
+      expect(icons).not.toContain('visibility');
+      expect(icons).not.toContain('edit');
+      expect(icons).not.toContain('delete');
+    });
+
+    it('hides restore when the delete permission is missing', () => {
+      authStoreMock.hasPermissions.mockReturnValue(false);
+      componentRef.setInput('users', [deletedUser]);
+      fixture.detectChanges();
+
+      expect(findRestoreButton(fixture.nativeElement)).toBeNull();
+    });
+
+    it('emits restoreUser with the row when restore is clicked', () => {
+      authStoreMock.hasPermissions.mockReturnValue(true);
+      componentRef.setInput('users', [deletedUser]);
+      fixture.detectChanges();
+
+      const emitted: User[] = [];
+      component.restoreUser.subscribe((user) => emitted.push(user));
+      findRestoreButton(fixture.nativeElement)?.click();
+
+      expect(emitted).toEqual([deletedUser]);
+    });
+
+    it('keeps the normal actions on a live row', () => {
+      authStoreMock.hasPermissions.mockReturnValue(true);
+      componentRef.setInput('users', [mockUser]);
+      fixture.detectChanges();
+
+      const root = fixture.nativeElement as HTMLElement;
+      const icons = Array.from(
+        root.querySelectorAll<HTMLElement>('td mat-icon')
+      ).map((i) => i.textContent?.trim());
+
+      expect(findRestoreButton(root)).toBeNull();
+      expect(icons).toContain('visibility');
+      expect(icons).toContain('edit');
+      expect(icons).toContain('delete');
+    });
   });
 
   describe('sortedRoles', () => {

@@ -20,6 +20,7 @@ export type UserSearch = Pick<
 > & {
   q?: string;
   role?: string;
+  includeDeleted?: boolean;
 };
 
 export type CreateUser = Pick<User, 'email' | 'firstName' | 'lastName'> & {

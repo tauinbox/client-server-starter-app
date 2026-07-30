@@ -44,6 +44,10 @@ export class UserService {
     return this.#http.delete<void>(`${USERS_API_V1}/${id}`);
   }
 
+  restore(id: string): Observable<User> {
+    return this.#http.post<User>(`${USERS_API_V1}/${id}/restore`, {});
+  }
+
   getPermissions(id: string): Observable<UserEffectivePermissionsResponse> {
     return this.#http.get<UserEffectivePermissionsResponse>(
       `${USERS_API_V1}/${id}/permissions`
@@ -117,6 +121,10 @@ export class UserService {
 
     if (criteria.isActive !== undefined) {
       next = next.set('isActive', criteria.isActive.toString());
+    }
+
+    if (criteria.includeDeleted) {
+      next = next.set('includeDeleted', 'true');
     }
 
     return next;

@@ -781,8 +781,9 @@ router.post('/:id/restore', adminGuard, (req, res) => {
     return;
   }
 
+  // Restore lifts the soft-delete only - `isActive` is a separate
+  // administrative state changed through PATCH /users/:id.
   targetUser.deletedAt = null;
-  targetUser.isActive = true;
   targetUser.updatedAt = new Date().toISOString();
 
   const actor = (req as AuthenticatedRequest).user;

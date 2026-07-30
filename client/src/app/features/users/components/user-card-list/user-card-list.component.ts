@@ -62,6 +62,7 @@ export class UserCardListComponent {
   readonly users = input.required<User[]>();
 
   readonly deleteUser = output<User>();
+  readonly restoreUser = output<User>();
 
   protected readonly roleIcon = roleIcon;
   protected readonly isAdminRole = isAdminRole;

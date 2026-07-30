@@ -14,6 +14,7 @@ import {
   removeEntity,
   setAllEntities,
   setEntity,
+  updateEntity,
   upsertEntities,
   withEntities
 } from '@ngrx/signals/entities';
@@ -82,7 +83,8 @@ export const UsersStore = signalStore(
       const hasFilters = !!(
         filters.q ||
         filters.role ||
-        filters.isActive !== undefined
+        filters.isActive !== undefined ||
+        filters.includeDeleted
       );
       return hasFilters
         ? userService.search(filters, params)
@@ -193,10 +195,30 @@ export const UsersStore = signalStore(
       deleteUser(id: string): Observable<void> {
         return userService.delete(id).pipe(
           tap(() => {
+            // While deleted users are on screen the row must stay visible and
+            // flip to its deleted state instead of vanishing from the list.
+            if (store.filters().includeDeleted) {
+              patchState(
+                store,
+                updateEntity({
+                  id,
+                  changes: { deletedAt: new Date().toISOString() }
+                })
+              );
+              return;
+            }
             patchState(store, removeEntity(id));
             patchState(store, {
               totalUsers: Math.max(0, store.totalUsers() - 1)
             });
+          })
+        );
+      },
+
+      restoreUser(id: string): Observable<User> {
+        return userService.restore(id).pipe(
+          tap((user) => {
+            patchState(store, setEntity(user));
           })
         );
       },
