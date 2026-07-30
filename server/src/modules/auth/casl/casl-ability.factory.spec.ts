@@ -228,6 +228,65 @@ describe('CaslAbilityFactory', () => {
     warnSpy.mockRestore();
   });
 
+  it('should skip an allow whose custom uses an operator outside the allowed set', async () => {
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+    const permissions: ResolvedPermission[] = [
+      {
+        resource: 'users',
+        action: 'read',
+        permission: 'users:read',
+        conditions: { custom: '{"email":{"$regex":"x"}}' }
+      }
+    ];
+
+    const ability = await factory.createForUser('user-1', roles, permissions);
+
+    // $regex has no faithful SQL translation, so honouring it here would grant
+    // a record that list/search never returns - the grant fails closed instead.
+    expect(ability.can('read', 'User')).toBe(false);
+    expect(
+      ability.can('read', {
+        __caslSubjectType__: 'User',
+        email: 'x@example.com'
+      } as never)
+    ).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('$regex'));
+
+    warnSpy.mockRestore();
+  });
+
+  it('should widen a deny into a blanket deny when its custom uses an operator outside the allowed set', async () => {
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];
+    const permissions: ResolvedPermission[] = [
+      {
+        resource: 'users',
+        action: 'update',
+        permission: 'users:update',
+        conditions: null
+      },
+      {
+        resource: 'users',
+        action: 'update',
+        permission: 'users:update',
+        conditions: { effect: 'deny', custom: '{"email":{"$regex":"x"}}' }
+      }
+    ];
+
+    const ability = await factory.createForUser('user-1', roles, permissions);
+
+    expect(ability.can('update', 'User')).toBe(false);
+    expect(
+      ability.can('update', {
+        __caslSubjectType__: 'User',
+        email: 'someone@example.com'
+      } as never)
+    ).toBe(false);
+
+    warnSpy.mockRestore();
+  });
+
   it('should skip custom conditions containing __proto__', async () => {
     const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     const roles: RoleInfo[] = [{ name: 'editor', isSuper: false }];

@@ -212,8 +212,20 @@ describe('condition shape parity with server', () => {
       expect(editorUserRules().granted).toBe(false);
     });
 
+    it('vetoes a permission whose stored custom uses an operator outside the allowed set', () => {
+      grantToEditor({ custom: '{"email":{"$regex":"x"}}' });
+
+      expect(editorUserRules().granted).toBe(false);
+    });
+
     it('grants the permission when the stored condition is valid (control)', () => {
       grantToEditor({ fieldMatch: { status: ['active'] } });
+
+      expect(editorUserRules().granted).toBe(true);
+    });
+
+    it('grants the permission when the stored custom uses an allowed operator (control)', () => {
+      grantToEditor({ custom: '{"status":{"$in":["active"]}}' });
 
       expect(editorUserRules().granted).toBe(true);
     });
