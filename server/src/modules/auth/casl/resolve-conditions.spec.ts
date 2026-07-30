@@ -376,6 +376,60 @@ describe('resolveConditions', () => {
       });
     });
 
+    describe('operators outside the allowed set', () => {
+      // The write layer rejects these on the way in; the runtime layer must
+      // agree, otherwise a stored row grants a single record through CASL and
+      // returns zero rows through the SQL list-filter translator, which cannot
+      // reproduce these operators.
+      it.each([
+        ['$regex', '{"email":{"$regex":"x"}}'],
+        ['$exists', '{"deletedAt":{"$exists":false}}'],
+        ['$all', '{"tags":{"$all":["a"]}}'],
+        ['$size', '{"tags":{"$size":2}}'],
+        ['$elemMatch', '{"tags":{"$elemMatch":{"a":1}}}'],
+        ['$mod', '{"age":{"$mod":[2,0]}}'],
+        ['$inn', '{"status":{"$inn":["active"]}}']
+      ])('should veto the permission when %s is used', (op, json) => {
+        const result = resolveConditions({ custom: json }, ctx);
+
+        expect(result.skipPermission).toBe(true);
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(op));
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('users:update')
+        );
+      });
+
+      it('should veto when an unsupported operator is nested inside $or', () => {
+        const result = resolveConditions(
+          { custom: '{"$or":[{"status":"active"},{"email":{"$regex":"x"}}]}' },
+          ctx
+        );
+
+        expect(result.skipPermission).toBe(true);
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('$regex'));
+      });
+
+      it.each([
+        ['$eq', '{"status":{"$eq":"active"}}'],
+        ['$ne', '{"status":{"$ne":"archived"}}'],
+        ['$in', '{"status":{"$in":["active"]}}'],
+        ['$nin', '{"status":{"$nin":["archived"]}}'],
+        ['$gt', '{"age":{"$gt":18}}'],
+        ['$gte', '{"age":{"$gte":18}}'],
+        ['$lt', '{"age":{"$lt":65}}'],
+        ['$lte', '{"age":{"$lte":65}}'],
+        ['$or', '{"$or":[{"a":1},{"b":2}]}'],
+        ['$and', '{"$and":[{"a":1},{"b":2}]}'],
+        ['$nor', '{"$nor":[{"a":1}]}'],
+        ['$not', '{"status":{"$not":{"$eq":"archived"}}}']
+      ])('should still resolve the allowed operator %s', (_op, json) => {
+        const result = resolveConditions({ custom: json }, ctx);
+
+        expect(result.skipPermission).toBe(false);
+        expect(warnSpy).not.toHaveBeenCalled();
+      });
+    });
+
     describe('prototype-pollution keys', () => {
       it.each([
         ['__proto__', '{"__proto__":{"admin":true}}'],

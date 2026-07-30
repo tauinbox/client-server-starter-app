@@ -246,10 +246,9 @@ describe('CASL → SQL query translation (e2e)', () => {
     const { qb, calls } = fakeQb();
     applyAbilityToUserQuery(qb, ability, 'search');
 
-    // The pre-fix translator would have produced `user.id = 'u-1'` and
-    // silently ignored the regex — over-sharing the row to the caller.
-    // After the fix, the whole rule is dropped → deny-all.
-    expect(calls[0].sql).toBe('(1 = 0)');
+    // Unbracketed because the factory's operator allow-list vetoes the
+    // permission, so no allow rule reaches the translator at all.
+    expect(calls[0].sql).toBe('1 = 0');
     expect(calls[0].sql).not.toContain('user.id = :abFilter_0');
     expect(warnSpy).toHaveBeenCalled();
   });

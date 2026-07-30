@@ -40,7 +40,7 @@ import type {
   RoleResponse,
   RoleAdminResponse
 } from '@app/shared/types';
-import { findDeniedMongoKey } from '@app/shared/utils/mongo-query-safety';
+import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
 import {
   findFieldMatchShapeError,
   findOwnershipShapeError,
@@ -446,7 +446,7 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
           parsed === null ||
           typeof parsed !== 'object' ||
           Array.isArray(parsed) ||
-          findDeniedMongoKey(parsed) ||
+          validateMongoQueryKeys(parsed, '') !== null ||
           (ownershipField !== undefined &&
             Object.prototype.hasOwnProperty.call(parsed, ownershipField))
         ) {

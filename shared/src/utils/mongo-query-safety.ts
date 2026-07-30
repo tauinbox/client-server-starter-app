@@ -1,7 +1,8 @@
 /**
- * MongoQuery operator whitelist/denylist for CASL conditions.
+ * MongoQuery operator whitelist for CASL conditions.
  *
- * Used at two layers:
+ * Both layers apply the same allow-list, so a stored condition cannot mean one
+ * thing to CASL and another to the SQL translator:
  * 1. DTO validation (input) — rejects requests with dangerous operators
  * 2. Ability factory (runtime) — defense-in-depth for pre-existing DB data
  *
@@ -48,36 +49,6 @@ export const PROTOTYPE_KEYS = new Set([
  * of being rejected as invalid input.
  */
 export const MAX_MONGO_QUERY_DEPTH = 32;
-
-/**
- * Recursively checks whether an object tree contains any denied
- * MongoQuery operator or prototype-pollution key.
- *
- * @returns The offending key name, a descriptive sentinel when the
- * nesting depth limit is exceeded (fail-closed), or `null` if the tree
- * is safe.
- */
-export function findDeniedMongoKey(obj: unknown, depth = 0): string | null {
-  if (obj === null || typeof obj !== 'object') return null;
-
-  if (depth >= MAX_MONGO_QUERY_DEPTH) {
-    return `nesting deeper than ${MAX_MONGO_QUERY_DEPTH} levels`;
-  }
-
-  const entries = Array.isArray(obj)
-    ? obj.map((v, i) => [String(i), v] as const)
-    : Object.entries(obj as Record<string, unknown>);
-
-  for (const [key, value] of entries) {
-    if (PROTOTYPE_KEYS.has(key)) return key;
-    if (DENIED_MONGO_OPERATORS.has(key)) return key;
-
-    const nested = findDeniedMongoKey(value, depth + 1);
-    if (nested) return nested;
-  }
-
-  return null;
-}
 
 /**
  * Recursively checks whether an object tree contains any unknown

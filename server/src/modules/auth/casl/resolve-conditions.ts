@@ -1,6 +1,6 @@
 import type { Logger } from '@nestjs/common';
 import type { PermissionCondition } from '@app/shared/types';
-import { findDeniedMongoKey } from '@app/shared/utils/mongo-query-safety';
+import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
 import {
   findFieldMatchShapeError,
   findOwnershipShapeError,
@@ -30,7 +30,8 @@ export interface ResolverContext {
  * Returns `skipPermission: true` to veto the entire permission when the input
  * cannot be honored as authored: a branch whose shape is malformed (validated
  * by the shared shape finders the DTO also uses), an unknown `userAttr`
- * attribute, invalid/non-object/denied-operator `custom`, or restriction
+ * attribute, invalid/non-object `custom` or one carrying an operator outside
+ * the allowed set, or restriction
  * branches that resolve to an empty query. Dropping just the malformed part
  * would silently widen an intended restriction (and make a deny vanish), so
  * any unusable fragment fails the whole permission closed. A condition object
@@ -117,9 +118,11 @@ export function resolveConditions(
       return veto('custom condition is not a JSON object');
     }
 
-    const denied = findDeniedMongoKey(parsed);
-    if (denied) {
-      return veto(`denied operator "${denied}" in custom condition`);
+    // Same allow-list the write layer applies, so a stored condition cannot
+    // mean one thing to CASL and another to the SQL list-filter translator.
+    const keyError = validateMongoQueryKeys(parsed, '');
+    if (keyError) {
+      return veto(`${keyError} in custom condition`);
     }
     if (
       ownershipField !== undefined &&
