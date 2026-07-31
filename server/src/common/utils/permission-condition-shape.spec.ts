@@ -1,6 +1,8 @@
 import {
   CONDITION_MAX_KEY_LENGTH,
+  findConditionActionError,
   findFieldMatchShapeError,
+  findIdentityBoundBranch,
   findOwnershipShapeError,
   findUserAttrShapeError
 } from '@app/shared/utils/permission-condition-shape';
@@ -54,6 +56,50 @@ describe('permission condition shape key validation', () => {
 
     it('accepts a plain key and attribute name', () => {
       expect(findUserAttrShapeError({ ownerId: 'id' })).toBeNull();
+    });
+  });
+
+  describe('identity-bound branches on a create grant', () => {
+    it.each(['ownership', 'userAttr'])(
+      'rejects %s combined with the create action',
+      (branch) => {
+        const conditions =
+          branch === 'ownership'
+            ? { ownership: { userField: 'createdBy' } }
+            : { userAttr: { ownerId: 'id' } };
+
+        expect(findConditionActionError('create', conditions)).toContain(
+          `conditions.${branch}`
+        );
+        expect(findIdentityBoundBranch(conditions)).toBe(branch);
+      }
+    );
+
+    it.each(['update', 'delete', 'read'])(
+      'accepts ownership on the %s action',
+      (action) => {
+        expect(
+          findConditionActionError(action, {
+            ownership: { userField: 'createdBy' }
+          })
+        ).toBeNull();
+      }
+    );
+
+    it('accepts fieldMatch and custom on the create action', () => {
+      expect(
+        findConditionActionError('create', { fieldMatch: { locale: ['ru'] } })
+      ).toBeNull();
+      expect(
+        findConditionActionError('create', { custom: '{"locale":"ru"}' })
+      ).toBeNull();
+    });
+
+    it('ignores a null branch and a non-object condition', () => {
+      expect(
+        findConditionActionError('create', { ownership: null })
+      ).toBeNull();
+      expect(findIdentityBoundBranch(null)).toBeNull();
     });
   });
 

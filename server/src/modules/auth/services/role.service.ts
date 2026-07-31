@@ -20,6 +20,10 @@ import {
   assertCanGrantPermissions,
   type ResolvedGrantItem
 } from '../utils/can-grant.util';
+import {
+  findConditionActionError,
+  findIdentityBoundBranch
+} from '@app/shared/utils/permission-condition-shape';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { assertCan } from '../../../common/utils/assert-can.util';
@@ -117,6 +121,46 @@ export class RoleService {
         );
       }
       throw err;
+    }
+  }
+
+  /**
+   * Reject a condition branch the granted action can never satisfy, whoever
+   * writes it (supers included) - an identity-bound branch on a `create` grant
+   * denies every create instead of restricting it, so it reads as a
+   * restriction in the admin UI while enforcing nothing. Only items that carry
+   * such a branch are resolved, so the common case costs no query. Unknown
+   * permission ids are left to the grant check, which reports them.
+   */
+  private async assertConditionsApplicable(
+    items: { permissionId: string; conditions?: PermissionCondition | null }[]
+  ): Promise<void> {
+    const identityBound = items.filter(
+      (item) => findIdentityBoundBranch(item.conditions) !== null
+    );
+    if (identityBound.length === 0) return;
+
+    const permissions = await this.permissionRepository.find({
+      where: identityBound.map((item) => ({ id: item.permissionId }))
+    });
+    const byId = new Map(permissions.map((p) => [p.id, p]));
+
+    for (const item of identityBound) {
+      const permission = byId.get(item.permissionId);
+      if (!permission) continue;
+      const error = findConditionActionError(
+        permission.action.name,
+        item.conditions
+      );
+      if (error) {
+        throw new HttpException(
+          {
+            message: `Cannot grant ${permission.action.name}:${permission.resource.subject} - ${error}`,
+            errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE
+          },
+          HttpStatus.BAD_REQUEST
+        );
+      }
     }
   }
 
@@ -387,6 +431,7 @@ export class RoleService {
     const role = await this.findOne(roleId);
     this.assertCanUpdateRole(role, ability, actorId);
     this.assertNotSystem(role, ability);
+    await this.assertConditionsApplicable(items);
     await this.assertGrantAllowed(ability, items, { actorId, roleId });
     await this.rolePermissionRepository.manager.transaction(async (em) => {
       await em.delete(RolePermission, { roleId });
@@ -418,6 +463,7 @@ export class RoleService {
       permissionId,
       conditions: conditions ?? null
     }));
+    await this.assertConditionsApplicable(items);
     await this.assertGrantAllowed(ability, items, { actorId, roleId });
     const rolePermissions = permissionIds.map((permissionId) =>
       this.rolePermissionRepository.create({

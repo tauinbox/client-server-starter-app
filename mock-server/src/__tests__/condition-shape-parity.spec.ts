@@ -53,7 +53,10 @@ function editorRolePermissions(): unknown[] {
 // instead of silently widening the grant.
 describe('condition shape parity with server', () => {
   describe('PUT /api/v1/roles/:id/permissions', () => {
-    async function putConditions(conditions: unknown): Promise<Response> {
+    async function putConditions(
+      conditions: unknown,
+      permissionId = 'perm-1'
+    ): Promise<Response> {
       const token = await loginAsAdmin();
       return fetch(`${baseUrl}/api/v1/roles/role-editor/permissions`, {
         method: 'PUT',
@@ -62,9 +65,20 @@ describe('condition shape parity with server', () => {
           authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          items: [{ permissionId: 'perm-1', conditions }]
+          items: [{ permissionId, conditions }]
         })
       });
+    }
+
+    // perm-1 is create:User, where ownership/userAttr are rejected as
+    // unsatisfiable; shape parity for those branches needs another action.
+    function updateUserPermissionId(): string {
+      const permission = [...getState().permissions.values()].find(
+        (p) => p.resourceId === 'res-users' && p.actionId === 'act-update'
+      );
+      if (!permission)
+        throw new Error('Seed permission users/update is missing');
+      return permission.id;
     }
 
     it.each([
@@ -112,13 +126,16 @@ describe('condition shape parity with server', () => {
     });
 
     it('accepts a valid condition', async () => {
-      const res = await putConditions({
-        effect: 'deny',
-        ownership: { userField: 'createdBy' },
-        fieldMatch: { status: ['active'] },
-        userAttr: { ownerId: 'id' },
-        custom: '{"status":{"$in":["active"]}}'
-      });
+      const res = await putConditions(
+        {
+          effect: 'deny',
+          ownership: { userField: 'createdBy' },
+          fieldMatch: { status: ['active'] },
+          userAttr: { ownerId: 'id' },
+          custom: '{"status":{"$in":["active"]}}'
+        },
+        updateUserPermissionId()
+      );
 
       expect(res.status).toBe(200);
       expect(editorRolePermissions()).toHaveLength(1);
