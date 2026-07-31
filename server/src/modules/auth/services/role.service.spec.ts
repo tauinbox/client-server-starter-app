@@ -667,6 +667,98 @@ describe('RoleService', () => {
     });
   });
 
+  describe('identity-bound conditions on a create grant', () => {
+    const permCreateUser = {
+      id: 'perm-create-user',
+      action: { name: 'create' },
+      resource: { subject: 'User' }
+    };
+    const permUpdateUser = {
+      id: 'perm-update-user',
+      action: { name: 'update' },
+      resource: { subject: 'User' }
+    };
+
+    // Super callers bypass the can-grant check, so the rejection must not live
+    // behind it: an ownership branch on `create` is dead for everyone.
+    // @ts-expect-error partial mock - only `can` is reached before the rejection
+    const superAbility: AppAbility = { can: jest.fn().mockReturnValue(true) };
+
+    it('rejects ownership on a create grant with 400 and leaves the set untouched', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockPermissionRepo.find.mockResolvedValue([permCreateUser]);
+
+      await expect(
+        service.setPermissionsForRole(
+          'role-2',
+          [
+            {
+              permissionId: 'perm-create-user',
+              conditions: { ownership: { userField: 'createdBy' } }
+            }
+          ],
+          superAbility,
+          'actor-1'
+        )
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: 'errors.roles.conditionNotApplicable' }
+      });
+
+      expect(mockRolePermissionRepo.manager.transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects userAttr on a create grant with 400 without saving', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockPermissionRepo.find.mockResolvedValue([permCreateUser]);
+
+      await expect(
+        service.assignPermissionsToRole(
+          'role-2',
+          ['perm-create-user'],
+          { userAttr: { ownerId: 'id' } },
+          superAbility,
+          'actor-1'
+        )
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: 'errors.roles.conditionNotApplicable' }
+      });
+
+      expect(mockRolePermissionRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('accepts ownership on an update grant', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockPermissionRepo.find.mockResolvedValue([permUpdateUser]);
+      mockRolePermissionRepo.save.mockResolvedValue([]);
+
+      await service.assignPermissionsToRole(
+        'role-2',
+        ['perm-update-user'],
+        { ownership: { userField: 'id' } },
+        superAbility,
+        'actor-1'
+      );
+
+      expect(mockRolePermissionRepo.save).toHaveBeenCalled();
+    });
+
+    it('does not query permissions when no item carries an identity-bound branch', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+
+      await service.setPermissionsForRole('role-2', [
+        {
+          permissionId: 'perm-create-user',
+          conditions: { fieldMatch: { locale: ['ru'] } }
+        }
+      ]);
+
+      expect(mockPermissionRepo.find).not.toHaveBeenCalled();
+      expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalled();
+    });
+  });
+
   // ── RBAC-SEC-1: grant-escalation block ────────────────────────────
 
   describe('assertCanGrantPermissions (via service)', () => {

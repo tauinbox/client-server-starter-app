@@ -125,3 +125,49 @@ export function findUserAttrShapeError(value: unknown): string | null {
   }
   return null;
 }
+
+/**
+ * Branches that resolve against the acting user's identity rather than against
+ * a stored value, so they can only be evaluated on a record that already
+ * exists.
+ */
+export const IDENTITY_BOUND_CONDITION_BRANCHES = [
+  'ownership',
+  'userAttr'
+] as const;
+
+/**
+ * Returns the first identity-bound branch present in a condition, or null.
+ */
+export function findIdentityBoundBranch(value: unknown): string | null {
+  if (!isPlainObject(value)) {
+    return null;
+  }
+  return (
+    IDENTITY_BOUND_CONDITION_BRANCHES.find(
+      (branch) => value[branch] !== undefined && value[branch] !== null
+    ) ?? null
+  );
+}
+
+/**
+ * Rejects a condition branch the given action can never satisfy.
+ *
+ * `ownership` and `userAttr` both resolve to the acting user's id, which a
+ * record that does not exist yet cannot carry: attached to a `create` grant
+ * they deny every create instead of restricting it, so the grant reads as a
+ * restriction in the admin UI while being silently dead.
+ */
+export function findConditionActionError(
+  actionName: string,
+  conditions: unknown
+): string | null {
+  if (actionName !== 'create') {
+    return null;
+  }
+  const branch = findIdentityBoundBranch(conditions);
+  if (!branch) {
+    return null;
+  }
+  return `conditions.${branch} matches the acting user's id, which a record that does not exist yet can never carry`;
+}

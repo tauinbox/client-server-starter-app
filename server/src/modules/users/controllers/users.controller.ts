@@ -90,8 +90,22 @@ export class UsersController {
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   async create(
     @Body() createUserDto: CreateUserDto,
-    @Request() req: JwtAuthRequest
+    @Request() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
+    // The route-level @Authorize check is type-level and ignores conditions,
+    // so a conditional create grant is re-evaluated against the record the
+    // caller is asking to create. The password is deliberately left out of the
+    // subject: no authorization condition can legitimately be written over it.
+    const { password: _password, ...subjectFields } = createUserDto;
+    assertCan(
+      ability,
+      'create',
+      subject('User', subjectFields),
+      this.auditService,
+      { actorId: req.user.userId, targetType: 'User' },
+      this.metricsService
+    );
     const createdUser = await this.usersService.create(createUserDto);
     await this.auditService.log({
       action: AuditAction.USER_CREATE,

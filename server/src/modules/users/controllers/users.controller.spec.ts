@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
+import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { UsersController } from './users.controller';
 import { UsersService } from '../services/users.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -135,7 +136,7 @@ describe('UsersController', () => {
       usersServiceMock.create.mockResolvedValue(createdUser);
       const req = mockJwtRequest() as JwtAuthRequest;
 
-      const result = await controller.create(dto, req);
+      const result = await controller.create(dto, req, mockAbility);
 
       expect(usersServiceMock.create).toHaveBeenCalledWith(dto);
       expect(result).toBe(createdUser);
@@ -155,7 +156,7 @@ describe('UsersController', () => {
         'admin@example.com'
       ) as JwtAuthRequest;
 
-      await controller.create(dto, req);
+      await controller.create(dto, req, mockAbility);
 
       expect(auditServiceMock.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -166,6 +167,79 @@ describe('UsersController', () => {
           targetType: 'User'
         })
       );
+    });
+
+    // Built on a real CASL ability: a mocked `can` cannot show the difference
+    // between the type-level check the route guard runs and the instance-level
+    // one, which is the whole point of this path.
+    describe('conditional create grant', () => {
+      function abilityWithLocaleCondition(): AppAbility {
+        const { can, build } = new AbilityBuilder<AppAbility>(
+          createMongoAbility
+        );
+        can('create', 'User', { locale: { $in: ['ru'] } });
+        return build();
+      }
+
+      const dto: CreateUserDto = {
+        email: 'new@example.com',
+        firstName: 'New',
+        lastName: 'User',
+        password: 'Password1',
+        locale: 'ru'
+      };
+
+      it('creates the user when the record satisfies the condition', async () => {
+        const createdUser = { id: 'user-99', email: 'new@example.com' };
+        usersServiceMock.create.mockResolvedValue(createdUser);
+        const req = mockJwtRequest() as JwtAuthRequest;
+
+        const result = await controller.create(
+          dto,
+          req,
+          abilityWithLocaleCondition()
+        );
+
+        expect(result).toBe(createdUser);
+      });
+
+      it('throws ForbiddenException and audits when the record fails the condition', async () => {
+        const req = mockJwtRequest('actor-1') as JwtAuthRequest;
+
+        await expect(
+          controller.create(
+            { ...dto, locale: 'en' },
+            req,
+            abilityWithLocaleCondition()
+          )
+        ).rejects.toBeInstanceOf(ForbiddenException);
+
+        expect(usersServiceMock.create).not.toHaveBeenCalled();
+        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: AuditAction.PERMISSION_CHECK_FAILURE,
+            actorId: 'actor-1',
+            targetType: 'User'
+          })
+        );
+        expect(metricsServiceMock.recordPermissionDenied).toHaveBeenCalledWith(
+          'instance',
+          'create',
+          'User'
+        );
+      });
+
+      it('does not expose the password to condition evaluation', async () => {
+        const { can, build } = new AbilityBuilder<AppAbility>(
+          createMongoAbility
+        );
+        can('create', 'User', { password: { $exists: true } });
+        const req = mockJwtRequest() as JwtAuthRequest;
+
+        await expect(
+          controller.create(dto, req, build())
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      });
     });
   });
 

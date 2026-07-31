@@ -54,6 +54,18 @@ function editorPermissionIds(): string[] {
     .map((rp) => rp.permissionId);
 }
 
+// Permission ids are positional in the seed, so resolve them by resource and
+// action instead of hardcoding.
+function permissionIdFor(resourceId: string, actionId: string): string {
+  const permission = [...getState().permissions.values()].find(
+    (p) => p.resourceId === resourceId && p.actionId === actionId
+  );
+  if (!permission) {
+    throw new Error(`Seed permission ${resourceId}/${actionId} is missing`);
+  }
+  return permission.id;
+}
+
 describe('role grant error parity with server', () => {
   describe('POST /api/v1/roles/:id/permissions', () => {
     it('returns 400 RESOURCE_NOT_FOUND for an unknown permission id', async () => {
@@ -138,6 +150,96 @@ describe('role grant error parity with server', () => {
       expect(body.message).toBe('Permission perm-nope not found');
       expect(body.errorKey).toBe('errors.general.resourceNotFound');
       expect(editorPermissionIds()).toEqual(['perm-1']);
+    });
+  });
+
+  describe('identity-bound conditions on a create grant', () => {
+    it('rejects ownership on a create grant with 400 on POST', async () => {
+      const token = await loginAsAdmin();
+      const createUser = permissionIdFor('res-users', 'act-create');
+
+      const res = await fetch(
+        `${baseUrl}/api/v1/roles/role-editor/permissions`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            permissionIds: [createUser],
+            conditions: { ownership: { userField: 'createdBy' } }
+          })
+        }
+      );
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { message: string; errorKey: string };
+      expect(body.message).toContain('Cannot grant create:User');
+      expect(body.errorKey).toBe('errors.roles.conditionNotApplicable');
+      expect(editorPermissionIds()).toEqual([]);
+    });
+
+    it('rejects userAttr on a create grant with 400 on PUT and leaves the set untouched', async () => {
+      const token = await loginAsAdmin();
+      getState().rolePermissions.push({
+        id: 'rp-test',
+        roleId: 'role-editor',
+        permissionId: 'perm-1',
+        conditions: null
+      });
+      const createUser = permissionIdFor('res-users', 'act-create');
+
+      const res = await fetch(
+        `${baseUrl}/api/v1/roles/role-editor/permissions`,
+        {
+          method: 'PUT',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            items: [
+              {
+                permissionId: createUser,
+                conditions: { userAttr: { ownerId: 'id' } }
+              }
+            ]
+          })
+        }
+      );
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { errorKey: string };
+      expect(body.errorKey).toBe('errors.roles.conditionNotApplicable');
+      expect(editorPermissionIds()).toEqual(['perm-1']);
+    });
+
+    it('accepts ownership on an update grant', async () => {
+      const token = await loginAsAdmin();
+      const updateUser = permissionIdFor('res-users', 'act-update');
+
+      const res = await fetch(
+        `${baseUrl}/api/v1/roles/role-editor/permissions`,
+        {
+          method: 'PUT',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            items: [
+              {
+                permissionId: updateUser,
+                conditions: { ownership: { userField: 'id' } }
+              }
+            ]
+          })
+        }
+      );
+
+      expect(res.status).toBe(200);
+      expect(editorPermissionIds()).toEqual([updateUser]);
     });
   });
 

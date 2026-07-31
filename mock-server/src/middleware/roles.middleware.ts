@@ -3,7 +3,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
 import {
+  findConditionActionError,
   findFieldMatchShapeError,
+  findIdentityBoundBranch,
   findOwnershipShapeError,
   findUserAttrShapeError
 } from '@app/shared/utils/permission-condition-shape';
@@ -89,6 +91,27 @@ function findConditionShapeError(conditions: unknown): string | null {
   }
 
   return null;
+}
+
+// Mirrors RoleService.assertConditionsApplicable: an identity-bound branch on
+// a `create` grant can never match a record that does not exist yet, so it is
+// rejected on write instead of being stored as a dead restriction. Unknown
+// permission ids fall through to the unknown-id 400, as on the server.
+function findGrantConditionError(
+  permissionId: string,
+  conditions: unknown
+): string | null {
+  if (findIdentityBoundBranch(conditions) === null) return null;
+  const state = getState();
+  const permission = state.permissions.get(permissionId);
+  if (!permission) return null;
+  const resource = state.resources.get(permission.resourceId);
+  const action = state.actions.get(permission.actionId);
+  if (!resource || !action) return null;
+  const error = findConditionActionError(action.name, conditions);
+  return error === null
+    ? null
+    : `Cannot grant ${action.name}:${resource.subject} - ${error}`;
 }
 
 // Notify every connected holder of a role that its effective permission set
@@ -419,6 +442,18 @@ router.put('/:id/permissions', adminGuard, (req, res) => {
     }
   }
 
+  for (const item of items) {
+    const error = findGrantConditionError(item.permissionId, item.conditions);
+    if (error) {
+      res.status(400).json({
+        message: error,
+        statusCode: 400,
+        errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE
+      });
+      return;
+    }
+  }
+
   // Mirror the server: unknown ids fail validation with 400 before the
   // existing set is touched.
   const unknownItem = items.find(
@@ -519,6 +554,18 @@ router.post('/:id/permissions', adminGuard, (req, res) => {
       error: 'Bad Request'
     });
     return;
+  }
+
+  for (const permissionId of permissionIds as string[]) {
+    const error = findGrantConditionError(permissionId, conditions);
+    if (error) {
+      res.status(400).json({
+        message: error,
+        statusCode: 400,
+        errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE
+      });
+      return;
+    }
   }
 
   // Mirror the server: unknown ids fail validation with 400 before anything
