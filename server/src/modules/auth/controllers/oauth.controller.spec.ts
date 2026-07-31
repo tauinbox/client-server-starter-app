@@ -7,11 +7,11 @@ import { OAuthController } from './oauth.controller';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
-import { UsersService } from '../../users/services/users.service';
 import { AuditService } from '../../audit/audit.service';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthUserProfile } from '../types/oauth-profile';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys } from '@app/shared/constants';
 import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
 
@@ -62,10 +62,11 @@ describe('OAuthController', () => {
   };
   let oauthAccountServiceMock: {
     findByUserId: jest.Mock;
-    deleteByUserIdAndProvider: jest.Mock;
+    unlinkProvider: jest.Mock;
   };
-  let usersServiceMock: {
-    findOne: jest.Mock;
+  let auditServiceMock: {
+    log: jest.Mock;
+    logFireAndForget: jest.Mock;
   };
   let configValues: Record<string, string | undefined>;
 
@@ -87,11 +88,12 @@ describe('OAuthController', () => {
 
     oauthAccountServiceMock = {
       findByUserId: jest.fn(),
-      deleteByUserIdAndProvider: jest.fn()
+      unlinkProvider: jest.fn().mockResolvedValue(undefined)
     };
 
-    usersServiceMock = {
-      findOne: jest.fn()
+    auditServiceMock = {
+      log: jest.fn().mockResolvedValue(undefined),
+      logFireAndForget: jest.fn()
     };
 
     configValues = {
@@ -106,14 +108,7 @@ describe('OAuthController', () => {
         { provide: JwtService, useValue: jwtServiceMock },
         { provide: OAuthService, useValue: oauthServiceMock },
         { provide: OAuthAccountService, useValue: oauthAccountServiceMock },
-        { provide: UsersService, useValue: usersServiceMock },
-        {
-          provide: AuditService,
-          useValue: {
-            log: jest.fn().mockResolvedValue(undefined),
-            logFireAndForget: jest.fn()
-          }
-        },
+        { provide: AuditService, useValue: auditServiceMock },
         {
           provide: ConfigService,
           useValue: {
@@ -169,42 +164,43 @@ describe('OAuthController', () => {
   });
 
   describe('unlinkOAuth', () => {
-    it('should unlink provider when user has other OAuth accounts', async () => {
-      oauthAccountServiceMock.findByUserId.mockResolvedValue([
-        { provider: 'google', userId: 'user-1' },
-        { provider: 'facebook', userId: 'user-1' }
-      ]);
-      usersServiceMock.findOne.mockResolvedValue({
-        id: 'user-1',
-        password: null
-      });
-
+    it('should delegate to the service and audit the unlink', async () => {
       const result = await controller.unlinkOAuth(
         'google',
         mockJwtRequest('user-1') as JwtAuthRequest
       );
 
-      expect(
-        oauthAccountServiceMock.deleteByUserIdAndProvider
-      ).toHaveBeenCalledWith('user-1', 'google');
+      expect(oauthAccountServiceMock.unlinkProvider).toHaveBeenCalledWith(
+        'user-1',
+        'google'
+      );
+      expect(auditServiceMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.OAUTH_UNLINK,
+          details: { provider: 'google' }
+        })
+      );
       expect(result.message).toContain('unlinked');
     });
 
-    it('should throw when trying to unlink last provider without password', async () => {
-      oauthAccountServiceMock.findByUserId.mockResolvedValue([
-        { provider: 'google', userId: 'user-1' }
-      ]);
-      usersServiceMock.findOne.mockResolvedValue({
-        id: 'user-1',
-        password: null
-      });
+    it('should not write an audit row when the unlink is rejected', async () => {
+      oauthAccountServiceMock.unlinkProvider.mockRejectedValue(
+        new HttpException(
+          {
+            message: 'No linked google account found',
+            errorKey: ErrorKeys.AUTH.OAUTH_PROVIDER_NOT_LINKED
+          },
+          HttpStatus.NOT_FOUND
+        )
+      );
 
       await expect(
         controller.unlinkOAuth(
           'google',
           mockJwtRequest('user-1') as JwtAuthRequest
         )
-      ).rejects.toThrow('Cannot unlink');
+      ).rejects.toThrow('No linked google account found');
+      expect(auditServiceMock.log).not.toHaveBeenCalled();
     });
 
     it('should throw when provider is invalid', async () => {
@@ -214,26 +210,7 @@ describe('OAuthController', () => {
           mockJwtRequest('user-1') as JwtAuthRequest
         )
       ).rejects.toThrow('Invalid OAuth provider');
-    });
-
-    it('should allow unlink when user has password', async () => {
-      oauthAccountServiceMock.findByUserId.mockResolvedValue([
-        { provider: 'google', userId: 'user-1' }
-      ]);
-      usersServiceMock.findOne.mockResolvedValue({
-        id: 'user-1',
-        password: 'hashed-password'
-      });
-
-      const result = await controller.unlinkOAuth(
-        'google',
-        mockJwtRequest('user-1') as JwtAuthRequest
-      );
-
-      expect(
-        oauthAccountServiceMock.deleteByUserIdAndProvider
-      ).toHaveBeenCalled();
-      expect(result.message).toContain('unlinked');
+      expect(oauthAccountServiceMock.unlinkProvider).not.toHaveBeenCalled();
     });
   });
 

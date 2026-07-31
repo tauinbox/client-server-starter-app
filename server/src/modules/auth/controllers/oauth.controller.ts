@@ -36,7 +36,6 @@ import { Public } from '../decorators/public.decorator';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
-import { UsersService } from '../../users/services/users.service';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
@@ -63,7 +62,6 @@ export class OAuthController {
   constructor(
     private readonly oauthService: OAuthService,
     private readonly oauthAccountService: OAuthAccountService,
-    private readonly usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
     private readonly auditService: AuditService,
@@ -197,26 +195,7 @@ export class OAuthController {
     }
 
     const userId = req.user.userId;
-    const accounts = await this.oauthAccountService.findByUserId(userId);
-
-    const user = await this.usersService.findOne(userId);
-    const hasPassword = user.password !== null;
-    const otherOAuthCount = accounts.filter(
-      (a) => a.provider !== provider
-    ).length;
-
-    if (!hasPassword && otherOAuthCount === 0) {
-      throw new HttpException(
-        {
-          message:
-            'Cannot unlink the last OAuth provider without a password set. Please set a password first.',
-          errorKey: ErrorKeys.AUTH.UNLINK_LAST_PROVIDER
-        },
-        HttpStatus.BAD_REQUEST
-      );
-    }
-
-    await this.oauthAccountService.deleteByUserIdAndProvider(userId, provider);
+    await this.oauthAccountService.unlinkProvider(userId, provider);
 
     await this.auditService.log({
       action: AuditAction.OAUTH_UNLINK,

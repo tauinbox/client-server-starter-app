@@ -1,7 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource, EntityManager } from 'typeorm';
+import { HttpStatus } from '@nestjs/common';
+import { ErrorKeys } from '@app/shared/constants';
 import { OAuthAccountService } from './oauth-account.service';
 import { OAuthAccount } from '../entities/oauth-account.entity';
+import { User } from '../../users/entities/user.entity';
+
+type TransactionalManagerStub = Pick<
+  EntityManager,
+  'findOne' | 'find' | 'delete'
+>;
 
 describe('OAuthAccountService', () => {
   let service: OAuthAccountService;
@@ -10,6 +19,11 @@ describe('OAuthAccountService', () => {
     find: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
+    delete: jest.Mock;
+  };
+  let mockManager: {
+    findOne: jest.Mock;
+    find: jest.Mock;
     delete: jest.Mock;
   };
 
@@ -22,12 +36,31 @@ describe('OAuthAccountService', () => {
       delete: jest.fn()
     };
 
+    mockManager = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      delete: jest.fn().mockResolvedValue({ affected: 1 })
+    };
+
+    // Only the three manager methods `unlinkProvider` calls are stubbed, so the
+    // callback is typed against that narrow slice rather than the full manager.
+    const mockDataSource = {
+      transaction: jest.fn(
+        (operation: (manager: TransactionalManagerStub) => Promise<unknown>) =>
+          operation(mockManager)
+      )
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OAuthAccountService,
         {
           provide: getRepositoryToken(OAuthAccount),
           useValue: mockRepository
+        },
+        {
+          provide: DataSource,
+          useValue: mockDataSource
         }
       ]
     }).compile();
@@ -115,16 +148,78 @@ describe('OAuthAccountService', () => {
     });
   });
 
-  describe('deleteByUserIdAndProvider', () => {
-    it('should delete an OAuth account by userId and provider', async () => {
-      mockRepository.delete.mockResolvedValue({ affected: 1 });
+  describe('unlinkProvider', () => {
+    function stubUser(password: string | null): void {
+      mockManager.findOne.mockResolvedValue({ id: 'user-1', password });
+    }
 
-      await service.deleteByUserIdAndProvider('user-1', 'google');
+    it('should delete the account while holding a write lock on the user row', async () => {
+      stubUser(null);
+      mockManager.find.mockResolvedValue([
+        { provider: 'google', userId: 'user-1' },
+        { provider: 'facebook', userId: 'user-1' }
+      ]);
 
-      expect(mockRepository.delete).toHaveBeenCalledWith({
+      await service.unlinkProvider('user-1', 'google');
+
+      expect(mockManager.findOne).toHaveBeenCalledWith(User, {
+        where: { id: 'user-1' },
+        lock: { mode: 'pessimistic_write' }
+      });
+      expect(mockManager.delete).toHaveBeenCalledWith(OAuthAccount, {
         userId: 'user-1',
         provider: 'google'
       });
+    });
+
+    it('should reject unlinking the last provider of a password-less account', async () => {
+      stubUser(null);
+      mockManager.find.mockResolvedValue([
+        { provider: 'google', userId: 'user-1' }
+      ]);
+
+      await expect(service.unlinkProvider('user-1', 'google')).rejects.toThrow(
+        'Cannot unlink'
+      );
+      expect(mockManager.delete).not.toHaveBeenCalled();
+    });
+
+    it('should allow unlinking the last provider when a password is set', async () => {
+      stubUser('hashed-password');
+      mockManager.find.mockResolvedValue([
+        { provider: 'google', userId: 'user-1' }
+      ]);
+
+      await service.unlinkProvider('user-1', 'google');
+
+      expect(mockManager.delete).toHaveBeenCalled();
+    });
+
+    it('should 404 without deleting when the provider is not linked', async () => {
+      stubUser('hashed-password');
+      mockManager.find.mockResolvedValue([
+        { provider: 'facebook', userId: 'user-1' }
+      ]);
+
+      await expect(
+        service.unlinkProvider('user-1', 'google')
+      ).rejects.toMatchObject({
+        status: HttpStatus.NOT_FOUND,
+        response: { errorKey: ErrorKeys.AUTH.OAUTH_PROVIDER_NOT_LINKED }
+      });
+      expect(mockManager.delete).not.toHaveBeenCalled();
+    });
+
+    it('should 404 when the user row is gone', async () => {
+      mockManager.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.unlinkProvider('user-1', 'google')
+      ).rejects.toMatchObject({
+        status: HttpStatus.NOT_FOUND,
+        response: { errorKey: ErrorKeys.USERS.NOT_FOUND }
+      });
+      expect(mockManager.find).not.toHaveBeenCalled();
     });
   });
 });

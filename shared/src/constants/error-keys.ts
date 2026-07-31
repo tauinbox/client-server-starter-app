@@ -30,6 +30,7 @@ export const ErrorKeys = {
     MISSING_OAUTH_DATA: 'errors.auth.missingOauthData',
     INVALID_OAUTH_DATA: 'errors.auth.invalidOauthData',
     UNLINK_LAST_PROVIDER: 'errors.auth.unlinkLastProvider',
+    OAUTH_PROVIDER_NOT_LINKED: 'errors.auth.oauthProviderNotLinked',
     INVALID_CURRENT_PASSWORD: 'errors.auth.invalidCurrentPassword',
     CAPTCHA_REQUIRED: 'errors.auth.captchaRequired',
     CAPTCHA_INVALID: 'errors.auth.captchaInvalid',
