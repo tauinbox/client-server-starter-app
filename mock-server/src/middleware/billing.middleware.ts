@@ -1140,10 +1140,14 @@ billingAdminRouter.post('/usage', adminGuard, (req: Request, res: Response) => {
     return;
   }
 
-  const subscription = [...state.billingSubscriptions.values()].find(
-    (s) =>
-      s.customerId === customerId && USAGE_ACTIVE_STATUSES.includes(s.status)
-  );
+  // Newest-first like the server, so usage is billed to the same subscription
+  // the entitlement resolver reports.
+  const subscription = [...state.billingSubscriptions.values()]
+    .filter(
+      (s) =>
+        s.customerId === customerId && USAGE_ACTIVE_STATUSES.includes(s.status)
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   if (!subscription) {
     res.status(404).json({
       message: 'No active subscription for customer to record usage against',
