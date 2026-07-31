@@ -34,7 +34,7 @@ export class CaslAbilityFactory {
       return build();
     }
 
-    const subjectMap = await this.resourceService.getSubjectMap();
+    const subjectMaps = await this.resourceService.getSubjectMaps();
 
     // CASL evaluates rules in order; inverted rules (cannot) must come after
     // direct rules (can) to override them. Partition so allows are registered
@@ -45,22 +45,34 @@ export class CaslAbilityFactory {
     ];
 
     for (const p of ordered) {
-      const rawSubject = subjectMap[p.resource];
-      if (!rawSubject) {
-        this.logger.warn(
-          `Unknown resource "${p.resource}" in permissions for user ${userId} — skipping`
-        );
-        continue;
-      }
-
-      // Values in subjectMap come from @RegisterResource and are valid string subjects.
-      // Cast to Extract<Subjects, string> because AbilityBuilder.can()/cannot() take
-      // constructors or string literals — never entity instances (those are for
-      // ability.can() checks).
-      const subject = rawSubject as Extract<Subjects, string>;
       const action = p.action;
       const isDeny = p.conditions?.effect === 'deny';
       const register = isDeny ? cannot : can;
+
+      // Fail closed in both directions, as the condition veto below does: an
+      // allow needs a live resource, while a deny must outlive its resource
+      // going orphaned rather than vanish with it.
+      const rawSubject = isDeny
+        ? (subjectMaps.active[p.resource] ?? subjectMaps.orphaned[p.resource])
+        : subjectMaps.active[p.resource];
+
+      if (!rawSubject) {
+        if (isDeny) {
+          this.logger.error(
+            `Deny permission "${p.permission}" for user ${userId} names unknown resource "${p.resource}" - the deny cannot be registered`
+          );
+        } else {
+          this.logger.warn(
+            `Unknown resource "${p.resource}" in permissions for user ${userId} — skipping`
+          );
+        }
+        continue;
+      }
+
+      // Cast to Extract<Subjects, string> because AbilityBuilder.can()/cannot()
+      // take constructors or string literals — never entity instances (those
+      // are for ability.can() checks).
+      const subject = rawSubject as Extract<Subjects, string>;
 
       if (!p.conditions) {
         register(action, subject);

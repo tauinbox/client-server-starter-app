@@ -15,8 +15,24 @@ import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { ResourceRegistryService } from './resource-registry.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 
-const SUBJECT_MAP_CACHE_KEY = 'rbac:subject_map';
+// Key is versioned: the cached value's shape changed from a flat
+// resource -> subject record to the split maps below, and a Redis entry
+// written by a previous release outlives the deploy.
+const SUBJECT_MAP_CACHE_KEY = 'rbac:subject_map:v2';
 const SUBJECT_MAP_CACHE_TTL = 300_000; // 5 minutes
+
+/**
+ * Resource name -> CASL subject, split by orphan state.
+ *
+ * Only `active` may grant: an orphaned resource has lost the controller that
+ * registered it, so nothing may be allowed on it. Denies resolve against
+ * `orphaned` as a fallback so that removing a controller cannot quietly drop a
+ * deny rule (see CaslAbilityFactory).
+ */
+export interface SubjectMaps {
+  active: Record<string, string>;
+  orphaned: Record<string, string>;
+}
 
 @Injectable()
 export class ResourceService {
@@ -69,8 +85,8 @@ export class ResourceService {
     return saved;
   }
 
-  async getSubjectMap(): Promise<Record<string, string>> {
-    const cached = await this.cacheManager.get<Record<string, string>>(
+  async getSubjectMaps(): Promise<SubjectMaps> {
+    const cached = await this.cacheManager.get<SubjectMaps>(
       SUBJECT_MAP_CACHE_KEY
     );
     this.metrics.recordCacheAccess('resources', cached ? 'hit' : 'miss');
@@ -79,19 +95,21 @@ export class ResourceService {
     }
 
     const resources = await this.resourceRepository.find();
-    const map: Record<string, string> = {};
+    const maps: SubjectMaps = { active: {}, orphaned: {} };
     for (const r of resources) {
-      if (!r.isOrphaned) {
-        map[r.name] = r.subject;
+      if (r.isOrphaned) {
+        maps.orphaned[r.name] = r.subject;
+      } else {
+        maps.active[r.name] = r.subject;
       }
     }
 
     await this.cacheManager.set(
       SUBJECT_MAP_CACHE_KEY,
-      map,
+      maps,
       SUBJECT_MAP_CACHE_TTL
     );
-    return map;
+    return maps;
   }
 
   async restore(id: string): Promise<Resource> {
