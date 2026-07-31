@@ -103,6 +103,7 @@
       "missingOauthData": "Отсутствуют данные OAuth",
       "invalidOauthData": "Недействительные или просроченные данные OAuth",
       "unlinkLastProvider": "Невозможно отвязать последнего OAuth-провайдера без установленного пароля. Сначала установите пароль.",
+      "oauthProviderNotLinked": "Этот провайдер не привязан к вашему аккаунту.",
       "invalidCurrentPassword": "Текущий пароль неверен",
       "captchaRequired": "Пожалуйста, пройдите проверку CAPTCHA для продолжения.",
       "captchaInvalid": "Проверка CAPTCHA не пройдена. Попробуйте ещё раз.",

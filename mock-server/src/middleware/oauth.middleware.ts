@@ -34,6 +34,16 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
 
   const state = getState();
   const accounts = state.oauthAccounts.get(user.id) || [];
+
+  if (!accounts.some((a) => a.provider === provider)) {
+    res.status(404).json({
+      message: `No linked ${provider} account found`,
+      statusCode: 404,
+      errorKey: ErrorKeys.AUTH.OAUTH_PROVIDER_NOT_LINKED
+    });
+    return;
+  }
+
   const otherOAuth = accounts.filter((a) => a.provider !== provider).length;
 
   if (!user.password && otherOAuth === 0) {
