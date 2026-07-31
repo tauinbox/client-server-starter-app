@@ -138,8 +138,12 @@ function matches(
 
 function buildFactory(): CaslAbilityFactory {
   return new CaslAbilityFactory(
-    // @ts-expect-error partial mock — only getSubjectMap exercised
-    { getSubjectMap: jest.fn().mockResolvedValue(SUBJECT_MAP) }
+    // @ts-expect-error partial mock — only getSubjectMaps exercised
+    {
+      getSubjectMaps: jest
+        .fn()
+        .mockResolvedValue({ active: SUBJECT_MAP, orphaned: {} })
+    }
   );
 }
 

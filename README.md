@@ -773,7 +773,7 @@ Nine tables managed via TypeORM migrations:
 - **oauth_accounts** — Linked to users (CASCADE delete), provider + provider_id (unique), timestamps
 - **refresh_tokens** — Linked to users (CASCADE delete), token string (SHA-256 hashed), expiry, revoked flag
 - **roles** — UUID PK, name (unique), description, isSystem flag, isSuper flag; ManyToMany with users
-- **resources** — UUID PK, name (unique), displayName, description, isSystem flag, `is_orphaned` boolean (true when controller was removed; excluded from CASL ability until restored), `allowed_action_names text[]` (null = use all default actions)
+- **resources** — UUID PK, name (unique), displayName, description, isSystem flag, `is_orphaned` boolean (true when controller was removed; its permissions stop granting, while deny rules keep applying until restored), `allowed_action_names text[]` (null = use all default actions)
 - **actions** — UUID PK, name (unique), displayName, description, isSystem flag, sortOrder
 - **permissions** — UUID PK, resource_id + action_id (unique constraint, FKs to resources and actions)
 - **role_permissions** — FK to roles + permissions, optional jsonb `conditions` column
@@ -819,7 +819,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1653 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1656 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 249 tests, 242 passing with Postgres + Mailpit (23 skip on a bare run without Postgres/Redis/Mailpit) |
 | Client unit tests | Vitest | `*.spec.ts` alongside source | 1004 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 208 tests passing |

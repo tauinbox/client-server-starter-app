@@ -332,7 +332,7 @@ Core tables managed via TypeORM migrations:
 | `oauth_accounts` | UUID PK, provider + provider_id (unique), FK to users (CASCADE, indexed) |
 | `refresh_tokens` | UUID PK, token (SHA-256 hashed, unique, `@Exclude`-d from the wire), FK to users (CASCADE), expires_at, revoked |
 | `roles` | UUID PK, name (unique), description, isSystem flag, isSuper flag |
-| `resources` | UUID PK, name (unique), `subject` (unique — CASL cannot resolve an ambiguous subject; enforced in CI by `check:permissions`), displayName, description, isSystem flag, `is_orphaned` boolean (marked true when controller removed; excluded from CASL subject map until restored), `allowed_action_names text[]` |
+| `resources` | UUID PK, name (unique), `subject` (unique — CASL cannot resolve an ambiguous subject; enforced in CI by `check:permissions`), displayName, description, isSystem flag, `is_orphaned` boolean (marked true when controller removed; its permissions can no longer grant, while deny rules keep applying until the resource is restored), `allowed_action_names text[]` |
 | `actions` | UUID PK, name (unique), displayName, description, isSystem flag, sortOrder |
 | `permissions` | UUID PK, resource_id + action_id (unique constraint, FKs to resources and actions) |
 | `role_permissions` | FK to roles + permissions, optional jsonb `conditions` |

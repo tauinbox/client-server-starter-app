@@ -9,16 +9,23 @@ const MOCK_SUBJECT_MAP: Record<string, string> = {
   profile: 'Profile'
 };
 
+const MOCK_ORPHANED_SUBJECT_MAP: Record<string, string> = {
+  legacy: 'LegacyThing'
+};
+
 describe('CaslAbilityFactory', () => {
   let factory: CaslAbilityFactory;
-  let resourceService: { getSubjectMap: jest.Mock };
+  let resourceService: { getSubjectMaps: jest.Mock };
 
   beforeEach(() => {
     resourceService = {
-      getSubjectMap: jest.fn().mockResolvedValue(MOCK_SUBJECT_MAP)
+      getSubjectMaps: jest.fn().mockResolvedValue({
+        active: MOCK_SUBJECT_MAP,
+        orphaned: MOCK_ORPHANED_SUBJECT_MAP
+      })
     };
     factory = new CaslAbilityFactory(
-      // @ts-expect-error testing mock — only getSubjectMap is needed
+      // @ts-expect-error testing mock — only getSubjectMaps is needed
       resourceService
     );
   });
@@ -132,6 +139,71 @@ describe('CaslAbilityFactory', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('user-1'));
 
     warnSpy.mockRestore();
+  });
+
+  it('should not grant an allow whose resource is orphaned', async () => {
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const roles: RoleInfo[] = [{ name: 'viewer', isSuper: false }];
+    const permissions: ResolvedPermission[] = [
+      {
+        resource: 'legacy',
+        action: 'read',
+        permission: 'legacy:read',
+        conditions: null
+      }
+    ];
+
+    const ability = await factory.createForUser('user-1', roles, permissions);
+
+    expect(ability.rules).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('legacy'));
+
+    warnSpy.mockRestore();
+  });
+
+  it('should keep a deny whose resource is orphaned rather than drop it', async () => {
+    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    const roles: RoleInfo[] = [{ name: 'viewer', isSuper: false }];
+    const permissions: ResolvedPermission[] = [
+      {
+        resource: 'legacy',
+        action: 'read',
+        permission: 'legacy:read',
+        conditions: { effect: 'deny' }
+      }
+    ];
+
+    const ability = await factory.createForUser('user-1', roles, permissions);
+
+    const [rule, ...rest] = ability.rules;
+    expect(rest).toHaveLength(0);
+    expect(rule.inverted).toBe(true);
+    expect(rule.action).toBe('read');
+    expect(rule.subject).toBe('LegacyThing');
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    errorSpy.mockRestore();
+  });
+
+  it('should log at error level when a deny names a resource in neither map', async () => {
+    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    const roles: RoleInfo[] = [{ name: 'viewer', isSuper: false }];
+    const permissions: ResolvedPermission[] = [
+      {
+        resource: 'ghost',
+        action: 'read',
+        permission: 'ghost:read',
+        conditions: { effect: 'deny' }
+      }
+    ];
+
+    const ability = await factory.createForUser('user-1', roles, permissions);
+
+    expect(ability.rules).toHaveLength(0);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('ghost'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('user-1'));
+
+    errorSpy.mockRestore();
   });
 
   it('should handle multiple permissions for different resources', async () => {
