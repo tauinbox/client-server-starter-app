@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { FindOneOptions } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
@@ -79,6 +80,35 @@ describe('UsageService', () => {
       })
     );
     expect(result.id).toBe('usage-1');
+  });
+
+  it('bills the newest active subscription when the customer has more than one', async () => {
+    const older = makeSubscription({
+      id: 'sub-old',
+      createdAt: new Date('2026-01-01T00:00:00.000Z')
+    });
+    const newer = makeSubscription({
+      id: 'sub-new',
+      createdAt: new Date('2026-06-01T00:00:00.000Z')
+    });
+    // Without an ORDER BY, Postgres is free to return the older row first.
+    const rows = [older, newer];
+    subscriptions.findOne.mockImplementation(
+      (options: FindOneOptions<Subscription>) =>
+        Promise.resolve(
+          options.order?.createdAt === 'DESC'
+            ? [...rows].sort(
+                (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+              )[0]
+            : rows[0]
+        )
+    );
+
+    await service.record(INPUT);
+
+    expect(usageRecords.create).toHaveBeenCalledWith(
+      expect.objectContaining({ subscriptionId: 'sub-new' })
+    );
   });
 
   it('defaults occurredAt to now when omitted', async () => {

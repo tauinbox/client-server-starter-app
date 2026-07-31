@@ -70,11 +70,16 @@ export class UsageService {
       );
     }
 
+    // Newest-first, matching the entitlement resolver, so usage is billed to the
+    // subscription whose entitlements the customer is actually using. Two active
+    // rows only arise from an admin action or a webhook race, never from
+    // self-service subscribing.
     const subscription = await this.subscriptions.findOne({
       where: {
         customerId: input.customerId,
         status: In([...ACTIVE_STATUSES])
-      }
+      },
+      order: { createdAt: 'DESC' }
     });
     if (!subscription) {
       throw new NotFoundException(

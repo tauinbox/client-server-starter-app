@@ -1,7 +1,7 @@
 import type { AddressInfo } from 'net';
 import type { Server } from 'http';
 import { createApp } from '../app';
-import { resetState } from '../state';
+import { getState, resetState } from '../state';
 
 let server: Server;
 let baseUrl: string;
@@ -231,6 +231,38 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     expect(a['customerId']).toBe(first);
     expect(b['customerId']).toBe(second);
     expect(b['quantity']).toBe(25);
+  });
+
+  it('bills the newest active subscription when the customer has more than one', async () => {
+    const token = await login('admin@example.com');
+    const { customerId, subscriptionId } = await activateSubscription(
+      'admin@example.com',
+      'pro'
+    );
+    const state = getState();
+    const first = state.billingSubscriptions.get(subscriptionId);
+    if (!first) throw new Error('subscription was not seeded');
+    first.createdAt = '2026-01-01T00:00:00.000Z';
+    // A second active row for the same customer, as an admin action or a
+    // webhook race can produce. Inserted after the older one, so an unordered
+    // scan returns the wrong subscription first.
+    const newer = {
+      ...first,
+      id: '22222222-2222-2222-2222-222222222222',
+      createdAt: '2026-06-01T00:00:00.000Z'
+    };
+    state.billingSubscriptions.set(newer.id, newer);
+
+    const res = await postUsage(token, {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 5,
+      idempotencyKey: 'evt-newest'
+    });
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body['subscriptionId']).toBe(newer.id);
   });
 
   it('returns 404 when the customer has no active subscription', async () => {
