@@ -11,7 +11,7 @@ import { CookieStateStore } from '../utils/cookie-state-store';
 @Injectable()
 export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
   constructor(configService: ConfigService) {
-    super({
+    const options: StrategyOptions = {
       clientID: configService.getOrThrow('FACEBOOK_CLIENT_ID'),
       clientSecret: configService.getOrThrow('FACEBOOK_CLIENT_SECRET'),
       callbackURL: '/api/v1/auth/oauth/facebook/callback',
@@ -22,7 +22,9 @@ export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
         OAuthProvider.FACEBOOK,
         configService.get('ENVIRONMENT') === 'production'
       )
-    } as StrategyOptions);
+    };
+
+    super(options);
   }
 
   validate(

@@ -11,7 +11,7 @@ import { CookieStateStore } from '../utils/cookie-state-store';
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor(configService: ConfigService) {
-    super({
+    const options: StrategyOptions = {
       clientID: configService.getOrThrow('GOOGLE_CLIENT_ID'),
       clientSecret: configService.getOrThrow('GOOGLE_CLIENT_SECRET'),
       callbackURL: '/api/v1/auth/oauth/google/callback',
@@ -21,7 +21,9 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
         OAuthProvider.GOOGLE,
         configService.get('ENVIRONMENT') === 'production'
       )
-    } as StrategyOptions);
+    };
+
+    super(options);
   }
 
   validate(
