@@ -56,3 +56,18 @@ test.describe('OAuth login — auto-link disabled', () => {
     );
   });
 });
+
+// A declined consent screen reaches the login page as its own key, so the
+// banner must read as a cancellation rather than an authentication failure.
+test.describe('OAuth login — cancelled consent screen', () => {
+  test('renders the cancellation message, not the failure one', async ({
+    page,
+    _mockServer
+  }) => {
+    await page.goto('/login?oauth_error=oauth_cancelled');
+
+    const banner = page.locator('.error-message');
+    await expect(banner).toContainText('cancelled');
+    await expect(banner).not.toContainText('OAuth authentication failed');
+  });
+});
