@@ -4,5 +4,5 @@
     "module": "ESNext",
     "types": ["node"]
   },
-  "include": ["e2e/**/*.ts"]
+  "include": ["e2e/**/*.ts", "playwright.config.ts"]
 }

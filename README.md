@@ -704,7 +704,9 @@ API base URL: `/api/v1`
 
 > `format` / `format:check` cover every TypeScript and ESM file the workspace owns, not just `src/` — root-level configs (`eslint.config.*`, `playwright.config.ts`, `proxy.conf.mjs`, …) and `scripts/` are included. The `shared/` module and root-level `*.mjs` configs are formatted from `server/`, since they belong to no single workspace.
 
-> `typecheck` exists in all three workspaces and is not redundant with `build`: `build` only typechecks what it compiles. `server/`'s `tsconfig.build.json` excludes `test/`, `*.spec.ts` and `common/testing/`; the client's `ng build` covers the `app` project only, so `e2e/` and root-level configs are checked by nothing else — and Playwright transpiles without typechecking. Run it in every affected workspace before pushing.
+> `typecheck` exists in all three workspaces and is not redundant with `build`: `build` only typechecks what it compiles. `server/`'s `tsconfig.build.json` excludes `test/`, `*.spec.ts` and `common/testing/`; the client's `ng build` covers the `app` project only, and Playwright transpiles without typechecking, so `e2e/` is checked by nothing else. Each script runs the real project configs, never the base `tsconfig.json` — the client's base config is not a compilable program on its own (`e2e/` needs `types: ["node"]` and ESNext modules, specs need `lib: esnext.disposable`, the app project needs `types: []`). Run it in every affected workspace before pushing.
+
+> The client splits the gate in two: `typecheck` (app + spec projects) and `typecheck:e2e` (e2e project + `playwright.config.ts`). They are separate because `e2e/` fixtures import mock-server sources, so the e2e project only typechecks where that workspace is installed — locally, and in the `Client E2E` CI job. Run both before pushing a client change.
 
 ### Mock Server (`cd mock-server`)
 
@@ -739,7 +741,8 @@ npm run seed:run           # Run seeders (build first)
 ```bash
 npm start                  # Dev server (port 4200, proxy to backend)
 npm run build              # Production build
-npm run typecheck          # tsc --noEmit incl. e2e/ and root configs (not covered by build)
+npm run typecheck          # tsc --noEmit over the app + spec projects
+npm run typecheck:e2e      # tsc --noEmit over e2e/ + playwright.config.ts (needs mock-server installed)
 npm run lint               # Lint check
 npm run lint:fix           # Lint and auto-fix (TS + SCSS)
 npm test                   # Unit tests (Vitest)
@@ -840,7 +843,7 @@ GitHub Actions runs on every push and pull request to `master` with 5 jobs:
 | **Server – Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
 | **Mock Server** | — | audit (high), lint, format:check, typecheck, test | — |
 | **Client** | — | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |
-| **Client E2E** | mock-server | ng build → serve (static), Playwright Chromium | HTML report, test results |
+| **Client E2E** | mock-server | typecheck:e2e (after installing mock-server), ng build → serve (static), Playwright Chromium | HTML report, test results |
 | **Server – Checks** | — | check:i18n (validates all ErrorKeys exist in all i18n JSON files) | — |
 
 Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file required — all tests run against mocks.
