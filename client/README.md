@@ -17,6 +17,7 @@ The dev proxy (`proxy.conf.mjs`) forwards `/api` and `/ws` requests to `BACKEND_
 |------|---------|
 | Dev server | `npm start` |
 | Build | `npm run build` |
+| Typecheck | `npm run typecheck` — `tsc --noEmit` over `tsconfig.json` (src + e2e + root configs) and `tsconfig.e2e.json`; `ng build` only typechecks the `app` project and Playwright transpiles without typechecking, so `e2e/` is covered by nothing else |
 | Lint (TS + SCSS + checks) | `npm run lint` |
 | Lint fix (TS + SCSS) | `npm run lint:fix` |
 | Lint SCSS only | `npm run lint:styles` |

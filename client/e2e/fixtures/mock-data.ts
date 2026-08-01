@@ -1,5 +1,7 @@
 import { createMockJwt } from './jwt.utils';
 
+import { createMockUser } from '../../../mock-server/src/factories';
+
 export {
   createMockUser,
   createOAuthAccount
@@ -8,7 +10,7 @@ export {
 import type { MockUser } from '../../../mock-server/src/types';
 export type { MockUser };
 
-export const defaultUser: MockUser = {
+export const defaultUser: MockUser = createMockUser({
   id: '1',
   email: 'test@example.com',
   firstName: 'John',
@@ -23,7 +25,7 @@ export const defaultUser: MockUser = {
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt: '2025-01-01T00:00:00.000Z',
   deletedAt: null
-};
+});
 
 export const defaultTokens = {
   access_token: createMockJwt(),
@@ -31,7 +33,7 @@ export const defaultTokens = {
 };
 
 export const mockUsersList: MockUser[] = [
-  {
+  createMockUser({
     id: '1',
     email: 'admin@example.com',
     firstName: 'Admin',
@@ -46,8 +48,8 @@ export const mockUsersList: MockUser[] = [
     createdAt: '2025-01-01T00:00:00.000Z',
     updatedAt: '2025-01-01T00:00:00.000Z',
     deletedAt: null
-  },
-  {
+  }),
+  createMockUser({
     id: '2',
     email: 'john@example.com',
     firstName: 'John',
@@ -62,8 +64,8 @@ export const mockUsersList: MockUser[] = [
     createdAt: '2025-02-01T00:00:00.000Z',
     updatedAt: '2025-02-01T00:00:00.000Z',
     deletedAt: null
-  },
-  {
+  }),
+  createMockUser({
     id: '3',
     email: 'jane@example.com',
     firstName: 'Jane',
@@ -78,5 +80,5 @@ export const mockUsersList: MockUser[] = [
     createdAt: '2025-03-01T00:00:00.000Z',
     updatedAt: '2025-03-01T00:00:00.000Z',
     deletedAt: null
-  }
+  })
 ];

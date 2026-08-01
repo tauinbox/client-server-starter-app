@@ -1,4 +1,5 @@
 import { expect, test } from '../fixtures/base.fixture';
+import { createMockUser } from '../fixtures/mock-data';
 
 test.describe('Email verification', () => {
   test('should register and then verify email via token', async ({
@@ -39,7 +40,7 @@ test.describe('Email verification', () => {
   }) => {
     // Seed an unverified user
     await _mockServer.seedUsers([
-      {
+      createMockUser({
         id: '300',
         email: 'unverified@example.com',
         firstName: 'Unverified',
@@ -54,7 +55,7 @@ test.describe('Email verification', () => {
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
         deletedAt: null
-      }
+      })
     ]);
 
     await page.goto('/login');
@@ -78,7 +79,7 @@ test.describe('Email verification', () => {
   test('should resend verification email', async ({ _mockServer, page }) => {
     // Seed an unverified user
     await _mockServer.seedUsers([
-      {
+      createMockUser({
         id: '301',
         email: 'resend@example.com',
         firstName: 'Resend',
@@ -93,7 +94,7 @@ test.describe('Email verification', () => {
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
         deletedAt: null
-      }
+      })
     ]);
 
     await page.goto('/login');
@@ -133,7 +134,7 @@ test.describe('Email verification', () => {
   }) => {
     // Seed an unverified user with a verification token
     await _mockServer.seedUsers([
-      {
+      createMockUser({
         id: '302',
         email: 'verifythenlogin@example.com',
         firstName: 'Verify',
@@ -148,7 +149,7 @@ test.describe('Email verification', () => {
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
         deletedAt: null
-      }
+      })
     ]);
 
     // Trigger a resend-verification to create a token

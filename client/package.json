@@ -11,6 +11,8 @@
     "pretest": "node scripts/version.mjs",
     "test": "ng test",
     "test:cov": "ng test --coverage",
+    "pretypecheck": "node scripts/version.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.e2e.json --noEmit",
     "format": "prettier --write \"src/**/*.ts\" \"e2e/**/*.ts\" \"scripts/*.mjs\" \"*.ts\" \"*.mjs\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"e2e/**/*.ts\" \"scripts/*.mjs\" \"*.ts\" \"*.mjs\"",
     "lint": "ng lint && npm run lint:styles && npm run lint:no-mat-color && npm run check:form-fields",

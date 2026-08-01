@@ -14,10 +14,14 @@ import type { Page } from '@playwright/test';
 // (`--mat-sys-error`), so the test stays valid across palette/theme tweaks.
 // Both light and dark themes are exercised.
 
-const seedTheme = (page: Page, theme: 'light' | 'dark'): Promise<void> =>
-  page.addInitScript((t) => {
+const seedTheme = async (
+  page: Page,
+  theme: 'light' | 'dark'
+): Promise<void> => {
+  await page.addInitScript((t) => {
     localStorage.setItem('preferred-theme', t);
   }, theme);
+};
 
 // Resolve a CSS custom property to its canonical `rgb(r, g, b)` form via a
 // throw-away probe element. `getPropertyValue('--mat-sys-error')` returns the

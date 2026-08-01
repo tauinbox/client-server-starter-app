@@ -1,4 +1,5 @@
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { createMockUser } from '../fixtures/mock-data';
 
 // Regression for the OAuth-only-account safety check. Server: /oauth/accounts
 // /:provider DELETE rejects with `auth.unlinkLastProvider` when the user has
@@ -29,7 +30,7 @@ test.describe('OAuth — unlink last provider safety', () => {
     // exclusively via OAuth signup looks like. The server's unlink check is
     // gated on `!user.password && otherOAuth === 0`.
     await _mockServer.seedUsers([
-      {
+      createMockUser({
         id: userId,
         email,
         firstName: 'John',
@@ -44,7 +45,7 @@ test.describe('OAuth — unlink last provider safety', () => {
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
         deletedAt: null
-      }
+      })
     ]);
 
     // Attach a single OAuth account — the only remaining auth path.

@@ -1,9 +1,10 @@
 import type { Page } from '@playwright/test';
 
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { createMockUser } from '../fixtures/mock-data';
 import type { MockUser } from '../fixtures/mock-data';
 
-const baseUser: Omit<MockUser, 'id' | 'email' | 'firstName' | 'deletedAt'> = {
+const baseUser = {
   lastName: 'Restorable',
   password: 'Password1',
   roles: ['user'],
@@ -14,24 +15,24 @@ const baseUser: Omit<MockUser, 'id' | 'email' | 'firstName' | 'deletedAt'> = {
   tokenRevokedAt: null,
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt: '2025-01-01T00:00:00.000Z'
-};
+} satisfies Partial<MockUser>;
 
 // Deactivated BEFORE deletion: restoring must not silently re-enable it.
-const deletedUser: MockUser = {
+const deletedUser: MockUser = createMockUser({
   ...baseUser,
   id: '900',
   email: 'deleted.restorable@example.com',
   firstName: 'Deleted',
   deletedAt: '2025-02-01T00:00:00.000Z'
-};
+});
 
-const liveUser: MockUser = {
+const liveUser: MockUser = createMockUser({
   ...baseUser,
   id: '901',
   email: 'live.restorable@example.com',
   firstName: 'Live',
   deletedAt: null
-};
+});
 
 /**
  * The mock seeds ~70 users and the list is infinite-scrolled 20 at a time, so a

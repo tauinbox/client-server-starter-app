@@ -34,6 +34,7 @@ jobs:
       - run: npm run audit:ci
       - run: npm run lint
       - run: npm run format:check
+      - run: npm run typecheck
       - run: npm run check:routes
       - run: npm run check:enums
       - run: npm run check:permissions
@@ -137,7 +138,7 @@ jobs:
       - run: npm run audit:ci
       - run: npm run lint
       - run: npm run format:check
-      - run: npx tsc --noEmit
+      - run: npm run typecheck
       - run: npm test
 
   client:
@@ -162,6 +163,9 @@ jobs:
       - run: npm run audit:ci
       - run: npm run lint
       - run: npm run format:check
+      # Covers e2e/ and the root-level configs: `ng build` compiles the app
+      # project only, and Playwright transpiles specs without typechecking.
+      - run: npm run typecheck
       - run: npm run test:cov
       - run: npm run build
 

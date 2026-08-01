@@ -704,11 +704,14 @@ API base URL: `/api/v1`
 
 > `format` / `format:check` cover every TypeScript and ESM file the workspace owns, not just `src/` — root-level configs (`eslint.config.*`, `playwright.config.ts`, `proxy.conf.mjs`, …) and `scripts/` are included. The `shared/` module and root-level `*.mjs` configs are formatted from `server/`, since they belong to no single workspace.
 
+> `typecheck` exists in all three workspaces and is not redundant with `build`: `build` only typechecks what it compiles. `server/`'s `tsconfig.build.json` excludes `test/`, `*.spec.ts` and `common/testing/`; the client's `ng build` covers the `app` project only, so `e2e/` and root-level configs are checked by nothing else — and Playwright transpiles without typechecking. Run it in every affected workspace before pushing.
+
 ### Mock Server (`cd mock-server`)
 
 ```bash
 npm start                  # Start mock server (port 3000)
 npm run start:dev          # Start with watch mode (ts-node-dev)
+npm run typecheck          # tsc --noEmit (no build script — this is the type gate)
 npm run lint               # Lint check
 npm run format:check       # Prettier check
 ```
@@ -718,6 +721,7 @@ npm run format:check       # Prettier check
 ```bash
 npm run start:dev          # Dev server (port 3000, watch mode)
 npm run build              # Production build
+npm run typecheck          # tsc --noEmit incl. test/ and specs (excluded from build)
 npm run lint               # Lint check
 npm run lint:fix           # Lint and auto-fix
 npm run format:check       # Prettier check
@@ -735,6 +739,7 @@ npm run seed:run           # Run seeders (build first)
 ```bash
 npm start                  # Dev server (port 4200, proxy to backend)
 npm run build              # Production build
+npm run typecheck          # tsc --noEmit incl. e2e/ and root configs (not covered by build)
 npm run lint               # Lint check
 npm run lint:fix           # Lint and auto-fix (TS + SCSS)
 npm test                   # Unit tests (Vitest)
@@ -831,10 +836,10 @@ GitHub Actions runs on every push and pull request to `master` with 5 jobs:
 
 | Job | Depends on | Steps | Artifacts |
 |-----|-----------|-------|-----------|
-| **Server – Checks** | — | audit (high), lint, format:check, check:routes, check:enums, check:permissions | — |
+| **Server – Checks** | — | audit (high), lint, format:check, typecheck, check:routes, check:enums, check:permissions | — |
 | **Server – Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
-| **Mock Server** | — | audit (high), lint, format:check, tsc, test | — |
-| **Client** | — | audit (high), lint, format:check, test:cov, build | Coverage report |
+| **Mock Server** | — | audit (high), lint, format:check, typecheck, test | — |
+| **Client** | — | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |
 | **Client E2E** | mock-server | ng build → serve (static), Playwright Chromium | HTML report, test results |
 | **Server – Checks** | — | check:i18n (validates all ErrorKeys exist in all i18n JSON files) | — |
 
