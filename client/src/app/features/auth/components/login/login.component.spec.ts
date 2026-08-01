@@ -59,8 +59,12 @@ describe('LoginComponent', () => {
     getEvaluatedFlags: ReturnType<typeof vi.fn>;
   };
   let router: Router;
+  // Mutated by the OAuth-error tests before they create their own fixture; the
+  // provider holds this exact object, so a later write is still visible.
+  let queryParams: Record<string, string>;
 
   beforeEach(async () => {
+    queryParams = {};
     authServiceMock = {
       login: vi.fn()
     };
@@ -84,7 +88,7 @@ describe('LoginComponent', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            snapshot: { queryParams: {} }
+            snapshot: { queryParams }
           }
         }
       ]
@@ -98,6 +102,33 @@ describe('LoginComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  describe('oauth_error query parameter', () => {
+    const renderWithOAuthError = (error: string) => {
+      queryParams['oauth_error'] = error;
+      const errorFixture = TestBed.createComponent(LoginComponent);
+      errorFixture.detectChanges();
+      return errorFixture.componentInstance['error']();
+    };
+
+    it('shows a cancellation message when the user declined the consent screen', () => {
+      expect(renderWithOAuthError('oauth_cancelled')).toBe(
+        'Sign-in was cancelled. You can try again or log in with your email and password.'
+      );
+    });
+
+    it('still shows the generic OAuth failure for auth_failed', () => {
+      expect(renderWithOAuthError('auth_failed')).toBe(
+        'OAuth authentication failed. Please try again.'
+      );
+    });
+
+    it('falls back to the generic message for an unknown key', () => {
+      expect(renderWithOAuthError('made_up')).toBe(
+        'Authentication failed. Please try again.'
+      );
+    });
   });
 
   describe('form validation', () => {

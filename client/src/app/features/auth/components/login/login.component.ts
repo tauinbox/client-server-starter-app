@@ -32,6 +32,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { take } from 'rxjs/operators';
 import { isOAuthProvider, OAUTH_URLS } from '../../constants/auth-api.const';
+import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
 import { isSafeReturnUrl } from '../../utils/is-safe-return-url';
 import type { LockoutErrorData } from '../../models/auth.types';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
@@ -47,6 +48,7 @@ type LoginData = {
 
 const OAUTH_ERROR_KEYS: Record<string, string> = {
   auth_failed: 'auth.login.errorOauthFailed',
+  [OAUTH_ERROR_CANCELLED]: 'auth.login.errorOauthCancelled',
   no_email: 'auth.login.errorNoEmail',
   email_already_registered: 'auth.login.errorEmailAlreadyRegistered'
 };

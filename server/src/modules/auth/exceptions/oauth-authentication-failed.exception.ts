@@ -1,9 +1,17 @@
 /**
- * Key the client's login page maps to a user-facing message. Anything it does
- * not recognise falls back to the same generic text, so one key covers every
- * Passport-level failure.
+ * Keys the client maps to a user-facing message. Anything it does not
+ * recognise falls back to the same generic text.
  */
 export const OAUTH_ERROR_AUTH_FAILED = 'auth_failed';
+export const OAUTH_ERROR_CANCELLED = 'oauth_cancelled';
+
+/**
+ * Where the browser is sent after a failure. A cancelled or failed link flow
+ * started on the profile page belongs back there, not on the login page of an
+ * already authenticated user. Both members are literals chosen in code - no
+ * request value ever reaches the redirect.
+ */
+export type OAuthFailureRedirect = '/login' | '/profile';
 
 /**
  * Raised when Passport rejects an OAuth request - a denied consent screen, an
@@ -14,7 +22,8 @@ export const OAUTH_ERROR_AUTH_FAILED = 'auth_failed';
 export class OAuthAuthenticationFailedException extends Error {
   constructor(
     readonly oauthError: string,
-    readonly reason?: unknown
+    readonly reason?: unknown,
+    readonly redirectPath: OAuthFailureRedirect = '/login'
   ) {
     super(`OAuth authentication failed (${oauthError})`);
     this.name = 'OAuthAuthenticationFailedException';
