@@ -115,6 +115,34 @@ describe('ProfileComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  describe('oauth_error query parameter', () => {
+    it('reports a cancelled link attempt as a notice, not a failure', () => {
+      activatedRouteMock.snapshot.queryParamMap.set(
+        'oauth_error',
+        'oauth_cancelled'
+      );
+      fixture.detectChanges();
+
+      expect(notifyMock.info).toHaveBeenCalledWith(
+        'auth.profile.linkCancelled'
+      );
+      expect(notifyMock.error).not.toHaveBeenCalled();
+    });
+
+    it('still reports a genuine link failure as an error', () => {
+      activatedRouteMock.snapshot.queryParamMap.set(
+        'oauth_error',
+        'link_failed'
+      );
+      fixture.detectChanges();
+
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        'auth.profile.errorLinkFailed'
+      );
+      expect(notifyMock.info).not.toHaveBeenCalled();
+    });
+  });
+
   describe('ngOnInit / loadProfile', () => {
     it('should load profile and set model on init', () => {
       fixture.detectChanges();

@@ -17,15 +17,37 @@ jest.mock('@nestjs/passport', () => ({
 }));
 
 import { AuthGuard } from '@nestjs/passport';
+import type { Request as ExpressRequest } from 'express';
 import { GoogleOAuthGuard } from './google-oauth.guard';
 import { FacebookOAuthGuard } from './facebook-oauth.guard';
 import { VkOAuthGuard } from './vk-oauth.guard';
 import {
   OAUTH_ERROR_AUTH_FAILED,
+  OAUTH_ERROR_CANCELLED,
   OAuthAuthenticationFailedException
 } from '../exceptions/oauth-authentication-failed.exception';
 
 const context = {} as ExecutionContext;
+
+const contextWith = (request: Partial<ExpressRequest>): ExecutionContext =>
+  ({
+    switchToHttp: () => ({
+      getRequest: <T>() => request as T,
+      getResponse: <T>() => ({}) as T,
+      getNext: <T>() => (() => undefined) as T
+    })
+  }) as ExecutionContext;
+
+const callbackContext = contextWith({ query: {}, cookies: {} });
+
+const captureFailure = (call: () => unknown) => {
+  try {
+    call();
+  } catch (error) {
+    return error as OAuthAuthenticationFailedException;
+  }
+  throw new Error('Expected an OAuthAuthenticationFailedException');
+};
 
 describe.each([
   ['GoogleOAuthGuard', GoogleOAuthGuard, 'google', 'Google'],
@@ -72,28 +94,77 @@ describe.each([
   describe('handleRequest', () => {
     it('raises a redirectable failure when Passport rejects the request', () => {
       expect(() =>
-        new GuardClass().handleRequest<unknown>(null, false, undefined, context)
+        new GuardClass().handleRequest<unknown>(
+          null,
+          false,
+          undefined,
+          callbackContext
+        )
       ).toThrow(OAuthAuthenticationFailedException);
     });
 
     it('carries the underlying error as the reason', () => {
       const cause = new Error('Failed to obtain access token');
 
-      let thrown: unknown;
-      try {
+      const failure = captureFailure(() =>
         new GuardClass().handleRequest<unknown>(
           cause,
           undefined,
           undefined,
-          context
-        );
-      } catch (error) {
-        thrown = error;
-      }
+          callbackContext
+        )
+      );
 
-      expect(thrown).toBeInstanceOf(OAuthAuthenticationFailedException);
-      const failure = thrown as OAuthAuthenticationFailedException;
+      expect(failure).toBeInstanceOf(OAuthAuthenticationFailedException);
       expect(failure.reason).toBe(cause);
+      expect(failure.oauthError).toBe(OAUTH_ERROR_AUTH_FAILED);
+      expect(failure.redirectPath).toBe('/login');
+    });
+
+    it('reports a declined consent screen as a cancellation, not a failure', () => {
+      const failure = captureFailure(() =>
+        new GuardClass().handleRequest<unknown>(
+          null,
+          false,
+          undefined,
+          contextWith({ query: { error: 'access_denied' }, cookies: {} })
+        )
+      );
+
+      expect(failure.oauthError).toBe(OAUTH_ERROR_CANCELLED);
+      expect(failure.redirectPath).toBe('/login');
+    });
+
+    it('sends a failed link flow back to the profile page', () => {
+      const failure = captureFailure(() =>
+        new GuardClass().handleRequest<unknown>(
+          null,
+          false,
+          undefined,
+          contextWith({
+            query: { error: 'access_denied' },
+            cookies: { oauth_link: 'link-token' }
+          })
+        )
+      );
+
+      expect(failure.oauthError).toBe(OAUTH_ERROR_CANCELLED);
+      expect(failure.redirectPath).toBe('/profile');
+    });
+
+    it('never carries an attacker-supplied error value into the key', () => {
+      const failure = captureFailure(() =>
+        new GuardClass().handleRequest<unknown>(
+          null,
+          false,
+          undefined,
+          contextWith({
+            query: { error: 'https://evil.example/#' },
+            cookies: {}
+          })
+        )
+      );
+
       expect(failure.oauthError).toBe(OAUTH_ERROR_AUTH_FAILED);
     });
 
@@ -105,7 +176,7 @@ describe.each([
           null,
           profile,
           undefined,
-          context
+          callbackContext
         )
       ).toBe(profile);
     });

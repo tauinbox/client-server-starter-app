@@ -43,6 +43,10 @@ import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authentication-exception.filter';
+import {
+  OAUTH_LINK_COOKIE,
+  OAUTH_LINK_COOKIE_PATH
+} from '../constants/oauth.constants';
 
 @ApiTags('OAuth API')
 @Controller({
@@ -54,7 +58,6 @@ import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authenticat
 export class OAuthController {
   private readonly logger = new Logger(OAuthController.name);
 
-  private static readonly OAUTH_LINK_COOKIE = 'oauth_link';
   private static readonly OAUTH_LINK_MAX_AGE_SECONDS = 300;
   private static readonly OAUTH_DATA_COOKIE = 'oauth_data';
   private static readonly OAUTH_DATA_MAX_AGE_SECONDS = 60;
@@ -82,11 +85,11 @@ export class OAuthController {
       { expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS }
     );
 
-    res.cookie(OAuthController.OAUTH_LINK_COOKIE, linkToken, {
+    res.cookie(OAUTH_LINK_COOKIE, linkToken, {
       httpOnly: true,
       sameSite: 'lax',
       secure: this.configService.get('ENVIRONMENT') === 'production',
-      path: '/api/v1/auth/oauth',
+      path: OAUTH_LINK_COOKIE_PATH,
       maxAge: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS * 1000
     });
 
@@ -288,7 +291,7 @@ export class OAuthController {
   ): Promise<void> {
     try {
       const linkToken = (req.cookies as Record<string, string> | undefined)?.[
-        OAuthController.OAUTH_LINK_COOKIE
+        OAUTH_LINK_COOKIE
       ];
 
       if (linkToken) {
@@ -346,8 +349,8 @@ export class OAuthController {
     req: ExpressRequest,
     res: Response
   ): Promise<void> {
-    res.clearCookie(OAuthController.OAUTH_LINK_COOKIE, {
-      path: '/api/v1/auth/oauth'
+    res.clearCookie(OAUTH_LINK_COOKIE, {
+      path: OAUTH_LINK_COOKIE_PATH
     });
 
     try {

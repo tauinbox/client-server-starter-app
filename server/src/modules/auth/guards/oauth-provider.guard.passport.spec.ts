@@ -12,6 +12,7 @@ import { PassportModule } from '@nestjs/passport';
 import { Test } from '@nestjs/testing';
 import type { Request as ExpressRequest } from 'express';
 import * as passport from 'passport';
+import * as cookieParser from 'cookie-parser';
 import * as request from 'supertest';
 import { createOAuthProviderGuard } from './oauth-provider.guard';
 import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authentication-exception.filter';
@@ -102,6 +103,8 @@ describe('createOAuthProviderGuard (real Passport pipeline)', () => {
     }).compile();
 
     app = moduleRef.createNestApplication();
+    // main.ts applies the same parser, and the link-flow branch reads req.cookies.
+    app.use(cookieParser());
     await app.init();
     server = app.getHttpServer() as Server;
   });
@@ -126,6 +129,43 @@ describe('createOAuthProviderGuard (real Passport pipeline)', () => {
 
   it('redirects to the client login page when the strategy errors', async () => {
     const response = await request(server).get('/oauth/error/callback');
+
+    expect(response.status).toBe(302);
+    expect(response.headers['location']).toBe(
+      `${CLIENT}/login?oauth_error=auth_failed`
+    );
+  });
+
+  it('reports a declined consent screen as a cancellation', async () => {
+    const response = await request(server).get(
+      '/oauth/fail/callback?error=access_denied'
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers['location']).toBe(
+      `${CLIENT}/login?oauth_error=oauth_cancelled`
+    );
+  });
+
+  it('returns a cancelled link flow to the profile page and clears the link cookie', async () => {
+    const response = await request(server)
+      .get('/oauth/fail/callback?error=access_denied')
+      .set('Cookie', 'oauth_link=link-token');
+
+    expect(response.status).toBe(302);
+    expect(response.headers['location']).toBe(
+      `${CLIENT}/profile?oauth_error=oauth_cancelled`
+    );
+    expect(response.headers['set-cookie']).toEqual([
+      expect.stringContaining('oauth_link=;')
+    ]);
+  });
+
+  it('keeps an attacker-supplied error value out of the redirect', async () => {
+    const response = await request(server).get(
+      '/oauth/fail/callback?error=' +
+        encodeURIComponent('https://evil.example/#')
+    );
 
     expect(response.status).toBe(302);
     expect(response.headers['location']).toBe(
