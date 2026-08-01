@@ -36,6 +36,7 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Dev server | `npm run start:dev` (port 3000, watch mode) |
 | Production start | `npm run start:prod` |
 | Build | `npm run build` |
+| Typecheck | `npm run typecheck` — `tsc --noEmit` over the full `tsconfig.json`, so it covers `test/`, `*.spec.ts`, `common/testing/` and `eslint.config.ts`, which `tsconfig.build.json` excludes from `npm run build` |
 | Lint | `npm run lint` |
 | Lint fix | `npm run lint:fix` |
 | Format check | `npm run format:check` — covers `src/`, `test/`, `scripts/`, root configs, plus `shared/src/` and the root-level `*.mjs` configs |

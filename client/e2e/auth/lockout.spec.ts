@@ -1,4 +1,5 @@
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { createMockUser } from '../fixtures/mock-data';
 
 test.describe('Account lockout', () => {
   test('should lock account after 5 failed login attempts', async ({
@@ -38,7 +39,7 @@ test.describe('Account lockout', () => {
     const lockedUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
     await _mockServer.seedUsers([
-      {
+      createMockUser({
         id: '200',
         email: 'locked@example.com',
         firstName: 'Locked',
@@ -53,7 +54,7 @@ test.describe('Account lockout', () => {
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
         deletedAt: null
-      }
+      })
     ]);
 
     await page.goto('/login');
@@ -77,7 +78,7 @@ test.describe('Account lockout', () => {
     const lockedUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
     await _mockServer.seedUsers([
-      {
+      createMockUser({
         id: '201',
         email: 'lockeduser@example.com',
         firstName: 'Locked',
@@ -92,7 +93,7 @@ test.describe('Account lockout', () => {
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
         deletedAt: null
-      }
+      })
     ]);
 
     // Login as admin

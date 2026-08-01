@@ -17,6 +17,8 @@ The dev proxy (`proxy.conf.mjs`) forwards `/api` and `/ws` requests to `BACKEND_
 |------|---------|
 | Dev server | `npm start` |
 | Build | `npm run build` |
+| Typecheck | `npm run typecheck` — `tsc --noEmit` over the `app` and `spec` projects. Never point it at the base `tsconfig.json`: that file is a shared base, not a compilable program (the app project needs `types: []`, specs need `lib: esnext.disposable`, e2e needs `types: ["node"]`) |
+| Typecheck e2e | `npm run typecheck:e2e` — `tsconfig.e2e.json` (`e2e/**` + `playwright.config.ts`). Separate because the fixtures import mock-server sources, so it needs `mock-server/` installed; `ng build` covers the app project only and Playwright transpiles without typechecking, so `e2e/` is checked by nothing else |
 | Lint (TS + SCSS + checks) | `npm run lint` |
 | Lint fix (TS + SCSS) | `npm run lint:fix` |
 | Lint SCSS only | `npm run lint:styles` |

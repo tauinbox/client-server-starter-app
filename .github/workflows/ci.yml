@@ -34,6 +34,7 @@ jobs:
       - run: npm run audit:ci
       - run: npm run lint
       - run: npm run format:check
+      - run: npm run typecheck
       - run: npm run check:routes
       - run: npm run check:enums
       - run: npm run check:permissions
@@ -137,7 +138,7 @@ jobs:
       - run: npm run audit:ci
       - run: npm run lint
       - run: npm run format:check
-      - run: npx tsc --noEmit
+      - run: npm run typecheck
       - run: npm test
 
   client:
@@ -162,6 +163,10 @@ jobs:
       - run: npm run audit:ci
       - run: npm run lint
       - run: npm run format:check
+      # Covers src/ under both project configs. `e2e/` is typechecked in the
+      # Client E2E job instead, since its fixtures import mock-server sources
+      # and this job does not install that workspace.
+      - run: npm run typecheck
       - run: npm run test:cov
       - run: npm run build
 
@@ -196,6 +201,12 @@ jobs:
       - name: Install mock-server dependencies
         run: npm ci
         working-directory: mock-server
+
+      # Only runnable here: e2e fixtures import mock-server sources, so the
+      # workspace has to be installed first. Nothing else typechecks e2e/ --
+      # `ng build` compiles the app project and Playwright transpiles specs
+      # without typechecking.
+      - run: npm run typecheck:e2e
 
       - name: Cache Playwright browsers
         id: playwright-cache

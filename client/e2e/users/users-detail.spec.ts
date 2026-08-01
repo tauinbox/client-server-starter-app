@@ -4,6 +4,7 @@ import {
   loginViaUi,
   test
 } from '../fixtures/base.fixture';
+import { createMockUser } from '../fixtures/mock-data';
 
 test.describe('User Detail page', () => {
   test('should redirect to login when not authenticated', async ({
@@ -36,7 +37,7 @@ test.describe('User Detail page', () => {
     page
   }) => {
     await _mockServer.seedUsers([
-      {
+      createMockUser({
         id: '50',
         email: 'target@example.com',
         firstName: 'Target',
@@ -51,7 +52,7 @@ test.describe('User Detail page', () => {
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
         deletedAt: null
-      }
+      })
     ]);
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/50');
@@ -64,7 +65,7 @@ test.describe('User Detail page', () => {
     page
   }) => {
     await _mockServer.seedUsers([
-      {
+      createMockUser({
         id: '50',
         email: 'target@example.com',
         firstName: 'Target',
@@ -79,7 +80,7 @@ test.describe('User Detail page', () => {
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
         deletedAt: null
-      }
+      })
     ]);
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users/50');
