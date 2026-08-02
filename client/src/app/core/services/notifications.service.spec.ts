@@ -59,6 +59,10 @@ describe('NotificationsService', () => {
   afterEach(() => {
     service.disconnect();
     httpController.verify();
+    // Nine tests below install fake timers inline; the builder runs files with
+    // `isolate: false`, so one failing mid-test would fake timers for every
+    // later file in the same worker.
+    vi.useRealTimers();
   });
 
   it('should be created', () => {

@@ -829,7 +829,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 |------|------|-------|--------|
 | Server unit tests | Jest | `*.spec.ts` alongside source | 1672 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 249 tests, 242 passing with Postgres + Mailpit (23 skip on a bare run without Postgres/Redis/Mailpit) |
-| Client unit tests | Vitest | `*.spec.ts` alongside source | 1009 tests passing |
+| Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1010 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 209 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
 
