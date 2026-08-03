@@ -1,8 +1,8 @@
-import type { AddressInfo } from 'net';
 import type { Server } from 'http';
 import { PASSWORD_ERROR } from '@app/shared/constants/password.constants';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { createApp } from '../app';
+import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState } from '../state';
 
 let server: Server;
@@ -11,14 +11,11 @@ let baseUrl: string;
 // Satisfies the min-length check but fails PASSWORD_REGEX (no uppercase).
 const INVALID_PASSWORD = 'nouppercase1';
 
-beforeAll((done) => {
+beforeAll(async () => {
   resetState();
   const app = createApp();
-  server = app.listen(0, () => {
-    const addr = server.address() as AddressInfo;
-    baseUrl = `http://localhost:${addr.port}`;
-    done();
-  });
+  server = await listenOnUnblockedPort(app);
+  baseUrl = baseUrlOf(server);
 });
 
 afterAll((done) => {

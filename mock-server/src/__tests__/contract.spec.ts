@@ -2,6 +2,7 @@ import type { Server } from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createApp } from '../app';
+import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 
 type Route = {
   method: string;
@@ -29,14 +30,10 @@ function loadManifestRoutes(): Route[] {
 let server: Server;
 let baseUrl: string;
 
-beforeAll((done) => {
+beforeAll(async () => {
   const app = createApp();
-  server = app.listen(0, () => {
-    const addr = server.address();
-    const port = typeof addr === 'object' && addr ? addr.port : 0;
-    baseUrl = `http://localhost:${port}`;
-    done();
-  });
+  server = await listenOnUnblockedPort(app);
+  baseUrl = baseUrlOf(server);
 });
 
 afterAll((done) => {

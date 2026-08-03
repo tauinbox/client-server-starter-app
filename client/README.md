@@ -287,7 +287,7 @@ npm test
 
 - Browser: Chromium
 - **API testing**: Uses in-memory Express mock-server with per-worker isolation (not route interception)
-- Worker-scoped fixture starts Express on dynamic port (`app.listen(0)`), test-scoped resets state
+- Worker-scoped fixture starts Express on a dynamic port via `listenOnUnblockedPort()` (`mock-server/src/utils/listen.ts`), test-scoped resets state. The helper re-binds when the OS hands out a port on the WHATWG bad-port list (6665-6669, 6679, 6697, 10080 and the rest): Node's `fetch` refuses those with `bad port` and Chromium with `ERR_UNSAFE_PORT`, so a worker that drew one failed every request against it with an error naming no port
 - `page.route(/\/api\//)` intercepts API calls and rewrites URL to worker's mock-server port
 - **CI web server**: runs `ng build` before `playwright test`, then serves the pre-built output via `serve -s dist/client/browser` (eliminates 60-90 s Angular dev-server startup). Local dev still uses `ng serve`
 - Seed data: 5 well-known users + 65 faker-generated (70 total). Credentials: `admin@example.com / Password1` (admin), `user@example.com / Password1` (user)
