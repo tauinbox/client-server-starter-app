@@ -8,6 +8,10 @@ import {
 } from './app-ability';
 import { ResourceService } from '../services/resource.service';
 import { resolveConditions } from './resolve-conditions';
+import {
+  CASL_RESERVED_ACTION_NAMES,
+  CASL_RESERVED_SUBJECT_NAMES
+} from './constants';
 
 export interface RoleInfo {
   name: string;
@@ -73,6 +77,25 @@ export class CaslAbilityFactory {
       // take constructors or string literals — never entity instances (those
       // are for ability.can() checks).
       const subject = rawSubject as Extract<Subjects, string>;
+
+      // A reserved keyword reaching here bypassed the write-time checks, and
+      // can('manage', X) / can(X, 'all') grant far beyond what the permission
+      // names. The deny stays registered - inverting a wildcard is strictly
+      // more restrictive, and dropping an authored deny would fail open.
+      if (
+        CASL_RESERVED_ACTION_NAMES.includes(action) ||
+        CASL_RESERVED_SUBJECT_NAMES.includes(subject.toLowerCase())
+      ) {
+        this.logger.error(
+          `Permission "${p.permission}" for user ${userId} uses a reserved CASL keyword (action "${action}", subject "${subject}") - ${
+            isDeny ? 'registered as a blanket deny' : 'not registered'
+          }`
+        );
+        if (isDeny) {
+          register(action, subject);
+        }
+        continue;
+      }
 
       if (!p.conditions) {
         register(action, subject);

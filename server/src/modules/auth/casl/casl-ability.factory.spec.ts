@@ -6,7 +6,9 @@ const MOCK_SUBJECT_MAP: Record<string, string> = {
   users: 'User',
   roles: 'Role',
   permissions: 'Permission',
-  profile: 'Profile'
+  profile: 'Profile',
+  // Only reachable through a DB write that bypassed ResourceService.
+  wildcard: 'all'
 };
 
 const MOCK_ORPHANED_SUBJECT_MAP: Record<string, string> = {
@@ -204,6 +206,115 @@ describe('CaslAbilityFactory', () => {
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('user-1'));
 
     errorSpy.mockRestore();
+  });
+
+  describe('reserved CASL keywords', () => {
+    it('should not register an allow whose action is reserved', async () => {
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+      const roles: RoleInfo[] = [{ name: 'viewer', isSuper: false }];
+      const permissions: ResolvedPermission[] = [
+        {
+          resource: 'users',
+          action: 'manage',
+          permission: 'users:manage',
+          conditions: null
+        }
+      ];
+
+      const ability = await factory.createForUser('user-1', roles, permissions);
+
+      expect(ability.rules).toHaveLength(0);
+      expect(ability.can('manage', 'User')).toBe(false);
+      expect(ability.can('delete', 'User')).toBe(false);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('users:manage')
+      );
+
+      errorSpy.mockRestore();
+    });
+
+    it('should not register an allow whose subject is reserved', async () => {
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+      const roles: RoleInfo[] = [{ name: 'viewer', isSuper: false }];
+      const permissions: ResolvedPermission[] = [
+        {
+          resource: 'wildcard',
+          action: 'read',
+          permission: 'wildcard:read',
+          conditions: null
+        }
+      ];
+
+      const ability = await factory.createForUser('user-1', roles, permissions);
+
+      expect(ability.rules).toHaveLength(0);
+      expect(ability.can('read', 'User')).toBe(false);
+      expect(ability.can('read', 'Role')).toBe(false);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('wildcard:read')
+      );
+
+      errorSpy.mockRestore();
+    });
+
+    it('should keep a deny whose action is reserved', async () => {
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+      const roles: RoleInfo[] = [{ name: 'viewer', isSuper: false }];
+      const permissions: ResolvedPermission[] = [
+        {
+          resource: 'users',
+          action: 'read',
+          permission: 'users:read',
+          conditions: null
+        },
+        {
+          resource: 'users',
+          action: 'manage',
+          permission: 'users:manage',
+          conditions: { effect: 'deny' }
+        }
+      ];
+
+      const ability = await factory.createForUser('user-1', roles, permissions);
+
+      expect(ability.can('read', 'User')).toBe(false);
+
+      errorSpy.mockRestore();
+    });
+
+    it('should ignore a reserved allow while honouring the rest of the set', async () => {
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+      const roles: RoleInfo[] = [{ name: 'viewer', isSuper: false }];
+      const permissions: ResolvedPermission[] = [
+        {
+          resource: 'users',
+          action: 'manage',
+          permission: 'users:manage',
+          conditions: null
+        },
+        {
+          resource: 'roles',
+          action: 'read',
+          permission: 'roles:read',
+          conditions: null
+        }
+      ];
+
+      const ability = await factory.createForUser('user-1', roles, permissions);
+
+      expect(ability.can('read', 'Role')).toBe(true);
+      expect(ability.can('read', 'User')).toBe(false);
+
+      errorSpy.mockRestore();
+    });
   });
 
   it('should handle multiple permissions for different resources', async () => {
