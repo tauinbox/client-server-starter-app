@@ -10,6 +10,7 @@ import { User } from '../entities/user.entity';
 import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
 import type { AppAbility } from '../../auth/casl/app-ability';
 
 describe('UsersService', () => {
@@ -213,12 +214,15 @@ describe('UsersService', () => {
     it('should return paginated results with default params', async () => {
       mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockUser], 1]);
 
-      const result = await service.findPaginated({
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      });
+      const result = await service.findPaginated(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        },
+        SYSTEM_ABILITY
+      );
 
       expect(mockRepository.createQueryBuilder).toHaveBeenCalledWith('user');
       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
@@ -239,12 +243,15 @@ describe('UsersService', () => {
     it('should apply custom page and limit', async () => {
       mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 25]);
 
-      const result = await service.findPaginated({
-        page: 3,
-        limit: 5,
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      });
+      const result = await service.findPaginated(
+        {
+          page: 3,
+          limit: 5,
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        },
+        SYSTEM_ABILITY
+      );
 
       expect(mockQueryBuilder.skip).toHaveBeenCalledWith(10);
       expect(mockQueryBuilder.take).toHaveBeenCalledWith(5);
@@ -259,12 +266,15 @@ describe('UsersService', () => {
     it('should apply sorting', async () => {
       mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
 
-      await service.findPaginated({
-        page: 1,
-        limit: 10,
-        sortBy: 'email',
-        sortOrder: 'asc'
-      });
+      await service.findPaginated(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'email',
+          sortOrder: 'asc'
+        },
+        SYSTEM_ABILITY
+      );
 
       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
         'user.email',
@@ -275,13 +285,16 @@ describe('UsersService', () => {
     it('should apply filters along with pagination', async () => {
       mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockUser], 1]);
 
-      await service.findPaginated({
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-        email: 'test'
-      });
+      await service.findPaginated(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+          email: 'test'
+        },
+        SYSTEM_ABILITY
+      );
 
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         'user.email ILIKE :email',
@@ -295,13 +308,16 @@ describe('UsersService', () => {
     it('should filter by role via a dedicated inner join (not trimming displayed roles)', async () => {
       mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockUser], 1]);
 
-      await service.findPaginated({
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-        role: 'admin'
-      });
+      await service.findPaginated(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+          role: 'admin'
+        },
+        SYSTEM_ABILITY
+      );
 
       expect(mockQueryBuilder.innerJoin).toHaveBeenCalledWith(
         'user.roles',
@@ -319,12 +335,15 @@ describe('UsersService', () => {
     it('should return empty data with correct meta when no results', async () => {
       mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
 
-      const result = await service.findPaginated({
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      });
+      const result = await service.findPaginated(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        },
+        SYSTEM_ABILITY
+      );
 
       expect(result.data).toEqual([]);
       expect(result.meta).toEqual({
@@ -338,12 +357,15 @@ describe('UsersService', () => {
     it('should compute totalPages correctly', async () => {
       mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 71]);
 
-      const result = await service.findPaginated({
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      });
+      const result = await service.findPaginated(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        },
+        SYSTEM_ABILITY
+      );
 
       expect(result.meta.totalPages).toBe(8);
     });
@@ -351,13 +373,16 @@ describe('UsersService', () => {
     it('should call withDeleted() when includeDeleted is true', async () => {
       mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
 
-      await service.findPaginated({
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-        includeDeleted: true
-      });
+      await service.findPaginated(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+          includeDeleted: true
+        },
+        SYSTEM_ABILITY
+      );
 
       expect(mockQueryBuilder.withDeleted).toHaveBeenCalled();
     });
@@ -365,13 +390,16 @@ describe('UsersService', () => {
     it('should not call withDeleted() when includeDeleted is false', async () => {
       mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
 
-      await service.findPaginated({
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-        includeDeleted: false
-      });
+      await service.findPaginated(
+        {
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+          includeDeleted: false
+        },
+        SYSTEM_ABILITY
+      );
 
       expect(mockQueryBuilder.withDeleted).not.toHaveBeenCalled();
     });
@@ -381,11 +409,14 @@ describe('UsersService', () => {
     it('should return cursor-paginated results with default params', async () => {
       mockQueryBuilder.getMany.mockResolvedValue([mockUser]);
 
-      const result = await service.findCursorPaginated({
-        limit: 20,
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      });
+      const result = await service.findCursorPaginated(
+        {
+          limit: 20,
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        },
+        SYSTEM_ABILITY
+      );
 
       expect(mockRepository.createQueryBuilder).toHaveBeenCalledWith('user');
       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
@@ -411,11 +442,14 @@ describe('UsersService', () => {
       }));
       mockQueryBuilder.getMany.mockResolvedValue(users);
 
-      const result = await service.findCursorPaginated({
-        limit: 2,
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      });
+      const result = await service.findCursorPaginated(
+        {
+          limit: 2,
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        },
+        SYSTEM_ABILITY
+      );
 
       expect(result.data).toHaveLength(2);
       expect(result.meta.hasMore).toBe(true);
@@ -425,12 +459,15 @@ describe('UsersService', () => {
     it('should apply filters', async () => {
       mockQueryBuilder.getMany.mockResolvedValue([]);
 
-      await service.findCursorPaginated({
-        limit: 20,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-        email: 'test'
-      });
+      await service.findCursorPaginated(
+        {
+          limit: 20,
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+          email: 'test'
+        },
+        SYSTEM_ABILITY
+      );
 
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         'user.email ILIKE :email',
@@ -441,12 +478,15 @@ describe('UsersService', () => {
     it('applies unified q filter as OR across email/firstName/lastName/id', async () => {
       mockQueryBuilder.getMany.mockResolvedValue([]);
 
-      await service.findCursorPaginated({
-        limit: 20,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-        q: 'al_ice'
-      });
+      await service.findCursorPaginated(
+        {
+          limit: 20,
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+          q: 'al_ice'
+        },
+        SYSTEM_ABILITY
+      );
 
       type BracketsLike = { whereFactory: (qb: SubRecorder) => void };
       type SubRecorder = {
@@ -495,12 +535,15 @@ describe('UsersService', () => {
     it('should call withDeleted when includeDeleted is true', async () => {
       mockQueryBuilder.getMany.mockResolvedValue([]);
 
-      await service.findCursorPaginated({
-        limit: 20,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-        includeDeleted: true
-      });
+      await service.findCursorPaginated(
+        {
+          limit: 20,
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+          includeDeleted: true
+        },
+        SYSTEM_ABILITY
+      );
 
       expect(mockQueryBuilder.withDeleted).toHaveBeenCalled();
     });
@@ -512,7 +555,7 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       mockRepository.save.mockResolvedValue({ ...mockUser, ...updateDto });
 
-      const result = await service.update('user-1', updateDto);
+      const result = await service.update('user-1', updateDto, SYSTEM_ABILITY);
 
       expect(mockRepository.merge).toHaveBeenCalledWith(mockUser, updateDto);
       expect(mockRepository.save).toHaveBeenCalledWith(mockUser);
@@ -525,7 +568,7 @@ describe('UsersService', () => {
       mockRepository.save.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('new-hashed' as never);
 
-      await service.update('user-1', updateDto);
+      await service.update('user-1', updateDto, SYSTEM_ABILITY);
 
       expect(bcrypt.hash).toHaveBeenCalledWith(
         'NewPassword1',
@@ -540,7 +583,7 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(null);
 
       await expect(
-        service.update('nonexistent', { firstName: 'Updated' })
+        service.update('nonexistent', { firstName: 'Updated' }, SYSTEM_ABILITY)
       ).rejects.toThrow(HttpException);
     });
 
@@ -552,7 +595,7 @@ describe('UsersService', () => {
       });
       mockRepository.save.mockResolvedValue(mockUser);
 
-      await service.update('user-1', { unlockAccount: true });
+      await service.update('user-1', { unlockAccount: true }, SYSTEM_ABILITY);
 
       expect(mockRepository.merge).toHaveBeenCalledWith(
         expect.anything(),
@@ -567,7 +610,7 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       mockRepository.save.mockResolvedValue({ ...mockUser, isActive: false });
 
-      await service.update('user-1', { isActive: false });
+      await service.update('user-1', { isActive: false }, SYSTEM_ABILITY);
 
       expect(mockRepository.merge).toHaveBeenCalledWith(
         expect.anything(),
@@ -617,7 +660,11 @@ describe('UsersService', () => {
         firstName: 'Updated'
       });
 
-      const result = await service.update('user-1', { firstName: 'Updated' });
+      const result = await service.update(
+        'user-1',
+        { firstName: 'Updated' },
+        SYSTEM_ABILITY
+      );
 
       expect(result.firstName).toBe('Updated');
     });
@@ -646,9 +693,13 @@ describe('UsersService', () => {
           .mockResolvedValueOnce(user)
           .mockResolvedValueOnce(null);
 
-        const result = await service.update('user-1', {
-          email: 'changed@example.com'
-        });
+        const result = await service.update(
+          'user-1',
+          {
+            email: 'changed@example.com'
+          },
+          SYSTEM_ABILITY
+        );
 
         expect(result.email).toBe('changed@example.com');
         expect(result.isEmailVerified).toBe(false);
@@ -667,7 +718,11 @@ describe('UsersService', () => {
         const user = buildVerifiedUser();
         mockRepository.findOne.mockResolvedValueOnce(user);
 
-        const result = await service.update('user-1', { email: user.email });
+        const result = await service.update(
+          'user-1',
+          { email: user.email },
+          SYSTEM_ABILITY
+        );
 
         expect(result.isEmailVerified).toBe(true);
         expect(mockMailService.sendEmailVerification).not.toHaveBeenCalled();
@@ -680,7 +735,11 @@ describe('UsersService', () => {
           .mockResolvedValueOnce({ ...user, id: 'other-user' } as User);
 
         await expect(
-          service.update('user-1', { email: 'taken@example.com' })
+          service.update(
+            'user-1',
+            { email: 'taken@example.com' },
+            SYSTEM_ABILITY
+          )
         ).rejects.toMatchObject({
           status: HttpStatus.CONFLICT,
           response: {
@@ -699,7 +758,11 @@ describe('UsersService', () => {
 
         // Same id returned by uniqueness check should be ignored
         await expect(
-          service.update('user-1', { email: 'taken@example.com' })
+          service.update(
+            'user-1',
+            { email: 'taken@example.com' },
+            SYSTEM_ABILITY
+          )
         ).resolves.toBeDefined();
       });
     });
@@ -729,7 +792,7 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       const manager = mockRemoveTransaction();
 
-      await service.remove('user-1');
+      await service.remove('user-1', SYSTEM_ABILITY);
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'user-1' },
@@ -742,7 +805,7 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       const manager = mockRemoveTransaction();
 
-      await service.remove('user-1');
+      await service.remove('user-1', SYSTEM_ABILITY);
 
       expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(manager.update).toHaveBeenCalledWith(User, 'user-1', {
@@ -761,7 +824,9 @@ describe('UsersService', () => {
         softRemove: jest.fn().mockRejectedValue(new Error('db down'))
       });
 
-      await expect(service.remove('user-1')).rejects.toThrow('db down');
+      await expect(service.remove('user-1', SYSTEM_ABILITY)).rejects.toThrow(
+        'db down'
+      );
 
       // The clear was issued on the transactional manager, so the rejection
       // propagating out of the callback rolls it back with the soft-delete.
@@ -772,9 +837,9 @@ describe('UsersService', () => {
     it('should throw HttpException when user not found', async () => {
       mockRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.remove('nonexistent')).rejects.toThrow(
-        HttpException
-      );
+      await expect(
+        service.remove('nonexistent', SYSTEM_ABILITY)
+      ).rejects.toThrow(HttpException);
     });
 
     it('should throw ForbiddenException when ability denies delete', async () => {
@@ -823,7 +888,7 @@ describe('UsersService', () => {
         .mockResolvedValueOnce(deletedUser) // withDeleted lookup
         .mockResolvedValueOnce(restoredUser); // final findOne after restore
 
-      const result = await service.restore('user-1');
+      const result = await service.restore('user-1', SYSTEM_ABILITY);
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'user-1' },
@@ -847,7 +912,7 @@ describe('UsersService', () => {
         .mockResolvedValueOnce(deletedActiveUser)
         .mockResolvedValueOnce(mockUser);
 
-      const result = await service.restore('user-1');
+      const result = await service.restore('user-1', SYSTEM_ABILITY);
 
       expect(mockRepository.restore).toHaveBeenCalledWith('user-1');
       expect(result.isActive).toBe(true);
@@ -857,9 +922,9 @@ describe('UsersService', () => {
     it('should throw HttpException when user does not exist', async () => {
       mockRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.restore('nonexistent')).rejects.toThrow(
-        HttpException
-      );
+      await expect(
+        service.restore('nonexistent', SYSTEM_ABILITY)
+      ).rejects.toThrow(HttpException);
     });
 
     it('should throw ForbiddenException when ability denies restore', async () => {
@@ -1077,6 +1142,37 @@ describe('UsersService', () => {
         passwordResetToken: null,
         passwordResetExpiresAt: null
       });
+    });
+  });
+
+  // The authorization argument is required on every method that filters or
+  // instance-checks, so a caller cannot get unfiltered data by omitting it.
+  // ts-jest typechecks this file, so an accidental revert to an optional
+  // parameter makes each @ts-expect-error unused and fails the suite.
+  describe('authorization argument is mandatory', () => {
+    const query = {
+      page: 1,
+      limit: 10,
+      sortBy: 'createdAt',
+      sortOrder: 'desc'
+    } as const;
+
+    it('does not compile when omitted', () => {
+      // @ts-expect-error ability is required
+      void (() => service.findPaginated(query));
+      // @ts-expect-error ability is required
+      void (() => service.findCursorPaginated({ ...query, cursor: undefined }));
+      // @ts-expect-error ability is required
+      void (() => service.update('user-1', { firstName: 'x' }));
+      // @ts-expect-error ability is required
+      void (() => service.remove('user-1'));
+      // @ts-expect-error ability is required
+      void (() => service.restore('user-1'));
+    });
+
+    it('rejects undefined in place of an ability', () => {
+      // @ts-expect-error undefined is not an ability nor the system sentinel
+      void (() => service.remove('user-1', undefined));
     });
   });
 });

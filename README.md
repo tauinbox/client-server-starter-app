@@ -206,7 +206,7 @@ Meaning: user can update only their own record, only if it's active, and only if
 
 #### Instance-Level Checks
 
-**Server-side:** controllers inject `@CurrentAbility()` and pass it to the service, which loads the entity and calls `ability.can(action, entity)`. Returns 403 if denied.
+**Server-side:** controllers inject `@CurrentAbility()` and pass it to the service, which loads the entity and calls `ability.can(action, entity)`. Returns 403 if denied. On `UsersService` the ability parameter is **required** (typed `AbilityOrSystem`), so a new caller cannot skip filtering or the instance check by omitting it — a caller that genuinely acts without a requesting principal (e.g. the self-service `PATCH /auth/profile`, whose target is pinned to the authenticated user) passes the explicit `SYSTEM_ABILITY` sentinel.
 
 **Client-side** — three mechanisms:
 
@@ -829,7 +829,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1676 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1678 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 249 tests, 242 passing with Postgres + Mailpit (23 skip on a bare run without Postgres/Redis/Mailpit) |
 | Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1010 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 209 tests passing |

@@ -171,7 +171,8 @@ src/
 │   ├── entities/           # Role, Permission, RolePermission
 │   ├── guards/             # PermissionsGuard (resolves + checks typed permissions; admin bypasses)
 │   ├── decorators/         # @RequirePermissions([Actions,Subjects]), @Authorize([action,subject]) composite, @RegisterResource
-│   └── casl/               # app-ability.ts (AppAbility, Actions, Subjects, PermissionCheck types)
+│   └── casl/               # app-ability.ts (AppAbility, Actions, Subjects, PermissionCheck types,
+│                           #   SYSTEM_ABILITY sentinel + AbilityOrSystem union)
 │                           # CaslAbilityFactory (builds AppAbility, used by AuthController /permissions)
 │                           # constants.ts (reserved keywords: skipped for an allow, kept for a deny, at build time)
 ├── notifications/

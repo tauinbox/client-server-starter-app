@@ -18,6 +18,7 @@ import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factor
 import { SessionRevocationListener } from '../src/modules/auth/listeners/session-revocation.listener';
 import { User } from '../src/modules/users/entities/user.entity';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import type { AppAbility } from '../src/modules/auth/casl/app-ability';
 
 interface UserStore {
@@ -125,9 +126,13 @@ describe('UsersService.update — email change side effects', () => {
   });
 
   it('resets isEmailVerified, persists a hashed verification token and triggers MailService', async () => {
-    const updated = await usersService.update('user-1', {
-      email: 'after@example.com'
-    });
+    const updated = await usersService.update(
+      'user-1',
+      {
+        email: 'after@example.com'
+      },
+      SYSTEM_ABILITY
+    );
 
     expect(updated.email).toBe('after@example.com');
     expect(updated.isEmailVerified).toBe(false);
@@ -147,10 +152,14 @@ describe('UsersService.update — email change side effects', () => {
   });
 
   it('does not touch verification fields when email is unchanged', async () => {
-    const updated = await usersService.update('user-1', {
-      email: 'before@example.com',
-      firstName: 'Updated'
-    });
+    const updated = await usersService.update(
+      'user-1',
+      {
+        email: 'before@example.com',
+        firstName: 'Updated'
+      },
+      SYSTEM_ABILITY
+    );
 
     expect(updated.isEmailVerified).toBe(true);
     expect(updated.emailVerificationToken).toBeNull();
@@ -163,7 +172,11 @@ describe('UsersService.update — email change side effects', () => {
     u.pendingEmailToken = 'hashed-self-service-token';
     u.pendingEmailExpiresAt = new Date(Date.now() + 3600_000);
 
-    await usersService.update('user-1', { email: 'admin-set@example.com' });
+    await usersService.update(
+      'user-1',
+      { email: 'admin-set@example.com' },
+      SYSTEM_ABILITY
+    );
 
     const persisted = store.rows.get('user-1');
     expect(persisted?.pendingEmail).toBeNull();
@@ -180,7 +193,11 @@ describe('UsersService.update — email change side effects', () => {
 
     let caught: unknown;
     try {
-      await usersService.update('user-1', { email: 'reserved@example.com' });
+      await usersService.update(
+        'user-1',
+        { email: 'reserved@example.com' },
+        SYSTEM_ABILITY
+      );
     } catch (err) {
       caught = err;
     }
@@ -196,7 +213,11 @@ describe('UsersService.update — email change side effects', () => {
 
     let caught: unknown;
     try {
-      await usersService.update('user-1', { email: 'taken@example.com' });
+      await usersService.update(
+        'user-1',
+        { email: 'taken@example.com' },
+        SYSTEM_ABILITY
+      );
     } catch (err) {
       caught = err;
     }

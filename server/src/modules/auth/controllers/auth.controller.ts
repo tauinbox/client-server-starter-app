@@ -35,6 +35,7 @@ import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { AuthService } from '../services/auth.service';
 import { PermissionService } from '../services/permission.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
+import { SYSTEM_ABILITY } from '../casl/app-ability';
 import { RegisterDto } from '../dtos/register.dto';
 import { UpdateProfileDto } from '../dtos/update-profile.dto';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
@@ -236,9 +237,13 @@ export class AuthController {
     }
 
     const { currentPassword: _ignored, ...updatePayload } = updateProfileDto;
+    // Self-service route: the target is pinned to the authenticated caller and
+    // the route is already gated by @Authorize(['update', 'Profile']), so no
+    // instance-level check on another user's record can apply here.
     const updatedUser = await this.userService.update(
       req.user.userId,
-      updatePayload
+      updatePayload,
+      SYSTEM_ABILITY
     );
 
     if (updateProfileDto.password) {

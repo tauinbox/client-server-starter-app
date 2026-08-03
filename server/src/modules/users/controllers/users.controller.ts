@@ -133,7 +133,7 @@ export class UsersController {
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   findAll(
     @Query() query: SearchUsersQueryDto,
-    @CurrentAbility() ability: AppAbility | undefined
+    @CurrentAbility() ability: AppAbility
   ) {
     return this.usersService.findPaginated(query, ability);
   }
@@ -149,7 +149,7 @@ export class UsersController {
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   searchUsers(
     @Query() query: SearchUsersQueryDto,
-    @CurrentAbility() ability: AppAbility | undefined
+    @CurrentAbility() ability: AppAbility
   ) {
     return this.usersService.findPaginated(query, ability);
   }
@@ -167,7 +167,7 @@ export class UsersController {
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   findAllCursor(
     @Query() query: SearchUsersCursorQueryDto,
-    @CurrentAbility() ability: AppAbility | undefined
+    @CurrentAbility() ability: AppAbility
   ) {
     return this.usersService.findCursorPaginated(query, ability);
   }
@@ -185,7 +185,7 @@ export class UsersController {
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   searchUsersCursor(
     @Query() query: SearchUsersCursorQueryDto,
-    @CurrentAbility() ability: AppAbility | undefined
+    @CurrentAbility() ability: AppAbility
   ) {
     return this.usersService.findCursorPaginated(query, ability);
   }

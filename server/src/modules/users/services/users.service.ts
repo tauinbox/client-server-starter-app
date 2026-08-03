@@ -6,7 +6,8 @@ import { withTransaction } from '../../../common/utils/with-transaction.util';
 import * as bcrypt from 'bcrypt';
 import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
-import type { AppAbility } from '../../auth/casl/app-ability';
+import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
+import type { AbilityOrSystem } from '../../auth/casl/app-ability';
 import { AuditService } from '../../audit/audit.service';
 import { assertCan } from '../../../common/utils/assert-can.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -76,7 +77,7 @@ export class UsersService {
 
   async findPaginated(
     query: SearchUsersQueryDto,
-    ability?: AppAbility
+    ability: AbilityOrSystem
   ): Promise<PaginatedResponseDto<User>> {
     const { page, limit, sortBy, sortOrder, includeDeleted, ...filters } =
       query;
@@ -89,7 +90,7 @@ export class UsersService {
       qb.withDeleted();
     }
 
-    if (ability) {
+    if (ability !== SYSTEM_ABILITY) {
       applyAbilityToUserQuery(qb, ability, 'search');
     }
 
@@ -109,7 +110,7 @@ export class UsersService {
 
   async findCursorPaginated(
     query: SearchUsersCursorQueryDto,
-    ability?: AppAbility
+    ability: AbilityOrSystem
   ): Promise<CursorPaginatedResponseDto<User>> {
     const { cursor, limit, sortBy, sortOrder, includeDeleted, ...filters } =
       query;
@@ -122,7 +123,7 @@ export class UsersService {
       qb.withDeleted();
     }
 
-    if (ability) {
+    if (ability !== SYSTEM_ABILITY) {
       applyAbilityToUserQuery(qb, ability, 'search');
     }
 
@@ -236,11 +237,11 @@ export class UsersService {
   async update(
     id: string,
     updateUserDto: UpdateUserDto,
-    ability?: AppAbility
+    ability: AbilityOrSystem
   ): Promise<User> {
     const user = await this.findOne(id);
 
-    if (ability) {
+    if (ability !== SYSTEM_ABILITY) {
       assertCan(
         ability,
         'update',
@@ -413,10 +414,10 @@ export class UsersService {
     });
   }
 
-  async remove(id: string, ability?: AppAbility): Promise<void> {
+  async remove(id: string, ability: AbilityOrSystem): Promise<void> {
     const user = await this.findOne(id);
 
-    if (ability) {
+    if (ability !== SYSTEM_ABILITY) {
       assertCan(
         ability,
         'delete',
@@ -441,7 +442,7 @@ export class UsersService {
     });
   }
 
-  async restore(id: string, ability?: AppAbility): Promise<User> {
+  async restore(id: string, ability: AbilityOrSystem): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id },
       relations: ['roles'],
@@ -457,7 +458,7 @@ export class UsersService {
       );
     }
 
-    if (ability) {
+    if (ability !== SYSTEM_ABILITY) {
       assertCan(
         ability,
         'delete',
