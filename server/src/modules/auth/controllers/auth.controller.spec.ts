@@ -15,6 +15,7 @@ import { CaptchaRequiredGuard } from '../captcha/captcha-required.guard';
 import { JwtAuthRequest, LocalAuthRequest } from '../types/auth.request';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
+import { SYSTEM_ABILITY } from '../casl/app-ability';
 
 const allowAllGuard = { canActivate: () => true };
 
@@ -449,7 +450,11 @@ describe('AuthController', () => {
 
       const result = await controller.updateProfile(req, dto as never, res);
 
-      expect(userServiceMock.update).toHaveBeenCalledWith('user-1', dto);
+      expect(userServiceMock.update).toHaveBeenCalledWith(
+        'user-1',
+        dto,
+        SYSTEM_ABILITY
+      );
       expect(authServiceMock.verifyCurrentPassword).not.toHaveBeenCalled();
       expect(authServiceMock.logout).not.toHaveBeenCalled();
       expect(res.clearCookie).not.toHaveBeenCalled();
@@ -494,9 +499,11 @@ describe('AuthController', () => {
 
       await controller.updateProfile(req, dto as never, res);
 
-      expect(userServiceMock.update).toHaveBeenCalledWith('user-1', {
-        password: 'NewPassword1'
-      });
+      expect(userServiceMock.update).toHaveBeenCalledWith(
+        'user-1',
+        { password: 'NewPassword1' },
+        SYSTEM_ABILITY
+      );
     });
 
     it('should propagate INVALID_CURRENT_PASSWORD when verifyCurrentPassword throws', async () => {

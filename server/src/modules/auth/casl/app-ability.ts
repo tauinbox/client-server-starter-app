@@ -44,6 +44,18 @@ export type Subjects = KnownSubjects | SubjectInstance | 'all';
 export type AppAbility = MongoAbility<[Actions, Subjects]>;
 
 /**
+ * Explicit opt-out from instance-level authorization, for callers that act
+ * without a requesting principal: self-service routes whose target is already
+ * pinned to the caller, background jobs and seeders. Service methods take
+ * `AbilityOrSystem` as a REQUIRED parameter so that skipping authorization has
+ * to be written down and can be grepped for - forgetting the argument is a
+ * compile error rather than a silent unfiltered query.
+ */
+export const SYSTEM_ABILITY = Symbol('SYSTEM_ABILITY');
+
+export type AbilityOrSystem = AppAbility | typeof SYSTEM_ABILITY;
+
+/**
  * Typed permission check used by @Authorize decorator and PermissionsGuard.
  * KnownActions catches typos at compile time; Subjects validates resource names.
  */

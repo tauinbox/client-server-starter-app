@@ -23,6 +23,7 @@ import { AuditService } from '../src/modules/audit/audit.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
 import { CaptchaRequiredGuard } from '../src/modules/auth/captcha/captcha-required.guard';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 
 describe('Profile mass-assignment protection (e2e)', () => {
   let app: INestApplication;
@@ -113,8 +114,10 @@ describe('Profile mass-assignment protection (e2e)', () => {
       .expect(200);
 
     expect(res.body).toEqual({ id: 'user-1', firstName: 'x' });
-    expect(usersService.update).toHaveBeenCalledWith('user-1', {
-      firstName: 'x'
-    });
+    expect(usersService.update).toHaveBeenCalledWith(
+      'user-1',
+      { firstName: 'x' },
+      SYSTEM_ABILITY
+    );
   });
 });
