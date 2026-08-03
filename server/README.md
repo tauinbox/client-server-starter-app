@@ -173,6 +173,7 @@ src/
 │   ├── decorators/         # @RequirePermissions([Actions,Subjects]), @Authorize([action,subject]) composite, @RegisterResource
 │   └── casl/               # app-ability.ts (AppAbility, Actions, Subjects, PermissionCheck types)
 │                           # CaslAbilityFactory (builds AppAbility, used by AuthController /permissions)
+│                           # constants.ts (reserved keywords: skipped for an allow, kept for a deny, at build time)
 ├── notifications/
 │   ├── notifications.service.ts    # Manages Map<userId, Map<connectionId, Subject>> — push(userId), pushToAll()
 │   ├── notifications.listener.ts   # @OnEvent() handlers: UserDeleted/PasswordChanged/Created/Updated/Restored/RoleChanged/RolePermissionsChanged → push

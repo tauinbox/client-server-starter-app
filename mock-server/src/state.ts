@@ -5,6 +5,10 @@ import {
 } from '@casl/ability';
 import type { MongoQuery } from '@casl/ability';
 import { packRules } from '@casl/ability/extra';
+import {
+  CASL_RESERVED_ACTION_NAMES,
+  CASL_RESERVED_SUBJECT_NAMES
+} from './constants';
 import type {
   AdminUserResponse,
   MockAuditLog,
@@ -383,6 +387,19 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
 
     const isDeny = conditions?.effect === 'deny';
     const register = isDeny ? cannot : can;
+
+    // Mirrors the server factory: a reserved keyword bypassed the write-time
+    // checks, and can('manage', X) / can(X, 'all') grant far beyond what the
+    // permission names. The deny stays registered - it only ever restricts.
+    if (
+      CASL_RESERVED_ACTION_NAMES.includes(action) ||
+      CASL_RESERVED_SUBJECT_NAMES.includes(subject.toLowerCase())
+    ) {
+      if (isDeny) {
+        register(action as Actions, subject);
+      }
+      continue;
+    }
 
     if (!conditions) {
       register(action as Actions, subject);

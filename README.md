@@ -246,6 +246,8 @@ Meaning: user can update only their own record, only if it's active, and only if
 
 Roles with `isSuper: true` receive `can('manage', 'all')` — a CASL wildcard that bypasses all condition checks. All buttons visible, all routes accessible, all API calls allowed.
 
+This is the only path to a wildcard rule. `manage` and `all` are rejected as action names and `all` as a resource subject when they are written, and rejected again when rules are built: a stored permission carrying either keyword is skipped (and logged at `error`) if it is an allow, and kept if it is a deny, since inverting a wildcard only ever restricts. The mock server's rule packer applies the same guard.
+
 #### Deny Rules (`effect: 'deny'`)
 
 Any permission on a role can set `effect: 'deny'` in its `conditions` to register a CASL `cannot()` rule instead of a `can()` rule. The factory partitions rules allow-first, deny-last; CASL's last-matching-rule semantics mean a deny always overrides a prior allow for the same `(resource, action)` pair. Deny rules may carry the same MongoQuery conditions as allow rules (ownership / fieldMatch / userAttr / custom), so you can express patterns like:
@@ -827,7 +829,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1672 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1676 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 249 tests, 242 passing with Postgres + Mailpit (23 skip on a bare run without Postgres/Redis/Mailpit) |
 | Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1010 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 209 tests passing |
