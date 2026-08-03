@@ -1,9 +1,12 @@
 import { test as base, expect } from '@playwright/test';
 import { createApp } from '../../../mock-server/src/app';
 import { resetState } from '../../../mock-server/src/state';
+import {
+  listenOnUnblockedPort,
+  portOf
+} from '../../../mock-server/src/utils/listen';
 import type { ControlApi } from '../../../mock-server/src/control.types';
 import type { Server } from 'http';
-import type { AddressInfo } from 'net';
 
 // ControlApi is the single source of truth for all __control endpoints.
 // TypeScript enforces that every ControlApi method is implemented in the
@@ -28,10 +31,8 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     // eslint-disable-next-line no-empty-pattern
     async ({}, use) => {
       const app = createApp();
-      const server = await new Promise<Server>((resolve) => {
-        const s = app.listen(0, () => resolve(s));
-      });
-      const port = (server.address() as AddressInfo).port;
+      const server = await listenOnUnblockedPort(app);
+      const port = portOf(server);
       console.log(`[Worker] Mock server started on port ${port}`);
       await use({ port, server });
       server.close();

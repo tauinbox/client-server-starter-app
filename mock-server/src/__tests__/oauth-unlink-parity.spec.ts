@@ -1,20 +1,17 @@
-import type { AddressInfo } from 'net';
 import type { Server } from 'http';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { createApp } from '../app';
+import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
 
 let server: Server;
 let baseUrl: string;
 
-beforeAll((done) => {
+beforeAll(async () => {
   resetState();
   const app = createApp();
-  server = app.listen(0, () => {
-    const addr = server.address() as AddressInfo;
-    baseUrl = `http://localhost:${addr.port}`;
-    done();
-  });
+  server = await listenOnUnblockedPort(app);
+  baseUrl = baseUrlOf(server);
 });
 
 afterAll((done) => {

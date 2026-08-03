@@ -2,22 +2,19 @@
 // filter params: a duplicated query param (?q=a&q=b, parsed as an array)
 // must be rejected 400, not coerced to "a,b".
 
-import type { AddressInfo } from 'net';
 import type { Server } from 'http';
 import { createApp } from '../app';
+import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState } from '../state';
 
 let server: Server;
 let baseUrl: string;
 
-beforeAll((done) => {
+beforeAll(async () => {
   resetState();
   const app = createApp();
-  server = app.listen(0, () => {
-    const addr = server.address() as AddressInfo;
-    baseUrl = `http://localhost:${addr.port}`;
-    done();
-  });
+  server = await listenOnUnblockedPort(app);
+  baseUrl = baseUrlOf(server);
 });
 
 afterAll((done) => {
