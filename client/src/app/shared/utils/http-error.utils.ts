@@ -3,6 +3,7 @@ import type { TranslocoService } from '@jsverse/transloco';
 
 type ServerErrorBody = {
   message?: string | string[];
+  errors?: string[];
   errorKey?: string;
 };
 
@@ -11,9 +12,11 @@ type ServerErrorBody = {
  *
  * Resolution order:
  * 1. `errorKey` when it maps to an actual translation entry;
- * 2. `message` as a string array - the ValidationPipe shape, whose entries are
- *    raw English class-validator texts, so a generic translated message is used
- *    instead of leaking them (per-field errors are already rendered by forms);
+ * 2. a validation payload - either an `errors` string array, which is how
+ *    `GlobalExceptionFilter` forwards ValidationPipe failures, or a `message`
+ *    string array, the raw ValidationPipe shape. Both carry raw English
+ *    class-validator texts, so a generic translated message is used instead of
+ *    leaking them (per-field errors are already rendered by forms);
  * 3. `fallbackKey` - a translated caller-specific message always beats the
  *    untranslated server text below it;
  * 4. `message` as a single string - server text, the last resort before the
@@ -36,7 +39,7 @@ export function parseHttpErrorMessage(
     }
   }
 
-  if (Array.isArray(body?.message)) {
+  if (Array.isArray(body?.errors) || Array.isArray(body?.message)) {
     return transloco.translate('errors.general.validationFailed');
   }
 

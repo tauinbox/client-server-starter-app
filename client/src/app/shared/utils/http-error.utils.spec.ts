@@ -40,6 +40,20 @@ describe('parseHttpErrorMessage', () => {
     );
   });
 
+  it('translates a generic message for the filtered validation payload', () => {
+    const error = new HttpErrorResponse({
+      error: {
+        message: 'email must be an email. name should not be empty',
+        errors: ['email must be an email', 'name should not be empty']
+      },
+      status: 400
+    });
+
+    expect(parseHttpErrorMessage(error, transloco)).toBe(
+      'Some of the submitted values are invalid. Please check the form and try again.'
+    );
+  });
+
   it('prefers the translated fallback key over a raw server message', () => {
     const error = new HttpErrorResponse({
       error: { message: 'Untranslated server text' },

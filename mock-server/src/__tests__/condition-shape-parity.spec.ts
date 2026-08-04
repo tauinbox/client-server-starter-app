@@ -117,8 +117,8 @@ describe('condition shape parity with server', () => {
       const res = await putConditions(conditions);
 
       expect(res.status).toBe(400);
-      const body = (await res.json()) as { message: string[] };
-      expect(body.message.join(' ')).toContain(part);
+      const body = (await res.json()) as { errors: string[] };
+      expect(body.errors.join(' ')).toContain(part);
       expect(editorRolePermissions()).toEqual([]);
     });
 
@@ -159,8 +159,8 @@ describe('condition shape parity with server', () => {
       );
 
       expect(res.status).toBe(400);
-      const body = (await res.json()) as { message: string[] };
-      expect(body.message.join(' ')).toContain('fieldMatch.status');
+      const body = (await res.json()) as { errors: string[] };
+      expect(body.errors.join(' ')).toContain('fieldMatch.status');
       expect(editorRolePermissions()).toEqual([]);
     });
   });
