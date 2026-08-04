@@ -54,6 +54,7 @@ describe('AuthService', () => {
     setPasswordResetToken: jest.Mock;
     findByPasswordResetToken: jest.Mock;
     clearPasswordResetToken: jest.Mock;
+    clearPendingEmailChange: jest.Mock;
     update: jest.Mock;
   };
   let mockTokenGenerator: {
@@ -170,6 +171,7 @@ describe('AuthService', () => {
       setPasswordResetToken: jest.fn().mockResolvedValue(undefined),
       findByPasswordResetToken: jest.fn(),
       clearPasswordResetToken: jest.fn().mockResolvedValue(undefined),
+      clearPendingEmailChange: jest.fn().mockResolvedValue(undefined),
       update: jest.fn().mockResolvedValue(mockUser)
     };
 
@@ -571,6 +573,31 @@ describe('AuthService', () => {
         HttpException
       );
       expect(mockManager.save).not.toHaveBeenCalled();
+    });
+
+    it('translates a unique violation on the insert into the same 409', async () => {
+      mockManager.findOne.mockResolvedValue(null); // check passes
+      mockManager.save.mockRejectedValue({ code: '23505' }); // index rejects
+
+      try {
+        await service.register(registerDto);
+        fail('Expected HttpException');
+      } catch (err) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect((err as HttpException).getStatus()).toBe(HttpStatus.CONFLICT);
+        expect((err as HttpException).getResponse()).toEqual(
+          expect.objectContaining({ errorKey: ErrorKeys.USERS.EMAIL_EXISTS })
+        );
+      }
+    });
+
+    it('propagates unrelated database failures from the insert', async () => {
+      mockManager.findOne.mockResolvedValue(null);
+      mockManager.save.mockRejectedValue(new Error('connection lost'));
+
+      await expect(service.register(registerDto)).rejects.toThrow(
+        'connection lost'
+      );
     });
   });
 
@@ -1219,6 +1246,42 @@ describe('AuthService', () => {
         })
       );
     });
+
+    it('stays enumeration-safe when the unique index rejects the write', async () => {
+      mockUsersService.findOne.mockResolvedValue({ ...mockUser });
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+      // Nobody held the address at check time; a concurrent request claimed it
+      // before this write landed.
+      mockManager.update.mockRejectedValue({ code: '23505' });
+
+      const result = await service.initiateEmailChange('user-1', {
+        newEmail: 'taken@example.com',
+        currentPassword: 'CorrectPassword1'
+      });
+
+      expect(result.message).toMatch(/confirmation link/);
+      expect(
+        mockMailService.sendEmailChangeConfirmation
+      ).not.toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          details: { newEmailDomain: 'example.com', conflict: true }
+        })
+      );
+    });
+
+    it('propagates unrelated database failures', async () => {
+      mockUsersService.findOne.mockResolvedValue({ ...mockUser });
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+      mockManager.update.mockRejectedValue(new Error('connection lost'));
+
+      await expect(
+        service.initiateEmailChange('user-1', {
+          newEmail: 'new@example.com',
+          currentPassword: 'CorrectPassword1'
+        })
+      ).rejects.toThrow('connection lost');
+    });
   });
 
   describe('confirmEmailChange', () => {
@@ -1299,14 +1362,11 @@ describe('AuthService', () => {
       await expect(service.confirmEmailChange('raw-token')).rejects.toThrow(
         HttpException
       );
-      expect(mockManager.update).toHaveBeenCalledWith(
-        expect.anything(),
-        'user-1',
-        expect.objectContaining({
-          pendingEmail: null,
-          pendingEmailToken: null,
-          pendingEmailExpiresAt: null
-        })
+      // Cleared outside the transaction: an in-transaction clear followed by a
+      // throw would be rolled back and the dead token would survive.
+      expect(mockManager.update).not.toHaveBeenCalled();
+      expect(mockUsersService.clearPendingEmailChange).toHaveBeenCalledWith(
+        'user-1'
       );
     });
 
@@ -1328,16 +1388,56 @@ describe('AuthService', () => {
         expect(err).toBeInstanceOf(HttpException);
         expect((err as HttpException).getStatus()).toBe(HttpStatus.CONFLICT);
       }
-      // The pending fields must be cleared so the user can re-initiate cleanly
-      expect(mockManager.update).toHaveBeenCalledWith(
-        expect.anything(),
-        'user-1',
-        expect.objectContaining({
-          pendingEmail: null,
-          pendingEmailToken: null,
-          pendingEmailExpiresAt: null
-        })
+      // The pending fields must be cleared so the user can re-initiate cleanly,
+      // and outside the transaction so the throw cannot roll the clear back.
+      expect(mockManager.update).not.toHaveBeenCalled();
+      expect(mockUsersService.clearPendingEmailChange).toHaveBeenCalledWith(
+        'user-1'
       );
+    });
+
+    it('translates a unique violation on the write into the documented 409', async () => {
+      const pendingUser = {
+        ...mockUser,
+        pendingEmail: 'race@example.com',
+        pendingEmailToken: 'hashed-token',
+        pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
+      };
+      mockManager.findOne.mockResolvedValue(pendingUser);
+      // Nobody held the address at check time; the index rejects the write.
+      mockManager.update.mockRejectedValue({ code: '23505' });
+
+      try {
+        await service.confirmEmailChange('raw-token');
+        fail('Expected HttpException');
+      } catch (err) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect((err as HttpException).getStatus()).toBe(HttpStatus.CONFLICT);
+        expect((err as HttpException).getResponse()).toEqual(
+          expect.objectContaining({
+            errorKey: ErrorKeys.USERS.EMAIL_EXISTS
+          })
+        );
+      }
+      expect(mockUsersService.clearPendingEmailChange).toHaveBeenCalledWith(
+        'user-1'
+      );
+    });
+
+    it('does not translate unrelated database failures', async () => {
+      const pendingUser = {
+        ...mockUser,
+        pendingEmail: 'new@example.com',
+        pendingEmailToken: 'hashed-token',
+        pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
+      };
+      mockManager.findOne.mockResolvedValue(pendingUser);
+      mockManager.update.mockRejectedValue(new Error('connection lost'));
+
+      await expect(service.confirmEmailChange('raw-token')).rejects.toThrow(
+        'connection lost'
+      );
+      expect(mockUsersService.clearPendingEmailChange).not.toHaveBeenCalled();
     });
   });
 });

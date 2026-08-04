@@ -17,6 +17,7 @@ import { MetricsService } from '../../core/metrics/metrics.service';
 import { hashToken } from '../../../common/utils/hash-token';
 import { issueEmailVerificationToken } from '../../../common/utils/issue-verification-token.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
+import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { SYSTEM_ROLES, ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
@@ -29,6 +30,34 @@ import {
 import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
 
 const RESET_TOKEN_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
+
+type ConfirmEmailChangeOutcome =
+  | {
+      kind: 'applied';
+      userId: string;
+      oldEmail: string;
+      newEmail: string;
+      locale: string;
+    }
+  | { kind: 'expired'; userId: string }
+  | { kind: 'conflict'; userId: string };
+
+/**
+ * The address checks in this file are not atomic with their writes: a
+ * concurrent request can claim the same address in between. The unique indexes
+ * on email and pending_email reject the loser, and translating that violation
+ * here keeps its response identical to the pre-check's instead of the generic
+ * unique-violation shape the exception filter would produce.
+ */
+function emailExistsConflict(): HttpException {
+  return new HttpException(
+    {
+      message: 'User with this email already exists',
+      errorKey: ErrorKeys.USERS.EMAIL_EXISTS
+    },
+    HttpStatus.CONFLICT
+  );
+}
 
 const ENUMERATION_SAFE_INITIATE_RESPONSE = {
   message:
@@ -210,21 +239,21 @@ export class AuthService {
         ]
       });
       if (existing) {
-        throw new HttpException(
-          {
-            message: 'User with this email already exists',
-            errorKey: ErrorKeys.USERS.EMAIL_EXISTS
-          },
-          HttpStatus.CONFLICT
-        );
+        throw emailExistsConflict();
       }
 
-      const newUser = await manager.save(User, {
-        ...registerDto,
-        password: hashedPassword,
-        emailVerificationToken: hashedToken,
-        emailVerificationExpiresAt: expiresAt
-      });
+      let newUser: User;
+      try {
+        newUser = await manager.save(User, {
+          ...registerDto,
+          password: hashedPassword,
+          emailVerificationToken: hashedToken,
+          emailVerificationExpiresAt: expiresAt
+        });
+      } catch (error: unknown) {
+        if (isUniqueViolation(error)) throw emailExistsConflict();
+        throw error;
+      }
 
       // Assign default 'user' role
       const userRole = await this.roleService.findRoleByName(SYSTEM_ROLES.USER);
@@ -604,26 +633,36 @@ export class AuthService {
     const hashedToken = hashToken(rawToken);
     const expiresAt = new Date(Date.now() + EMAIL_CHANGE_TOKEN_EXPIRY_MS);
 
-    const conflict = await withTransaction(this.dataSource, async (manager) => {
-      // Conflict if any OTHER user already holds this address as their
-      // primary email OR as a pending email change in flight.
-      const existing = await manager
-        .createQueryBuilder(User, 'u')
-        .where('(u.email = :email OR u.pendingEmail = :email)', {
-          email: dto.newEmail
-        })
-        .andWhere('u.id != :userId', { userId })
-        .getOne();
+    let conflict: boolean;
+    try {
+      conflict = await withTransaction(this.dataSource, async (manager) => {
+        // Conflict if any OTHER user already holds this address as their
+        // primary email OR as a pending email change in flight.
+        const existing = await manager
+          .createQueryBuilder(User, 'u')
+          .where('(u.email = :email OR u.pendingEmail = :email)', {
+            email: dto.newEmail
+          })
+          .andWhere('u.id != :userId', { userId })
+          .getOne();
 
-      if (existing) return true;
+        if (existing) return true;
 
-      await manager.update(User, userId, {
-        pendingEmail: dto.newEmail,
-        pendingEmailToken: hashedToken,
-        pendingEmailExpiresAt: expiresAt
+        await manager.update(User, userId, {
+          pendingEmail: dto.newEmail,
+          pendingEmailToken: hashedToken,
+          pendingEmailExpiresAt: expiresAt
+        });
+        return false;
       });
-      return false;
-    });
+    } catch (error: unknown) {
+      // The unique index on pending_email is the last line of defence when two
+      // requests claim the same address at once. The loser takes the same
+      // enumeration-safe path as a detected conflict - surfacing the violation
+      // would reveal that someone else holds the address.
+      if (!isUniqueViolation(error)) throw error;
+      conflict = true;
+    }
 
     const domain = dto.newEmail.slice(dto.newEmail.indexOf('@') + 1);
     this.auditService.logFireAndForget({
@@ -669,74 +708,92 @@ export class AuthService {
   ): Promise<{ message: string }> {
     const hashedToken = hashToken(rawToken);
 
-    const result = await withTransaction(this.dataSource, async (manager) => {
-      const user = await manager.findOne(User, {
-        where: { pendingEmailToken: hashedToken }
-      });
-      if (!user || !user.pendingEmail) {
-        throw new HttpException(
-          {
-            message: 'Invalid or expired email-change token',
-            errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED
-          },
-          HttpStatus.BAD_REQUEST
-        );
-      }
+    // Set inside the transaction, read after it: the unique index can reject
+    // the write below, and the loser still has to be cleaned up by id.
+    let tokenHolderId: string | null = null;
 
-      if (
-        user.pendingEmailExpiresAt &&
-        user.pendingEmailExpiresAt.getTime() < Date.now()
-      ) {
-        await manager.update(User, user.id, {
-          pendingEmail: null,
-          pendingEmailToken: null,
-          pendingEmailExpiresAt: null
-        });
-        throw new HttpException(
-          {
-            message:
-              'Email-change token has expired. Please request a new one.',
-            errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED
-          },
-          HttpStatus.BAD_REQUEST
-        );
-      }
+    let outcome: ConfirmEmailChangeOutcome;
+    try {
+      outcome = await withTransaction(
+        this.dataSource,
+        async (manager): Promise<ConfirmEmailChangeOutcome> => {
+          const user = await manager.findOne(User, {
+            where: { pendingEmailToken: hashedToken }
+          });
+          if (!user || !user.pendingEmail) {
+            throw new HttpException(
+              {
+                message: 'Invalid or expired email-change token',
+                errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED
+              },
+              HttpStatus.BAD_REQUEST
+            );
+          }
+          tokenHolderId = user.id;
 
-      const newEmail = user.pendingEmail;
-      const oldEmail = user.email;
+          if (
+            user.pendingEmailExpiresAt &&
+            user.pendingEmailExpiresAt.getTime() < Date.now()
+          ) {
+            return { kind: 'expired', userId: user.id };
+          }
 
-      const conflicting = await manager
-        .createQueryBuilder(User, 'u')
-        .where('u.email = :email', { email: newEmail })
-        .andWhere('u.id != :userId', { userId: user.id })
-        .getOne();
-      if (conflicting) {
-        await manager.update(User, user.id, {
-          pendingEmail: null,
-          pendingEmailToken: null,
-          pendingEmailExpiresAt: null
-        });
-        throw new HttpException(
-          {
-            message: 'User with this email already exists',
-            errorKey: ErrorKeys.USERS.EMAIL_EXISTS
-          },
-          HttpStatus.CONFLICT
-        );
-      }
+          const newEmail = user.pendingEmail;
+          const oldEmail = user.email;
 
-      await manager.update(User, user.id, {
-        email: newEmail,
-        isEmailVerified: true,
-        pendingEmail: null,
-        pendingEmailToken: null,
-        pendingEmailExpiresAt: null,
-        tokenRevokedAt: new Date()
-      });
-      await manager.delete(RefreshToken, { userId: user.id });
+          const conflicting = await manager
+            .createQueryBuilder(User, 'u')
+            .where('u.email = :email', { email: newEmail })
+            .andWhere('u.id != :userId', { userId: user.id })
+            .getOne();
+          if (conflicting) {
+            return { kind: 'conflict', userId: user.id };
+          }
 
-      return { userId: user.id, oldEmail, newEmail, locale: user.locale };
-    });
+          await manager.update(User, user.id, {
+            email: newEmail,
+            isEmailVerified: true,
+            pendingEmail: null,
+            pendingEmailToken: null,
+            pendingEmailExpiresAt: null,
+            tokenRevokedAt: new Date()
+          });
+          await manager.delete(RefreshToken, { userId: user.id });
+
+          return {
+            kind: 'applied',
+            userId: user.id,
+            oldEmail,
+            newEmail,
+            locale: user.locale
+          };
+        }
+      );
+    } catch (error: unknown) {
+      const racedUserId: string | null = tokenHolderId;
+      if (!isUniqueViolation(error) || racedUserId === null) throw error;
+      outcome = { kind: 'conflict', userId: racedUserId };
+    }
+
+    if (outcome.kind !== 'applied') {
+      // Outside the transaction on purpose: dropping the pending change and
+      // then throwing inside it would roll the cleanup back, leaving the dead
+      // token in place forever.
+      await this.usersService.clearPendingEmailChange(outcome.userId);
+
+      throw outcome.kind === 'expired'
+        ? new HttpException(
+            {
+              message:
+                'Email-change token has expired. Please request a new one.',
+              errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED
+            },
+            HttpStatus.BAD_REQUEST
+          )
+        : emailExistsConflict();
+    }
+
+    const result = outcome;
 
     await this.auditService.log({
       action: AuditAction.USER_EMAIL_CHANGE_COMPLETE,

@@ -161,6 +161,38 @@ describe('UsersService', () => {
         'User with this email already exists'
       );
     });
+
+    it('translates a unique violation on save into the same 409', async () => {
+      // The check passes, then a concurrent request claims the address and the
+      // unique index rejects this insert.
+      mockRepository.findOne.mockResolvedValue(null);
+      mockRepository.create.mockReturnValue(mockUser);
+      mockRepository.save.mockRejectedValue({ code: '23505' });
+      jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
+
+      try {
+        await service.create(createUserDto);
+        fail('Expected HttpException');
+      } catch (err) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect((err as HttpException).getStatus()).toBe(HttpStatus.CONFLICT);
+        expect((err as HttpException).getResponse()).toEqual({
+          message: 'User with this email already exists',
+          errorKey: ErrorKeys.USERS.EMAIL_EXISTS
+        });
+      }
+    });
+
+    it('propagates unrelated database failures from save', async () => {
+      mockRepository.findOne.mockResolvedValue(null);
+      mockRepository.create.mockReturnValue(mockUser);
+      mockRepository.save.mockRejectedValue(new Error('connection lost'));
+      jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
+
+      await expect(service.create(createUserDto)).rejects.toThrow(
+        'connection lost'
+      );
+    });
   });
 
   describe('findOne', () => {
@@ -619,6 +651,39 @@ describe('UsersService', () => {
           tokenRevokedAt: expect.any(Date) as Date
         })
       );
+    });
+
+    it('translates a unique violation on save into the same 409', async () => {
+      mockRepository.findOne
+        .mockResolvedValueOnce(mockUser) // target user
+        .mockResolvedValueOnce(null); // address free at check time
+      mockRepository.save.mockRejectedValue({ code: '23505' });
+
+      try {
+        await service.update(
+          'user-1',
+          { email: 'taken@example.com' },
+          SYSTEM_ABILITY
+        );
+        fail('Expected HttpException');
+      } catch (err) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect((err as HttpException).getStatus()).toBe(HttpStatus.CONFLICT);
+        expect((err as HttpException).getResponse()).toEqual({
+          message: 'User with this email already exists',
+          errorKey: ErrorKeys.USERS.EMAIL_EXISTS,
+          field: 'email'
+        });
+      }
+    });
+
+    it('propagates unrelated database failures from save', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      mockRepository.save.mockRejectedValue(new Error('connection lost'));
+
+      await expect(
+        service.update('user-1', { firstName: 'Updated' }, SYSTEM_ABILITY)
+      ).rejects.toThrow('connection lost');
     });
 
     it('should throw ForbiddenException when ability denies update', async () => {
