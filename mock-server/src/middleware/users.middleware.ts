@@ -40,6 +40,7 @@ import { adminGuard, authGuard } from '../helpers/auth.helpers';
 import { cancelSubscriptionsForDeletedUser } from './billing.middleware';
 import type { AuthenticatedRequest, MockUser } from '../types';
 import { pushToUser, pushToUsersMatching } from '../sse-hub';
+import { validationError } from '../helpers/validation-error.helpers';
 
 type UserCrudAction = 'created' | 'updated' | 'deleted' | 'restored';
 
@@ -267,16 +268,12 @@ router.post('/', adminGuard, (req, res) => {
   const email = normalizeEmail(req.body.email) ?? '';
 
   if (!email || !firstName || !lastName || !password) {
-    res
-      .status(400)
-      .json({ message: 'All fields are required', statusCode: 400 });
+    res.status(400).json(validationError('All fields are required'));
     return;
   }
 
   if (!isValidEmail(email)) {
-    res
-      .status(400)
-      .json({ message: 'email must be an email', statusCode: 400 });
+    res.status(400).json(validationError('email must be an email'));
     return;
   }
 
@@ -287,19 +284,19 @@ router.post('/', adminGuard, (req, res) => {
   const pwMaxErr = validateMaxLength(password, 128, 'password');
   const lengthErr = emailMaxErr || fnMaxErr || lnMaxErr || pwMinErr || pwMaxErr;
   if (lengthErr) {
-    res.status(400).json({ message: lengthErr, statusCode: 400 });
+    res.status(400).json(validationError(lengthErr));
     return;
   }
 
   if (!PASSWORD_REGEX.test(password)) {
-    res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });
+    res.status(400).json(validationError(PASSWORD_ERROR));
     return;
   }
 
   const locale: unknown = req.body.locale;
   const localeErr = validateLocale(locale);
   if (localeErr) {
-    res.status(400).json({ message: localeErr, statusCode: 400 });
+    res.status(400).json(validationError(localeErr));
     return;
   }
 
@@ -360,9 +357,7 @@ router.get('/', adminGuard, (req, res) => {
     req.query as Record<string, unknown>
   );
   if (badFilter) {
-    res
-      .status(400)
-      .json({ message: `${badFilter} must be a string`, statusCode: 400 });
+    res.status(400).json(validationError(`${badFilter} must be a string`));
     return;
   }
   const includeDeleted = String(req.query['includeDeleted']) === 'true';
@@ -382,9 +377,7 @@ router.get('/search', adminGuard, (req, res) => {
     req.query as Record<string, unknown>
   );
   if (badFilter) {
-    res
-      .status(400)
-      .json({ message: `${badFilter} must be a string`, statusCode: 400 });
+    res.status(400).json(validationError(`${badFilter} must be a string`));
     return;
   }
   const { q, email, firstName, lastName, role, isActive } = req.query;
@@ -438,9 +431,7 @@ router.get('/cursor', adminGuard, (req, res) => {
     req.query as Record<string, unknown>
   );
   if (badFilter) {
-    res
-      .status(400)
-      .json({ message: `${badFilter} must be a string`, statusCode: 400 });
+    res.status(400).json(validationError(`${badFilter} must be a string`));
     return;
   }
   const includeDeleted = String(req.query['includeDeleted']) === 'true';
@@ -462,9 +453,7 @@ router.get('/search/cursor', adminGuard, (req, res) => {
     req.query as Record<string, unknown>
   );
   if (badFilter) {
-    res
-      .status(400)
-      .json({ message: `${badFilter} must be a string`, statusCode: 400 });
+    res.status(400).json(validationError(`${badFilter} must be a string`));
     return;
   }
   const { q, email, firstName, lastName, role, isActive } = req.query;
@@ -574,14 +563,12 @@ router.patch('/:id', adminGuard, (req, res) => {
 
   if (email !== undefined) {
     if (!isValidEmail(email)) {
-      res
-        .status(400)
-        .json({ message: 'email must be an email', statusCode: 400 });
+      res.status(400).json(validationError('email must be an email'));
       return;
     }
     const emailMaxErr = validateMaxLength(email, 255, 'email');
     if (emailMaxErr) {
-      res.status(400).json({ message: emailMaxErr, statusCode: 400 });
+      res.status(400).json(validationError(emailMaxErr));
       return;
     }
   }
@@ -589,7 +576,7 @@ router.patch('/:id', adminGuard, (req, res) => {
   if (firstName !== undefined) {
     const fnMaxErr = validateMaxLength(firstName, 255, 'firstName');
     if (fnMaxErr) {
-      res.status(400).json({ message: fnMaxErr, statusCode: 400 });
+      res.status(400).json(validationError(fnMaxErr));
       return;
     }
   }
@@ -597,40 +584,37 @@ router.patch('/:id', adminGuard, (req, res) => {
   if (lastName !== undefined) {
     const lnMaxErr = validateMaxLength(lastName, 255, 'lastName');
     if (lnMaxErr) {
-      res.status(400).json({ message: lnMaxErr, statusCode: 400 });
+      res.status(400).json(validationError(lnMaxErr));
       return;
     }
   }
 
   if (password !== undefined) {
-    const pwMinErr = validateMinLength(password, 8, 'password');
-    const pwMaxErr = validateMaxLength(password, 128, 'password');
-    if (pwMinErr || pwMaxErr) {
-      res.status(400).json({ message: pwMinErr || pwMaxErr, statusCode: 400 });
+    const pwLenErr =
+      validateMinLength(password, 8, 'password') ??
+      validateMaxLength(password, 128, 'password');
+    if (pwLenErr) {
+      res.status(400).json(validationError(pwLenErr));
       return;
     }
     // Regex must be checked with the rest of the DTO validation, before any
     // field assignment: the real server validates the whole DTO first and
     // never partially mutates on a 400.
     if (!PASSWORD_REGEX.test(password)) {
-      res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });
+      res.status(400).json(validationError(PASSWORD_ERROR));
       return;
     }
   }
 
   if (isActive !== undefined && typeof isActive !== 'boolean') {
-    res.status(400).json({
-      message: 'isActive must be a boolean value',
-      statusCode: 400
-    });
+    res.status(400).json(validationError('isActive must be a boolean value'));
     return;
   }
 
   if (unlockAccount !== undefined && typeof unlockAccount !== 'boolean') {
-    res.status(400).json({
-      message: 'unlockAccount must be a boolean value',
-      statusCode: 400
-    });
+    res
+      .status(400)
+      .json(validationError('unlockAccount must be a boolean value'));
     return;
   }
 

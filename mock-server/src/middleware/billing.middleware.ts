@@ -29,6 +29,7 @@ import type {
   MockSubscription,
   MockUsageRecord
 } from '../types';
+import { validationError } from '../helpers/validation-error.helpers';
 
 const router = Router();
 
@@ -344,9 +345,7 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
   const productKey =
     typeof req.body?.productKey === 'string' ? req.body.productKey.trim() : '';
   if (!productKey) {
-    res
-      .status(400)
-      .json({ message: 'productKey must be a string', statusCode: 400 });
+    res.status(400).json(validationError('productKey must be a string'));
     return;
   }
   const requestedMinor = req.body?.amountMinor as unknown;
@@ -354,10 +353,9 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
     requestedMinor !== undefined &&
     (!Number.isInteger(requestedMinor) || (requestedMinor as number) < 1)
   ) {
-    res.status(400).json({
-      message: 'amountMinor must be a positive integer',
-      statusCode: 400
-    });
+    res
+      .status(400)
+      .json(validationError('amountMinor must be a positive integer'));
     return;
   }
 
@@ -448,9 +446,7 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
   const planKey =
     typeof req.body?.planKey === 'string' ? req.body.planKey.trim() : '';
   if (!planKey) {
-    res
-      .status(400)
-      .json({ message: 'planKey must be a string', statusCode: 400 });
+    res.status(400).json(validationError('planKey must be a string'));
     return;
   }
 
@@ -593,9 +589,7 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
   const planKey =
     typeof req.body?.planKey === 'string' ? req.body.planKey.trim() : '';
   if (!planKey) {
-    res
-      .status(400)
-      .json({ message: 'planKey must be a string', statusCode: 400 });
+    res.status(400).json(validationError('planKey must be a string'));
     return null;
   }
 
@@ -795,10 +789,9 @@ billingRouter.post(
     const { user } = req as AuthenticatedRequest;
     const mode = req.body?.mode ?? 'period_end';
     if (mode !== 'period_end' && mode !== 'immediate') {
-      res.status(400).json({
-        message: 'mode must be one of: period_end, immediate',
-        statusCode: 400
-      });
+      res
+        .status(400)
+        .json(validationError('mode must be one of: period_end, immediate'));
       return;
     }
 
@@ -848,10 +841,9 @@ billingRouter.put('/region', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
   const region = req.body?.region;
   if (region !== 'auto' && region !== 'ru' && region !== 'world') {
-    res.status(400).json({
-      message: 'region must be one of: auto, ru, world',
-      statusCode: 400
-    });
+    res
+      .status(400)
+      .json(validationError('region must be one of: auto, ru, world'));
     return;
   }
 
@@ -954,10 +946,9 @@ billingAdminRouter.post(
   (req: Request, res: Response) => {
     const mode = req.body?.mode ?? 'period_end';
     if (mode !== 'period_end' && mode !== 'immediate') {
-      res.status(400).json({
-        message: 'mode must be one of: period_end, immediate',
-        statusCode: 400
-      });
+      res
+        .status(400)
+        .json(validationError('mode must be one of: period_end, immediate'));
       return;
     }
 
@@ -1037,12 +1028,18 @@ billingAdminRouter.post(
     const alreadyRefunded = invoice.refundedMinor ?? 0;
     const remaining = invoice.amountMinor - alreadyRefunded;
     const amountMinor = req.body?.amountMinor;
+    // The DTO's @IsInt()/@Min(1) run before the service, so a supplied 0 or a
+    // fractional amount never reaches the remaining-total check.
     if (amountMinor !== undefined && !Number.isInteger(amountMinor)) {
-      res.status(400).json({
-        message:
-          'Refund amount must be between 1 and the remaining refundable total',
-        statusCode: 400
-      });
+      res
+        .status(400)
+        .json(validationError('amountMinor must be an integer number'));
+      return;
+    }
+    if (amountMinor !== undefined && (amountMinor as number) < 1) {
+      res
+        .status(400)
+        .json(validationError('amountMinor must not be less than 1'));
       return;
     }
 
@@ -1110,7 +1107,7 @@ billingAdminRouter.post('/usage', adminGuard, (req: Request, res: Response) => {
       (typeof occurredAtRaw !== 'string' ||
         Number.isNaN(Date.parse(occurredAtRaw))))
   ) {
-    res.status(400).json({ message: 'Invalid usage payload', statusCode: 400 });
+    res.status(400).json(validationError('Invalid usage payload'));
     return;
   }
 

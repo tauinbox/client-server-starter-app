@@ -35,6 +35,7 @@ import {
   trackAttemptAndSetHeader
 } from '../helpers/captcha.helpers';
 import type { AuthenticatedRequest, MockUser } from '../types';
+import { validationError } from '../helpers/validation-error.helpers';
 
 function findUserByPendingEmail(email: string): MockUser | undefined {
   const state = getState();
@@ -98,16 +99,12 @@ router.post('/register', (req, res) => {
   const email = normalizeEmail(req.body.email) ?? '';
 
   if (!email || !firstName || !lastName || !password) {
-    res
-      .status(400)
-      .json({ message: 'All fields are required', statusCode: 400 });
+    res.status(400).json(validationError('All fields are required'));
     return;
   }
 
   if (!isValidEmail(email)) {
-    res
-      .status(400)
-      .json({ message: 'email must be an email', statusCode: 400 });
+    res.status(400).json(validationError('email must be an email'));
     return;
   }
 
@@ -118,19 +115,19 @@ router.post('/register', (req, res) => {
   const pwMaxErr = validateMaxLength(password, 128, 'password');
   const lengthErr = emailMaxErr || fnMaxErr || lnMaxErr || pwMinErr || pwMaxErr;
   if (lengthErr) {
-    res.status(400).json({ message: lengthErr, statusCode: 400 });
+    res.status(400).json(validationError(lengthErr));
     return;
   }
 
   if (!PASSWORD_REGEX.test(password)) {
-    res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });
+    res.status(400).json(validationError(PASSWORD_ERROR));
     return;
   }
 
   const locale: unknown = req.body.locale;
   const localeErr = validateLocale(locale);
   if (localeErr) {
-    res.status(400).json({ message: localeErr, statusCode: 400 });
+    res.status(400).json(validationError(localeErr));
     return;
   }
 
@@ -316,13 +313,13 @@ router.post('/verify-email', (req, res) => {
   const { token } = req.body;
 
   if (!token) {
-    res.status(400).json({ message: 'Token is required', statusCode: 400 });
+    res.status(400).json(validationError('Token is required'));
     return;
   }
 
   const tokenLenError = validateMaxLength(token, 512, 'token');
   if (tokenLenError) {
-    res.status(400).json({ message: tokenLenError, statusCode: 400 });
+    res.status(400).json(validationError(tokenLenError));
     return;
   }
 
@@ -365,15 +362,13 @@ router.post('/resend-verification', (req, res) => {
   }
 
   if (!isValidEmail(email)) {
-    res
-      .status(400)
-      .json({ message: 'email must be an email', statusCode: 400 });
+    res.status(400).json(validationError('email must be an email'));
     return;
   }
 
   const emailLenError = validateMaxLength(email, 255, 'email');
   if (emailLenError) {
-    res.status(400).json({ message: emailLenError, statusCode: 400 });
+    res.status(400).json(validationError(emailLenError));
     return;
   }
 
@@ -428,15 +423,13 @@ router.post('/forgot-password', (req, res) => {
   }
 
   if (!isValidEmail(email)) {
-    res
-      .status(400)
-      .json({ message: 'email must be an email', statusCode: 400 });
+    res.status(400).json(validationError('email must be an email'));
     return;
   }
 
   const emailLenError = validateMaxLength(email, 255, 'email');
   if (emailLenError) {
-    res.status(400).json({ message: emailLenError, statusCode: 400 });
+    res.status(400).json(validationError(emailLenError));
     return;
   }
 
@@ -479,27 +472,26 @@ router.post('/reset-password', (req, res) => {
   const { token, password } = req.body;
 
   if (!token || !password) {
-    res
-      .status(400)
-      .json({ message: 'Token and password are required', statusCode: 400 });
+    res.status(400).json(validationError('Token and password are required'));
     return;
   }
 
   const tokenLenError = validateMaxLength(token, 512, 'token');
   if (tokenLenError) {
-    res.status(400).json({ message: tokenLenError, statusCode: 400 });
+    res.status(400).json(validationError(tokenLenError));
     return;
   }
 
-  const pwMinErr = validateMinLength(password, 8, 'password');
-  const pwMaxErr = validateMaxLength(password, 128, 'password');
-  if (pwMinErr || pwMaxErr) {
-    res.status(400).json({ message: pwMinErr || pwMaxErr, statusCode: 400 });
+  const pwLenErr =
+    validateMinLength(password, 8, 'password') ??
+    validateMaxLength(password, 128, 'password');
+  if (pwLenErr) {
+    res.status(400).json(validationError(pwLenErr));
     return;
   }
 
   if (!PASSWORD_REGEX.test(password)) {
-    res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });
+    res.status(400).json(validationError(PASSWORD_ERROR));
     return;
   }
 
@@ -707,14 +699,14 @@ router.patch('/profile', authGuard, (req, res) => {
 
   const localeErr = validateLocale(locale);
   if (localeErr) {
-    res.status(400).json({ message: localeErr, statusCode: 400 });
+    res.status(400).json(validationError(localeErr));
     return;
   }
 
   if (firstName !== undefined) {
     const fnMaxErr = validateMaxLength(firstName, 255, 'firstName');
     if (fnMaxErr) {
-      res.status(400).json({ message: fnMaxErr, statusCode: 400 });
+      res.status(400).json(validationError(fnMaxErr));
       return;
     }
   }
@@ -722,16 +714,17 @@ router.patch('/profile', authGuard, (req, res) => {
   if (lastName !== undefined) {
     const lnMaxErr = validateMaxLength(lastName, 255, 'lastName');
     if (lnMaxErr) {
-      res.status(400).json({ message: lnMaxErr, statusCode: 400 });
+      res.status(400).json(validationError(lnMaxErr));
       return;
     }
   }
 
   if (password !== undefined) {
-    const pwMinErr = validateMinLength(password, 8, 'password');
-    const pwMaxErr = validateMaxLength(password, 128, 'password');
-    if (pwMinErr || pwMaxErr) {
-      res.status(400).json({ message: pwMinErr || pwMaxErr, statusCode: 400 });
+    const pwLenErr =
+      validateMinLength(password, 8, 'password') ??
+      validateMaxLength(password, 128, 'password');
+    if (pwLenErr) {
+      res.status(400).json(validationError(pwLenErr));
       return;
     }
 
@@ -739,7 +732,7 @@ router.patch('/profile', authGuard, (req, res) => {
     // currentPassword business check and before any field assignment, so a 400
     // must leave the profile unchanged.
     if (!PASSWORD_REGEX.test(password)) {
-      res.status(400).json({ message: PASSWORD_ERROR, statusCode: 400 });
+      res.status(400).json(validationError(PASSWORD_ERROR));
       return;
     }
 
@@ -803,20 +796,16 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
     'If the new email is available, a confirmation link has been sent to it.';
 
   if (!newEmail) {
-    res
-      .status(400)
-      .json({ message: 'newEmail must be an email', statusCode: 400 });
+    res.status(400).json(validationError('newEmail must be an email'));
     return;
   }
   if (!isValidEmail(newEmail)) {
-    res
-      .status(400)
-      .json({ message: 'newEmail must be an email', statusCode: 400 });
+    res.status(400).json(validationError('newEmail must be an email'));
     return;
   }
   const emailMaxErr = validateMaxLength(newEmail, 255, 'newEmail');
   if (emailMaxErr) {
-    res.status(400).json({ message: emailMaxErr, statusCode: 400 });
+    res.status(400).json(validationError(emailMaxErr));
     return;
   }
   if (
@@ -824,10 +813,7 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
     currentPassword.length === 0 ||
     currentPassword.length > 128
   ) {
-    res.status(400).json({
-      message: 'currentPassword is required',
-      statusCode: 400
-    });
+    res.status(400).json(validationError('currentPassword is required'));
     return;
   }
 
@@ -916,13 +902,13 @@ router.post('/profile/email/confirm', (req, res) => {
   const { token } = req.body;
 
   if (!token || typeof token !== 'string') {
-    res.status(400).json({ message: 'Token is required', statusCode: 400 });
+    res.status(400).json(validationError('Token is required'));
     return;
   }
 
   const tokenLenError = validateMaxLength(token, 512, 'token');
   if (tokenLenError) {
-    res.status(400).json({ message: tokenLenError, statusCode: 400 });
+    res.status(400).json(validationError(tokenLenError));
     return;
   }
 
