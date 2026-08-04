@@ -39,7 +39,7 @@ export class ActionService {
   async create(data: {
     name: string;
     displayName: string;
-    description: string;
+    description?: string;
   }): Promise<Action> {
     const normalizedName = data.name.toLowerCase().trim();
 
@@ -69,6 +69,7 @@ export class ActionService {
     const action = this.actionRepository.create({
       ...data,
       name: normalizedName,
+      description: data.description ?? '',
       isDefault: false
     });
     const saved = await this.actionRepository.save(action);
