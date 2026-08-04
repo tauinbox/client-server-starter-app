@@ -183,6 +183,14 @@ describe('ActionService', () => {
       );
     });
 
+    it('should default an omitted description to the column default', async () => {
+      mockActionRepo.findOne.mockResolvedValue(null);
+      await service.create({ name: 'Export', displayName: 'Export' });
+      expect(mockActionRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ description: '' })
+      );
+    });
+
     it('should throw BadRequestException if name already exists', async () => {
       mockActionRepo.findOne.mockResolvedValue(makeCustomAction());
       await expect(service.create(createData)).rejects.toThrow(HttpException);

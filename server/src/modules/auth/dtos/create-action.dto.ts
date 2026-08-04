@@ -1,5 +1,5 @@
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 
 export class CreateActionDto {
@@ -24,12 +24,14 @@ export class CreateActionDto {
   @MaxLength(100)
   displayName: string;
 
-  @ApiProperty({
+  // Optional to match the column default and the update DTO: an action could
+  // always be edited down to an empty description but never created with one.
+  @ApiPropertyOptional({
     description: 'Description of what this action does',
     example: 'Publish a record to make it publicly visible'
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   @MaxLength(500)
-  description: string;
+  description?: string;
 }

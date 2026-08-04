@@ -14,8 +14,6 @@ import { validationError } from '../helpers/validation-error.helpers';
 
 const router = Router();
 
-const ACTION_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
-
 // GET /api/v1/rbac/metadata
 router.get('/metadata', adminGuard, (_req, res) => {
   const state = getState();
@@ -135,11 +133,8 @@ router.patch('/resources/:id', adminGuard, (req, res) => {
   }
 
   if (displayName !== undefined) {
-    if (typeof displayName !== 'string' || displayName.trim().length === 0) {
-      res.status(400).json({
-        message: 'displayName must be a non-empty string',
-        statusCode: 400
-      });
+    if (typeof displayName !== 'string') {
+      res.status(400).json(validationError('displayName must be a string'));
       return;
     }
     if (displayName.length > 100) {
@@ -148,6 +143,22 @@ router.patch('/resources/:id', adminGuard, (req, res) => {
         .json(validationError('displayName must not exceed 100 characters'));
       return;
     }
+  }
+
+  if (description !== undefined && description !== null) {
+    if (typeof description !== 'string') {
+      res.status(400).json(validationError('description must be a string'));
+      return;
+    }
+    if (description.length > 500) {
+      res
+        .status(400)
+        .json(validationError('description must not exceed 500 characters'));
+      return;
+    }
+  }
+
+  if (displayName !== undefined) {
     resource.displayName = displayName;
   }
 
@@ -200,14 +211,6 @@ router.post('/actions', adminGuard, (req, res) => {
     return;
   }
 
-  if (!ACTION_NAME_PATTERN.test(trimmedName)) {
-    res.status(400).json({
-      message: 'name must match pattern /^[a-z][a-z0-9_]*$/',
-      statusCode: 400
-    });
-    return;
-  }
-
   if (CASL_RESERVED_ACTION_NAMES.includes(trimmedName)) {
     res.status(400).json({
       message: `Action name "${trimmedName}" is reserved and cannot be used`,
@@ -230,18 +233,21 @@ router.post('/actions', adminGuard, (req, res) => {
     return;
   }
 
-  // Validate description
-  const desc =
-    description !== undefined && typeof description === 'string'
-      ? description
-      : '';
-
-  if (desc.length > 500) {
-    res
-      .status(400)
-      .json(validationError('description must not exceed 500 characters'));
-    return;
+  // Validate description - optional, but a supplied value must be a string.
+  if (description !== undefined && description !== null) {
+    if (typeof description !== 'string') {
+      res.status(400).json(validationError('description must be a string'));
+      return;
+    }
+    if (description.length > 500) {
+      res
+        .status(400)
+        .json(validationError('description must not exceed 500 characters'));
+      return;
+    }
   }
+
+  const desc = typeof description === 'string' ? description : '';
 
   // Check duplicate name
   const state = getState();
@@ -310,12 +316,11 @@ router.patch('/actions/:id', adminGuard, (req, res) => {
 
   const { displayName, description } = req.body;
 
+  // Validate before any mutation so a rejected request leaves the action
+  // untouched, matching the server's whole-DTO validation.
   if (displayName !== undefined) {
-    if (typeof displayName !== 'string' || displayName.trim().length === 0) {
-      res.status(400).json({
-        message: 'displayName must be a non-empty string',
-        statusCode: 400
-      });
+    if (typeof displayName !== 'string') {
+      res.status(400).json(validationError('displayName must be a string'));
       return;
     }
     if (displayName.length > 100) {
@@ -324,16 +329,26 @@ router.patch('/actions/:id', adminGuard, (req, res) => {
         .json(validationError('displayName must not exceed 100 characters'));
       return;
     }
-    action.displayName = displayName;
   }
 
-  if (description !== undefined) {
-    if (typeof description === 'string' && description.length > 500) {
+  if (description !== undefined && description !== null) {
+    if (typeof description !== 'string') {
+      res.status(400).json(validationError('description must be a string'));
+      return;
+    }
+    if (description.length > 500) {
       res
         .status(400)
         .json(validationError('description must not exceed 500 characters'));
       return;
     }
+  }
+
+  if (displayName !== undefined) {
+    action.displayName = displayName;
+  }
+
+  if (description !== undefined) {
     action.description = typeof description === 'string' ? description : '';
   }
 
