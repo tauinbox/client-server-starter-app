@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, DataSource, Repository } from 'typeorm';
 import { subject } from '@casl/ability';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
+import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import * as bcrypt from 'bcrypt';
 import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
@@ -72,7 +73,32 @@ export class UsersService {
       password: hashedPassword
     });
 
-    return this.userRepository.save(user);
+    try {
+      return await this.userRepository.save(user);
+    } catch (error: unknown) {
+      throw this.emailConflictOrOriginal(error, false);
+    }
+  }
+
+  /**
+   * The address checks above are not atomic with their write: a concurrent
+   * request can claim the same address in between. The unique indexes on
+   * email and pending_email reject the loser, and this keeps its response
+   * identical to the pre-check's 409 instead of the generic unique-violation
+   * shape the exception filter would produce. Every unique index on users
+   * covers an address, so any violation here is an address collision.
+   */
+  private emailConflictOrOriginal(error: unknown, withField: boolean): unknown {
+    if (!isUniqueViolation(error)) return error;
+
+    return new HttpException(
+      {
+        message: 'User with this email already exists',
+        errorKey: ErrorKeys.USERS.EMAIL_EXISTS,
+        ...(withField && { field: 'email' })
+      },
+      HttpStatus.CONFLICT
+    );
   }
 
   async findPaginated(
@@ -297,7 +323,12 @@ export class UsersService {
     }
 
     this.userRepository.merge(user, changes);
-    const saved = await this.userRepository.save(user);
+    let saved: User;
+    try {
+      saved = await this.userRepository.save(user);
+    } catch (error: unknown) {
+      throw this.emailConflictOrOriginal(error, true);
+    }
 
     if (pendingVerificationRawToken) {
       this.mailService
@@ -404,6 +435,14 @@ export class UsersService {
   async findByPasswordResetToken(hashedToken: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: { passwordResetToken: hashedToken }
+    });
+  }
+
+  async clearPendingEmailChange(userId: string): Promise<void> {
+    await this.userRepository.update(userId, {
+      pendingEmail: null,
+      pendingEmailToken: null,
+      pendingEmailExpiresAt: null
     });
   }
 

@@ -6,7 +6,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| Frontend | Angular | 21.2.17 |
+| Frontend | Angular | 21.2.19 |
 | UI Library | Angular Material + CDK | 21.2.14 |
 | Backend | NestJS | 11.1.17 |
 | Database | PostgreSQL (TypeORM) | 0.3.28 |
@@ -829,7 +829,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1682 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1696 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 249 tests, 242 passing with Postgres + Mailpit (23 skip on a bare run without Postgres/Redis/Mailpit) |
 | Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1010 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 209 tests passing |
