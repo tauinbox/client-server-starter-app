@@ -10,6 +10,7 @@ import {
 import { adminGuard } from '../helpers/auth.helpers';
 import { CASL_RESERVED_ACTION_NAMES } from '../constants';
 import type { AuthenticatedRequest } from '../types';
+import { validationError } from '../helpers/validation-error.helpers';
 
 const router = Router();
 
@@ -92,38 +93,43 @@ router.patch('/resources/:id', adminGuard, (req, res) => {
   // untouched, matching the server's whole-DTO validation.
   if (allowedActionNames !== undefined && allowedActionNames !== null) {
     if (!Array.isArray(allowedActionNames)) {
-      res.status(400).json({
-        message: 'allowedActionNames must be an array',
-        statusCode: 400
-      });
+      res
+        .status(400)
+        .json(validationError('allowedActionNames must be an array'));
       return;
     }
     if (allowedActionNames.length > 100) {
-      res.status(400).json({
-        message: 'allowedActionNames must contain no more than 100 elements',
-        statusCode: 400
-      });
+      res
+        .status(400)
+        .json(
+          validationError(
+            'allowedActionNames must contain no more than 100 elements'
+          )
+        );
       return;
     }
     const nonString = (allowedActionNames as unknown[]).some(
       (name) => typeof name !== 'string'
     );
     if (nonString) {
-      res.status(400).json({
-        message: 'each value in allowedActionNames must be a string',
-        statusCode: 400
-      });
+      res
+        .status(400)
+        .json(
+          validationError('each value in allowedActionNames must be a string')
+        );
       return;
     }
     const tooLong = (allowedActionNames as string[]).some(
       (name) => name.length > 50
     );
     if (tooLong) {
-      res.status(400).json({
-        message:
-          'each value in allowedActionNames must be shorter than or equal to 50 characters',
-        statusCode: 400
-      });
+      res
+        .status(400)
+        .json(
+          validationError(
+            'each value in allowedActionNames must be shorter than or equal to 50 characters'
+          )
+        );
       return;
     }
   }
@@ -137,10 +143,9 @@ router.patch('/resources/:id', adminGuard, (req, res) => {
       return;
     }
     if (displayName.length > 100) {
-      res.status(400).json({
-        message: 'displayName must not exceed 100 characters',
-        statusCode: 400
-      });
+      res
+        .status(400)
+        .json(validationError('displayName must not exceed 100 characters'));
       return;
     }
     resource.displayName = displayName;
@@ -179,22 +184,19 @@ router.post('/actions', adminGuard, (req, res) => {
 
   // Validate name
   if (!name || typeof name !== 'string') {
-    res.status(400).json({ message: 'name is required', statusCode: 400 });
+    res.status(400).json(validationError('name is required'));
     return;
   }
 
   const trimmedName = name.trim().toLowerCase();
 
   if (trimmedName.length === 0) {
-    res.status(400).json({ message: 'name is required', statusCode: 400 });
+    res.status(400).json(validationError('name is required'));
     return;
   }
 
   if (trimmedName.length > 50) {
-    res.status(400).json({
-      message: 'name must not exceed 50 characters',
-      statusCode: 400
-    });
+    res.status(400).json(validationError('name must not exceed 50 characters'));
     return;
   }
 
@@ -217,17 +219,14 @@ router.post('/actions', adminGuard, (req, res) => {
 
   // Validate displayName
   if (!displayName || typeof displayName !== 'string') {
-    res
-      .status(400)
-      .json({ message: 'displayName is required', statusCode: 400 });
+    res.status(400).json(validationError('displayName is required'));
     return;
   }
 
   if (displayName.length > 100) {
-    res.status(400).json({
-      message: 'displayName must not exceed 100 characters',
-      statusCode: 400
-    });
+    res
+      .status(400)
+      .json(validationError('displayName must not exceed 100 characters'));
     return;
   }
 
@@ -238,10 +237,9 @@ router.post('/actions', adminGuard, (req, res) => {
       : '';
 
   if (desc.length > 500) {
-    res.status(400).json({
-      message: 'description must not exceed 500 characters',
-      statusCode: 400
-    });
+    res
+      .status(400)
+      .json(validationError('description must not exceed 500 characters'));
     return;
   }
 
@@ -321,10 +319,9 @@ router.patch('/actions/:id', adminGuard, (req, res) => {
       return;
     }
     if (displayName.length > 100) {
-      res.status(400).json({
-        message: 'displayName must not exceed 100 characters',
-        statusCode: 400
-      });
+      res
+        .status(400)
+        .json(validationError('displayName must not exceed 100 characters'));
       return;
     }
     action.displayName = displayName;
@@ -332,10 +329,9 @@ router.patch('/actions/:id', adminGuard, (req, res) => {
 
   if (description !== undefined) {
     if (typeof description === 'string' && description.length > 500) {
-      res.status(400).json({
-        message: 'description must not exceed 500 characters',
-        statusCode: 400
-      });
+      res
+        .status(400)
+        .json(validationError('description must not exceed 500 characters'));
       return;
     }
     action.description = typeof description === 'string' ? description : '';

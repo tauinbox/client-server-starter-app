@@ -18,6 +18,7 @@ import {
 import { adminGuard } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';
 import { pushToUser } from '../sse-hub';
+import { validationError } from '../helpers/validation-error.helpers';
 
 const router = Router();
 
@@ -211,7 +212,7 @@ router.post('/', adminGuard, (req, res) => {
   const { name, description, isSuper } = req.body;
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
-    res.status(400).json({ message: 'Role name is required', statusCode: 400 });
+    res.status(400).json(validationError('Role name is required'));
     return;
   }
 
@@ -415,17 +416,14 @@ router.put('/:id/permissions', adminGuard, (req, res) => {
     items?: { permissionId: string; conditions?: unknown }[];
   };
   if (!Array.isArray(items)) {
-    res
-      .status(400)
-      .json({ message: 'items must be an array', statusCode: 400 });
+    res.status(400).json(validationError('items must be an array'));
     return;
   }
 
   if (items.length > 500) {
-    res.status(400).json({
-      message: 'items must contain no more than 500 elements',
-      statusCode: 400
-    });
+    res
+      .status(400)
+      .json(validationError('items must contain no more than 500 elements'));
     return;
   }
 
@@ -433,12 +431,7 @@ router.put('/:id/permissions', adminGuard, (req, res) => {
   for (const item of items) {
     const error = findConditionShapeError(item.conditions);
     if (error) {
-      res.status(400).json({
-        message: error,
-        errors: [error],
-        statusCode: 400,
-        error: 'Bad Request'
-      });
+      res.status(400).json(validationError(error));
       return;
     }
   }
@@ -524,37 +517,28 @@ router.post('/:id/permissions', adminGuard, (req, res) => {
 
   const { permissionIds, conditions } = req.body;
   if (!Array.isArray(permissionIds)) {
-    res
-      .status(400)
-      .json({ message: 'permissionIds must be an array', statusCode: 400 });
+    res.status(400).json(validationError('permissionIds must be an array'));
     return;
   }
 
   if (permissionIds.length === 0) {
-    res.status(400).json({
-      message: 'permissionIds should not be empty',
-      statusCode: 400
-    });
+    res.status(400).json(validationError('permissionIds should not be empty'));
     return;
   }
 
   if (permissionIds.length > 500) {
-    res.status(400).json({
-      message: 'permissionIds must contain no more than 500 elements',
-      statusCode: 400
-    });
+    res
+      .status(400)
+      .json(
+        validationError('permissionIds must contain no more than 500 elements')
+      );
     return;
   }
 
   // Validate condition shape (mirrors the server's DTO validation)
   const conditionError = findConditionShapeError(conditions);
   if (conditionError) {
-    res.status(400).json({
-      message: conditionError,
-      errors: [conditionError],
-      statusCode: 400,
-      error: 'Bad Request'
-    });
+    res.status(400).json(validationError(conditionError));
     return;
   }
 

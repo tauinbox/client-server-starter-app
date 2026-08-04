@@ -25,6 +25,7 @@ import {
 } from '@app/shared/constants';
 import { attributeValueError } from '@app/shared/utils/feature-flag-attribute-value';
 import { adminGuard, authenticateRequest } from '../helpers/auth.helpers';
+import { validationError } from '../helpers/validation-error.helpers';
 import { pushToAll } from '../sse-hub';
 import { getState, logAudit, toFeatureFlagResponse } from '../state';
 import type { MockFeatureFlag, MockFeatureFlagRule } from '../types';
@@ -240,34 +241,51 @@ interface IncomingRule {
   payload?: unknown;
 }
 
+// `source` says which server layer rejects the same input: 'dto' is a
+// class-validator failure on ReplaceRulesDto/FeatureFlagRuleDto (envelope
+// carries `errors`), 'service' is a BadRequestException thrown by the
+// rule-payload validator (bare message).
+type RuleFailure = { ok: false; message: string; source: 'dto' | 'service' };
+
+const dtoFail = (message: string): RuleFailure => ({
+  ok: false,
+  message,
+  source: 'dto'
+});
+
+const serviceFail = (message: string): RuleFailure => ({
+  ok: false,
+  message,
+  source: 'service'
+});
+
 function validateRulePayload(
   type: FeatureFlagRuleType,
   payload: unknown
-):
-  | { ok: true; payload: FeatureFlagRulePayload }
-  | { ok: false; message: string } {
+): { ok: true; payload: FeatureFlagRulePayload } | RuleFailure {
   if (payload === null || typeof payload !== 'object') {
-    return { ok: false, message: 'rule payload must be an object' };
+    // @IsObject() on FeatureFlagRuleDto.payload rejects this before the
+    // rule-payload validator ever runs.
+    return dtoFail('rule payload must be an object');
   }
   const p = payload as Record<string, unknown>;
   if (p['type'] !== type) {
-    return {
-      ok: false,
-      message: `payload.type "${String(p['type'])}" does not match rule.type "${type}"`
-    };
+    return serviceFail(
+      `payload.type "${String(p['type'])}" does not match rule.type "${type}"`
+    );
   }
   switch (type) {
     case 'user': {
       const userIds = p['userIds'];
       if (!isStringArray(userIds)) {
-        return { ok: false, message: 'user rule requires userIds: string[]' };
+        return serviceFail('user rule requires userIds: string[]');
       }
       return { ok: true, payload: { type: 'user', userIds } };
     }
     case 'role': {
       const roleNames = p['roleNames'];
       if (!isStringArray(roleNames)) {
-        return { ok: false, message: 'role rule requires roleNames: string[]' };
+        return serviceFail('role rule requires roleNames: string[]');
       }
       return { ok: true, payload: { type: 'role', roleNames } };
     }
@@ -279,10 +297,9 @@ function validateRulePayload(
         percent < 0 ||
         percent > 100
       ) {
-        return {
-          ok: false,
-          message: 'percentage rule requires percent: number in [0, 100]'
-        };
+        return serviceFail(
+          'percentage rule requires percent: number in [0, 100]'
+        );
       }
       return { ok: true, payload: { type: 'percentage', percent } };
     }
@@ -295,33 +312,28 @@ function validateRulePayload(
         typeof field !== 'string' ||
         !ATTRIBUTE_FIELDS.includes(field as FeatureFlagAttributeField)
       ) {
-        return {
-          ok: false,
-          message: `attribute rule requires field ∈ ${ATTRIBUTE_FIELDS.join(', ')}`
-        };
+        return serviceFail(
+          `attribute rule requires field ∈ ${ATTRIBUTE_FIELDS.join(', ')}`
+        );
       }
       if (
         typeof op !== 'string' ||
         !ATTRIBUTE_OPS.includes(op as FeatureFlagAttributeOp)
       ) {
-        return {
-          ok: false,
-          message: `attribute rule requires op ∈ ${ATTRIBUTE_OPS.join(', ')}`
-        };
+        return serviceFail(
+          `attribute rule requires op ∈ ${ATTRIBUTE_OPS.join(', ')}`
+        );
       }
       if (field === 'custom') {
         if (typeof customKey !== 'string' || customKey === '') {
-          return {
-            ok: false,
-            message:
-              'attribute rule with field=custom requires customKey: string'
-          };
+          return serviceFail(
+            'attribute rule with field=custom requires customKey: string'
+          );
         }
         if (!KNOWN_CUSTOM_KEYS.has(customKey)) {
-          return {
-            ok: false,
-            message: `customKey "${customKey}" is not registered (mock-server has no DI registry)`
-          };
+          return serviceFail(
+            `customKey "${customKey}" is not registered (mock-server has no DI registry)`
+          );
         }
       }
       const valueError = attributeValueError(
@@ -329,7 +341,7 @@ function validateRulePayload(
         value
       );
       if (valueError) {
-        return { ok: false, message: valueError };
+        return serviceFail(valueError);
       }
       return {
         ok: true,
@@ -353,34 +365,32 @@ type ValidatedRule = {
 
 function validateRules(
   input: unknown
-): { ok: true; rules: ValidatedRule[] } | { ok: false; message: string } {
+): { ok: true; rules: ValidatedRule[] } | RuleFailure {
   if (!Array.isArray(input)) {
-    return { ok: false, message: 'rules must be an array' };
+    return dtoFail('rules must be an array');
   }
   if (input.length > 64) {
-    return { ok: false, message: 'rules array can contain at most 64 entries' };
+    return dtoFail('rules array can contain at most 64 entries');
   }
   const out: ValidatedRule[] = [];
   for (let i = 0; i < input.length; i++) {
     const r = input[i] as IncomingRule;
     if (!RULE_EFFECTS.includes(r.effect as FeatureFlagRuleEffect)) {
-      return {
-        ok: false,
-        message: `rules[${i}].effect must be one of: ${RULE_EFFECTS.join(', ')}`
-      };
+      return dtoFail(
+        `rules[${i}].effect must be one of: ${RULE_EFFECTS.join(', ')}`
+      );
     }
     if (!RULE_TYPES.includes(r.type as FeatureFlagRuleType)) {
-      return {
-        ok: false,
-        message: `rules[${i}].type must be one of: ${RULE_TYPES.join(', ')}`
-      };
+      return dtoFail(
+        `rules[${i}].type must be one of: ${RULE_TYPES.join(', ')}`
+      );
     }
     const validated = validateRulePayload(
       r.type as FeatureFlagRuleType,
       r.payload
     );
     if (!validated.ok) {
-      return { ok: false, message: `rules[${i}]: ${validated.message}` };
+      return { ...validated, message: `rules[${i}]: ${validated.message}` };
     }
     out.push({
       type: r.type as FeatureFlagRuleType,
@@ -542,7 +552,7 @@ adminRouter.get('/:id', (req, res) => {
 adminRouter.post('/', (req, res) => {
   const validation = validateCreate(req.body as CreateFlagBody);
   if (!validation.ok) {
-    sendError(res, 400, validation.message);
+    res.status(400).json(validationError(validation.message));
     return;
   }
   if (findFlagByKey(validation.data.key)) {
@@ -605,7 +615,7 @@ adminRouter.patch('/:id', (req, res) => {
   }
   const validation = validateUpdate(req.body as UpdateFlagBody);
   if (!validation.ok) {
-    sendError(res, 400, validation.message);
+    res.status(400).json(validationError(validation.message));
     return;
   }
   if (validation.patch.key !== undefined) {
@@ -685,7 +695,11 @@ adminRouter.put('/:id/rules', (req, res) => {
   const body = req.body as ReplaceRulesBody;
   const validation = validateRules(body.rules);
   if (!validation.ok) {
-    sendError(res, 400, validation.message);
+    if (validation.source === 'dto') {
+      res.status(400).json(validationError(validation.message));
+    } else {
+      sendError(res, 400, validation.message);
+    }
     return;
   }
   const state = getState();
