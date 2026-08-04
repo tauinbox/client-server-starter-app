@@ -38,6 +38,7 @@ jobs:
       - run: npm run check:routes
       - run: npm run check:enums
       - run: npm run check:permissions
+      - run: npm run check:i18n
 
   server-tests:
     name: Server – Tests & Build

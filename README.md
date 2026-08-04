@@ -841,12 +841,11 @@ GitHub Actions runs on every push and pull request to `master` with 5 jobs:
 
 | Job | Depends on | Steps | Artifacts |
 |-----|-----------|-------|-----------|
-| **Server – Checks** | — | audit (high), lint, format:check, typecheck, check:routes, check:enums, check:permissions | — |
+| **Server – Checks** | — | audit (high), lint, format:check, typecheck, check:routes, check:enums, check:permissions, check:i18n (validates all `ErrorKeys` values exist in every client i18n JSON) | — |
 | **Server – Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
 | **Mock Server** | — | audit (high), lint, format:check, typecheck, test | — |
 | **Client** | — | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |
 | **Client E2E** | mock-server | typecheck:e2e (after installing mock-server), ng build → serve (static), Playwright Chromium | HTML report, test results |
-| **Server – Checks** | — | check:i18n (validates all ErrorKeys exist in all i18n JSON files) | — |
 
 Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file required — all tests run against mocks.
 
