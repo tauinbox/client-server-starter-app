@@ -434,7 +434,8 @@ router.put('/:id/permissions', adminGuard, (req, res) => {
     const error = findConditionShapeError(item.conditions);
     if (error) {
       res.status(400).json({
-        message: [error],
+        message: error,
+        errors: [error],
         statusCode: 400,
         error: 'Bad Request'
       });
@@ -549,7 +550,8 @@ router.post('/:id/permissions', adminGuard, (req, res) => {
   const conditionError = findConditionShapeError(conditions);
   if (conditionError) {
     res.status(400).json({
-      message: [conditionError],
+      message: conditionError,
+      errors: [conditionError],
       statusCode: 400,
       error: 'Bad Request'
     });
