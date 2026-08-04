@@ -50,7 +50,7 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Generate migration | `npm run migrations:gen -- ./src/migrations/<kebab-name>` (build first) |
 | Revert migration | `npm run migrations:revert` (build first) |
 | Run seeders | `npm run seed:run` (build first) |
-| Validate i18n keys | `npm run check:i18n` — verifies all `ErrorKeys` values exist in every client i18n JSON |
+| Validate i18n keys | `npm run check:i18n` — verifies all `ErrorKeys` values exist in every client i18n JSON. Enforced in CI (`Server – Checks`), so a new error key without translations fails the build |
 | Generate CASL subjects | `npm run generate:subjects` — scans `@RegisterResource` decorators and writes `shared/src/generated/casl-subjects.ts`; run when adding a new resource |
 | Audit role-permission conditions | `npm run check:role-conditions` — flags any `role_permissions.conditions.custom` rows that contain operators or fields the SQL translator (`apply-ability.util.ts`) cannot handle. Run against staging dumps before deploying changes to the translator. |
 | Audit dependencies | `npm run audit:ci` — runs `npm audit --audit-level=high --omit=dev` through `scripts/audit-ci.mjs`, the same gate CI enforces. Fails on high/critical advisories; moderate findings pass. Run before every push (advisories are tree-based, so this can fail with no source change). The wrapper retries up to 3 times, 15 s apart, **only** when the registry's advisory endpoint itself errors — a real finding still fails on the first attempt. |

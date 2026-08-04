@@ -830,7 +830,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
 | Server unit tests | Jest | `*.spec.ts` alongside source | 1696 tests passing |
-| Server E2E tests | Jest | Separate config in `test/` | 249 tests, 242 passing with Postgres + Mailpit (23 skip on a bare run without Postgres/Redis/Mailpit) |
+| Server E2E tests | Jest | Separate config in `test/` | 249 tests; a run with Postgres + Redis + Mailpit reports 226 passing and 23 skipped (suites gated on `DB_HOST` / `REDIS_URL` skip entirely on a bare run) |
 | Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1010 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 209 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support | In use |
@@ -841,12 +841,11 @@ GitHub Actions runs on every push and pull request to `master` with 5 jobs:
 
 | Job | Depends on | Steps | Artifacts |
 |-----|-----------|-------|-----------|
-| **Server – Checks** | — | audit (high), lint, format:check, typecheck, check:routes, check:enums, check:permissions | — |
+| **Server – Checks** | — | audit (high), lint, format:check, typecheck, check:routes, check:enums, check:permissions, check:i18n (validates all `ErrorKeys` values exist in every client i18n JSON) | — |
 | **Server – Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
 | **Mock Server** | — | audit (high), lint, format:check, typecheck, test | — |
 | **Client** | — | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |
 | **Client E2E** | mock-server | typecheck:e2e (after installing mock-server), ng build → serve (static), Playwright Chromium | HTML report, test results |
-| **Server – Checks** | — | check:i18n (validates all ErrorKeys exist in all i18n JSON files) | — |
 
 Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file required — all tests run against mocks.
 

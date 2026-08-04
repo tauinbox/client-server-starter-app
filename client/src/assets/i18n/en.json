@@ -89,6 +89,7 @@
       "userDeactivated": "User account is deactivated",
       "userNotFound": "User not found",
       "oauthAlreadyLinked": "This OAuth account is already linked to another user",
+      "oauthEmailAlreadyRegistered": "This email is already registered. Log in with your password first, then link the provider from your profile.",
       "userNotFoundOrDeactivated": "User account not found or deactivated",
       "invalidVerificationToken": "Invalid or expired verification token",
       "verificationTokenExpired": "Verification token has expired. Please request a new one.",
@@ -135,6 +136,12 @@
       "notFound": "Resource not found",
       "cannotRestore": "Cannot restore resource: its controller is not registered. Restore the controller code first.",
       "subjectReserved": "Resource subject is reserved and cannot be used"
+    },
+    "featureFlags": {
+      "notFound": "Feature flag not found",
+      "keyExists": "Feature flag with this key already exists",
+      "versionConflict": "Feature flag was modified by another request. Reload and retry.",
+      "ifMatchRequired": "The If-Match header is required for optimistic locking"
     },
     "db": {
       "uniqueViolation": "A record with this value already exists",
