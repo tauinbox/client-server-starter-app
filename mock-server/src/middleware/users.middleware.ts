@@ -14,6 +14,7 @@ import {
 } from '../utils/validation';
 import {
   ALLOWED_USER_SORT_COLUMNS,
+  MAX_USER_FILTER_LENGTH,
   type UserSortColumn
 } from '@app/shared/constants/user.constants';
 import {
@@ -108,17 +109,40 @@ function parsePaginationParams(
   return { page, limit, sortBy, sortOrder };
 }
 
-// Mirrors the real server's @IsString() DTO validation: an array-valued
-// query param (?q[]=a&q[]=b) must be rejected 400, not coerced.
+// Mirrors the real server's UserFiltersQueryDto: an array-valued query param
+// (?q[]=a&q[]=b) must be rejected 400 rather than coerced, a filter longer
+// than the shared cap is a 400, and a boolean param that spells neither
+// "true" nor "false" is a 400 rather than a silently dropped filter.
 const STRING_FILTER_PARAMS = ['q', 'email', 'firstName', 'lastName', 'role'];
+const BOOLEAN_FILTER_PARAMS = ['isActive', 'includeDeleted'];
 
-function findNonStringFilterParam(
+/** Mirrors the DTO's boolean @Transform: an empty param reads as unset. */
+function parseOptionalBoolean(value: unknown): boolean | undefined {
+  if (value === 'true' || value === true) return true;
+  if (value === 'false' || value === false) return false;
+  return undefined;
+}
+
+function findFilterValidationError(
   query: Record<string, unknown>
 ): string | null {
   for (const key of STRING_FILTER_PARAMS) {
     const value = query[key];
-    if (value !== undefined && typeof value !== 'string') return key;
+    if (value === undefined) continue;
+    if (typeof value !== 'string') return `${key} must be a string`;
+    if (value.length > MAX_USER_FILTER_LENGTH) {
+      return `${key} must be shorter than or equal to ${MAX_USER_FILTER_LENGTH} characters`;
+    }
   }
+
+  for (const key of BOOLEAN_FILTER_PARAMS) {
+    const value = query[key];
+    if (value === undefined || value === '') continue;
+    if (parseOptionalBoolean(value) === undefined) {
+      return `${key} must be a boolean value`;
+    }
+  }
+
   return null;
 }
 
@@ -356,11 +380,11 @@ router.post('/', adminGuard, (req, res) => {
 
 // GET /api/v1/users
 router.get('/', adminGuard, (req, res) => {
-  const badFilter = findNonStringFilterParam(
+  const filterError = findFilterValidationError(
     req.query as Record<string, unknown>
   );
-  if (badFilter) {
-    res.status(400).json(validationError(`${badFilter} must be a string`));
+  if (filterError) {
+    res.status(400).json(validationError(filterError));
     return;
   }
   const includeDeleted = String(req.query['includeDeleted']) === 'true';
@@ -376,11 +400,11 @@ router.get('/', adminGuard, (req, res) => {
 
 // GET /api/v1/users/search
 router.get('/search', adminGuard, (req, res) => {
-  const badFilter = findNonStringFilterParam(
+  const filterError = findFilterValidationError(
     req.query as Record<string, unknown>
   );
-  if (badFilter) {
-    res.status(400).json(validationError(`${badFilter} must be a string`));
+  if (filterError) {
+    res.status(400).json(validationError(filterError));
     return;
   }
   const { q, email, firstName, lastName, role, isActive } = req.query;
@@ -417,8 +441,8 @@ router.get('/search', adminGuard, (req, res) => {
     const roleStr = String(role);
     users = users.filter((u) => u.roles.includes(roleStr));
   }
-  if (isActive !== undefined) {
-    const activeBool = String(isActive) === 'true';
+  const activeBool = parseOptionalBoolean(isActive);
+  if (activeBool !== undefined) {
     users = users.filter((u) => u.isActive === activeBool);
   }
 
@@ -430,11 +454,11 @@ router.get('/search', adminGuard, (req, res) => {
 
 // GET /api/v1/users/cursor
 router.get('/cursor', adminGuard, (req, res) => {
-  const badFilter = findNonStringFilterParam(
+  const filterError = findFilterValidationError(
     req.query as Record<string, unknown>
   );
-  if (badFilter) {
-    res.status(400).json(validationError(`${badFilter} must be a string`));
+  if (filterError) {
+    res.status(400).json(validationError(filterError));
     return;
   }
   const includeDeleted = String(req.query['includeDeleted']) === 'true';
@@ -452,11 +476,11 @@ router.get('/cursor', adminGuard, (req, res) => {
 
 // GET /api/v1/users/search/cursor
 router.get('/search/cursor', adminGuard, (req, res) => {
-  const badFilter = findNonStringFilterParam(
+  const filterError = findFilterValidationError(
     req.query as Record<string, unknown>
   );
-  if (badFilter) {
-    res.status(400).json(validationError(`${badFilter} must be a string`));
+  if (filterError) {
+    res.status(400).json(validationError(filterError));
     return;
   }
   const { q, email, firstName, lastName, role, isActive } = req.query;
@@ -493,8 +517,8 @@ router.get('/search/cursor', adminGuard, (req, res) => {
     const roleStr = String(role);
     users = users.filter((u) => u.roles.includes(roleStr));
   }
-  if (isActive !== undefined) {
-    const activeBool = String(isActive) === 'true';
+  const activeBool = parseOptionalBoolean(isActive);
+  if (activeBool !== undefined) {
     users = users.filter((u) => u.isActive === activeBool);
   }
 

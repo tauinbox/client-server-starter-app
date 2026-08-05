@@ -4,12 +4,15 @@ import { toArray } from 'rxjs';
 import type { RoleAdminResponse } from '@app/shared/types/role.types';
 import { UserService } from '@features/users/services/user.service';
 import type { User } from '@features/users/models/user.types';
+import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants/user.constants';
 import {
   debouncedUserSearch,
+  isSearchableTerm,
   roleToChip,
   searchUsersPage,
   USER_SEARCH_DEBOUNCE_MS,
   USER_SEARCH_LIMIT,
+  USER_SEARCH_MIN_CHARS,
   userToChip
 } from './user-chip-search';
 
@@ -71,6 +74,20 @@ describe('roleToChip', () => {
 
   it('drops a null description instead of rendering it', () => {
     expect(roleToChip(makeRole({ description: null })).sub).toBeUndefined();
+  });
+});
+
+describe('isSearchableTerm', () => {
+  it('rejects a term shorter than the minimum', () => {
+    expect(isSearchableTerm('x'.repeat(USER_SEARCH_MIN_CHARS - 1))).toBe(false);
+    expect(isSearchableTerm('x'.repeat(USER_SEARCH_MIN_CHARS))).toBe(true);
+  });
+
+  it('rejects a term the search endpoint would answer with a 400', () => {
+    expect(isSearchableTerm('x'.repeat(MAX_USER_FILTER_LENGTH))).toBe(true);
+    expect(isSearchableTerm('x'.repeat(MAX_USER_FILTER_LENGTH + 1))).toBe(
+      false
+    );
   });
 });
 

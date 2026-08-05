@@ -1,6 +1,7 @@
 import type { Observable, OperatorFunction } from 'rxjs';
 import { debounceTime, distinctUntilChanged, map, switchMap } from 'rxjs';
 import type { RoleAdminResponse } from '@app/shared/types/role.types';
+import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants/user.constants';
 import type { ChipOption } from '@shared/forms';
 import type { UserService } from '@features/users/services/user.service';
 import type { User } from '@features/users/models/user.types';
@@ -10,6 +11,18 @@ export const USER_SEARCH_DEBOUNCE_MS = 350;
 
 /** Shortest term worth a request - anything shorter yields no options. */
 export const USER_SEARCH_MIN_CHARS = 3;
+
+/**
+ * Whether a typed term is worth a request: long enough to narrow the list, and
+ * within the filter cap the search endpoint validates against (a longer term is
+ * a 400 there, and could not match a varchar(255) column anyway).
+ */
+export function isSearchableTerm(term: string): boolean {
+  return (
+    term.length >= USER_SEARCH_MIN_CHARS &&
+    term.length <= MAX_USER_FILTER_LENGTH
+  );
+}
 
 /** Page size of a user search request. A full page means more may exist. */
 export const USER_SEARCH_LIMIT = 10;
