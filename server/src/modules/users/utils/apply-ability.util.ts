@@ -120,6 +120,9 @@ function translateField(
       if (opVal.length === 0) {
         return { skip: true, reason: `${op} array is empty` };
       }
+      if (!opVal.every(isAcceptableScalar)) {
+        return { skip: true, reason: `${op} array element must be a scalar` };
+      }
       const sqlOp = LIST_OPERATORS[op as keyof typeof LIST_OPERATORS];
       const p = nextParam(ctx);
       ctx.params[p] = opVal;

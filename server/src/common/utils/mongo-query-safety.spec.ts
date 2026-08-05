@@ -44,3 +44,35 @@ describe('mongo-query-safety depth limit', () => {
     });
   });
 });
+
+describe('mongo-query-safety list operator elements', () => {
+  it('accepts an $in array of JSON scalars', () => {
+    expect(
+      validateMongoQueryKeys({ id: { $in: ['u-1', 3, true, null] } })
+    ).toBeNull();
+  });
+
+  it('rejects an $in array holding an object', () => {
+    expect(validateMongoQueryKeys({ id: { $in: ['u-1', {}] } })).toContain(
+      'Operator "$in" at id.$in must be an array of'
+    );
+  });
+
+  it('rejects a $nin array holding a nested array', () => {
+    expect(validateMongoQueryKeys({ email: { $nin: [['a@x.io']] } })).toContain(
+      'Operator "$nin" at email.$nin must be an array of'
+    );
+  });
+
+  it('rejects a list operator whose value is not an array', () => {
+    expect(validateMongoQueryKeys({ id: { $in: 'u-1' } })).toContain(
+      'Operator "$in" at id.$in must be an array'
+    );
+  });
+
+  it('rejects a non-scalar element nested under a logical operator', () => {
+    expect(
+      validateMongoQueryKeys({ $or: [{ id: { $in: [{ nested: 'x' }] } }] })
+    ).toContain('must be an array of');
+  });
+});

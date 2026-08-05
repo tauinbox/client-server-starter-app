@@ -421,4 +421,64 @@ describe('CASL → SQL query translation (e2e)', () => {
       abFilter_0: ['alice@x.io', 'bob@x.io']
     });
   });
+
+  it('vetoes a custom allow whose $in list carries a non-scalar element', async () => {
+    const factory = buildFactory();
+    const permissions: ResolvedPermission[] = [
+      {
+        resource: 'users',
+        action: 'search',
+        permission: 'users:search:custom-bad-in',
+        conditions: {
+          custom: JSON.stringify({ id: { $in: ['u-1', { nested: 'x' }] } })
+        }
+      }
+    ];
+
+    const ability = await factory.createForUser(
+      'caller-1',
+      NON_SUPER,
+      permissions
+    );
+
+    const { qb, calls } = fakeQb();
+    applyAbilityToUserQuery(qb, ability, 'search');
+
+    // Only scalars can be bound into IN (:...p), so the condition is rejected
+    // at resolve time and never reaches the translator as a partial grant.
+    expect(calls[0].sql).toBe('1 = 0');
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it('turns a deny whose $in list carries a non-scalar element into a blanket deny', async () => {
+    const factory = buildFactory();
+    const permissions: ResolvedPermission[] = [
+      {
+        resource: 'users',
+        action: 'search',
+        permission: 'users:search:all',
+        conditions: null
+      },
+      {
+        resource: 'users',
+        action: 'search',
+        permission: 'users:search:deny-bad-in',
+        conditions: {
+          effect: 'deny',
+          custom: JSON.stringify({ id: { $in: [{ nested: 'x' }] } })
+        }
+      }
+    ];
+
+    const ability = await factory.createForUser(
+      'caller-1',
+      NON_SUPER,
+      permissions
+    );
+
+    const { qb, calls } = fakeQb();
+    applyAbilityToUserQuery(qb, ability, 'search');
+
+    expect(calls[0].sql).toBe('1 = 0');
+  });
 });

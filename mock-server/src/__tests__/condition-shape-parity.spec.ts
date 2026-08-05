@@ -120,7 +120,12 @@ describe('condition shape parity with server', () => {
         '$where'
       ],
       ['a "$"-prefixed userAttr key', { userAttr: { $expr: 'id' } }, '$expr'],
-      ['a non-string custom', { custom: 5 }, 'JSON string']
+      ['a non-string custom', { custom: 5 }, 'JSON string'],
+      [
+        'a custom $in list holding a non-scalar element',
+        { custom: '{"status":{"$in":["active",{"nested":"x"}]}}' },
+        'must be an array of'
+      ]
     ])('rejects %s with 400 and no write', async (_label, conditions, part) => {
       const res = await putConditions(conditions);
 
@@ -236,6 +241,12 @@ describe('condition shape parity with server', () => {
 
     it('vetoes a permission whose stored custom uses an operator outside the allowed set', () => {
       grantToEditor({ custom: '{"email":{"$regex":"x"}}' });
+
+      expect(editorUserRules().granted).toBe(false);
+    });
+
+    it('vetoes a permission whose stored custom $in list holds a non-scalar element', () => {
+      grantToEditor({ custom: '{"status":{"$in":["active",{"nested":"x"}]}}' });
 
       expect(editorUserRules().granted).toBe(false);
     });

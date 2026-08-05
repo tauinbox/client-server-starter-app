@@ -13,7 +13,7 @@
  * value matches the declared shape.
  */
 
-import { PROTOTYPE_KEYS } from './mongo-query-safety';
+import { isJsonScalar, PROTOTYPE_KEYS } from './mongo-query-safety';
 
 export const CONDITION_MAX_FIELDS = 32;
 export const CONDITION_MAX_FIELD_MATCH_VALUES = 100;
@@ -21,15 +21,6 @@ export const CONDITION_MAX_KEY_LENGTH = 128;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isJsonScalar(value: unknown): boolean {
-  return (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean'
-  );
 }
 
 function findKeyError(branch: string, key: string): string | null {
