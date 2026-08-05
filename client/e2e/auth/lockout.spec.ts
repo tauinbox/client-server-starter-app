@@ -1,5 +1,6 @@
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
+import { mockId } from '../fixtures/ids';
 
 test.describe('Account lockout', () => {
   test('should lock account after 5 failed login attempts', async ({
@@ -40,7 +41,7 @@ test.describe('Account lockout', () => {
 
     await _mockServer.seedUsers([
       createMockUser({
-        id: '200',
+        id: mockId('user-200'),
         email: 'locked@example.com',
         firstName: 'Locked',
         lastName: 'User',
@@ -79,7 +80,7 @@ test.describe('Account lockout', () => {
 
     await _mockServer.seedUsers([
       createMockUser({
-        id: '201',
+        id: mockId('user-201'),
         email: 'lockeduser@example.com',
         firstName: 'Locked',
         lastName: 'Account',
@@ -98,13 +99,13 @@ test.describe('Account lockout', () => {
 
     // Login as admin
     await loginViaUi(page, _mockServer.url, {
-      id: '1',
+      id: mockId('user-1'),
       email: 'admin@example.com',
       roles: ['admin']
     });
 
     // Navigate to the locked user's edit page
-    await page.goto('/users/201/edit');
+    await page.goto(`/users/${mockId('user-201')}/edit`);
 
     // Should see lockout status and unlock button
     await expect(page.getByRole('button', { name: /unlock/i })).toBeVisible();

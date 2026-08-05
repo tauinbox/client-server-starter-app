@@ -2,6 +2,7 @@ import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState } from '../state';
+import { mockId } from '../utils/mock-id';
 
 let server: Server;
 let baseUrl: string;
@@ -103,7 +104,7 @@ describe('rbac validation parity with server', () => {
 
   describe('PATCH /rbac/actions/:id', () => {
     it('accepts a whitespace-only displayName', async () => {
-      const res = await send('PATCH', '/rbac/actions/act-assign', {
+      const res = await send('PATCH', `/rbac/actions/${mockId('act-assign')}`, {
         displayName: '   '
       });
 
@@ -113,7 +114,7 @@ describe('rbac validation parity with server', () => {
     });
 
     it('rejects a non-string displayName', async () => {
-      const res = await send('PATCH', '/rbac/actions/act-assign', {
+      const res = await send('PATCH', `/rbac/actions/${mockId('act-assign')}`, {
         displayName: 7
       });
 
@@ -123,14 +124,18 @@ describe('rbac validation parity with server', () => {
     });
 
     it('rejects a non-string description without mutating the action', async () => {
-      const res = await send('PATCH', '/rbac/actions/act-assign', {
+      const res = await send('PATCH', `/rbac/actions/${mockId('act-assign')}`, {
         displayName: 'Assign records',
         description: { nested: true }
       });
 
       expect(res.status).toBe(400);
 
-      const after = await send('PATCH', '/rbac/actions/act-assign', {});
+      const after = await send(
+        'PATCH',
+        `/rbac/actions/${mockId('act-assign')}`,
+        {}
+      );
       const action = (await after.json()) as { displayName: string };
       expect(action.displayName).toBe('Assign');
     });
@@ -138,9 +143,13 @@ describe('rbac validation parity with server', () => {
 
   describe('PATCH /rbac/resources/:id', () => {
     it('accepts a whitespace-only displayName', async () => {
-      const res = await send('PATCH', '/rbac/resources/res-users', {
-        displayName: '  '
-      });
+      const res = await send(
+        'PATCH',
+        `/rbac/resources/${mockId('res-users')}`,
+        {
+          displayName: '  '
+        }
+      );
 
       expect(res.status).toBe(200);
       const resource = (await res.json()) as { displayName: string };
@@ -148,9 +157,13 @@ describe('rbac validation parity with server', () => {
     });
 
     it('rejects a non-string displayName', async () => {
-      const res = await send('PATCH', '/rbac/resources/res-users', {
-        displayName: []
-      });
+      const res = await send(
+        'PATCH',
+        `/rbac/resources/${mockId('res-users')}`,
+        {
+          displayName: []
+        }
+      );
 
       expect(res.status).toBe(400);
       const body = (await res.json()) as { errors?: string[] };
@@ -158,10 +171,14 @@ describe('rbac validation parity with server', () => {
     });
 
     it('rejects an over-long description without mutating the resource', async () => {
-      const res = await send('PATCH', '/rbac/resources/res-users', {
-        displayName: 'Renamed',
-        description: 'x'.repeat(501)
-      });
+      const res = await send(
+        'PATCH',
+        `/rbac/resources/${mockId('res-users')}`,
+        {
+          displayName: 'Renamed',
+          description: 'x'.repeat(501)
+        }
+      );
 
       expect(res.status).toBe(400);
       const body = (await res.json()) as { errors?: string[] };
@@ -169,15 +186,23 @@ describe('rbac validation parity with server', () => {
         'description must not exceed 500 characters'
       ]);
 
-      const after = await send('PATCH', '/rbac/resources/res-users', {});
+      const after = await send(
+        'PATCH',
+        `/rbac/resources/${mockId('res-users')}`,
+        {}
+      );
       const resource = (await after.json()) as { displayName: string };
       expect(resource.displayName).not.toBe('Renamed');
     });
 
     it('accepts a null description', async () => {
-      const res = await send('PATCH', '/rbac/resources/res-users', {
-        description: null
-      });
+      const res = await send(
+        'PATCH',
+        `/rbac/resources/${mockId('res-users')}`,
+        {
+          description: null
+        }
+      );
 
       expect(res.status).toBe(200);
     });

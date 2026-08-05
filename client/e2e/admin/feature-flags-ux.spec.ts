@@ -1,4 +1,5 @@
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { mockId } from '../fixtures/ids';
 
 test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => {
   test('FF-UX-007: handset card shows "All environments" when the flag has no environments configured', async ({
@@ -11,7 +12,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     await page.setViewportSize({ width: 375, height: 667 });
 
     await loginViaUi(page, _mockServer.url, {
-      id: '100',
+      id: mockId('user-100'),
       email: 'mobileadmin@example.com',
       roles: ['admin']
     });
@@ -29,7 +30,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     page
   }) => {
     await loginViaUi(page, _mockServer.url, {
-      id: '101',
+      id: mockId('user-101'),
       email: 'rulesadmin@example.com',
       roles: ['admin']
     });

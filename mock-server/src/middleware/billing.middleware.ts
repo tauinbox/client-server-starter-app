@@ -29,7 +29,10 @@ import type {
   MockSubscription,
   MockUsageRecord
 } from '../types';
-import { validationError } from '../helpers/validation-error.helpers';
+import {
+  requireUuid,
+  validationError
+} from '../helpers/validation-error.helpers';
 
 const router = Router();
 
@@ -943,6 +946,7 @@ billingAdminRouter.get(
 billingAdminRouter.post(
   '/subscriptions/:id/cancel',
   adminGuard,
+  requireUuid('id'),
   (req: Request, res: Response) => {
     const mode = req.body?.mode ?? 'period_end';
     if (mode !== 'period_end' && mode !== 'immediate') {
@@ -1009,6 +1013,7 @@ function revokeOneTimeEffects(invoice: MockInvoice): void {
 billingAdminRouter.post(
   '/invoices/:id/refund',
   adminGuard,
+  requireUuid('id'),
   (req: Request, res: Response) => {
     const invoice = getState().billingInvoices.get(
       (req.params['id'] as string) ?? ''
@@ -1070,6 +1075,7 @@ billingAdminRouter.post(
 billingAdminRouter.post(
   '/webhook-events/:id/replay',
   adminGuard,
+  requireUuid('id'),
   (_req: Request, res: Response) => {
     res
       .status(404)

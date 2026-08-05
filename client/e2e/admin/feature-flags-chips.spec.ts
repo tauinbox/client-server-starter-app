@@ -4,6 +4,7 @@ import {
   openedDialog,
   test
 } from '../fixtures/base.fixture';
+import { mockId } from '../fixtures/ids';
 
 test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () => {
   test('Environments and role-rule chips persist a created flag', async ({
@@ -11,7 +12,7 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
     page
   }) => {
     await loginViaUi(page, _mockServer.url, {
-      id: '100',
+      id: mockId('user-100'),
       email: 'chipsadmin@example.com',
       roles: ['admin']
     });

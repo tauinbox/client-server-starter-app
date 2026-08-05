@@ -10,7 +10,10 @@ import {
 import { adminGuard } from '../helpers/auth.helpers';
 import { CASL_RESERVED_ACTION_NAMES } from '../constants';
 import type { AuthenticatedRequest } from '../types';
-import { validationError } from '../helpers/validation-error.helpers';
+import {
+  requireUuid,
+  validationError
+} from '../helpers/validation-error.helpers';
 
 const router = Router();
 
@@ -33,45 +36,50 @@ router.get('/resources', adminGuard, (_req, res) => {
 });
 
 // POST /api/v1/rbac/resources/:id/restore
-router.post('/resources/:id/restore', adminGuard, (req, res) => {
-  const id = req.params['id'] as string;
-  const state = getState();
-  const resource = state.resources.get(id);
+router.post(
+  '/resources/:id/restore',
+  adminGuard,
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const state = getState();
+    const resource = state.resources.get(id);
 
-  if (!resource) {
-    res.status(404).json({
-      message: 'Resource not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.RESOURCES.NOT_FOUND
+    if (!resource) {
+      res.status(404).json({
+        message: 'Resource not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.RESOURCES.NOT_FOUND
+      });
+      return;
+    }
+
+    if (!resource.isRegistered) {
+      res.status(400).json({
+        message: `Cannot restore resource "${resource.name}": its @RegisterResource controller is not registered. Restore the controller code first.`,
+        statusCode: 400,
+        errorKey: ErrorKeys.RESOURCES.CANNOT_RESTORE
+      });
+      return;
+    }
+
+    resource.isOrphaned = false;
+
+    const actor = (req as AuthenticatedRequest).user;
+    logAudit('RESOURCE_RESTORE', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: id,
+      targetType: 'Resource',
+      ip: req.ip
     });
-    return;
+
+    res.json(toResourceResponse(resource));
   }
-
-  if (!resource.isRegistered) {
-    res.status(400).json({
-      message: `Cannot restore resource "${resource.name}": its @RegisterResource controller is not registered. Restore the controller code first.`,
-      statusCode: 400,
-      errorKey: ErrorKeys.RESOURCES.CANNOT_RESTORE
-    });
-    return;
-  }
-
-  resource.isOrphaned = false;
-
-  const actor = (req as AuthenticatedRequest).user;
-  logAudit('RESOURCE_RESTORE', {
-    actorId: actor.id,
-    actorEmail: actor.email,
-    targetId: id,
-    targetType: 'Resource',
-    ip: req.ip
-  });
-
-  res.json(toResourceResponse(resource));
-});
+);
 
 // PATCH /api/v1/rbac/resources/:id
-router.patch('/resources/:id', adminGuard, (req, res) => {
+router.patch('/resources/:id', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
   const resource = state.resources.get(id);
@@ -300,7 +308,7 @@ router.post('/actions', adminGuard, (req, res) => {
 });
 
 // PATCH /api/v1/rbac/actions/:id
-router.patch('/actions/:id', adminGuard, (req, res) => {
+router.patch('/actions/:id', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
   const action = state.actions.get(id);
@@ -368,7 +376,7 @@ router.patch('/actions/:id', adminGuard, (req, res) => {
 });
 
 // DELETE /api/v1/rbac/actions/:id
-router.delete('/actions/:id', adminGuard, (req, res) => {
+router.delete('/actions/:id', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
   const action = state.actions.get(id);

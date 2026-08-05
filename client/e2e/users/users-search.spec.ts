@@ -1,4 +1,5 @@
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { mockId } from '../fixtures/ids';
 
 test.describe('Inline user search (User Management page)', () => {
   test('should display search form fields', async ({ _mockServer, page }) => {
@@ -76,7 +77,7 @@ test.describe('Inline user search (User Management page)', () => {
       })
       .click();
 
-    await expect(page).toHaveURL(/.*\/users\/1$/);
+    await expect(page).toHaveURL(new RegExp(`/users/${mockId('user-1')}$`));
   });
 
   test('should navigate to edit page on edit button click', async ({
@@ -94,7 +95,9 @@ test.describe('Inline user search (User Management page)', () => {
       .locator('button', { has: page.locator('mat-icon', { hasText: 'edit' }) })
       .click();
 
-    await expect(page).toHaveURL(/.*\/users\/1\/edit$/);
+    await expect(page).toHaveURL(
+      new RegExp(`/users/${mockId('user-1')}/edit$`)
+    );
   });
 
   test('should send isActive=true when "Active" status is selected', async ({

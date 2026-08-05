@@ -6,6 +6,7 @@ import {
   OAUTH_PROVIDER_FLAGS
 } from '@app/shared/constants';
 import { createMockUser, createOAuthAccount } from './factories';
+import { mockId } from './utils/mock-id';
 import type {
   MockUser,
   OAuthAccount,
@@ -29,7 +30,7 @@ function generateUsers(): MockUser[] {
   // Well-known users that E2E tests depend on — do not change
   const manual: MockUser[] = [
     {
-      id: '1',
+      id: mockId('user-1'),
       email: 'admin@example.com',
       firstName: 'Admin',
       lastName: 'User',
@@ -49,7 +50,7 @@ function generateUsers(): MockUser[] {
       deletedAt: null
     },
     {
-      id: '2',
+      id: mockId('user-2'),
       email: 'user@example.com',
       firstName: 'Regular',
       lastName: 'User',
@@ -69,7 +70,7 @@ function generateUsers(): MockUser[] {
       deletedAt: null
     },
     {
-      id: '3',
+      id: mockId('user-3'),
       email: 'john@example.com',
       firstName: 'John',
       lastName: 'Smith',
@@ -89,7 +90,7 @@ function generateUsers(): MockUser[] {
       deletedAt: null
     },
     {
-      id: '4',
+      id: mockId('user-4'),
       email: 'jane@example.com',
       firstName: 'Jane',
       lastName: 'Doe',
@@ -109,7 +110,7 @@ function generateUsers(): MockUser[] {
       deletedAt: null
     },
     {
-      id: '5',
+      id: mockId('user-5'),
       email: 'bob@example.com',
       firstName: 'Bob',
       lastName: 'Wilson',
@@ -150,7 +151,7 @@ function generateUsers(): MockUser[] {
     const combo = i % 20 === 0 ? ['admin'] : roleCombos[i % roleCombos.length];
     generated.push(
       createMockUser({
-        id: String(i + 6),
+        id: mockId(`user-${i + 6}`),
         isActive: i % 5 !== 0,
         roles: [...combo]
       })
@@ -164,7 +165,7 @@ function generateOAuthAccounts(): Map<string, OAuthAccount[]> {
   const accounts = new Map<string, OAuthAccount[]>();
 
   // Admin always has a Google OAuth account
-  accounts.set('1', [
+  accounts.set(mockId('user-1'), [
     {
       provider: 'google',
       providerId: 'google-admin-123',
@@ -174,7 +175,7 @@ function generateOAuthAccounts(): Map<string, OAuthAccount[]> {
 
   // Add OAuth accounts for ~10 random generated users
   for (let i = 0; i < 10; i++) {
-    const userId = String(faker.number.int({ min: 6, max: 70 }));
+    const userId = mockId(`user-${faker.number.int({ min: 6, max: 70 })}`);
     if (!accounts.has(userId)) {
       accounts.set(userId, [createOAuthAccount()]);
     }
@@ -187,7 +188,7 @@ function generateResources(): MockResource[] {
   const now = '2025-01-01T00:00:00.000Z';
   return [
     {
-      id: 'res-users',
+      id: mockId('res-users'),
       name: 'users',
       subject: 'User',
       displayName: 'Users',
@@ -200,7 +201,7 @@ function generateResources(): MockResource[] {
       createdAt: now
     },
     {
-      id: 'res-profile',
+      id: mockId('res-profile'),
       name: 'profile',
       subject: 'Profile',
       displayName: 'Profile',
@@ -213,7 +214,7 @@ function generateResources(): MockResource[] {
       createdAt: now
     },
     {
-      id: 'res-roles',
+      id: mockId('res-roles'),
       name: 'roles',
       subject: 'Role',
       displayName: 'Roles',
@@ -233,7 +234,7 @@ function generateResources(): MockResource[] {
       createdAt: now
     },
     {
-      id: 'res-permissions',
+      id: mockId('res-permissions'),
       name: 'permissions',
       subject: 'Permission',
       displayName: 'Permissions',
@@ -252,7 +253,7 @@ function generateActions(): MockAction[] {
   const now = '2025-01-01T00:00:00.000Z';
   return [
     {
-      id: 'act-create',
+      id: mockId('act-create'),
       name: 'create',
       displayName: 'Create',
       description: 'Create new records',
@@ -260,7 +261,7 @@ function generateActions(): MockAction[] {
       createdAt: now
     },
     {
-      id: 'act-read',
+      id: mockId('act-read'),
       name: 'read',
       displayName: 'Read',
       description: 'View records',
@@ -268,7 +269,7 @@ function generateActions(): MockAction[] {
       createdAt: now
     },
     {
-      id: 'act-update',
+      id: mockId('act-update'),
       name: 'update',
       displayName: 'Update',
       description: 'Modify existing records',
@@ -276,7 +277,7 @@ function generateActions(): MockAction[] {
       createdAt: now
     },
     {
-      id: 'act-delete',
+      id: mockId('act-delete'),
       name: 'delete',
       displayName: 'Delete',
       description: 'Remove records',
@@ -284,7 +285,7 @@ function generateActions(): MockAction[] {
       createdAt: now
     },
     {
-      id: 'act-search',
+      id: mockId('act-search'),
       name: 'search',
       displayName: 'Search',
       description: 'Search and list records',
@@ -292,7 +293,7 @@ function generateActions(): MockAction[] {
       createdAt: now
     },
     {
-      id: 'act-assign',
+      id: mockId('act-assign'),
       name: 'assign',
       displayName: 'Assign',
       description: 'Assign associations',
@@ -305,7 +306,7 @@ function generateActions(): MockAction[] {
 function generateRoles(): MockRole[] {
   return [
     {
-      id: 'role-admin',
+      id: mockId('role-admin'),
       name: 'admin',
       description: 'System administrator with full access',
       isSystem: true,
@@ -314,7 +315,7 @@ function generateRoles(): MockRole[] {
       updatedAt: '2025-01-01T00:00:00.000Z'
     },
     {
-      id: 'role-user',
+      id: mockId('role-user'),
       name: 'user',
       description: 'Regular user with basic access',
       isSystem: true,
@@ -323,7 +324,7 @@ function generateRoles(): MockRole[] {
       updatedAt: '2025-01-01T00:00:00.000Z'
     },
     {
-      id: 'role-editor',
+      id: mockId('role-editor'),
       name: 'editor',
       description: 'Can create and edit content',
       isSystem: false,
@@ -332,7 +333,7 @@ function generateRoles(): MockRole[] {
       updatedAt: '2025-01-02T00:00:00.000Z'
     },
     {
-      id: 'role-moderator',
+      id: mockId('role-moderator'),
       name: 'moderator',
       description: 'Moderates user-generated content',
       isSystem: false,
@@ -341,7 +342,7 @@ function generateRoles(): MockRole[] {
       updatedAt: '2025-01-03T00:00:00.000Z'
     },
     {
-      id: 'role-support',
+      id: mockId('role-support'),
       name: 'support',
       description: 'Handles customer support requests',
       isSystem: false,
@@ -350,7 +351,7 @@ function generateRoles(): MockRole[] {
       updatedAt: '2025-01-04T00:00:00.000Z'
     },
     {
-      id: 'role-auditor',
+      id: mockId('role-auditor'),
       name: 'auditor',
       description: 'Read-only access to audit logs',
       isSystem: false,
@@ -372,7 +373,7 @@ function generatePermissions(
   for (const resource of resources) {
     for (const action of actions) {
       perms.push({
-        id: `perm-${id++}`,
+        id: mockId(`perm-${id++}`),
         resourceId: resource.id,
         actionId: action.id,
         description: `${action.displayName} ${resource.displayName}`,
@@ -398,7 +399,7 @@ function generateRolePermissions(
   if (adminRole) {
     for (const perm of permissions) {
       result.push({
-        id: `rp-${id++}`,
+        id: mockId(`rp-${id++}`),
         roleId: adminRole.id,
         permissionId: perm.id,
         conditions: null
@@ -414,7 +415,7 @@ function generateRolePermissions(
         (p) => p.resourceId === profileResource.id
       )) {
         result.push({
-          id: `rp-${id++}`,
+          id: mockId(`rp-${id++}`),
           roleId: userRole.id,
           permissionId: perm.id,
           conditions: null
@@ -443,7 +444,7 @@ function generateFeatureFlags(): MockFeatureFlag[] {
   const now = '2025-01-01T00:00:00.000Z';
   return [
     {
-      id: 'flag-new-dashboard',
+      id: mockId('flag-new-dashboard'),
       key: 'new-dashboard',
       description: 'Hidden behind a flag while in development',
       enabled: false,
@@ -455,7 +456,7 @@ function generateFeatureFlags(): MockFeatureFlag[] {
       updatedAt: now
     },
     {
-      id: 'flag-beta-export',
+      id: mockId('flag-beta-export'),
       key: 'beta-export',
       description: 'Beta export rolled out to a 10% sample of users',
       enabled: true,
@@ -470,7 +471,7 @@ function generateFeatureFlags(): MockFeatureFlag[] {
     // the provider's "configured" signal. The mock environment marks every
     // provider configured, so all three buttons show in dev / E2E.
     ...OAUTH_PROVIDER_FLAGS.map(({ provider, flagKey }) => ({
-      id: `flag-${flagKey}`,
+      id: mockId(`flag-${flagKey}`),
       key: flagKey,
       description: `Show the ${provider} OAuth login button (gated by provider configuration)`,
       enabled: true,
@@ -485,7 +486,7 @@ function generateFeatureFlags(): MockFeatureFlag[] {
     // signal — the mock marks every provider configured, so billing UI shows in
     // dev / E2E.
     {
-      id: `flag-${BILLING_FLAG_KEY}`,
+      id: mockId(`flag-${BILLING_FLAG_KEY}`),
       key: BILLING_FLAG_KEY,
       description:
         'Show billing (gated by at least one provider being configured)',
@@ -501,7 +502,7 @@ function generateFeatureFlags(): MockFeatureFlag[] {
     // (unlike the real server's disabled default) so checkout flows resolve a
     // provider in E2E.
     ...BILLING_PROVIDER_FLAGS.map(({ provider, enabledFlagKey }) => ({
-      id: `flag-${enabledFlagKey}`,
+      id: mockId(`flag-${enabledFlagKey}`),
       key: enabledFlagKey,
       description: `Admin kill-switch enabling the ${provider} billing provider`,
       enabled: true,
@@ -519,8 +520,8 @@ function generateFeatureFlagRules(): MockFeatureFlagRule[] {
   const now = '2025-01-01T00:00:00.000Z';
   return [
     {
-      id: 'rule-beta-export-percent',
-      flagId: 'flag-beta-export',
+      id: mockId('rule-beta-export-percent'),
+      flagId: mockId('flag-beta-export'),
       type: 'percentage',
       effect: 'include',
       payload: { type: 'percentage', percent: 10 },
@@ -528,8 +529,8 @@ function generateFeatureFlagRules(): MockFeatureFlagRule[] {
       updatedAt: now
     },
     ...OAUTH_PROVIDER_FLAGS.map(({ flagKey, attributeKey }) => ({
-      id: `rule-${flagKey}-configured`,
-      flagId: `flag-${flagKey}`,
+      id: mockId(`rule-${flagKey}-configured`),
+      flagId: mockId(`flag-${flagKey}`),
       type: 'attribute' as const,
       effect: 'include' as const,
       payload: {
@@ -543,8 +544,8 @@ function generateFeatureFlagRules(): MockFeatureFlagRule[] {
       updatedAt: now
     })),
     {
-      id: `rule-${BILLING_FLAG_KEY}-configured`,
-      flagId: `flag-${BILLING_FLAG_KEY}`,
+      id: mockId(`rule-${BILLING_FLAG_KEY}-configured`),
+      flagId: mockId(`flag-${BILLING_FLAG_KEY}`),
       type: 'attribute' as const,
       effect: 'include' as const,
       payload: {

@@ -4,18 +4,19 @@ import {
   loginViaUi,
   test
 } from '../fixtures/base.fixture';
+import { mockId } from '../fixtures/ids';
 
 test.describe('User Edit page', () => {
   test('should redirect to login when not authenticated', async ({
     _mockServer,
     page
   }) => {
-    await expectAuthRedirect(page, '/users/1/edit');
+    await expectAuthRedirect(page, `/users/${mockId('user-1')}/edit`);
   });
 
   test('should populate form with user data', async ({ _mockServer, page }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/1/edit');
+    await page.goto(`/users/${mockId('user-1')}/edit`);
 
     await expect(page.getByLabel('Email')).toHaveValue('admin@example.com');
     await expect(page.getByLabel('First Name')).toHaveValue('Admin');
@@ -27,7 +28,7 @@ test.describe('User Edit page', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/1/edit');
+    await page.goto(`/users/${mockId('user-1')}/edit`);
 
     await expect(page.getByLabel('Active')).toBeVisible();
   });
@@ -37,7 +38,7 @@ test.describe('User Edit page', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, {});
-    await page.goto('/users/3/edit');
+    await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await expect(page).toHaveURL(/.*\/forbidden$/);
   });
@@ -48,7 +49,7 @@ test.describe('User Edit page', () => {
   }) => {
     // Login as user id=100 (admin), edit user id=3 (another user)
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/3/edit');
+    await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await expect(
       page.getByRole('button', { name: 'Delete', exact: true })
@@ -61,7 +62,7 @@ test.describe('User Edit page', () => {
   }) => {
     // Login as user id=100 (admin), edit user id=100 (self)
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/100/edit');
+    await page.goto(`/users/${mockId('user-100')}/edit`);
 
     await expect(
       page.getByRole('button', { name: 'Delete', exact: true })
@@ -73,7 +74,7 @@ test.describe('User Edit page', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, {});
-    await page.goto('/users/100/edit');
+    await page.goto(`/users/${mockId('user-100')}/edit`);
 
     await expect(page).toHaveURL(/.*\/forbidden$/);
   });
@@ -83,7 +84,7 @@ test.describe('User Edit page', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/1/edit');
+    await page.goto(`/users/${mockId('user-1')}/edit`);
 
     await page.getByLabel('Email').clear();
     await page.getByLabel('First Name').click();
@@ -103,14 +104,14 @@ test.describe('User Edit page', () => {
 
   test('should update user successfully', async ({ _mockServer, page }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/1/edit');
+    await page.goto(`/users/${mockId('user-1')}/edit`);
 
     await page.getByLabel('First Name').fill('Updated');
     await page.getByLabel('First Name').blur();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByText('User updated successfully')).toBeVisible();
-    await expect(page).toHaveURL(/.*\/users\/1$/);
+    await expect(page).toHaveURL(new RegExp(`/users/${mockId('user-1')}$`));
   });
 
   test('should show error message on update failure', async ({
@@ -132,7 +133,7 @@ test.describe('User Edit page', () => {
       }
       return route.fallback();
     });
-    await page.goto('/users/1/edit');
+    await page.goto(`/users/${mockId('user-1')}/edit`);
 
     await page.getByLabel('First Name').fill('Updated');
     await page.getByLabel('First Name').blur();
@@ -146,7 +147,7 @@ test.describe('User Edit page', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/3/edit');
+    await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await page.getByLabel('Email').fill('renamed@example.com');
     await page.getByLabel('Email').blur();
@@ -171,7 +172,7 @@ test.describe('User Edit page', () => {
       return route.fallback();
     });
 
-    await page.goto('/users/3/edit');
+    await page.goto(`/users/${mockId('user-3')}/edit`);
     await page.getByLabel('Email').fill('renamed@example.com');
     await page.getByLabel('Email').blur();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -190,7 +191,7 @@ test.describe('User Edit page', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/3/edit');
+    await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await page.getByLabel('Email').fill('renamed@example.com');
     await page.getByLabel('Email').blur();
@@ -202,7 +203,7 @@ test.describe('User Edit page', () => {
       .click();
 
     await expect(page.getByText('User updated successfully')).toBeVisible();
-    await expect(page).toHaveURL(/.*\/users\/3$/);
+    await expect(page).toHaveURL(new RegExp(`/users/${mockId('user-3')}$`));
   });
 
   test('should show confirmation dialog on "Delete" click', async ({
@@ -210,7 +211,7 @@ test.describe('User Edit page', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/3/edit');
+    await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await page.getByRole('button', { name: 'Delete', exact: true }).click();
 
@@ -223,7 +224,7 @@ test.describe('User Edit page', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/3/edit');
+    await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await page.getByRole('button', { name: 'Delete', exact: true }).click();
     await page
@@ -241,7 +242,7 @@ test.describe('User Edit page', () => {
   }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/3/edit');
+    await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await expect(
       page.getByRole('button', { name: 'Delete', exact: true })

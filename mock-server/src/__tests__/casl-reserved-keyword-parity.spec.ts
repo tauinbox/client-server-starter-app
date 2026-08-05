@@ -5,6 +5,7 @@ import {
   resetState
 } from '../state';
 import type { MockUser } from '../types';
+import { mockId } from '../utils/mock-id';
 
 const NOW = '2025-01-01T00:00:00.000Z';
 
@@ -22,7 +23,7 @@ function editorUser(): MockUser {
 function grantToEditor(permissionId: string, deny = false): void {
   getState().rolePermissions.push({
     id: `rp-${permissionId}`,
-    roleId: 'role-editor',
+    roleId: mockId('role-editor'),
     permissionId,
     conditions: deny ? { effect: 'deny' } : null
   });
@@ -40,7 +41,7 @@ function addReservedAction(): string {
   });
   state.permissions.set('perm-users-manage', {
     id: 'perm-users-manage',
-    resourceId: 'res-users',
+    resourceId: mockId('res-users'),
     actionId: 'act-manage',
     description: null,
     createdAt: NOW
@@ -107,7 +108,8 @@ describe('reserved CASL keyword parity with server', () => {
       (a) => a.name === 'read'
     );
     const usersRead = [...state.permissions.values()].find(
-      (p) => p.resourceId === 'res-users' && p.actionId === readAction?.id
+      (p) =>
+        p.resourceId === mockId('res-users') && p.actionId === readAction?.id
     );
     if (!usersRead) throw new Error('seed permission users/read missing');
 

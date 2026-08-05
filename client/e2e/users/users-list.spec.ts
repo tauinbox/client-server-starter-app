@@ -5,6 +5,7 @@ import {
   loginViaUi,
   test
 } from '../fixtures/base.fixture';
+import { mockId } from '../fixtures/ids';
 
 test.describe('User List page', () => {
   test('should redirect to login when not authenticated', async ({
@@ -139,7 +140,7 @@ test.describe('User List page', () => {
 
     // Override to return a known user on page 1
     const knownUser = {
-      id: '1',
+      id: mockId('user-1'),
       email: 'admin@example.com',
       firstName: 'Admin',
       lastName: 'User',
@@ -176,7 +177,7 @@ test.describe('User List page', () => {
       })
       .click();
 
-    await expect(page).toHaveURL(/.*\/users\/1$/);
+    await expect(page).toHaveURL(new RegExp(`/users/${mockId('user-1')}$`));
   });
 
   test('should navigate to edit page on edit button click', async ({
@@ -186,7 +187,7 @@ test.describe('User List page', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
 
     const knownUser = {
-      id: '1',
+      id: mockId('user-1'),
       email: 'admin@example.com',
       firstName: 'Admin',
       lastName: 'User',
@@ -221,7 +222,9 @@ test.describe('User List page', () => {
       .locator('button', { has: page.locator('mat-icon', { hasText: 'edit' }) })
       .click();
 
-    await expect(page).toHaveURL(/.*\/users\/1\/edit$/);
+    await expect(page).toHaveURL(
+      new RegExp(`/users/${mockId('user-1')}/edit$`)
+    );
   });
 
   test('should show confirmation dialog on delete button click', async ({
@@ -231,7 +234,7 @@ test.describe('User List page', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
 
     const knownUser = {
-      id: '3',
+      id: mockId('user-3'),
       email: 'john@example.com',
       firstName: 'John',
       lastName: 'Smith',

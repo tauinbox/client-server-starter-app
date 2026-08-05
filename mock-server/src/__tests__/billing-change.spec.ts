@@ -3,6 +3,7 @@ import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState, getState } from '../state';
 import type { ProrationPreviewResponse } from '@app/shared/types';
+import { mockId } from '../utils/mock-id';
 
 let server: Server;
 let baseUrl: string;
@@ -40,7 +41,7 @@ async function activateSubscription(planKey: string): Promise<string> {
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ userId: '2', planKey })
+      body: JSON.stringify({ userId: mockId('user-2'), planKey })
     }
   );
   expect(res.status).toBe(200);

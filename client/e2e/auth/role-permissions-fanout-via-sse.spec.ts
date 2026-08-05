@@ -1,4 +1,5 @@
 import { expect, loginViaUiKeepSse, test } from '../fixtures/base.fixture';
+import { mockId } from '../fixtures/ids';
 
 // Regression for the role-permission fan-out path. Scenario: an admin changes
 // a *role's* permission set (not a single user's role membership). Every
@@ -29,8 +30,8 @@ test.describe('Live RBAC update via SSE — role-permission fan-out', () => {
     await _mockServer.seedPermissions([
       {
         id: 'perm-test-read-role',
-        resourceId: 'res-roles',
-        actionId: 'act-read',
+        resourceId: mockId('res-roles'),
+        actionId: mockId('act-read'),
         description: 'Read Role',
         createdAt: '2025-01-01T00:00:00.000Z'
       }

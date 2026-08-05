@@ -18,7 +18,10 @@ import {
 import { adminGuard } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';
 import { pushToUser } from '../sse-hub';
-import { validationError } from '../helpers/validation-error.helpers';
+import {
+  requireUuid,
+  validationError
+} from '../helpers/validation-error.helpers';
 import { validateMaxLength } from '../utils/validation';
 
 const router = Router();
@@ -173,7 +176,7 @@ router.get('/permissions', adminGuard, (_req, res) => {
 });
 
 // GET /api/v1/roles/:id/permissions
-router.get('/:id/permissions', adminGuard, (req, res) => {
+router.get('/:id/permissions', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
   const role = state.roles.get(id);
@@ -208,7 +211,7 @@ router.get('/:id/permissions', adminGuard, (req, res) => {
 });
 
 // GET /api/v1/roles/:id
-router.get('/:id', adminGuard, (req, res) => {
+router.get('/:id', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const role = getState().roles.get(id);
 
@@ -283,7 +286,7 @@ router.post('/', adminGuard, (req, res) => {
 });
 
 // PATCH /api/v1/roles/:id
-router.patch('/:id', adminGuard, (req, res) => {
+router.patch('/:id', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
   const role = state.roles.get(id);
@@ -358,7 +361,7 @@ router.patch('/:id', adminGuard, (req, res) => {
 });
 
 // DELETE /api/v1/roles/:id
-router.delete('/:id', adminGuard, (req, res) => {
+router.delete('/:id', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
   const role = state.roles.get(id);
@@ -415,7 +418,7 @@ router.delete('/:id', adminGuard, (req, res) => {
 });
 
 // PUT /api/v1/roles/:id/permissions  — replaces the full permission set atomically
-router.put('/:id/permissions', adminGuard, (req, res) => {
+router.put('/:id/permissions', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
   const role = state.roles.get(id);
@@ -518,7 +521,7 @@ router.put('/:id/permissions', adminGuard, (req, res) => {
 });
 
 // POST /api/v1/roles/:id/permissions
-router.post('/:id/permissions', adminGuard, (req, res) => {
+router.post('/:id/permissions', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
   const role = state.roles.get(id);
@@ -634,180 +637,195 @@ router.post('/:id/permissions', adminGuard, (req, res) => {
 });
 
 // DELETE /api/v1/roles/:id/permissions/:permissionId
-router.delete('/:id/permissions/:permissionId', adminGuard, (req, res) => {
-  const id = req.params['id'] as string;
-  const permissionId = req.params['permissionId'] as string;
-  const state = getState();
-  const role = state.roles.get(id);
+router.delete(
+  '/:id/permissions/:permissionId',
+  adminGuard,
+  requireUuid('id', 'permissionId'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const permissionId = req.params['permissionId'] as string;
+    const state = getState();
+    const role = state.roles.get(id);
 
-  if (!role) {
-    res.status(404).json({
-      message: 'Role not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.ROLES.NOT_FOUND
+    if (!role) {
+      res.status(404).json({
+        message: 'Role not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.ROLES.NOT_FOUND
+      });
+      return;
+    }
+
+    if (role.isSystem && !isActorSuper(req)) {
+      res.status(400).json({
+        message: 'Cannot modify system roles',
+        statusCode: 400,
+        errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
+      });
+      return;
+    }
+
+    state.rolePermissions = state.rolePermissions.filter(
+      (rp) => !(rp.roleId === id && rp.permissionId === permissionId)
+    );
+
+    notifyRoleHolders(role.name);
+
+    const actor = (req as AuthenticatedRequest).user;
+    logAudit('PERMISSION_UNASSIGN', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: id,
+      targetType: 'Role',
+      details: { permissionId },
+      ip: req.ip
     });
-    return;
+
+    res.send();
   }
-
-  if (role.isSystem && !isActorSuper(req)) {
-    res.status(400).json({
-      message: 'Cannot modify system roles',
-      statusCode: 400,
-      errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
-    });
-    return;
-  }
-
-  state.rolePermissions = state.rolePermissions.filter(
-    (rp) => !(rp.roleId === id && rp.permissionId === permissionId)
-  );
-
-  notifyRoleHolders(role.name);
-
-  const actor = (req as AuthenticatedRequest).user;
-  logAudit('PERMISSION_UNASSIGN', {
-    actorId: actor.id,
-    actorEmail: actor.email,
-    targetId: id,
-    targetType: 'Role',
-    details: { permissionId },
-    ip: req.ip
-  });
-
-  res.send();
-});
+);
 
 // POST /api/v1/roles/assign/:userId
-router.post('/assign/:userId', adminGuard, (req, res) => {
-  const userId = req.params['userId'] as string;
-  const { roleId } = req.body;
+router.post(
+  '/assign/:userId',
+  adminGuard,
+  requireUuid('userId'),
+  (req, res) => {
+    const userId = req.params['userId'] as string;
+    const { roleId } = req.body;
 
-  const state = getState();
-  const user = findUserById(userId);
-  if (!user) {
-    res.status(404).json({
-      message: 'User not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.USERS.NOT_FOUND
-    });
-    return;
-  }
-
-  const role = state.roles.get(roleId);
-  if (!role) {
-    res.status(404).json({
-      message: 'Role not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.ROLES.NOT_FOUND
-    });
-    return;
-  }
-
-  // Prevent assigning super roles via API (only super users bypass, and they
-  // already pass adminGuard — but a future non-super admin role would need this)
-  if (role.isSuper) {
-    const actor = (req as AuthenticatedRequest).user;
-    const actorRoles = Array.from(state.roles.values()).filter((r) =>
-      actor.roles.includes(r.name)
-    );
-    if (!actorRoles.some((r) => r.isSuper)) {
-      res.status(403).json({
-        message: 'Cannot assign super roles',
-        statusCode: 403
+    const state = getState();
+    const user = findUserById(userId);
+    if (!user) {
+      res.status(404).json({
+        message: 'User not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.USERS.NOT_FOUND
       });
       return;
     }
-  }
 
-  // Mirror the server: a duplicate assignment hits the user_roles unique
-  // constraint and maps to 409 before any side effect (no token revocation,
-  // no audit entry, no SSE push).
-  if (user.roles.includes(role.name)) {
-    res.status(409).json({
-      message: 'A record with this value already exists',
-      statusCode: 409,
-      errorKey: ErrorKeys.DB.UNIQUE_VIOLATION
+    const role = state.roles.get(roleId);
+    if (!role) {
+      res.status(404).json({
+        message: 'Role not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.ROLES.NOT_FOUND
+      });
+      return;
+    }
+
+    // Prevent assigning super roles via API (only super users bypass, and they
+    // already pass adminGuard — but a future non-super admin role would need this)
+    if (role.isSuper) {
+      const actor = (req as AuthenticatedRequest).user;
+      const actorRoles = Array.from(state.roles.values()).filter((r) =>
+        actor.roles.includes(r.name)
+      );
+      if (!actorRoles.some((r) => r.isSuper)) {
+        res.status(403).json({
+          message: 'Cannot assign super roles',
+          statusCode: 403
+        });
+        return;
+      }
+    }
+
+    // Mirror the server: a duplicate assignment hits the user_roles unique
+    // constraint and maps to 409 before any side effect (no token revocation,
+    // no audit entry, no SSE push).
+    if (user.roles.includes(role.name)) {
+      res.status(409).json({
+        message: 'A record with this value already exists',
+        statusCode: 409,
+        errorKey: ErrorKeys.DB.UNIQUE_VIOLATION
+      });
+      return;
+    }
+
+    user.roles.push(role.name);
+
+    // Revoke tokens on any role change (mirrors UserRoleChangedListener)
+    user.tokenRevokedAt = new Date().toISOString();
+
+    const actor = (req as AuthenticatedRequest).user;
+    logAudit('ROLE_ASSIGN', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: userId,
+      targetType: 'User',
+      details: { roleId },
+      ip: req.ip
     });
-    return;
+
+    pushToUser(userId, { type: 'permissions_updated', userId });
+    res.send();
   }
-
-  user.roles.push(role.name);
-
-  // Revoke tokens on any role change (mirrors UserRoleChangedListener)
-  user.tokenRevokedAt = new Date().toISOString();
-
-  const actor = (req as AuthenticatedRequest).user;
-  logAudit('ROLE_ASSIGN', {
-    actorId: actor.id,
-    actorEmail: actor.email,
-    targetId: userId,
-    targetType: 'User',
-    details: { roleId },
-    ip: req.ip
-  });
-
-  pushToUser(userId, { type: 'permissions_updated', userId });
-  res.send();
-});
+);
 
 // DELETE /api/v1/roles/assign/:userId/:roleId
-router.delete('/assign/:userId/:roleId', adminGuard, (req, res) => {
-  const userId = req.params['userId'] as string;
-  const roleId = req.params['roleId'] as string;
+router.delete(
+  '/assign/:userId/:roleId',
+  adminGuard,
+  requireUuid('userId', 'roleId'),
+  (req, res) => {
+    const userId = req.params['userId'] as string;
+    const roleId = req.params['roleId'] as string;
 
-  const state = getState();
-  const user = findUserById(userId);
-  if (!user) {
-    res.status(404).json({
-      message: 'User not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.USERS.NOT_FOUND
-    });
-    return;
-  }
-
-  const role = state.roles.get(roleId);
-  if (!role) {
-    res.status(404).json({
-      message: 'Role not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.ROLES.NOT_FOUND
-    });
-    return;
-  }
-
-  // Prevent removing super roles via API unless actor is also super
-  if (role.isSuper) {
-    const actor = (req as AuthenticatedRequest).user;
-    const actorRoles = Array.from(state.roles.values()).filter((r) =>
-      actor.roles.includes(r.name)
-    );
-    if (!actorRoles.some((r) => r.isSuper)) {
-      res.status(403).json({
-        message: 'Cannot remove super roles',
-        statusCode: 403
+    const state = getState();
+    const user = findUserById(userId);
+    if (!user) {
+      res.status(404).json({
+        message: 'User not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.USERS.NOT_FOUND
       });
       return;
     }
+
+    const role = state.roles.get(roleId);
+    if (!role) {
+      res.status(404).json({
+        message: 'Role not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.ROLES.NOT_FOUND
+      });
+      return;
+    }
+
+    // Prevent removing super roles via API unless actor is also super
+    if (role.isSuper) {
+      const actor = (req as AuthenticatedRequest).user;
+      const actorRoles = Array.from(state.roles.values()).filter((r) =>
+        actor.roles.includes(r.name)
+      );
+      if (!actorRoles.some((r) => r.isSuper)) {
+        res.status(403).json({
+          message: 'Cannot remove super roles',
+          statusCode: 403
+        });
+        return;
+      }
+    }
+
+    user.roles = user.roles.filter((r) => r !== role.name);
+
+    // Revoke tokens on any role change (mirrors UserRoleChangedListener)
+    user.tokenRevokedAt = new Date().toISOString();
+
+    const actor = (req as AuthenticatedRequest).user;
+    logAudit('ROLE_UNASSIGN', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: userId,
+      targetType: 'User',
+      details: { roleId },
+      ip: req.ip
+    });
+
+    pushToUser(userId, { type: 'permissions_updated', userId });
+    res.send();
   }
-
-  user.roles = user.roles.filter((r) => r !== role.name);
-
-  // Revoke tokens on any role change (mirrors UserRoleChangedListener)
-  user.tokenRevokedAt = new Date().toISOString();
-
-  const actor = (req as AuthenticatedRequest).user;
-  logAudit('ROLE_UNASSIGN', {
-    actorId: actor.id,
-    actorEmail: actor.email,
-    targetId: userId,
-    targetType: 'User',
-    details: { roleId },
-    ip: req.ip
-  });
-
-  pushToUser(userId, { type: 'permissions_updated', userId });
-  res.send();
-});
+);
 
 export default router;

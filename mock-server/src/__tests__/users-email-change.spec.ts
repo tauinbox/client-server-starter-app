@@ -2,6 +2,7 @@ import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState } from '../state';
+import { mockId } from '../utils/mock-id';
 
 let server: Server;
 let baseUrl: string;
@@ -56,7 +57,7 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
     const token = await loginAsAdmin();
 
     // user '3' (john@example.com) trying to take user '5' (bob@example.com)
-    const res = await fetch(`${baseUrl}/api/v1/users/3`, {
+    const res = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
       method: 'PATCH',
       headers: {
         'content-type': 'application/json',
@@ -78,7 +79,7 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
   it('resets isEmailVerified when email changes', async () => {
     const token = await loginAsAdmin();
 
-    const res = await fetch(`${baseUrl}/api/v1/users/3`, {
+    const res = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
       method: 'PATCH',
       headers: {
         'content-type': 'application/json',
@@ -100,7 +101,7 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
     const victim = await loginAsUser('john@example.com');
     const adminToken = await loginAsAdmin();
 
-    const res = await fetch(`${baseUrl}/api/v1/users/3`, {
+    const res = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
       method: 'PATCH',
       headers: {
         'content-type': 'application/json',
@@ -126,7 +127,7 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
     const victim = await loginAsUser('john@example.com');
     const adminToken = await loginAsAdmin();
 
-    const res = await fetch(`${baseUrl}/api/v1/users/3`, {
+    const res = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
       method: 'PATCH',
       headers: {
         'content-type': 'application/json',
@@ -145,7 +146,7 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
   it('does not reset isEmailVerified when email is unchanged', async () => {
     const token = await loginAsAdmin();
 
-    const res = await fetch(`${baseUrl}/api/v1/users/3`, {
+    const res = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
       method: 'PATCH',
       headers: {
         'content-type': 'application/json',

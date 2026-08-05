@@ -4,6 +4,7 @@ import {
   openedDialog,
   test
 } from './fixtures/base.fixture';
+import { mockId } from './fixtures/ids';
 
 /**
  * Keyboard navigation tests — verifies that core flows are fully operable
@@ -97,7 +98,7 @@ test.describe('Keyboard navigation', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/1/edit');
+    await page.goto(`/users/${mockId('user-1')}/edit`);
 
     // Wait for form to load
     await expect(page.getByLabel('Email')).toHaveValue('admin@example.com');
@@ -122,7 +123,7 @@ test.describe('Keyboard navigation', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/3/edit');
+    await page.goto(`/users/${mockId('user-3')}/edit`);
 
     // Open the delete confirmation dialog
     await page.getByRole('button', { name: 'Delete', exact: true }).click();

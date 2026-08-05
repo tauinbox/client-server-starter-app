@@ -1,5 +1,6 @@
 import { expect, test } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
+import { mockId } from '../fixtures/ids';
 
 test.describe('Email verification', () => {
   test('should register and then verify email via token', async ({
@@ -41,7 +42,7 @@ test.describe('Email verification', () => {
     // Seed an unverified user
     await _mockServer.seedUsers([
       createMockUser({
-        id: '300',
+        id: mockId('user-300'),
         email: 'unverified@example.com',
         firstName: 'Unverified',
         lastName: 'User',
@@ -80,7 +81,7 @@ test.describe('Email verification', () => {
     // Seed an unverified user
     await _mockServer.seedUsers([
       createMockUser({
-        id: '301',
+        id: mockId('user-301'),
         email: 'resend@example.com',
         firstName: 'Resend',
         lastName: 'User',
@@ -135,7 +136,7 @@ test.describe('Email verification', () => {
     // Seed an unverified user with a verification token
     await _mockServer.seedUsers([
       createMockUser({
-        id: '302',
+        id: mockId('user-302'),
         email: 'verifythenlogin@example.com',
         firstName: 'Verify',
         lastName: 'Login',
@@ -163,7 +164,7 @@ test.describe('Email verification', () => {
     const tokens = await _mockServer.getTokens();
     const verificationTokens = tokens.emailVerificationTokens;
     const tokenEntry = Object.entries(verificationTokens).find(
-      ([, userId]) => userId === '302'
+      ([, userId]) => userId === mockId('user-302')
     );
     expect(tokenEntry).toBeTruthy();
     const token = tokenEntry![0];

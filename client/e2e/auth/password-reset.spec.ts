@@ -1,4 +1,5 @@
 import { expect, test } from '../fixtures/base.fixture';
+import { mockId } from '../fixtures/ids';
 
 test.describe('Password reset', () => {
   test('should display forgot password form', async ({ _mockServer, page }) => {
@@ -66,7 +67,7 @@ test.describe('Password reset', () => {
     const resetTokens = tokens.passwordResetTokens;
     // user@example.com has id '2'
     const tokenEntry = Object.entries(resetTokens).find(
-      ([, userId]) => userId === '2'
+      ([, userId]) => userId === mockId('user-2')
     );
     expect(tokenEntry).toBeTruthy();
     const token = tokenEntry![0];
@@ -154,7 +155,7 @@ test.describe('Password reset', () => {
     // Get the reset token
     const tokens = await _mockServer.getTokens();
     const tokenEntry = Object.entries(tokens.passwordResetTokens).find(
-      ([, userId]) => userId === '2'
+      ([, userId]) => userId === mockId('user-2')
     );
     const token = tokenEntry![0];
 

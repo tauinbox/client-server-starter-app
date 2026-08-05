@@ -2,6 +2,7 @@ import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState } from '../state';
+import { mockId } from '../utils/mock-id';
 
 let server: Server;
 let baseUrl: string;
@@ -54,7 +55,7 @@ describe('PATCH /api/v1/users/:id moderation-field parity with server', () => {
   it('accepts a boolean isActive and deactivates the user', async () => {
     const token = await loginAsAdmin();
 
-    const res = await patchUser(token, '3', { isActive: false });
+    const res = await patchUser(token, mockId('user-3'), { isActive: false });
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as { isActive: boolean };
@@ -64,7 +65,9 @@ describe('PATCH /api/v1/users/:id moderation-field parity with server', () => {
   it('accepts a boolean unlockAccount', async () => {
     const token = await loginAsAdmin();
 
-    const res = await patchUser(token, '3', { unlockAccount: true });
+    const res = await patchUser(token, mockId('user-3'), {
+      unlockAccount: true
+    });
 
     expect(res.status).toBe(200);
   });
@@ -75,7 +78,7 @@ describe('PATCH /api/v1/users/:id moderation-field parity with server', () => {
   ])('rejects a non-boolean %s with 400', async (field, payload) => {
     const token = await loginAsAdmin();
 
-    const res = await patchUser(token, '3', payload);
+    const res = await patchUser(token, mockId('user-3'), payload);
 
     expect(res.status).toBe(400);
     const body = (await res.json()) as { message: string };
