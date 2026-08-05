@@ -7,14 +7,16 @@ import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
 import { Server } from 'http';
 import { CoreModule } from '../src/modules/core/core.module';
+import { withPrivateThrottlerStorage } from './private-throttler';
 
 const MAILPIT_URL = process.env['MAILPIT_URL'] || 'http://localhost:8025';
 
 // Boots the full application and exercises register → verification email →
-// verify-email → login against a real Postgres and a Mailpit SMTP sink.
-// Runs only when DB_HOST is set: CI provides Postgres + Mailpit and SMTP_HOST,
-// while a bare local `npm run test:e2e` (no DB env) skips it.
-const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
+// verify-email → login against a real Postgres and a Mailpit SMTP sink. Without
+// SMTP_HOST the app posts nowhere, so the suite would wait out the delivery
+// timeout instead of skipping.
+const runWithInfra =
+  process.env['DB_HOST'] && process.env['SMTP_HOST'] ? describe : describe.skip;
 
 interface MailpitMessage {
   ID: string;
@@ -59,9 +61,9 @@ runWithInfra('Email delivery (e2e)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    const moduleRef: TestingModule = await Test.createTestingModule({
-      imports: [CoreModule.forRoot()]
-    }).compile();
+    const moduleRef: TestingModule = await withPrivateThrottlerStorage(
+      Test.createTestingModule({ imports: [CoreModule.forRoot()] })
+    ).compile();
 
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(

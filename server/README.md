@@ -273,7 +273,7 @@ TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
 - **Console transport** when `SMTP_HOST` is not set — logs clickable URLs
 - Email links use `CLIENT_URL` env var: `${clientUrl}/verify-email?token=xxx`, `${clientUrl}/reset-password?token=xxx`
 - **Async delivery**: when `REDIS_URL` is set, messages are rendered then enqueued on a BullMQ queue (`mail`) and delivered by `MailProcessor` with retries (3 attempts, exponential backoff). Without `REDIS_URL`, `MailService` delivers inline in the request (no retries). The queue is transparent to callers — `MailService.sendXxx(...)` is unchanged. Mail is best-effort on both paths: an enqueue failure (e.g. Redis outage) or an inline delivery failure is logged and never propagates to the caller.
-- **Delivery test**: `test/email-delivery.e2e-spec.ts` boots the full app and verifies register → email → verify → login against a Mailpit sink (reads the message via Mailpit's REST API). CI runs a `mailpit` service with `SMTP_HOST`/`SMTP_PORT` set; the test is gated on `DB_HOST` and skips on a bare local run.
+- **Delivery test**: `test/email-delivery.e2e-spec.ts` boots the full app and verifies register → email → verify → login against a Mailpit sink (reads the message via Mailpit's REST API). CI runs a `mailpit` service with `SMTP_HOST`/`SMTP_PORT` set; the test is gated on `DB_HOST` **and** `SMTP_HOST` (environment or `.env`), so it skips while no sink is configured instead of waiting out the delivery timeout.
 
 #### Transport options
 
@@ -920,6 +920,27 @@ npx jest --testPathPattern=auth   # Run specific tests
 ```bash
 npm run test:e2e
 ```
+
+**Database settings.** The run needs Postgres, and takes its `DB_*` values from
+the environment first and from `.env` for anything the environment leaves out -
+so `npm run test:e2e` works with no exports at all, and CI's explicit values
+still win. A partial export (`DB_HOST=localhost` alone) therefore no longer
+strands the credentials behind, which used to surface as `client password must
+be a string` from deep inside the driver. `global-setup.ts` opens one connection
+before the workers fork, so an unreachable or unmigrated database is reported
+once, by name, instead of once per suite.
+
+**Mail settings.** `SMTP_HOST`, `SMTP_PORT` and `MAILPIT_URL` are resolved the
+same way, and `test/email-delivery.e2e-spec.ts` runs only when `SMTP_HOST` is
+set - point it at a local Mailpit (`SMTP_HOST=localhost`, `SMTP_PORT=1025`) in
+`.env` to exercise the delivery path locally, or leave it empty to skip.
+
+**Rate-limit counters.** Suites that log in more than a few times pin the
+throttler to a per-application in-memory store (`test/private-throttler.ts`).
+Without Redis - how CI runs - every application already gets its own store; a
+Redis-backed local run shares one across all workers, where `/auth/login`'s 3
+per minute and 4 per 15 minutes per IP are spent by whichever suite gets there
+first. Suites that assert on rate limiting keep the real storage.
 
 **Redis isolation.** When a Redis URL is configured (environment or `.env`), the
 run is pinned to a dedicated logical database (`E2E_REDIS_DB`, default `15`) and
