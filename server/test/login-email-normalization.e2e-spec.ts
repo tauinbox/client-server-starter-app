@@ -9,6 +9,7 @@ import { Server } from 'http';
 import { DataSource } from 'typeorm';
 import { CoreModule } from '../src/modules/core/core.module';
 import { User } from '../src/modules/users/entities/user.entity';
+import { withPrivateThrottlerStorage } from './private-throttler';
 
 // The login route has no `@Body()` DTO and NestJS runs guards before pipes, so
 // nothing in a unit test can prove the raw body is canonicalized on the way to
@@ -23,9 +24,9 @@ runWithInfra('Login email normalization (e2e)', () => {
   const password = 'Password1';
 
   beforeAll(async () => {
-    const moduleRef: TestingModule = await Test.createTestingModule({
-      imports: [CoreModule.forRoot()]
-    }).compile();
+    const moduleRef: TestingModule = await withPrivateThrottlerStorage(
+      Test.createTestingModule({ imports: [CoreModule.forRoot()] })
+    ).compile();
 
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(
