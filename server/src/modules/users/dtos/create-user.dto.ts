@@ -2,10 +2,10 @@ import {
   IsEmail,
   IsIn,
   IsNotEmpty,
-  IsOptional,
   Matches,
   MaxLength,
-  MinLength
+  MinLength,
+  ValidateIf
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
@@ -15,6 +15,7 @@ import {
   PASSWORD_ERROR
 } from '@app/shared/constants/password.constants';
 import { SUPPORTED_LOCALES } from '@app/shared/constants';
+import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 
 export class CreateUserDto {
   @ApiProperty({
@@ -59,7 +60,7 @@ export class CreateUserDto {
     enum: SUPPORTED_LOCALES,
     example: 'en'
   })
-  @IsOptional()
+  @ValidateIf(propertyIsDefined)
   @IsIn([...SUPPORTED_LOCALES])
   locale?: string;
 }

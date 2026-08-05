@@ -556,10 +556,14 @@ router.patch('/:id', adminGuard, (req, res) => {
     return;
   }
 
-  const { firstName, lastName, password, isActive, unlockAccount } = req.body;
-  // null is treated as absent, matching @IsOptional() on the server DTO.
+  const { firstName, lastName, password, isActive, unlockAccount, locale } =
+    req.body;
+  // An explicit null is a 400 on the server, not an absent field: UpdateUserDto
+  // uses PartialType(..., { skipNullProperties: false }).
   const email =
-    req.body.email == null ? undefined : (normalizeEmail(req.body.email) ?? '');
+    req.body.email === undefined
+      ? undefined
+      : (normalizeEmail(req.body.email) ?? req.body.email);
 
   if (email !== undefined) {
     if (!isValidEmail(email)) {
@@ -606,6 +610,12 @@ router.patch('/:id', adminGuard, (req, res) => {
     }
   }
 
+  const localeErr = validateLocale(locale);
+  if (localeErr) {
+    res.status(400).json(validationError(localeErr));
+    return;
+  }
+
   if (isActive !== undefined && typeof isActive !== 'boolean') {
     res.status(400).json(validationError('isActive must be a boolean value'));
     return;
@@ -649,6 +659,7 @@ router.patch('/:id', adminGuard, (req, res) => {
   }
   if (firstName !== undefined) user.firstName = firstName;
   if (lastName !== undefined) user.lastName = lastName;
+  if (locale !== undefined) user.locale = locale as string;
   if (password !== undefined) {
     user.password = password;
     // Invalidate target user's sessions so attacker cannot keep access after admin password reset

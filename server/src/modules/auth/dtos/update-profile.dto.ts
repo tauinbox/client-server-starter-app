@@ -2,7 +2,6 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsIn,
   IsNotEmpty,
-  IsOptional,
   IsString,
   Matches,
   MaxLength,
@@ -14,13 +13,14 @@ import {
   PASSWORD_ERROR
 } from '@app/shared/constants/password.constants';
 import { SUPPORTED_LOCALES } from '@app/shared/constants';
+import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({
     description: 'The first name of the user',
     example: 'John'
   })
-  @IsOptional()
+  @ValidateIf(propertyIsDefined)
   @IsNotEmpty()
   @MaxLength(255)
   firstName?: string;
@@ -29,7 +29,7 @@ export class UpdateProfileDto {
     description: 'The last name of the user',
     example: 'Doe'
   })
-  @IsOptional()
+  @ValidateIf(propertyIsDefined)
   @IsNotEmpty()
   @MaxLength(255)
   lastName?: string;
@@ -40,7 +40,7 @@ export class UpdateProfileDto {
     example: 'NewPassword123',
     minLength: 8
   })
-  @IsOptional()
+  @ValidateIf(propertyIsDefined)
   @MinLength(8)
   @MaxLength(128)
   @Matches(PASSWORD_REGEX, { message: PASSWORD_ERROR })
@@ -63,7 +63,7 @@ export class UpdateProfileDto {
     enum: SUPPORTED_LOCALES,
     example: 'en'
   })
-  @IsOptional()
+  @ValidateIf(propertyIsDefined)
   @IsIn([...SUPPORTED_LOCALES])
   locale?: string;
 }

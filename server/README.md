@@ -126,6 +126,10 @@ src/
 ├── common/
 │   ├── dtos/               # PaginationQueryDto, PaginatedResponseDto<T>, CursorPaginationQueryDto, CursorPaginatedResponseDto<T>
 │   ├── utils/              # Shared utilities (escapeLikePattern, hashToken, withTransaction, extractAuditContext, cursor encode/decode, applyKeysetPagination)
+│   ├── validators/         # is-safe-mongo-query, permission-condition-shape; property-is-defined.ts - the @ValidateIf
+│   │                       #   condition that replaces @IsOptional() on an optional field backed by a NOT NULL column,
+│   │                       #   so an explicit null is a 400 instead of being assigned to the entity (PartialType DTOs
+│   │                       #   pass { skipNullProperties: false } for the same reason)
 │   └── upload/             # createDiskStorageOptions() — reusable multer disk storage factory (destination, allowedExtensions, maxFileSizeBytes); validates both file extension and MIME type to block rename attacks
 └── modules/
 ├── core/                   # Dynamic root module

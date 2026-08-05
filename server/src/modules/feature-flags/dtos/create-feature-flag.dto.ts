@@ -7,7 +7,8 @@ import {
   IsString,
   Matches,
   MaxLength,
-  MinLength
+  MinLength,
+  ValidateIf
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
@@ -15,6 +16,7 @@ import {
   APP_ENVIRONMENTS,
   normalizeEnvironmentList
 } from '@app/shared/constants';
+import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 
 const KEY_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 
@@ -40,7 +42,7 @@ export class CreateFeatureFlagDto {
   description?: string;
 
   @ApiPropertyOptional({ default: false })
-  @IsOptional()
+  @ValidateIf(propertyIsDefined)
   @IsBoolean()
   enabled?: boolean;
 
@@ -54,7 +56,7 @@ export class CreateFeatureFlagDto {
   @Transform(({ value }: { value: unknown }) =>
     Array.isArray(value) ? normalizeEnvironmentList(value) : value
   )
-  @IsOptional()
+  @ValidateIf(propertyIsDefined)
   @IsArray()
   @ArrayMaxSize(APP_ENVIRONMENTS.length)
   @IsString({ each: true })
@@ -65,7 +67,7 @@ export class CreateFeatureFlagDto {
     description: 'Visible to anonymous users via the public endpoint.',
     default: false
   })
-  @IsOptional()
+  @ValidateIf(propertyIsDefined)
   @IsBoolean()
   public?: boolean;
 }
