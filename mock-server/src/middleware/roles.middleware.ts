@@ -19,8 +19,25 @@ import { adminGuard } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';
 import { pushToUser } from '../sse-hub';
 import { validationError } from '../helpers/validation-error.helpers';
+import { validateMaxLength } from '../utils/validation';
 
 const router = Router();
+
+type RoleName = { ok: true; name: string } | { ok: false; error: string };
+
+// CreateRoleDto pairs @Transform(trim) with @IsNotEmpty/@IsString/@MaxLength(100),
+// and UpdateRoleDto inherits them without the null escape hatch.
+function normalizeRoleName(value: unknown): RoleName {
+  if (typeof value !== 'string') {
+    return { ok: false, error: 'name must be a string' };
+  }
+  const name = value.trim();
+  if (name.length === 0) {
+    return { ok: false, error: 'name should not be empty' };
+  }
+  const maxErr = validateMaxLength(name, 100, 'name');
+  return maxErr ? { ok: false, error: maxErr } : { ok: true, name };
+}
 
 function validateCustomCondition(custom: string | undefined): string | null {
   if (!custom) return null;
@@ -209,12 +226,14 @@ router.get('/:id', adminGuard, (req, res) => {
 
 // POST /api/v1/roles
 router.post('/', adminGuard, (req, res) => {
-  const { name, description, isSuper } = req.body;
+  const { description, isSuper } = req.body;
 
-  if (!name || typeof name !== 'string' || name.trim().length === 0) {
-    res.status(400).json(validationError('Role name is required'));
+  const normalized = normalizeRoleName(req.body.name);
+  if (!normalized.ok) {
+    res.status(400).json(validationError(normalized.error));
     return;
   }
+  const name = normalized.name;
 
   if (isSuper !== undefined) {
     res.status(400).json({
@@ -298,18 +317,25 @@ router.patch('/:id', adminGuard, (req, res) => {
     return;
   }
 
-  if (name !== undefined && name !== role.name) {
-    for (const existing of state.roles.values()) {
-      if (existing.name === name) {
-        res.status(400).json({
-          message: 'Role with this name already exists',
-          statusCode: 400,
-          errorKey: ErrorKeys.ROLES.NAME_EXISTS
-        });
-        return;
-      }
+  if (name !== undefined) {
+    const normalized = normalizeRoleName(name);
+    if (!normalized.ok) {
+      res.status(400).json(validationError(normalized.error));
+      return;
     }
-    role.name = name;
+    if (normalized.name !== role.name) {
+      for (const existing of state.roles.values()) {
+        if (existing.name === normalized.name) {
+          res.status(400).json({
+            message: 'Role with this name already exists',
+            statusCode: 400,
+            errorKey: ErrorKeys.ROLES.NAME_EXISTS
+          });
+          return;
+        }
+      }
+      role.name = normalized.name;
+    }
   }
 
   if (description !== undefined) {

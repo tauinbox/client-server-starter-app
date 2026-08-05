@@ -1,14 +1,19 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsOptional } from 'class-validator';
+import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { IsBoolean, ValidateIf } from 'class-validator';
 import { CreateUserDto } from './create-user.dto';
+import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 
-export class UpdateUserDto extends PartialType(CreateUserDto) {
+// @nestjs/swagger's PartialType (not @nestjs/mapped-types') keeps the inherited
+// @ApiProperty metadata; skipNullProperties rejects an explicit null, which
+// would otherwise reach a NOT NULL column or wipe the password.
+export class UpdateUserDto extends PartialType(CreateUserDto, {
+  skipNullProperties: false
+}) {
   @ApiPropertyOptional({
     description: 'Whether the user is active',
     example: true
   })
-  @IsOptional()
+  @ValidateIf(propertyIsDefined)
   @IsBoolean()
   isActive?: boolean;
 
@@ -16,7 +21,7 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
     description: 'Set to true to unlock a locked account',
     example: true
   })
-  @IsOptional()
+  @ValidateIf(propertyIsDefined)
   @IsBoolean()
   unlockAccount?: boolean;
 }

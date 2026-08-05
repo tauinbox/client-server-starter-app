@@ -331,7 +331,9 @@ router.patch('/actions/:id', adminGuard, (req, res) => {
     }
   }
 
-  if (description !== undefined && description !== null) {
+  // actions.description is NOT NULL, so UpdateActionDto rejects an explicit
+  // null - unlike resources.description, which is nullable.
+  if (description !== undefined) {
     if (typeof description !== 'string') {
       res.status(400).json(validationError('description must be a string'));
       return;
@@ -349,7 +351,7 @@ router.patch('/actions/:id', adminGuard, (req, res) => {
   }
 
   if (description !== undefined) {
-    action.description = typeof description === 'string' ? description : '';
+    action.description = description;
   }
 
   const actor = (req as AuthenticatedRequest).user;

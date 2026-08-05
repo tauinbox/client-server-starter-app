@@ -829,11 +829,11 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1702 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1736 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 249 tests; a run with Postgres + Redis + Mailpit reports 226 passing and 23 skipped (suites gated on `DB_HOST` / `REDIS_URL` skip entirely on a bare run) |
 | Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1011 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 209 tests passing |
-| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 244 tests passing |
+| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 262 tests passing |
 
 ## CI/CD
 
@@ -867,6 +867,7 @@ The `audit (high)` step in all three jobs runs `npm run audit:ci`, which wraps `
 - **Audit logging** — 20 security-sensitive actions (login, register, password change/reset, user/role/permission CRUD, OAuth link/unlink, logout, token refresh failures) written to a dedicated `audit_logs` table with actor, target, IP, and request ID
 - **`X-Request-Id` shape validation** — incoming `x-request-id` headers must match `^[A-Za-z0-9_-]{1,64}$`; non-conforming values are replaced with a fresh UUID before reaching audit rows, log lines, or Prometheus labels (prevents log injection and high-cardinality label abuse)
 - `class-validator` on server DTOs with `whitelist: true` and `forbidNonWhitelisted: true` — unknown properties are stripped and requests with undeclared fields are rejected (prevents mass-assignment attacks); Angular `Validators` on client forms
+- **An explicit `null` is not "absent"** — `@IsOptional()` skips every other validator for `null` as well as `undefined`, so an optional field would accept `null` and assign it to the entity. Optional fields whose column is NOT NULL therefore use `@ValidateIf(propertyIsDefined)` (`server/src/common/validators/property-is-defined.ts`), and DTOs built with `PartialType` pass the equivalent `{ skipNullProperties: false }`. Without it `PATCH /auth/profile` with `{"password": null}` set the column to NULL and answered 200, leaving the account unable to log in; the other affected fields turned a 400 into a NOT NULL violation reported as 500. `PartialType`'s option does not cover a property the parent class already marks `@IsOptional()` — those are converted in the parent
 - LIKE query pattern escaping to prevent SQL injection via wildcards
 - File upload security: auth required, 5 MB limit, type whitelist, filename sanitization
 - Configurable CORS (permissive only in `local` environment)

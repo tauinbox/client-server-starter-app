@@ -1,12 +1,13 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsString, MaxLength, ValidateIf } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 
 export class UpdateActionDto {
   @ApiPropertyOptional({
     description: 'Human-readable display name',
     example: 'Publish'
   })
-  @IsOptional()
+  @ValidateIf(propertyIsDefined)
   @IsString()
   @MaxLength(100)
   displayName?: string;
@@ -15,7 +16,7 @@ export class UpdateActionDto {
     description: 'Description of what this action does',
     example: 'Publish a record to make it publicly visible'
   })
-  @IsOptional()
+  @ValidateIf(propertyIsDefined)
   @IsString()
   @MaxLength(500)
   description?: string;
