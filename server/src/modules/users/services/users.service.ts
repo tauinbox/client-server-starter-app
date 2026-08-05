@@ -359,12 +359,15 @@ export class UsersService {
       .set({
         failedLoginAttempts: () => '"failed_login_attempts" + 1',
         lockedUntil: () =>
-          `CASE WHEN "failed_login_attempts" + 1 >= ${maxAttempts} ` +
+          `CASE WHEN "failed_login_attempts" + 1 >= :maxAttempts::int ` +
           `THEN NOW() + :lockInterval::interval ` +
           `ELSE "locked_until" END`
       })
       .where('id = :userId', { userId })
-      .setParameters({ lockInterval: `${lockDurationMs} milliseconds` })
+      .setParameters({
+        maxAttempts,
+        lockInterval: `${lockDurationMs} milliseconds`
+      })
       .returning(['failedLoginAttempts', 'lockedUntil'])
       .execute();
 
