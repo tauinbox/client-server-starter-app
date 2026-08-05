@@ -82,21 +82,12 @@ router.post(
 router.patch('/resources/:id', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
-  const resource = state.resources.get(id);
-
-  if (!resource) {
-    res.status(404).json({
-      message: 'Resource not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.RESOURCES.NOT_FOUND
-    });
-    return;
-  }
 
   const { displayName, description, allowedActionNames } = req.body;
 
-  // Validate before any mutation so a rejected request leaves the resource
-  // untouched, matching the server's whole-DTO validation.
+  // UpdateResourceDto is validated by the server's global pipe before the
+  // handler runs, so a malformed body is a 400 whether or not the resource
+  // exists, and a rejected request leaves the resource untouched.
   if (allowedActionNames !== undefined && allowedActionNames !== null) {
     if (!Array.isArray(allowedActionNames)) {
       res
@@ -164,6 +155,17 @@ router.patch('/resources/:id', adminGuard, requireUuid('id'), (req, res) => {
         .json(validationError('description must not exceed 500 characters'));
       return;
     }
+  }
+
+  const resource = state.resources.get(id);
+
+  if (!resource) {
+    res.status(404).json({
+      message: 'Resource not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.RESOURCES.NOT_FOUND
+    });
+    return;
   }
 
   if (displayName !== undefined) {
@@ -311,21 +313,12 @@ router.post('/actions', adminGuard, (req, res) => {
 router.patch('/actions/:id', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
-  const action = state.actions.get(id);
-
-  if (!action) {
-    res.status(404).json({
-      message: 'Action not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
-    });
-    return;
-  }
 
   const { displayName, description } = req.body;
 
-  // Validate before any mutation so a rejected request leaves the action
-  // untouched, matching the server's whole-DTO validation.
+  // UpdateActionDto is validated by the server's global pipe before the handler
+  // runs, so a malformed body is a 400 whether or not the action exists, and a
+  // rejected request leaves the action untouched.
   if (displayName !== undefined) {
     if (typeof displayName !== 'string') {
       res.status(400).json(validationError('displayName must be a string'));
@@ -352,6 +345,17 @@ router.patch('/actions/:id', adminGuard, requireUuid('id'), (req, res) => {
         .json(validationError('description must not exceed 500 characters'));
       return;
     }
+  }
+
+  const action = state.actions.get(id);
+
+  if (!action) {
+    res.status(404).json({
+      message: 'Action not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
+    });
+    return;
   }
 
   if (displayName !== undefined) {

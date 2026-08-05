@@ -549,16 +549,10 @@ router.get('/:id/permissions', adminGuard, requireUuid('id'), (req, res) => {
 // PATCH /api/v1/users/:id
 router.patch('/:id', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
-  const user = findUserById(id);
-  if (!user) {
-    res.status(404).json({
-      message: 'User not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.USERS.NOT_FOUND
-    });
-    return;
-  }
 
+  // The server's global ValidationPipe runs before the handler, so a body that
+  // fails UpdateUserDto is a 400 whether or not the addressed row exists. Only
+  // checks that need the looked-up row stay below the 404.
   const { firstName, lastName, password, isActive, unlockAccount, locale } =
     req.body;
   // An explicit null is a 400 on the server, not an absent field: UpdateUserDto
@@ -628,6 +622,16 @@ router.patch('/:id', adminGuard, requireUuid('id'), (req, res) => {
     res
       .status(400)
       .json(validationError('unlockAccount must be a boolean value'));
+    return;
+  }
+
+  const user = findUserById(id);
+  if (!user) {
+    res.status(404).json({
+      message: 'User not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.USERS.NOT_FOUND
+    });
     return;
   }
 
