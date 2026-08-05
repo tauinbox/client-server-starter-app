@@ -50,9 +50,27 @@ export const PROTOTYPE_KEYS = new Set([
  */
 export const MAX_MONGO_QUERY_DEPTH = 32;
 
+export const LIST_OPERATOR_KEYS = new Set(['$in', '$nin']);
+
+export function isJsonScalar(value: unknown): boolean {
+  return (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  );
+}
+
 /**
  * Recursively checks whether an object tree contains any unknown
- * `$`-prefixed operator (not in the allowed set) or any denied key.
+ * `$`-prefixed operator (not in the allowed set), any denied key, or a list
+ * operator whose array carries a non-scalar element.
+ *
+ * The element check keeps this layer and the SQL translator in agreement: the
+ * translator can only bind scalars into `IN (:...p)` and drops the whole rule
+ * otherwise, so accepting `{"$in":[{...}]}` here would store a condition that
+ * silently grants nothing (or, for a deny, denies everything). `fieldMatch`,
+ * the structured route to the same operator, already applies this rule.
  *
  * @returns Error message string, or `null` if safe.
  */
@@ -82,6 +100,15 @@ export function validateMongoQueryKeys(
       }
       if (!ALLOWED_MONGO_OPERATORS.has(key)) {
         return `Unknown operator "${key}" at ${path}`;
+      }
+      if (LIST_OPERATOR_KEYS.has(key)) {
+        const opPath = path ? `${path}.${key}` : key;
+        if (!Array.isArray(value)) {
+          return `Operator "${key}" at ${opPath} must be an array`;
+        }
+        if (!value.every(isJsonScalar)) {
+          return `Operator "${key}" at ${opPath} must be an array of strings, numbers, booleans or null`;
+        }
       }
     }
 

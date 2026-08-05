@@ -139,4 +139,25 @@ describe('IsSafeMongoQueryConstraint', () => {
   it('should accept an empty object', () => {
     expect(validator.validate('{}')).toBe(true);
   });
+
+  // Only scalars can be bound into the translator's IN (:...p); accepting a
+  // richer element here would store a condition that grants nothing in
+  // list/search while reading as a restriction in the admin UI.
+  it('should reject a list operator holding a non-scalar element', () => {
+    const rejected = [
+      '{"status":{"$in":["a",{"nested":"x"}]}}',
+      '{"status":{"$nin":[["a"]]}}',
+      '{"$or":[{"id":{"$in":[{"nested":"x"}]}}]}'
+    ];
+
+    for (const query of rejected) {
+      expect(validator.validate(query)).toBe(false);
+      expect(validator.defaultMessage()).toContain('must be an array of');
+    }
+  });
+
+  it('should reject a list operator whose value is not an array', () => {
+    expect(validator.validate('{"status":{"$in":"active"}}')).toBe(false);
+    expect(validator.defaultMessage()).toContain('must be an array');
+  });
 });

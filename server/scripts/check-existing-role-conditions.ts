@@ -145,6 +145,12 @@ function checkFieldValue(value: unknown, path: string): CheckResult {
           reason: `${childPath} → ${op} value must be array`
         };
       }
+      if (opVal.some((el) => typeof el === 'object' && el !== null)) {
+        return {
+          ok: false,
+          reason: `${childPath} → ${op} array element must be a scalar`
+        };
+      }
       continue;
     }
     return { ok: false, reason: `${childPath} → unknown operator "${op}"` };

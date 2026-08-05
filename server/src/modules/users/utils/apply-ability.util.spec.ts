@@ -566,6 +566,70 @@ describe('applyAbilityToUserQuery', () => {
     expect(calls[0].sql).toBe('(1 = 0)');
     expect(warnSpy).toHaveBeenCalled();
   });
+
+  it('SKIPS THE RULE when an $in element is not a scalar', () => {
+    const { qb, calls } = fakeQb();
+    applyAbilityToUserQuery(
+      qb,
+      ability({
+        rules: [{ conditions: { id: { $in: ['u-1', { nested: 'x' }] } } }]
+      }),
+      'search'
+    );
+    expect(calls[0].sql).toBe('(1 = 0)');
+    expect(calls[0].params).toEqual({});
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('$in array element must be a scalar')
+    );
+  });
+
+  it('SKIPS THE RULE when a $nin element is a nested array', () => {
+    const { qb, calls } = fakeQb();
+    applyAbilityToUserQuery(
+      qb,
+      ability({
+        rules: [{ conditions: { email: { $nin: [['a@x.io']] } } }]
+      }),
+      'search'
+    );
+    expect(calls[0].sql).toBe('(1 = 0)');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('$nin array element must be a scalar')
+    );
+  });
+
+  it('restricts to no rows when a DENY rule carries a non-scalar $in element', () => {
+    const { qb, calls } = fakeQb();
+    applyAbilityToUserQuery(
+      qb,
+      ability({
+        rules: [
+          { conditions: undefined },
+          { conditions: { id: { $in: [{ nested: 'x' }] } }, inverted: true }
+        ]
+      }),
+      'search'
+    );
+    // An untranslatable deny must not be dropped silently - dropping it would
+    // widen the query beyond what the deny intended.
+    expect(calls[0].sql).toBe('1 = 0');
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it('still binds an $in list of mixed scalar types', () => {
+    const { qb, calls } = fakeQb();
+    applyAbilityToUserQuery(
+      qb,
+      ability({
+        rules: [{ conditions: { isActive: { $in: [true, null, 3, 'x'] } } }]
+      }),
+      'search'
+    );
+    expect(calls[0].sql).toBe('(user.isActive IN (:...abFilter_0))');
+    expect(calls[0].params).toMatchObject({
+      abFilter_0: [true, null, 3, 'x']
+    });
+  });
 });
 
 describe('deny parity between in-memory can() and the SQL projection', () => {
