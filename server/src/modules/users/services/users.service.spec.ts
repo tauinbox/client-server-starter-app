@@ -1055,12 +1055,28 @@ describe('UsersService', () => {
         userId: 'user-1'
       });
       expect(mockUpdateQb.setParameters).toHaveBeenCalledWith({
+        maxAttempts: 5,
         lockInterval: '900000 milliseconds'
       });
       expect(result).toEqual({
         failedLoginAttempts: 1,
         lockedUntil: null
       });
+    });
+
+    it('should bind the lockout threshold instead of inlining it', async () => {
+      await service.incrementFailedAttemptsAndLockIfNeeded('user-1', 7, 900000);
+
+      const updateSet = (
+        mockUpdateQb.set.mock.calls[0] as [{ lockedUntil: () => string }]
+      )[0];
+      const lockedUntilSql = updateSet.lockedUntil();
+
+      expect(lockedUntilSql).toContain(':maxAttempts::int');
+      expect(lockedUntilSql).not.toContain('7');
+      expect(mockUpdateQb.setParameters).toHaveBeenCalledWith(
+        expect.objectContaining({ maxAttempts: 7 })
+      );
     });
 
     it('should pass entity property names (camelCase) to returning()', async () => {
