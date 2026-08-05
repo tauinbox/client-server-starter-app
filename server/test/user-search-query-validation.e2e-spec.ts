@@ -20,6 +20,7 @@ import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factor
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
+import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants/user.constants';
 
 const EMPTY_PAGE = {
   data: [],
@@ -114,6 +115,49 @@ describe('User search query DTO validation (e2e)', () => {
     await request(server).get(url).expect(400);
 
     expect(usersService.findCursorPaginated).not.toHaveBeenCalled();
+  });
+
+  it.each(FILTER_FIELDS)(
+    'rejects an over-long %s on GET /users/search (400)',
+    async (field) => {
+      const res = await request(server)
+        .get(
+          `/api/v1/users/search?${field}=${'x'.repeat(MAX_USER_FILTER_LENGTH + 1)}`
+        )
+        .expect(400);
+
+      const body = res.body as { message: string[] };
+      expect(body.message).toEqual(
+        expect.arrayContaining([
+          `${field} must be shorter than or equal to ${MAX_USER_FILTER_LENGTH} characters`
+        ])
+      );
+      expect(usersService.findPaginated).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['isActive', 'includeDeleted'])(
+    'rejects a non-boolean %s instead of dropping the filter (400)',
+    async (field) => {
+      const res = await request(server)
+        .get(`/api/v1/users/search?${field}=maybe`)
+        .expect(400);
+
+      const body = res.body as { message: string[] };
+      expect(body.message).toEqual(
+        expect.arrayContaining([`${field} must be a boolean value`])
+      );
+      expect(usersService.findPaginated).not.toHaveBeenCalled();
+    }
+  );
+
+  it('reads an empty isActive as unset', async () => {
+    await request(server).get('/api/v1/users/search?isActive=').expect(200);
+
+    expect(usersService.findPaginated).toHaveBeenCalledWith(
+      expect.objectContaining({ isActive: undefined }),
+      undefined
+    );
   });
 
   it('accepts scalar filters and dispatches the search', async () => {

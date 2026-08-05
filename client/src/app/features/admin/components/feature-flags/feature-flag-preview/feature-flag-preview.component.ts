@@ -25,9 +25,9 @@ import { UserService } from '../../../../users/services/user.service';
 import type { User } from '../../../../users/models/user.types';
 import {
   debouncedUserSearch,
+  isSearchableTerm,
   roleToChip,
   searchUsersPage,
-  USER_SEARCH_MIN_CHARS,
   userToChip
 } from '../../../utils/user-chip-search';
 import type { PreviewFlagContext } from '../../../services/feature-flags-admin.service';
@@ -131,7 +131,7 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
 
   #searchUsers(term: string) {
     const trimmed = term.trim();
-    if (trimmed.length < USER_SEARCH_MIN_CHARS) return of([] as User[]);
+    if (!isSearchableTerm(trimmed)) return of([] as User[]);
     return searchUsersPage(this.#userService, trimmed);
   }
 

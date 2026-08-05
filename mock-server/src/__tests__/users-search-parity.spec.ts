@@ -1,8 +1,8 @@
-// Parity with the server's @IsString() validation on the user-search
-// filter params: a duplicated query param (?q=a&q=b, parsed as an array)
-// must be rejected 400, not coerced to "a,b".
+// Parity with the server's UserFiltersQueryDto: the mock must reject the same
+// filter inputs with 400 instead of coercing or silently dropping them.
 
 import type { Server } from 'http';
+import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants/user.constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState } from '../state';
@@ -72,6 +72,72 @@ describe('User list/search filter-param validation parity with server', () => {
     const res = await getUsers(token, url);
 
     expect(res.status).toBe(400);
+  });
+
+  it.each(['q', 'email', 'firstName', 'lastName', 'role'])(
+    'rejects an over-long %s on GET /users/search with 400',
+    async (field) => {
+      const token = await loginAsAdmin();
+
+      const res = await getUsers(
+        token,
+        `/search?${field}=${'x'.repeat(MAX_USER_FILTER_LENGTH + 1)}`
+      );
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { message: string };
+      expect(body.message).toBe(
+        `${field} must be shorter than or equal to ${MAX_USER_FILTER_LENGTH} characters`
+      );
+    }
+  );
+
+  it.each(['isActive', 'includeDeleted'])(
+    'rejects a non-boolean %s on GET /users/search with 400',
+    async (field) => {
+      const token = await loginAsAdmin();
+
+      const res = await getUsers(token, `/search?${field}=maybe`);
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { message: string };
+      expect(body.message).toBe(`${field} must be a boolean value`);
+    }
+  );
+
+  it.each([
+    ['?includeDeleted=maybe'],
+    ['/cursor?isActive=maybe'],
+    ['/search/cursor?q=' + 'x'.repeat(MAX_USER_FILTER_LENGTH + 1)]
+  ])('rejects an invalid filter on GET /users%s with 400', async (url) => {
+    const token = await loginAsAdmin();
+
+    const res = await getUsers(token, url);
+
+    expect(res.status).toBe(400);
+  });
+
+  it('reads an empty isActive as unset, like the DTO transform', async () => {
+    const token = await loginAsAdmin();
+
+    const withFilter = await getUsers(token, '/search?isActive=');
+    const without = await getUsers(token, '/search');
+
+    expect(withFilter.status).toBe(200);
+    const filtered = (await withFilter.json()) as { data: unknown[] };
+    const all = (await without.json()) as { data: unknown[] };
+    expect(filtered.data.length).toBe(all.data.length);
+  });
+
+  it('accepts a filter exactly at the cap', async () => {
+    const token = await loginAsAdmin();
+
+    const res = await getUsers(
+      token,
+      `/search?q=${'x'.repeat(MAX_USER_FILTER_LENGTH)}`
+    );
+
+    expect(res.status).toBe(200);
   });
 
   it('accepts scalar filters on GET /users/search', async () => {

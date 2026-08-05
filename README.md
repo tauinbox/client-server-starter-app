@@ -673,7 +673,7 @@ API base URL: `/api/v1`
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink OAuth provider |
 | GET | `/auth/permissions` | Bearer | Get current user's resolved permissions |
 | GET | `/users` | `users:search` | List all users (paginated; `includeDeleted=true` to include soft-deleted) |
-| GET | `/users/search` | `users:search` | Search users (paginated + filters: `q` (unified substring across id/email/firstName/lastName), email, firstName, lastName, `role` (exact role name), isActive; `includeDeleted=true`) |
+| GET | `/users/search` | `users:search` | Search users (paginated + filters: `q` (unified substring across id/email/firstName/lastName), email, firstName, lastName, `role` (exact role name), isActive; `includeDeleted=true`). String filters are capped at 255 chars and the boolean filters accept only `true`/`false` — anything else is a 400 |
 | GET | `/users/cursor` | `users:search` | List users with cursor-based (keyset) pagination |
 | GET | `/users/search/cursor` | `users:search` | Search users with cursor-based pagination + same filters as `/users/search` |
 | GET | `/users/:id` | `users:read` | Get user by ID |
@@ -840,11 +840,11 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1748 tests passing |
-| Server E2E tests | Jest | Separate config in `test/` | 260 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 259 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and reports 253 passing, 7 skipped |
-| Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1011 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1790 tests passing |
+| Server E2E tests | Jest | Separate config in `test/` | 268 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 267 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and reports 261 passing, 7 skipped |
+| Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1015 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 209 tests passing |
-| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 312 tests passing |
+| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 324 tests passing |
 
 ## CI/CD
 

@@ -17,7 +17,7 @@ import {
   MatCardHeader,
   MatCardTitle
 } from '@angular/material/card';
-import { form } from '@angular/forms/signals';
+import { form, maxLength } from '@angular/forms/signals';
 import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatOption, MatSelect } from '@angular/material/select';
@@ -42,6 +42,7 @@ import { UserCardListComponent } from '../user-card-list/user-card-list.componen
 import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { RoleService } from '@features/admin/services/role.service';
 import type { RoleAdminResponse } from '@app/shared/types';
+import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants/user.constants';
 
 type FilterModel = {
   q: string;
@@ -89,7 +90,9 @@ export class UserListComponent implements OnInit {
   readonly layout = inject(LayoutService);
 
   readonly filterModel = signal<FilterModel>({ ...INITIAL_FILTER });
-  readonly filterForm = form(this.filterModel);
+  readonly filterForm = form(this.filterModel, (path) => {
+    maxLength(path.q, MAX_USER_FILTER_LENGTH);
+  });
 
   readonly isActiveFilter = signal('');
   readonly roleFilter = signal('');
@@ -174,6 +177,8 @@ export class UserListComponent implements OnInit {
   }
 
   onSubmit(): void {
+    if (this.filterForm().invalid()) return;
+
     const filters: UserSearch = {};
 
     const q = this.filterModel().q.trim();

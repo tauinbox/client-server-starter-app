@@ -45,10 +45,10 @@ import { UserService } from '../../../../users/services/user.service';
 import type { User } from '../../../../users/models/user.types';
 import {
   debouncedUserSearch,
+  isSearchableTerm,
   roleToChip,
   searchUsersPage,
   USER_SEARCH_LIMIT,
-  USER_SEARCH_MIN_CHARS,
   userToChip
 } from '../../../utils/user-chip-search';
 
@@ -290,7 +290,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
   #searchUsers(term: string) {
     const trimmed = term.trim();
-    if (trimmed.length < USER_SEARCH_MIN_CHARS) {
+    if (!isSearchableTerm(trimmed)) {
       this.#lastSearch = null;
       return of([] as User[]);
     }

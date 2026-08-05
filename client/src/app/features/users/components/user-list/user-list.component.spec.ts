@@ -14,6 +14,7 @@ import { NotifyService } from '@core/services/notify.service';
 import { RoleService } from '@features/admin/services/role.service';
 import type { User } from '../../models/user.types';
 import type { RoleAdminResponse } from '@app/shared/types';
+import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants/user.constants';
 
 const mockUserRole: RoleAdminResponse = {
   id: 'role-user',
@@ -221,6 +222,24 @@ describe('UserListComponent', () => {
 
       expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
         expect.not.objectContaining({ q: expect.anything() })
+      );
+    });
+
+    it('should not search when q exceeds the filter cap the API validates', () => {
+      usersStoreMock.load.mockClear();
+      component.filterModel.set({ q: 'x'.repeat(MAX_USER_FILTER_LENGTH + 1) });
+      component.onSubmit();
+
+      expect(usersStoreMock.setFilters).not.toHaveBeenCalled();
+      expect(usersStoreMock.load).not.toHaveBeenCalled();
+    });
+
+    it('should search when q is exactly at the filter cap', () => {
+      component.filterModel.set({ q: 'x'.repeat(MAX_USER_FILTER_LENGTH) });
+      component.onSubmit();
+
+      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
+        expect.objectContaining({ q: 'x'.repeat(MAX_USER_FILTER_LENGTH) })
       );
     });
 
