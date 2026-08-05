@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { mockId } from '../fixtures/ids';
 
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
@@ -20,7 +21,7 @@ const baseUser = {
 // Deactivated BEFORE deletion: restoring must not silently re-enable it.
 const deletedUser: MockUser = createMockUser({
   ...baseUser,
-  id: '900',
+  id: mockId('user-900'),
   email: 'deleted.restorable@example.com',
   firstName: 'Deleted',
   deletedAt: '2025-02-01T00:00:00.000Z'
@@ -28,7 +29,7 @@ const deletedUser: MockUser = createMockUser({
 
 const liveUser: MockUser = createMockUser({
   ...baseUser,
-  id: '901',
+  id: mockId('user-901'),
   email: 'live.restorable@example.com',
   firstName: 'Live',
   deletedAt: null

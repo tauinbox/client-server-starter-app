@@ -1,4 +1,5 @@
 import { expect, loginViaUiKeepSse, test } from '../fixtures/base.fixture';
+import { mockId } from '../fixtures/ids';
 
 // When an admin toggles a flag in the admin panel, the server (or mock-server
 // in this case) broadcasts `{ type: 'feature_flags_updated' }` to every
@@ -19,7 +20,7 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
     await page.unroute(/\/api\/.*\/notifications\/stream/);
 
     await loginViaUiKeepSse(page, _mockServer.url, {
-      id: '100',
+      id: mockId('user-100'),
       email: 'flagadmin@example.com',
       roles: ['admin']
     });

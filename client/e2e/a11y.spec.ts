@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 import type { Result } from 'axe-core';
+import { mockId } from './fixtures/ids';
 
 import { expect, loginViaUi, test } from './fixtures/base.fixture';
 
@@ -102,7 +103,7 @@ test.describe('Accessibility (axe-core)', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/1');
+    await page.goto(`/users/${mockId('user-1')}`);
     await page.waitForLoadState('networkidle');
 
     const { violations } = await buildAxeScanner(page).analyze();
@@ -114,7 +115,7 @@ test.describe('Accessibility (axe-core)', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto('/users/1/edit');
+    await page.goto(`/users/${mockId('user-1')}/edit`);
     await page.waitForLoadState('networkidle');
 
     const { violations } = await buildAxeScanner(page).analyze();

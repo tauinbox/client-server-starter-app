@@ -1,4 +1,5 @@
 import { createMockJwt } from './jwt.utils';
+import { mockId } from './ids';
 
 import { createMockUser } from '../../../mock-server/src/factories';
 
@@ -11,7 +12,7 @@ import type { MockUser } from '../../../mock-server/src/types';
 export type { MockUser };
 
 export const defaultUser: MockUser = createMockUser({
-  id: '1',
+  id: mockId('user-1'),
   email: 'test@example.com',
   firstName: 'John',
   lastName: 'Doe',
@@ -34,7 +35,7 @@ export const defaultTokens = {
 
 export const mockUsersList: MockUser[] = [
   createMockUser({
-    id: '1',
+    id: mockId('user-1'),
     email: 'admin@example.com',
     firstName: 'Admin',
     lastName: 'User',
@@ -50,7 +51,7 @@ export const mockUsersList: MockUser[] = [
     deletedAt: null
   }),
   createMockUser({
-    id: '2',
+    id: mockId('user-2'),
     email: 'john@example.com',
     firstName: 'John',
     lastName: 'Smith',
@@ -66,7 +67,7 @@ export const mockUsersList: MockUser[] = [
     deletedAt: null
   }),
   createMockUser({
-    id: '3',
+    id: mockId('user-3'),
     email: 'jane@example.com',
     firstName: 'Jane',
     lastName: 'Doe',

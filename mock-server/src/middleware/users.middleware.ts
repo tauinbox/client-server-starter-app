@@ -40,7 +40,10 @@ import { adminGuard, authGuard } from '../helpers/auth.helpers';
 import { cancelSubscriptionsForDeletedUser } from './billing.middleware';
 import type { AuthenticatedRequest, MockUser } from '../types';
 import { pushToUser, pushToUsersMatching } from '../sse-hub';
-import { validationError } from '../helpers/validation-error.helpers';
+import {
+  requireUuid,
+  validationError
+} from '../helpers/validation-error.helpers';
 
 type UserCrudAction = 'created' | 'updated' | 'deleted' | 'restored';
 
@@ -504,7 +507,7 @@ router.get('/search/cursor', adminGuard, (req, res) => {
 });
 
 // GET /api/v1/users/:id — requires auth (not admin) to match client route guards
-router.get('/:id', authGuard, (req, res) => {
+router.get('/:id', authGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const user = findUserById(id);
   if (!user) {
@@ -521,7 +524,7 @@ router.get('/:id', authGuard, (req, res) => {
 
 // GET /api/v1/users/:id/permissions — admin read-only preview of a user's
 // effective permissions: DB roles, resolved permissions and compiled CASL rules.
-router.get('/:id/permissions', adminGuard, (req, res) => {
+router.get('/:id/permissions', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const user = findUserById(id);
   if (!user) {
@@ -544,7 +547,7 @@ router.get('/:id/permissions', adminGuard, (req, res) => {
 });
 
 // PATCH /api/v1/users/:id
-router.patch('/:id', adminGuard, (req, res) => {
+router.patch('/:id', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const user = findUserById(id);
   if (!user) {
@@ -707,7 +710,7 @@ router.patch('/:id', adminGuard, (req, res) => {
 });
 
 // DELETE /api/v1/users/:id
-router.delete('/:id', adminGuard, (req, res) => {
+router.delete('/:id', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
   const targetUser = findUserById(id);
@@ -764,7 +767,7 @@ router.delete('/:id', adminGuard, (req, res) => {
 });
 
 // POST /api/v1/users/:id/restore
-router.post('/:id/restore', adminGuard, (req, res) => {
+router.post('/:id/restore', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const targetUser = findUserByIdWithDeleted(id);
   if (!targetUser) {

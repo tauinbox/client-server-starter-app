@@ -2,6 +2,7 @@ import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState, getState } from '../state';
+import { mockId } from '../utils/mock-id';
 
 let server: Server;
 let baseUrl: string;
@@ -47,7 +48,7 @@ function softDeleteUser(id: string): void {
 
 function editorPermissionIds(): string[] {
   return getState()
-    .rolePermissions.filter((rp) => rp.roleId === 'role-editor')
+    .rolePermissions.filter((rp) => rp.roleId === mockId('role-editor'))
     .map((rp) => rp.permissionId);
 }
 
@@ -69,7 +70,7 @@ describe('role grant error parity with server', () => {
       const token = await loginAsAdmin();
 
       const res = await fetch(
-        `${baseUrl}/api/v1/roles/role-editor/permissions`,
+        `${baseUrl}/api/v1/roles/${mockId('role-editor')}/permissions`,
         {
           method: 'POST',
           headers: {
@@ -91,22 +92,24 @@ describe('role grant error parity with server', () => {
       const token = await loginAsAdmin();
       getState().rolePermissions.push({
         id: 'rp-test',
-        roleId: 'role-editor',
-        permissionId: 'perm-1',
+        roleId: mockId('role-editor'),
+        permissionId: mockId('perm-1'),
         conditions: null
       });
 
       // perm-2 is new, perm-1 already granted: all-or-nothing like the
       // server's single-transaction save.
       const res = await fetch(
-        `${baseUrl}/api/v1/roles/role-editor/permissions`,
+        `${baseUrl}/api/v1/roles/${mockId('role-editor')}/permissions`,
         {
           method: 'POST',
           headers: {
             'content-type': 'application/json',
             authorization: `Bearer ${token}`
           },
-          body: JSON.stringify({ permissionIds: ['perm-2', 'perm-1'] })
+          body: JSON.stringify({
+            permissionIds: [mockId('perm-2'), mockId('perm-1')]
+          })
         }
       );
 
@@ -114,7 +117,7 @@ describe('role grant error parity with server', () => {
       const body = (await res.json()) as { message: string; errorKey: string };
       expect(body.message).toBe('A record with this value already exists');
       expect(body.errorKey).toBe('errors.db.uniqueViolation');
-      expect(editorPermissionIds()).toEqual(['perm-1']);
+      expect(editorPermissionIds()).toEqual([mockId('perm-1')]);
     });
   });
 
@@ -123,13 +126,13 @@ describe('role grant error parity with server', () => {
       const token = await loginAsAdmin();
       getState().rolePermissions.push({
         id: 'rp-test',
-        roleId: 'role-editor',
-        permissionId: 'perm-1',
+        roleId: mockId('role-editor'),
+        permissionId: mockId('perm-1'),
         conditions: null
       });
 
       const res = await fetch(
-        `${baseUrl}/api/v1/roles/role-editor/permissions`,
+        `${baseUrl}/api/v1/roles/${mockId('role-editor')}/permissions`,
         {
           method: 'PUT',
           headers: {
@@ -137,7 +140,10 @@ describe('role grant error parity with server', () => {
             authorization: `Bearer ${token}`
           },
           body: JSON.stringify({
-            items: [{ permissionId: 'perm-2' }, { permissionId: 'perm-nope' }]
+            items: [
+              { permissionId: mockId('perm-2') },
+              { permissionId: 'perm-nope' }
+            ]
           })
         }
       );
@@ -146,17 +152,20 @@ describe('role grant error parity with server', () => {
       const body = (await res.json()) as { message: string; errorKey: string };
       expect(body.message).toBe('Permission perm-nope not found');
       expect(body.errorKey).toBe('errors.general.resourceNotFound');
-      expect(editorPermissionIds()).toEqual(['perm-1']);
+      expect(editorPermissionIds()).toEqual([mockId('perm-1')]);
     });
   });
 
   describe('identity-bound conditions on a create grant', () => {
     it('rejects ownership on a create grant with 400 on POST', async () => {
       const token = await loginAsAdmin();
-      const createUser = permissionIdFor('res-users', 'act-create');
+      const createUser = permissionIdFor(
+        mockId('res-users'),
+        mockId('act-create')
+      );
 
       const res = await fetch(
-        `${baseUrl}/api/v1/roles/role-editor/permissions`,
+        `${baseUrl}/api/v1/roles/${mockId('role-editor')}/permissions`,
         {
           method: 'POST',
           headers: {
@@ -181,14 +190,17 @@ describe('role grant error parity with server', () => {
       const token = await loginAsAdmin();
       getState().rolePermissions.push({
         id: 'rp-test',
-        roleId: 'role-editor',
-        permissionId: 'perm-1',
+        roleId: mockId('role-editor'),
+        permissionId: mockId('perm-1'),
         conditions: null
       });
-      const createUser = permissionIdFor('res-users', 'act-create');
+      const createUser = permissionIdFor(
+        mockId('res-users'),
+        mockId('act-create')
+      );
 
       const res = await fetch(
-        `${baseUrl}/api/v1/roles/role-editor/permissions`,
+        `${baseUrl}/api/v1/roles/${mockId('role-editor')}/permissions`,
         {
           method: 'PUT',
           headers: {
@@ -209,15 +221,18 @@ describe('role grant error parity with server', () => {
       expect(res.status).toBe(400);
       const body = (await res.json()) as { errorKey: string };
       expect(body.errorKey).toBe('errors.roles.conditionNotApplicable');
-      expect(editorPermissionIds()).toEqual(['perm-1']);
+      expect(editorPermissionIds()).toEqual([mockId('perm-1')]);
     });
 
     it('accepts ownership on an update grant', async () => {
       const token = await loginAsAdmin();
-      const updateUser = permissionIdFor('res-users', 'act-update');
+      const updateUser = permissionIdFor(
+        mockId('res-users'),
+        mockId('act-update')
+      );
 
       const res = await fetch(
-        `${baseUrl}/api/v1/roles/role-editor/permissions`,
+        `${baseUrl}/api/v1/roles/${mockId('role-editor')}/permissions`,
         {
           method: 'PUT',
           headers: {
@@ -245,21 +260,24 @@ describe('role grant error parity with server', () => {
       const token = await loginAsAdmin();
 
       // Seed user '2' already holds the 'user' role (role-user).
-      const res = await fetch(`${baseUrl}/api/v1/roles/assign/2`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ roleId: 'role-user' })
-      });
+      const res = await fetch(
+        `${baseUrl}/api/v1/roles/assign/${mockId('user-2')}`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ roleId: mockId('role-user') })
+        }
+      );
 
       expect(res.status).toBe(409);
       const body = (await res.json()) as { message: string; errorKey: string };
       expect(body.message).toBe('A record with this value already exists');
       expect(body.errorKey).toBe('errors.db.uniqueViolation');
 
-      const user = getState().users.get('2');
+      const user = getState().users.get(mockId('user-2'));
       expect(user?.roles).toEqual(['user']);
       expect(user?.tokenRevokedAt).toBeNull();
       expect(
@@ -270,17 +288,20 @@ describe('role grant error parity with server', () => {
     it('still assigns a new role with the usual side effects', async () => {
       const token = await loginAsAdmin();
 
-      const res = await fetch(`${baseUrl}/api/v1/roles/assign/2`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ roleId: 'role-editor' })
-      });
+      const res = await fetch(
+        `${baseUrl}/api/v1/roles/assign/${mockId('user-2')}`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ roleId: mockId('role-editor') })
+        }
+      );
 
       expect(res.status).toBe(200);
-      const user = getState().users.get('2');
+      const user = getState().users.get(mockId('user-2'));
       expect(user?.roles).toEqual(['user', 'editor']);
       expect(user?.tokenRevokedAt).not.toBeNull();
       expect(
@@ -297,7 +318,7 @@ describe('role grant error parity with server', () => {
           'content-type': 'application/json',
           authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ roleId: 'role-editor' })
+        body: JSON.stringify({ roleId: mockId('role-editor') })
       });
 
       expect(res.status).toBe(404);
@@ -307,21 +328,24 @@ describe('role grant error parity with server', () => {
 
     it('returns 404 USERS.NOT_FOUND for a soft-deleted user without changing roles', async () => {
       const token = await loginAsAdmin();
-      softDeleteUser('2');
+      softDeleteUser(mockId('user-2'));
 
-      const res = await fetch(`${baseUrl}/api/v1/roles/assign/2`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ roleId: 'role-editor' })
-      });
+      const res = await fetch(
+        `${baseUrl}/api/v1/roles/assign/${mockId('user-2')}`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ roleId: mockId('role-editor') })
+        }
+      );
 
       expect(res.status).toBe(404);
       const body = (await res.json()) as { errorKey: string };
       expect(body.errorKey).toBe('errors.users.notFound');
-      expect(getState().users.get('2')?.roles).toEqual(['user']);
+      expect(getState().users.get(mockId('user-2'))?.roles).toEqual(['user']);
     });
   });
 
@@ -330,7 +354,7 @@ describe('role grant error parity with server', () => {
       const token = await loginAsAdmin();
 
       const res = await fetch(
-        `${baseUrl}/api/v1/roles/assign/${UNKNOWN_ID}/role-user`,
+        `${baseUrl}/api/v1/roles/assign/${UNKNOWN_ID}/${mockId('role-user')}`,
         {
           method: 'DELETE',
           headers: { authorization: `Bearer ${token}` }
@@ -344,17 +368,20 @@ describe('role grant error parity with server', () => {
 
     it('returns 404 USERS.NOT_FOUND for a soft-deleted user without changing roles', async () => {
       const token = await loginAsAdmin();
-      softDeleteUser('2');
+      softDeleteUser(mockId('user-2'));
 
-      const res = await fetch(`${baseUrl}/api/v1/roles/assign/2/role-user`, {
-        method: 'DELETE',
-        headers: { authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(
+        `${baseUrl}/api/v1/roles/assign/${mockId('user-2')}/${mockId('role-user')}`,
+        {
+          method: 'DELETE',
+          headers: { authorization: `Bearer ${token}` }
+        }
+      );
 
       expect(res.status).toBe(404);
       const body = (await res.json()) as { errorKey: string };
       expect(body.errorKey).toBe('errors.users.notFound');
-      expect(getState().users.get('2')?.roles).toEqual(['user']);
+      expect(getState().users.get(mockId('user-2'))?.roles).toEqual(['user']);
     });
   });
 });

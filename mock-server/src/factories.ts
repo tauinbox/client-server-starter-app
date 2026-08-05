@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import type { MockUser, OAuthAccount } from './types';
+import { mockId } from './utils/mock-id';
 
 export type MockUserOptions = Partial<MockUser>;
 export type OAuthAccountOptions = Partial<OAuthAccount>;
@@ -7,7 +8,7 @@ export type OAuthAccountOptions = Partial<OAuthAccount>;
 let nextId = 1000;
 
 export function createMockUser(options: MockUserOptions = {}): MockUser {
-  const id = options.id ?? String(nextId++);
+  const id = options.id ?? mockId(`user-${nextId++}`);
   const firstName = options.firstName ?? faker.person.firstName();
   const lastName = options.lastName ?? faker.person.lastName();
   const now = faker.date.past({ years: 1 }).toISOString();

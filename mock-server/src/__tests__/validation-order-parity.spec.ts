@@ -4,6 +4,7 @@ import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState } from '../state';
+import { mockId } from '../utils/mock-id';
 
 let server: Server;
 let baseUrl: string;
@@ -48,7 +49,7 @@ describe('PATCH /api/v1/users/:id validates the whole body before mutating', () 
   it('a 400 on the password regex leaves the other fields untouched', async () => {
     const token = await login('admin@example.com');
 
-    const res = await fetch(`${baseUrl}/api/v1/users/3`, {
+    const res = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
       method: 'PATCH',
       headers: authHeaders(token),
       body: JSON.stringify({
@@ -62,7 +63,7 @@ describe('PATCH /api/v1/users/:id validates the whole body before mutating', () 
     const body = (await res.json()) as { message: string };
     expect(body.message).toBe(PASSWORD_ERROR);
 
-    const after = await fetch(`${baseUrl}/api/v1/users/3`, {
+    const after = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
       headers: authHeaders(token)
     });
     const user = (await after.json()) as {
@@ -129,7 +130,7 @@ describe('DELETE /api/v1/roles/:id/permissions/:permissionId', () => {
     const token = await login('admin@example.com');
 
     const res = await fetch(
-      `${baseUrl}/api/v1/roles/no-such-role/permissions/perm-1`,
+      `${baseUrl}/api/v1/roles/${mockId('no-such-role')}/permissions/${mockId('perm-1')}`,
       { method: 'DELETE', headers: authHeaders(token) }
     );
 
@@ -142,7 +143,7 @@ describe('DELETE /api/v1/roles/:id/permissions/:permissionId', () => {
     const token = await login('admin@example.com');
 
     const res = await fetch(
-      `${baseUrl}/api/v1/roles/role-editor/permissions/perm-1`,
+      `${baseUrl}/api/v1/roles/${mockId('role-editor')}/permissions/${mockId('perm-1')}`,
       { method: 'DELETE', headers: authHeaders(token) }
     );
 

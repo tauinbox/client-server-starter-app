@@ -8,6 +8,7 @@ import type {
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
+import { mockId } from '../utils/mock-id';
 
 let server: Server;
 let baseUrl: string;
@@ -214,7 +215,7 @@ describe('/__control/billing/complete-purchase', () => {
     const session = (await purchase.json()) as PurchaseSessionResponse;
 
     // Settle via the userId path (latest pending session for the buyer).
-    const complete = await completePurchase({ userId: '2' });
+    const complete = await completePurchase({ userId: mockId('user-2') });
     expect(complete.status).toBe(200);
     const invoice = (await complete.json()) as InvoiceResponse;
     expect(invoice).toMatchObject({
@@ -330,7 +331,7 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId: '2', planKey: 'usage' })
+        body: JSON.stringify({ userId: mockId('user-2'), planKey: 'usage' })
       }
     );
     expect(activate.status).toBe(200);
@@ -351,7 +352,7 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId: '2' })
+        body: JSON.stringify({ userId: mockId('user-2') })
       }
     );
     expect(advance.status).toBe(200);

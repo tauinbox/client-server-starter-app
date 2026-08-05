@@ -291,6 +291,7 @@ npm test
 - `page.route(/\/api\//)` intercepts API calls and rewrites URL to worker's mock-server port
 - **CI web server**: runs `ng build` before `playwright test`, then serves the pre-built output via `serve -s dist/client/browser` (eliminates 60-90 s Angular dev-server startup). Local dev still uses `ng serve`
 - Seed data: 5 well-known users + 65 faker-generated (70 total). Credentials: `admin@example.com / Password1` (admin), `user@example.com / Password1` (user)
+- Seed ids are UUIDs, matching the `ParseUUIDPipe` the server puts on every id path parameter. Address a seed row through `mockId('user-1')` (`e2e/fixtures/ids.ts`) instead of a literal id — a malformed id is a 400 from the mock, as it is from the server
 - Modular fixture architecture in `e2e/fixtures/`:
   - `base.fixture.ts` — `_mockServer` (MockServerApi) and `_workerMockServer` fixtures + re-exports all modules
   - `jwt.utils.ts` — JWT creation utilities (`base64url`, `createMockJwt`, `createExpiredJwt`, `createValidJwt`)

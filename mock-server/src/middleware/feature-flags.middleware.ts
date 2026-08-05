@@ -25,7 +25,10 @@ import {
 } from '@app/shared/constants';
 import { attributeValueError } from '@app/shared/utils/feature-flag-attribute-value';
 import { adminGuard, authenticateRequest } from '../helpers/auth.helpers';
-import { validationError } from '../helpers/validation-error.helpers';
+import {
+  requireUuid,
+  validationError
+} from '../helpers/validation-error.helpers';
 import { pushToAll } from '../sse-hub';
 import { getState, logAudit, toFeatureFlagResponse } from '../state';
 import type { MockFeatureFlag, MockFeatureFlagRule } from '../types';
@@ -535,8 +538,8 @@ adminRouter.get('/', (_req, res) => {
   res.json(flags);
 });
 
-adminRouter.get('/:id', (req, res) => {
-  const flag = getState().featureFlags.get(req.params['id'] ?? '');
+adminRouter.get('/:id', requireUuid('id'), (req, res) => {
+  const flag = getState().featureFlags.get((req.params['id'] as string) ?? '');
   if (!flag) {
     sendError(
       res,
@@ -588,8 +591,8 @@ adminRouter.post('/', (req, res) => {
   res.status(201).json(toFeatureFlagResponse(flag));
 });
 
-adminRouter.patch('/:id', (req, res) => {
-  const flag = getState().featureFlags.get(req.params['id'] ?? '');
+adminRouter.patch('/:id', requireUuid('id'), (req, res) => {
+  const flag = getState().featureFlags.get((req.params['id'] as string) ?? '');
   if (!flag) {
     sendError(
       res,
@@ -654,8 +657,8 @@ adminRouter.patch('/:id', (req, res) => {
   res.json(toFeatureFlagResponse(flag));
 });
 
-adminRouter.delete('/:id', (req, res) => {
-  const id = req.params['id'] ?? '';
+adminRouter.delete('/:id', requireUuid('id'), (req, res) => {
+  const id = (req.params['id'] as string) ?? '';
   const flag = getState().featureFlags.get(id);
   if (!flag) {
     sendError(
@@ -681,8 +684,8 @@ adminRouter.delete('/:id', (req, res) => {
   res.status(204).end();
 });
 
-adminRouter.put('/:id/rules', (req, res) => {
-  const flag = getState().featureFlags.get(req.params['id'] ?? '');
+adminRouter.put('/:id/rules', requireUuid('id'), (req, res) => {
+  const flag = getState().featureFlags.get((req.params['id'] as string) ?? '');
   if (!flag) {
     sendError(
       res,
@@ -737,8 +740,8 @@ adminRouter.put('/:id/rules', (req, res) => {
   res.json(toFeatureFlagResponse(flag));
 });
 
-adminRouter.post('/:id/preview', (req, res) => {
-  const flag = getState().featureFlags.get(req.params['id'] ?? '');
+adminRouter.post('/:id/preview', requireUuid('id'), (req, res) => {
+  const flag = getState().featureFlags.get((req.params['id'] as string) ?? '');
   if (!flag) {
     sendError(
       res,
@@ -795,8 +798,8 @@ adminRouter.post('/:id/preview', (req, res) => {
   res.json(result);
 });
 
-adminRouter.post('/:id/toggle', (req, res) => {
-  const flag = getState().featureFlags.get(req.params['id'] ?? '');
+adminRouter.post('/:id/toggle', requireUuid('id'), (req, res) => {
+  const flag = getState().featureFlags.get((req.params['id'] as string) ?? '');
   if (!flag) {
     sendError(
       res,

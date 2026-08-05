@@ -7,6 +7,7 @@ import {
   getState,
   resetState
 } from '../state';
+import { mockId } from '../utils/mock-id';
 
 let server: Server;
 let baseUrl: string;
@@ -41,7 +42,9 @@ async function loginAsAdmin(): Promise<string> {
 }
 
 function editorRolePermissions(): unknown[] {
-  return getState().rolePermissions.filter((rp) => rp.roleId === 'role-editor');
+  return getState().rolePermissions.filter(
+    (rp) => rp.roleId === mockId('role-editor')
+  );
 }
 
 // Mirrors the server's PermissionConditionDto shape validation: a partially
@@ -52,26 +55,31 @@ describe('condition shape parity with server', () => {
   describe('PUT /api/v1/roles/:id/permissions', () => {
     async function putConditions(
       conditions: unknown,
-      permissionId = 'perm-1'
+      permissionId = mockId('perm-1')
     ): Promise<Response> {
       const token = await loginAsAdmin();
-      return fetch(`${baseUrl}/api/v1/roles/role-editor/permissions`, {
-        method: 'PUT',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          items: [{ permissionId, conditions }]
-        })
-      });
+      return fetch(
+        `${baseUrl}/api/v1/roles/${mockId('role-editor')}/permissions`,
+        {
+          method: 'PUT',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            items: [{ permissionId, conditions }]
+          })
+        }
+      );
     }
 
     // perm-1 is create:User, where ownership/userAttr are rejected as
     // unsatisfiable; shape parity for those branches needs another action.
     function updateUserPermissionId(): string {
       const permission = [...getState().permissions.values()].find(
-        (p) => p.resourceId === 'res-users' && p.actionId === 'act-update'
+        (p) =>
+          p.resourceId === mockId('res-users') &&
+          p.actionId === mockId('act-update')
       );
       if (!permission)
         throw new Error('Seed permission users/update is missing');
@@ -144,7 +152,7 @@ describe('condition shape parity with server', () => {
       const token = await loginAsAdmin();
 
       const res = await fetch(
-        `${baseUrl}/api/v1/roles/role-editor/permissions`,
+        `${baseUrl}/api/v1/roles/${mockId('role-editor')}/permissions`,
         {
           method: 'POST',
           headers: {
@@ -152,7 +160,7 @@ describe('condition shape parity with server', () => {
             authorization: `Bearer ${token}`
           },
           body: JSON.stringify({
-            permissionIds: ['perm-1'],
+            permissionIds: [mockId('perm-1')],
             conditions: { fieldMatch: { status: 'active' } }
           })
         }
@@ -169,8 +177,8 @@ describe('condition shape parity with server', () => {
     function grantToEditor(conditions: unknown): void {
       getState().rolePermissions.push({
         id: 'rp-shape-test',
-        roleId: 'role-editor',
-        permissionId: 'perm-1',
+        roleId: mockId('role-editor'),
+        permissionId: mockId('perm-1'),
         conditions: conditions as null
       });
     }
@@ -181,7 +189,7 @@ describe('condition shape parity with server', () => {
       user.roles = ['editor'];
 
       const state = getState();
-      const perm = state.permissions.get('perm-1');
+      const perm = state.permissions.get(mockId('perm-1'));
       if (!perm) throw new Error('seed permission missing');
       const resource = state.resources.get(perm.resourceId);
       const action = state.actions.get(perm.actionId);

@@ -361,9 +361,15 @@ fullstack-starter-app/
         ├── jwt.utils.ts    # JWT generation/validation
         ├── middleware/      # Route handlers (auth, users, OAuth, notifications) + guards
         ├── sse-hub.ts      # SSE connection registry and push helpers
-        ├── helpers/        # Auth helper utilities
+        ├── helpers/        # Auth helper utilities + requireUuid param guard
+        ├── utils/          # mockId (slug -> stable UUID), cursor, period, listen
         └── control.routes.ts  # Test control API (reset, seed, notify, invalidate-access-tokens, revoke-user-sessions)
 ```
+
+Seed entities carry UUID ids, minted from a readable slug by `mockId()` (`utils/mock-id.ts`), because the
+server guards every id path parameter with `ParseUUIDPipe`. `requireUuid()` mirrors that guard on the mock
+routes, so a malformed id is a 400 in both, ahead of any lookup. Specs and E2E fixtures address seed rows
+through `mockId('user-1')`, `mockId('role-editor')` and friends rather than through literal ids.
 
 All three workspaces import from `@app/shared/*` path alias (maps to `../shared/src/*` in each workspace's `tsconfig.json`).
 
@@ -833,7 +839,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 | Server E2E tests | Jest | Separate config in `test/` | 249 tests; a run with Postgres + Redis + Mailpit reports 226 passing and 23 skipped (suites gated on `DB_HOST` / `REDIS_URL` skip entirely on a bare run) |
 | Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1011 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 209 tests passing |
-| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 262 tests passing |
+| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 294 tests passing |
 
 ## CI/CD
 

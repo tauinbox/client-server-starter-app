@@ -1,5 +1,6 @@
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
 import type { Page } from '@playwright/test';
+import { mockId } from '../fixtures/ids';
 
 // Visual regression spec for the M3 button-color migration (BKL-018).
 //
@@ -67,7 +68,7 @@ for (const theme of ['light', 'dark'] as const) {
       await seedTheme(page, theme);
 
       await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-      await page.goto('/users/3/edit');
+      await page.goto(`/users/${mockId('user-3')}/edit`);
       await expect(
         page.getByRole('button', { name: 'Delete', exact: true })
       ).toBeVisible();

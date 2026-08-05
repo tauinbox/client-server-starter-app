@@ -4,6 +4,7 @@ import {
   loginViaUi,
   test
 } from '../fixtures/base.fixture';
+import { mockId } from '../fixtures/ids';
 
 test.describe('Profile page', () => {
   test('should redirect to login when not authenticated', async ({
@@ -56,7 +57,7 @@ test.describe('Profile page', () => {
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            id: '100',
+            id: mockId('user-100'),
             email: 'testlogin@example.com',
             firstName: 'John',
             lastName: 'Doe',

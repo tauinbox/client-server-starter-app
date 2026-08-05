@@ -1,4 +1,5 @@
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { mockId } from '../fixtures/ids';
 
 // Angular CDK BreakpointObserver's Breakpoints.Handset evaluates to a media
 // query that matches at widths <= 599px (portrait). 375x812 is the iPhone X
@@ -56,7 +57,7 @@ test.describe('User List page — handset layout', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
 
     const knownUser = {
-      id: '1',
+      id: mockId('user-1'),
       email: 'admin@example.com',
       firstName: 'Admin',
       lastName: 'User',
@@ -98,7 +99,7 @@ test.describe('User List page — handset layout', () => {
 
     await menu.getByRole('menuitem', { name: /View Details/i }).click();
 
-    await expect(page).toHaveURL(/.*\/users\/1$/);
+    await expect(page).toHaveURL(new RegExp(`/users/${mockId('user-1')}$`));
   });
 
   test('action trigger stays inside card and viewport even for very long names', async ({
@@ -113,7 +114,7 @@ test.describe('User List page — handset layout', () => {
     // header beyond the card unless we constrain it explicitly).
     const longNameUsers = [
       {
-        id: '10',
+        id: mockId('user-10'),
         email: 'claire.kerluke-shields@example.com',
         firstName: 'Claire',
         lastName: 'Kerluke-Shields-Williamson',
@@ -126,7 +127,7 @@ test.describe('User List page — handset layout', () => {
         updatedAt: '2025-01-01T00:00:00.000Z'
       },
       {
-        id: '11',
+        id: mockId('user-11'),
         email: 'angel.runolfsdottir.with.a.really.long.address@example.com',
         firstName: 'Angel',
         lastName: 'Runolfsdottir-Hermiston',
@@ -197,7 +198,7 @@ test.describe('User List page — handset layout', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
 
     const knownUser = {
-      id: '3',
+      id: mockId('user-3'),
       email: 'john@example.com',
       firstName: 'John',
       lastName: 'Smith',

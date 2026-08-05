@@ -2,6 +2,7 @@ import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { findUserByEmail, getState, resetState } from '../state';
+import { mockId } from '../utils/mock-id';
 
 let server: Server;
 let baseUrl: string;
@@ -87,7 +88,7 @@ describe('validation-error envelope parity with server', () => {
       const token = await login('admin@example.com');
       const { status, body } = await send(
         'POST',
-        '/api/v1/roles/role-editor/permissions',
+        `/api/v1/roles/${mockId('role-editor')}/permissions`,
         { permissionIds: [] },
         token
       );
@@ -140,7 +141,7 @@ describe('validation-error envelope parity with server', () => {
       const token = await login('admin@example.com');
       const { status, body } = await send(
         'PUT',
-        '/api/v1/admin/feature-flags/flag-new-dashboard/rules',
+        `/api/v1/admin/feature-flags/${mockId('flag-new-dashboard')}/rules`,
         { rules: [{ effect: 'include', type: 'nope', payload: {} }] },
         token
       );
@@ -206,7 +207,7 @@ describe('validation-error envelope parity with server', () => {
       const token = await login('admin@example.com');
       const { status, body } = await send(
         'PUT',
-        '/api/v1/admin/feature-flags/flag-new-dashboard/rules',
+        `/api/v1/admin/feature-flags/${mockId('flag-new-dashboard')}/rules`,
         {
           rules: [
             { effect: 'include', type: 'user', payload: { type: 'user' } }
@@ -229,7 +230,7 @@ describe('validation-error envelope parity with server', () => {
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ userId: '2', planKey: 'pro' })
+          body: JSON.stringify({ userId: mockId('user-2'), planKey: 'pro' })
         }
       );
       expect(res.status).toBe(200);

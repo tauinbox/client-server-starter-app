@@ -2,6 +2,7 @@ import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
+import { mockId } from '../utils/mock-id';
 
 let server: Server;
 let baseUrl: string;
@@ -66,22 +67,28 @@ async function expectValidation400(
 describe('explicit null parity with server DTOs', () => {
   describe('PATCH /roles/:id', () => {
     it('rejects a null name', async () => {
-      await expectValidation400('PATCH', '/roles/role-editor', { name: null });
+      await expectValidation400('PATCH', `/roles/${mockId('role-editor')}`, {
+        name: null
+      });
     });
 
     it('rejects a non-string and an over-long name', async () => {
-      await expectValidation400('PATCH', '/roles/role-editor', { name: 7 });
-      await expectValidation400('PATCH', '/roles/role-editor', {
+      await expectValidation400('PATCH', `/roles/${mockId('role-editor')}`, {
+        name: 7
+      });
+      await expectValidation400('PATCH', `/roles/${mockId('role-editor')}`, {
         name: 'x'.repeat(101)
       });
     });
 
     it('rejects a whitespace-only name, which CreateRoleDto trims to empty', async () => {
-      await expectValidation400('PATCH', '/roles/role-editor', { name: '   ' });
+      await expectValidation400('PATCH', `/roles/${mockId('role-editor')}`, {
+        name: '   '
+      });
     });
 
     it('trims an accepted name and leaves a null description legal', async () => {
-      const res = await send('PATCH', '/roles/role-editor', {
+      const res = await send('PATCH', `/roles/${mockId('role-editor')}`, {
         name: '  content-editor  ',
         description: null
       });
@@ -98,20 +105,32 @@ describe('explicit null parity with server DTOs', () => {
 
   describe('PATCH /rbac/actions/:id', () => {
     it('rejects a null displayName and a null description', async () => {
-      await expectValidation400('PATCH', '/rbac/actions/act-assign', {
-        displayName: null
-      });
-      await expectValidation400('PATCH', '/rbac/actions/act-assign', {
-        description: null
-      });
+      await expectValidation400(
+        'PATCH',
+        `/rbac/actions/${mockId('act-assign')}`,
+        {
+          displayName: null
+        }
+      );
+      await expectValidation400(
+        'PATCH',
+        `/rbac/actions/${mockId('act-assign')}`,
+        {
+          description: null
+        }
+      );
     });
   });
 
   describe('PATCH /rbac/resources/:id', () => {
     it('keeps accepting a null description, whose column is nullable', async () => {
-      const res = await send('PATCH', '/rbac/resources/res-users', {
-        description: null
-      });
+      const res = await send(
+        'PATCH',
+        `/rbac/resources/${mockId('res-users')}`,
+        {
+          description: null
+        }
+      );
 
       expect(res.status).toBe(200);
     });
@@ -121,28 +140,36 @@ describe('explicit null parity with server DTOs', () => {
     it.each(['email', 'firstName', 'lastName', 'password', 'locale'])(
       'rejects a null %s',
       async (field) => {
-        await expectValidation400('PATCH', '/users/3', { [field]: null });
+        await expectValidation400('PATCH', `/users/${mockId('user-3')}`, {
+          [field]: null
+        });
       }
     );
 
     it('leaves the target untouched after a rejected null', async () => {
-      const before = getState().users.get('3');
+      const before = getState().users.get(mockId('user-3'));
       const firstName = before?.firstName;
 
-      await expectValidation400('PATCH', '/users/3', { firstName: null });
+      await expectValidation400('PATCH', `/users/${mockId('user-3')}`, {
+        firstName: null
+      });
 
-      expect(getState().users.get('3')?.firstName).toBe(firstName);
+      expect(getState().users.get(mockId('user-3'))?.firstName).toBe(firstName);
     });
 
     it('applies a locale the server DTO also accepts', async () => {
-      const res = await send('PATCH', '/users/3', { locale: 'ru' });
+      const res = await send('PATCH', `/users/${mockId('user-3')}`, {
+        locale: 'ru'
+      });
 
       expect(res.status).toBe(200);
-      expect(getState().users.get('3')?.locale).toBe('ru');
+      expect(getState().users.get(mockId('user-3'))?.locale).toBe('ru');
     });
 
     it('rejects an unsupported locale', async () => {
-      await expectValidation400('PATCH', '/users/3', { locale: 'xx' });
+      await expectValidation400('PATCH', `/users/${mockId('user-3')}`, {
+        locale: 'xx'
+      });
     });
   });
 
