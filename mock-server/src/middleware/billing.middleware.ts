@@ -1015,6 +1015,23 @@ billingAdminRouter.post(
   adminGuard,
   requireUuid('id'),
   (req: Request, res: Response) => {
+    const amountMinor = req.body?.amountMinor;
+    // The DTO's @IsInt()/@Min(1) run in the global pipe, before the handler, so
+    // a supplied 0 or a fractional amount is a 400 whether or not the invoice
+    // exists and never reaches the remaining-total check.
+    if (amountMinor !== undefined && !Number.isInteger(amountMinor)) {
+      res
+        .status(400)
+        .json(validationError('amountMinor must be an integer number'));
+      return;
+    }
+    if (amountMinor !== undefined && (amountMinor as number) < 1) {
+      res
+        .status(400)
+        .json(validationError('amountMinor must not be less than 1'));
+      return;
+    }
+
     const invoice = getState().billingInvoices.get(
       (req.params['id'] as string) ?? ''
     );
@@ -1032,22 +1049,6 @@ billingAdminRouter.post(
 
     const alreadyRefunded = invoice.refundedMinor ?? 0;
     const remaining = invoice.amountMinor - alreadyRefunded;
-    const amountMinor = req.body?.amountMinor;
-    // The DTO's @IsInt()/@Min(1) run before the service, so a supplied 0 or a
-    // fractional amount never reaches the remaining-total check.
-    if (amountMinor !== undefined && !Number.isInteger(amountMinor)) {
-      res
-        .status(400)
-        .json(validationError('amountMinor must be an integer number'));
-      return;
-    }
-    if (amountMinor !== undefined && (amountMinor as number) < 1) {
-      res
-        .status(400)
-        .json(validationError('amountMinor must not be less than 1'));
-      return;
-    }
-
     const refundAmount = amountMinor ?? remaining;
     if (refundAmount <= 0 || refundAmount > remaining) {
       res.status(400).json({

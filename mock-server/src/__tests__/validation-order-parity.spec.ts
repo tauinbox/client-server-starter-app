@@ -125,6 +125,153 @@ describe('PATCH /api/v1/auth/profile validates the whole body before mutating', 
   });
 });
 
+// The server's global ValidationPipe runs before the handler, so a body that
+// fails its DTO is a 400 regardless of whether the addressed row exists. Every
+// handler below therefore has to answer 400 on a malformed body against an
+// unknown id, and keep answering 404 once the body is well-formed.
+describe('body validation precedes the entity lookup', () => {
+  const UNKNOWN = mockId('no-such-row');
+
+  interface Case {
+    name: string;
+    method: string;
+    path: string;
+    malformed: unknown;
+    malformedMessage: string;
+    wellFormed: unknown;
+    notFoundKey?: string;
+  }
+
+  const cases: Case[] = [
+    {
+      name: 'PATCH /users/:id',
+      method: 'PATCH',
+      path: `/api/v1/users/${UNKNOWN}`,
+      malformed: { password: INVALID_PASSWORD },
+      malformedMessage: PASSWORD_ERROR,
+      wellFormed: { firstName: 'Valid' },
+      notFoundKey: ErrorKeys.USERS.NOT_FOUND
+    },
+    {
+      name: 'PATCH /roles/:id',
+      method: 'PATCH',
+      path: `/api/v1/roles/${UNKNOWN}`,
+      malformed: { name: '   ' },
+      malformedMessage: 'name should not be empty',
+      wellFormed: { name: 'valid-role-name' },
+      notFoundKey: ErrorKeys.ROLES.NOT_FOUND
+    },
+    {
+      name: 'PUT /roles/:id/permissions',
+      method: 'PUT',
+      path: `/api/v1/roles/${UNKNOWN}/permissions`,
+      malformed: { items: 'not-an-array' },
+      malformedMessage: 'items must be an array',
+      wellFormed: { items: [] },
+      notFoundKey: ErrorKeys.ROLES.NOT_FOUND
+    },
+    {
+      name: 'POST /roles/:id/permissions',
+      method: 'POST',
+      path: `/api/v1/roles/${UNKNOWN}/permissions`,
+      malformed: { permissionIds: [] },
+      malformedMessage: 'permissionIds should not be empty',
+      wellFormed: { permissionIds: [mockId('perm-1')] },
+      notFoundKey: ErrorKeys.ROLES.NOT_FOUND
+    },
+    {
+      name: 'PATCH /rbac/resources/:id',
+      method: 'PATCH',
+      path: `/api/v1/rbac/resources/${UNKNOWN}`,
+      malformed: { displayName: 42 },
+      malformedMessage: 'displayName must be a string',
+      wellFormed: { displayName: 'Valid' },
+      notFoundKey: ErrorKeys.RESOURCES.NOT_FOUND
+    },
+    {
+      name: 'PATCH /rbac/actions/:id',
+      method: 'PATCH',
+      path: `/api/v1/rbac/actions/${UNKNOWN}`,
+      malformed: { description: 'x'.repeat(501) },
+      malformedMessage: 'description must not exceed 500 characters',
+      wellFormed: { description: 'Valid' },
+      notFoundKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
+    },
+    {
+      name: 'POST /admin/billing/invoices/:id/refund',
+      method: 'POST',
+      path: `/api/v1/admin/billing/invoices/${UNKNOWN}/refund`,
+      malformed: { amountMinor: 0 },
+      malformedMessage: 'amountMinor must not be less than 1',
+      wellFormed: { amountMinor: 500 }
+    }
+  ];
+
+  it.each(cases)(
+    '$name returns 400 on a malformed body against an unknown id',
+    async ({ method, path, malformed, malformedMessage }) => {
+      const token = await login('admin@example.com');
+
+      const res = await fetch(`${baseUrl}${path}`, {
+        method,
+        headers: authHeaders(token),
+        body: JSON.stringify(malformed)
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { message: string };
+      expect(body.message).toBe(malformedMessage);
+    }
+  );
+
+  it.each(cases)(
+    '$name still returns 404 on a well-formed body against an unknown id',
+    async ({ method, path, wellFormed, notFoundKey }) => {
+      const token = await login('admin@example.com');
+
+      const res = await fetch(`${baseUrl}${path}`, {
+        method,
+        headers: authHeaders(token),
+        body: JSON.stringify(wellFormed)
+      });
+
+      expect(res.status).toBe(404);
+      if (notFoundKey) {
+        const body = (await res.json()) as { errorKey: string };
+        expect(body.errorKey).toBe(notFoundKey);
+      }
+    }
+  );
+
+  it('PATCH /roles/:id rejects isSuper before the lookup', async () => {
+    const token = await login('admin@example.com');
+
+    const res = await fetch(`${baseUrl}/api/v1/roles/${UNKNOWN}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({ isSuper: true })
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { errorKey: string };
+    expect(body.errorKey).toBe(ErrorKeys.ROLES.SUPER_FLAG_FORBIDDEN);
+  });
+
+  it('an existing row is still mutated by a well-formed body', async () => {
+    const token = await login('admin@example.com');
+
+    const res = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({ firstName: 'Renamed' })
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { firstName: string };
+    expect(body.firstName).toBe('Renamed');
+  });
+});
+
 describe('DELETE /api/v1/roles/:id/permissions/:permissionId', () => {
   it('returns 404 for an unknown role', async () => {
     const token = await login('admin@example.com');

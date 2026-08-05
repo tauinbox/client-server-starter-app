@@ -289,6 +289,27 @@ router.post('/', adminGuard, (req, res) => {
 router.patch('/:id', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
+
+  // The server's global ValidationPipe runs before the handler, so a body that
+  // fails UpdateRoleDto is a 400 whether or not the role exists. isSuper is not
+  // a DTO property either, so forbidNonWhitelisted rejects it just as early.
+  const { name, description, isSuper } = req.body;
+
+  if (isSuper !== undefined) {
+    res.status(400).json({
+      message: 'isSuper flag cannot be changed via API',
+      statusCode: 400,
+      errorKey: ErrorKeys.ROLES.SUPER_FLAG_FORBIDDEN
+    });
+    return;
+  }
+
+  const normalized = name === undefined ? undefined : normalizeRoleName(name);
+  if (normalized && !normalized.ok) {
+    res.status(400).json(validationError(normalized.error));
+    return;
+  }
+
   const role = state.roles.get(id);
 
   if (!role) {
@@ -309,23 +330,7 @@ router.patch('/:id', adminGuard, requireUuid('id'), (req, res) => {
     return;
   }
 
-  const { name, description, isSuper } = req.body;
-
-  if (isSuper !== undefined) {
-    res.status(400).json({
-      message: 'isSuper flag cannot be changed via API',
-      statusCode: 400,
-      errorKey: ErrorKeys.ROLES.SUPER_FLAG_FORBIDDEN
-    });
-    return;
-  }
-
-  if (name !== undefined) {
-    const normalized = normalizeRoleName(name);
-    if (!normalized.ok) {
-      res.status(400).json(validationError(normalized.error));
-      return;
-    }
+  if (normalized?.ok) {
     if (normalized.name !== role.name) {
       for (const existing of state.roles.values()) {
         if (existing.name === normalized.name) {
@@ -421,26 +426,10 @@ router.delete('/:id', adminGuard, requireUuid('id'), (req, res) => {
 router.put('/:id/permissions', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
-  const role = state.roles.get(id);
 
-  if (!role) {
-    res.status(404).json({
-      message: 'Role not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.ROLES.NOT_FOUND
-    });
-    return;
-  }
-
-  if (role.isSystem && !isActorSuper(req)) {
-    res.status(400).json({
-      message: 'Cannot modify system roles',
-      statusCode: 400,
-      errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
-    });
-    return;
-  }
-
+  // SetPermissionsDto is validated by the server's global pipe before the
+  // handler runs, so its shape checks precede the role lookup. Everything that
+  // needs the role or the permission registry stays below the 404.
   const { items } = req.body as {
     items?: { permissionId: string; conditions?: unknown }[];
   };
@@ -463,6 +452,26 @@ router.put('/:id/permissions', adminGuard, requireUuid('id'), (req, res) => {
       res.status(400).json(validationError(error));
       return;
     }
+  }
+
+  const role = state.roles.get(id);
+
+  if (!role) {
+    res.status(404).json({
+      message: 'Role not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.ROLES.NOT_FOUND
+    });
+    return;
+  }
+
+  if (role.isSystem && !isActorSuper(req)) {
+    res.status(400).json({
+      message: 'Cannot modify system roles',
+      statusCode: 400,
+      errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
+    });
+    return;
   }
 
   for (const item of items) {
@@ -524,26 +533,10 @@ router.put('/:id/permissions', adminGuard, requireUuid('id'), (req, res) => {
 router.post('/:id/permissions', adminGuard, requireUuid('id'), (req, res) => {
   const id = req.params['id'] as string;
   const state = getState();
-  const role = state.roles.get(id);
 
-  if (!role) {
-    res.status(404).json({
-      message: 'Role not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.ROLES.NOT_FOUND
-    });
-    return;
-  }
-
-  if (role.isSystem && !isActorSuper(req)) {
-    res.status(400).json({
-      message: 'Cannot modify system roles',
-      statusCode: 400,
-      errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
-    });
-    return;
-  }
-
+  // AssignPermissionsDto is validated by the server's global pipe before the
+  // handler runs, so its shape checks precede the role lookup. Everything that
+  // needs the role or the permission registry stays below the 404.
   const { permissionIds, conditions } = req.body;
   if (!Array.isArray(permissionIds)) {
     res.status(400).json(validationError('permissionIds must be an array'));
@@ -568,6 +561,26 @@ router.post('/:id/permissions', adminGuard, requireUuid('id'), (req, res) => {
   const conditionError = findConditionShapeError(conditions);
   if (conditionError) {
     res.status(400).json(validationError(conditionError));
+    return;
+  }
+
+  const role = state.roles.get(id);
+
+  if (!role) {
+    res.status(404).json({
+      message: 'Role not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.ROLES.NOT_FOUND
+    });
+    return;
+  }
+
+  if (role.isSystem && !isActorSuper(req)) {
+    res.status(400).json({
+      message: 'Cannot modify system roles',
+      statusCode: 400,
+      errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
+    });
     return;
   }
 
