@@ -8,7 +8,6 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
-import { createHash } from 'crypto';
 import type { IncomingHttpHeaders } from 'http';
 import { Repository } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
@@ -73,8 +72,6 @@ export class WebhookIngestionService {
       throw new BadRequestException('Webhook verification failed');
     }
 
-    const payloadHash = createHash('sha256').update(rawBody).digest('hex');
-
     const result = await this.webhookEvents
       .createQueryBuilder()
       .insert()
@@ -82,7 +79,6 @@ export class WebhookIngestionService {
         provider: providerId,
         providerEventId: event.providerEventId,
         type: event.type,
-        payloadHash,
         payload: event,
         status: 'received',
         processedAt: null

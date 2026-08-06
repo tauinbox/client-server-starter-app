@@ -13,7 +13,6 @@ function row(overrides: Partial<WebhookEvent>): WebhookEvent {
     provider: 'paddle',
     providerEventId: 'evt_1',
     type: 'invoice.paid',
-    payloadHash: 'hash',
     status: 'received',
     attempts: 0,
     lastError: null,
