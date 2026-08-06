@@ -12,7 +12,7 @@ import { BillingUserDeletedListener } from './billing-user-deleted.listener';
 describe('BillingUserDeletedListener', () => {
   let listener: BillingUserDeletedListener;
   let customers: { findOne: jest.Mock };
-  let subscriptions: { find: jest.Mock; save: jest.Mock };
+  let subscriptions: { find: jest.Mock; save: jest.Mock; update: jest.Mock };
   let paddleCancel: jest.Mock;
   let yookassaCancel: jest.Mock;
   let emit: jest.Mock;
@@ -23,7 +23,8 @@ describe('BillingUserDeletedListener', () => {
       find: jest.fn().mockResolvedValue([]),
       save: jest
         .fn()
-        .mockImplementation((s: Subscription) => Promise.resolve(s))
+        .mockImplementation((s: Subscription) => Promise.resolve(s)),
+      update: jest.fn().mockResolvedValue({ affected: 1 })
     };
     paddleCancel = jest.fn().mockResolvedValue(undefined);
     yookassaCancel = jest.fn().mockResolvedValue(undefined);
@@ -88,7 +89,7 @@ describe('BillingUserDeletedListener', () => {
     await listener.handleUserDeleted(new UserDeletedEvent('user-1'));
     expect(paddleCancel).not.toHaveBeenCalled();
     expect(yookassaCancel).not.toHaveBeenCalled();
-    expect(subscriptions.save).not.toHaveBeenCalled();
+    expect(subscriptions.update).not.toHaveBeenCalled();
     expect(emit).not.toHaveBeenCalled();
   });
 
@@ -106,13 +107,16 @@ describe('BillingUserDeletedListener', () => {
 
     await listener.handleUserDeleted(new UserDeletedEvent('user-1'));
 
-    expect(subscriptions.save).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: 'sub-2',
+    // A targeted write, not the whole entity: the row is older than the
+    // database by however long the provider cancel took.
+    expect(subscriptions.save).not.toHaveBeenCalled();
+    expect(subscriptions.update).toHaveBeenCalledWith(
+      { id: 'sub-2' },
+      {
         status: 'canceled',
         cancelAtPeriodEnd: false,
         nextRenewalAttemptAt: null
-      })
+      }
     );
     expect(emit).toHaveBeenCalledWith(
       SubscriptionCanceledEvent.name,
@@ -121,7 +125,7 @@ describe('BillingUserDeletedListener', () => {
     expect(yookassaCancel).not.toHaveBeenCalled();
   });
 
-  it('swallows a local-cancel save failure so account deletion is not blocked', async () => {
+  it('swallows a local-cancel write failure so account deletion is not blocked', async () => {
     customers.findOne.mockResolvedValue({ id: 'cust-1', userId: 'user-1' });
     subscriptions.find.mockResolvedValue([
       {
@@ -131,7 +135,7 @@ describe('BillingUserDeletedListener', () => {
         providerSubscriptionId: null
       }
     ]);
-    subscriptions.save.mockRejectedValue(new Error('db down'));
+    subscriptions.update.mockRejectedValue(new Error('db down'));
     const logSpy = jest
       .spyOn(Logger.prototype, 'error')
       .mockImplementation(() => undefined);

@@ -8,6 +8,7 @@ import {
   ServiceUnavailableException
 } from '@nestjs/common';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { In } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import { User } from '../../users/entities/user.entity';
@@ -61,6 +62,7 @@ function makeInsertStore() {
     save: (_target: unknown, entity: { id?: string }) =>
       Promise.resolve({ id: 'generated-id', ...entity }),
     update: jest.fn().mockResolvedValue({ affected: 1 }),
+    findOne: jest.fn().mockResolvedValue(null),
     createQueryBuilder: () => {
       const captured: { values?: InsertedInvoice } = {};
       const builder = {
@@ -177,6 +179,7 @@ async function build() {
 
   const insertStore = makeInsertStore();
   const dataSource = {
+    manager: insertStore.manager,
     transaction: jest.fn((cb: (m: unknown) => unknown) =>
       cb(insertStore.manager)
     )
@@ -691,9 +694,6 @@ describe('BillingUserService', () => {
         cancelAtPeriodEnd: false
       };
       ctx.subscriptions.findOne.mockResolvedValue(sub);
-      ctx.subscriptions.save.mockImplementation((s: object) =>
-        Promise.resolve(s)
-      );
       const paddle = provider('paddle', true);
       ctx.billing.getProviderById.mockReturnValue(paddle);
 
@@ -703,6 +703,13 @@ describe('BillingUserService', () => {
       expect(result.cancelAtPeriodEnd).toBe(true);
       expect(result.status).toBe('active');
       expect(ctx.emit).not.toHaveBeenCalled();
+      // Only the cancel column is written — the row moved on while the provider
+      // was cancelling, and the whole entity would carry it back.
+      expect(ctx.subscriptions.save).not.toHaveBeenCalled();
+      expect(ctx.subscriptions.update).toHaveBeenCalledWith(
+        { id: 'sub-1' },
+        { cancelAtPeriodEnd: true }
+      );
     });
 
     it('cancels immediately and emits SubscriptionCanceled', async () => {
@@ -715,9 +722,6 @@ describe('BillingUserService', () => {
         status: 'active',
         cancelAtPeriodEnd: false
       });
-      ctx.subscriptions.save.mockImplementation((s: object) =>
-        Promise.resolve(s)
-      );
 
       const result = await ctx.service.cancelSubscription(
         'user-1',
@@ -725,6 +729,11 @@ describe('BillingUserService', () => {
       );
 
       expect(result.status).toBe('canceled');
+      expect(ctx.subscriptions.save).not.toHaveBeenCalled();
+      expect(ctx.subscriptions.update).toHaveBeenCalledWith(
+        { id: 'sub-1' },
+        { status: 'canceled', cancelAtPeriodEnd: false }
+      );
       expect(ctx.emit).toHaveBeenCalledWith(
         SubscriptionCanceledEvent.name,
         expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
@@ -930,9 +939,6 @@ describe('BillingUserService', () => {
         providerSubscriptionId: 'sub_ext'
       });
       ctx.subscriptions.findOne.mockResolvedValue(sub);
-      ctx.subscriptions.save.mockImplementation((s: object) =>
-        Promise.resolve(s)
-      );
       const paddle = provider('paddle', true);
       ctx.billing.getProviderById.mockReturnValue(paddle);
 
@@ -963,9 +969,6 @@ describe('BillingUserService', () => {
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
-      ctx.subscriptions.save.mockImplementation((s: object) =>
-        Promise.resolve(s)
-      );
       ctx.invoices.findOne.mockResolvedValue({
         id: 'inv-period',
         amountMinor: Money.fromMinor(99000),
@@ -1019,9 +1022,6 @@ describe('BillingUserService', () => {
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
-      ctx.subscriptions.save.mockImplementation((s: object) =>
-        Promise.resolve(s)
-      );
       ctx.invoices.findOne.mockResolvedValue(null);
       const yoo = provider('yookassa', false);
       yoo.chargeOffSession.mockResolvedValue({
@@ -1059,9 +1059,6 @@ describe('BillingUserService', () => {
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSub({ planKey: 'business' })
       );
-      ctx.subscriptions.save.mockImplementation((s: object) =>
-        Promise.resolve(s)
-      );
       // The period was paid with a discounted 100000 invoice — smaller than the
       // computed 116000 remainder, so the cap applies.
       ctx.invoices.findOne.mockResolvedValue({
@@ -1096,9 +1093,6 @@ describe('BillingUserService', () => {
       ctx.customers.findOne.mockResolvedValue(customer);
       const sub = makeSub();
       ctx.subscriptions.findOne.mockResolvedValue(sub);
-      ctx.subscriptions.save.mockImplementation((s: object) =>
-        Promise.resolve(s)
-      );
       ctx.invoices.findOne.mockResolvedValue({
         id: 'inv-period',
         amountMinor: Money.fromMinor(99000),
@@ -1127,9 +1121,6 @@ describe('BillingUserService', () => {
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSub({ status: 'trialing', trialEnd: new Date('2026-06-25') })
-      );
-      ctx.subscriptions.save.mockImplementation((s: object) =>
-        Promise.resolve(s)
       );
       const yoo = provider('yookassa', false);
       ctx.billing.getProviderById.mockReturnValue(yoo);
@@ -1285,6 +1276,85 @@ describe('BillingUserService', () => {
         39600,
         expect.any(String)
       );
+    });
+
+    it('applies the switch as a two-column guarded write, never as a whole-entity save', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      ctx.invoices.findOne.mockResolvedValue(null);
+      ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
+
+      await ctx.service.changePlan('user-1', 'business');
+
+      // Nothing the concurrent writer owns (status, period, dunning, cancel
+      // flag) may appear in the write set, and the guard carries the claimed
+      // version so a row that moved during the charge loses.
+      expect(ctx.dataSource.manager.update).toHaveBeenCalledWith(
+        Subscription,
+        {
+          id: 'sub-1',
+          version: 2,
+          status: In(['trialing', 'active']),
+          cancelAtPeriodEnd: false
+        },
+        { planKey: 'business', billingMode: 'fixed' }
+      );
+    });
+
+    it('refuses the switch but keeps the money recorded when the row moved during the charge', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      ctx.invoices.findOne.mockResolvedValue(null);
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+      // A cancel (or any guarded column change) landed while the charge was in
+      // flight, so the apply finds no row matching the claim.
+      ctx.dataSource.manager.update.mockResolvedValue({ affected: 0 });
+
+      await expect(
+        ctx.service.changePlan('user-1', 'business')
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(yoo.chargeOffSession).toHaveBeenCalledTimes(1);
+      // The charge left the customer's card, so its invoice must survive the
+      // refused switch — nothing else would ever record it.
+      expect(ctx.insertedInvoices).toHaveLength(1);
+      expect(ctx.insertedInvoices[0]).toMatchObject({ status: 'paid' });
+      expect(
+        ctx.emit.mock.calls.filter(
+          (call: unknown[]) => call[0] === PlanChangedEvent.name
+        )
+      ).toHaveLength(0);
+      expect(ctx.emit).toHaveBeenCalledWith(
+        InvoicePaidEvent.name,
+        expect.objectContaining({ userId: 'user-1' })
+      );
+    });
+
+    it('rejects a provider-managed change whose local row moved during the provider call', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue({ ...customer, country: 'US' });
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSub({
+          provider: 'paddle',
+          lifecycleOwner: 'provider',
+          providerSubscriptionId: 'sub_ext'
+        })
+      );
+      ctx.billing.getProviderById.mockReturnValue(provider('paddle', true));
+      ctx.dataSource.manager.update.mockResolvedValue({ affected: 0 });
+
+      await expect(
+        ctx.service.changePlan('user-1', 'business')
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(ctx.subscriptions.save).not.toHaveBeenCalled();
+      expect(ctx.emit).not.toHaveBeenCalled();
     });
 
     it('caps the proration refund by the source’s already-refunded amount', async () => {
