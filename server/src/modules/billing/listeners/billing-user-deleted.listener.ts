@@ -10,6 +10,7 @@ import {
   BILLING_PROVIDERS,
   type PaymentProvider
 } from '../providers/payment-provider.interface';
+import { cancelFields } from '../utils/cancel-fields.util';
 
 /**
  * Cancels a deleted user's subscriptions: provider-managed ones at their
@@ -72,10 +73,10 @@ export class BillingUserDeletedListener {
     userId: string
   ): Promise<void> {
     try {
-      subscription.status = 'canceled';
-      subscription.cancelAtPeriodEnd = false;
-      subscription.nextRenewalAttemptAt = null;
-      await this.subscriptions.save(subscription);
+      await this.subscriptions.update(
+        { id: subscription.id },
+        { ...cancelFields('immediate'), nextRenewalAttemptAt: null }
+      );
       this.events.emit(
         SubscriptionCanceledEvent.name,
         new SubscriptionCanceledEvent(userId, subscription.id)

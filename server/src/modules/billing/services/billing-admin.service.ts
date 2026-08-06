@@ -18,6 +18,7 @@ import { WebhookEvent } from '../entities/webhook-event.entity';
 import { EntitlementService } from '../entitlements/entitlement.service';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import type { CancelMode } from '../providers/payment-provider.interface';
+import { cancelFields } from '../utils/cancel-fields.util';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
 
@@ -104,13 +105,11 @@ export class BillingAdminService {
       }
     }
 
-    if (mode === 'immediate') {
-      subscription.status = 'canceled';
-      subscription.cancelAtPeriodEnd = false;
-    } else {
-      subscription.cancelAtPeriodEnd = true;
-    }
-    const saved = await this.subscriptions.save(subscription);
+    const fields = cancelFields(mode);
+    Object.assign(subscription, fields);
+    await this.subscriptions.update({ id: subscription.id }, fields);
+    const saved =
+      (await this.subscriptions.findOne({ where: { id } })) ?? subscription;
 
     // Immediate cancellation revokes access now, so the cached entitlements must
     // be invalidated; a period-end cancel keeps access until the period closes.

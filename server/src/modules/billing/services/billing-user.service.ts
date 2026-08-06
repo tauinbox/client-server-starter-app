@@ -41,6 +41,7 @@ import { ProrationCalculator } from '../rating/proration-calculator';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
 import { addInterval } from '../utils/period.util';
+import { cancelFields } from '../utils/cancel-fields.util';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
 
@@ -507,13 +508,12 @@ export class BillingUserService {
       }
     }
 
-    if (mode === 'immediate') {
-      subscription.status = 'canceled';
-      subscription.cancelAtPeriodEnd = false;
-    } else {
-      subscription.cancelAtPeriodEnd = true;
-    }
-    const saved = await this.subscriptions.save(subscription);
+    const fields = cancelFields(mode);
+    Object.assign(subscription, fields);
+    await this.subscriptions.update({ id: subscription.id }, fields);
+    const saved =
+      (await this.subscriptions.findOne({ where: { id: subscription.id } })) ??
+      subscription;
 
     if (mode === 'immediate') {
       this.events.emit(
@@ -622,9 +622,10 @@ export class BillingUserService {
       }
     }
 
-    // Single transaction: both invoice legs, the partial-refund bookkeeping on
-    // the source, and the plan apply commit together — a crash can't leave money
-    // recorded without the plan applied, or the plan applied without the money.
+    // One transaction so a crash can't leave the plan applied without the money.
+    // A guarded apply that loses to a concurrent writer still commits the legs:
+    // the money already left, and the paid webhook only settles an invoice this
+    // path planted — it never inserts one, so nothing else would record it.
     const chargeAmount = quote?.chargeMinor ?? 0;
     const { saved, chargeInvoiceId } = await withTransaction(
       this.dataSource,
@@ -663,24 +664,71 @@ export class BillingUserService {
             }
           );
         }
-        subscription.planKey = toPlan.key;
-        subscription.billingMode = toPlan.billingMode;
-        const saved = await manager.save(Subscription, subscription);
+        const saved = await this.commitPlanChange(
+          manager,
+          subscription,
+          toPlan
+        );
         return { saved, chargeInvoiceId };
       }
     );
 
-    this.events.emit(
-      PlanChangedEvent.name,
-      new PlanChangedEvent(customer.userId, saved.id, fromPlan.key, toPlan.key)
-    );
+    if (saved) {
+      this.events.emit(
+        PlanChangedEvent.name,
+        new PlanChangedEvent(
+          customer.userId,
+          saved.id,
+          fromPlan.key,
+          toPlan.key
+        )
+      );
+    }
     if (chargeInvoiceId && chargeCaptured) {
       this.events.emit(
         InvoicePaidEvent.name,
         new InvoicePaidEvent(userId, chargeInvoiceId)
       );
     }
+    if (!saved) {
+      throw new ConflictException(
+        'This subscription changed while the payment was in flight; the plan was not switched. Any amount charged is on your invoices.'
+      );
+    }
     return saved;
+  }
+
+  /**
+   * Writes the two columns the change owns, and only while the row still looks
+   * like the one the change was claimed against. The entity was loaded before
+   * the provider round-trip, so committing it whole would write back every
+   * column as it looked then — reverting whatever landed during that window (a
+   * cancellation, a dunning write, a period advance). Returns the re-read row,
+   * or `null` when the guard missed and the caller must refuse the switch.
+   */
+  private async commitPlanChange(
+    manager: EntityManager,
+    subscription: Subscription,
+    toPlan: Plan
+  ): Promise<Subscription | null> {
+    const applied = await manager.update(
+      Subscription,
+      {
+        id: subscription.id,
+        version: subscription.version,
+        status: In([...CHANGEABLE_STATUSES]),
+        cancelAtPeriodEnd: false
+      },
+      { planKey: toPlan.key, billingMode: toPlan.billingMode }
+    );
+    if (applied.affected !== 1) return null;
+
+    subscription.planKey = toPlan.key;
+    subscription.billingMode = toPlan.billingMode;
+    const fresh = await manager.findOne(Subscription, {
+      where: { id: subscription.id }
+    });
+    return fresh ?? subscription;
   }
 
   /**
@@ -858,12 +906,23 @@ export class BillingUserService {
     return { source, minor };
   }
 
-  /** Persists the new plan on the local row and publishes the change. */
+  /**
+   * Persists the new plan on the local row and publishes the change. A row that
+   * moved while the provider was applying the change is left alone: the
+   * provider's own webhook reconciles the local row from its snapshot.
+   */
   private async applyPlanChange(ctx: ChangeContext): Promise<Subscription> {
     const { customer, subscription, fromPlan, toPlan } = ctx;
-    subscription.planKey = toPlan.key;
-    subscription.billingMode = toPlan.billingMode;
-    const saved = await this.subscriptions.save(subscription);
+    const saved = await this.commitPlanChange(
+      this.dataSource.manager,
+      subscription,
+      toPlan
+    );
+    if (!saved) {
+      throw new ConflictException(
+        'This subscription changed while the plan change was in flight. Please retry.'
+      );
+    }
     this.events.emit(
       PlanChangedEvent.name,
       new PlanChangedEvent(customer.userId, saved.id, fromPlan.key, toPlan.key)

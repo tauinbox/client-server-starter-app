@@ -232,6 +232,13 @@ describe('BillingAdminService', () => {
       expect(yoo.cancel).toHaveBeenCalledWith('sub_ext_1', 'immediate');
       expect(saved.status).toBe('canceled');
       expect(saved.cancelAtPeriodEnd).toBe(false);
+      // Only the cancel columns are written — the entity predates the provider
+      // round-trip, so the whole row would carry that snapshot back.
+      expect(ctx.subscriptions.save).not.toHaveBeenCalled();
+      expect(ctx.subscriptions.update).toHaveBeenCalledWith(
+        { id: 'sub-1' },
+        { status: 'canceled', cancelAtPeriodEnd: false }
+      );
       expect(ctx.emit).toHaveBeenCalledWith(
         SubscriptionCanceledEvent.name,
         expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
