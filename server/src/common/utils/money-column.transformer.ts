@@ -11,8 +11,14 @@ import { Money } from '@app/shared/utils/money';
  * a raw string or a float.
  */
 export const moneyColumnTransformer: ValueTransformer = {
-  to(value?: Money | null): string | null {
-    if (value == null) {
+  to(value?: Money | null): string | null | undefined {
+    // `undefined` must survive: TypeORM transforms before deciding whether to
+    // emit the column's DEFAULT, so collapsing it to null makes every insert
+    // that omits the field write an explicit NULL over a NOT NULL DEFAULT 0.
+    if (value === undefined) {
+      return undefined;
+    }
+    if (value === null) {
       return null;
     }
     return value.toMinorString();
