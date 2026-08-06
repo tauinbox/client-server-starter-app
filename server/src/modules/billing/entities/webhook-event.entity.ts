@@ -36,9 +36,6 @@ export class WebhookEvent {
   @Column({ type: 'varchar', length: 255 })
   type: string;
 
-  @Column({ name: 'payload_hash', type: 'varchar', length: 255 })
-  payloadHash: string;
-
   @Column({ type: 'varchar', length: 16 })
   status: string;
 

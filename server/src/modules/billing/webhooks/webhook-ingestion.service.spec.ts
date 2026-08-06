@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { getQueueToken } from '@nestjs/bullmq';
-import { createHash } from 'crypto';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import { BILLING_PROVIDERS } from '../providers/payment-provider.interface';
 import type { NormalizedEvent } from '../providers/payment-provider.interface';
@@ -105,7 +104,7 @@ describe('WebhookIngestionService', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it('passes the raw bytes to the provider and hashes them for the ledger', async () => {
+  it('passes the raw bytes to the provider and ledgers the verified event', async () => {
     const { service, verify, values } = await buildHarness({
       withQueue: false
     });
@@ -116,7 +115,6 @@ describe('WebhookIngestionService', () => {
     expect(verify).toHaveBeenCalledWith(raw, { 'paddle-signature': 'sig' });
     expect(values).toHaveBeenCalledWith(
       expect.objectContaining({
-        payloadHash: createHash('sha256').update(raw).digest('hex'),
         // The verified event is persisted so the reconciliation sweep can
         // replay a stuck delivery without the provider.
         payload: event,
