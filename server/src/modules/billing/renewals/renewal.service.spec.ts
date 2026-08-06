@@ -1217,4 +1217,214 @@ describe('RenewalService', () => {
       expect(emit).not.toHaveBeenCalled();
     });
   });
+
+  describe('a period that re-rates to zero while a charge is open', () => {
+    function pushUsagePlan(store: Store): void {
+      store.plans.push(
+        Object.assign(new Plan(), {
+          ...makePlan(),
+          id: 'plan-usage',
+          key: 'usage',
+          billingMode: 'usage',
+          meterKey: 'api_calls',
+          prices: {
+            yookassa: {
+              currency: 'RUB',
+              amountMinor: 0,
+              unitPriceMinor: 200,
+              includedUnits: 100
+            }
+          }
+        })
+      );
+    }
+
+    // 132 recorded − 100 included = 32 billable; 10 prepaid credits leave 22
+    // units at 200 minor = 4400 charged.
+    const usageSum = () => jest.fn().mockResolvedValue(132);
+
+    it('polls the open charge instead of settling it from re-rated values', async () => {
+      const sub = makeSub({ planKey: 'usage', billingMode: 'usage' });
+      const store = baseStore(sub);
+      pushUsagePlan(store);
+      const charge = jest.fn().mockResolvedValue({
+        providerInvoiceRef: 'pay_real',
+        status: 'pending'
+      });
+      const findCharge = jest.fn().mockResolvedValue({
+        providerInvoiceRef: 'pay_real',
+        status: 'pending'
+      });
+      const { service, emit, credits } = await build(
+        store,
+        charge,
+        usageSum(),
+        10,
+        findCharge
+      );
+
+      await service.runDueRenewals(NOW);
+      expect(store.invoices[0]).toMatchObject({
+        status: 'pending',
+        amountMinor: Money.fromMinor(4400),
+        creditUnitsApplied: 10,
+        providerInvoiceRef: 'pay_real'
+      });
+
+      // The buyer tops the balance up while the charge is still settling, so
+      // the same period now rates to zero.
+      credits.availableUnits.mockResolvedValue(40);
+      await service.runDueRenewals(NOW);
+
+      expect(findCharge).toHaveBeenCalledTimes(1);
+      expect(charge).toHaveBeenCalledTimes(1);
+      expect(store.invoices).toHaveLength(1);
+      expect(store.invoices[0]).toMatchObject({
+        status: 'pending',
+        amountMinor: Money.fromMinor(4400),
+        creditUnitsApplied: 10,
+        providerInvoiceRef: 'pay_real'
+      });
+      expect(credits.spendOnUsage).not.toHaveBeenCalled();
+      expect(sub.currentPeriodEnd).toEqual(new Date('2026-06-01T00:00:00Z'));
+      expect(emit).not.toHaveBeenCalled();
+    });
+
+    it('settles the open charge at its stored amount and credit units', async () => {
+      const sub = makeSub({ planKey: 'usage', billingMode: 'usage' });
+      const store = baseStore(sub);
+      pushUsagePlan(store);
+      const charge = jest.fn().mockResolvedValue({
+        providerInvoiceRef: 'pay_real',
+        status: 'pending'
+      });
+      const findCharge = jest.fn().mockResolvedValue({
+        providerInvoiceRef: 'pay_real',
+        status: 'captured'
+      });
+      const { service, credits } = await build(
+        store,
+        charge,
+        usageSum(),
+        10,
+        findCharge
+      );
+
+      await service.runDueRenewals(NOW);
+      credits.availableUnits.mockResolvedValue(40);
+      await service.runDueRenewals(NOW);
+
+      expect(store.invoices).toHaveLength(1);
+      // The money the provider actually captured, under its own payment id -
+      // never the re-rated zero, never the idempotency key as a payment ref.
+      expect(store.invoices[0]).toMatchObject({
+        status: 'paid',
+        amountMinor: Money.fromMinor(4400),
+        creditUnitsApplied: 10,
+        providerInvoiceRef: 'pay_real'
+      });
+      expect(credits.spendOnUsage).toHaveBeenCalledTimes(1);
+      expect(credits.spendOnUsage).toHaveBeenCalledWith(
+        expect.anything(),
+        'cust-1',
+        'inv-1',
+        10
+      );
+      expect(sub.currentPeriodEnd).toEqual(new Date('2026-07-01T00:00:00Z'));
+    });
+
+    it('reconciles a captured prior attempt at its stored amount', async () => {
+      const sub = makeSub({
+        planKey: 'usage',
+        billingMode: 'usage',
+        status: 'past_due',
+        dunningAttempts: 1,
+        nextRenewalAttemptAt: new Date('2026-06-07T00:00:00Z')
+      });
+      const store = baseStore(sub);
+      pushUsagePlan(store);
+      const anchorMs = new Date('2026-06-01T00:00:00Z').getTime();
+      // @ts-expect-error - partial Invoice fake for this scenario
+      const failedInvoice: Invoice & { providerEventId: string | null } = {
+        id: 'inv-pre',
+        providerEventId: `renewal:sub-1:${anchorMs}`,
+        status: 'failed',
+        providerInvoiceRef: 'pay_prior',
+        amountMinor: Money.fromMinor(4400),
+        creditUnitsApplied: 10
+      };
+      store.invoices.push(failedInvoice);
+      const charge = jest.fn();
+      const findCharge = jest.fn().mockResolvedValue({
+        providerInvoiceRef: 'pay_prior',
+        status: 'captured'
+      });
+      // The balance grew since the failed attempt, so this scan rates to zero.
+      const { service, credits } = await build(
+        store,
+        charge,
+        usageSum(),
+        40,
+        findCharge
+      );
+
+      await service.runDueRenewals(NOW);
+
+      expect(findCharge).toHaveBeenCalledTimes(1);
+      expect(charge).not.toHaveBeenCalled();
+      expect(store.invoices).toHaveLength(1);
+      expect(store.invoices[0]).toMatchObject({
+        status: 'paid',
+        amountMinor: Money.fromMinor(4400),
+        creditUnitsApplied: 10,
+        providerInvoiceRef: 'pay_prior'
+      });
+      expect(credits.spendOnUsage).toHaveBeenCalledWith(
+        expect.anything(),
+        'cust-1',
+        'inv-pre',
+        10
+      );
+      expect(sub.currentPeriodEnd).toEqual(new Date('2026-07-01T00:00:00Z'));
+    });
+
+    it('keeps a pending fixed charge when the plan is re-priced to zero', async () => {
+      const sub = makeSub();
+      const store = baseStore(sub);
+      const charge = jest.fn().mockResolvedValue({
+        providerInvoiceRef: 'pay_fix',
+        status: 'pending'
+      });
+      const findCharge = jest.fn().mockResolvedValue({
+        providerInvoiceRef: 'pay_fix',
+        status: 'pending'
+      });
+      const { service, credits } = await build(
+        store,
+        charge,
+        undefined,
+        0,
+        findCharge
+      );
+
+      await service.runDueRenewals(NOW);
+      expect(store.invoices[0]).toMatchObject({
+        status: 'pending',
+        amountMinor: Money.fromMinor(99000)
+      });
+
+      store.plans[0].prices = { yookassa: { currency: 'RUB', amountMinor: 0 } };
+      await service.runDueRenewals(NOW);
+
+      expect(findCharge).toHaveBeenCalledTimes(1);
+      expect(store.invoices).toHaveLength(1);
+      expect(store.invoices[0]).toMatchObject({
+        status: 'pending',
+        amountMinor: Money.fromMinor(99000),
+        providerInvoiceRef: 'pay_fix'
+      });
+      expect(credits.spendOnUsage).not.toHaveBeenCalled();
+      expect(sub.currentPeriodEnd).toEqual(new Date('2026-06-01T00:00:00Z'));
+    });
+  });
 });

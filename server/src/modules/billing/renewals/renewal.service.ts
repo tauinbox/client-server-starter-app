@@ -195,29 +195,21 @@ export class RenewalService {
     // provider's dedup and double-charge a retried timeout-after-capture.
     const idempotencyKey = `renewal:${subscription.id}:${anchor.getTime()}`;
 
-    let charge: ChargeResult;
-    let settleStored = false;
-    if (rated.amountMinor === 0) {
-      // Zero-amount renewals (usage with no overage / fully credited, or a fixed
-      // $0 plan like Free) aren't chargeable/fiscalizable: skip the provider but
-      // still record a zero invoice whose provider_event_id advances the period.
-      charge = { providerInvoiceRef: idempotencyKey, status: 'captured' };
-    } else {
-      const resolved = await this.resolveDueCharge(
-        subscription,
-        customer,
-        plan,
-        provider,
-        rated,
-        creditUnitsApplied,
-        anchor,
-        idempotencyKey,
-        now
-      );
-      if (!resolved) return;
-      charge = resolved.charge;
-      settleStored = resolved.settleStored;
-    }
+    // Resolved even when the period rates to zero: the invoice recorded under
+    // the stable key is inspected before any decision, so a re-rate that drops
+    // to zero can never settle a charge an earlier scan left open.
+    const resolved = await this.resolveDueCharge(
+      subscription,
+      customer,
+      plan,
+      provider,
+      rated,
+      creditUnitsApplied,
+      anchor,
+      idempotencyKey,
+      now
+    );
+    if (!resolved) return;
 
     await this.handleSuccess(
       subscription,
@@ -225,11 +217,11 @@ export class RenewalService {
       plan,
       rated,
       creditUnitsApplied,
-      charge,
+      resolved.charge,
       anchor,
       idempotencyKey,
       now,
-      settleStored
+      resolved.settleStored
     );
   }
 
@@ -243,6 +235,12 @@ export class RenewalService {
    * `settleStored` marks a charge whose recorded invoice already carries the
    * amount/credit units the provider actually charged - the settle must keep
    * them instead of this scan's re-rated values.
+   *
+   * A period that rates to zero is resolved here too, and only after that
+   * inspection: deciding "nothing to charge" up front would settle an invoice
+   * recorded for a charge still open at the provider, paying for the period
+   * twice (money at the provider plus the re-rated credits) and overwriting the
+   * real payment reference with the idempotency key.
    */
   private async resolveDueCharge(
     subscription: Subscription,
@@ -323,8 +321,11 @@ export class RenewalService {
         return null;
       }
     }
+    // A prior attempt's charge carries the amount that attempt was rated at,
+    // which the recorded row already holds - settling or refreshing it from
+    // this scan's re-rating would book a figure the provider never charged.
     if (prior?.status === 'captured') {
-      return { charge: prior, settleStored: false };
+      return { charge: prior, settleStored: existing !== null };
     }
     if (prior) {
       await this.recordPendingCharge(
@@ -335,9 +336,21 @@ export class RenewalService {
         creditUnitsApplied,
         prior.providerInvoiceRef,
         anchor,
-        idempotencyKey
+        idempotencyKey,
+        existing !== null
       );
       return null;
+    }
+
+    if (rated.amountMinor === 0) {
+      // Zero-amount renewals (usage with no overage / fully credited, or a fixed
+      // $0 plan like Free) aren't chargeable/fiscalizable: skip the provider but
+      // still record a zero invoice whose provider_event_id advances the period.
+      // Reached only once no charge is open at the provider under this key.
+      return {
+        charge: { providerInvoiceRef: idempotencyKey, status: 'captured' },
+        settleStored: false
+      };
     }
 
     let result: ChargeResult;
@@ -400,6 +413,8 @@ export class RenewalService {
    * the confirming webhook or a later scan's poll settles or fails it. The
    * rated amount and the credit units it assumed are persisted so the settle
    * spends exactly what the charge was computed from, immune to balance drift.
+   * `keepStored` marks a charge an earlier attempt created, whose recorded
+   * amount/credit units this scan must leave alone.
    */
   private async recordPendingCharge(
     subscription: Subscription,
@@ -409,7 +424,8 @@ export class RenewalService {
     creditUnitsApplied: number,
     providerInvoiceRef: string,
     anchor: Date,
-    idempotencyKey: string
+    idempotencyKey: string,
+    keepStored = false
   ): Promise<void> {
     const period = this.invoicePeriodFor(subscription, plan, anchor);
     await withTransaction(this.dataSource, async (manager) => {
@@ -446,8 +462,12 @@ export class RenewalService {
           {
             status: 'pending',
             providerInvoiceRef,
-            amountMinor: Money.fromMinor(rated.amountMinor),
-            creditUnitsApplied
+            ...(keepStored
+              ? {}
+              : {
+                  amountMinor: Money.fromMinor(rated.amountMinor),
+                  creditUnitsApplied
+                })
           }
         );
       }
