@@ -164,14 +164,41 @@ describe('UsageService', () => {
   });
 
   it('is idempotent: a replayed key returns the existing record without re-inserting', async () => {
-    const existing = { id: 'usage-1', idempotencyKey: 'evt-1' } as UsageRecord;
+    const existing = {
+      id: 'usage-1',
+      customerId: 'cust-1',
+      meterKey: 'api_calls',
+      idempotencyKey: 'evt-1'
+    } as UsageRecord;
     usageRecords.findOne.mockResolvedValue(existing);
+    subscriptions.findOne.mockResolvedValue(makeSubscription());
+    plans.findOne.mockResolvedValue(makePlan());
 
     const result = await service.record(INPUT);
 
     expect(result).toBe(existing);
-    expect(subscriptions.findOne).not.toHaveBeenCalled();
     expect(usageRecords.save).not.toHaveBeenCalled();
+    // The replay still resolves the pricing verdict, so it reports the plan in
+    // force now rather than whatever applied when the row was written.
+    expect(existing.pricedByCurrentPlan).toBe(true);
+  });
+
+  it('reports a replayed record as unpriced once the customer has moved off the metered plan', async () => {
+    const existing = {
+      id: 'usage-1',
+      customerId: 'cust-1',
+      meterKey: 'api_calls',
+      idempotencyKey: 'evt-1'
+    } as UsageRecord;
+    usageRecords.findOne.mockResolvedValue(existing);
+    subscriptions.findOne.mockResolvedValue(
+      makeSubscription({ planKey: 'pro' })
+    );
+    plans.findOne.mockResolvedValue(makePlan({ key: 'pro', meterKey: null }));
+
+    await service.record(INPUT);
+
+    expect(existing.pricedByCurrentPlan).toBe(false);
   });
 
   it('treats the same key from another customer as a distinct event', async () => {
@@ -266,19 +293,21 @@ describe('UsageService', () => {
       makePlan()
     ]);
 
-    await service.record(INPUT);
+    const result = await service.record(INPUT);
 
     expect(usageRecords.save).toHaveBeenCalledTimes(1);
     expect(metrics.recordUnratedUsage).toHaveBeenCalledWith('api_calls');
+    expect(result.pricedByCurrentPlan).toBe(false);
   });
 
   it('stores without counting when the meter is the active plan meter', async () => {
     subscriptions.findOne.mockResolvedValue(makeSubscription());
 
-    await service.record(INPUT);
+    const result = await service.record(INPUT);
 
     expect(usageRecords.save).toHaveBeenCalledTimes(1);
     expect(metrics.recordUnratedUsage).not.toHaveBeenCalled();
+    expect(result.pricedByCurrentPlan).toBe(true);
   });
 
   it('counts a dangling planKey as unrated rather than refusing the record', async () => {

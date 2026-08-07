@@ -181,6 +181,9 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     expect(body['quantity']).toBe(42);
     expect(body['meterKey']).toBe('api_calls');
     expect(body).not.toHaveProperty('idempotencyKey');
+    // seedActiveCustomer subscribes to the fixed `pro` plan, which prices no
+    // meter — the record is kept, the response says it will not bill.
+    expect(body['pricedByCurrentPlan']).toBe(false);
   });
 
   it('is idempotent: a replayed key returns the original record', async () => {
@@ -316,6 +319,29 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
 
     expect(res.status).toBe(201);
     expect([...getState().billingUsageRecords.values()]).toHaveLength(1);
+    expect(
+      ((await res.json()) as Record<string, unknown>)['pricedByCurrentPlan']
+    ).toBe(false);
+  });
+
+  it('reports a record as priced when the meter is the active plan meter', async () => {
+    const token = await login('admin@example.com');
+    const { customerId } = await activateSubscription(
+      'admin@example.com',
+      'usage'
+    );
+
+    const res = await postUsage(token, {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 3,
+      idempotencyKey: 'evt-priced'
+    });
+
+    expect(res.status).toBe(201);
+    expect(
+      ((await res.json()) as Record<string, unknown>)['pricedByCurrentPlan']
+    ).toBe(true);
   });
 
   it('rejects an invalid payload (400)', async () => {

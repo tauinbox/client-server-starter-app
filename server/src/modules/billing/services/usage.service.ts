@@ -73,7 +73,7 @@ export class UsageService {
       }
     });
     if (existing) {
-      return existing;
+      return this.stampPricing(existing);
     }
 
     // A negative balance means a refund clawed back already-spent credits:
@@ -84,17 +84,7 @@ export class UsageService {
       );
     }
 
-    // Newest-first, matching the entitlement resolver, so usage is billed to the
-    // subscription whose entitlements the customer is actually using. Two active
-    // rows only arise from an admin action or a webhook race, never from
-    // self-service subscribing.
-    const subscription = await this.subscriptions.findOne({
-      where: {
-        customerId: input.customerId,
-        status: In([...ACTIVE_STATUSES])
-      },
-      order: { createdAt: 'DESC' }
-    });
+    const subscription = await this.findActiveSubscription(input.customerId);
     if (!subscription) {
       throw new NotFoundException(
         'No active subscription for customer to record usage against'
@@ -140,17 +130,19 @@ export class UsageService {
           this.logger.debug(
             `Idempotent usage replay on key ${input.idempotencyKey}`
           );
-          return winner;
+          return this.stampPricing(winner);
         }
       }
       throw error;
     }
 
+    const ownPlan = candidates.find((p) => p.key === subscription.planKey);
+    saved.pricedByCurrentPlan = ownPlan?.meterKey === input.meterKey;
+
     // Stored but not chargeable under the plan in force. Visible rather than
     // fatal: a producer meters what it observes and cannot know the customer's
     // plan, so this is an operations signal, not the producer's error.
-    const ownPlan = candidates.find((p) => p.key === subscription.planKey);
-    if (ownPlan?.meterKey !== input.meterKey) {
+    if (!saved.pricedByCurrentPlan) {
       this.logger.warn(
         `Usage under meter "${input.meterKey}" is not priced by plan "${subscription.planKey}" (customer ${input.customerId})`
       );
@@ -158,5 +150,34 @@ export class UsageService {
     }
 
     return saved;
+  }
+
+  /**
+   * Newest-first, matching the entitlement resolver, so usage is billed to the
+   * subscription whose entitlements the customer is actually using. Two active
+   * rows only arise from an admin action or a webhook race, never from
+   * self-service subscribing.
+   */
+  private findActiveSubscription(
+    customerId: string
+  ): Promise<Subscription | null> {
+    return this.subscriptions.findOne({
+      where: { customerId, status: In([...ACTIVE_STATUSES]) },
+      order: { createdAt: 'DESC' }
+    });
+  }
+
+  /**
+   * Answers the pricing verdict for a record the caller did not just build, so
+   * a replay reports the plan in force now rather than the one that applied
+   * when the row was first written.
+   */
+  private async stampPricing(record: UsageRecord): Promise<UsageRecord> {
+    const subscription = await this.findActiveSubscription(record.customerId);
+    const plan = subscription
+      ? await this.plans.findOne({ where: { key: subscription.planKey } })
+      : null;
+    record.pricedByCurrentPlan = plan?.meterKey === record.meterKey;
+    return record;
   }
 }

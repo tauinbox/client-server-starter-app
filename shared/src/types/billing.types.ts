@@ -192,6 +192,13 @@ export type InvoiceResponse = {
 /**
  * A single metered-usage record on the wire. `idempotencyKey` is an internal
  * dedup token (`@Exclude`d server-side) and is intentionally absent.
+ *
+ * `pricedByCurrentPlan` is a verdict about *now*, not a permanent property of
+ * the record: it says whether the customer's plan at this moment prices this
+ * meter. Ingest accepts any meter the catalog declares, so a `false` means the
+ * units are stored and will not bill under the current plan - the caller
+ * mis-keyed the producer, or the customer is not on the plan that prices it
+ * yet. Rating re-decides from the plan in force when the period closes.
  */
 export type UsageResponse = {
   id: string;
@@ -201,6 +208,7 @@ export type UsageResponse = {
   quantity: number;
   occurredAt: string;
   recordedAt: string;
+  pricedByCurrentPlan: boolean;
 };
 
 /**

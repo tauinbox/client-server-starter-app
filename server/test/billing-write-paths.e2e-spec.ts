@@ -417,20 +417,22 @@ runWithInfra('billing write paths (e2e)', () => {
       };
       const occurredAt = new Date('2020-01-15T00:00:00Z');
       const usage = await build(UsageService);
-      await usage.record({
+      const own = await usage.record({
         customerId,
         meterKey: 'api_calls',
         quantity: 7,
         occurredAt,
         idempotencyKey: 'wp-rate-own'
       });
-      await usage.record({
+      const foreign = await usage.record({
         customerId,
         meterKey: ALT_METER,
         quantity: 1000,
         occurredAt,
         idempotencyKey: 'wp-rate-foreign'
       });
+      expect(own.pricedByCurrentPlan).toBe(true);
+      expect(foreign.pricedByCurrentPlan).toBe(false);
       const stored = await ds
         .getRepository(UsageRecord)
         .find({ where: { customerId, meterKey: ALT_METER } });

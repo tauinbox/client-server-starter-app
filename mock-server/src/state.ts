@@ -627,6 +627,30 @@ export function toInvoiceResponse(invoice: MockInvoice): InvoiceResponse {
   };
 }
 
+const USAGE_ACTIVE_STATUSES: ReadonlyArray<MockSubscription['status']> = [
+  'trialing',
+  'active',
+  'past_due'
+];
+
+// Mirrors UsageService.stampPricing: the verdict follows the plan in force now,
+// not anything stored on the record, so it is resolved at serialization time.
+function pricedByCurrentPlan(record: MockUsageRecord): boolean {
+  const state = getState();
+  const subscription = [...state.billingSubscriptions.values()]
+    .filter(
+      (s) =>
+        s.customerId === record.customerId &&
+        USAGE_ACTIVE_STATUSES.includes(s.status)
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  if (!subscription) return false;
+  const plan = [...state.plans.values()].find(
+    (p) => p.key === subscription.planKey
+  );
+  return plan?.meterKey === record.meterKey;
+}
+
 export function toUsageResponse(record: MockUsageRecord): UsageResponse {
   return {
     id: record.id,
@@ -635,7 +659,8 @@ export function toUsageResponse(record: MockUsageRecord): UsageResponse {
     meterKey: record.meterKey,
     quantity: record.quantity,
     occurredAt: record.occurredAt,
-    recordedAt: record.recordedAt
+    recordedAt: record.recordedAt,
+    pricedByCurrentPlan: pricedByCurrentPlan(record)
   };
 }
 

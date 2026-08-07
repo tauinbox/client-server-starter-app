@@ -27,6 +27,13 @@ export class UsageResponseDto {
 
   @ApiProperty({ example: '2023-01-01T00:00:00Z' })
   recordedAt: Date;
+
+  @ApiProperty({
+    example: true,
+    description:
+      "Whether the customer's plan prices this meter right now. False means the units are stored but will not bill under the current plan."
+  })
+  pricedByCurrentPlan: boolean;
 }
 
 type _DtoMatchesShared = _AssertNever<
