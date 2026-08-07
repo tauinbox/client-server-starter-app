@@ -356,6 +356,68 @@ runWithInfra('billing write paths (e2e)', () => {
       expect(rows[0].quantity.toNumber()).toBe(5);
     }, 30000);
 
+    it('refuses a meter the active plan does not price', async () => {
+      const usage = await build(UsageService);
+
+      await expect(
+        usage.record({
+          customerId,
+          meterKey: 'wp-foreign',
+          quantity: 5,
+          idempotencyKey: 'wp-usage-foreign'
+        })
+      ).rejects.toMatchObject({ status: 400 });
+
+      const rows = await ds
+        .getRepository(UsageRecord)
+        .find({ where: { customerId, idempotencyKey: 'wp-usage-foreign' } });
+      expect(rows).toHaveLength(0);
+    }, 30000);
+
+    it('rates only the plan meter when a foreign-meter row shares the period', async () => {
+      // An isolated window, so only these two rows are in scope whatever else
+      // the suite has recorded.
+      const period = {
+        start: new Date('2020-01-01T00:00:00Z'),
+        end: new Date('2020-02-01T00:00:00Z')
+      };
+      const occurredAt = new Date('2020-01-15T00:00:00Z');
+      await ds.getRepository(UsageRecord).save([
+        ds.getRepository(UsageRecord).create({
+          customerId,
+          subscriptionId,
+          meterKey: 'api_calls',
+          quantity: Money.fromMinor(7),
+          occurredAt,
+          idempotencyKey: 'wp-rate-own'
+        }),
+        ds.getRepository(UsageRecord).create({
+          customerId,
+          subscriptionId,
+          meterKey: 'wp-foreign',
+          quantity: Money.fromMinor(1000),
+          occurredAt,
+          idempotencyKey: 'wp-rate-foreign'
+        })
+      ]);
+      const rating = await build(UsageRating);
+      const subscription = await ds
+        .getRepository(Subscription)
+        .findOneByOrFail({ id: subscriptionId });
+      const plan = await ds
+        .getRepository(Plan)
+        .findOneByOrFail({ key: USAGE_PLAN });
+
+      const summary = await rating.summarizeForPeriod(
+        subscription,
+        plan,
+        period
+      );
+
+      expect(summary.totalUnits).toBe(7);
+      expect(summary.amountMinor).toBe(1400);
+    }, 30000);
+
     it('upserts the balance and appends a ledger row per delta', async () => {
       const invoice = await ds.getRepository(Invoice).save(
         ds.getRepository(Invoice).create({

@@ -1,8 +1,13 @@
 import { Test } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException
+} from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { FindOneOptions } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
+import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
 import { CreditService } from './credit.service';
@@ -29,8 +34,19 @@ function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
     id: 'sub-1',
     customerId: 'cust-1',
     status: 'active',
+    planKey: 'usage',
     ...overrides
   } as Subscription;
+}
+
+function makePlan(overrides: Partial<Plan> = {}): Plan {
+  return {
+    key: 'usage',
+    name: 'Pay as you go',
+    billingMode: 'usage',
+    meterKey: 'api_calls',
+    ...overrides
+  } as Plan;
 }
 
 const INPUT = {
@@ -44,11 +60,14 @@ describe('UsageService', () => {
   let service: UsageService;
   let usageRecords: RepoMock;
   let subscriptions: RepoMock;
+  let plans: RepoMock;
   let credits: { isBlocked: jest.Mock };
 
   beforeEach(async () => {
     usageRecords = repo();
     subscriptions = repo();
+    plans = repo();
+    plans.findOne.mockResolvedValue(makePlan());
     credits = { isBlocked: jest.fn().mockResolvedValue(false) };
 
     const moduleRef = await Test.createTestingModule({
@@ -56,6 +75,7 @@ describe('UsageService', () => {
         UsageService,
         { provide: getRepositoryToken(UsageRecord), useValue: usageRecords },
         { provide: getRepositoryToken(Subscription), useValue: subscriptions },
+        { provide: getRepositoryToken(Plan), useValue: plans },
         { provide: CreditService, useValue: credits }
       ]
     }).compile();
@@ -212,6 +232,38 @@ describe('UsageService', () => {
 
     await expect(service.record(INPUT)).rejects.toBeInstanceOf(
       NotFoundException
+    );
+    expect(usageRecords.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects a meter the active plan does not meter', async () => {
+    subscriptions.findOne.mockResolvedValue(makeSubscription());
+
+    await expect(
+      service.record({ ...INPUT, meterKey: 'other_product_calls' })
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(plans.findOne).toHaveBeenCalledWith({ where: { key: 'usage' } });
+    expect(usageRecords.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects every meter while the subscription is on a plan with no meter', async () => {
+    subscriptions.findOne.mockResolvedValue(
+      makeSubscription({ planKey: 'pro' })
+    );
+    plans.findOne.mockResolvedValue(makePlan({ key: 'pro', meterKey: null }));
+
+    await expect(service.record(INPUT)).rejects.toBeInstanceOf(
+      BadRequestException
+    );
+    expect(usageRecords.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects usage when the subscription points at a plan that no longer exists', async () => {
+    subscriptions.findOne.mockResolvedValue(makeSubscription());
+    plans.findOne.mockResolvedValue(null);
+
+    await expect(service.record(INPUT)).rejects.toBeInstanceOf(
+      BadRequestException
     );
     expect(usageRecords.save).not.toHaveBeenCalled();
   });

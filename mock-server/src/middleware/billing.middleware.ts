@@ -227,14 +227,19 @@ billingRouter.get('/usage', authGuard, (req: Request, res: Response) => {
     return;
   }
 
-  const totalUnits = [...getState().billingUsageRecords.values()]
-    .filter(
-      (r) =>
-        r.subscriptionId === sub.id &&
-        r.occurredAt >= sub.currentPeriodStart &&
-        r.occurredAt < sub.currentPeriodEnd
-    )
-    .reduce((sum, r) => sum + r.quantity, 0);
+  // Only the plan's own meter is priced at its rate; a plan naming no meter
+  // charges for nothing.
+  const totalUnits = plan.meterKey
+    ? [...getState().billingUsageRecords.values()]
+        .filter(
+          (r) =>
+            r.subscriptionId === sub.id &&
+            r.meterKey === plan.meterKey &&
+            r.occurredAt >= sub.currentPeriodStart &&
+            r.occurredAt < sub.currentPeriodEnd
+        )
+        .reduce((sum, r) => sum + r.quantity, 0)
+    : 0;
 
   const includedUnits = price.includedUnits ?? 0;
   const unitPriceMinor = price.unitPriceMinor ?? 0;
@@ -1156,6 +1161,20 @@ billingAdminRouter.post('/usage', adminGuard, (req: Request, res: Response) => {
     res.status(404).json({
       message: 'No active subscription for customer to record usage against',
       statusCode: 404
+    });
+    return;
+  }
+
+  // Rating prices only the plan's own meter, so a record under any other key
+  // would be stored and never billed. Fail the producer loudly instead. A
+  // dangling planKey lands here too: an unresolvable meter is not billable.
+  const plan = [...state.plans.values()].find(
+    (p) => p.key === subscription.planKey
+  );
+  if (!plan || plan.meterKey !== meterKey) {
+    res.status(400).json({
+      message: `Meter "${meterKey}" is not metered by the customer's active plan`,
+      statusCode: 400
     });
     return;
   }

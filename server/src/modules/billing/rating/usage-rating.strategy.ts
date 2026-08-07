@@ -110,20 +110,11 @@ export class UsageRating implements RatingStrategy {
       );
     }
 
-    // SUM over a bigint column comes back as a numeric string; decode it through
-    // Money so an overflow throws loudly rather than silently losing precision
-    // (the start is inclusive, the end exclusive — a record stamped exactly at
-    // the boundary belongs to the next period).
-    const raw = await this.usageRecords
-      .createQueryBuilder('u')
-      .select('COALESCE(SUM(u.quantity), 0)', 'total')
-      .where('u.subscriptionId = :subscriptionId', {
-        subscriptionId: subscription.id
-      })
-      .andWhere('u.occurredAt >= :start', { start: period.start })
-      .andWhere('u.occurredAt < :end', { end: period.end })
-      .getRawOne<{ total: string }>();
-    const totalUnits = Money.fromMinor(BigInt(raw?.total ?? '0')).toNumber();
+    // A record under any other key belongs to a different product and must not
+    // be priced at this plan's rate; a plan naming no meter charges for nothing.
+    const totalUnits = plan.meterKey
+      ? await this.sumUnits(subscription.id, plan.meterKey, period)
+      : 0;
 
     const includedUnits = price.includedUnits ?? 0;
     const unitPriceMinor = price.unitPriceMinor ?? 0;
@@ -150,5 +141,27 @@ export class UsageRating implements RatingStrategy {
             ]
           : []
     };
+  }
+
+  /**
+   * SUM over a bigint column comes back as a numeric string; decode it through
+   * Money so an overflow throws loudly rather than silently losing precision
+   * (the start is inclusive, the end exclusive - a record stamped exactly at the
+   * boundary belongs to the next period).
+   */
+  private async sumUnits(
+    subscriptionId: string,
+    meterKey: string,
+    period: BillingPeriod
+  ): Promise<number> {
+    const raw = await this.usageRecords
+      .createQueryBuilder('u')
+      .select('COALESCE(SUM(u.quantity), 0)', 'total')
+      .where('u.subscriptionId = :subscriptionId', { subscriptionId })
+      .andWhere('u.meterKey = :meterKey', { meterKey })
+      .andWhere('u.occurredAt >= :start', { start: period.start })
+      .andWhere('u.occurredAt < :end', { end: period.end })
+      .getRawOne<{ total: string }>();
+    return Money.fromMinor(BigInt(raw?.total ?? '0')).toNumber();
   }
 }

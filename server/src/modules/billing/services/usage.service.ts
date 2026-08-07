@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -7,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
+import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
 import { CreditService } from './credit.service';
@@ -48,6 +50,8 @@ export class UsageService {
     private readonly usageRecords: Repository<UsageRecord>,
     @InjectRepository(Subscription)
     private readonly subscriptions: Repository<Subscription>,
+    @InjectRepository(Plan)
+    private readonly plans: Repository<Plan>,
     private readonly credits: CreditService
   ) {}
 
@@ -84,6 +88,18 @@ export class UsageService {
     if (!subscription) {
       throw new NotFoundException(
         'No active subscription for customer to record usage against'
+      );
+    }
+
+    // Rating prices only the plan's own meter, so a record under any other key
+    // would be stored and never billed. Fail the producer loudly instead. A
+    // dangling planKey lands here too: an unresolvable meter is not billable.
+    const plan = await this.plans.findOne({
+      where: { key: subscription.planKey }
+    });
+    if (!plan || plan.meterKey !== input.meterKey) {
+      throw new BadRequestException(
+        `Meter "${input.meterKey}" is not metered by the customer's active plan`
       );
     }
 

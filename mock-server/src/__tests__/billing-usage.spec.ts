@@ -32,8 +32,8 @@ async function login(email: string): Promise<string> {
   return body.tokens.access_token;
 }
 
-// Activates a subscription for the admin user so a customer with an active
-// subscription exists, and returns its customer id.
+// Activates a metered subscription for the admin user so a customer that may
+// accrue usage exists, and returns its customer id.
 async function seedActiveCustomer(): Promise<string> {
   const admin = await fetch(`${baseUrl}/api/v1/auth/login`, {
     method: 'POST',
@@ -46,7 +46,7 @@ async function seedActiveCustomer(): Promise<string> {
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ userId: me.user.id, planKey: 'pro' })
+      body: JSON.stringify({ userId: me.user.id, planKey: 'usage' })
     }
   );
   expect(res.status).toBe(200);
@@ -96,12 +96,13 @@ async function activateSubscription(
 async function seedUsage(
   customerId: string,
   quantity: number,
-  occurredAt?: string
+  occurredAt?: string,
+  meterKey?: string
 ): Promise<void> {
   const res = await fetch(`${baseUrl}/__control/billing/seed-usage`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ customerId, quantity, occurredAt })
+    body: JSON.stringify({ customerId, quantity, occurredAt, meterKey })
   });
   expect(res.status).toBe(200);
 }
@@ -139,6 +140,9 @@ describe('GET /api/v1/billing/usage parity with server', () => {
     await seedUsage(customerId, 12);
     // Outside the current period — must not count.
     await seedUsage(customerId, 999, '2000-01-01T00:00:00.000Z');
+    // Recorded against the same subscription under another product's meter —
+    // the plan does not price it, so it must not count either.
+    await seedUsage(customerId, 500, undefined, 'other_product_calls');
 
     const res = await getUsage(token);
     expect(res.status).toBe(200);
@@ -205,11 +209,11 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     const token = await login('admin@example.com');
     const { customerId: first } = await activateSubscription(
       'admin@example.com',
-      'pro'
+      'usage'
     );
     const { customerId: second } = await activateSubscription(
       'user@example.com',
-      'pro'
+      'usage'
     );
     const payload = {
       meterKey: 'api_calls',
@@ -234,7 +238,7 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     const token = await login('admin@example.com');
     const { customerId, subscriptionId } = await activateSubscription(
       'admin@example.com',
-      'pro'
+      'usage'
     );
     const state = getState();
     const first = state.billingSubscriptions.get(subscriptionId);
@@ -273,6 +277,44 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     });
 
     expect(res.status).toBe(404);
+  });
+
+  it('rejects a meter the active plan does not meter (400)', async () => {
+    const token = await login('admin@example.com');
+    const customerId = await seedActiveCustomer();
+
+    const res = await postUsage(token, {
+      customerId,
+      meterKey: 'other_product_calls',
+      quantity: 7,
+      idempotencyKey: 'evt-foreign'
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      message:
+        'Meter "other_product_calls" is not metered by the customer\'s active plan',
+      statusCode: 400
+    });
+    expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
+  });
+
+  it('rejects usage against a plan with no meter (400)', async () => {
+    const token = await login('admin@example.com');
+    const { customerId } = await activateSubscription(
+      'admin@example.com',
+      'pro'
+    );
+
+    const res = await postUsage(token, {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 7,
+      idempotencyKey: 'evt-unmetered'
+    });
+
+    expect(res.status).toBe(400);
+    expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
   });
 
   it('rejects an invalid payload (400)', async () => {
