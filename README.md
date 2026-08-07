@@ -840,11 +840,11 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1800 tests passing |
-| Server E2E tests | Jest | Separate config in `test/` | 286 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 285 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and reports 279 passing, 7 skipped |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1805 tests passing |
+| Server E2E tests | Jest | Separate config in `test/` | 288 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 287 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and reports 281 passing, 7 skipped |
 | Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1015 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 209 tests passing |
-| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 324 tests passing |
+| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 326 tests passing |
 
 ## CI/CD
 
