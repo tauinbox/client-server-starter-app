@@ -227,14 +227,19 @@ billingRouter.get('/usage', authGuard, (req: Request, res: Response) => {
     return;
   }
 
-  const totalUnits = [...getState().billingUsageRecords.values()]
-    .filter(
-      (r) =>
-        r.subscriptionId === sub.id &&
-        r.occurredAt >= sub.currentPeriodStart &&
-        r.occurredAt < sub.currentPeriodEnd
-    )
-    .reduce((sum, r) => sum + r.quantity, 0);
+  // Only the plan's own meter is priced at its rate; a plan naming no meter
+  // charges for nothing.
+  const totalUnits = plan.meterKey
+    ? [...getState().billingUsageRecords.values()]
+        .filter(
+          (r) =>
+            r.subscriptionId === sub.id &&
+            r.meterKey === plan.meterKey &&
+            r.occurredAt >= sub.currentPeriodStart &&
+            r.occurredAt < sub.currentPeriodEnd
+        )
+        .reduce((sum, r) => sum + r.quantity, 0)
+    : 0;
 
   const includedUnits = price.includedUnits ?? 0;
   const unitPriceMinor = price.unitPriceMinor ?? 0;
@@ -1156,6 +1161,17 @@ billingAdminRouter.post('/usage', adminGuard, (req: Request, res: Response) => {
     res.status(404).json({
       message: 'No active subscription for customer to record usage against',
       statusCode: 404
+    });
+    return;
+  }
+
+  // A record is an observation, so the customer's current plan does not gate it
+  // — rating decides at period close. Only a meter no plan declares is refused:
+  // it can never become chargeable and is a producer typo.
+  if (![...state.plans.values()].some((p) => p.meterKey === meterKey)) {
+    res.status(400).json({
+      message: `Meter "${meterKey}" is not declared by any plan`,
+      statusCode: 400
     });
     return;
   }

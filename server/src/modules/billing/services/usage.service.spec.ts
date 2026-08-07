@@ -1,8 +1,14 @@
 import { Test } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException
+} from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { FindOneOptions } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
+import { MetricsService } from '../../core/metrics/metrics.service';
+import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
 import { CreditService } from './credit.service';
@@ -10,6 +16,7 @@ import { UsageService } from './usage.service';
 
 type RepoMock = {
   findOne: jest.Mock;
+  find: jest.Mock;
   create: jest.Mock;
   save: jest.Mock;
 };
@@ -17,6 +24,7 @@ type RepoMock = {
 function repo(): RepoMock {
   return {
     findOne: jest.fn().mockResolvedValue(null),
+    find: jest.fn().mockResolvedValue([]),
     create: jest.fn((entity: object) => entity),
     save: jest.fn((entity: object) =>
       Promise.resolve({ id: 'usage-1', ...entity })
@@ -29,8 +37,19 @@ function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
     id: 'sub-1',
     customerId: 'cust-1',
     status: 'active',
+    planKey: 'usage',
     ...overrides
   } as Subscription;
+}
+
+function makePlan(overrides: Partial<Plan> = {}): Plan {
+  return {
+    key: 'usage',
+    name: 'Pay as you go',
+    billingMode: 'usage',
+    meterKey: 'api_calls',
+    ...overrides
+  } as Plan;
 }
 
 const INPUT = {
@@ -44,19 +63,26 @@ describe('UsageService', () => {
   let service: UsageService;
   let usageRecords: RepoMock;
   let subscriptions: RepoMock;
+  let plans: RepoMock;
   let credits: { isBlocked: jest.Mock };
+  let metrics: { recordUnratedUsage: jest.Mock };
 
   beforeEach(async () => {
     usageRecords = repo();
     subscriptions = repo();
+    plans = repo();
+    plans.find.mockResolvedValue([makePlan()]);
     credits = { isBlocked: jest.fn().mockResolvedValue(false) };
+    metrics = { recordUnratedUsage: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         UsageService,
         { provide: getRepositoryToken(UsageRecord), useValue: usageRecords },
         { provide: getRepositoryToken(Subscription), useValue: subscriptions },
-        { provide: CreditService, useValue: credits }
+        { provide: getRepositoryToken(Plan), useValue: plans },
+        { provide: CreditService, useValue: credits },
+        { provide: MetricsService, useValue: metrics }
       ]
     }).compile();
 
@@ -138,14 +164,41 @@ describe('UsageService', () => {
   });
 
   it('is idempotent: a replayed key returns the existing record without re-inserting', async () => {
-    const existing = { id: 'usage-1', idempotencyKey: 'evt-1' } as UsageRecord;
+    const existing = {
+      id: 'usage-1',
+      customerId: 'cust-1',
+      meterKey: 'api_calls',
+      idempotencyKey: 'evt-1'
+    } as UsageRecord;
     usageRecords.findOne.mockResolvedValue(existing);
+    subscriptions.findOne.mockResolvedValue(makeSubscription());
+    plans.findOne.mockResolvedValue(makePlan());
 
     const result = await service.record(INPUT);
 
     expect(result).toBe(existing);
-    expect(subscriptions.findOne).not.toHaveBeenCalled();
     expect(usageRecords.save).not.toHaveBeenCalled();
+    // The replay still resolves the pricing verdict, so it reports the plan in
+    // force now rather than whatever applied when the row was written.
+    expect(existing.pricedByCurrentPlan).toBe(true);
+  });
+
+  it('reports a replayed record as unpriced once the customer has moved off the metered plan', async () => {
+    const existing = {
+      id: 'usage-1',
+      customerId: 'cust-1',
+      meterKey: 'api_calls',
+      idempotencyKey: 'evt-1'
+    } as UsageRecord;
+    usageRecords.findOne.mockResolvedValue(existing);
+    subscriptions.findOne.mockResolvedValue(
+      makeSubscription({ planKey: 'pro' })
+    );
+    plans.findOne.mockResolvedValue(makePlan({ key: 'pro', meterKey: null }));
+
+    await service.record(INPUT);
+
+    expect(existing.pricedByCurrentPlan).toBe(false);
   });
 
   it('treats the same key from another customer as a distinct event', async () => {
@@ -214,6 +267,59 @@ describe('UsageService', () => {
       NotFoundException
     );
     expect(usageRecords.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects a meter no plan in the catalog declares', async () => {
+    subscriptions.findOne.mockResolvedValue(makeSubscription());
+    // A typo resolves to nothing: neither the customer's plan nor any plan
+    // declaring that meter comes back.
+    plans.find.mockResolvedValue([makePlan()]);
+
+    await expect(
+      service.record({ ...INPUT, meterKey: 'api_call' })
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(usageRecords.save).not.toHaveBeenCalled();
+    expect(metrics.recordUnratedUsage).not.toHaveBeenCalled();
+  });
+
+  it('stores a catalog meter the current plan does not price, and counts it', async () => {
+    subscriptions.findOne.mockResolvedValue(
+      makeSubscription({ planKey: 'pro' })
+    );
+    // The customer is on a fixed plan; another plan declares the meter, so the
+    // observation is legitimate and simply rates to nothing today.
+    plans.find.mockResolvedValue([
+      makePlan({ key: 'pro', billingMode: 'fixed', meterKey: null }),
+      makePlan()
+    ]);
+
+    const result = await service.record(INPUT);
+
+    expect(usageRecords.save).toHaveBeenCalledTimes(1);
+    expect(metrics.recordUnratedUsage).toHaveBeenCalledWith('api_calls');
+    expect(result.pricedByCurrentPlan).toBe(false);
+  });
+
+  it('stores without counting when the meter is the active plan meter', async () => {
+    subscriptions.findOne.mockResolvedValue(makeSubscription());
+
+    const result = await service.record(INPUT);
+
+    expect(usageRecords.save).toHaveBeenCalledTimes(1);
+    expect(metrics.recordUnratedUsage).not.toHaveBeenCalled();
+    expect(result.pricedByCurrentPlan).toBe(true);
+  });
+
+  it('counts a dangling planKey as unrated rather than refusing the record', async () => {
+    subscriptions.findOne.mockResolvedValue(
+      makeSubscription({ planKey: 'deleted-plan' })
+    );
+    plans.find.mockResolvedValue([makePlan()]);
+
+    await service.record(INPUT);
+
+    expect(usageRecords.save).toHaveBeenCalledTimes(1);
+    expect(metrics.recordUnratedUsage).toHaveBeenCalledWith('api_calls');
   });
 
   it('rejects new usage with 409 while the credit balance is negative', async () => {

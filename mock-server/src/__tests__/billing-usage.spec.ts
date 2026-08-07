@@ -96,12 +96,13 @@ async function activateSubscription(
 async function seedUsage(
   customerId: string,
   quantity: number,
-  occurredAt?: string
+  occurredAt?: string,
+  meterKey?: string
 ): Promise<void> {
   const res = await fetch(`${baseUrl}/__control/billing/seed-usage`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ customerId, quantity, occurredAt })
+    body: JSON.stringify({ customerId, quantity, occurredAt, meterKey })
   });
   expect(res.status).toBe(200);
 }
@@ -139,6 +140,9 @@ describe('GET /api/v1/billing/usage parity with server', () => {
     await seedUsage(customerId, 12);
     // Outside the current period — must not count.
     await seedUsage(customerId, 999, '2000-01-01T00:00:00.000Z');
+    // Recorded against the same subscription under another product's meter —
+    // the plan does not price it, so it must not count either.
+    await seedUsage(customerId, 500, undefined, 'other_product_calls');
 
     const res = await getUsage(token);
     expect(res.status).toBe(200);
@@ -177,6 +181,9 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     expect(body['quantity']).toBe(42);
     expect(body['meterKey']).toBe('api_calls');
     expect(body).not.toHaveProperty('idempotencyKey');
+    // seedActiveCustomer subscribes to the fixed `pro` plan, which prices no
+    // meter — the record is kept, the response says it will not bill.
+    expect(body['pricedByCurrentPlan']).toBe(false);
   });
 
   it('is idempotent: a replayed key returns the original record', async () => {
@@ -273,6 +280,68 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     });
 
     expect(res.status).toBe(404);
+  });
+
+  it('rejects a meter no plan declares (400)', async () => {
+    const token = await login('admin@example.com');
+    const customerId = await seedActiveCustomer();
+
+    const res = await postUsage(token, {
+      customerId,
+      meterKey: 'api_call',
+      quantity: 7,
+      idempotencyKey: 'evt-typo'
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      message: 'Meter "api_call" is not declared by any plan',
+      statusCode: 400
+    });
+    expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
+  });
+
+  it('stores a catalog meter the current plan does not price', async () => {
+    const token = await login('admin@example.com');
+    // On the fixed `pro` plan, which meters nothing — the observation is still
+    // recorded, it simply rates to nothing until the customer is on `usage`.
+    const { customerId } = await activateSubscription(
+      'admin@example.com',
+      'pro'
+    );
+
+    const res = await postUsage(token, {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 7,
+      idempotencyKey: 'evt-unpriced'
+    });
+
+    expect(res.status).toBe(201);
+    expect([...getState().billingUsageRecords.values()]).toHaveLength(1);
+    expect(
+      ((await res.json()) as Record<string, unknown>)['pricedByCurrentPlan']
+    ).toBe(false);
+  });
+
+  it('reports a record as priced when the meter is the active plan meter', async () => {
+    const token = await login('admin@example.com');
+    const { customerId } = await activateSubscription(
+      'admin@example.com',
+      'usage'
+    );
+
+    const res = await postUsage(token, {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 3,
+      idempotencyKey: 'evt-priced'
+    });
+
+    expect(res.status).toBe(201);
+    expect(
+      ((await res.json()) as Record<string, unknown>)['pricedByCurrentPlan']
+    ).toBe(true);
   });
 
   it('rejects an invalid payload (400)', async () => {

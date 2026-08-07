@@ -54,4 +54,12 @@ export class UsageRecord {
 
   @CreateDateColumn({ name: 'recorded_at', type: 'timestamptz' })
   recordedAt: Date;
+
+  /**
+   * Not a column: `UsageService` stamps it on every record it hands back, since
+   * whether a meter is priced depends on the plan in force rather than on
+   * anything stored here. Undecorated, so TypeORM neither persists nor hydrates
+   * it - a record read by any other path carries `undefined`.
+   */
+  pricedByCurrentPlan: boolean;
 }

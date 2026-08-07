@@ -68,6 +68,13 @@ export const MAIL_QUEUE_REF = Symbol('MAIL_QUEUE_REF');
       help: 'Total cache lookups by logical cache and hit/miss outcome',
       labelNames: ['cache', 'outcome']
     }),
+    // The `meter` label is bounded by the plan catalog: ingest rejects a meter
+    // no plan declares before this counter is ever touched.
+    makeCounterProvider({
+      name: 'billing_usage_records_unrated_total',
+      help: 'Usage records stored under a meter the customer active plan does not price',
+      labelNames: ['meter']
+    }),
     {
       provide: SSE_CONNECTIONS_REF,
       useFactory: (): SseConnectionsRef => ({ getCount: () => 0 })

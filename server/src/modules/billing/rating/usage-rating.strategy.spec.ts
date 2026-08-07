@@ -98,6 +98,34 @@ describe('UsageRating', () => {
     });
   });
 
+  it('rates only the plan meter, not every meter on the subscription', async () => {
+    mockTotal(150);
+
+    await rating.summarizeForPeriod(makeSubscription(), makePlan(), PERIOD);
+
+    expect(qb.andWhere).toHaveBeenCalledWith('u.meterKey = :meterKey', {
+      meterKey: 'api_calls'
+    });
+  });
+
+  it('charges nothing for a plan that names no meter', async () => {
+    mockTotal(999);
+
+    const summary = await rating.summarizeForPeriod(
+      makeSubscription(),
+      makePlan({ meterKey: null }),
+      PERIOD
+    );
+
+    expect(createQueryBuilder).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({
+      totalUnits: 0,
+      billableUnits: 0,
+      amountMinor: 0,
+      receiptItems: []
+    });
+  });
+
   it('rates zero usage (no records) as a zero amount with no receipt lines', async () => {
     mockTotal(0);
 

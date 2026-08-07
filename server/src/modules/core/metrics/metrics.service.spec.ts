@@ -42,6 +42,10 @@ describe('MetricsService', () => {
         {
           provide: getToken('cache_requests_total'),
           useValue: mockCounter
+        },
+        {
+          provide: getToken('billing_usage_records_unrated_total'),
+          useValue: mockCounter
         }
       ]
     }).compile();
@@ -131,6 +135,14 @@ describe('MetricsService', () => {
         cache: 'feature_flags',
         outcome: 'miss'
       });
+    });
+  });
+
+  describe('recordUnratedUsage', () => {
+    it('increments the counter labelled by meter', () => {
+      service.recordUnratedUsage('api_calls');
+
+      expect(mockCounter.inc).toHaveBeenCalledWith({ meter: 'api_calls' });
     });
   });
 });
