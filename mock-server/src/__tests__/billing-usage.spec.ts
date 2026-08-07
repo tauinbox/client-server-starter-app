@@ -32,8 +32,8 @@ async function login(email: string): Promise<string> {
   return body.tokens.access_token;
 }
 
-// Activates a metered subscription for the admin user so a customer that may
-// accrue usage exists, and returns its customer id.
+// Activates a subscription for the admin user so a customer with an active
+// subscription exists, and returns its customer id.
 async function seedActiveCustomer(): Promise<string> {
   const admin = await fetch(`${baseUrl}/api/v1/auth/login`, {
     method: 'POST',
@@ -46,7 +46,7 @@ async function seedActiveCustomer(): Promise<string> {
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ userId: me.user.id, planKey: 'usage' })
+      body: JSON.stringify({ userId: me.user.id, planKey: 'pro' })
     }
   );
   expect(res.status).toBe(200);
@@ -209,11 +209,11 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     const token = await login('admin@example.com');
     const { customerId: first } = await activateSubscription(
       'admin@example.com',
-      'usage'
+      'pro'
     );
     const { customerId: second } = await activateSubscription(
       'user@example.com',
-      'usage'
+      'pro'
     );
     const payload = {
       meterKey: 'api_calls',
@@ -238,7 +238,7 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     const token = await login('admin@example.com');
     const { customerId, subscriptionId } = await activateSubscription(
       'admin@example.com',
-      'usage'
+      'pro'
     );
     const state = getState();
     const first = state.billingSubscriptions.get(subscriptionId);
@@ -279,28 +279,29 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     expect(res.status).toBe(404);
   });
 
-  it('rejects a meter the active plan does not meter (400)', async () => {
+  it('rejects a meter no plan declares (400)', async () => {
     const token = await login('admin@example.com');
     const customerId = await seedActiveCustomer();
 
     const res = await postUsage(token, {
       customerId,
-      meterKey: 'other_product_calls',
+      meterKey: 'api_call',
       quantity: 7,
-      idempotencyKey: 'evt-foreign'
+      idempotencyKey: 'evt-typo'
     });
 
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({
-      message:
-        'Meter "other_product_calls" is not metered by the customer\'s active plan',
+      message: 'Meter "api_call" is not declared by any plan',
       statusCode: 400
     });
     expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
   });
 
-  it('rejects usage against a plan with no meter (400)', async () => {
+  it('stores a catalog meter the current plan does not price', async () => {
     const token = await login('admin@example.com');
+    // On the fixed `pro` plan, which meters nothing — the observation is still
+    // recorded, it simply rates to nothing until the customer is on `usage`.
     const { customerId } = await activateSubscription(
       'admin@example.com',
       'pro'
@@ -310,11 +311,11 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
       customerId,
       meterKey: 'api_calls',
       quantity: 7,
-      idempotencyKey: 'evt-unmetered'
+      idempotencyKey: 'evt-unpriced'
     });
 
-    expect(res.status).toBe(400);
-    expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
+    expect(res.status).toBe(201);
+    expect([...getState().billingUsageRecords.values()]).toHaveLength(1);
   });
 
   it('rejects an invalid payload (400)', async () => {

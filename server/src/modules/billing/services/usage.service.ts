@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
@@ -40,6 +41,14 @@ export interface RecordUsageInput {
  * discard the second customer's event. There is no public
  * meter endpoint — the only HTTP surface is the `manage Billing`-gated admin
  * route; this service is also called in-process by usage producers.
+ *
+ * A record is an observation about a customer, not an accounting fact: it is
+ * stored whatever plan is in force, and `UsageRating` decides at period close
+ * whether the plan prices that meter. Gating the write on the plan would make an
+ * immutable fact conditional on state that changes under it — an upgrade an hour
+ * into the period would have discarded the hour before it. The only rejection
+ * here is a meter no plan in the catalog declares, which cannot become
+ * chargeable later and is a producer typo.
  */
 @Injectable()
 export class UsageService {
@@ -52,7 +61,8 @@ export class UsageService {
     private readonly subscriptions: Repository<Subscription>,
     @InjectRepository(Plan)
     private readonly plans: Repository<Plan>,
-    private readonly credits: CreditService
+    private readonly credits: CreditService,
+    private readonly metrics: MetricsService
   ) {}
 
   async record(input: RecordUsageInput): Promise<UsageRecord> {
@@ -91,15 +101,14 @@ export class UsageService {
       );
     }
 
-    // Rating prices only the plan's own meter, so a record under any other key
-    // would be stored and never billed. Fail the producer loudly instead. A
-    // dangling planKey lands here too: an unresolvable meter is not billable.
-    const plan = await this.plans.findOne({
-      where: { key: subscription.planKey }
+    // One query answers both questions: is this meter in the catalog at all, and
+    // is it the meter the customer's current plan prices.
+    const candidates = await this.plans.find({
+      where: [{ key: subscription.planKey }, { meterKey: input.meterKey }]
     });
-    if (!plan || plan.meterKey !== input.meterKey) {
+    if (!candidates.some((p) => p.meterKey === input.meterKey)) {
       throw new BadRequestException(
-        `Meter "${input.meterKey}" is not metered by the customer's active plan`
+        `Meter "${input.meterKey}" is not declared by any plan`
       );
     }
 
@@ -112,8 +121,9 @@ export class UsageService {
       idempotencyKey: input.idempotencyKey
     });
 
+    let saved: UsageRecord;
     try {
-      return await this.usageRecords.save(record);
+      saved = await this.usageRecords.save(record);
     } catch (error: unknown) {
       // Lost an insert race on the same idempotency key — the unique constraint
       // rejected the second writer. Return the record the winner persisted so the
@@ -135,5 +145,18 @@ export class UsageService {
       }
       throw error;
     }
+
+    // Stored but not chargeable under the plan in force. Visible rather than
+    // fatal: a producer meters what it observes and cannot know the customer's
+    // plan, so this is an operations signal, not the producer's error.
+    const ownPlan = candidates.find((p) => p.key === subscription.planKey);
+    if (ownPlan?.meterKey !== input.meterKey) {
+      this.logger.warn(
+        `Usage under meter "${input.meterKey}" is not priced by plan "${subscription.planKey}" (customer ${input.customerId})`
+      );
+      this.metrics.recordUnratedUsage(input.meterKey);
+    }
+
+    return saved;
   }
 }

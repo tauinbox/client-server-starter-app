@@ -10,6 +10,7 @@ import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { postgresConfig } from '../src/postgres.config';
+import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { CustomerGrant } from '../src/modules/billing/entities/customer-grant.entity';
@@ -42,6 +43,10 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 const DAY = 86_400_000;
 const FIXED_PLAN = 'wp-fixed';
 const USAGE_PLAN = 'wp-usage';
+// A second metered plan, so the suite has a meter that is in the catalog but is
+// not the meter of the subscription under test.
+const ALT_USAGE_PLAN = 'wp-usage-alt';
+const ALT_METER = 'wp-alt-meter';
 
 runWithInfra('billing write paths (e2e)', () => {
   let ds: DataSource;
@@ -95,7 +100,11 @@ runWithInfra('billing write paths (e2e)', () => {
       .delete({ providerEventId: 'wp-webhook-1' });
     await ds
       .getRepository(Plan)
-      .delete([{ key: FIXED_PLAN }, { key: USAGE_PLAN }]);
+      .delete([
+        { key: FIXED_PLAN },
+        { key: USAGE_PLAN },
+        { key: ALT_USAGE_PLAN }
+      ]);
     await ds
       .getRepository(Product)
       .delete([{ key: 'wp-sku' }, { key: 'wp-credits' }]);
@@ -156,6 +165,26 @@ runWithInfra('billing write paths (e2e)', () => {
             currency: 'RUB',
             amountMinor: 0,
             unitPriceMinor: 200,
+            includedUnits: 0
+          }
+        }
+      }),
+      ds.getRepository(Plan).create({
+        key: ALT_USAGE_PLAN,
+        name: ALT_USAGE_PLAN,
+        description: null,
+        billingMode: 'usage',
+        interval: 'month',
+        meterKey: ALT_METER,
+        entitlements: [],
+        limits: null,
+        trialDays: 0,
+        active: true,
+        prices: {
+          yookassa: {
+            currency: 'RUB',
+            amountMinor: 0,
+            unitPriceMinor: 900,
             includedUnits: 0
           }
         }
@@ -264,6 +293,10 @@ runWithInfra('billing write paths (e2e)', () => {
         },
         { provide: BILLING_PROVIDERS, useValue: [provider] },
         {
+          provide: MetricsService,
+          useValue: { recordUnratedUsage: jest.fn() }
+        },
+        {
           provide: EventEmitter2,
           useValue: {
             emit: jest.fn(),
@@ -356,50 +389,53 @@ runWithInfra('billing write paths (e2e)', () => {
       expect(rows[0].quantity.toNumber()).toBe(5);
     }, 30000);
 
-    it('refuses a meter the active plan does not price', async () => {
+    it('refuses a meter no plan in the catalog declares', async () => {
       const usage = await build(UsageService);
 
       await expect(
         usage.record({
           customerId,
-          meterKey: 'wp-foreign',
+          meterKey: 'wp-unknown',
           quantity: 5,
-          idempotencyKey: 'wp-usage-foreign'
+          idempotencyKey: 'wp-usage-unknown'
         })
       ).rejects.toMatchObject({ status: 400 });
 
       const rows = await ds
         .getRepository(UsageRecord)
-        .find({ where: { customerId, idempotencyKey: 'wp-usage-foreign' } });
+        .find({ where: { customerId, idempotencyKey: 'wp-usage-unknown' } });
       expect(rows).toHaveLength(0);
     }, 30000);
 
     it('rates only the plan meter when a foreign-meter row shares the period', async () => {
       // An isolated window, so only these two rows are in scope whatever else
-      // the suite has recorded.
+      // the suite has recorded. Both go in through the real ingest: the foreign
+      // one is another plan's meter, which is stored and simply not priced here.
       const period = {
         start: new Date('2020-01-01T00:00:00Z'),
         end: new Date('2020-02-01T00:00:00Z')
       };
       const occurredAt = new Date('2020-01-15T00:00:00Z');
-      await ds.getRepository(UsageRecord).save([
-        ds.getRepository(UsageRecord).create({
-          customerId,
-          subscriptionId,
-          meterKey: 'api_calls',
-          quantity: Money.fromMinor(7),
-          occurredAt,
-          idempotencyKey: 'wp-rate-own'
-        }),
-        ds.getRepository(UsageRecord).create({
-          customerId,
-          subscriptionId,
-          meterKey: 'wp-foreign',
-          quantity: Money.fromMinor(1000),
-          occurredAt,
-          idempotencyKey: 'wp-rate-foreign'
-        })
-      ]);
+      const usage = await build(UsageService);
+      await usage.record({
+        customerId,
+        meterKey: 'api_calls',
+        quantity: 7,
+        occurredAt,
+        idempotencyKey: 'wp-rate-own'
+      });
+      await usage.record({
+        customerId,
+        meterKey: ALT_METER,
+        quantity: 1000,
+        occurredAt,
+        idempotencyKey: 'wp-rate-foreign'
+      });
+      const stored = await ds
+        .getRepository(UsageRecord)
+        .find({ where: { customerId, meterKey: ALT_METER } });
+      expect(stored).toHaveLength(1);
+
       const rating = await build(UsageRating);
       const subscription = await ds
         .getRepository(Subscription)

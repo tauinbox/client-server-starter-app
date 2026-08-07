@@ -1165,15 +1165,12 @@ billingAdminRouter.post('/usage', adminGuard, (req: Request, res: Response) => {
     return;
   }
 
-  // Rating prices only the plan's own meter, so a record under any other key
-  // would be stored and never billed. Fail the producer loudly instead. A
-  // dangling planKey lands here too: an unresolvable meter is not billable.
-  const plan = [...state.plans.values()].find(
-    (p) => p.key === subscription.planKey
-  );
-  if (!plan || plan.meterKey !== meterKey) {
+  // A record is an observation, so the customer's current plan does not gate it
+  // — rating decides at period close. Only a meter no plan declares is refused:
+  // it can never become chargeable and is a producer typo.
+  if (![...state.plans.values()].some((p) => p.meterKey === meterKey)) {
     res.status(400).json({
-      message: `Meter "${meterKey}" is not metered by the customer's active plan`,
+      message: `Meter "${meterKey}" is not declared by any plan`,
       statusCode: 400
     });
     return;
