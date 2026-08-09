@@ -10,10 +10,21 @@ import { YOOKASSA_CLIENT } from './yookassa.client';
 import { PaymentMethod } from '../entities/payment-method.entity';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
+import { WEBHOOK_IGNORED } from './payment-provider.interface';
 import type {
+  NormalizedEvent,
   NormalizedInvoicePayload,
-  ReceiptItem
+  ReceiptItem,
+  WebhookVerificationResult
 } from './payment-provider.interface';
+
+/** Narrows the webhook seam's union to the reducible event a test asserts on. */
+function reducible(result: WebhookVerificationResult): NormalizedEvent {
+  if (result === null || result === WEBHOOK_IGNORED) {
+    throw new Error(`Expected a normalized event, got ${String(result)}`);
+  }
+  return result;
+}
 
 function yooMock() {
   return {
@@ -882,7 +893,7 @@ describe('YooKassaProvider', () => {
       ).toBeNull();
     });
 
-    it('ignores events it does not reduce', async () => {
+    it('rejects an event outside the payment pair (nothing re-fetched, so unverified)', async () => {
       const { provider, client } = await build();
       expect(
         await provider.verifyAndParseWebhook(notification('refund.succeeded'))
@@ -911,7 +922,7 @@ describe('YooKassaProvider', () => {
         providerEventId: 'payment.succeeded:pay-w',
         type: 'invoice.paid'
       });
-      const payload = result!.payload as NormalizedInvoicePayload;
+      const payload = reducible(result).payload as NormalizedInvoicePayload;
       expect(payload).toMatchObject({
         ref: { customerId: 'cust-1', userId: 'user-1' },
         providerInvoiceRef: 'pay-w',
@@ -939,7 +950,7 @@ describe('YooKassaProvider', () => {
 
       // A fixed scale of 2 would reject '1500' as unparseable-with-decimals or
       // read it as 150000 minor; the currency scale keeps it 1500.
-      const payload = result!.payload as NormalizedInvoicePayload;
+      const payload = reducible(result).payload as NormalizedInvoicePayload;
       expect(payload).toMatchObject({ amountMinor: 1500, currency: 'JPY' });
     });
 
@@ -993,7 +1004,7 @@ describe('YooKassaProvider', () => {
         await provider.verifyAndParseWebhook(
           notification('payment.canceled', 'pay-mu')
         )
-      ).toBeNull();
+      ).toBe(WEBHOOK_IGNORED);
     });
 
     it('maps a succeeded one-time purchase to invoice.paid with kind + product id and no saved method', async () => {
@@ -1021,7 +1032,7 @@ describe('YooKassaProvider', () => {
       );
 
       expect(result).toMatchObject({ type: 'invoice.paid' });
-      const payload = result!.payload as NormalizedInvoicePayload;
+      const payload = reducible(result).payload as NormalizedInvoicePayload;
       expect(payload).toMatchObject({
         kind: 'one_time',
         productId: 'prod-1',
@@ -1046,7 +1057,7 @@ describe('YooKassaProvider', () => {
         await provider.verifyAndParseWebhook(
           notification('payment.canceled', 'pay-ot')
         )
-      ).toBeNull();
+      ).toBe(WEBHOOK_IGNORED);
     });
 
     it('maps a canceled payment to payment.failed', async () => {
@@ -1068,7 +1079,7 @@ describe('YooKassaProvider', () => {
       });
     });
 
-    it('returns null for a non-terminal re-fetched status', async () => {
+    it('ignores a non-terminal re-fetched status (authentic, nothing to reduce)', async () => {
       const { provider, client } = await build();
       client!.getPayment.mockResolvedValue({
         id: 'pay-w',
@@ -1079,7 +1090,7 @@ describe('YooKassaProvider', () => {
 
       expect(
         await provider.verifyAndParseWebhook(notification('payment.succeeded'))
-      ).toBeNull();
+      ).toBe(WEBHOOK_IGNORED);
     });
 
     it('returns null when the re-fetch throws', async () => {
@@ -1116,7 +1127,7 @@ describe('YooKassaProvider', () => {
       );
 
       expect(result).toMatchObject({ type: 'invoice.paid' });
-      const payload = result!.payload as NormalizedInvoicePayload;
+      const payload = reducible(result).payload as NormalizedInvoicePayload;
       expect(payload.offSessionChargeKey).toBe('renewal:sub-1:123:0');
       expect(payload.providerInvoiceRef).toBe('pay-os');
       // The card is already saved from the first payment; a renewal must not

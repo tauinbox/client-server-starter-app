@@ -29,6 +29,19 @@ export interface NormalizedEvent {
 }
 
 /**
+ * Verdict for a delivery the provider verified as authentic but which carries
+ * nothing to reduce (a zero-amount payment-method change, an event type we do
+ * not map, a non-terminal payment status). Distinct from `null`, which means
+ * the payload could not be verified at all: the ingestion seam acks this one
+ * and rejects that one, so a signature alert never fires on normal traffic.
+ */
+export const WEBHOOK_IGNORED = 'ignored';
+export type WebhookIgnored = typeof WEBHOOK_IGNORED;
+
+/** What the webhook seam returns: reduce it, ack it, or reject it (`null`). */
+export type WebhookVerificationResult = NormalizedEvent | WebhookIgnored | null;
+
+/**
  * Identifies the affected user/customer on a normalized event. Providers echo
  * our `customerId`/`userId` through their custom-data field at checkout so the
  * reducer resolves the local rows without a provider-id reverse lookup.
@@ -203,7 +216,8 @@ export interface ChangePreview {
  * subscription lifecycle itself (`managesLifecycle = true`); YooKassa is
  * self-managed (`false`) so the core drives renewals. `verifyAndParseWebhook`
  * returns `null` for a payload that cannot be verified, so the
- * webhook-ingestion seam stays exercisable without provider credentials.
+ * webhook-ingestion seam stays exercisable without provider credentials, and
+ * `WEBHOOK_IGNORED` for an authentic delivery with nothing to reduce.
  */
 export interface PaymentProvider {
   readonly id: BillingProviderId;
@@ -299,10 +313,17 @@ export interface PaymentProvider {
     amountMinor: number,
     idempotencyKey?: string
   ): Promise<void>;
+  /**
+   * Verifies a raw delivery and maps it onto a `NormalizedEvent`. Returns
+   * `null` when the payload is not authentic (bad/absent signature, an object
+   * the provider's API does not confirm, an unparseable body) — the seam
+   * answers 400 — and `WEBHOOK_IGNORED` when the delivery is authentic but
+   * carries nothing to reduce, which is acked.
+   */
   verifyAndParseWebhook(
     rawBody: Buffer,
     headers: Record<string, string | string[] | undefined>
-  ): Promise<NormalizedEvent | null>;
+  ): Promise<WebhookVerificationResult>;
 }
 
 /** Injection token for the registered `PaymentProvider` array. */
