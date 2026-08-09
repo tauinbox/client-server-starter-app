@@ -14,6 +14,7 @@ import type { BillingProviderId } from '@app/shared/types';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import {
   BILLING_PROVIDERS,
+  WEBHOOK_IGNORED,
   type PaymentProvider
 } from '../providers/payment-provider.interface';
 import { BillingEventReducer } from './billing-event-reducer.service';
@@ -67,9 +68,15 @@ export class WebhookIngestionService {
     }
 
     const event = await provider.verifyAndParseWebhook(rawBody, headers);
-    if (!event) {
-      // Signature invalid / unverifiable, or an event type we ignore.
+    if (event === null) {
+      // Signature invalid, or a payload the provider cannot confirm.
       throw new BadRequestException('Webhook verification failed');
+    }
+    if (event === WEBHOOK_IGNORED) {
+      // Ack: a 400 would retry a delivery that can never do anything, and would
+      // make routine traffic indistinguishable from a forged signature.
+      this.logger.debug(`Ignored ${providerId} webhook with nothing to reduce`);
+      return;
     }
 
     const result = await this.webhookEvents

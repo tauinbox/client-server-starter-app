@@ -3,7 +3,10 @@ import { BadRequestException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { getQueueToken } from '@nestjs/bullmq';
 import { WebhookEvent } from '../entities/webhook-event.entity';
-import { BILLING_PROVIDERS } from '../providers/payment-provider.interface';
+import {
+  BILLING_PROVIDERS,
+  WEBHOOK_IGNORED
+} from '../providers/payment-provider.interface';
 import type { NormalizedEvent } from '../providers/payment-provider.interface';
 import { BillingEventReducer } from './billing-event-reducer.service';
 import { WebhookIngestionService } from './webhook-ingestion.service';
@@ -102,6 +105,21 @@ describe('WebhookIngestionService', () => {
       service.ingest('paddle', Buffer.from('{}'), {})
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('acks an authentic webhook with nothing to reduce and ledgers nothing', async () => {
+    const { service, execute, reduce, add } = await buildHarness({
+      withQueue: true,
+      verify: jest.fn().mockResolvedValue(WEBHOOK_IGNORED)
+    });
+
+    await expect(
+      service.ingest('paddle', Buffer.from('{}'), {})
+    ).resolves.toBeUndefined();
+
+    expect(execute).not.toHaveBeenCalled();
+    expect(reduce).not.toHaveBeenCalled();
+    expect(add).not.toHaveBeenCalled();
   });
 
   it('passes the raw bytes to the provider and ledgers the verified event', async () => {

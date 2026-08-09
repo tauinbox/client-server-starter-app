@@ -9,12 +9,23 @@ import { PaddleProvider } from './paddle.provider';
 import { PADDLE_CLIENT } from './paddle.client';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
+import { WEBHOOK_IGNORED } from './payment-provider.interface';
 import type {
+  NormalizedEvent,
   NormalizedInvoicePayload,
-  NormalizedSubscriptionPayload
+  NormalizedSubscriptionPayload,
+  WebhookVerificationResult
 } from './payment-provider.interface';
 
 const WEBHOOK_SECRET = 'pdl_ntfset_whsec';
+
+/** Narrows the webhook seam's union to the reducible event a test asserts on. */
+function reducible(result: WebhookVerificationResult): NormalizedEvent {
+  if (result === null || result === WEBHOOK_IGNORED) {
+    throw new Error(`Expected a normalized event, got ${String(result)}`);
+  }
+  return result;
+}
 
 function paddleMock() {
   return {
@@ -162,7 +173,8 @@ describe('PaddleProvider', () => {
         providerEventId: 'evt_1',
         type: expectedType
       });
-      const payload = result!.payload as NormalizedSubscriptionPayload;
+      const payload = reducible(result)
+        .payload as NormalizedSubscriptionPayload;
       expect(payload).toMatchObject({
         ref: { customerId: 'cust-1', userId: 'user-1' },
         providerSubscriptionId: 'sub_123',
@@ -186,7 +198,8 @@ describe('PaddleProvider', () => {
         'paddle-signature': 'sig'
       });
 
-      const payload = result!.payload as NormalizedSubscriptionPayload;
+      const payload = reducible(result)
+        .payload as NormalizedSubscriptionPayload;
       expect(payload.cancelAtPeriodEnd).toBe(true);
     });
 
@@ -203,7 +216,7 @@ describe('PaddleProvider', () => {
       });
 
       expect(result).toMatchObject({ type: 'invoice.paid' });
-      const payload = result!.payload as NormalizedInvoicePayload;
+      const payload = reducible(result).payload as NormalizedInvoicePayload;
       expect(payload).toMatchObject({
         ref: { customerId: 'cust-1', userId: 'user-1' },
         providerInvoiceRef: 'txn_123',
@@ -231,9 +244,9 @@ describe('PaddleProvider', () => {
         'paddle-signature': 'sig'
       });
 
-      expect((result!.payload as NormalizedInvoicePayload).usageChargeKey).toBe(
-        'usage:sub-1:123'
-      );
+      expect(
+        (reducible(result).payload as NormalizedInvoicePayload).usageChargeKey
+      ).toBe('usage:sub-1:123');
     });
 
     it('leaves the usage charge key null on ordinary subscription transactions', async () => {
@@ -249,11 +262,11 @@ describe('PaddleProvider', () => {
       });
 
       expect(
-        (result!.payload as NormalizedInvoicePayload).usageChargeKey
+        (reducible(result).payload as NormalizedInvoicePayload).usageChargeKey
       ).toBeNull();
     });
 
-    it('drops a completed payment-method-change transaction (no invoice to reduce)', async () => {
+    it('ignores a completed payment-method-change transaction (no invoice to reduce)', async () => {
       const { provider, client } = await build({});
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_pmc_1',
@@ -269,10 +282,10 @@ describe('PaddleProvider', () => {
         'paddle-signature': 'sig'
       });
 
-      expect(result).toBeNull();
+      expect(result).toBe(WEBHOOK_IGNORED);
     });
 
-    it('drops a failed payment-method-change transaction (no dunning signal)', async () => {
+    it('ignores a failed payment-method-change transaction (no dunning signal)', async () => {
       const { provider, client } = await build({});
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_pmc_2',
@@ -287,7 +300,7 @@ describe('PaddleProvider', () => {
         'paddle-signature': 'sig'
       });
 
-      expect(result).toBeNull();
+      expect(result).toBe(WEBHOOK_IGNORED);
     });
 
     it('maps a one-time purchase transaction to invoice.paid with kind + product id', async () => {
@@ -312,7 +325,9 @@ describe('PaddleProvider', () => {
       });
 
       expect(result).toMatchObject({ type: 'invoice.paid' });
-      expect(result!.payload as NormalizedInvoicePayload).toMatchObject({
+      expect(
+        reducible(result).payload as NormalizedInvoicePayload
+      ).toMatchObject({
         kind: 'one_time',
         productId: 'prod-1',
         providerSubscriptionId: null,
@@ -320,7 +335,7 @@ describe('PaddleProvider', () => {
       });
     });
 
-    it('drops a failed one-time purchase transaction (nothing pending to fail)', async () => {
+    it('ignores a failed one-time purchase transaction (nothing pending to fail)', async () => {
       const { provider, client } = await build({});
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_ot_2',
@@ -341,7 +356,7 @@ describe('PaddleProvider', () => {
         'paddle-signature': 'sig'
       });
 
-      expect(result).toBeNull();
+      expect(result).toBe(WEBHOOK_IGNORED);
     });
 
     it('maps transaction.payment_failed to payment.failed', async () => {
@@ -362,7 +377,7 @@ describe('PaddleProvider', () => {
       });
     });
 
-    it('returns null for an event type it does not reduce', async () => {
+    it('ignores an event type it does not reduce (HMAC already passed)', async () => {
       const { provider, client } = await build({});
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_4',
@@ -374,7 +389,7 @@ describe('PaddleProvider', () => {
         'paddle-signature': 'sig'
       });
 
-      expect(result).toBeNull();
+      expect(result).toBe(WEBHOOK_IGNORED);
     });
   });
 

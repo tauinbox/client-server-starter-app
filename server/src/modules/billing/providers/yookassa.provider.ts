@@ -22,20 +22,21 @@ import type { Customer } from '../entities/customer.entity';
 import { PaymentMethod } from '../entities/payment-method.entity';
 import type { Plan } from '../entities/plan.entity';
 import { YOOKASSA_CLIENT } from './yookassa.client';
+import { WEBHOOK_IGNORED } from './payment-provider.interface';
 import type {
   CancelMode,
   ChargeResult,
   CheckoutSession,
   CheckoutUrls,
   NormalizedCustomerRef,
-  NormalizedEvent,
   NormalizedInvoicePayload,
   NormalizedPaymentFailedPayload,
   NormalizedPaymentMethodPayload,
   OneTimePaymentParams,
   OneTimePaymentSession,
   PaymentProvider,
-  ReceiptItem
+  ReceiptItem,
+  WebhookVerificationResult
 } from './payment-provider.interface';
 
 /**
@@ -534,7 +535,7 @@ export class YooKassaProvider implements PaymentProvider {
 
   async verifyAndParseWebhook(
     rawBody: Buffer
-  ): Promise<NormalizedEvent | null> {
+  ): Promise<WebhookVerificationResult> {
     if (!this.yoo) {
       return null;
     }
@@ -555,8 +556,9 @@ export class YooKassaProvider implements PaymentProvider {
     }
 
     // Re-fetch the payment by id — the notification body is not trusted (no
-    // signature), the API object is authoritative. Refund/other events carry no
-    // state we reduce here, so they are ignored.
+    // signature), the API object is authoritative. An event outside the payment
+    // pair is rejected rather than acked: nothing has been re-fetched yet, so
+    // the delivery's authenticity is unproven and `null` is the honest answer.
     if (event !== 'payment.succeeded' && event !== 'payment.canceled') {
       return null;
     }
@@ -638,7 +640,7 @@ export class YooKassaProvider implements PaymentProvider {
         isMethodUpdate(payment.metadata) ||
         oneTimeFromMetadata(payment.metadata)
       ) {
-        return null;
+        return WEBHOOK_IGNORED;
       }
       // An off-session charge canceled at capture (accepted as `pending`, then
       // declined) must fail the pending invoice the core recorded. For a
@@ -652,8 +654,9 @@ export class YooKassaProvider implements PaymentProvider {
       return { ...base, type: 'payment.failed', payload };
     }
 
-    // `pending`/`waiting_for_capture` are not terminal — wait for the next event.
-    return null;
+    // `pending`/`waiting_for_capture` are not terminal — the payment was
+    // re-fetched, so the delivery is authentic: ack it and wait for the next.
+    return WEBHOOK_IGNORED;
   }
 
   /**

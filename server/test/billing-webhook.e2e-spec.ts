@@ -27,10 +27,14 @@ import { Subscription } from '../src/modules/billing/entities/subscription.entit
 import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { Money } from '@app/shared/utils/money';
-import { BILLING_PROVIDERS } from '../src/modules/billing/providers/payment-provider.interface';
+import {
+  BILLING_PROVIDERS,
+  WEBHOOK_IGNORED
+} from '../src/modules/billing/providers/payment-provider.interface';
 import type {
   NormalizedEvent,
-  PaymentProvider
+  PaymentProvider,
+  WebhookVerificationResult
 } from '../src/modules/billing/providers/payment-provider.interface';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
 import { WebhookIngestionService } from '../src/modules/billing/webhooks/webhook-ingestion.service';
@@ -246,7 +250,7 @@ function makeStubProvider(): PaymentProvider {
     refund: jest.fn(),
     verifyAndParseWebhook: (rawBody: Buffer) => {
       const parsed = JSON.parse(rawBody.toString('utf8')) as {
-        event: NormalizedEvent | null;
+        event: WebhookVerificationResult;
       };
       return Promise.resolve(parsed.event);
     }
@@ -483,6 +487,20 @@ describe('Billing Paddle webhook (e2e)', () => {
       .expect(400);
 
     expect(stores.subscriptions).toHaveLength(0);
+  });
+
+  it('acks an authentic webhook that carries nothing to reduce', async () => {
+    await request(server)
+      .post('/api/v1/billing/webhooks/paddle')
+      .set('paddle-signature', 'sig')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ event: WEBHOOK_IGNORED }))
+      .expect(200)
+      .expect({ received: true });
+
+    expect(stores.webhookEvents).toHaveLength(0);
+    expect(stores.subscriptions).toHaveLength(0);
+    expect(emit).not.toHaveBeenCalled();
   });
 
   // ── One-time purchases ──────────────────────────────────────────────────────

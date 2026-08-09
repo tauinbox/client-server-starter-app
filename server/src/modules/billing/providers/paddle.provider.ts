@@ -18,6 +18,7 @@ import { Money } from '@app/shared/utils/money';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
 import { PADDLE_CLIENT } from './paddle.client';
+import { WEBHOOK_IGNORED } from './payment-provider.interface';
 import type {
   CancelMode,
   ChangePreview,
@@ -31,7 +32,9 @@ import type {
   NormalizedSubscriptionPayload,
   OneTimePaymentParams,
   OneTimePaymentSession,
-  PaymentProvider
+  PaymentProvider,
+  WebhookIgnored,
+  WebhookVerificationResult
 } from './payment-provider.interface';
 
 /**
@@ -459,7 +462,7 @@ export class PaddleProvider implements PaymentProvider {
   async verifyAndParseWebhook(
     rawBody: Buffer,
     headers: Record<string, string | string[] | undefined>
-  ): Promise<NormalizedEvent | null> {
+  ): Promise<WebhookVerificationResult> {
     if (!this.paddle || !this.webhookSecret) {
       return null;
     }
@@ -483,12 +486,17 @@ export class PaddleProvider implements PaymentProvider {
     }
   }
 
-  /** Maps a verified Paddle event onto a provider-agnostic `NormalizedEvent`. */
+  /**
+   * Maps a verified Paddle event onto a provider-agnostic `NormalizedEvent`.
+   * The HMAC already passed at this point, so a delivery this method does not
+   * map is authentic-but-empty (`WEBHOOK_IGNORED`), never a verification
+   * failure.
+   */
   private normalize(event: {
     eventId: string;
     eventType: string;
     data: object;
-  }): NormalizedEvent | null {
+  }): NormalizedEvent | WebhookIgnored {
     const base = { provider: this.id, providerEventId: event.eventId };
 
     switch (event.eventType as EventName) {
@@ -530,7 +538,7 @@ export class PaddleProvider implements PaymentProvider {
         // A payment-method-change transaction is zero-amount — no money moved,
         // nothing to reduce onto an Invoice (Paddle holds the new method).
         if (txn.origin === 'subscription_payment_method_change') {
-          return null;
+          return WEBHOOK_IGNORED;
         }
         return {
           ...base,
@@ -548,7 +556,7 @@ export class PaddleProvider implements PaymentProvider {
           txn.origin === 'subscription_payment_method_change' ||
           oneTimeFromCustomData(txn.customData)
         ) {
-          return null;
+          return WEBHOOK_IGNORED;
         }
         const payload: NormalizedPaymentFailedPayload = {
           ref: refFromCustomData(txn.customData),
@@ -558,8 +566,8 @@ export class PaddleProvider implements PaymentProvider {
         return { ...base, type: 'payment.failed', payload };
       }
       default:
-        // An event type we don't reduce — ignore it (no idempotency row).
-        return null;
+        // An event type we don't reduce — ack it (no idempotency row).
+        return WEBHOOK_IGNORED;
     }
   }
 

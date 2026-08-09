@@ -25,7 +25,10 @@ import { CreditService } from '../src/modules/billing/services/credit.service';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { YooKassaProvider } from '../src/modules/billing/providers/yookassa.provider';
 import { YOOKASSA_CLIENT } from '../src/modules/billing/providers/yookassa.client';
-import { BILLING_PROVIDERS } from '../src/modules/billing/providers/payment-provider.interface';
+import {
+  BILLING_PROVIDERS,
+  WEBHOOK_IGNORED
+} from '../src/modules/billing/providers/payment-provider.interface';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
 
 const NOW = new Date('2026-06-08T00:00:00Z');
@@ -321,7 +324,10 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
         JSON.stringify({ event: 'payment.succeeded', object: { id: 'pay-1' } })
       )
     );
-    await reducer.reduce(event!);
+    if (event === null || event === WEBHOOK_IGNORED) {
+      throw new Error(`Expected a reducible event, got ${String(event)}`);
+    }
+    await reducer.reduce(event);
 
     // The webhook reconciled onto the scheduler's invoice: no duplicate row, no
     // second default card, and no spurious activation on a renewal.
