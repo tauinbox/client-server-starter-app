@@ -9,6 +9,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConflictException } from '@nestjs/common';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { Money } from '@app/shared/utils/money';
 import { postgresConfig } from '../src/postgres.config';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
@@ -106,7 +107,8 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   }
 
   async function seedSubscription(
-    provider: 'yookassa' | 'paddle'
+    provider: 'yookassa' | 'paddle',
+    planKey = 'race-pro'
   ): Promise<Subscription> {
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const user = await ds.getRepository(User).save(
@@ -135,7 +137,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     return ds.getRepository(Subscription).save(
       ds.getRepository(Subscription).create({
         customerId: customer.id,
-        planKey: 'race-pro',
+        planKey,
         provider,
         billingMode: 'fixed',
         status: 'active',
@@ -237,16 +239,49 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
 
   async function setup(
     providerId: 'yookassa' | 'paddle',
-    duringCall: ConcurrentWrite | null
-  ): Promise<{ subscription: Subscription; user: string }> {
+    duringCall: ConcurrentWrite | null,
+    planKey = 'race-pro'
+  ): Promise<{
+    subscription: Subscription;
+    user: string;
+    provider: ReturnType<typeof providerStub>;
+  }> {
     await seedPlan('race-pro', 99000);
     await seedPlan('race-business', 290000);
-    const subscription = await seedSubscription(providerId);
-    service = await buildService(
-      providerStub(providerId, subscription.id, duringCall)
-    );
+    const subscription = await seedSubscription(providerId, planKey);
+    const provider = providerStub(providerId, subscription.id, duringCall);
+    service = await buildService(provider);
     await warmPool();
-    return { subscription, user: userId as string };
+    return { subscription, user: userId as string, provider };
+  }
+
+  /** The paid fixed invoice a downgrade's proration refund targets. */
+  async function seedSourceInvoice(
+    subscription: Subscription,
+    amountMinor: number
+  ): Promise<Invoice> {
+    const repo = ds.getRepository(Invoice);
+    return repo.save(
+      repo.create({
+        customerId: subscription.customerId,
+        subscriptionId: subscription.id,
+        provider: subscription.provider,
+        providerEventId: `source-${subscription.id}`,
+        providerInvoiceRef: `pay_source_${subscription.id}`,
+        amountMinor: Money.fromMinor(amountMinor),
+        refundedMinor: Money.fromMinor(0),
+        currency: 'RUB',
+        status: 'paid',
+        creditUnitsApplied: 0,
+        billingMode: 'fixed',
+        kind: 'subscription',
+        productId: null,
+        periodStart,
+        periodEnd,
+        paidAt: periodStart,
+        receiptRef: null
+      })
+    );
   }
 
   function reload(id: string): Promise<Subscription | null> {
@@ -340,6 +375,39 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
       cancelAtPeriodEnd: false,
       status: 'active'
     });
+  }, 30000);
+
+  it('prices the proration refund against a refund committed during the provider call', async () => {
+    const { subscription, user, provider } = await setup(
+      'yookassa',
+      // An admin refund of the same source invoice, reserved the way
+      // BillingAdminService reserves it, lands mid-flight. The charge invoice
+      // does not exist yet, so this only touches the refund source.
+      (subscriptionId) =>
+        ds
+          .getRepository(Invoice)
+          .update(
+            { subscriptionId },
+            { refundedMinor: Money.fromMinor(80000) }
+          ),
+      'race-business'
+    );
+    const source = await seedSourceInvoice(subscription, 99000);
+
+    await service.changePlan(user, 'race-pro');
+
+    // Only 19000 of the source is still refundable once the concurrent leg is
+    // accounted for; pricing against the pre-call read refunded the whole
+    // 99000 on top of it.
+    expect(provider.refund).toHaveBeenCalledWith(
+      source.providerInvoiceRef,
+      19000,
+      expect.any(String)
+    );
+    const row = await ds
+      .getRepository(Invoice)
+      .findOneOrFail({ where: { id: source.id } });
+    expect(row.refundedMinor.toNumber()).toBe(99000);
   }, 30000);
 
   it('keeps a cancellation committed while the provider-managed change was in flight', async () => {
