@@ -35,7 +35,11 @@ import { BillingAdminService } from '../src/modules/billing/services/billing-adm
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
 import { WebhookIngestionService } from '../src/modules/billing/webhooks/webhook-ingestion.service';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
-import { UsagePeriodClosedEvent } from '../src/modules/billing/events/billing.events';
+import {
+  PaymentFailedEvent,
+  SubscriptionCanceledEvent,
+  UsagePeriodClosedEvent
+} from '../src/modules/billing/events/billing.events';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -307,6 +311,16 @@ runWithInfra('billing write paths (e2e)', () => {
       ]
     }).compile();
     return module.get(type);
+  }
+
+  /** A renewal service whose emitted events the caller can count. */
+  function buildWithEmitter(emit: jest.Mock): Promise<RenewalService> {
+    return build(RenewalService, [
+      {
+        provide: EventEmitter2,
+        useValue: { emit, emitAsync: jest.fn(() => Promise.resolve([])) }
+      }
+    ]);
   }
 
   function buildAdmin(): Promise<BillingAdminService> {
@@ -693,6 +707,67 @@ runWithInfra('billing write paths (e2e)', () => {
       expect(sub.status).toBe('past_due');
       expect(sub.dunningAttempts).toBe(1);
       expect(sub.nextRenewalAttemptAt).not.toBeNull();
+    }, 60000);
+
+    it('walks one dunning rung when two scans race the same decline', async () => {
+      await resetSubscription(FIXED_PLAN);
+      // Both scans load the row before either writes; the winner's guarded
+      // UPDATE must leave the loser's WHERE with nothing to match in Postgres.
+      let arrived = 0;
+      let openGate: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        openGate = resolve;
+      });
+      const decline = () => {
+        if (++arrived === 2) openGate();
+        return gate.then<never>(() =>
+          Promise.reject(new Error('card declined'))
+        );
+      };
+      provider.chargeOffSession
+        .mockImplementationOnce(decline)
+        .mockImplementationOnce(decline);
+      const emit = jest.fn();
+      const renewals = await buildWithEmitter(emit);
+
+      const now = new Date();
+      await Promise.all([
+        renewals.runDueRenewals(now),
+        renewals.runDueRenewals(now)
+      ]);
+
+      expect(arrived).toBe(2);
+      const sub = await ds
+        .getRepository(Subscription)
+        .findOneOrFail({ where: { id: subscriptionId } });
+      expect(sub.status).toBe('past_due');
+      expect(sub.dunningAttempts).toBe(1);
+      expect(
+        emit.mock.calls.filter(
+          (call: unknown[]) => call[0] === PaymentFailedEvent.name
+        )
+      ).toHaveLength(1);
+    }, 60000);
+
+    it('cancels at the period boundary through a guarded update', async () => {
+      await resetSubscription(FIXED_PLAN, { cancelAtPeriodEnd: true });
+      const charges = provider.chargeOffSession.mock.calls.length;
+      const emit = jest.fn();
+      const renewals = await buildWithEmitter(emit);
+
+      await renewals.runDueRenewals(new Date());
+
+      const sub = await ds
+        .getRepository(Subscription)
+        .findOneOrFail({ where: { id: subscriptionId } });
+      expect(sub.status).toBe('canceled');
+      expect(sub.nextRenewalAttemptAt).toBeNull();
+      expect(provider.chargeOffSession.mock.calls).toHaveLength(charges);
+      expect(
+        emit.mock.calls.filter(
+          (call: unknown[]) => call[0] === SubscriptionCanceledEvent.name
+        )
+      ).toHaveLength(1);
     }, 60000);
   });
 });

@@ -100,6 +100,53 @@ function makePlan(): Plan {
   });
 }
 
+/**
+ * Each read hands back its own entity, as a real repository does: two scans
+ * loading the same row must not share one object, or a write by the first
+ * would silently update what the second believes it read.
+ */
+function readSubscription(store: Store, id: unknown): Subscription | null {
+  const row = store.subscriptions.find((s) => s.id === id);
+  return row ? Object.assign(new Subscription(), row) : null;
+}
+
+/** A `status: In([...])` criterion arrives as a FindOperator; unwrap it. */
+function criterionStatuses(criterion: unknown): string[] | null {
+  if (criterion === undefined) return null;
+  if (typeof criterion === 'string') return [criterion];
+  return (criterion as { value: string[] }).value ?? [];
+}
+
+function matchesSubscription(
+  s: Subscription,
+  criteria: Record<string, unknown>
+): boolean {
+  const statuses = criterionStatuses(criteria['status']);
+  return (
+    s.id === criteria['id'] &&
+    (criteria['currentPeriodEnd'] === undefined ||
+      s.currentPeriodEnd.getTime() ===
+        (criteria['currentPeriodEnd'] as Date).getTime()) &&
+    (criteria['dunningAttempts'] === undefined ||
+      s.dunningAttempts === criteria['dunningAttempts']) &&
+    (criteria['cancelAtPeriodEnd'] === undefined ||
+      s.cancelAtPeriodEnd === criteria['cancelAtPeriodEnd']) &&
+    (statuses === null || statuses.includes(s.status))
+  );
+}
+
+function updateSubscriptions(
+  store: Store,
+  criteria: Record<string, unknown>,
+  values: Record<string, unknown>
+): Promise<{ affected: number }> {
+  const match = store.subscriptions.find((s) =>
+    matchesSubscription(s, criteria)
+  );
+  if (match) Object.assign(match, values);
+  return Promise.resolve({ affected: match ? 1 : 0 });
+}
+
 function makeManager(store: Store) {
   let seq = 0;
   return {
@@ -108,9 +155,7 @@ function makeManager(store: Store) {
       opts: { where: { id?: string; providerEventId?: string } }
     ) => {
       if (entity === Subscription) {
-        return Promise.resolve(
-          store.subscriptions.find((s) => s.id === opts.where.id) ?? null
-        );
+        return Promise.resolve(readSubscription(store, opts.where.id));
       }
       if (entity === Invoice) {
         return Promise.resolve(
@@ -124,31 +169,19 @@ function makeManager(store: Store) {
       }
       return Promise.resolve(null);
     },
-    save: (entity: Subscription) => Promise.resolve(entity),
+    save: (entity: Subscription) => {
+      const row = store.subscriptions.find((s) => s.id === entity.id);
+      if (row) Object.assign(row, entity);
+      return Promise.resolve(entity);
+    },
     update: (
       entity: unknown,
       criteria: Record<string, unknown>,
       values: Record<string, unknown>
     ) => {
-      // A `status: In([...])` criterion arrives as a FindOperator; unwrap it.
-      const statusCriterion = criteria['status'];
-      const statuses =
-        statusCriterion === undefined
-          ? null
-          : typeof statusCriterion === 'string'
-            ? [statusCriterion]
-            : ((statusCriterion as { value: string[] }).value ?? []);
+      const statuses = criterionStatuses(criteria['status']);
       if (entity === Subscription) {
-        const match = store.subscriptions.find(
-          (s) =>
-            s.id === criteria['id'] &&
-            (criteria['currentPeriodEnd'] === undefined ||
-              s.currentPeriodEnd.getTime() ===
-                (criteria['currentPeriodEnd'] as Date).getTime()) &&
-            (statuses === null || statuses.includes(s.status))
-        );
-        if (match) Object.assign(match, values);
-        return Promise.resolve({ affected: match ? 1 : 0 });
+        return updateSubscriptions(store, criteria, values);
       }
       if (entity === Invoice) {
         const matches = store.invoices.filter(
@@ -198,10 +231,16 @@ function makeManager(store: Store) {
 function subscriptionsRepo(store: Store) {
   return {
     findOne: (opts: { where: { id: string } }) =>
-      Promise.resolve(
-        store.subscriptions.find((s) => s.id === opts.where.id) ?? null
-      ),
-    save: (entity: Subscription) => Promise.resolve(entity),
+      Promise.resolve(readSubscription(store, opts.where.id)),
+    save: (entity: Subscription) => {
+      const row = store.subscriptions.find((s) => s.id === entity.id);
+      if (row) Object.assign(row, entity);
+      return Promise.resolve(entity);
+    },
+    update: (
+      criteria: Record<string, unknown>,
+      values: Record<string, unknown>
+    ) => updateSubscriptions(store, criteria, values),
     createQueryBuilder: () => {
       const qb = {
         innerJoin: (_entity: unknown, _alias: string, condition: string) => {
@@ -662,6 +701,41 @@ describe('RenewalService', () => {
     );
   });
 
+  it('advances the dunning ladder one rung when two scans react to one decline', async () => {
+    const sub = makeSub();
+    const store = baseStore(sub);
+    // Both scans read the row before either writes: the barrier holds the
+    // first decline until the second scan has also reached the provider.
+    let arrived = 0;
+    let openGate: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      openGate = resolve;
+    });
+    const charge = jest.fn(() => {
+      if (++arrived === 2) openGate();
+      return gate.then<never>(() => Promise.reject(new Error('declined')));
+    });
+    const { service, emit } = await build(store, charge);
+
+    const first = service.runDueRenewals(NOW);
+    const second = service.runDueRenewals(NOW);
+    await Promise.all([first, second]);
+
+    expect(charge).toHaveBeenCalledTimes(2);
+    expect(sub.status).toBe('past_due');
+    expect(sub.dunningAttempts).toBe(1);
+    expect(
+      emit.mock.calls.filter(
+        (call: unknown[]) => call[0] === PaymentFailedEvent.name
+      )
+    ).toHaveLength(1);
+    expect(
+      emit.mock.calls.filter(
+        (call: unknown[]) => call[0] === SubscriptionPastDueEvent.name
+      )
+    ).toHaveLength(1);
+  });
+
   it('cancels at the period boundary instead of charging when cancel_at_period_end', async () => {
     const sub = makeSub({ cancelAtPeriodEnd: true });
     const store = baseStore(sub);
@@ -676,6 +750,28 @@ describe('RenewalService', () => {
       SubscriptionCanceledEvent.name,
       expect.objectContaining({ userId: 'user-1' })
     );
+  });
+
+  it('cancels once at the boundary when two scans reach it together', async () => {
+    const sub = makeSub({ cancelAtPeriodEnd: true });
+    const store = baseStore(sub);
+    const charge = jest.fn();
+    const { service, emit } = await build(store, charge);
+
+    // Both scans load the still-active row, so only the guarded write may
+    // cancel it; the loser must not re-cancel or notify a second time.
+    await Promise.all([
+      service.runDueRenewals(NOW),
+      service.runDueRenewals(NOW)
+    ]);
+
+    expect(charge).not.toHaveBeenCalled();
+    expect(sub.status).toBe('canceled');
+    expect(
+      emit.mock.calls.filter(
+        (call: unknown[]) => call[0] === SubscriptionCanceledEvent.name
+      )
+    ).toHaveLength(1);
   });
 
   describe('usage-mode subscriptions (postpaid period close)', () => {

@@ -630,37 +630,41 @@ export class RenewalService {
     userId: string,
     now: Date
   ): Promise<void> {
-    const result = await withTransaction(this.dataSource, async (manager) => {
-      const fresh = await manager.findOne(Subscription, {
-        where: { id: subscription.id }
-      });
-      if (!fresh) return null;
+    const attempts = subscription.dunningAttempts + 1;
+    const exhausted = attempts >= DUNNING_MAX_ATTEMPTS;
 
-      const attempts = fresh.dunningAttempts + 1;
-      fresh.dunningAttempts = attempts;
+    // CAS on the rung this scan claimed at its start, never on a re-read one:
+    // two scans racing one decline charge under the same idempotency key, so
+    // a re-read would let the second consume a second rung of a three-rung
+    // ladder, cancelling a paying customer early and notifying them twice.
+    const applied = await this.subscriptions.update(
+      {
+        id: subscription.id,
+        dunningAttempts: subscription.dunningAttempts,
+        status: In([...CHARGEABLE_STATUSES])
+      },
+      exhausted
+        ? {
+            dunningAttempts: attempts,
+            status: 'canceled',
+            cancelAtPeriodEnd: false,
+            nextRenewalAttemptAt: null
+          }
+        : {
+            dunningAttempts: attempts,
+            status: 'past_due',
+            nextRenewalAttemptAt: new Date(
+              now.getTime() + DUNNING_RETRY_DELAY_MS
+            )
+          }
+    );
+    if (applied.affected !== 1) return;
 
-      if (attempts >= DUNNING_MAX_ATTEMPTS) {
-        fresh.status = 'canceled';
-        fresh.cancelAtPeriodEnd = false;
-        fresh.nextRenewalAttemptAt = null;
-        await manager.save(fresh);
-        return { canceled: true };
-      }
-
-      fresh.status = 'past_due';
-      fresh.nextRenewalAttemptAt = new Date(
-        now.getTime() + DUNNING_RETRY_DELAY_MS
-      );
-      await manager.save(fresh);
-      return { canceled: false };
-    });
-
-    if (!result) return;
     this.events.emit(
       PaymentFailedEvent.name,
       new PaymentFailedEvent(userId, subscription.id)
     );
-    if (result.canceled) {
+    if (exhausted) {
       this.events.emit(
         SubscriptionCanceledEvent.name,
         new SubscriptionCanceledEvent(userId, subscription.id)
@@ -677,9 +681,20 @@ export class RenewalService {
     subscription: Subscription,
     userId: string
   ): Promise<void> {
-    subscription.status = 'canceled';
-    subscription.nextRenewalAttemptAt = null;
-    await this.subscriptions.save(subscription);
+    // Guarded on the state that justified the cancel: saving the whole entity
+    // loaded at scan start would re-cancel an already-canceled row, emit a
+    // second event, and write back columns another writer moved in between,
+    // including the version token the self-service plan change swaps on.
+    const applied = await this.subscriptions.update(
+      {
+        id: subscription.id,
+        status: In([...CHARGEABLE_STATUSES]),
+        cancelAtPeriodEnd: true
+      },
+      { status: 'canceled', nextRenewalAttemptAt: null }
+    );
+    if (applied.affected !== 1) return;
+
     this.events.emit(
       SubscriptionCanceledEvent.name,
       new SubscriptionCanceledEvent(userId, subscription.id)
