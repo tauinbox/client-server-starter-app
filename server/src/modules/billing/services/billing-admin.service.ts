@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -33,6 +34,8 @@ const ZERO = Money.fromMinor(0);
  */
 @Injectable()
 export class BillingAdminService {
+  private readonly logger = new Logger(BillingAdminService.name);
+
   constructor(
     @InjectRepository(Subscription)
     private readonly subscriptions: Repository<Subscription>,
@@ -125,11 +128,26 @@ export class BillingAdminService {
     return saved;
   }
 
+  /**
+   * Refunds a leg of an invoice through its provider, in three steps: reserve,
+   * call, settle.
+   *
+   * The row lock cannot be held across the provider call - an HTTP round-trip
+   * inside an open transaction pins a pool connection for its whole duration -
+   * so the leg first commits its amount onto `refundedMinor`. That reservation
+   * is what makes concurrency safe: a second leg prices against the reserved
+   * total and fails its own remaining-amount check before any funds move.
+   * Reserving amounts that never move is the deliberate failure direction; the
+   * compensating release gives them back.
+   *
+   * Known gap, left as an operator task rather than papered over: a crash
+   * between a successful provider call and the settling transaction leaves the
+   * invoice `paid` with `refunded_minor` at the full amount, so the grant
+   * revoke never runs and a retry is refused (nothing left to refund). That
+   * pair of values is the signature to reconcile on.
+   */
   async refundInvoice(id: string, amountMinor?: number): Promise<Invoice> {
-    // Price the leg under a short row lock, released before the provider leg:
-    // a provider HTTP call held inside an open transaction pins a pool
-    // connection for the whole round-trip.
-    const { alreadyRefunded, refundAmount, cumulativeRefunded, providerRef } =
+    const { refundAmount, cumulativeRefunded, providerRef } =
       await withTransaction(this.dataSource, async (manager) => {
         const invoice = await manager.findOne(Invoice, {
           where: { id },
@@ -142,8 +160,7 @@ export class BillingAdminService {
           throw new ConflictException('Only paid invoices can be refunded');
         }
 
-        const alreadyRefunded = invoice.refundedMinor;
-        const remaining = invoice.amountMinor.sub(alreadyRefunded);
+        const remaining = invoice.amountMinor.sub(invoice.refundedMinor);
         const refundAmount =
           amountMinor != null ? Money.fromMinor(amountMinor) : remaining;
         if (
@@ -155,10 +172,13 @@ export class BillingAdminService {
           );
         }
 
+        const cumulativeRefunded = invoice.refundedMinor.add(refundAmount);
+        invoice.refundedMinor = cumulativeRefunded;
+        await manager.save(Invoice, invoice);
+
         return {
-          alreadyRefunded,
           refundAmount,
-          cumulativeRefunded: alreadyRefunded.add(refundAmount),
+          cumulativeRefunded,
           providerRef: {
             provider: invoice.provider,
             invoiceRef: invoice.providerInvoiceRef
@@ -168,17 +188,21 @@ export class BillingAdminService {
 
     const provider = this.billing.getProviderById(providerRef.provider);
     if (provider) {
-      // Keying on the cumulative-after total makes a post-crash retry reuse
-      // the same key and dedup at the provider.
-      await provider.refund(
-        providerRef.invoiceRef,
-        refundAmount.toNumber(),
-        `refund-${id}-${cumulativeRefunded.toMinorString()}`
-      );
+      try {
+        // Keying on the cumulative-after total makes a post-crash retry reuse
+        // the same key and dedup at the provider.
+        await provider.refund(
+          providerRef.invoiceRef,
+          refundAmount.toNumber(),
+          `refund-${id}-${cumulativeRefunded.toMinorString()}`
+        );
+      } catch (error) {
+        await this.releaseReservation(id, refundAmount);
+        throw error;
+      }
     }
 
-    // Re-lock and reconcile against whatever landed while the lock was
-    // released.
+    // The money side is already recorded, so settling is only the status flip.
     const { saved, invalidateUserId } = await withTransaction(
       this.dataSource,
       async (manager) => {
@@ -190,33 +214,22 @@ export class BillingAdminService {
           throw new NotFoundException('Invoice not found');
         }
 
-        // A concurrent leg from the same base with the same amount shared our
-        // idempotency key, so the provider collapsed both calls into one money
-        // move already recorded by that leg - recording ours would double it.
-        const interleaved = invoice.refundedMinor.sub(alreadyRefunded);
-        if (interleaved.compare(refundAmount) === 0) {
+        // The one-way `paid -> refunded` flip keeps grant revoke / credit
+        // clawback exactly-once. Gating it on this leg's own cumulative rather
+        // than on the row keeps a concurrent leg's still-in-flight reservation
+        // from revoking access for money that may never move.
+        if (
+          cumulativeRefunded.compare(invoice.amountMinor) < 0 ||
+          invoice.status !== 'paid'
+        ) {
           return { saved: invoice, invalidateUserId: null };
         }
-
-        const newCumulative = invoice.refundedMinor.add(refundAmount);
-        if (newCumulative.compare(invoice.amountMinor) > 0) {
-          throw new ConflictException(
-            'Concurrent refunds exceeded the invoice total; reconcile against the provider'
-          );
-        }
-        invoice.refundedMinor = newCumulative;
-
-        // The one-way `paid -> refunded` flip keeps grant revoke / credit
-        // clawback exactly-once across multiple partial legs.
-        let invalidateUserId: string | null = null;
-        if (
-          newCumulative.compare(invoice.amountMinor) >= 0 &&
-          invoice.status === 'paid'
-        ) {
-          invoice.status = 'refunded';
-          invalidateUserId = await this.revokeOneTimeGrants(manager, invoice);
-          await this.clawbackCreditPurchase(manager, invoice);
-        }
+        invoice.status = 'refunded';
+        const invalidateUserId = await this.revokeOneTimeGrants(
+          manager,
+          invoice
+        );
+        await this.clawbackCreditPurchase(manager, invoice);
         const saved = await manager.save(Invoice, invoice);
         return { saved, invalidateUserId };
       }
@@ -227,6 +240,46 @@ export class BillingAdminService {
       await this.entitlements.invalidateUser(invalidateUserId);
     }
     return saved;
+  }
+
+  /**
+   * Gives back a reservation whose provider call failed. `refundedMinor` is
+   * only ever moved by a reservation (up) or this release (down), so
+   * subtracting this leg's own amount under the lock cannot disturb a
+   * concurrent one. A refund that reached the provider despite the error is not
+   * lost: the retry prices from the released total, so it recomputes the same
+   * idempotency key and the providers' key scans collapse it into the original
+   * money move. A release that itself fails leaves the reservation standing -
+   * the invoice then shows more refunded than was paid out until an operator
+   * reconciles it, which is the safe direction to fail in.
+   */
+  private async releaseReservation(
+    id: string,
+    refundAmount: Money
+  ): Promise<void> {
+    try {
+      await withTransaction(this.dataSource, async (manager) => {
+        const invoice = await manager.findOne(Invoice, {
+          where: { id },
+          lock: { mode: 'pessimistic_write' }
+        });
+        if (!invoice) {
+          return;
+        }
+        const released = invoice.refundedMinor.sub(refundAmount);
+        invoice.refundedMinor = released.compare(ZERO) < 0 ? ZERO : released;
+        await manager.save(Invoice, invoice);
+        if (invoice.status === 'refunded') {
+          this.logger.error(
+            `Invoice ${id} is marked refunded but a leg of ${refundAmount.toMinorString()} was released; reconcile against the provider`
+          );
+        }
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to release refund reservation of ${refundAmount.toMinorString()} on invoice ${id}: ${(error as Error).message}`
+      );
+    }
   }
 
   /**

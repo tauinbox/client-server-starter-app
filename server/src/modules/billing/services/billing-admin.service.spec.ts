@@ -335,7 +335,24 @@ describe('BillingAdminService', () => {
       expect(seenDuringRefund).toEqual([0]);
     });
 
-    it('records a concurrent same-amount refund once (provider dedups the shared idempotency key)', async () => {
+    it('reserves the leg on the invoice before calling the provider', async () => {
+      const ctx = await build();
+      const invoice = makeInvoice();
+      ctx.invoices.findOne.mockResolvedValue(invoice);
+      const yoo = providerStub('yookassa');
+      const reservedAtCallTime: string[] = [];
+      yoo.refund.mockImplementation(() => {
+        reservedAtCallTime.push(invoice.refundedMinor.toMinorString());
+        return Promise.resolve();
+      });
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await ctx.service.refundInvoice('inv-1', 50000);
+
+      expect(reservedAtCallTime).toEqual(['50000']);
+    });
+
+    it('rejects a concurrent leg against the reserved total before it reaches the provider', async () => {
       const ctx = await build();
       ctx.invoices.findOne.mockResolvedValue(
         makeInvoice({
@@ -352,41 +369,97 @@ describe('BillingAdminService', () => {
       });
       const yoo = providerStub('yookassa');
       let releaseFirst!: () => void;
-      yoo.refund
-        .mockImplementationOnce(
-          () => new Promise<void>((resolve) => (releaseFirst = resolve))
-        )
-        .mockResolvedValue(undefined);
+      yoo.refund.mockImplementationOnce(
+        () => new Promise<void>((resolve) => (releaseFirst = resolve))
+      );
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
-      // First refund parks inside the provider call (row lock released);
-      // a second full refund of the same invoice runs to completion meanwhile.
+      // The first refund parks inside the provider call, so the row lock is
+      // released while its money is in flight - the window a second leg used to
+      // price itself from a base that no longer reflected reality.
       const firstPromise = ctx.service.refundInvoice('inv-1');
       await new Promise((resolve) => setImmediate(resolve));
-      const second = await ctx.service.refundInvoice('inv-1');
+      await expect(ctx.service.refundInvoice('inv-1', 10000)).rejects.toThrow(
+        BadRequestException
+      );
       releaseFirst();
       const first = await firstPromise;
 
-      // Both legs priced from the same base with the same amount, so they sent
-      // the same idempotency key: the provider deduped them into one money
-      // move, and the first leg must not add it to the books again.
-      expect(yoo.refund).toHaveBeenCalledTimes(2);
-      expect(yoo.refund).toHaveBeenNthCalledWith(
-        1,
+      expect(yoo.refund).toHaveBeenCalledTimes(1);
+      expect(yoo.refund).toHaveBeenCalledWith(
         'pay_1',
         49000,
         'refund-inv-1-49000'
       );
+      expect(first.refundedMinor.toMinorString()).toBe('49000');
+      expect(first.status).toBe('refunded');
+      expect(ctx.credits.clawbackPurchase).toHaveBeenCalledTimes(1);
+    });
+
+    it('releases the reservation when the provider call fails', async () => {
+      const ctx = await build();
+      const invoice = makeInvoice();
+      ctx.invoices.findOne.mockResolvedValue(invoice);
+      const yoo = providerStub('yookassa');
+      yoo.refund.mockRejectedValueOnce(new Error('provider down'));
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await expect(ctx.service.refundInvoice('inv-1', 50000)).rejects.toThrow(
+        'provider down'
+      );
+
+      expect(invoice.refundedMinor.toMinorString()).toBe('0');
+      expect(invoice.status).toBe('paid');
+
+      // The released amount is refundable again, and the retry prices from the
+      // same base, so it reuses the idempotency key of the failed attempt.
+      yoo.refund.mockResolvedValue(undefined);
+      await ctx.service.refundInvoice('inv-1', 50000);
       expect(yoo.refund).toHaveBeenNthCalledWith(
         2,
         'pay_1',
-        49000,
-        'refund-inv-1-49000'
+        50000,
+        'refund-inv-1-50000'
       );
-      expect(second.refundedMinor.toMinorString()).toBe('49000');
-      expect(first.refundedMinor.toMinorString()).toBe('49000');
-      expect(first.status).toBe('refunded');
-      expect(ctx.invoices.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not settle on a concurrent leg reservation whose money is still in flight', async () => {
+      const ctx = await build();
+      ctx.invoices.findOne.mockResolvedValue(
+        makeInvoice({
+          kind: 'one_time',
+          subscriptionId: null,
+          productId: 'prod-cr',
+          amountMinor: Money.fromMinor(49000)
+        })
+      );
+      ctx.products.findOne.mockResolvedValue({
+        id: 'prod-cr',
+        type: 'credits',
+        grant: { credits: 500 }
+      });
+      const yoo = providerStub('yookassa');
+      const releases: (() => void)[] = [];
+      yoo.refund.mockImplementation(
+        () => new Promise<void>((resolve) => releases.push(resolve))
+      );
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      // Two halves are in flight at once, so the row reads as fully refunded
+      // while neither leg has heard back from the provider.
+      const firstPromise = ctx.service.refundInvoice('inv-1', 24500);
+      await new Promise((resolve) => setImmediate(resolve));
+      const secondPromise = ctx.service.refundInvoice('inv-1', 24500);
+      await new Promise((resolve) => setImmediate(resolve));
+
+      releases[0]();
+      const first = await firstPromise;
+      expect(first.status).toBe('paid');
+      expect(ctx.credits.clawbackPurchase).not.toHaveBeenCalled();
+
+      releases[1]();
+      const second = await secondPromise;
+      expect(second.status).toBe('refunded');
       expect(ctx.credits.clawbackPurchase).toHaveBeenCalledTimes(1);
     });
 

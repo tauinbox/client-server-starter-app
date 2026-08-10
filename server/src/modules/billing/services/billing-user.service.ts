@@ -577,14 +577,6 @@ export class BillingUserService {
     const chargeKey = `change-charge:${subscription.id}:${toPlan.key}:${periodEndMs}`;
     const refundKey = `change-refund:${subscription.id}:${toPlan.key}:${periodEndMs}`;
 
-    // Resolve the refund source BEFORE creating the new charge: the proration
-    // refund must target the invoice that paid for the outgoing plan's current
-    // coverage, never the charge we are about to record for the incoming plan.
-    const refund =
-      quote && quote.refundMinor > 0
-        ? await this.resolveRefund(subscription, quote.refundMinor)
-        : null;
-
     // External legs run outside the DB transaction — a provider HTTP call must
     // never be held inside an open transaction. Both keys are stable across
     // retries so a replay reconciles instead of charging/refunding twice.
@@ -604,6 +596,15 @@ export class BillingUserService {
       chargeCaptured = charge.status === 'captured';
     }
 
+    // The reservation is taken here rather than up front: it must land after the
+    // charge (a charge failure aborts the switch and would strand it) and still
+    // before the new charge invoice is inserted below, so the invoice this path
+    // is about to record can never become its own refund source.
+    const refund =
+      quote && quote.refundMinor > 0
+        ? await this.reserveProrationRefund(subscription, quote.refundMinor)
+        : null;
+
     let refundIssued = false;
     if (refund) {
       try {
@@ -614,6 +615,7 @@ export class BillingUserService {
         );
         refundIssued = true;
       } catch (error) {
+        await this.releaseProrationRefund(refund.source.id, refund.minor);
         // A refund failure after a successful charge never reverts the switch —
         // reverting would double-tangle the money; the admin console can re-issue.
         this.logger.error(
@@ -652,17 +654,6 @@ export class BillingUserService {
             status: 'refunded',
             billingMode: 'fixed'
           });
-          // Record the partial refund on the source so an admin refund of the
-          // same invoice can't give the money back a second time.
-          await manager.update(
-            Invoice,
-            { id: refund.source.id },
-            {
-              refundedMinor: refund.source.refundedMinor.add(
-                Money.fromMinor(refund.minor)
-              )
-            }
-          );
         }
         const saved = await this.commitPlanChange(
           manager,
@@ -879,31 +870,74 @@ export class BillingUserService {
   }
 
   /**
-   * Resolves the refund leg of a self-managed switch: the invoice that paid for
-   * the outgoing plan's current coverage and how much of the computed remainder
-   * is actually refundable against it. The amount is capped by what is still
-   * unrefunded on that invoice (no source, or nothing left → no refund, e.g. a
-   * period opened by a zero usage invoice). Resolved before the new charge is
-   * recorded so the charge can't become its own refund source.
+   * Reserves the refund leg of a self-managed switch against the invoice that
+   * paid for the outgoing plan's current coverage, capped by what is still
+   * unrefunded on it (no source, or nothing left → no refund, e.g. a period
+   * opened by a zero usage invoice).
+   *
+   * The cap is applied and committed under the row lock, before the provider
+   * call, so an admin refund of the same invoice either loses the race and
+   * prices against this leg or wins it and shrinks this one. Reading the
+   * remainder and writing it back around an HTTP round-trip would instead
+   * overwrite whatever committed in between, and the erased amount could then
+   * be paid out a second time.
    */
-  private async resolveRefund(
+  private async reserveProrationRefund(
     subscription: Subscription,
     refundMinor: number
   ): Promise<{ source: Invoice; minor: number } | null> {
-    const source = await this.invoices.findOne({
-      where: {
-        subscriptionId: subscription.id,
-        status: 'paid',
-        billingMode: 'fixed'
-      },
-      order: { createdAt: 'DESC' }
-    });
-    if (!source) return null;
+    return withTransaction(this.dataSource, async (manager) => {
+      const source = await manager.findOne(Invoice, {
+        where: {
+          subscriptionId: subscription.id,
+          status: 'paid',
+          billingMode: 'fixed'
+        },
+        order: { createdAt: 'DESC' },
+        lock: { mode: 'pessimistic_write' }
+      });
+      if (!source) return null;
 
-    const refundable = source.amountMinor.sub(source.refundedMinor).toNumber();
-    const minor = Math.min(refundMinor, refundable);
-    if (minor <= 0) return null;
-    return { source, minor };
+      const refundable = source.amountMinor
+        .sub(source.refundedMinor)
+        .toNumber();
+      const minor = Math.min(refundMinor, refundable);
+      if (minor <= 0) return null;
+
+      source.refundedMinor = source.refundedMinor.add(Money.fromMinor(minor));
+      await manager.save(Invoice, source);
+      return { source, minor };
+    });
+  }
+
+  /**
+   * Gives a proration reservation back when its provider call failed. Mirrors
+   * the admin refund's compensating release: the row is only moved by a
+   * reservation or a release, so subtracting this leg cannot disturb another.
+   */
+  private async releaseProrationRefund(
+    sourceId: string,
+    minor: number
+  ): Promise<void> {
+    try {
+      await withTransaction(this.dataSource, async (manager) => {
+        const source = await manager.findOne(Invoice, {
+          where: { id: sourceId },
+          lock: { mode: 'pessimistic_write' }
+        });
+        if (!source) return;
+        const released = source.refundedMinor.sub(Money.fromMinor(minor));
+        source.refundedMinor =
+          released.compare(Money.fromMinor(0)) < 0
+            ? Money.fromMinor(0)
+            : released;
+        await manager.save(Invoice, source);
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to release proration refund reservation of ${minor} minor on invoice ${sourceId}: ${(error as Error).message}`
+      );
+    }
   }
 
   /**

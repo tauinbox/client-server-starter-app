@@ -54,7 +54,7 @@ type InsertedInvoice = Record<string, unknown> & {
 };
 
 /** Transactional manager stub: records invoice inserts, dedups on event id. */
-function makeInsertStore() {
+function makeInsertStore(invoices: RepoMock) {
   const inserted: InsertedInvoice[] = [];
   let seq = 0;
   const manager = {
@@ -62,7 +62,14 @@ function makeInsertStore() {
     save: (_target: unknown, entity: { id?: string }) =>
       Promise.resolve({ id: 'generated-id', ...entity }),
     update: jest.fn().mockResolvedValue({ affected: 1 }),
-    findOne: jest.fn().mockResolvedValue(null),
+    // The proration refund reserves its leg on the source invoice under a row
+    // lock, so that read goes through the transactional manager.
+    findOne: jest.fn(
+      (entity: unknown, options: unknown): Promise<unknown> =>
+        entity === Invoice
+          ? (invoices.findOne(options) as Promise<unknown>)
+          : Promise.resolve(null)
+    ),
     createQueryBuilder: () => {
       const captured: { values?: InsertedInvoice } = {};
       const builder = {
@@ -177,7 +184,7 @@ async function build() {
     )
   };
 
-  const insertStore = makeInsertStore();
+  const insertStore = makeInsertStore(invoices);
   const dataSource = {
     manager: insertStore.manager,
     transaction: jest.fn((cb: (m: unknown) => unknown) =>
