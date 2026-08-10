@@ -11,9 +11,33 @@ import { Temporal } from 'temporal-polyfill';
  * Mirrors the server's `addInterval` (server/src/modules/billing/utils/period.util.ts).
  */
 export function addInterval(from: Date, interval: 'month' | 'year'): Date {
-  const start = Temporal.Instant.fromEpochMilliseconds(
-    from.getTime()
-  ).toZonedDateTimeISO('UTC');
-  const end = start.add(interval === 'year' ? { years: 1 } : { months: 1 });
+  const end = utc(from).add(interval === 'year' ? { years: 1 } : { months: 1 });
   return new Date(end.epochMilliseconds);
+}
+
+/**
+ * The boundary one interval after `from`, restored to the billing day `anchor`
+ * was opened on, so a February clamp cannot walk a month-end customer
+ * permanently backwards.
+ * Mirrors the server's `nextPeriodEnd` (server/src/modules/billing/utils/period.util.ts).
+ */
+export function nextPeriodEnd(
+  anchor: Date,
+  from: Date,
+  interval: 'month' | 'year'
+): Date {
+  const stepped = utc(from).add(
+    interval === 'year' ? { years: 1 } : { months: 1 }
+  );
+  const restored = stepped.with(
+    { day: utc(anchor).day },
+    { overflow: 'constrain' }
+  );
+  return new Date(restored.epochMilliseconds);
+}
+
+function utc(date: Date): Temporal.ZonedDateTime {
+  return Temporal.Instant.fromEpochMilliseconds(
+    date.getTime()
+  ).toZonedDateTimeISO('UTC');
 }

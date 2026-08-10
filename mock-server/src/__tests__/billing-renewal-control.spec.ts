@@ -131,6 +131,28 @@ describe('POST /__control/billing/advance-renewal', () => {
     ).not.toHaveLength(0);
   });
 
+  it('lands the new boundary on the billing day, not on the clamped one', async () => {
+    const { id } = await login('user@example.com');
+    const { id: subscriptionId } = await activate(id, 'pro');
+    const row = getState().billingSubscriptions.get(subscriptionId)!;
+    row.billingAnchorAt = '2025-12-31T10:00:00.000Z';
+
+    const res = await control('advance-renewal', { userId: id });
+    expect(res.status).toBe(200);
+    const advanced = (await res.json()) as Record<string, string>;
+
+    // The advance anchors the new period at now, so the boundary falls in the
+    // following month - on the 31st where that month has one, clamped where not.
+    const start = new Date(advanced['currentPeriodStart']!);
+    const daysInTargetMonth = new Date(
+      Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 2, 0)
+    ).getUTCDate();
+    expect(new Date(advanced['currentPeriodEnd']!).getUTCDate()).toBe(
+      Math.min(31, daysInTargetMonth)
+    );
+    expect(row.billingAnchorAt).toBe('2025-12-31T10:00:00.000Z');
+  });
+
   it('walks the dunning ladder on failures: past_due, then canceled after 3', async () => {
     const { id } = await login('user@example.com');
     await activate(id, 'usage');

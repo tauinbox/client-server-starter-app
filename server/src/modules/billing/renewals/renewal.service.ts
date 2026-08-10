@@ -26,7 +26,7 @@ import { FixedRating } from '../rating/fixed-rating.strategy';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import type { RatedAmount } from '../rating/rating-strategy.interface';
 import { CreditService } from '../services/credit.service';
-import { addInterval } from '../utils/period.util';
+import { nextPeriodEnd } from '../utils/period.util';
 import {
   DUNNING_MAX_ATTEMPTS,
   DUNNING_RETRY_DELAY_MS
@@ -404,7 +404,26 @@ export class RenewalService {
   ): { start: Date; end: Date } {
     return subscription.billingMode === 'usage'
       ? { start: subscription.currentPeriodStart, end: anchor }
-      : { start: anchor, end: addInterval(anchor, plan.interval) };
+      : {
+          start: anchor,
+          end: nextPeriodEnd(
+            this.billingAnchor(subscription, anchor),
+            anchor,
+            plan.interval
+          )
+        };
+  }
+
+  /**
+   * The day billing is anchored on, which every boundary is restored to. A trial
+   * converts at `trial_end`, so the first paid period re-anchors there rather
+   * than on the checkout moment. A row written before the column existed falls
+   * back to its current period start.
+   */
+  private billingAnchor(subscription: Subscription, anchor: Date): Date {
+    return subscription.status === 'trialing' && subscription.trialEnd
+      ? anchor
+      : (subscription.billingAnchorAt ?? subscription.currentPeriodStart);
   }
 
   /**
@@ -490,7 +509,8 @@ export class RenewalService {
     settleStored: boolean
   ): Promise<void> {
     const newPeriodStart = anchor;
-    const newPeriodEnd = addInterval(anchor, plan.interval);
+    const billingAnchor = this.billingAnchor(subscription, anchor);
+    const newPeriodEnd = nextPeriodEnd(billingAnchor, anchor, plan.interval);
     const invoicePeriod = this.invoicePeriodFor(subscription, plan, anchor);
 
     const result = await withTransaction(this.dataSource, async (manager) => {
@@ -582,6 +602,7 @@ export class RenewalService {
           status: 'active',
           currentPeriodStart: newPeriodStart,
           currentPeriodEnd: newPeriodEnd,
+          billingAnchorAt: billingAnchor,
           trialEnd: null,
           dunningAttempts: 0,
           nextRenewalAttemptAt: null

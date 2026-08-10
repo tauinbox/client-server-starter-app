@@ -14,6 +14,7 @@ function createSubscription(
     lifecycleOwner: 'provider',
     currentPeriodStart: new Date('2025-01-01T00:00:00Z'),
     currentPeriodEnd: new Date('2025-02-01T00:00:00Z'),
+    billingAnchorAt: new Date('2025-01-01T00:00:00Z'),
     cancelAtPeriodEnd: false,
     trialEnd: null,
     providerSubscriptionId: 'sub_secret_ref',
@@ -37,6 +38,11 @@ describe('Subscription entity serialization', () => {
     const plain = instanceToPlain(createSubscription());
     expect(plain).not.toHaveProperty('dunningAttempts');
     expect(plain).not.toHaveProperty('nextRenewalAttemptAt');
+  });
+
+  it('hides the billing anchor', () => {
+    const plain = instanceToPlain(createSubscription());
+    expect(plain).not.toHaveProperty('billingAnchorAt');
   });
 
   it('hides the concurrency token', () => {

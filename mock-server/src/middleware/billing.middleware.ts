@@ -501,6 +501,7 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
       lifecycleOwner: 'self' as const,
       currentPeriodStart: now.toISOString(),
       currentPeriodEnd: addInterval(now, plan.interval).toISOString(),
+      billingAnchorAt: now.toISOString(),
       cancelAtPeriodEnd: false,
       trialEnd:
         plan.trialDays > 0

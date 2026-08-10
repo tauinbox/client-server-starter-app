@@ -172,6 +172,12 @@ export interface MockSubscription {
    * the server's @Exclude'd column and is never serialized on the wire.
    */
   dunningAttempts?: number;
+  /**
+   * The billing day every boundary is restored to — mirrors the server's
+   * @Exclude'd `billing_anchor_at` and is never serialized on the wire. Absent
+   * on provider-managed rows, whose boundaries come from the provider.
+   */
+  billingAnchorAt?: string;
   createdAt: string;
   updatedAt: string;
 }
