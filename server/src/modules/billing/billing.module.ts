@@ -55,6 +55,7 @@ import { BillingWebhooksController } from './webhooks/billing-webhooks.controlle
 import { WebhookIngestionService } from './webhooks/webhook-ingestion.service';
 import { WebhookIpAllowlistGuard } from './webhooks/webhook-ip-allowlist.guard';
 import { WebhookReconciliationService } from './webhooks/webhook-reconciliation.service';
+import { WebhookRetentionService } from './webhooks/webhook-retention.service';
 import { BillingEventReducer } from './webhooks/billing-event-reducer.service';
 import { BillingWebhookProcessor } from './webhooks/billing-webhook.processor';
 import { BILLING_WEBHOOK_QUEUE } from './webhooks/billing-webhook-queue.constants';
@@ -147,7 +148,11 @@ export class BillingModule {
         BillingEventReducer,
         RenewalService,
         ...(redisUrl
-          ? [WebhookReconciliationService, BillingWebhookProcessor]
+          ? [
+              WebhookReconciliationService,
+              WebhookRetentionService,
+              BillingWebhookProcessor
+            ]
           : []),
         ...(renewalEnabled ? [RenewalProcessor] : []),
         {
