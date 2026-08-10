@@ -638,13 +638,36 @@ describe('BillingUserService', () => {
       await ctx.service.checkout('user-1', 'pro');
 
       expect(ctx.subscriptions.create).not.toHaveBeenCalled();
-      expect(ctx.subscriptions.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 'sub-pending',
-          planKey: 'pro',
-          status: 'incomplete'
-        })
+      expect(ctx.subscriptions.save).not.toHaveBeenCalled();
+      expect(ctx.subscriptions.update).toHaveBeenCalledWith(
+        { id: 'sub-pending', status: 'incomplete' },
+        expect.objectContaining({ planKey: 'pro', status: 'incomplete' })
       );
+    });
+
+    it('returns 409 without rewriting the row when the incomplete row was activated mid-checkout', async () => {
+      const ctx = await build();
+      ctx.plans.findOne.mockResolvedValue(makePlan());
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'RU',
+        providerOverride: null
+      });
+      ctx.billing.resolveProvider.mockResolvedValue(
+        provider('yookassa', false)
+      );
+      ctx.subscriptions.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'sub-pending', status: 'incomplete' });
+      // The first-payment webhook flipped the row to `active` in the meantime,
+      // so the conditional write matches nothing.
+      ctx.subscriptions.update.mockResolvedValue({ affected: 0 });
+
+      await expect(ctx.service.checkout('user-1', 'pro')).rejects.toThrow(
+        ConflictException
+      );
+      expect(ctx.subscriptions.save).not.toHaveBeenCalled();
     });
 
     it('returns 409 when a concurrent checkout wins the insert race', async () => {
@@ -683,9 +706,33 @@ describe('BillingUserService', () => {
 
       await ctx.service.checkout('user-1', 'pro');
 
-      expect(ctx.subscriptions.save).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'sub-pending', status: 'canceled' })
+      expect(ctx.subscriptions.save).not.toHaveBeenCalled();
+      expect(ctx.subscriptions.update).toHaveBeenCalledWith(
+        { id: 'sub-pending', status: 'incomplete' },
+        { status: 'canceled' }
       );
+    });
+
+    it('returns 409 rather than canceling a self row that was activated mid-checkout', async () => {
+      const ctx = await build();
+      ctx.plans.findOne.mockResolvedValue(makePlan());
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'US',
+        providerOverride: null
+      });
+      const paddle = provider('paddle', true);
+      ctx.billing.resolveProvider.mockResolvedValue(paddle);
+      ctx.subscriptions.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'sub-pending', status: 'incomplete' });
+      ctx.subscriptions.update.mockResolvedValue({ affected: 0 });
+
+      await expect(ctx.service.checkout('user-1', 'pro')).rejects.toThrow(
+        ConflictException
+      );
+      expect(paddle.startCheckout).not.toHaveBeenCalled();
     });
   });
 
