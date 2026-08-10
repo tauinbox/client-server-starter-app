@@ -8,11 +8,15 @@ import { Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
 import { WebhookIngestionService } from './webhook-ingestion.service';
 import { WebhookReconciliationService } from './webhook-reconciliation.service';
+import { WebhookRetentionService } from './webhook-retention.service';
 import {
   BILLING_WEBHOOK_QUEUE,
   BILLING_WEBHOOK_RECONCILE_JOB,
   BILLING_WEBHOOK_RECONCILE_SCHEDULER_ID,
+  BILLING_WEBHOOK_RETENTION_JOB,
+  BILLING_WEBHOOK_RETENTION_SCHEDULER_ID,
   WEBHOOK_RECONCILE_INTERVAL_MS,
+  WEBHOOK_RETENTION_INTERVAL_MS,
   type BillingWebhookJobData
 } from './billing-webhook-queue.constants';
 
@@ -21,8 +25,9 @@ import {
  * BullMQ applies the configured retry/backoff. Only registered when REDIS_URL
  * is set (see BillingModule.forRoot); without Redis, ingestion reduces inline.
  *
- * Also hosts the periodic reconciliation sweep that replays deliveries stuck in
- * `received` (a queued reduce that exhausted its retries). The repeatable job is
+ * Also hosts the two periodic sweeps over the webhook ledger: reconciliation,
+ * which replays deliveries stuck in `received` (a queued reduce that exhausted
+ * its retries), and retention, which prunes settled ones. Each repeatable job is
  * upserted once on bootstrap under a stable id, so multiple instances converge
  * on a single schedule.
  */
@@ -36,6 +41,7 @@ export class BillingWebhookProcessor
   constructor(
     private readonly ingestion: WebhookIngestionService,
     private readonly reconciliation: WebhookReconciliationService,
+    private readonly retention: WebhookRetentionService,
     @InjectQueue(BILLING_WEBHOOK_QUEUE) private readonly queue: Queue
   ) {
     super();
@@ -53,11 +59,20 @@ export class BillingWebhookProcessor
       { every: WEBHOOK_RECONCILE_INTERVAL_MS },
       { name: BILLING_WEBHOOK_RECONCILE_JOB, data: {} }
     );
+    await this.queue.upsertJobScheduler(
+      BILLING_WEBHOOK_RETENTION_SCHEDULER_ID,
+      { every: WEBHOOK_RETENTION_INTERVAL_MS },
+      { name: BILLING_WEBHOOK_RETENTION_JOB, data: {} }
+    );
   }
 
   async process(job: Job<BillingWebhookJobData>): Promise<void> {
     if (job.name === BILLING_WEBHOOK_RECONCILE_JOB) {
       await this.reconciliation.sweep();
+      return;
+    }
+    if (job.name === BILLING_WEBHOOK_RETENTION_JOB) {
+      await this.retention.sweep();
       return;
     }
     await this.ingestion.processEvent(job.data);

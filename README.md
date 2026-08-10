@@ -456,6 +456,8 @@ Edit `.env` with your database credentials and settings:
 | `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency for new customers (`USD` or `RUB`) |
 | `BILLING_PROVIDER_TIMEOUT_MS` | `20000` | Deadline for a single provider API call, in milliseconds. Neither provider SDK sets a transport timeout, so without it a stalled socket blocks the sequential renewal scan |
 | `BILLING_WEBHOOK_IP_ALLOWLIST` | - (local), provider egress ranges (docker-compose) | Comma-separated IPs/CIDRs allowed to call the billing webhook receivers (`/api/v1/billing/webhooks/*`); other sources get `403` before any webhook processing. Empty disables the check; a malformed entry fails startup. `docker-compose.yml` defaults it to the published Paddle + YooKassa egress ranges. See ["Billing webhook source-IP allowlist" in `server/README.md`](server/README.md#billing-webhook-source-ip-allowlist) |
+| `BILLING_WEBHOOK_RETENTION_DAYS` | `90` | Age at which a settled webhook delivery is deleted from the idempotency ledger by the daily retention sweep. Unfinished and dead-lettered deliveries are never pruned |
+| `BILLING_WEBHOOK_PAYLOAD_RETENTION_DAYS` | `7` | Age at which a settled delivery's stored event is nulled out, ahead of the row itself. Keep below `BILLING_WEBHOOK_RETENTION_DAYS` |
 
 ### 3. Set up the database
 
@@ -841,8 +843,8 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1828 tests passing |
-| Server E2E tests | Jest | Separate config in `test/` | 296 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 295 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and reports 289 passing, 7 skipped |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1836 tests passing |
+| Server E2E tests | Jest | Separate config in `test/` | 300 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 299 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and reports 293 passing, 7 skipped |
 | Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1015 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 209 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 327 tests passing |

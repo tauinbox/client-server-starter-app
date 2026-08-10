@@ -1,6 +1,10 @@
 import * as Joi from 'joi';
 import { APP_ENVIRONMENTS } from '@app/shared/constants';
 import { DEFAULT_BILLING_PROVIDER_TIMEOUT_MS } from '../billing/providers/provider-deadline';
+import {
+  DEFAULT_WEBHOOK_PAYLOAD_RETENTION_DAYS,
+  DEFAULT_WEBHOOK_RETENTION_DAYS
+} from '../billing/webhooks/billing-webhook-queue.constants';
 
 // Validated by ConfigModule at bootstrap: a malformed value or a missing
 // required key aborts startup instead of degrading behavior at runtime.
@@ -65,5 +69,15 @@ export const configValidationSchema = Joi.object({
   // Syntax (IP/CIDR per entry) is validated by
   // WebhookIpAllowlistGuard, which throws at bootstrap on a
   // malformed entry.
-  BILLING_WEBHOOK_IP_ALLOWLIST: Joi.string().optional().allow('')
+  BILLING_WEBHOOK_IP_ALLOWLIST: Joi.string().optional().allow(''),
+  BILLING_WEBHOOK_RETENTION_DAYS: Joi.number()
+    .integer()
+    .min(1)
+    .default(DEFAULT_WEBHOOK_RETENTION_DAYS),
+  // Only meaningful below BILLING_WEBHOOK_RETENTION_DAYS: above it the row is
+  // deleted before its payload would ever be dropped.
+  BILLING_WEBHOOK_PAYLOAD_RETENTION_DAYS: Joi.number()
+    .integer()
+    .min(1)
+    .default(DEFAULT_WEBHOOK_PAYLOAD_RETENTION_DAYS)
 });

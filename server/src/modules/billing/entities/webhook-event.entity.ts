@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   PrimaryGeneratedColumn,
   Unique
 } from 'typeorm';
@@ -17,11 +18,19 @@ import type { BillingProviderId } from '@app/shared/types';
  * after `WEBHOOK_MAX_REPLAY_ATTEMPTS` attempts so it stops being replayed every
  * tick; it keeps its `payload` and stays replayable via the admin endpoint or a
  * provider redelivery.
+ *
+ * The ledger is bounded by WebhookRetentionService: a `processed` row loses its
+ * `payload` and then the row itself once each is past its retention window.
+ * `received` and `dead_letter` rows are never pruned - both stay actionable.
  */
 @Entity('billing_webhook_events')
 @Unique('UQ_billing_webhook_events_provider_event', [
   'provider',
   'providerEventId'
+])
+@Index('IDX_billing_webhook_events_status_received_at', [
+  'status',
+  'receivedAt'
 ])
 export class WebhookEvent {
   @PrimaryGeneratedColumn('uuid')
