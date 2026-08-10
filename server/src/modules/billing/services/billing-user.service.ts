@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import type { QueryDeepPartialEntity } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import type {
   BillingProviderId,
@@ -49,6 +50,9 @@ import { CreditService } from './credit.service';
 const ACTIVE_STATUSES = ['trialing', 'active', 'past_due'] as const;
 
 const PG_UNIQUE_VIOLATION = '23505';
+
+const ALREADY_SUBSCRIBED_MESSAGE =
+  'You already have an active subscription. Cancel it before subscribing to another plan.';
 
 /** Non-canceled statuses — the "current" subscription for read/cancel/region. */
 const OPEN_STATUSES = ['incomplete', 'trialing', 'active', 'past_due'] as const;
@@ -366,9 +370,7 @@ export class BillingUserService {
       where: { customerId: customer.id, status: In([...ACTIVE_STATUSES]) }
     });
     if (active) {
-      throw new ConflictException(
-        'You already have an active subscription. Cancel it before subscribing to another plan.'
-      );
+      throw new ConflictException(ALREADY_SUBSCRIBED_MESSAGE);
     }
 
     // resolveProvider asserts the geo's provider is enabled + configured (503),
@@ -403,7 +405,7 @@ export class BillingUserService {
         paymentMethodId: null
       };
       if (pending) {
-        await this.subscriptions.save(Object.assign(pending, fields));
+        await this.reuseIncompleteRow(pending, fields);
       } else {
         try {
           await this.subscriptions.save(
@@ -413,9 +415,7 @@ export class BillingUserService {
           // Lost the insert race against a concurrent checkout: the partial
           // unique index rejected the second open row.
           if ((error as { code?: string }).code === PG_UNIQUE_VIOLATION) {
-            throw new ConflictException(
-              'You already have an active subscription. Cancel it before subscribing to another plan.'
-            );
+            throw new ConflictException(ALREADY_SUBSCRIBED_MESSAGE);
           }
           throw error;
         }
@@ -423,8 +423,7 @@ export class BillingUserService {
     } else if (pending) {
       // The region now resolves a provider-managed plan; release the stale
       // self `incomplete` so the provider's activation webhook isn't blocked.
-      pending.status = 'canceled';
-      await this.subscriptions.save(pending);
+      await this.reuseIncompleteRow(pending, { status: 'canceled' });
     }
 
     const session = await provider.startCheckout(customer, plan, {
@@ -436,6 +435,27 @@ export class BillingUserService {
       url: session.url,
       sessionRef: session.sessionRef
     };
+  }
+
+  /**
+   * Rewrites a leftover `incomplete` row, but only while it still is one. The
+   * row was read before the provider was resolved, and the first-payment webhook
+   * can activate it inside that window — committing the whole entity would put a
+   * paid subscription back to `incomplete` with no period and no payment method,
+   * outside both the entitled statuses and the renewal sweep. On a miss the
+   * customer does have a live subscription, which is the guard's own answer.
+   */
+  private async reuseIncompleteRow(
+    pending: Subscription,
+    fields: QueryDeepPartialEntity<Subscription>
+  ): Promise<void> {
+    const applied = await this.subscriptions.update(
+      { id: pending.id, status: 'incomplete' },
+      fields
+    );
+    if (applied.affected !== 1) {
+      throw new ConflictException(ALREADY_SUBSCRIBED_MESSAGE);
+    }
   }
 
   /**

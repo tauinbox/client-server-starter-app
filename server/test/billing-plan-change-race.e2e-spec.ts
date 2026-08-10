@@ -49,6 +49,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   }, 30000);
 
   afterEach(async () => {
+    jest.restoreAllMocks();
     if (customerId) {
       // Invoices hold the customer under RESTRICT, so they go first; the
       // customer and its subscription then cascade from the user.
@@ -108,7 +109,8 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
 
   async function seedSubscription(
     provider: 'yookassa' | 'paddle',
-    planKey = 'race-pro'
+    planKey = 'race-pro',
+    status: Subscription['status'] = 'active'
   ): Promise<Subscription> {
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const user = await ds.getRepository(User).save(
@@ -140,7 +142,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
         planKey,
         provider,
         billingMode: 'fixed',
-        status: 'active',
+        status,
         lifecycleOwner: provider === 'yookassa' ? 'self' : 'provider',
         currentPeriodStart: periodStart,
         currentPeriodEnd: periodEnd,
@@ -180,6 +182,9 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
       changePlan: jest.fn(async () => {
         await runConcurrentWrite();
       }),
+      startCheckout: jest
+        .fn()
+        .mockResolvedValue({ url: 'https://checkout/x', sessionRef: 'sess-1' }),
       refund: jest.fn().mockResolvedValue(undefined),
       previewChangePlan: jest
         .fn()
@@ -220,7 +225,10 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
         { provide: getRepositoryToken(User), useValue: ds.getRepository(User) },
         {
           provide: BillingService,
-          useValue: { getProviderById: () => provider }
+          useValue: {
+            getProviderById: () => provider,
+            resolveProvider: () => Promise.resolve(provider)
+          }
         },
         {
           provide: CreditService,
@@ -240,7 +248,8 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   async function setup(
     providerId: 'yookassa' | 'paddle',
     duringCall: ConcurrentWrite | null,
-    planKey = 'race-pro'
+    planKey = 'race-pro',
+    status: Subscription['status'] = 'active'
   ): Promise<{
     subscription: Subscription;
     user: string;
@@ -248,7 +257,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   }> {
     await seedPlan('race-pro', 99000);
     await seedPlan('race-business', 290000);
-    const subscription = await seedSubscription(providerId, planKey);
+    const subscription = await seedSubscription(providerId, planKey, status);
     const provider = providerStub(providerId, subscription.id, duringCall);
     service = await buildService(provider);
     await warmPool();
@@ -408,6 +417,40 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
       .getRepository(Invoice)
       .findOneOrFail({ where: { id: source.id } });
     expect(row.refundedMinor.toNumber()).toBe(99000);
+  }, 30000);
+
+  it('refuses a checkout whose incomplete row was activated inside the read-write window', async () => {
+    const { subscription, user } = await setup(
+      'yookassa',
+      null,
+      'race-pro',
+      'incomplete'
+    );
+    const activatedAt = new Date(Date.now() - DAY_MS);
+    // The success webhook commits between the pending-row read and the write
+    // that reuses it - the only window checkout leaves open.
+    const repo = ds.getRepository(Subscription);
+    const read = repo.findOne.bind(repo);
+    jest.spyOn(repo, 'findOne').mockImplementation(async (options) => {
+      const row = await read(options);
+      if (row?.status === 'incomplete') {
+        await repo.update(
+          { id: row.id },
+          { status: 'active', currentPeriodStart: activatedAt }
+        );
+      }
+      return row;
+    });
+
+    await expect(
+      service.checkout(user, 'race-business')
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(await reload(subscription.id)).toMatchObject({
+      status: 'active',
+      planKey: 'race-pro',
+      currentPeriodStart: activatedAt
+    });
   }, 30000);
 
   it('keeps a cancellation committed while the provider-managed change was in flight', async () => {
