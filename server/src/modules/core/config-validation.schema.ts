@@ -1,5 +1,6 @@
 import * as Joi from 'joi';
 import { APP_ENVIRONMENTS } from '@app/shared/constants';
+import { DEFAULT_BILLING_PROVIDER_TIMEOUT_MS } from '../billing/providers/provider-deadline';
 
 // Validated by ConfigModule at bootstrap: a malformed value or a missing
 // required key aborts startup instead of degrading behavior at runtime.
@@ -54,6 +55,13 @@ export const configValidationSchema = Joi.object({
   YOOKASSA_SECRET_KEY: Joi.string().optional().allow(''),
   YOOKASSA_VAT_CODE: Joi.number().integer().min(1).max(6).default(1),
   BILLING_DEFAULT_CURRENCY: Joi.string().valid('USD', 'RUB').default('USD'),
+  // Deadline for a single provider API call. Neither SDK sets a transport
+  // timeout, so without this a stalled socket blocks the sequential renewal
+  // scan for as long as the peer keeps it open.
+  BILLING_PROVIDER_TIMEOUT_MS: Joi.number()
+    .integer()
+    .min(1)
+    .default(DEFAULT_BILLING_PROVIDER_TIMEOUT_MS),
   // Syntax (IP/CIDR per entry) is validated by
   // WebhookIpAllowlistGuard, which throws at bootstrap on a
   // malformed entry.

@@ -11,6 +11,10 @@ import { PaymentMethod } from '../entities/payment-method.entity';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
 import { WEBHOOK_IGNORED } from './payment-provider.interface';
+import {
+  ProviderTimeoutError,
+  withProviderDeadline
+} from './provider-deadline';
 import type {
   NormalizedEvent,
   NormalizedInvoicePayload,
@@ -369,6 +373,20 @@ describe('YooKassaProvider', () => {
     const items: ReceiptItem[] = [
       { description: 'Pro renewal', amountMinor: 99000, quantity: 1 }
     ];
+
+    it('gives up on a charge the SDK never settles', async () => {
+      const { provider, client } = await build();
+      // The SDK issues bare axios calls with no timeout, so a stalled socket
+      // would otherwise block the whole sequential renewal scan.
+      client!.createPayment.mockImplementation(
+        () => new Promise<never>(() => {})
+      );
+      const bounded = withProviderDeadline(provider, 20);
+
+      await expect(
+        bounded.chargeOffSession(savedCustomer, 99000, items, 'idem-hung')
+      ).rejects.toBeInstanceOf(ProviderTimeoutError);
+    });
 
     it('charges the saved method with a receipt and forwards the idempotency key', async () => {
       const { provider, client, paymentMethods } = await build();
