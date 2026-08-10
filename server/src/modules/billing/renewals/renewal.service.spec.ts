@@ -15,7 +15,11 @@ import {
   SubscriptionPastDueEvent,
   SubscriptionRenewedEvent
 } from '../events/billing.events';
-import { BILLING_PROVIDERS } from '../providers/payment-provider.interface';
+import {
+  BILLING_PROVIDERS,
+  type PaymentProvider
+} from '../providers/payment-provider.interface';
+import { withProviderDeadline } from '../providers/provider-deadline';
 import { FixedRating } from '../rating/fixed-rating.strategy';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import { UsageRecord } from '../entities/usage-record.entity';
@@ -236,7 +240,8 @@ async function build(
   chargeOffSession: jest.Mock,
   usageSum: jest.Mock = jest.fn().mockResolvedValue(null),
   availableCredits = 0,
-  findOffSessionCharge: jest.Mock = jest.fn().mockResolvedValue(null)
+  findOffSessionCharge: jest.Mock = jest.fn().mockResolvedValue(null),
+  deadlineMs = 0
 ): Promise<{
   service: RenewalService;
   emit: jest.Mock;
@@ -261,10 +266,15 @@ async function build(
     startCheckout: jest.fn(),
     chargeOffSession,
     findOffSessionCharge,
+    createOneTimePayment: jest.fn(),
+    chargeUsage: jest.fn(),
+    changePlan: jest.fn(),
+    previewChangePlan: jest.fn(),
+    updatePaymentMethod: jest.fn(),
     cancel: jest.fn(),
     refund: jest.fn(),
     verifyAndParseWebhook: jest.fn()
-  };
+  } satisfies PaymentProvider;
 
   const moduleRef = await Test.createTestingModule({
     providers: [
@@ -312,7 +322,10 @@ async function build(
         }
       },
       { provide: getDataSourceToken(), useValue: dataSource },
-      { provide: BILLING_PROVIDERS, useValue: [provider] },
+      {
+        provide: BILLING_PROVIDERS,
+        useValue: [withProviderDeadline(provider, deadlineMs)]
+      },
       { provide: CreditService, useValue: credits },
       { provide: EventEmitter2, useValue: { emit } }
     ]
@@ -375,6 +388,36 @@ describe('RenewalService', () => {
       SubscriptionRenewedEvent.name,
       expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
     );
+  });
+
+  it('bounds a stalled provider call and still renews the next due subscription', async () => {
+    const stalled = makeSub();
+    const next = makeSub({ id: 'sub-2', customerId: 'cust-2' });
+    const store = baseStore(stalled);
+    store.subscriptions.push(next);
+    store.customers.push(
+      Object.assign(makeCustomer(), { id: 'cust-2', userId: 'user-2' })
+    );
+    // Without a deadline the first charge never settles and the scan never
+    // reaches `sub-2` — the whole queue waits on one stuck socket.
+    const charge = jest.fn((customer: Customer) =>
+      customer.id === 'cust-1'
+        ? new Promise<never>(() => {})
+        : Promise.resolve({ providerInvoiceRef: 'pay_2', status: 'captured' })
+    );
+    const { service } = await build(store, charge, undefined, 0, undefined, 20);
+
+    await service.runDueRenewals(NOW);
+
+    expect(charge).toHaveBeenCalledTimes(2);
+    expect(next.status).toBe('active');
+    expect(next.currentPeriodEnd).toEqual(new Date('2026-07-01T00:00:00Z'));
+    expect(store.invoices).toHaveLength(1);
+    expect(store.invoices[0]).toMatchObject({ providerInvoiceRef: 'pay_2' });
+    // The timed-out charge takes the ordinary decline path: one dunning rung,
+    // and the next scan reconciles it against `findOffSessionCharge`.
+    expect(stalled.status).toBe('past_due');
+    expect(stalled.dunningAttempts).toBe(1);
   });
 
   it('converts a trial at trial_end, anchoring the period there', async () => {

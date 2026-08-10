@@ -10,6 +10,10 @@ import { PADDLE_CLIENT } from './paddle.client';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
 import { WEBHOOK_IGNORED } from './payment-provider.interface';
+import {
+  ProviderTimeoutError,
+  withProviderDeadline
+} from './provider-deadline';
 import type {
   NormalizedEvent,
   NormalizedInvoicePayload,
@@ -405,6 +409,23 @@ describe('PaddleProvider', () => {
         paddle: { currency: 'USD', amountMinor: 1200, providerPriceId: 'pri_1' }
       }
     } as Plan;
+
+    it('gives up on a call the SDK never settles', async () => {
+      const { provider, client } = await build({});
+      // The SDK calls global fetch with no signal, so its own ceiling is the
+      // runtime default — minutes, far beyond anything the core can wait for.
+      client!.transactions.create.mockImplementation(
+        () => new Promise<never>(() => {})
+      );
+      const bounded = withProviderDeadline(provider, 20);
+
+      await expect(
+        bounded.startCheckout(customer, plan, {
+          successUrl: 'https://app/return',
+          cancelUrl: 'https://app/cancel'
+        })
+      ).rejects.toBeInstanceOf(ProviderTimeoutError);
+    });
 
     it('creates a transaction and returns the checkout url + session ref', async () => {
       const { provider, client } = await build({});

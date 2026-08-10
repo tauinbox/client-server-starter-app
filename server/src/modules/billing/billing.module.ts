@@ -35,6 +35,10 @@ import {
   BILLING_PROVIDERS,
   type PaymentProvider
 } from './providers/payment-provider.interface';
+import {
+  DEFAULT_BILLING_PROVIDER_TIMEOUT_MS,
+  withProviderDeadline
+} from './providers/provider-deadline';
 import { FixedRating } from './rating/fixed-rating.strategy';
 import { UsageRating } from './rating/usage-rating.strategy';
 import { ProrationCalculator } from './rating/proration-calculator';
@@ -160,9 +164,18 @@ export class BillingModule {
           provide: BILLING_PROVIDERS,
           useFactory: (
             paddle: PaddleProvider,
-            yookassa: YooKassaProvider
-          ): PaymentProvider[] => [paddle, yookassa],
-          inject: [PaddleProvider, YooKassaProvider]
+            yookassa: YooKassaProvider,
+            config: ConfigService
+          ): PaymentProvider[] => {
+            const timeoutMs = Number(
+              config.get<string>('BILLING_PROVIDER_TIMEOUT_MS') ??
+                DEFAULT_BILLING_PROVIDER_TIMEOUT_MS
+            );
+            return [paddle, yookassa].map((provider) =>
+              withProviderDeadline(provider, timeoutMs)
+            );
+          },
+          inject: [PaddleProvider, YooKassaProvider, ConfigService]
         }
       ],
       exports: [

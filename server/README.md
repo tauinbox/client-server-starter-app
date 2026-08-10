@@ -115,6 +115,7 @@ Copy `.env.example` to `.env` and configure:
 | `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
 | `YOOKASSA_VAT_CODE` | `1` | VAT code on every 54-FZ receipt line (1–6, tax-regime specific; `1` = "без НДС") |
 | `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency for new customers (`USD` or `RUB`). Billing UI stays hidden until at least one provider is configured |
+| `BILLING_PROVIDER_TIMEOUT_MS` | `20000` | Deadline for a single provider API call. Neither SDK sets a transport timeout, so without it a stalled socket blocks the sequential renewal scan and holds a webhook delivery open indefinitely. The deadline bounds our call, not the provider's request |
 | `BILLING_WEBHOOK_IP_ALLOWLIST` | - (local), provider egress ranges (docker-compose) | Comma-separated IPs/CIDRs allowed to call `/billing/webhooks/*`; other sources get `403` before any webhook processing. Empty disables the check; a malformed entry fails startup. Requires `TRUSTED_PROXIES` behind a reverse proxy. See [Billing webhook source-IP allowlist](#billing-webhook-source-ip-allowlist) |
 
 ## Architecture
