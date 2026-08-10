@@ -160,6 +160,22 @@ function subscriptionsRepo(store: Store) {
         store.subscriptions.find((s) => s.id === opts.where.id) ?? null
       ),
     save: (entity: Subscription) => Promise.resolve(entity),
+    // Dunning and the period-end cancel compare-and-swap on the row as the scan
+    // claimed it, so the criterion carries the rung, the status set and the flag.
+    update: (where: Record<string, unknown>, set: Record<string, unknown>) => {
+      const statuses = where['status'] as { value?: string[] } | undefined;
+      const matches = store.subscriptions.filter(
+        (s) =>
+          s.id === where['id'] &&
+          (where['dunningAttempts'] === undefined ||
+            s.dunningAttempts === where['dunningAttempts']) &&
+          (where['cancelAtPeriodEnd'] === undefined ||
+            s.cancelAtPeriodEnd === where['cancelAtPeriodEnd']) &&
+          (statuses?.value === undefined || statuses.value.includes(s.status))
+      );
+      for (const s of matches) Object.assign(s, set);
+      return Promise.resolve({ affected: matches.length });
+    },
     createQueryBuilder: () => {
       const qb = {
         innerJoin: () => qb,
