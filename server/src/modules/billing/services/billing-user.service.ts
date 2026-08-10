@@ -396,6 +396,9 @@ export class BillingUserService {
         lifecycleOwner: 'self' as const,
         currentPeriodStart: now,
         currentPeriodEnd: addInterval(now, plan.interval),
+        // Every later boundary is derived from this day, so a February clamp
+        // cannot walk a month-end customer permanently backwards.
+        billingAnchorAt: now,
         cancelAtPeriodEnd: false,
         trialEnd:
           plan.trialDays > 0

@@ -1,4 +1,4 @@
-import { addInterval } from './period.util';
+import { addInterval, nextPeriodEnd } from './period.util';
 
 /** UTC [year, month-1, day] for a Date - addInterval operates on the UTC wall-clock. */
 function ymd(date: Date): [number, number, number] {
@@ -146,5 +146,100 @@ describe('addInterval', () => {
         expect(inNewYork).toBe(expected);
       }
     );
+  });
+});
+
+describe('nextPeriodEnd', () => {
+  /** The boundaries the anchor produces over `periods` consecutive renewals. */
+  function chain(
+    anchor: Date,
+    from: Date,
+    interval: 'month' | 'year',
+    periods: number
+  ): string[] {
+    const ends: string[] = [];
+    let cursor = from;
+    for (let i = 0; i < periods; i++) {
+      cursor = nextPeriodEnd(anchor, cursor, interval);
+      ends.push(cursor.toISOString().slice(0, 10));
+    }
+    return ends;
+  }
+
+  it('restores a 31st billing day after February', () => {
+    const anchor = utc(2025, 11, 31);
+    expect(chain(anchor, anchor, 'month', 6)).toEqual([
+      '2026-01-31',
+      '2026-02-28',
+      '2026-03-31',
+      '2026-04-30',
+      '2026-05-31',
+      '2026-06-30'
+    ]);
+  });
+
+  it('restores a 30th billing day after February', () => {
+    const anchor = utc(2026, 0, 30);
+    expect(chain(anchor, anchor, 'month', 3)).toEqual([
+      '2026-02-28',
+      '2026-03-30',
+      '2026-04-30'
+    ]);
+  });
+
+  it('leaves a mid-month billing day unchanged', () => {
+    const anchor = utc(2026, 0, 15);
+    expect(chain(anchor, anchor, 'month', 3)).toEqual([
+      '2026-02-15',
+      '2026-03-15',
+      '2026-04-15'
+    ]);
+  });
+
+  it('restores a leap-day billing day on the next leap year', () => {
+    const anchor = utc(2024, 1, 29);
+    expect(chain(anchor, anchor, 'year', 4)).toEqual([
+      '2025-02-28',
+      '2026-02-28',
+      '2027-02-28',
+      '2028-02-29'
+    ]);
+  });
+
+  it('matches deriving the n-th boundary straight from the anchor', () => {
+    const anchor = utc(2026, 0, 31);
+    const chained = chain(anchor, anchor, 'month', 14);
+    const derived = Array.from({ length: 14 }, (_, i) => {
+      let d = anchor;
+      for (let n = 0; n <= i; n++) d = addInterval(d, 'month');
+      return d;
+    });
+    // Chaining addInterval is the ratchet the anchor exists to undo, so only
+    // the first boundary (before any clamp) may agree.
+    expect(chained[0]).toBe(derived[0].toISOString().slice(0, 10));
+    expect(chained[13]).toBe('2027-03-31');
+    expect(derived[13].toISOString().slice(0, 10)).toBe('2027-03-28');
+  });
+
+  it('preserves the time-of-day component', () => {
+    const anchor = utc(2026, 0, 31, 13, 45, 30);
+    const result = nextPeriodEnd(anchor, anchor, 'month');
+    expect(result.toISOString()).toBe('2026-02-28T13:45:30.000Z');
+  });
+
+  it('is unaffected by the process time zone', () => {
+    const originalTz = process.env['TZ'];
+    const anchor = utc(2025, 11, 31);
+    const from = utc(2026, 1, 28);
+    try {
+      process.env['TZ'] = 'UTC';
+      const inUtc = nextPeriodEnd(anchor, from, 'month').toISOString();
+      process.env['TZ'] = 'America/New_York';
+      const inNewYork = nextPeriodEnd(anchor, from, 'month').toISOString();
+      expect(inUtc).toBe('2026-03-31T00:00:00.000Z');
+      expect(inNewYork).toBe('2026-03-31T00:00:00.000Z');
+    } finally {
+      process.env['TZ'] = originalTz;
+    }
   });
 });

@@ -27,7 +27,7 @@ import type {
 import type { BillingProviderId } from '@app/shared/types';
 import type { NotificationEvent } from '@app/shared/types';
 import { pushToAll, pushToUser } from './sse-hub';
-import { addInterval } from './utils/period';
+import { addInterval, nextPeriodEnd } from './utils/period';
 import { notifyRoleHolders } from './middleware/roles.middleware';
 
 const router = Router();
@@ -428,6 +428,10 @@ router.post('/billing/activate-subscription', (req, res) => {
   subscription.status = status;
   subscription.paymentMethodId = customer.defaultPaymentMethodId;
   subscription.currentPeriodEnd = periodEnd.toISOString();
+  // The seeded boundary is re-derived from now, so the billing day is too.
+  if (subscription.lifecycleOwner === 'self') {
+    subscription.billingAnchorAt = nowIso;
+  }
   subscription.updatedAt = nowIso;
   state.billingSubscriptions.set(subscription.id, subscription);
 
@@ -695,9 +699,18 @@ router.post('/billing/advance-renewal', (req, res) => {
   }
 
   // The clock advance anchors the boundary at NOW: the closed period is
-  // [currentPeriodStart, now) and the new one [now, now + interval).
+  // [currentPeriodStart, now) and the new one [now, now + interval). The new
+  // end still lands on the billing day, as the server's renewal does.
   const closedStart = subscription.currentPeriodStart;
-  const newEnd = addInterval(now, plan.interval);
+  // A trial converts into its first paid period, which re-anchors the billing
+  // day there - the same rule the server's renewal applies at trial_end.
+  const billingAnchor =
+    subscription.status === 'trialing'
+      ? now
+      : new Date(
+          subscription.billingAnchorAt ?? subscription.currentPeriodStart
+        );
+  const newEnd = nextPeriodEnd(billingAnchor, now, plan.interval);
 
   let amountMinor = price.amountMinor;
   let periodStart = nowIso;
@@ -757,6 +770,7 @@ router.post('/billing/advance-renewal', (req, res) => {
   subscription.dunningAttempts = 0;
   subscription.currentPeriodStart = nowIso;
   subscription.currentPeriodEnd = newEnd.toISOString();
+  subscription.billingAnchorAt = billingAnchor.toISOString();
   subscription.updatedAt = nowIso;
   res.json(toSubscriptionResponse(subscription));
 });

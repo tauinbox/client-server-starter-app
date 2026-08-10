@@ -48,6 +48,17 @@ export class Subscription {
   @Column({ name: 'current_period_end', type: 'timestamptz' })
   currentPeriodEnd: Date;
 
+  /**
+   * The moment billing was first anchored on - checkout for a plain
+   * subscription, `trial_end` for one that converted from a trial. Only its
+   * day-of-month matters: every later boundary is restored to it, so a February
+   * clamp cannot walk a month-end customer permanently backwards. Null on
+   * provider-managed rows, whose boundaries come from the provider's snapshot.
+   */
+  @Column({ name: 'billing_anchor_at', type: 'timestamptz', nullable: true })
+  @Exclude()
+  billingAnchorAt: Date | null;
+
   @Column({ name: 'cancel_at_period_end', default: false })
   cancelAtPeriodEnd: boolean;
 

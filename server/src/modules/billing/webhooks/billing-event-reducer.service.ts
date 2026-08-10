@@ -177,15 +177,20 @@ export class BillingEventReducer {
         const plan = await manager.findOne(Plan, {
           where: { key: payload.planKey }
         });
+        const lifecycleOwner = lifecycleOwnerFor(provider);
+        const periodStart = parseDate(payload.currentPeriodStart, now);
         subscription = manager.create(Subscription, {
           customerId: payload.ref.customerId,
           planKey: payload.planKey,
           provider,
           billingMode: plan?.billingMode ?? 'fixed',
           status: payload.status,
-          lifecycleOwner: lifecycleOwnerFor(provider),
-          currentPeriodStart: parseDate(payload.currentPeriodStart, now),
+          lifecycleOwner,
+          currentPeriodStart: periodStart,
           currentPeriodEnd: parseDate(payload.currentPeriodEnd, now),
+          // Only the self-managed scheduler derives boundaries; a provider-owned
+          // row takes each one from the provider's snapshot.
+          billingAnchorAt: lifecycleOwner === 'self' ? periodStart : null,
           cancelAtPeriodEnd: payload.cancelAtPeriodEnd,
           trialEnd: payload.trialEnd ? new Date(payload.trialEnd) : null,
           providerSubscriptionId: payload.providerSubscriptionId,

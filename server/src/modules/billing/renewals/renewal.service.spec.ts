@@ -54,6 +54,7 @@ function makeSub(overrides: Partial<Subscription> = {}): Subscription {
     lifecycleOwner: 'self',
     currentPeriodStart: new Date('2026-05-01T00:00:00Z'),
     currentPeriodEnd: new Date('2026-06-01T00:00:00Z'),
+    billingAnchorAt: new Date('2026-05-01T00:00:00Z'),
     cancelAtPeriodEnd: false,
     trialEnd: null,
     providerSubscriptionId: null,
@@ -479,6 +480,105 @@ describe('RenewalService', () => {
     expect(sub.trialEnd).toBeNull();
     expect(sub.currentPeriodStart).toEqual(new Date('2026-06-05T00:00:00Z'));
     expect(sub.currentPeriodEnd).toEqual(new Date('2026-07-05T00:00:00Z'));
+    // The trial's own start is not the billing day - the first paid period is.
+    expect(sub.billingAnchorAt).toEqual(new Date('2026-06-05T00:00:00Z'));
+  });
+
+  describe('month-end billing day', () => {
+    /**
+     * Renews `sub` once per period and returns the boundary each renewal set.
+     * Every scan runs at the boundary that fell due, as the scheduler does.
+     */
+    async function renewalDays(
+      sub: Subscription,
+      periods: number
+    ): Promise<string[]> {
+      const store = baseStore(sub);
+      const charge = jest
+        .fn()
+        .mockResolvedValue({ providerInvoiceRef: 'pay', status: 'captured' });
+      const { service } = await build(store, charge);
+      const ends: string[] = [];
+      for (let i = 0; i < periods; i++) {
+        await service.runDueRenewals(sub.currentPeriodEnd);
+        ends.push(sub.currentPeriodEnd.toISOString());
+      }
+      return ends;
+    }
+
+    it('returns to the 31st after February instead of ratcheting to the 28th', async () => {
+      const sub = makeSub({
+        currentPeriodStart: new Date('2025-12-31T10:00:00Z'),
+        currentPeriodEnd: new Date('2026-01-31T10:00:00Z'),
+        billingAnchorAt: new Date('2025-12-31T10:00:00Z')
+      });
+
+      // Chaining each boundary onto the previous one gives
+      // 02-28 -> 03-28 -> 04-28 -> 05-28 -> 06-28: one short month moved the
+      // customer to the 28th permanently.
+      expect(await renewalDays(sub, 5)).toEqual([
+        '2026-02-28T10:00:00.000Z',
+        '2026-03-31T10:00:00.000Z',
+        '2026-04-30T10:00:00.000Z',
+        '2026-05-31T10:00:00.000Z',
+        '2026-06-30T10:00:00.000Z'
+      ]);
+    });
+
+    it('keeps the invoice period aligned with the subscription period', async () => {
+      const sub = makeSub({
+        currentPeriodStart: new Date('2025-12-31T10:00:00Z'),
+        currentPeriodEnd: new Date('2026-01-31T10:00:00Z'),
+        billingAnchorAt: new Date('2025-12-31T10:00:00Z')
+      });
+      const store = baseStore(sub);
+      const charge = jest
+        .fn()
+        .mockResolvedValue({ providerInvoiceRef: 'pay', status: 'captured' });
+      const { service } = await build(store, charge);
+
+      await service.runDueRenewals(sub.currentPeriodEnd);
+      const firstEnd = sub.currentPeriodEnd;
+      await service.runDueRenewals(sub.currentPeriodEnd);
+
+      expect(store.invoices).toHaveLength(2);
+      expect(store.invoices[0]).toMatchObject({
+        periodStart: new Date('2026-01-31T10:00:00Z'),
+        periodEnd: firstEnd
+      });
+      expect(store.invoices[1]).toMatchObject({
+        periodStart: firstEnd,
+        periodEnd: sub.currentPeriodEnd
+      });
+    });
+
+    it('leaves a mid-month billing day untouched', async () => {
+      const sub = makeSub({
+        currentPeriodStart: new Date('2026-04-15T10:00:00Z'),
+        currentPeriodEnd: new Date('2026-05-15T10:00:00Z'),
+        billingAnchorAt: new Date('2026-04-15T10:00:00Z')
+      });
+
+      expect(await renewalDays(sub, 3)).toEqual([
+        '2026-06-15T10:00:00.000Z',
+        '2026-07-15T10:00:00.000Z',
+        '2026-08-15T10:00:00.000Z'
+      ]);
+    });
+
+    it('falls back to the period start for a row written before the anchor existed', async () => {
+      const sub = makeSub({
+        currentPeriodStart: new Date('2025-12-31T10:00:00Z'),
+        currentPeriodEnd: new Date('2026-01-31T10:00:00Z'),
+        billingAnchorAt: null
+      });
+
+      expect(await renewalDays(sub, 2)).toEqual([
+        '2026-02-28T10:00:00.000Z',
+        '2026-03-31T10:00:00.000Z'
+      ]);
+      expect(sub.billingAnchorAt).toEqual(new Date('2025-12-31T10:00:00Z'));
+    });
   });
 
   it('charges a past_due subscription whose retry is due (dunning recovery)', async () => {
