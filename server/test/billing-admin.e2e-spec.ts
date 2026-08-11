@@ -1,9 +1,8 @@
-// End-to-end coverage for the admin billing controller.
-// Verifies the CASL `manage Billing` boundary (non-admin → 403, admin → 200),
-// HTTP serialization (ClassSerializerInterceptor strips @Exclude'd provider
-// refs), and that cancel/refund dispatch to the service. The PermissionsGuard is
-// replaced with a test stand-in keyed on a header so authorization is exercised
-// without a live RBAC stack; auth (401) is covered by check-auth-coverage.
+// End-to-end coverage for the admin billing controller: the CASL
+// `manage Billing` boundary, @Exclude'd provider refs staying out of responses,
+// service dispatch, and the audit trail every mutation must leave (the real
+// AuditLogInterceptor runs against a mocked AuditService). The PermissionsGuard
+// is a header-keyed stand-in; auth (401) is covered by check-auth-coverage.
 
 import { Test } from '@nestjs/testing';
 import {
@@ -14,7 +13,7 @@ import {
   VersioningType,
   type INestApplication
 } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
+import { APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import type { NextFunction, Request, Response } from 'express';
 import * as request from 'supertest';
 import type { Server } from 'http';
@@ -25,6 +24,9 @@ import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
 import { BillingAdminService } from '../src/modules/billing/services/billing-admin.service';
 import { UsageService } from '../src/modules/billing/services/usage.service';
 import { BillingAdminController } from '../src/modules/billing/controllers/billing-admin.controller';
+import { AuditService } from '../src/modules/audit/audit.service';
+import { AuditLogInterceptor } from '../src/modules/audit/interceptors/audit-log.interceptor';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 
 class TestPermissionsGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
@@ -88,10 +90,15 @@ describe('Billing admin (e2e)', () => {
     listSubscriptions: jest.fn(),
     listInvoices: jest.fn(),
     cancelSubscription: jest.fn(),
-    refundInvoice: jest.fn()
+    refundInvoice: jest.fn(),
+    replayWebhookEvent: jest.fn()
   };
   const usage = {
     record: jest.fn()
+  };
+  const audit = {
+    log: jest.fn(),
+    logFireAndForget: jest.fn()
   };
 
   beforeEach(async () => {
@@ -102,6 +109,8 @@ describe('Billing admin (e2e)', () => {
       providers: [
         { provide: BillingAdminService, useValue: billingAdmin },
         { provide: UsageService, useValue: usage },
+        { provide: AuditService, useValue: audit },
+        { provide: APP_INTERCEPTOR, useClass: AuditLogInterceptor },
         Reflector
       ]
     })
@@ -267,5 +276,94 @@ describe('Billing admin (e2e)', () => {
       .send({ customerId: 'not-a-uuid', meterKey: '', quantity: 0 })
       .expect(400);
     expect(usage.record).not.toHaveBeenCalled();
+  });
+
+  it('replays a dead-lettered webhook event by id', async () => {
+    billingAdmin.replayWebhookEvent.mockResolvedValue({
+      id: uuid,
+      status: 'received'
+    });
+
+    await request(server)
+      .post(`/api/v1/admin/billing/webhook-events/${uuid}/replay`)
+      .set('x-test-role', 'admin')
+      .expect(200);
+
+    expect(billingAdmin.replayWebhookEvent).toHaveBeenCalledWith(uuid);
+  });
+
+  it('audits a webhook replay with the event id', async () => {
+    billingAdmin.replayWebhookEvent.mockResolvedValue({
+      id: uuid,
+      status: 'received'
+    });
+
+    await request(server)
+      .post(`/api/v1/admin/billing/webhook-events/${uuid}/replay`)
+      .set('x-test-role', 'admin')
+      .expect(200);
+
+    expect(audit.logFireAndForget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.BILLING_WEBHOOK_EVENT_REPLAY,
+        actorId: 'admin-1',
+        targetId: uuid,
+        targetType: 'WebhookEvent',
+        details: { status: 'received' }
+      })
+    );
+  });
+
+  it('audits a recorded usage event with the new record id', async () => {
+    usage.record.mockResolvedValue(
+      Object.assign(new UsageRecord(), {
+        id: 'usage-1',
+        customerId: uuid,
+        subscriptionId: 'sub-1',
+        meterKey: 'api_calls',
+        quantity: 42,
+        occurredAt: new Date('2026-06-01T00:00:00Z'),
+        idempotencyKey: 'evt-secret',
+        recordedAt: new Date('2026-06-01T00:00:01Z')
+      })
+    );
+
+    await request(server)
+      .post('/api/v1/admin/billing/usage')
+      .set('x-test-role', 'admin')
+      .send({
+        customerId: uuid,
+        meterKey: 'api_calls',
+        quantity: 42,
+        idempotencyKey: 'evt-secret'
+      })
+      .expect(201);
+
+    expect(audit.logFireAndForget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.BILLING_USAGE_RECORD,
+        actorId: 'admin-1',
+        targetId: 'usage-1',
+        targetType: 'UsageRecord',
+        details: { customerId: uuid, meterKey: 'api_calls', quantity: 42 }
+      })
+    );
+  });
+
+  it('leaves no audit entry when a mutation fails', async () => {
+    usage.record.mockRejectedValue(new Error('boom'));
+
+    await request(server)
+      .post('/api/v1/admin/billing/usage')
+      .set('x-test-role', 'admin')
+      .send({
+        customerId: uuid,
+        meterKey: 'api_calls',
+        quantity: 1,
+        idempotencyKey: 'evt-1'
+      })
+      .expect(500);
+
+    expect(audit.logFireAndForget).not.toHaveBeenCalled();
   });
 });

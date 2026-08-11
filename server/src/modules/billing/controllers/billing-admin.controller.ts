@@ -120,6 +120,13 @@ export class BillingAdminController {
   @Post('webhook-events/:id/replay')
   @HttpCode(200)
   @Authorize(['manage', 'Billing'])
+  @LogAudit({
+    action: AuditAction.BILLING_WEBHOOK_EVENT_REPLAY,
+    targetType: 'WebhookEvent',
+    details: ({ response }) => ({
+      status: (response as { status?: string })?.status ?? null
+    })
+  })
   @ApiOperation({
     summary:
       'Requeue a dead-lettered webhook delivery for the reconciliation sweep.'
@@ -133,6 +140,16 @@ export class BillingAdminController {
 
   @Post('usage')
   @Authorize(['manage', 'Billing'])
+  @LogAudit({
+    action: AuditAction.BILLING_USAGE_RECORD,
+    targetType: 'UsageRecord',
+    targetIdFromResponse: (response) => (response as { id?: string })?.id,
+    details: ({ body }) => ({
+      customerId: (body as RecordUsageRequestDto).customerId,
+      meterKey: (body as RecordUsageRequestDto).meterKey,
+      quantity: (body as RecordUsageRequestDto).quantity
+    })
+  })
   @ApiOperation({
     summary:
       'Record a metering usage event against a customer’s active subscription (idempotent).'
