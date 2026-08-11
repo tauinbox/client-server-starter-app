@@ -146,7 +146,9 @@ src/
 │   ├── filters/            # GlobalExceptionFilter (standardized error responses, DB error mapping)
 │   ├── health/             # HealthModule (GET /api/health/live, /api/health/ready — DB ping + Redis PING when REDIS_URL set or production;
 │   │                       #   dead Redis fails readiness (2 s timeout), missing REDIS_URL in production and SMTP failures degrade to a generic
-│   │                       #   warning — the raw SMTP error is logged server-side, never returned to the public endpoint)
+│   │                       #   warning — the raw SMTP error is logged server-side, never returned to the public endpoint;
+│   │                       #   the SMTP verify result is cached for 5 min behind an in-flight guard, so probing does not re-authenticate
+│   │                       #   against the provider on every request)
 │   ├── metrics/            # MetricsModule (@Global) — Prometheus metrics via @willsoto/nestjs-prometheus
 │   │                       #   GET /metrics (excluded from /api prefix, gated by InternalNetworkGuard — loopback/private/
 │   │                       #   unique-local req.ip only, 403 otherwise); http_requests_total,
