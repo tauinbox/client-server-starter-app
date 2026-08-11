@@ -199,4 +199,55 @@ describe('explicit null parity with server DTOs', () => {
       expect(admin?.password).toBe('Password1');
     });
   });
+
+  // The billing pair the sweep above predates. A null amountMinor used to skip
+  // the DTO validators, then miss the "amount omitted" guard and compare as 0
+  // against the product bounds; a null mode used to slip past the cancel
+  // handler's default and reach the provider adapter as a CancelMode.
+  describe('POST /billing/purchase', () => {
+    it('rejects a null amountMinor with the server messages', async () => {
+      const res = await send('POST', '/billing/purchase', {
+        productKey: 'donation',
+        amountMinor: null
+      });
+
+      expect(res.status).toBe(400);
+      const payload = (await res.json()) as { errors: string[] };
+      expect(payload.errors).toEqual([
+        'amountMinor must not be less than 1',
+        'amountMinor must be an integer number'
+      ]);
+    });
+
+    it('keeps a null description legal, as @IsOptional() does', async () => {
+      const res = await send('POST', '/billing/purchase', {
+        productKey: 'report-pack',
+        description: null
+      });
+
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('POST /billing/subscription/cancel', () => {
+    it('rejects a null mode with the server message', async () => {
+      const res = await send('POST', '/billing/subscription/cancel', {
+        mode: null
+      });
+
+      expect(res.status).toBe(400);
+      const payload = (await res.json()) as { errors: string[] };
+      expect(payload.errors).toEqual([
+        'mode must be one of the following values: period_end, immediate'
+      ]);
+    });
+
+    it('still accepts an omitted mode', async () => {
+      // No subscription to cancel, but the body cleared validation - the 404
+      // proves the handler was reached rather than the DTO rejecting it.
+      const res = await send('POST', '/billing/subscription/cancel', {});
+
+      expect(res.status).toBe(404);
+    });
+  });
 });

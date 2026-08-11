@@ -8,6 +8,10 @@ import { CreateUserDto } from '../../modules/users/dtos/create-user.dto';
 import { UpdateUserDto } from '../../modules/users/dtos/update-user.dto';
 import { CreateFeatureFlagDto } from '../../modules/feature-flags/dtos/create-feature-flag.dto';
 import { UpdateFeatureFlagDto } from '../../modules/feature-flags/dtos/update-feature-flag.dto';
+import { PurchaseRequestDto } from '../../modules/billing/dtos/purchase-request.dto';
+import { CancelSubscriptionRequestDto } from '../../modules/billing/dtos/cancel-subscription-request.dto';
+import { RefundInvoiceRequestDto } from '../../modules/billing/dtos/refund-invoice-request.dto';
+import { RecordUsageRequestDto } from '../../modules/billing/dtos/record-usage-request.dto';
 
 // @IsOptional() skips validation for null as well as undefined, so an explicit
 // null used to be forwarded to the entity: a NOT NULL violation surfacing as a
@@ -199,6 +203,67 @@ describe('explicit null is rejected on optional fields backed by NOT NULL column
       await expect(
         validate(UpdateFeatureFlagDto, { description: null })
       ).resolves.toEqual({ description: null });
+    });
+  });
+
+  // The billing DTOs post-date the sweep above. A null amountMinor used to pass
+  // validation, skip the "amount omitted" guard (=== undefined) and then compare
+  // as 0 against the bounds, so a custom product with a zero lower bound charged
+  // - and receipted - the provider a null amount.
+  describe('billing DTOs', () => {
+    it('rejects a null amountMinor on a purchase', async () => {
+      await expectRejected(PurchaseRequestDto, {
+        productKey: 'donation',
+        amountMinor: null
+      });
+    });
+
+    it('still accepts an omitted and a valid amountMinor', async () => {
+      await expect(
+        validate(PurchaseRequestDto, { productKey: 'donation' })
+      ).resolves.toEqual({ productKey: 'donation' });
+      await expect(
+        validate(PurchaseRequestDto, {
+          productKey: 'donation',
+          amountMinor: 500
+        })
+      ).resolves.toEqual({ productKey: 'donation', amountMinor: 500 });
+    });
+
+    it('rejects a null cancel mode instead of passing it to the provider', async () => {
+      await expectRejected(CancelSubscriptionRequestDto, { mode: null });
+    });
+
+    it('still accepts an omitted and a valid cancel mode', async () => {
+      await expect(validate(CancelSubscriptionRequestDto, {})).resolves.toEqual(
+        {}
+      );
+      await expect(
+        validate(CancelSubscriptionRequestDto, { mode: 'immediate' })
+      ).resolves.toEqual({ mode: 'immediate' });
+    });
+
+    // The remaining optional billing fields default a null the same way they
+    // default an omitted property, so @IsOptional() stays correct for them.
+    it('keeps accepting a null on the fields whose consumer defaults it', async () => {
+      await expect(
+        validate(RefundInvoiceRequestDto, { amountMinor: null })
+      ).resolves.toEqual({ amountMinor: null });
+      await expect(
+        validate(PurchaseRequestDto, {
+          productKey: 'donation',
+          description: null
+        })
+      ).resolves.toEqual({ productKey: 'donation', description: null });
+      await expect(
+        validate(RecordUsageRequestDto, {
+          customerId: '123e4567-e89b-12d3-a456-426614174000',
+          meterKey: 'api_calls',
+          quantity: 1,
+          idempotencyKey: 'evt-1',
+          occurredAt: null
+        })
+      ).resolves.toMatchObject({ occurredAt: null });
     });
   });
 });
