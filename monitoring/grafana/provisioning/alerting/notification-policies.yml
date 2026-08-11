@@ -1,0 +1,14 @@
+apiVersion: 1
+
+# Mandatory, not cosmetic: without a root policy Grafana keeps routing to its
+# built-in email contact point, which would deliver a "mail is down" alert by
+# mail. Provisioning this makes the webhook the only delivery path.
+policies:
+  - orgId: 1
+    receiver: ops-webhook
+    group_by:
+      - alertname
+      - dependency
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 12h

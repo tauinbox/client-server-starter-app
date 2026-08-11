@@ -1,0 +1,95 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: platform
+    folder: Platform
+    interval: 1m
+    rules:
+      # The readiness payload stays "ok" for a degraded dependency by design, so
+      # this gauge is the only signal that distinguishes it from a healthy one.
+      - uid: nexus-dependency-degraded
+        title: Dependency degraded
+        condition: B
+        # Above the SMTP indicator's 5 min verify cache: a recovery can take one
+        # TTL to surface, and a shorter window would alert on a stale sample.
+        for: 10m
+        annotations:
+          summary: 'Dependency {{ $labels.dependency }} has been degraded for 10 minutes'
+          description: 'The readiness probe reports {{ $labels.dependency }} as degraded or down. Transactional mail (smtp) or rate limiting and cache invalidation (redis) are not working, while /health/ready keeps returning ok.'
+        labels:
+          severity: warning
+        # Server-down is covered by nexus-server-down, so an absent series here
+        # must stay silent instead of duplicating that alert.
+        noDataState: OK
+        execErrState: Error
+        isPaused: false
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: dependency_up
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    type: lt
+                    params:
+                      - 1
+
+      # Without this the dependency rule's noDataState: OK would make a dead
+      # server look identical to a healthy one.
+      - uid: nexus-server-down
+        title: Server unreachable
+        condition: B
+        for: 5m
+        annotations:
+          summary: 'Prometheus cannot scrape the API server'
+          description: 'The nestjs-server scrape target has been down for 5 minutes. Dependency alerts are suppressed while this fires.'
+        labels:
+          severity: critical
+        noDataState: Alerting
+        execErrState: Error
+        isPaused: false
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: up{job="nestjs-server"}
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    type: lt
+                    params:
+                      - 1

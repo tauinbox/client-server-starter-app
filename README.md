@@ -531,7 +531,38 @@ Services:
 - **server** — NestJS API on port 3000; entrypoint runs migrations, optional admin seed, then starts the server; exposes `GET /metrics` for Prometheus scraping; joins both `default` and the external `shared` network so a host Caddy can reach it as `server:3000`
 - **client** — Angular SPA served by nginx on port 8080; host binding `127.0.0.1:4200:8080` (localhost-only; Caddy accesses internally via `client:8080`); built with `--base-href /nexus/` (overridable via `docker build --build-arg BASE_HREF=/`); joins both `default` and the external `shared` network. Declaring `shared` in compose (not attaching it manually) keeps the proxy reachable across container recreates
 - **prometheus** — prom/prometheus:v3.12.0, internal network only (no ports exposed); scrapes `/metrics` every 15s, 30d retention; config at `monitoring/prometheus.yml`
-- **grafana** — grafana/grafana:13.0.1, accessible at port 3001; provisioned datasource (Prometheus) and the **App Metrics** dashboard (HTTP traffic, per-route p95 latency, auth events, SSE connections, Node.js runtime, an RBAC & Reliability section: permission denials, process RSS, token-reuse alarm, uptime, queue/handle health, and a Mail Queue section: BullMQ depth by state and failed/completed job counts, a Database section: connection-pool depth by state, and a Cache section: per-cache hit ratio for the Redis-backed RBAC/feature-flag caches). See [`server/README.md` → "Observability"](server/README.md#observability) for the full metric list, Prometheus alert recipes for `rbac_permission_denied_total`, and an RBAC drill-down dashboard (`doc/grafana/rbac.json`)
+- **grafana** — grafana/grafana:13.0.1, accessible at port 3001; provisioned datasource (Prometheus) and the **App Metrics** dashboard (HTTP traffic, per-route p95 latency, auth events, SSE connections, Node.js runtime, an RBAC & Reliability section: permission denials, process RSS, token-reuse alarm, uptime, queue/handle health, and a Mail Queue section: BullMQ depth by state and failed/completed job counts, a Database section: connection-pool depth by state, and a Cache section: per-cache hit ratio for the Redis-backed RBAC/feature-flag caches). See [`server/README.md` → "Observability"](server/README.md#observability) for the full metric list, Prometheus alert recipes for `rbac_permission_denied_total`, and an RBAC drill-down dashboard (`doc/grafana/rbac.json`). Grafana-managed alerting is provisioned from `monitoring/grafana/provisioning/alerting/` — see [Alerting](#alerting) below
+
+### Alerting
+
+`/health/ready` deliberately stays `ok` when a non-fatal dependency degrades (a failed SMTP verify, a
+production instance running without `REDIS_URL`), so neither the container healthcheck nor the deploy
+gate notices. The `dependency_up` gauge is the signal that does: the readiness indicators mirror their
+outcome onto it (`1` healthy, `0` degraded or down), one series per dependency.
+
+Two Grafana-managed rules watch it, provisioned as files (read-only in the UI, `provenance: file`):
+
+| Rule | Expression | `for` | No-data behaviour |
+|---|---|---|---|
+| Dependency degraded | `dependency_up < 1` | 10m | `OK` — a missing series means the server is down, which the rule below owns |
+| Server unreachable | `up{job="nestjs-server"} < 1` | 5m | `Alerting` |
+
+The 10-minute window is deliberate: `SmtpHealthIndicator` memoizes its verify for 5 minutes, so a
+sample can be one TTL stale and a shorter window would alert on an already-recovered dependency.
+Worst-case detection latency is therefore ~15 minutes, against the five and a half weeks a dead SMTP
+went unnoticed before this existed.
+
+Delivery goes to a single webhook contact point (`ops-webhook`), read from `$ALERT_WEBHOOK_URL`. The
+root notification policy is provisioned too, and is not optional: without it Grafana keeps routing to
+its built-in email contact point, which would try to deliver "mail is down" by mail.
+
+**Setting up the receiver:** create a webhook endpoint that accepts `POST` with a JSON body (an n8n
+*Webhook* node with method `POST` and "Respond immediately" is enough), then store its URL as the
+`ALERT_WEBHOOK_URL` repository secret. Both deploy workflows abort while the secret is empty, because
+Grafana refuses to start with an empty webhook URL and would take the monitoring stack down with it.
+The payload is Alertmanager-shaped: `status`, `alerts[].labels.{alertname,dependency,severity}`,
+`alerts[].annotations.{summary,description}`. Routing on `severity` (`warning` vs `critical`) or on
+`dependency` is done in the receiver, not in Grafana.
 
 ### Resource limits
 
@@ -623,6 +654,7 @@ preserved byte-for-byte. The script's header comment is the authoritative refere
 | `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` | all VPS workflows | — (SSH auth) | how Actions reaches the VPS |
 | `GITHUB_TOKEN` | all | — (GHCR login) | auto-provided by Actions |
 | `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_ROOT_URL` | deploy, rebuild | `docker-compose.yml` `${}` | Grafana container env. An empty `GRAFANA_ADMIN_PASSWORD` aborts the deploy (no silent `admin` default in prod). |
+| `ALERT_WEBHOOK_URL` | deploy, rebuild | root `.env` → `docker-compose.yml` `${}` | Where Grafana POSTs firing alerts. An empty value aborts the deploy: Grafana exits at startup when a provisioned webhook has no URL. Treat as a capability — anyone who can POST to it can inject fake alerts. |
 | `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` | deploy, rebuild, rotate-keys | `server/.env` | RS256 keypair (base64 PEM) |
 | `DB_PASSWORD` | deploy, rebuild | `server/.env` + root `.env` | must equal the postgres volume's password — see caveat below |
 | `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_SECRET`, `VK_CLIENT_SECRET` | deploy, rebuild | `server/.env` | OAuth client secrets |
@@ -852,7 +884,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1857 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1864 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 306 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 305 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and reports 299 passing, 7 skipped |
 | Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1015 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 209 tests passing |

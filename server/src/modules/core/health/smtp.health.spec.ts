@@ -2,22 +2,30 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { SmtpHealthIndicator } from './smtp.health';
 import { MailService } from '../../mail/mail.service';
+import {
+  DEPENDENCY_HEALTH_REF,
+  DependencyHealthRef,
+  createDependencyHealthRef
+} from '../metrics/dependency-up.gauge';
 
 describe('SmtpHealthIndicator', () => {
   let indicator: SmtpHealthIndicator;
   let mockMailService: { verifySmtp: jest.Mock };
+  let dependencyHealth: DependencyHealthRef;
   let warnSpy: jest.SpyInstance;
 
   beforeEach(async () => {
     mockMailService = {
       verifySmtp: jest.fn()
     };
+    dependencyHealth = createDependencyHealthRef();
     warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SmtpHealthIndicator,
-        { provide: MailService, useValue: mockMailService }
+        { provide: MailService, useValue: mockMailService },
+        { provide: DEPENDENCY_HEALTH_REF, useValue: dependencyHealth }
       ]
     }).compile();
 
@@ -37,6 +45,7 @@ describe('SmtpHealthIndicator', () => {
 
       expect(result).toEqual({ smtp: { status: 'up' } });
       expect(warnSpy).not.toHaveBeenCalled();
+      expect(dependencyHealth.statuses.get('smtp')).toBe(true);
     });
 
     it('should degrade to healthy-with-warning when SMTP connection fails', async () => {
@@ -49,6 +58,7 @@ describe('SmtpHealthIndicator', () => {
       expect(result).toEqual({
         smtp: { status: 'up', warning: 'SMTP verify failed' }
       });
+      expect(dependencyHealth.statuses.get('smtp')).toBe(false);
     });
 
     it('should not leak the SMTP error detail into the public warning', async () => {
@@ -143,6 +153,7 @@ describe('SmtpHealthIndicator', () => {
         smtp: { status: 'up', warning: 'SMTP verify failed' }
       });
       expect(recovered).toEqual({ smtp: { status: 'up' } });
+      expect(dependencyHealth.statuses.get('smtp')).toBe(true);
     });
 
     it('should issue a single verify for concurrent probes', async () => {
