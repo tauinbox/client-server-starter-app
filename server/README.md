@@ -167,7 +167,7 @@ src/
 │   ├── enums/              # OAuthProvider
 │   └── dto/                # LoginDto, RegisterDto, UpdateProfileDto, VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto
 ├── audit/
-│   ├── audit.service.ts         # AuditService — records 20 security-sensitive actions to audit_logs table
+│   ├── audit.service.ts         # AuditService — records 41 security-sensitive actions to audit_logs table
 │   ├── audit-cleanup.service.ts # AuditCleanupService — nightly cron deletes entries older than AUDIT_LOG_RETENTION_DAYS days
 │   ├── decorators/              # @LogAudit({action,targetType,targetIdParam?,targetIdFromResponse?,details?}) declarative audit logging
 │   ├── interceptors/            # AuditLogInterceptor — global APP_INTERCEPTOR reads @LogAudit metadata and fires logFireAndForget after success

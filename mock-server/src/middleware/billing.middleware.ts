@@ -10,6 +10,7 @@ import type {
 } from '@app/shared/types';
 import {
   getState,
+  logAudit,
   toCreditBalanceResponse,
   toInvoiceResponse,
   toPaymentMethodResponse,
@@ -970,6 +971,27 @@ billingRouter.get(
 // ---------------------------------------------------------------------------
 const billingAdminRouter = Router();
 
+// Mirrors the server's @LogAudit on the admin billing mutations: the entry is
+// written only after the handler has succeeded, with the same action names,
+// target types and projected detail fields.
+function auditAdminAction(
+  req: Request,
+  action: string,
+  targetType: string,
+  targetId: string,
+  details: Record<string, unknown>
+): void {
+  const { user } = req as AuthenticatedRequest;
+  logAudit(action, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    targetId,
+    targetType,
+    details,
+    ip: req.ip
+  });
+}
+
 billingAdminRouter.get(
   '/subscriptions',
   adminGuard,
@@ -1017,6 +1039,13 @@ billingAdminRouter.post(
       sub.cancelAtPeriodEnd = true;
     }
     sub.updatedAt = new Date().toISOString();
+    auditAdminAction(
+      req,
+      'BILLING_SUBSCRIPTION_CANCEL',
+      'Subscription',
+      sub.id,
+      { mode }
+    );
     res.json(toSubscriptionResponse(sub));
   }
 );
@@ -1111,6 +1140,9 @@ billingAdminRouter.post(
       revokeOneTimeEffects(invoice);
     }
     invoice.updatedAt = new Date().toISOString();
+    auditAdminAction(req, 'BILLING_INVOICE_REFUND', 'Invoice', invoice.id, {
+      amountMinor: amountMinor ?? null
+    });
     res.json(toInvoiceResponse(invoice));
   }
 );
@@ -1180,6 +1212,13 @@ billingAdminRouter.post('/usage', adminGuard, (req: Request, res: Response) => {
     (r) => r.customerId === customerId && r.idempotencyKey === idempotencyKey
   );
   if (existing) {
+    // The server audits by response, so an idempotent replay is recorded too,
+    // pointing at the original record's id.
+    auditAdminAction(req, 'BILLING_USAGE_RECORD', 'UsageRecord', existing.id, {
+      customerId,
+      meterKey,
+      quantity
+    });
     res.status(201).json(toUsageResponse(existing));
     return;
   }
@@ -1239,6 +1278,11 @@ billingAdminRouter.post('/usage', adminGuard, (req: Request, res: Response) => {
     recordedAt: now
   };
   state.billingUsageRecords.set(record.id, record);
+  auditAdminAction(req, 'BILLING_USAGE_RECORD', 'UsageRecord', record.id, {
+    customerId,
+    meterKey,
+    quantity
+  });
   res.status(201).json(toUsageResponse(record));
 });
 
