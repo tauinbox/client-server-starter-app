@@ -73,7 +73,7 @@ function cancelBodyErrors(body: unknown): string[] {
   const fields = body as Record<string, unknown> | undefined;
   return [
     ...unknownPropertyErrors(body, CANCEL_KEYS),
-    ...oneOfErrors('mode', fields?.['mode'], CANCEL_MODES, true)
+    ...oneOfErrors('mode', fields?.['mode'], CANCEL_MODES, 'definedOnly')
   ];
 }
 
@@ -405,20 +405,18 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
       }),
       ...intErrors('amountMinor', body?.['amountMinor'], {
         min: 1,
-        optional: true
+        optional: 'definedOnly'
       }),
       ...trimmedStringErrors('description', body?.['description'], {
         max: 128,
-        optional: true
+        optional: 'nullable'
       })
     ])
   ) {
     return;
   }
   const productKey = (body?.['productKey'] as string).trim();
-  // `null` reaches the bounds check as the server's does: @IsOptional() skips
-  // an explicit null, so it is not the "amount omitted" case.
-  const requestedMinor = body?.['amountMinor'] as number | null | undefined;
+  const requestedMinor = body?.['amountMinor'] as number | undefined;
 
   const product = [...getState().billingProducts.values()].find(
     (p) => p.key === productKey
@@ -473,15 +471,14 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
       });
       return;
     }
-    const requested = requestedMinor as number;
-    if (requested < minAmountMinor || requested > maxAmountMinor) {
+    if (requestedMinor < minAmountMinor || requestedMinor > maxAmountMinor) {
       res.status(400).json({
         message: `amountMinor must be between ${minAmountMinor} and ${maxAmountMinor}`,
         statusCode: 400
       });
       return;
     }
-    amountMinor = requested;
+    amountMinor = requestedMinor;
   }
 
   const sessionRef = uuidv4();
@@ -1071,7 +1068,10 @@ billingAdminRouter.post(
     if (
       rejectInvalidBody(res, [
         ...unknownPropertyErrors(req.body, ['amountMinor']),
-        ...intErrors('amountMinor', amountMinor, { min: 1, optional: true })
+        ...intErrors('amountMinor', amountMinor, {
+          min: 1,
+          optional: 'nullable'
+        })
       ])
     ) {
       return;

@@ -67,12 +67,28 @@ export function unknownPropertyErrors(
     .map((key) => `property ${key} should not exist`);
 }
 
+/**
+ * How the DTO marks the field optional. `@IsOptional()` (`nullable`) skips the
+ * remaining validators for an explicit `null` as well as an omitted property;
+ * `@ValidateIf(propertyIsDefined)` (`definedOnly`) skips only the omitted one,
+ * so a `null` falls through and fails the validators the way any other
+ * wrong-typed value does.
+ */
+export type OptionalMode = 'nullable' | 'definedOnly';
+
+function isSkipped(
+  value: unknown,
+  optional: OptionalMode | undefined
+): boolean {
+  if (optional === undefined) return false;
+  return value === undefined || (optional === 'nullable' && value === null);
+}
+
 interface TrimmedStringRules {
   /** Omitted for a field carrying no `@MinLength`. */
   min?: number;
   max: number;
-  /** `@IsOptional()`, which skips both `undefined` and an explicit `null`. */
-  optional?: boolean;
+  optional?: OptionalMode;
 }
 
 /**
@@ -85,7 +101,7 @@ export function trimmedStringErrors(
   value: unknown,
   rules: TrimmedStringRules
 ): string[] {
-  if (rules.optional && (value === undefined || value === null)) return [];
+  if (isSkipped(value, rules.optional)) return [];
 
   const trimmed = typeof value === 'string' ? value.trim() : value;
   const errors: string[] = [];
@@ -103,7 +119,7 @@ interface IntRules {
   min: number;
   /** Omitted for a field carrying no `@Max`. */
   max?: number;
-  optional?: boolean;
+  optional?: OptionalMode;
 }
 
 /** Mirrors `@IsInt() @Min(min) @Max(max)`, reported Max, Min, IsInt. */
@@ -112,7 +128,7 @@ export function intErrors(
   value: unknown,
   rules: IntRules
 ): string[] {
-  if (rules.optional && (value === undefined || value === null)) return [];
+  if (isSkipped(value, rules.optional)) return [];
 
   const numeric = typeof value === 'number' ? value : null;
   const errors: string[] = [];
@@ -166,9 +182,9 @@ export function oneOfErrors(
   field: string,
   value: unknown,
   values: readonly string[],
-  optional = false
+  optional?: OptionalMode
 ): string[] {
-  if (optional && (value === undefined || value === null)) return [];
+  if (isSkipped(value, optional)) return [];
   return values.includes(value as string)
     ? []
     : [`${field} must be one of the following values: ${values.join(', ')}`];

@@ -4,10 +4,12 @@ import {
   IsString,
   MaxLength,
   Min,
-  MinLength
+  MinLength,
+  ValidateIf
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
+import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 
 export class PurchaseRequestDto {
   @ApiProperty({
@@ -27,7 +29,9 @@ export class PurchaseRequestDto {
       'Amount in minor units for a custom-amount product (validated against the product bounds). Ignored for fixed-price products — the server price is authoritative.',
     example: 150000
   })
-  @IsOptional()
+  // Defined-only, not @IsOptional(): the amount is read as a number, so an
+  // explicit null has to fail the bounds check rather than be skipped by it.
+  @ValidateIf(propertyIsDefined)
   @IsInt()
   @Min(1)
   amountMinor?: number;
