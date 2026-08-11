@@ -60,6 +60,12 @@ upsert YOOKASSA_SECRET_KEY    "${YOOKASSA_SECRET_KEY:-}"    "$SERVER_ENV"
 # DB_PASSWORD also feeds the postgres `db` service via root .env — keep in sync.
 upsert DB_PASSWORD            "${DB_PASSWORD:-}"            "$ROOT_ENV"
 
+# Grafana reads the alert webhook from the compose environment, so it belongs in
+# root .env rather than server/.env. Persisting it there (instead of relying on
+# the workflow's exported variable) means a manual `docker compose up` on the
+# host keeps the real contact point instead of the unroutable compose default.
+upsert ALERT_WEBHOOK_URL      "${ALERT_WEBHOOK_URL:-}"      "$ROOT_ENV"
+
 [ -f "$SERVER_ENV" ] && chmod 600 "$SERVER_ENV"
 [ -f "$ROOT_ENV" ]   && chmod 600 "$ROOT_ENV"
 

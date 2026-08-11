@@ -138,7 +138,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: DEPLOY_SHA,OWNER,GRAFANA_ADMIN_PASSWORD,GRAFANA_ROOT_URL,JWT_PRIVATE_KEY,JWT_PUBLIC_KEY,DB_PASSWORD,GOOGLE_CLIENT_SECRET,FACEBOOK_CLIENT_SECRET,VK_CLIENT_SECRET,ADMIN_PASSWORD,SMTP_HOST,SMTP_PORT,SMTP_USER,SMTP_PASS,SMTP_FROM,TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,PADDLE_API_KEY,PADDLE_WEBHOOK_SECRET,YOOKASSA_SHOP_ID,YOOKASSA_SECRET_KEY
+          envs: DEPLOY_SHA,OWNER,GRAFANA_ADMIN_PASSWORD,GRAFANA_ROOT_URL,ALERT_WEBHOOK_URL,JWT_PRIVATE_KEY,JWT_PUBLIC_KEY,DB_PASSWORD,GOOGLE_CLIENT_SECRET,FACEBOOK_CLIENT_SECRET,VK_CLIENT_SECRET,ADMIN_PASSWORD,SMTP_HOST,SMTP_PORT,SMTP_USER,SMTP_PASS,SMTP_FROM,TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,PADDLE_API_KEY,PADDLE_WEBHOOK_SECRET,YOOKASSA_SHOP_ID,YOOKASSA_SECRET_KEY
           script: |
             set -euo pipefail
             cd /home/deploy/nexus
@@ -160,6 +160,15 @@ jobs:
             # Fail before touching any container — the running stack is untouched.
             if [ -z "${GRAFANA_ADMIN_PASSWORD:-}" ]; then
               echo "ERROR: GRAFANA_ADMIN_PASSWORD is empty — refusing to deploy with the default 'admin' password. Set the GRAFANA_ADMIN_PASSWORD repository secret." >&2
+              exit 1
+            fi
+
+            # Refuse to deploy without an alert webhook. Grafana provisions its
+            # contact point from this URL and exits during startup when it is
+            # empty, so an unset secret would take the whole monitoring stack
+            # down — and a compose default would leave alerts silently undelivered.
+            if [ -z "${ALERT_WEBHOOK_URL:-}" ]; then
+              echo "ERROR: ALERT_WEBHOOK_URL is empty — Grafana would fail to provision its alert contact point and exit. Set the ALERT_WEBHOOK_URL repository secret." >&2
               exit 1
             fi
 
@@ -254,6 +263,7 @@ jobs:
           OWNER: ${{ needs.build-push.outputs.owner }}
           GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
           GRAFANA_ROOT_URL: ${{ secrets.GRAFANA_ROOT_URL }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
           JWT_PRIVATE_KEY: ${{ secrets.JWT_PRIVATE_KEY }}
           JWT_PUBLIC_KEY: ${{ secrets.JWT_PUBLIC_KEY }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}

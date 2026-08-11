@@ -200,6 +200,14 @@ services:
       # "permission denied" against the read-only bundled-plugin path and adds
       # startup churn. We don't use Elasticsearch, so opt out of the update.
       GF_PLUGINS_PREINSTALL_AUTO_UPDATE: "false"
+      # Consumed by monitoring/grafana/provisioning/alerting/contact-points.yml.
+      # Grafana refuses to start when a provisioned webhook has an empty url, so
+      # the placeholder keeps a local `docker compose up` bootable. Deployments
+      # never reach it: both workflows fail when the secret is empty, and
+      # sync-prod-env.sh writes the real URL into .env so it also survives a
+      # manual restart. Keep it out of the repo - whoever can POST to it can
+      # inject fake alerts.
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-http://127.0.0.1:9/alerting-not-configured}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro

@@ -2,6 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HealthIndicatorService } from '@nestjs/terminus';
 import { ConfigService } from '@nestjs/config';
 import { RedisHealthIndicator } from './redis.health';
+import {
+  DEPENDENCY_HEALTH_REF,
+  DependencyHealthRef,
+  createDependencyHealthRef
+} from '../metrics/dependency-up.gauge';
 
 const pingMock = jest.fn();
 const disconnectMock = jest.fn();
@@ -23,10 +28,12 @@ jest.mock('ioredis', () => ({
 describe('RedisHealthIndicator', () => {
   let indicator: RedisHealthIndicator;
   let configValues: Record<string, string | undefined>;
+  let dependencyHealth: DependencyHealthRef;
 
   beforeEach(async () => {
     jest.clearAllMocks();
     configValues = {};
+    dependencyHealth = createDependencyHealthRef();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -35,7 +42,8 @@ describe('RedisHealthIndicator', () => {
         {
           provide: ConfigService,
           useValue: { get: jest.fn((key: string) => configValues[key]) }
-        }
+        },
+        { provide: DEPENDENCY_HEALTH_REF, useValue: dependencyHealth }
       ]
     }).compile();
 
@@ -50,6 +58,7 @@ describe('RedisHealthIndicator', () => {
 
       expect(result).toEqual({ redis: { status: 'up' } });
       expect(redisCtorMock).not.toHaveBeenCalled();
+      expect(dependencyHealth.statuses.get('redis')).toBe(true);
     });
 
     it('reports up with a warning in production', async () => {
@@ -59,6 +68,14 @@ describe('RedisHealthIndicator', () => {
 
       expect(result['redis'].status).toBe('up');
       expect(result['redis']['warning']).toContain('REDIS_URL not set');
+    });
+
+    it('marks the dependency degraded in production so the warning is alertable', async () => {
+      configValues['ENVIRONMENT'] = 'production';
+
+      await indicator.isHealthy('redis');
+
+      expect(dependencyHealth.statuses.get('redis')).toBe(false);
     });
   });
 
@@ -74,6 +91,7 @@ describe('RedisHealthIndicator', () => {
 
       expect(result).toEqual({ redis: { status: 'up' } });
       expect(pingMock).toHaveBeenCalledTimes(1);
+      expect(dependencyHealth.statuses.get('redis')).toBe(true);
     });
 
     it('reports down when PING fails', async () => {
@@ -84,6 +102,7 @@ describe('RedisHealthIndicator', () => {
       expect(result).toEqual({
         redis: { status: 'down', message: 'Redis ping failed' }
       });
+      expect(dependencyHealth.statuses.get('redis')).toBe(false);
     });
 
     it('reports down when PING hangs past the timeout', async () => {

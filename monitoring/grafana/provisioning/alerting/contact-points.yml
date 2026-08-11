@@ -1,0 +1,13 @@
+apiVersion: 1
+
+# The URL is injected from the environment so the webhook (a capability - anyone
+# able to POST to it can inject fake alerts) stays out of the repository.
+contactPoints:
+  - orgId: 1
+    name: ops-webhook
+    receivers:
+      - uid: ops-webhook
+        type: webhook
+        settings:
+          url: $ALERT_WEBHOOK_URL
+          httpMethod: POST

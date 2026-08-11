@@ -148,7 +148,8 @@ src/
 │   │                       #   dead Redis fails readiness (2 s timeout), missing REDIS_URL in production and SMTP failures degrade to a generic
 │   │                       #   warning — the raw SMTP error is logged server-side, never returned to the public endpoint;
 │   │                       #   the SMTP verify result is cached for 5 min behind an in-flight guard, so probing does not re-authenticate
-│   │                       #   against the provider on every request)
+│   │                       #   against the provider on every request; every outcome is mirrored onto the dependency_up gauge,
+│   │                       #   which is what makes a degraded-but-"up" dependency alertable)
 │   ├── metrics/            # MetricsModule (@Global) — Prometheus metrics via @willsoto/nestjs-prometheus
 │   │                       #   GET /metrics (excluded from /api prefix, gated by InternalNetworkGuard — loopback/private/
 │   │                       #   unique-local req.ip only, 403 otherwise); http_requests_total,
@@ -156,7 +157,7 @@ src/
 │   │                       #   rbac_permission_denied_total{action,subject,level},
 │   │                       #   mail_queue_jobs{state}, mail_jobs_processed_total{outcome},
 │   │                       #   db_pool_connections{state}, cache_requests_total{cache,outcome},
-│   │                       #   billing_usage_records_unrated_total{meter};
+│   │                       #   billing_usage_records_unrated_total{meter}, dependency_up{dependency};
 │   │                       #   HttpMetricsInterceptor
 │   └── schedule/           # @nestjs/schedule for cron jobs
 ├── auth/
@@ -596,6 +597,7 @@ peer. Counters and histograms:
 | `mail_jobs_processed_total` | counter | `outcome` ∈ `completed`, `failed` | Mail jobs processed by the queue worker. `failed` counts each failed attempt, including retries |
 | `db_pool_connections` | gauge | `state` ∈ `total`, `idle`, `waiting` | PostgreSQL connection-pool size by state, read from the pg pool on the injected `DataSource`. A sustained `waiting` > 0 means the pool is exhausted and requests are queuing |
 | `cache_requests_total` | counter | `cache` ∈ `permissions`, `roles`, `resources`, `feature_flags`, `feature_flags_all`, `outcome` ∈ `hit`, `miss` | Redis-backed cache lookups by logical cache and outcome. Hit ratio = `hit / (hit + miss)` per `cache`; a persistently low ratio means the cache is invalidated faster than it serves hits |
+| `dependency_up` | gauge | `dependency` ∈ `smtp`, `redis` | Health of an external dependency as last observed by `/health/ready` (`1` healthy, `0` degraded or down). A series appears only once its indicator has run, so a deployment that does not configure SMTP never emits `dependency="smtp"`. This is the only machine-readable signal for the degradations readiness deliberately reports as `up` — see [Alerting](../README.md#alerting) |
 | `billing_usage_records_unrated_total` | counter | `meter` | Usage records stored under a meter the customer's current plan does not price. Expected to be non-zero while a customer meters a product they are not yet subscribed to; a sustained rise on one `meter` means a producer is keyed wrong and its units are silently not billing. Label cardinality is bounded by the plan catalog — ingest refuses a meter no plan declares |
 
 Plus the default Node.js process metrics (heap, GC, event-loop lag, file

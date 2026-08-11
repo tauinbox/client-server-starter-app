@@ -1,6 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { HealthIndicator, HealthIndicatorResult } from '@nestjs/terminus';
 import { MailService } from '../../mail/mail.service';
+import {
+  DEPENDENCY_HEALTH_REF,
+  DependencyHealthRef
+} from '../metrics/dependency-up.gauge';
 
 // verifySmtp() opens a fresh connection and runs EHLO + AUTH against the
 // provider on every call, and the container healthcheck probes /ready every
@@ -14,15 +18,21 @@ export class SmtpHealthIndicator extends HealthIndicator {
   private cached?: { ok: boolean; at: number };
   private inFlight?: Promise<boolean>;
 
-  constructor(private readonly mailService: MailService) {
+  constructor(
+    private readonly mailService: MailService,
+    @Inject(DEPENDENCY_HEALTH_REF)
+    private readonly dependencyHealth: DependencyHealthRef
+  ) {
     super();
   }
 
-  // The API serves all traffic without working email, so a failed SMTP verify
-  // degrades to healthy-with-warning (mirrors RedisHealthIndicator). The
-  // warning stays generic: /health/ready is public, detail goes to the log.
+  // The API serves all traffic without working email, so a failed verify
+  // degrades to healthy-with-warning (mirrors RedisHealthIndicator) and the
+  // warning stays generic - /health/ready is public. Because the payload stays
+  // green, the gauge is the only alertable signal of the degraded state.
   async isHealthy(key: string): Promise<HealthIndicatorResult> {
     const ok = await this.verify();
+    this.dependencyHealth.statuses.set(key, ok);
     return ok
       ? this.getStatus(key, true)
       : this.getStatus(key, true, {

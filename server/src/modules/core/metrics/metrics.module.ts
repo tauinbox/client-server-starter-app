@@ -11,6 +11,13 @@ import { Gauge, register } from 'prom-client';
 import { MetricsService } from './metrics.service';
 import { MetricsController } from './metrics.controller';
 import { DB_POOL_METRIC_NAME, createDbPoolGauge } from './db-pool.gauge';
+import {
+  DEPENDENCY_HEALTH_REF,
+  DEPENDENCY_UP_METRIC_NAME,
+  DependencyHealthRef,
+  createDependencyHealthRef,
+  createDependencyUpGauge
+} from './dependency-up.gauge';
 
 export interface SseConnectionsRef {
   getCount: () => number;
@@ -136,8 +143,23 @@ export const MAIL_QUEUE_REF = Symbol('MAIL_QUEUE_REF');
       useFactory: (dataSource: DataSource): Gauge<string> =>
         createDbPoolGauge(dataSource),
       inject: [getDataSourceToken()]
+    },
+    {
+      provide: DEPENDENCY_HEALTH_REF,
+      useFactory: createDependencyHealthRef
+    },
+    {
+      provide: getToken(DEPENDENCY_UP_METRIC_NAME),
+      useFactory: (ref: DependencyHealthRef): Gauge<string> =>
+        createDependencyUpGauge(ref),
+      inject: [DEPENDENCY_HEALTH_REF]
     }
   ],
-  exports: [MetricsService, SSE_CONNECTIONS_REF, MAIL_QUEUE_REF]
+  exports: [
+    MetricsService,
+    SSE_CONNECTIONS_REF,
+    MAIL_QUEUE_REF,
+    DEPENDENCY_HEALTH_REF
+  ]
 })
 export class MetricsModule {}
