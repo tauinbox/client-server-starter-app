@@ -291,7 +291,8 @@ export class UsersController {
     const updatedUser = await this.usersService.update(
       id,
       updateUserDto,
-      ability
+      ability,
+      req.user.userId
     );
     const emailChanged =
       previousEmail !== undefined && updatedUser.email !== previousEmail;
@@ -353,7 +354,7 @@ export class UsersController {
     @CurrentAbility() ability: AppAbility
   ) {
     const user = await this.usersService.findOne(id);
-    await this.usersService.remove(id, ability);
+    await this.usersService.remove(id, ability, req.user.userId);
     this.eventEmitter.emit(UserDeletedEvent.name, new UserDeletedEvent(id));
     await this.auditService.log({
       action: AuditAction.USER_DELETE,
@@ -388,7 +389,11 @@ export class UsersController {
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    const restoredUser = await this.usersService.restore(id, ability);
+    const restoredUser = await this.usersService.restore(
+      id,
+      ability,
+      req.user.userId
+    );
     await this.auditService.log({
       action: AuditAction.USER_RESTORE,
       actorId: req.user.userId,

@@ -375,7 +375,7 @@ describe('UsersController', () => {
   // ── update ────────────────────────────────────────────────────────
 
   describe('update', () => {
-    it('should call usersService.update with id, dto and ability, and return the updated user', async () => {
+    it('should call usersService.update with id, dto, ability and actor, and return the updated user', async () => {
       const dto: UpdateUserDto = { firstName: 'Updated', isActive: false };
       const updatedUser = { id: 'user-5', firstName: 'Updated' };
       usersServiceMock.update.mockResolvedValue(updatedUser);
@@ -386,7 +386,8 @@ describe('UsersController', () => {
       expect(usersServiceMock.update).toHaveBeenCalledWith(
         'user-5',
         dto,
-        mockAbility
+        mockAbility,
+        'user-1'
       );
       expect(result).toBe(updatedUser);
     });
@@ -629,7 +630,7 @@ describe('UsersController', () => {
   // ── remove ────────────────────────────────────────────────────────
 
   describe('remove', () => {
-    it('should call usersService.findOne and usersService.remove with the id and ability', async () => {
+    it('should call usersService.findOne and usersService.remove with the id, ability and actor', async () => {
       const user = { id: 'user-7', email: 'del@example.com' };
       usersServiceMock.findOne.mockResolvedValue(user);
       usersServiceMock.remove.mockResolvedValue(undefined);
@@ -640,7 +641,8 @@ describe('UsersController', () => {
       expect(usersServiceMock.findOne).toHaveBeenCalledWith('user-7');
       expect(usersServiceMock.remove).toHaveBeenCalledWith(
         'user-7',
-        mockAbility
+        mockAbility,
+        'user-1'
       );
     });
 
@@ -732,7 +734,7 @@ describe('UsersController', () => {
   // ── restore ───────────────────────────────────────────────────────
 
   describe('restore', () => {
-    it('should call usersService.restore with the id and ability, and return the restored user', async () => {
+    it('should call usersService.restore with the id, ability and actor, and return the restored user', async () => {
       const restoredUser = { id: 'user-8', email: 'restored@example.com' };
       usersServiceMock.restore.mockResolvedValue(restoredUser);
       const req = mockJwtRequest() as JwtAuthRequest;
@@ -741,7 +743,8 @@ describe('UsersController', () => {
 
       expect(usersServiceMock.restore).toHaveBeenCalledWith(
         'user-8',
-        mockAbility
+        mockAbility,
+        'user-1'
       );
       expect(result).toBe(restoredUser);
     });

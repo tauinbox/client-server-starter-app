@@ -483,6 +483,26 @@ describe('RoleService', () => {
       expect(canSpy).toHaveBeenCalledWith('update', targetUser);
     });
 
+    it('records the denying actor on the denial audit row', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRoleRepo.manager.findOne.mockResolvedValue({ id: 'user-99' } as User);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
+
+      await expect(
+        service.removeRoleFromUser('user-99', 'role-2', ability, 'actor-1')
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PERMISSION_CHECK_FAILURE',
+          actorId: 'actor-1',
+          targetId: 'user-99',
+          targetType: 'User'
+        })
+      );
+    });
+
     it('should proceed when ability allows update on target user', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       const targetUser = { id: 'user-1' } as User;

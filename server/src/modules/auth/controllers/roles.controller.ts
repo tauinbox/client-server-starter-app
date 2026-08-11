@@ -347,12 +347,14 @@ export class RolesController {
   async removeRole(
     @Param('userId', ParseUUIDPipe) userId: string,
     @Param('roleId', ParseUUIDPipe) roleId: string,
-    @CurrentAbility() ability: AppAbility
+    @CurrentAbility() ability: AppAbility,
+    @Req() req: JwtAuthRequest
   ) {
     const result = await this.roleService.removeRoleFromUser(
       userId,
       roleId,
-      ability
+      ability,
+      req.user?.userId
     );
     this.eventEmitter.emit(
       UserRoleChangedEvent.name,

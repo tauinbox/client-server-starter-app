@@ -374,7 +374,8 @@ export class RoleService {
   async removeRoleFromUser(
     userId: string,
     roleId: string,
-    ability?: AppAbility
+    ability?: AppAbility,
+    actorId?: string
   ): Promise<void> {
     const targetUser = await this.loadRoleAssignmentTarget(userId);
     const role = await this.findOne(roleId);
@@ -393,7 +394,7 @@ export class RoleService {
         'update',
         subject('User', targetUser),
         this.auditService,
-        { targetId: userId, targetType: 'User' },
+        { actorId, targetId: userId, targetType: 'User' },
         this.metricsService
       );
     }

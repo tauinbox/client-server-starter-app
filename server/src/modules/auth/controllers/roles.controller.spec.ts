@@ -347,13 +347,14 @@ describe('RolesController', () => {
   });
 
   describe('removeRole', () => {
-    it('should call roleService.removeRoleFromUser with userId, roleId and ability', async () => {
-      await controller.removeRole('user-99', 'role-1', mockAbility);
+    it('should call roleService.removeRoleFromUser with userId, roleId, ability and actor', async () => {
+      await controller.removeRole('user-99', 'role-1', mockAbility, mockReq);
 
       expect(roleServiceMock.removeRoleFromUser).toHaveBeenCalledWith(
         'user-99',
         'role-1',
-        mockAbility
+        mockAbility,
+        'actor-1'
       );
     });
 
@@ -361,7 +362,8 @@ describe('RolesController', () => {
       const result = await controller.removeRole(
         'user-99',
         'role-1',
-        mockAbility
+        mockAbility,
+        mockReq
       );
 
       expect(result).toBeUndefined();
