@@ -363,7 +363,7 @@ fullstack-starter-app/
         ├── middleware/      # Route handlers (auth, users, OAuth, notifications) + guards
         ├── sse-hub.ts      # SSE connection registry and push helpers
         ├── helpers/        # Auth helper utilities + requireUuid param guard
-        ├── utils/          # mockId (slug -> stable UUID), cursor, period, listen
+        ├── utils/          # mockId (slug -> stable UUID), cursor, period, listen, validation (class-validator mirrors)
         └── control.routes.ts  # Test control API (reset, seed, notify, invalidate-access-tokens, revoke-user-sessions)
 ```
 
@@ -376,6 +376,14 @@ Request bodies follow the same rule: the server's global `ValidationPipe` runs b
 that fails its DTO is a 400 whether or not the addressed row exists. Mock handlers therefore run their
 DTO-shape checks (type, length, enum, range) ahead of the entity lookup, and keep checks that need the
 looked-up row - uniqueness, state transitions, remaining-total comparisons - below the 404.
+
+The pipe also runs with `whitelist` + `forbidNonWhitelisted`, so a property no DTO declares is a 400 by
+itself. `utils/validation.ts` mirrors the individual class-validator constraints (`unknownPropertyErrors`,
+`trimmedStringErrors`, `intErrors`, `uuidErrors`, `iso8601Errors`, `oneOfErrors`) with the real validator's
+message text and ordering - unknown properties first, then each property as declared - so a handler composes
+its DTO from them and answers with the same envelope the server would. Note that `@IsUUID()` on a body field
+is stricter than `ParseUUIDPipe` on a route param: it constrains the version and variant nibbles, so an id
+can be a valid path parameter and an invalid body field.
 
 All three workspaces import from `@app/shared/*` path alias (maps to `../shared/src/*` in each workspace's `tsconfig.json`).
 
@@ -848,7 +856,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 | Server E2E tests | Jest | Separate config in `test/` | 302 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 301 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and reports 295 passing, 7 skipped |
 | Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1015 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 209 tests passing |
-| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 333 tests passing |
+| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 359 tests passing |
 
 ## CI/CD
 
