@@ -35,15 +35,16 @@ export function requireUuid(...params: string[]): RequestHandler {
  * A 400 the server raises from service logic carries no `errors` key and must
  * keep sending a bare `{ message, statusCode }` here.
  */
-export function validationError(message: string): {
+export function validationError(message: string | string[]): {
   message: string;
   errors: string[];
   statusCode: number;
   error: string;
 } {
+  const errors = Array.isArray(message) ? message : [message];
   return {
-    message,
-    errors: [message],
+    message: errors.join('. '),
+    errors,
     statusCode: 400,
     error: 'Bad Request'
   };

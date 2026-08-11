@@ -120,7 +120,9 @@ describe('validation-error envelope parity with server', () => {
       );
 
       expect(status).toBe(400);
-      expect(body.errors).toEqual(['region must be one of: auto, ru, world']);
+      expect(body.errors).toEqual([
+        'region must be one of the following values: auto, ru, world'
+      ]);
     });
 
     it('feature-flags: creating a flag with a malformed key', async () => {

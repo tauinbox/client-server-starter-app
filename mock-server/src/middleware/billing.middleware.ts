@@ -33,8 +33,49 @@ import {
   requireUuid,
   validationError
 } from '../helpers/validation-error.helpers';
+import {
+  intErrors,
+  iso8601Errors,
+  oneOfErrors,
+  trimmedStringErrors,
+  unknownPropertyErrors,
+  uuidErrors
+} from '../utils/validation';
 
 const router = Router();
+
+const CANCEL_KEYS = ['mode'] as const;
+const CANCEL_MODES = ['period_end', 'immediate'] as const;
+
+/**
+ * Replies with the class-validator envelope and returns true when anything
+ * failed. Each handler states the keys of its own request DTO and collects the
+ * messages in the order the server reports them: unknown properties first
+ * (the pipe whitelists before it validates), then each property as declared.
+ */
+function rejectInvalidBody(res: Response, errors: string[]): boolean {
+  if (errors.length === 0) return false;
+  res.status(400).json(validationError(errors));
+  return true;
+}
+
+/** Checkout and plan change share a single-`planKey` DTO with the same bounds. */
+function planKeyBodyErrors(body: unknown): string[] {
+  const fields = body as Record<string, unknown> | undefined;
+  return [
+    ...unknownPropertyErrors(body, ['planKey']),
+    ...trimmedStringErrors('planKey', fields?.['planKey'], { min: 1, max: 100 })
+  ];
+}
+
+/** Both cancel routes take the same optional `mode` DTO. */
+function cancelBodyErrors(body: unknown): string[] {
+  const fields = body as Record<string, unknown> | undefined;
+  return [
+    ...unknownPropertyErrors(body, CANCEL_KEYS),
+    ...oneOfErrors('mode', fields?.['mode'], CANCEL_MODES, true)
+  ];
+}
 
 // Provider webhook receivers. Public — providers verify their own authenticity,
 // so there is no JWT. The mock has no real signature to check, so it mirrors
@@ -350,22 +391,34 @@ billingRouter.get('/credits', authGuard, (req: Request, res: Response) => {
 // /__control/billing/complete-purchase settles the way the paid webhook would.
 billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
-  const productKey =
-    typeof req.body?.productKey === 'string' ? req.body.productKey.trim() : '';
-  if (!productKey) {
-    res.status(400).json(validationError('productKey must be a string'));
-    return;
-  }
-  const requestedMinor = req.body?.amountMinor as unknown;
+  const body = req.body as Record<string, unknown> | undefined;
   if (
-    requestedMinor !== undefined &&
-    (!Number.isInteger(requestedMinor) || (requestedMinor as number) < 1)
+    rejectInvalidBody(res, [
+      ...unknownPropertyErrors(body, [
+        'productKey',
+        'amountMinor',
+        'description'
+      ]),
+      ...trimmedStringErrors('productKey', body?.['productKey'], {
+        min: 1,
+        max: 100
+      }),
+      ...intErrors('amountMinor', body?.['amountMinor'], {
+        min: 1,
+        optional: true
+      }),
+      ...trimmedStringErrors('description', body?.['description'], {
+        max: 128,
+        optional: true
+      })
+    ])
   ) {
-    res
-      .status(400)
-      .json(validationError('amountMinor must be a positive integer'));
     return;
   }
+  const productKey = (body?.['productKey'] as string).trim();
+  // `null` reaches the bounds check as the server's does: @IsOptional() skips
+  // an explicit null, so it is not the "amount omitted" case.
+  const requestedMinor = body?.['amountMinor'] as number | null | undefined;
 
   const product = [...getState().billingProducts.values()].find(
     (p) => p.key === productKey
@@ -451,12 +504,10 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
 // POST /billing/checkout — start a hosted checkout for a plan.
 billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
-  const planKey =
-    typeof req.body?.planKey === 'string' ? req.body.planKey.trim() : '';
-  if (!planKey) {
-    res.status(400).json(validationError('planKey must be a string'));
-    return;
-  }
+  if (rejectInvalidBody(res, planKeyBodyErrors(req.body))) return;
+  const planKey = (
+    (req.body as Record<string, unknown>)['planKey'] as string
+  ).trim();
 
   const plan = [...getState().plans.values()].find(
     (p) => p.key === planKey && p.active
@@ -595,12 +646,10 @@ interface ChangeGuardResult {
 /** Shared guards of change/preview; replies with the error and returns null. */
 function guardChange(req: Request, res: Response): ChangeGuardResult | null {
   const { user } = req as AuthenticatedRequest;
-  const planKey =
-    typeof req.body?.planKey === 'string' ? req.body.planKey.trim() : '';
-  if (!planKey) {
-    res.status(400).json(validationError('planKey must be a string'));
-    return null;
-  }
+  if (rejectInvalidBody(res, planKeyBodyErrors(req.body))) return null;
+  const planKey = (
+    (req.body as Record<string, unknown>)['planKey'] as string
+  ).trim();
 
   const customer = findCustomer(user.id);
   const sub = customer ? findCurrentSubscription(customer.id) : undefined;
@@ -796,13 +845,8 @@ billingRouter.post(
   authGuard,
   (req: Request, res: Response) => {
     const { user } = req as AuthenticatedRequest;
+    if (rejectInvalidBody(res, cancelBodyErrors(req.body))) return;
     const mode = req.body?.mode ?? 'period_end';
-    if (mode !== 'period_end' && mode !== 'immediate') {
-      res
-        .status(400)
-        .json(validationError('mode must be one of: period_end, immediate'));
-      return;
-    }
 
     const customer = findCustomer(user.id);
     const sub = customer ? findCurrentSubscription(customer.id) : undefined;
@@ -848,16 +892,18 @@ billingRouter.get('/region', authGuard, (req: Request, res: Response) => {
 // PUT /billing/region — set the region for the next checkout.
 billingRouter.put('/region', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
-  const region = req.body?.region;
-  if (region !== 'auto' && region !== 'ru' && region !== 'world') {
-    res
-      .status(400)
-      .json(validationError('region must be one of: auto, ru, world'));
+  const region = (req.body as Record<string, unknown> | undefined)?.['region'];
+  if (
+    rejectInvalidBody(res, [
+      ...unknownPropertyErrors(req.body, ['region']),
+      ...oneOfErrors('region', region, ['auto', 'ru', 'world'])
+    ])
+  ) {
     return;
   }
 
   const customer = getOrCreateCustomer(user.id, user.locale);
-  const newOverride = overrideForRegion(region);
+  const newOverride = overrideForRegion(region as BillingRegion);
   const newEffective = newOverride ?? geoDefault(customer.country);
 
   const open = findCurrentSubscription(customer.id);
@@ -954,13 +1000,8 @@ billingAdminRouter.post(
   adminGuard,
   requireUuid('id'),
   (req: Request, res: Response) => {
+    if (rejectInvalidBody(res, cancelBodyErrors(req.body))) return;
     const mode = req.body?.mode ?? 'period_end';
-    if (mode !== 'period_end' && mode !== 'immediate') {
-      res
-        .status(400)
-        .json(validationError('mode must be one of: period_end, immediate'));
-      return;
-    }
 
     const sub = getState().billingSubscriptions.get(
       (req.params['id'] as string) ?? ''
@@ -1021,20 +1062,18 @@ billingAdminRouter.post(
   adminGuard,
   requireUuid('id'),
   (req: Request, res: Response) => {
-    const amountMinor = req.body?.amountMinor;
+    const amountMinor = (req.body as Record<string, unknown> | undefined)?.[
+      'amountMinor'
+    ] as number | undefined;
     // The DTO's @IsInt()/@Min(1) run in the global pipe, before the handler, so
     // a supplied 0 or a fractional amount is a 400 whether or not the invoice
     // exists and never reaches the remaining-total check.
-    if (amountMinor !== undefined && !Number.isInteger(amountMinor)) {
-      res
-        .status(400)
-        .json(validationError('amountMinor must be an integer number'));
-      return;
-    }
-    if (amountMinor !== undefined && (amountMinor as number) < 1) {
-      res
-        .status(400)
-        .json(validationError('amountMinor must not be less than 1'));
+    if (
+      rejectInvalidBody(res, [
+        ...unknownPropertyErrors(req.body, ['amountMinor']),
+        ...intErrors('amountMinor', amountMinor, { min: 1, optional: true })
+      ])
+    ) {
       return;
     }
 
@@ -1097,32 +1136,40 @@ const USAGE_ACTIVE_STATUSES = ['trialing', 'active', 'past_due'];
 
 billingAdminRouter.post('/usage', adminGuard, (req: Request, res: Response) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
-  const customerId =
-    typeof body['customerId'] === 'string' ? body['customerId'].trim() : '';
-  const meterKey =
-    typeof body['meterKey'] === 'string' ? body['meterKey'].trim() : '';
-  const quantity = body['quantity'];
-  const idempotencyKey =
-    typeof body['idempotencyKey'] === 'string'
-      ? body['idempotencyKey'].trim()
-      : '';
   const occurredAtRaw = body['occurredAt'];
 
   if (
-    !customerId ||
-    !meterKey ||
-    meterKey.length > 100 ||
-    !idempotencyKey ||
-    idempotencyKey.length > 255 ||
-    !Number.isInteger(quantity) ||
-    (quantity as number) < 1 ||
-    (occurredAtRaw !== undefined &&
-      (typeof occurredAtRaw !== 'string' ||
-        Number.isNaN(Date.parse(occurredAtRaw))))
+    rejectInvalidBody(res, [
+      ...unknownPropertyErrors(body, [
+        'customerId',
+        'meterKey',
+        'quantity',
+        'occurredAt',
+        'idempotencyKey'
+      ]),
+      ...uuidErrors('customerId', body['customerId']),
+      ...trimmedStringErrors('meterKey', body['meterKey'], {
+        min: 1,
+        max: 100
+      }),
+      ...intErrors('quantity', body['quantity'], {
+        min: 1,
+        max: 1_000_000_000
+      }),
+      ...iso8601Errors('occurredAt', occurredAtRaw),
+      ...trimmedStringErrors('idempotencyKey', body['idempotencyKey'], {
+        min: 1,
+        max: 255
+      })
+    ])
   ) {
-    res.status(400).json(validationError('Invalid usage payload'));
     return;
   }
+
+  const customerId = (body['customerId'] as string).trim();
+  const meterKey = (body['meterKey'] as string).trim();
+  const quantity = body['quantity'] as number;
+  const idempotencyKey = (body['idempotencyKey'] as string).trim();
 
   const state = getState();
 
@@ -1183,7 +1230,7 @@ billingAdminRouter.post('/usage', adminGuard, (req: Request, res: Response) => {
     customerId,
     subscriptionId: subscription.id,
     meterKey,
-    quantity: quantity as number,
+    quantity,
     occurredAt:
       typeof occurredAtRaw === 'string'
         ? new Date(occurredAtRaw).toISOString()

@@ -2,6 +2,7 @@ import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
+import { mockId } from '../utils/mock-id';
 
 let server: Server;
 let baseUrl: string;
@@ -273,7 +274,7 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     const token = await login('admin@example.com');
 
     const res = await postUsage(token, {
-      customerId: '11111111-1111-1111-1111-111111111111',
+      customerId: mockId('no-such-customer'),
       meterKey: 'api_calls',
       quantity: 1,
       idempotencyKey: 'evt-x'
@@ -362,7 +363,7 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     const token = await login('user@example.com');
 
     const res = await postUsage(token, {
-      customerId: '11111111-1111-1111-1111-111111111111',
+      customerId: mockId('no-such-customer'),
       meterKey: 'api_calls',
       quantity: 1,
       idempotencyKey: 'evt-y'
