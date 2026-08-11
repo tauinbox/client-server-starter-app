@@ -263,7 +263,8 @@ export class UsersService {
   async update(
     id: string,
     updateUserDto: UpdateUserDto,
-    ability: AbilityOrSystem
+    ability: AbilityOrSystem,
+    actorId?: string
   ): Promise<User> {
     const user = await this.findOne(id);
 
@@ -273,7 +274,7 @@ export class UsersService {
         'update',
         subject('User', user),
         this.auditService,
-        { targetId: id, targetType: 'User' },
+        { actorId, targetId: id, targetType: 'User' },
         this.metricsService
       );
     }
@@ -456,7 +457,11 @@ export class UsersService {
     });
   }
 
-  async remove(id: string, ability: AbilityOrSystem): Promise<void> {
+  async remove(
+    id: string,
+    ability: AbilityOrSystem,
+    actorId?: string
+  ): Promise<void> {
     const user = await this.findOne(id);
 
     if (ability !== SYSTEM_ABILITY) {
@@ -465,7 +470,7 @@ export class UsersService {
         'delete',
         subject('User', user),
         this.auditService,
-        { targetId: id, targetType: 'User' },
+        { actorId, targetId: id, targetType: 'User' },
         this.metricsService
       );
     }
@@ -484,7 +489,11 @@ export class UsersService {
     });
   }
 
-  async restore(id: string, ability: AbilityOrSystem): Promise<User> {
+  async restore(
+    id: string,
+    ability: AbilityOrSystem,
+    actorId?: string
+  ): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id },
       relations: ['roles'],
@@ -506,7 +515,7 @@ export class UsersService {
         'delete',
         subject('User', user),
         this.auditService,
-        { targetId: id, targetType: 'User' },
+        { actorId, targetId: id, targetType: 'User' },
         this.metricsService
       );
     }

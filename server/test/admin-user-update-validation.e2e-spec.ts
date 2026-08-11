@@ -91,7 +91,8 @@ describe('Admin user update DTO validation (e2e)', () => {
     expect(usersService.update).toHaveBeenCalledWith(
       TARGET_ID,
       payload,
-      undefined
+      undefined,
+      'admin-1'
     );
   });
 

@@ -29,6 +29,7 @@ describe('UsersService', () => {
   };
   let mockDataSource: { transaction: jest.Mock };
   let mockMailService: { sendEmailVerification: jest.Mock };
+  let mockAuditService: { logFireAndForget: jest.Mock };
   let mockQueryBuilder: {
     leftJoinAndSelect: jest.Mock;
     innerJoin: jest.Mock;
@@ -86,6 +87,7 @@ describe('UsersService', () => {
     mockMailService = {
       sendEmailVerification: jest.fn().mockResolvedValue(undefined)
     };
+    mockAuditService = { logFireAndForget: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -100,7 +102,7 @@ describe('UsersService', () => {
         },
         {
           provide: AuditService,
-          useValue: { logFireAndForget: jest.fn() }
+          useValue: mockAuditService
         },
         {
           provide: MetricsService,
@@ -698,6 +700,25 @@ describe('UsersService', () => {
       expect(canSpy).toHaveBeenCalledWith('update', mockUser);
     });
 
+    it('records the denying actor on the update denial audit row', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
+
+      await expect(
+        service.update('user-1', { firstName: 'Updated' }, ability, 'actor-1')
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PERMISSION_CHECK_FAILURE',
+          actorId: 'actor-1',
+          targetId: 'user-1',
+          targetType: 'User'
+        })
+      );
+    });
+
     it('should proceed when ability allows update', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       mockRepository.save.mockResolvedValue({
@@ -919,6 +940,25 @@ describe('UsersService', () => {
       expect(canSpy).toHaveBeenCalledWith('delete', mockUser);
     });
 
+    it('records the denying actor on the delete denial audit row', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
+
+      await expect(
+        service.remove('user-1', ability, 'actor-1')
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PERMISSION_CHECK_FAILURE',
+          actorId: 'actor-1',
+          targetId: 'user-1',
+          targetType: 'User'
+        })
+      );
+    });
+
     it('should proceed when ability allows delete', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       const manager = mockRemoveTransaction();
@@ -1002,6 +1042,25 @@ describe('UsersService', () => {
         ForbiddenException
       );
       expect(canSpy).toHaveBeenCalledWith('delete', deletedUser);
+    });
+
+    it('records the denying actor on the restore denial audit row', async () => {
+      mockRepository.findOne.mockResolvedValue(deletedUser);
+      // @ts-expect-error partial mock — only `can` is needed for instance-level tests
+      const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
+
+      await expect(
+        service.restore('user-1', ability, 'actor-1')
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PERMISSION_CHECK_FAILURE',
+          actorId: 'actor-1',
+          targetId: 'user-1',
+          targetType: 'User'
+        })
+      );
     });
 
     it('should proceed when ability allows restore', async () => {
