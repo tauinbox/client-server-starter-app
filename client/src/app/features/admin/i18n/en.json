@@ -244,7 +244,8 @@
     "allowedActions": "Allowed Actions",
     "customToggle": "Custom",
     "customBadge": "custom",
-    "defaultActionsHint": "All default actions are shown: create, read, update, delete, search."
+    "defaultActionsHint": "All default actions are shown: create, read, update, delete, search.",
+    "errorActionsFailed": "Could not load the action catalog. Reopen the dialog to try again."
   },
   "actions": {
     "title": "Actions",

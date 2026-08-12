@@ -28,6 +28,7 @@ import type {
   ResourceResponse
 } from '@app/shared/types/rbac.types';
 import type { UpdateResource } from '../../../services/rbac-admin.service';
+import { RbacAdminService } from '../../../services/rbac-admin.service';
 import { ResourcesStore } from '../../../store/resources.store';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NotifyService } from '@core/services/notify.service';
@@ -35,7 +36,6 @@ import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-fie
 
 export type ResourceFormDialogData = {
   resource: ResourceResponse;
-  actions: ActionResponse[];
 };
 
 type ResourceFormData = {
@@ -68,6 +68,7 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
   readonly #translocoService = inject(TranslocoService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #shortcuts = inject(KeyboardShortcutsService);
+  readonly #rbacService = inject(RbacAdminService);
   protected readonly data = inject<ResourceFormDialogData>(MAT_DIALOG_DATA);
 
   #cleanupSave: (() => void) | null = null;
@@ -86,13 +87,18 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
     this.data.resource.allowedActionNames !== null
   );
   protected readonly selectedActionNames = signal<Set<string>>(
-    new Set(
-      this.data.resource.allowedActionNames ??
-        this.data.actions.filter((a) => a.isDefault).map((a) => a.name)
-    )
+    new Set(this.data.resource.allowedActionNames ?? [])
   );
   protected readonly isLoading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
+
+  /**
+   * The whole action catalog, never a page of it: the default-action seed below
+   * would silently drop every action outside the page it did not see.
+   */
+  protected readonly actions = signal<ActionResponse[]>([]);
+  protected readonly actionsLoaded = signal(false);
+  protected readonly actionsFailed = signal(false);
 
   ngOnInit(): void {
     this.#cleanupSave = this.#shortcuts.registerSave(
@@ -100,6 +106,19 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
       'shortcuts.groupForms',
       () => this.submit()
     );
+
+    this.#rbacService
+      .getActions()
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: (actions) => {
+          this.actions.set(actions);
+          this.actionsLoaded.set(true);
+        },
+        error: () => {
+          this.actionsFailed.set(true);
+        }
+      });
   }
 
   ngOnDestroy(): void {
@@ -128,10 +147,15 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
   }
 
   toggleCustomMode(enabled: boolean): void {
+    if (enabled && !this.actionsLoaded()) return;
     this.isCustomMode.set(enabled);
     if (enabled && this.data.resource.allowedActionNames === null) {
       this.selectedActionNames.set(
-        new Set(this.data.actions.filter((a) => a.isDefault).map((a) => a.name))
+        new Set(
+          this.actions()
+            .filter((a) => a.isDefault)
+            .map((a) => a.name)
+        )
       );
     }
   }

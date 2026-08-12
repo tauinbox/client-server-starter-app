@@ -37,7 +37,6 @@ import type { ResourceResponse } from '@app/shared/types/rbac.types';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
-import { ActionsStore } from '../../../store/actions.store';
 import { ResourcesStore } from '../../../store/resources.store';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
 import type { ResourceFormDialogData } from '../resource-form-dialog/resource-form-dialog.component';
@@ -74,7 +73,6 @@ import { ResourceFormDialogComponent } from '../resource-form-dialog/resource-fo
 })
 export class ResourceListComponent implements OnInit {
   readonly #resourcesStore = inject(ResourcesStore);
-  readonly #actionsStore = inject(ActionsStore);
   readonly #dialog = inject(MatDialog);
   readonly #notify = inject(NotifyService);
   readonly #destroyRef = inject(DestroyRef);
@@ -108,8 +106,6 @@ export class ResourceListComponent implements OnInit {
 
   ngOnInit(): void {
     this.#resourcesStore.load();
-    // The edit dialog offers the action catalog, which lives in its own store.
-    this.#actionsStore.load();
   }
 
   restoreResource(resource: ResourceResponse): void {
@@ -129,10 +125,7 @@ export class ResourceListComponent implements OnInit {
   }
 
   openEditResource(resource: ResourceResponse): void {
-    const data: ResourceFormDialogData = {
-      resource,
-      actions: this.#actionsStore.actions()
-    };
+    const data: ResourceFormDialogData = { resource };
     this.#dialog.open(ResourceFormDialogComponent, {
       ...dialogSizeConfig(DialogSize.Form),
       panelClass: 'app-dialog-tall',
