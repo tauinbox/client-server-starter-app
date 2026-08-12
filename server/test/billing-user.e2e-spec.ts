@@ -24,7 +24,7 @@ import { EntitlementService } from '../src/modules/billing/entitlements/entitlem
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { BillingUserController } from '../src/modules/billing/controllers/billing-user.controller';
 import { MAX_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
-import { PaginatedResponseDto } from '../src/common/dtos/paginated-response.dto';
+import { CursorPaginatedResponseDto } from '../src/common/dtos/cursor-paginated-response.dto';
 
 function makeSubscription(): Subscription {
   return Object.assign(new Subscription(), {
@@ -161,7 +161,7 @@ describe('Billing user self-service (e2e)', () => {
 
   it('serializes invoices without the provider event id', async () => {
     billingUser.listInvoices.mockResolvedValue(
-      new PaginatedResponseDto([makeInvoice()], 1, 1, 10)
+      new CursorPaginatedResponseDto([makeInvoice()], null, 20)
     );
 
     const res = await request(server)
@@ -170,26 +170,26 @@ describe('Billing user self-service (e2e)', () => {
 
     const body = res.body as {
       data: Array<{ providerInvoiceRef: string }>;
-      meta: { total: number };
+      meta: { nextCursor: string | null; hasMore: boolean };
     };
     expect(body.data).toHaveLength(1);
     expect(body.data[0].providerInvoiceRef).toBe('pay_1');
     expect(body.data[0]).not.toHaveProperty('providerEventId');
-    expect(body.meta.total).toBe(1);
+    expect(body.meta.hasMore).toBe(false);
   });
 
-  it('passes the requested page through and caps the page size', async () => {
+  it('passes the cursor through and caps the page size', async () => {
     billingUser.listInvoices.mockResolvedValue(
-      new PaginatedResponseDto([], 0, 2, 25)
+      new CursorPaginatedResponseDto([], null, 25)
     );
 
     await request(server)
-      .get('/api/v1/billing/invoices?page=2&limit=25')
+      .get('/api/v1/billing/invoices?cursor=abc&limit=25')
       .expect(200);
 
     expect(billingUser.listInvoices).toHaveBeenCalledWith(
       expect.any(String),
-      expect.objectContaining({ page: 2, limit: 25 })
+      expect.objectContaining({ cursor: 'abc', limit: 25 })
     );
 
     await request(server)

@@ -84,7 +84,7 @@
             </div>
           }
         </div>
-      } @else if (totalUsers() === 0) {
+      } @else if (displayedUsers().length === 0) {
         <div class="empty-state">
           <mat-icon class="empty-icon">people_outline</mat-icon>
           <h3>{{ t('users.list.noUsers') }}</h3>
@@ -105,7 +105,13 @@
         />
       }
 
-      <div #scrollSentinel class="scroll-sentinel"></div>
+      <div
+        class="scroll-sentinel"
+        nxsInfiniteScroll
+        [hasMore]="hasMore()"
+        [busy]="busy()"
+        (loadMore)="loadMore()"
+      ></div>
 
       @if (isLoadingMore()) {
         <div class="load-more-container">

@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   Req,
   SerializeOptions,
   UseInterceptors
@@ -26,6 +27,7 @@ import {
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
 import { subject } from '@casl/ability';
+import { RoleCursorQueryDto } from '../../../common/dtos';
 import { RoleService } from '../services/role.service';
 import { CreateRoleDto } from '../dtos/create-role.dto';
 import { UpdateRoleDto } from '../dtos/update-role.dto';
@@ -62,6 +64,17 @@ export class RolesController {
     private readonly auditService: AuditService,
     private readonly metricsService: MetricsService
   ) {}
+
+  @Get('cursor')
+  @Authorize(['read', 'Role'])
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cursor-paginated roles for the admin list page' })
+  @ApiOkResponse({ description: 'Cursor-paginated list of roles' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
+  findAllCursor(@Query() query: RoleCursorQueryDto) {
+    return this.roleService.findCursorPaginated(query);
+  }
 
   @Get()
   @Authorize(['read', 'Role'])

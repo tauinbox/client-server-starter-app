@@ -15,8 +15,16 @@ import {
   type EvaluatorRule,
   type FeatureFlagEvaluationContext
 } from '@app/shared/utils/feature-flag-evaluator';
+import { CursorPaginatedResponseDto } from '../../../common/dtos';
+import type { FeatureFlagCursorQueryDto } from '../../../common/dtos';
+import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
 import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
+
+const FEATURE_FLAG_SORT_COLUMN_MAP: Record<string, string> = {
+  createdAt: 'flag.createdAt',
+  key: 'flag.key'
+};
 import { CreateFeatureFlagDto } from '../dtos/create-feature-flag.dto';
 import { UpdateFeatureFlagDto } from '../dtos/update-feature-flag.dto';
 import { FeatureFlagRuleDto } from '../dtos/feature-flag-rule.dto';
@@ -62,7 +70,37 @@ export class FeatureFlagService {
 
   async findAll(): Promise<FeatureFlag[]> {
     const flags = await this.flagRepo.find({ order: { key: 'ASC' } });
-    if (flags.length === 0) return flags;
+    await this.#attachRules(flags);
+    return flags;
+  }
+
+  /**
+   * Cursor-paginated flags for the admin list page, each with its rules
+   * hydrated exactly as findAll does. findAll stays for the callers that need
+   * the whole set in one shot (cache warm-up, evaluation).
+   */
+  async findCursorPaginated(
+    query: FeatureFlagCursorQueryDto
+  ): Promise<CursorPaginatedResponseDto<FeatureFlag>> {
+    const { cursor, limit, sortBy, sortOrder } = query;
+    const { data, nextCursor } = await applyKeysetPagination(
+      this.flagRepo.createQueryBuilder('flag'),
+      {
+        cursor,
+        limit,
+        sortBy,
+        sortOrder,
+        sortColumnMap: FEATURE_FLAG_SORT_COLUMN_MAP,
+        idColumn: 'flag.id'
+      }
+    );
+    await this.#attachRules(data);
+    return new CursorPaginatedResponseDto(data, nextCursor, limit);
+  }
+
+  /** Loads every rule of the given flags in one query and attaches them. */
+  async #attachRules(flags: FeatureFlag[]): Promise<void> {
+    if (flags.length === 0) return;
     const rules = await this.ruleRepo.find({
       where: { flagId: In(flags.map((f) => f.id)) },
       order: { createdAt: 'ASC', id: 'ASC' }
@@ -74,7 +112,6 @@ export class FeatureFlagService {
       byFlag.set(r.flagId, list);
     }
     for (const f of flags) f.rules = byFlag.get(f.id) ?? [];
-    return flags;
   }
 
   /**

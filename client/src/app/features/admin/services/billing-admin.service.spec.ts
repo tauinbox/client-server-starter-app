@@ -26,28 +26,41 @@ describe('BillingAdminService', () => {
 
   afterEach(() => httpMock.verify());
 
-  it('GETs subscriptions without page params when none are given', () => {
+  it('GETs subscriptions without params when none are given', () => {
     service.listSubscriptions().subscribe();
     const req = httpMock.expectOne(`${ADMIN_BILLING_API_V1}/subscriptions`);
     expect(req.request.method).toBe('GET');
     expect(req.request.params.keys()).toEqual([]);
     req.flush({
       data: [],
-      meta: { page: 1, limit: 10, total: 0, totalPages: 0 }
+      meta: { nextCursor: null, hasMore: false, limit: 20 }
     });
   });
 
-  it('GETs invoices with the requested page and limit', () => {
-    service.listInvoices({ page: 3, limit: 25 }).subscribe();
+  it('GETs invoices with the cursor and limit', () => {
+    service.listInvoices({ cursor: 'abc', limit: 25 }).subscribe();
     const req = httpMock.expectOne(
       (r) => r.url === `${ADMIN_BILLING_API_V1}/invoices`
     );
     expect(req.request.method).toBe('GET');
-    expect(req.request.params.get('page')).toBe('3');
+    expect(req.request.params.get('cursor')).toBe('abc');
     expect(req.request.params.get('limit')).toBe('25');
     req.flush({
       data: [],
-      meta: { page: 3, limit: 25, total: 0, totalPages: 0 }
+      meta: { nextCursor: null, hasMore: false, limit: 25 }
+    });
+  });
+
+  it('omits the cursor on a first-page request', () => {
+    service.listInvoices({ cursor: null, limit: 10 }).subscribe();
+    const req = httpMock.expectOne(
+      (r) => r.url === `${ADMIN_BILLING_API_V1}/invoices`
+    );
+    expect(req.request.params.has('cursor')).toBe(false);
+    expect(req.request.params.get('limit')).toBe('10');
+    req.flush({
+      data: [],
+      meta: { nextCursor: null, hasMore: false, limit: 10 }
     });
   });
 

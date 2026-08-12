@@ -6,6 +6,11 @@ import type {
   PermissionResponse,
   RoleAdminResponse
 } from '@app/shared/types/role.types';
+import type { CursorPaginatedResponse } from '@app/shared/types';
+import {
+  cursorParams,
+  type CursorPageRequest
+} from '@shared/utils/pagination.utils';
 
 export type CreateRole = {
   name: string;
@@ -32,6 +37,19 @@ export const ROLES_API_V1 = '/api/v1/roles';
 })
 export class RoleService {
   readonly #http = inject(HttpClient);
+
+  /**
+   * One page of roles for the admin list. `getAll` below stays for the callers
+   * that need every option at once (assign-role picker, rule editor).
+   */
+  getAllCursor(
+    request: CursorPageRequest
+  ): Observable<CursorPaginatedResponse<RoleAdminResponse>> {
+    return this.#http.get<CursorPaginatedResponse<RoleAdminResponse>>(
+      `${ROLES_API_V1}/cursor`,
+      { params: cursorParams(request) }
+    );
+  }
 
   getAll(): Observable<RoleAdminResponse[]> {
     return this.#http.get<RoleAdminResponse[]>(ROLES_API_V1);

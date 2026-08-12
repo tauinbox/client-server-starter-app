@@ -133,11 +133,11 @@
       <mat-card-content>
         <h2 class="card-heading">{{ t('billing.settings.invoices') }}</h2>
 
-        @if (store.invoices().length === 0) {
+        @if (invoices().length === 0) {
           <p class="invoices-empty">{{ t('billing.settings.noInvoices') }}</p>
         } @else if (isHandset()) {
           <ul class="invoice-cards">
-            @for (invoice of store.invoices(); track invoice.id) {
+            @for (invoice of invoices(); track invoice.id) {
               <li class="invoice-card">
                 <div class="invoice-card-row">
                   <span>{{
@@ -178,7 +178,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (invoice of store.invoices(); track invoice.id) {
+              @for (invoice of invoices(); track invoice.id) {
                 <tr>
                   <td>
                     {{
@@ -211,16 +211,18 @@
           </table>
         }
 
-        @let invoicesPage = store.invoicesPage();
-        @if (invoicesPage.total > 0) {
-          <mat-paginator
-            [length]="invoicesPage.total"
-            [pageIndex]="invoicesPage.pageIndex"
-            [pageSize]="invoicesPage.pageSize"
-            [pageSizeOptions]="pageSizeOptions"
-            [disabled]="store.loading()"
-            (page)="onInvoicesPage($event)"
-          />
+        <div
+          class="scroll-sentinel"
+          nxsInfiniteScroll
+          [hasMore]="invoicesHasMore()"
+          [busy]="invoicesBusy()"
+          (loadMore)="loadMoreInvoices()"
+        ></div>
+
+        @if (invoicesLoadingMore()) {
+          <div class="load-more-container">
+            <mat-spinner [diameter]="36"></mat-spinner>
+          </div>
         }
       </mat-card-content>
     </mat-card>

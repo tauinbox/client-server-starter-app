@@ -9,6 +9,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { subject } from '@casl/ability';
 import { Role } from '../entities/role.entity';
+import { CursorPaginatedResponseDto } from '../../../common/dtos';
+import type { RoleCursorQueryDto } from '../../../common/dtos';
+import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
+import { ROLE_SORT_COLUMN_MAP } from '../utils/rbac-sort-columns.util';
 import { Permission } from '../entities/permission.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { User } from '../../users/entities/user.entity';
@@ -201,6 +205,29 @@ export class RoleService {
     return this.roleRepository.find({
       order: { name: 'ASC' }
     });
+  }
+
+  /**
+   * Cursor-paginated roles for the admin list page. The unpaginated findAll
+   * above stays: it backs the assign-role picker and the rule editor, which
+   * need every option in one shot.
+   */
+  async findCursorPaginated(
+    query: RoleCursorQueryDto
+  ): Promise<CursorPaginatedResponseDto<Role>> {
+    const { cursor, limit, sortBy, sortOrder } = query;
+    const { data, nextCursor } = await applyKeysetPagination(
+      this.roleRepository.createQueryBuilder('role'),
+      {
+        cursor,
+        limit,
+        sortBy,
+        sortOrder,
+        sortColumnMap: ROLE_SORT_COLUMN_MAP,
+        idColumn: 'role.id'
+      }
+    );
+    return new CursorPaginatedResponseDto(data, nextCursor, limit);
   }
 
   async findOne(id: string): Promise<Role> {

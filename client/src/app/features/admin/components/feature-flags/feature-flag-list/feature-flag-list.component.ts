@@ -37,6 +37,7 @@ import {
   MatRowDef,
   MatTable
 } from '@angular/material/table';
+import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { FeatureFlagResponse } from '@app/shared/types';
 import { LayoutService } from '@core/services/layout.service';
@@ -76,6 +77,7 @@ import { FeatureFlagFormDialogComponent } from '../feature-flag-form-dialog/feat
     MatHeaderRowDef,
     MatRowDef,
     MatCell,
+    InfiniteScrollDirective,
     TranslocoDirective
   ],
   templateUrl: './feature-flag-list.component.html',
@@ -93,6 +95,15 @@ export class FeatureFlagListComponent implements OnInit {
   protected readonly authStore = inject(AuthStore);
 
   readonly loading = this.#store.loading;
+  readonly hasMore = this.#store.hasMore;
+  readonly isLoadingMore = this.#store.isLoadingMore;
+  readonly busy = computed(
+    () => this.#store.loading() || this.#store.isLoadingMore()
+  );
+
+  loadMore(): void {
+    this.#store.loadMore();
+  }
   readonly flags = this.#store.entities;
 
   // Flags whose `replaceRules` call failed after a successful flag create/update

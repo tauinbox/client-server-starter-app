@@ -6,6 +6,7 @@ import {
   withMethods,
   withState
 } from '@ngrx/signals';
+import { withEntities } from '@ngrx/signals/entities';
 import { firstValueFrom } from 'rxjs';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type {
@@ -21,27 +22,18 @@ import type {
   SubscriptionResponse,
   UsageSummaryResponse
 } from '@app/shared/types';
-import { DEFAULT_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
 import { NotifyService } from '@core/services/notify.service';
+import { withCursorList } from '@shared/store/with-cursor-list';
 import {
   BillingService,
   type CancelMode,
   type PurchaseRequest
 } from '../services/billing.service';
 
-/** Zero-based index to match `mat-paginator`; the API pages are 1-based. */
-type InvoicesPage = {
-  pageIndex: number;
-  pageSize: number;
-  total: number;
-};
-
 type BillingState = {
   plans: PlanResponse[];
   products: ProductResponse[];
   subscription: SubscriptionResponse | null;
-  invoices: InvoiceResponse[];
-  invoicesPage: InvoicesPage;
   paymentMethod: PaymentMethodResponse | null;
   usage: UsageSummaryResponse | null;
   credits: CreditBalanceResponse | null;
@@ -50,18 +42,10 @@ type BillingState = {
   working: boolean;
 };
 
-const initialInvoicesPage: InvoicesPage = {
-  pageIndex: 0,
-  pageSize: DEFAULT_PAGE_SIZE,
-  total: 0
-};
-
 const initialState: BillingState = {
   plans: [],
   products: [],
   subscription: null,
-  invoices: [],
-  invoicesPage: initialInvoicesPage,
   paymentMethod: null,
   usage: null,
   credits: null,
@@ -79,7 +63,9 @@ const ACTIVE_STATUSES: readonly SubscriptionResponse['status'][] = [
 ];
 
 export const BillingStore = signalStore(
+  withEntities<InvoiceResponse>(),
   withState(initialState),
+  withCursorList<InvoiceResponse>({ errorKey: 'billing.errors.loadFailed' }),
   withComputed((store) => ({
     /** The plan the caller is currently subscribed to, if any. */
     currentPlan: computed(() => {
@@ -145,42 +131,23 @@ export const BillingStore = signalStore(
      * failure keeps the slices that did load; the first failure is reported
      * once.
      */
-    function pageRequest({ pageIndex, pageSize }: InvoicesPage) {
-      return { page: pageIndex + 1, limit: pageSize };
-    }
-
     async function loadSettings(): Promise<void> {
       patchState(store, { loading: true });
-      // Opening the page always starts at the first page of invoices.
-      const invoicesPage = { ...store.invoicesPage(), pageIndex: 0 };
+      // Opening the page always restarts the invoice list at its first page.
+      void store.loadFirstPage((request) => billing.getInvoices(request));
       const results = await Promise.allSettled([
         firstValueFrom(billing.getSubscription()),
-        firstValueFrom(billing.getInvoices(pageRequest(invoicesPage))),
         firstValueFrom(billing.getPaymentMethod()),
         firstValueFrom(billing.getUsage()),
         firstValueFrom(billing.getCredits()),
         firstValueFrom(billing.getPlans()),
         firstValueFrom(billing.getRegion())
       ]);
-      const [
-        subscription,
-        invoices,
-        paymentMethod,
-        usage,
-        credits,
-        plans,
-        region
-      ] = results;
+      const [subscription, paymentMethod, usage, credits, plans, region] =
+        results;
       const patch: Partial<BillingState> = { loading: false };
       if (subscription.status === 'fulfilled')
         patch.subscription = subscription.value;
-      if (invoices.status === 'fulfilled') {
-        patch.invoices = invoices.value.data;
-        patch.invoicesPage = {
-          ...invoicesPage,
-          total: invoices.value.meta.total
-        };
-      }
       if (paymentMethod.status === 'fulfilled')
         patch.paymentMethod = paymentMethod.value;
       if (usage.status === 'fulfilled') patch.usage = usage.value;
@@ -258,44 +225,18 @@ export const BillingStore = signalStore(
      * Refresh just the invoices (e.g. while a one-time purchase return waits
      * for the provider webhook to settle the paid invoice).
      */
+    /**
+     * Re-reads the invoice list from its first page (a purchase or plan change
+     * lands at the top, and a cursor already handed out cannot see it).
+     */
     async function refreshInvoices(): Promise<InvoiceResponse[]> {
-      const invoicesPage = store.invoicesPage();
-      try {
-        const result = await firstValueFrom(
-          billing.getInvoices(pageRequest(invoicesPage))
-        );
-        patchState(store, {
-          invoices: result.data,
-          invoicesPage: { ...invoicesPage, total: result.meta.total }
-        });
-        return result.data;
-      } catch (error) {
-        notify.error(error as HttpErrorResponse, 'billing.errors.loadFailed');
-        return store.invoices();
-      }
+      await store.loadFirstPage((request) => billing.getInvoices(request));
+      return store.entities();
     }
 
-    /** Moves the invoice history to another page (paginator interaction). */
-    async function loadInvoicesPage(
-      pageIndex: number,
-      pageSize: number
-    ): Promise<void> {
-      const invoicesPage = {
-        pageIndex,
-        pageSize,
-        total: store.invoicesPage().total
-      };
-      try {
-        const result = await firstValueFrom(
-          billing.getInvoices(pageRequest(invoicesPage))
-        );
-        patchState(store, {
-          invoices: result.data,
-          invoicesPage: { ...invoicesPage, total: result.meta.total }
-        });
-      } catch (error) {
-        notify.error(error as HttpErrorResponse, 'billing.errors.loadFailed');
-      }
+    /** Appends the next page; wired to the list's scroll sentinel. */
+    function loadMoreInvoices(): void {
+      void store.loadNextPage((request) => billing.getInvoices(request));
     }
 
     /**
@@ -316,17 +257,12 @@ export const BillingStore = signalStore(
       } finally {
         patchState(store, { working: false });
       }
-      const invoicesPage = { ...store.invoicesPage(), pageIndex: 0 };
       try {
-        const [invoices, usage] = await Promise.all([
-          firstValueFrom(billing.getInvoices(pageRequest(invoicesPage))),
-          firstValueFrom(billing.getUsage())
+        const [usage] = await Promise.all([
+          firstValueFrom(billing.getUsage()),
+          refreshInvoices()
         ]);
-        patchState(store, {
-          invoices: invoices.data,
-          invoicesPage: { ...invoicesPage, total: invoices.meta.total },
-          usage
-        });
+        patchState(store, { usage });
       } catch {
         // The switch itself succeeded and was reported; a stale invoice list
         // self-heals on the next settings load.
@@ -390,7 +326,7 @@ export const BillingStore = signalStore(
       loadSettings,
       refreshSubscription,
       refreshInvoices,
-      loadInvoicesPage,
+      loadMoreInvoices,
       checkout,
       purchase,
       changePlan,

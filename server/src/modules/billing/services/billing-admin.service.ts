@@ -9,8 +9,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
-import type { PaginationQueryDto } from '../../../common/dtos/pagination-query.dto';
-import { PaginatedResponseDto } from '../../../common/dtos/paginated-response.dto';
+import { CursorPaginatedResponseDto } from '../../../common/dtos/cursor-paginated-response.dto';
+import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
 import { CustomerGrant } from '../entities/customer-grant.entity';
@@ -23,10 +23,13 @@ import { SubscriptionCanceledEvent } from '../events/billing.events';
 import type { CancelMode } from '../providers/payment-provider.interface';
 import { cancelFields } from '../utils/cancel-fields.util';
 import {
-  invoiceOrder,
-  sortDirection,
-  subscriptionOrder
+  INVOICE_SORT_COLUMN_MAP,
+  SUBSCRIPTION_SORT_COLUMN_MAP
 } from '../utils/list-order.util';
+import type {
+  InvoiceCursorQueryDto,
+  SubscriptionCursorQueryDto
+} from '../dtos/billing-cursor-query.dto';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
 
@@ -60,27 +63,39 @@ export class BillingAdminService {
   ) {}
 
   async listSubscriptions(
-    query: PaginationQueryDto
-  ): Promise<PaginatedResponseDto<Subscription>> {
-    const { page, limit, sortBy, sortOrder } = query;
-    const [data, total] = await this.subscriptions.findAndCount({
-      order: subscriptionOrder(sortBy, sortDirection(sortOrder)),
-      skip: (page - 1) * limit,
-      take: limit
-    });
-    return new PaginatedResponseDto(data, total, page, limit);
+    query: SubscriptionCursorQueryDto
+  ): Promise<CursorPaginatedResponseDto<Subscription>> {
+    const { cursor, limit, sortBy, sortOrder } = query;
+    const { data, nextCursor } = await applyKeysetPagination(
+      this.subscriptions.createQueryBuilder('subscription'),
+      {
+        cursor,
+        limit,
+        sortBy,
+        sortOrder,
+        sortColumnMap: SUBSCRIPTION_SORT_COLUMN_MAP,
+        idColumn: 'subscription.id'
+      }
+    );
+    return new CursorPaginatedResponseDto(data, nextCursor, limit);
   }
 
   async listInvoices(
-    query: PaginationQueryDto
-  ): Promise<PaginatedResponseDto<Invoice>> {
-    const { page, limit, sortBy, sortOrder } = query;
-    const [data, total] = await this.invoices.findAndCount({
-      order: invoiceOrder(sortBy, sortDirection(sortOrder)),
-      skip: (page - 1) * limit,
-      take: limit
-    });
-    return new PaginatedResponseDto(data, total, page, limit);
+    query: InvoiceCursorQueryDto
+  ): Promise<CursorPaginatedResponseDto<Invoice>> {
+    const { cursor, limit, sortBy, sortOrder } = query;
+    const { data, nextCursor } = await applyKeysetPagination(
+      this.invoices.createQueryBuilder('invoice'),
+      {
+        cursor,
+        limit,
+        sortBy,
+        sortOrder,
+        sortColumnMap: INVOICE_SORT_COLUMN_MAP,
+        idColumn: 'invoice.id'
+      }
+    );
+    return new CursorPaginatedResponseDto(data, nextCursor, limit);
   }
 
   /**

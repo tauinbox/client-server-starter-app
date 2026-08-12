@@ -20,11 +20,14 @@ import {
   toUsageResponse
 } from '../state';
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
-import type { PaginationQuery } from '../helpers/pagination.helpers';
 import {
-  paginate,
-  paginationQueryErrors,
-  parsePaginationQuery
+  ALLOWED_INVOICE_SORT_COLUMNS,
+  ALLOWED_SUBSCRIPTION_SORT_COLUMNS
+} from '@app/shared/constants';
+import {
+  cursorPaginate,
+  cursorQueryErrors,
+  parseCursorQuery
 } from '../helpers/pagination.helpers';
 import { addInterval } from '../utils/period';
 import type {
@@ -211,58 +214,6 @@ function getOrCreateCustomer(userId: string, locale: string): MockCustomer {
  * (`list-order.util.ts`): an unrecognized `sortBy` falls back to `createdAt`.
  * Nulls sort last on an ascending pass, as Postgres orders them.
  */
-function byColumn<T>(
-  readers: Record<string, (item: T) => unknown>,
-  column: string,
-  sortOrder: 'asc' | 'desc'
-): (a: T, b: T) => number {
-  const read = readers[column] ?? readers['createdAt'];
-  const direction = sortOrder === 'asc' ? 1 : -1;
-  return (a, b) => {
-    const left = read(a);
-    const right = read(b);
-    if (left == null && right == null) return 0;
-    if (left == null) return 1;
-    if (right == null) return -1;
-    if (typeof left === 'number' && typeof right === 'number') {
-      return (left - right) * direction;
-    }
-    return String(left).localeCompare(String(right)) * direction;
-  };
-}
-
-const INVOICE_SORT_READERS: Record<string, (i: MockInvoice) => unknown> = {
-  createdAt: (i) => i.createdAt,
-  paidAt: (i) => i.paidAt,
-  amountMinor: (i) => i.amountMinor,
-  status: (i) => i.status
-};
-
-const SUBSCRIPTION_SORT_READERS: Record<
-  string,
-  (s: MockSubscription) => unknown
-> = {
-  createdAt: (s) => s.createdAt,
-  currentPeriodEnd: (s) => s.currentPeriodEnd,
-  status: (s) => s.status
-};
-
-function sortInvoices(
-  invoices: MockInvoice[],
-  { sortBy, sortOrder }: PaginationQuery
-): MockInvoice[] {
-  return [...invoices].sort(byColumn(INVOICE_SORT_READERS, sortBy, sortOrder));
-}
-
-function sortSubscriptions(
-  subscriptions: MockSubscription[],
-  { sortBy, sortOrder }: PaginationQuery
-): MockSubscription[] {
-  return [...subscriptions].sort(
-    byColumn(SUBSCRIPTION_SORT_READERS, sortBy, sortOrder)
-  );
-}
-
 function findCurrentSubscription(
   customerId: string
 ): MockSubscription | undefined {
@@ -285,22 +236,21 @@ billingRouter.get('/subscription', authGuard, (req: Request, res: Response) => {
 // GET /billing/invoices — caller's invoices, newest first (paginated).
 billingRouter.get('/invoices', authGuard, (req: Request, res: Response) => {
   const query = req.query as Record<string, unknown>;
-  if (rejectInvalidBody(res, paginationQueryErrors(query))) return;
-  const params = parsePaginationQuery(query);
+  const errors = cursorQueryErrors(query, {
+    sortColumns: ALLOWED_INVOICE_SORT_COLUMNS
+  });
+  if (rejectInvalidBody(res, errors)) return;
+  const params = parseCursorQuery(query);
 
   const { user } = req as AuthenticatedRequest;
   const customer = findCustomer(user.id);
-  if (!customer) {
-    res.json(paginate([], params));
-    return;
-  }
-  const invoices = sortInvoices(
-    [...getState().billingInvoices.values()].filter(
-      (i) => i.customerId === customer.id
-    ),
-    params
-  ).map(toInvoiceResponse);
-  res.json(paginate(invoices, params));
+  const invoices = customer
+    ? [...getState().billingInvoices.values()].filter(
+        (i) => i.customerId === customer.id
+      )
+    : [];
+  const page = cursorPaginate(invoices, params);
+  res.json({ data: page.data.map(toInvoiceResponse), meta: page.meta });
 });
 
 // GET /billing/payment-method — caller's default saved method or null.
@@ -1066,14 +1016,20 @@ billingAdminRouter.get(
   adminGuard,
   (req: Request, res: Response) => {
     const query = req.query as Record<string, unknown>;
-    if (rejectInvalidBody(res, paginationQueryErrors(query))) return;
-    const params = parsePaginationQuery(query);
+    const errors = cursorQueryErrors(query, {
+      sortColumns: ALLOWED_SUBSCRIPTION_SORT_COLUMNS
+    });
+    if (rejectInvalidBody(res, errors)) return;
+    const params = parseCursorQuery(query);
 
-    const subs = sortSubscriptions(
+    const page = cursorPaginate(
       [...getState().billingSubscriptions.values()],
       params
-    ).map(toSubscriptionResponse);
-    res.json(paginate(subs, params));
+    );
+    res.json({
+      data: page.data.map(toSubscriptionResponse),
+      meta: page.meta
+    });
   }
 );
 
@@ -1082,14 +1038,17 @@ billingAdminRouter.get(
   adminGuard,
   (req: Request, res: Response) => {
     const query = req.query as Record<string, unknown>;
-    if (rejectInvalidBody(res, paginationQueryErrors(query))) return;
-    const params = parsePaginationQuery(query);
+    const errors = cursorQueryErrors(query, {
+      sortColumns: ALLOWED_INVOICE_SORT_COLUMNS
+    });
+    if (rejectInvalidBody(res, errors)) return;
+    const params = parseCursorQuery(query);
 
-    const invoices = sortInvoices(
+    const page = cursorPaginate(
       [...getState().billingInvoices.values()],
       params
-    ).map(toInvoiceResponse);
-    res.json(paginate(invoices, params));
+    );
+    res.json({ data: page.data.map(toInvoiceResponse), meta: page.meta });
   }
 );
 

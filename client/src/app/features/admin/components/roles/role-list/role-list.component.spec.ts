@@ -41,7 +41,10 @@ describe('RoleListComponent — openPermissionsDialog', () => {
   let rolesStoreMock: {
     entities: ReturnType<typeof signal<RoleAdminResponse[]>>;
     loading: ReturnType<typeof signal<boolean>>;
+    isLoadingMore: ReturnType<typeof signal<boolean>>;
+    hasMore: ReturnType<typeof signal<boolean>>;
     load: ReturnType<typeof vi.fn>;
+    loadMore: ReturnType<typeof vi.fn>;
     createRole: ReturnType<typeof vi.fn>;
     updateRole: ReturnType<typeof vi.fn>;
     deleteRole: ReturnType<typeof vi.fn>;
@@ -58,7 +61,10 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     rolesStoreMock = {
       entities: signal([]),
       loading: signal(false),
+      isLoadingMore: signal(false),
+      hasMore: signal(false),
       load: vi.fn(),
+      loadMore: vi.fn(),
       createRole: vi.fn(),
       updateRole: vi.fn(),
       deleteRole: vi.fn()

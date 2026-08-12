@@ -18,7 +18,7 @@ import {
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
 import type { JwtAuthRequest } from '../../auth/types/auth.request';
-import { PaginationQueryDto } from '../../../common/dtos/pagination-query.dto';
+import { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
 import { RequireEntitlement } from '../entitlements/require-entitlement.decorator';
 import { BillingUserService } from '../services/billing-user.service';
 import { CheckoutRequestDto } from '../dtos/checkout-request.dto';
@@ -55,9 +55,16 @@ export class BillingUserController {
   }
 
   @Get('invoices')
-  @ApiOperation({ summary: "The caller's invoices, newest first (paginated)." })
-  @ApiOkResponse({ description: "Paginated list of the caller's invoices" })
-  getInvoices(@Req() req: JwtAuthRequest, @Query() query: PaginationQueryDto) {
+  @ApiOperation({
+    summary: "The caller's invoices, newest first (cursor-paginated)."
+  })
+  @ApiOkResponse({
+    description: "Cursor-paginated list of the caller's invoices"
+  })
+  getInvoices(
+    @Req() req: JwtAuthRequest,
+    @Query() query: InvoiceCursorQueryDto
+  ) {
     return this.billingUser.listInvoices(req.user.userId, query);
   }
 

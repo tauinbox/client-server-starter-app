@@ -39,6 +39,16 @@
       "method": "DELETE",
       "path": "/api/v1/rbac/actions/1",
       "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/rbac/resources/cursor",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/rbac/actions/cursor",
+      "expectedStatus": 401
     }
   ]
 }

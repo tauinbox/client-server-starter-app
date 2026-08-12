@@ -54,3 +54,18 @@ export {
   BILLING_PROVIDER_FLAGS,
   type BillingProviderFlag
 } from './billing-flags.constants';
+
+export {
+  ALLOWED_INVOICE_SORT_COLUMNS,
+  ALLOWED_SUBSCRIPTION_SORT_COLUMNS,
+  ALLOWED_ROLE_SORT_COLUMNS,
+  ALLOWED_RESOURCE_SORT_COLUMNS,
+  ALLOWED_ACTION_SORT_COLUMNS,
+  ALLOWED_FEATURE_FLAG_SORT_COLUMNS,
+  type InvoiceSortColumn,
+  type SubscriptionSortColumn,
+  type RoleSortColumn,
+  type ResourceSortColumn,
+  type ActionSortColumn,
+  type FeatureFlagSortColumn
+} from './sort-columns.constants';

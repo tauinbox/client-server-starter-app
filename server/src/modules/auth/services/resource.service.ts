@@ -10,6 +10,10 @@ import { Repository } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Resource } from '../entities/resource.entity';
+import { CursorPaginatedResponseDto } from '../../../common/dtos';
+import type { ResourceCursorQueryDto } from '../../../common/dtos';
+import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
+import { RESOURCE_SORT_COLUMN_MAP } from '../utils/rbac-sort-columns.util';
 import { CASL_RESERVED_SUBJECT_NAMES } from '../casl/constants';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { ResourceRegistryService } from './resource-registry.service';
@@ -46,6 +50,31 @@ export class ResourceService {
     private readonly registry: ResourceRegistryService,
     private readonly metrics: MetricsService
   ) {}
+
+  /**
+   * Cursor-paginated resources for the admin list page. The unpaginated
+   * findAll below stays: the permissions matrix needs every resource at once.
+   */
+  async findCursorPaginated(
+    query: ResourceCursorQueryDto
+  ): Promise<CursorPaginatedResponseDto<Resource>> {
+    const { cursor, limit, sortBy, sortOrder } = query;
+    const { data, nextCursor } = await applyKeysetPagination(
+      this.resourceRepository.createQueryBuilder('resource'),
+      {
+        cursor,
+        limit,
+        sortBy,
+        sortOrder,
+        sortColumnMap: RESOURCE_SORT_COLUMN_MAP,
+        idColumn: 'resource.id'
+      }
+    );
+    for (const resource of data) {
+      resource.isRegistered = this.registry.isRegistered(resource.name);
+    }
+    return new CursorPaginatedResponseDto(data, nextCursor, limit);
+  }
 
   async findAll(): Promise<Resource[]> {
     const resources = await this.resourceRepository.find({

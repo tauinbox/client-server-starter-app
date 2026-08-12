@@ -62,8 +62,9 @@ test.describe('Admin billing console', () => {
     await expect(invoiceTable).toContainText('Refunded');
   });
 
-  // The invoice list is server-paginated: the page must never request the whole
-  // table, and moving the paginator must fetch the next slice from the server.
+  // The invoice list is cursor-paginated behind an infinite scroll: the page
+  // must never request the whole table, and scrolling must fetch the next slice
+  // from the server rather than filtering rows already in memory.
   test('pages through the invoice list without loading every row', async ({
     page,
     _mockServer
@@ -79,8 +80,8 @@ test.describe('Admin billing console', () => {
         userId: ADMIN_ID,
         planKey: 'pro'
       });
-    // One invoice per renewal: 12 in total, so the default page size splits it.
-    for (let i = 0; i < 11; i += 1) {
+    // One invoice per renewal: 25 in total, so the default page size splits it.
+    for (let i = 0; i < 24; i += 1) {
       await _mockServer.advanceBillingRenewal({ subscriptionId });
     }
 
@@ -94,17 +95,24 @@ test.describe('Admin billing console', () => {
     await page.goto('/admin/billing');
 
     const invoiceTable = page.locator('table').nth(1);
-    await expect(invoiceTable.locator('tbody tr')).toHaveCount(10);
-    expect(invoiceRequests[0]).toContain('page=1');
-    expect(invoiceRequests[0]).toContain('limit=10');
+    // The sentinel keeps pulling pages while it stays in view, so the list
+    // fills the viewport on open and settles once the server stops handing out
+    // cursors - all 25 rows, never in one request.
+    await expect(invoiceTable.locator('tbody tr')).toHaveCount(25);
 
-    const invoicePaginator = page.locator('mat-paginator').nth(1);
-    await expect(invoicePaginator).toContainText('1 - 10 of 12');
+    // The first request opens the sequence without a cursor; every later one
+    // continues from the previous page rather than re-reading the table.
+    expect(invoiceRequests[0]).not.toContain('cursor=');
+    expect(invoiceRequests[0]).toContain('limit=');
+    expect(
+      invoiceRequests.slice(1).every((url) => url.includes('cursor='))
+    ).toBe(true);
+    // 25 rows at a 20-row page: two requests, not one unbounded read.
+    expect(invoiceRequests).toHaveLength(2);
 
-    await invoicePaginator.getByRole('button', { name: 'Next page' }).click();
-
-    await expect(invoiceTable.locator('tbody tr')).toHaveCount(2);
-    await expect(invoicePaginator).toContainText('11 - 12 of 12');
-    expect(invoiceRequests.at(-1)).toContain('page=2');
+    // Exhausted: scrolling again asks for nothing more.
+    await invoiceTable.locator('tbody tr').last().scrollIntoViewIfNeeded();
+    await page.waitForTimeout(500);
+    expect(invoiceRequests).toHaveLength(2);
   });
 });

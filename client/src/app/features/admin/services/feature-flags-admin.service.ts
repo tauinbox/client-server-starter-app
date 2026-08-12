@@ -9,6 +9,12 @@ import type {
   FeatureFlagRuleType
 } from '@app/shared/types';
 
+import type { CursorPaginatedResponse } from '@app/shared/types';
+import {
+  cursorParams,
+  type CursorPageRequest
+} from '@shared/utils/pagination.utils';
+
 const ADMIN_API_V1 = '/api/v1/admin/feature-flags';
 
 export type CreateFeatureFlag = {
@@ -38,6 +44,16 @@ export type PreviewFlagContext = {
 @Injectable({ providedIn: 'root' })
 export class FeatureFlagsAdminService {
   readonly #http = inject(HttpClient);
+
+  /** One page of flags for the admin list page. */
+  getAllCursor(
+    request: CursorPageRequest
+  ): Observable<CursorPaginatedResponse<FeatureFlagResponse>> {
+    return this.#http.get<CursorPaginatedResponse<FeatureFlagResponse>>(
+      `${ADMIN_API_V1}/cursor`,
+      { params: cursorParams(request) }
+    );
+  }
 
   getAll(): Observable<FeatureFlagResponse[]> {
     return this.#http.get<FeatureFlagResponse[]>(ADMIN_API_V1);

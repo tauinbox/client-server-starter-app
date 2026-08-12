@@ -22,7 +22,10 @@ import {
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { PaginationQueryDto } from '../../../common/dtos/pagination-query.dto';
+import {
+  InvoiceCursorQueryDto,
+  SubscriptionCursorQueryDto
+} from '../dtos/billing-cursor-query.dto';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
 import { RegisterResource } from '../../auth/decorators/register-resource.decorator';
 import { LogAudit } from '../../audit/decorators/log-audit.decorator';
@@ -56,17 +59,19 @@ export class BillingAdminController {
 
   @Get('subscriptions')
   @Authorize(['manage', 'Billing'])
-  @ApiOperation({ summary: 'List subscriptions, newest first (paginated).' })
-  @ApiOkResponse({ description: 'Paginated list of subscriptions' })
-  listSubscriptions(@Query() query: PaginationQueryDto) {
+  @ApiOperation({
+    summary: 'List subscriptions, newest first (cursor-paginated).'
+  })
+  @ApiOkResponse({ description: 'Cursor-paginated list of subscriptions' })
+  listSubscriptions(@Query() query: SubscriptionCursorQueryDto) {
     return this.billingAdmin.listSubscriptions(query);
   }
 
   @Get('invoices')
   @Authorize(['manage', 'Billing'])
-  @ApiOperation({ summary: 'List invoices, newest first (paginated).' })
-  @ApiOkResponse({ description: 'Paginated list of invoices' })
-  listInvoices(@Query() query: PaginationQueryDto) {
+  @ApiOperation({ summary: 'List invoices, newest first (cursor-paginated).' })
+  @ApiOkResponse({ description: 'Cursor-paginated list of invoices' })
+  listInvoices(@Query() query: InvoiceCursorQueryDto) {
     return this.billingAdmin.listInvoices(query);
   }
 

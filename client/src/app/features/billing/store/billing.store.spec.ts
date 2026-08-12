@@ -2,25 +2,27 @@ import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import type {
   CreditBalanceResponse,
+  CursorPaginatedResponse,
   InvoiceResponse,
-  PaginatedResponse,
   PlanResponse,
   SubscriptionResponse,
   UsageSummaryResponse
 } from '@app/shared/types';
-import { DEFAULT_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
+import { DEFAULT_CURSOR_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
 import { NotifyService } from '@core/services/notify.service';
 import { BillingService } from '../services/billing.service';
 import { BillingStore } from './billing.store';
 
-function page<T>(data: T[], total: number): PaginatedResponse<T> {
+function page<T>(
+  data: T[],
+  nextCursor: string | null = null
+): CursorPaginatedResponse<T> {
   return {
     data,
     meta: {
-      page: 1,
-      limit: DEFAULT_PAGE_SIZE,
-      total,
-      totalPages: Math.ceil(total / DEFAULT_PAGE_SIZE)
+      nextCursor,
+      hasMore: nextCursor !== null,
+      limit: DEFAULT_CURSOR_PAGE_SIZE
     }
   };
 }
@@ -128,7 +130,7 @@ describe('BillingStore', () => {
     billingMock = {
       getPlans: vi.fn().mockReturnValue(of([proPlan])),
       getSubscription: vi.fn().mockReturnValue(of(activeSub)),
-      getInvoices: vi.fn().mockReturnValue(of(page([invoice], 1))),
+      getInvoices: vi.fn().mockReturnValue(of(page([invoice]))),
       getPaymentMethod: vi.fn().mockReturnValue(of(null)),
       getUsage: vi.fn().mockReturnValue(of(usageSummary)),
       getCredits: vi.fn().mockReturnValue(of(creditBalance)),
@@ -189,7 +191,7 @@ describe('BillingStore', () => {
 
     expect(store.plans()).toHaveLength(1);
     expect(store.subscription()).toEqual(activeSub);
-    expect(store.invoices()).toHaveLength(1);
+    expect(store.entities()).toHaveLength(1);
     expect(store.usage()).toEqual(usageSummary);
     expect(store.credits()).toEqual(creditBalance);
     expect(store.currentPlan()?.key).toBe('pro');
@@ -205,7 +207,7 @@ describe('BillingStore', () => {
     expect(store.credits()).toBeNull();
     expect(store.plans()).toHaveLength(1);
     expect(store.subscription()).toEqual(activeSub);
-    expect(store.invoices()).toHaveLength(1);
+    expect(store.entities()).toHaveLength(1);
     expect(store.usage()).toEqual(usageSummary);
     expect(store.loading()).toBe(false);
     expect(notifyMock.error).toHaveBeenCalledTimes(1);
@@ -267,55 +269,63 @@ describe('BillingStore', () => {
     const store = createStore();
     const invoices = await store.refreshInvoices();
     expect(invoices).toHaveLength(1);
-    expect(store.invoices()).toHaveLength(1);
+    expect(store.entities()).toHaveLength(1);
   });
 
-  it('loadSettings requests only the first page of invoices and keeps the total', async () => {
-    billingMock.getInvoices.mockReturnValue(of(page([invoice], 37)));
+  it('loadSettings asks for the first page of invoices', async () => {
+    billingMock.getInvoices.mockReturnValue(of(page([invoice], 'cur-1')));
     const store = createStore();
     await store.loadSettings();
 
-    expect(billingMock.getInvoices).toHaveBeenCalledWith({
-      page: 1,
-      limit: DEFAULT_PAGE_SIZE
-    });
-    expect(store.invoices()).toHaveLength(1);
-    expect(store.invoicesPage()).toEqual({
-      pageIndex: 0,
-      pageSize: DEFAULT_PAGE_SIZE,
-      total: 37
-    });
+    expect(billingMock.getInvoices).toHaveBeenCalledWith(
+      expect.objectContaining({ cursor: null })
+    );
+    expect(store.entities()).toHaveLength(1);
+    expect(store.hasMore()).toBe(true);
+    expect(store.nextCursor()).toBe('cur-1');
   });
 
-  it('loadInvoicesPage moves to the 1-based page behind the paginator index', async () => {
+  it('loadMoreInvoices appends the next page behind the cursor', async () => {
+    billingMock.getInvoices.mockReturnValue(of(page([invoice], 'cur-1')));
     const store = createStore();
     await store.loadSettings();
 
-    billingMock.getInvoices.mockReturnValue(of(page([invoice], 37)));
-    await store.loadInvoicesPage(3, 10);
+    const second = { ...invoice, id: 'inv-2' };
+    billingMock.getInvoices.mockReturnValue(of(page([second])));
+    store.loadMoreInvoices();
+    await Promise.resolve();
+    await Promise.resolve();
 
-    expect(billingMock.getInvoices).toHaveBeenLastCalledWith({
-      page: 4,
-      limit: 10
-    });
-    expect(store.invoicesPage()).toEqual({
-      pageIndex: 3,
-      pageSize: 10,
-      total: 37
-    });
+    expect(billingMock.getInvoices).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cursor: 'cur-1' })
+    );
+    // Appended, not replaced.
+    expect(store.entities()).toHaveLength(2);
+    expect(store.hasMore()).toBe(false);
   });
 
-  it('refreshInvoices stays on the page the user is looking at', async () => {
+  it('ignores loadMoreInvoices once the server reports no more rows', async () => {
+    billingMock.getInvoices.mockReturnValue(of(page([invoice])));
     const store = createStore();
     await store.loadSettings();
-    await store.loadInvoicesPage(2, 25);
+    const callsAfterLoad = billingMock.getInvoices.mock.calls.length;
+
+    store.loadMoreInvoices();
+    await Promise.resolve();
+
+    expect(billingMock.getInvoices).toHaveBeenCalledTimes(callsAfterLoad);
+  });
+
+  it('refreshInvoices restarts from the first page', async () => {
+    billingMock.getInvoices.mockReturnValue(of(page([invoice], 'cur-1')));
+    const store = createStore();
+    await store.loadSettings();
 
     await store.refreshInvoices();
 
-    expect(billingMock.getInvoices).toHaveBeenLastCalledWith({
-      page: 3,
-      limit: 25
-    });
+    expect(billingMock.getInvoices).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cursor: null })
+    );
   });
 
   it('checkout returns the provider session', async () => {
@@ -335,9 +345,7 @@ describe('BillingStore', () => {
 
   it('changePlan patches the subscription and refreshes invoices + usage', async () => {
     const changeInvoice = { ...invoice, id: 'inv-2', status: 'refunded' };
-    billingMock.getInvoices.mockReturnValue(
-      of(page([invoice, changeInvoice], 2))
-    );
+    billingMock.getInvoices.mockReturnValue(of(page([invoice, changeInvoice])));
     const store = createStore();
 
     const ok = await store.changePlan('business');
@@ -345,7 +353,7 @@ describe('BillingStore', () => {
     expect(ok).toBe(true);
     expect(billingMock.changePlan).toHaveBeenCalledWith('business');
     expect(store.subscription()?.planKey).toBe('business');
-    expect(store.invoices()).toHaveLength(2);
+    expect(store.entities()).toHaveLength(2);
     expect(billingMock.getUsage).toHaveBeenCalled();
     expect(notifyMock.success).toHaveBeenCalled();
     expect(store.working()).toBe(false);

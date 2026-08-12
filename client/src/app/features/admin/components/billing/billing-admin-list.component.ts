@@ -17,7 +17,6 @@ import {
 import { MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import { MatPaginator, type PageEvent } from '@angular/material/paginator';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatMenu, MatMenuItem, MatMenuTrigger } from '@angular/material/menu';
 import {
@@ -38,9 +37,10 @@ import { LayoutService } from '@core/services/layout.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { formatMoney } from '@features/billing/utils/billing-format';
-import { PAGE_SIZE_OPTIONS } from '@shared/utils/pagination.utils';
+import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
 import type { CancelMode } from '@features/billing/services/billing.service';
-import { BillingAdminStore } from '../../store/billing-admin.store';
+import { BillingInvoicesStore } from '../../store/billing-invoices.store';
+import { BillingSubscriptionsStore } from '../../store/billing-subscriptions.store';
 
 /**
  * Admin-shell billing console: a read view of every
@@ -61,7 +61,6 @@ import { BillingAdminStore } from '../../store/billing-admin.store';
     MatIconButton,
     MatIcon,
     MatProgressSpinner,
-    MatPaginator,
     MatTooltip,
     MatMenu,
     MatMenuItem,
@@ -76,27 +75,43 @@ import { BillingAdminStore } from '../../store/billing-admin.store';
     MatHeaderRowDef,
     MatRowDef,
     MatCell,
-    TranslocoDirective
+    TranslocoDirective,
+    InfiniteScrollDirective
   ],
   templateUrl: './billing-admin-list.component.html',
   styleUrl: './billing-admin-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class BillingAdminListComponent implements OnInit {
-  readonly #store = inject(BillingAdminStore);
+  readonly #subscriptionsStore = inject(BillingSubscriptionsStore);
+  readonly #invoicesStore = inject(BillingInvoicesStore);
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #transloco = inject(TranslocoService);
   protected readonly layout = inject(LayoutService);
   protected readonly authStore = inject(AuthStore);
 
-  readonly loading = this.#store.loading;
-  readonly working = this.#store.working;
-  readonly subscriptions = this.#store.subscriptions;
-  readonly invoices = this.#store.invoices;
-  readonly subscriptionsPage = this.#store.subscriptionsPage;
-  readonly invoicesPage = this.#store.invoicesPage;
-  readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
+  readonly subscriptions = this.#subscriptionsStore.subscriptions;
+  readonly invoices = this.#invoicesStore.invoices;
+  readonly subscriptionsLoading = this.#subscriptionsStore.loading;
+  readonly invoicesLoading = this.#invoicesStore.loading;
+  readonly subscriptionsBusy = computed(
+    () =>
+      this.#subscriptionsStore.loading() ||
+      this.#subscriptionsStore.isLoadingMore()
+  );
+  readonly invoicesBusy = computed(
+    () => this.#invoicesStore.loading() || this.#invoicesStore.isLoadingMore()
+  );
+  readonly subscriptionsHasMore = this.#subscriptionsStore.hasMore;
+  readonly invoicesHasMore = this.#invoicesStore.hasMore;
+  readonly subscriptionsLoadingMore = this.#subscriptionsStore.isLoadingMore;
+  readonly invoicesLoadingMore = this.#invoicesStore.isLoadingMore;
+
+  /** Either list having a mutation in flight disables both action columns. */
+  readonly working = computed(
+    () => this.#subscriptionsStore.working() || this.#invoicesStore.working()
+  );
 
   readonly #lang = toSignal(this.#transloco.langChanges$, {
     initialValue: this.#transloco.getActiveLang()
@@ -125,15 +140,16 @@ export class BillingAdminListComponent implements OnInit {
   );
 
   ngOnInit(): void {
-    void this.#store.load();
+    this.#subscriptionsStore.load();
+    this.#invoicesStore.load();
   }
 
-  onSubscriptionsPage(event: PageEvent): void {
-    void this.#store.loadSubscriptionsPage(event.pageIndex, event.pageSize);
+  loadMoreSubscriptions(): void {
+    this.#subscriptionsStore.loadMore();
   }
 
-  onInvoicesPage(event: PageEvent): void {
-    void this.#store.loadInvoicesPage(event.pageIndex, event.pageSize);
+  loadMoreInvoices(): void {
+    this.#invoicesStore.loadMore();
   }
 
   invoiceAmount(invoice: InvoiceResponse): string {
@@ -176,7 +192,10 @@ export class BillingAdminListComponent implements OnInit {
       .subscribe((confirmed) => {
         // Re-check: another mutation may have started while the dialog was open.
         if (confirmed && !this.working()) {
-          void this.#store.cancelSubscription(subscription.id, mode);
+          void this.#subscriptionsStore.cancelSubscription(
+            subscription.id,
+            mode
+          );
         }
       });
   }
@@ -200,7 +219,7 @@ export class BillingAdminListComponent implements OnInit {
       .subscribe((confirmed) => {
         // Re-check: another mutation may have started while the dialog was open.
         if (confirmed && !this.working()) {
-          void this.#store.refundInvoice(invoice.id);
+          void this.#invoicesStore.refundInvoice(invoice.id);
         }
       });
   }

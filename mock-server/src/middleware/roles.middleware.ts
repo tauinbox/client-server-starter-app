@@ -1,6 +1,13 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ALLOWED_ROLE_SORT_COLUMNS } from '@app/shared/constants';
+import {
+  cursorPaginate,
+  cursorQueryErrors,
+  parseCursorQuery
+} from '../helpers/pagination.helpers';
+
 import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
 import {
   findConditionActionError,
@@ -156,6 +163,24 @@ function isActorSuper(req: unknown): boolean {
 }
 
 // GET /api/v1/roles
+// GET /api/v1/roles/cursor
+router.get('/cursor', adminGuard, (req, res) => {
+  const query = req.query as Record<string, unknown>;
+  const errors = cursorQueryErrors(query, {
+    sortColumns: ALLOWED_ROLE_SORT_COLUMNS
+  });
+  if (errors.length > 0) {
+    res.status(400).json(validationError(errors));
+    return;
+  }
+  res.json(
+    cursorPaginate(
+      Array.from(getState().roles.values()),
+      parseCursorQuery(query)
+    )
+  );
+});
+
 router.get('/', adminGuard, (_req, res) => {
   const roles = Array.from(getState().roles.values());
 

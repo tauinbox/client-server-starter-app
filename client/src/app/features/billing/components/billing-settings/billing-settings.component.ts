@@ -9,7 +9,6 @@ import {
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatCard, MatCardContent } from '@angular/material/card';
-import { MatPaginator, type PageEvent } from '@angular/material/paginator';
 import { MatButton } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIcon } from '@angular/material/icon';
@@ -20,7 +19,7 @@ import type { InvoiceResponse } from '@app/shared/types';
 import { LayoutService } from '@core/services/layout.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
-import { PAGE_SIZE_OPTIONS } from '@shared/utils/pagination.utils';
+import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
 import { BillingStore } from '../../store/billing.store';
@@ -43,8 +42,8 @@ import { UsageMeterComponent } from '../usage-meter/usage-meter.component';
     MatButton,
     MatIcon,
     MatProgressSpinner,
-    MatPaginator,
     TranslocoDirective,
+    InfiniteScrollDirective,
     CreditsCardComponent,
     UsageMeterComponent
   ],
@@ -63,7 +62,14 @@ export class BillingSettingsComponent implements OnInit {
 
   protected readonly billingRoute = `/${AppRouteSegmentEnum.Billing}`;
   protected readonly isHandset = this.#layout.isHandset;
-  protected readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
+
+  /** Invoice history state, owned by the shared cursor-list feature. */
+  protected readonly invoices = this.store.entities;
+  protected readonly invoicesHasMore = this.store.hasMore;
+  protected readonly invoicesLoadingMore = this.store.isLoadingMore;
+  protected readonly invoicesBusy = computed(
+    () => this.store.loading() || this.store.isLoadingMore()
+  );
 
   readonly #lang = toSignal(this.#transloco.langChanges$, {
     initialValue: this.#transloco.getActiveLang()
@@ -110,8 +116,8 @@ export class BillingSettingsComponent implements OnInit {
     void this.store.loadSettings();
   }
 
-  protected onInvoicesPage(event: PageEvent): void {
-    void this.store.loadInvoicesPage(event.pageIndex, event.pageSize);
+  protected loadMoreInvoices(): void {
+    this.store.loadMoreInvoices();
   }
 
   invoiceAmount(invoice: InvoiceResponse): string {

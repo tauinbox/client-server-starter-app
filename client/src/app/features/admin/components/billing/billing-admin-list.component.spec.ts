@@ -7,10 +7,31 @@ import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/trans
 import { LayoutService } from '@core/services/layout.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
-import { BillingAdminStore } from '../../store/billing-admin.store';
+import { BillingInvoicesStore } from '../../store/billing-invoices.store';
+import { BillingSubscriptionsStore } from '../../store/billing-subscriptions.store';
 import { BillingAdminListComponent } from './billing-admin-list.component';
 
-type PageState = { pageIndex: number; pageSize: number; total: number };
+type ListStoreMock<T> = {
+  loading: ReturnType<typeof signal<boolean>>;
+  isLoadingMore: ReturnType<typeof signal<boolean>>;
+  hasMore: ReturnType<typeof signal<boolean>>;
+  working: ReturnType<typeof signal<boolean>>;
+  entities: ReturnType<typeof signal<T[]>>;
+  load: ReturnType<typeof vi.fn>;
+  loadMore: ReturnType<typeof vi.fn>;
+};
+
+function listStoreMock<T>(): ListStoreMock<T> {
+  return {
+    loading: signal(false),
+    isLoadingMore: signal(false),
+    hasMore: signal(false),
+    working: signal(false),
+    entities: signal<T[]>([]),
+    load: vi.fn(),
+    loadMore: vi.fn()
+  };
+}
 
 /** Row cancel/refund buttons only — the paginator renders icon buttons too. */
 function rowActionButtons(host: HTMLElement): HTMLButtonElement[] {
@@ -59,17 +80,12 @@ const paidInvoice: InvoiceResponse = {
 };
 
 describe('BillingAdminListComponent', () => {
-  let storeMock: {
-    loading: ReturnType<typeof signal<boolean>>;
-    working: ReturnType<typeof signal<boolean>>;
+  let subscriptionsMock: ListStoreMock<SubscriptionResponse> & {
     subscriptions: ReturnType<typeof signal<SubscriptionResponse[]>>;
-    invoices: ReturnType<typeof signal<InvoiceResponse[]>>;
-    subscriptionsPage: ReturnType<typeof signal<PageState>>;
-    invoicesPage: ReturnType<typeof signal<PageState>>;
-    load: ReturnType<typeof vi.fn>;
-    loadSubscriptionsPage: ReturnType<typeof vi.fn>;
-    loadInvoicesPage: ReturnType<typeof vi.fn>;
     cancelSubscription: ReturnType<typeof vi.fn>;
+  };
+  let invoicesMock: ListStoreMock<InvoiceResponse> & {
+    invoices: ReturnType<typeof signal<InvoiceResponse[]>>;
     refundInvoice: ReturnType<typeof vi.fn>;
   };
   let confirmSpy: ReturnType<typeof vi.fn>;
@@ -81,7 +97,8 @@ describe('BillingAdminListComponent', () => {
       imports: [BillingAdminListComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideNoopAnimations(),
-        { provide: BillingAdminStore, useValue: storeMock },
+        { provide: BillingSubscriptionsStore, useValue: subscriptionsMock },
+        { provide: BillingInvoicesStore, useValue: invoicesMock },
         {
           provide: AdaptiveDialogService,
           useValue: { openConfirm: confirmSpy }
@@ -101,17 +118,14 @@ describe('BillingAdminListComponent', () => {
   }
 
   beforeEach(() => {
-    storeMock = {
-      loading: signal(false),
-      working: signal(false),
+    subscriptionsMock = {
+      ...listStoreMock(),
       subscriptions: signal([activeSub]),
+      cancelSubscription: vi.fn().mockResolvedValue(true)
+    };
+    invoicesMock = {
+      ...listStoreMock(),
       invoices: signal([paidInvoice]),
-      subscriptionsPage: signal({ pageIndex: 0, pageSize: 10, total: 1 }),
-      invoicesPage: signal({ pageIndex: 0, pageSize: 10, total: 1 }),
-      load: vi.fn(),
-      loadSubscriptionsPage: vi.fn(),
-      loadInvoicesPage: vi.fn(),
-      cancelSubscription: vi.fn().mockResolvedValue(true),
       refundInvoice: vi.fn().mockResolvedValue(true)
     };
     confirmSpy = vi.fn().mockReturnValue(of(true));
@@ -122,7 +136,7 @@ describe('BillingAdminListComponent', () => {
   it('loads billing data on init', async () => {
     const fixture = await setup();
     fixture.detectChanges();
-    expect(storeMock.load).toHaveBeenCalled();
+    expect(subscriptionsMock.load).toHaveBeenCalled();
   });
 
   it('renders desktop tables with one row each', async () => {
@@ -159,7 +173,7 @@ describe('BillingAdminListComponent', () => {
     fixture.detectChanges();
     fixture.componentInstance.confirmCancel(activeSub, 'immediate');
     expect(confirmSpy).toHaveBeenCalled();
-    expect(storeMock.cancelSubscription).toHaveBeenCalledWith(
+    expect(subscriptionsMock.cancelSubscription).toHaveBeenCalledWith(
       'sub-1',
       'immediate'
     );
@@ -170,27 +184,27 @@ describe('BillingAdminListComponent', () => {
     const fixture = await setup();
     fixture.detectChanges();
     fixture.componentInstance.confirmCancel(activeSub, 'period_end');
-    expect(storeMock.cancelSubscription).not.toHaveBeenCalled();
+    expect(subscriptionsMock.cancelSubscription).not.toHaveBeenCalled();
   });
 
   it('confirmRefund refunds the invoice when confirmed', async () => {
     const fixture = await setup();
     fixture.detectChanges();
     fixture.componentInstance.confirmRefund(paidInvoice);
-    expect(storeMock.refundInvoice).toHaveBeenCalledWith('inv-1');
+    expect(invoicesMock.refundInvoice).toHaveBeenCalledWith('inv-1');
   });
 
   it('ignores cancel and refund while a mutation is in flight', async () => {
     const fixture = await setup();
     fixture.detectChanges();
-    storeMock.working.set(true);
+    subscriptionsMock.working.set(true);
 
     fixture.componentInstance.confirmCancel(activeSub, 'immediate');
     fixture.componentInstance.confirmRefund(paidInvoice);
 
     expect(confirmSpy).not.toHaveBeenCalled();
-    expect(storeMock.cancelSubscription).not.toHaveBeenCalled();
-    expect(storeMock.refundInvoice).not.toHaveBeenCalled();
+    expect(subscriptionsMock.cancelSubscription).not.toHaveBeenCalled();
+    expect(invoicesMock.refundInvoice).not.toHaveBeenCalled();
   });
 
   it('does not dispatch when a mutation starts while the dialog is open', async () => {
@@ -198,20 +212,20 @@ describe('BillingAdminListComponent', () => {
     fixture.detectChanges();
     // The dialog resolves only after another action has flipped `working`.
     confirmSpy.mockImplementation(() => {
-      storeMock.working.set(true);
+      subscriptionsMock.working.set(true);
       return of(true);
     });
 
     fixture.componentInstance.confirmRefund(paidInvoice);
 
     expect(confirmSpy).toHaveBeenCalled();
-    expect(storeMock.refundInvoice).not.toHaveBeenCalled();
+    expect(invoicesMock.refundInvoice).not.toHaveBeenCalled();
   });
 
   it('disables the action controls while a mutation is in flight', async () => {
     const fixture = await setup();
     fixture.detectChanges();
-    storeMock.working.set(true);
+    subscriptionsMock.working.set(true);
     fixture.detectChanges();
 
     const actionButtons = rowActionButtons(fixture.nativeElement);

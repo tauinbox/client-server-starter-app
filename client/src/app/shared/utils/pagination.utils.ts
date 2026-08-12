@@ -1,26 +1,48 @@
 import { HttpParams } from '@angular/common/http';
-import { DEFAULT_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
-
-/** Page sizes offered by `mat-paginator`; all within the server's cap. */
-export const PAGE_SIZE_OPTIONS = [DEFAULT_PAGE_SIZE, 25, 50, 100];
-
-/** A page request as the server's `PaginationQueryDto` accepts it. */
-export type PageRequest = {
-  page?: number;
-  limit?: number;
-};
+import {
+  DEFAULT_CURSOR_PAGE_SIZE,
+  DEFAULT_SORT_BY,
+  DEFAULT_SORT_ORDER
+} from '@app/shared/constants/pagination.constants';
+import type { SortOrder } from '@app/shared/types';
 
 /**
- * Only the params the caller set are sent — an omitted `page`/`limit` lets the
- * server apply its own defaults instead of the client duplicating them.
+ * One page request against a cursor-paginated list endpoint. `cursor` is the
+ * opaque `meta.nextCursor` of the previous response; omitting it asks for the
+ * first page.
  */
-export function pageParams({ page, limit }: PageRequest): HttpParams {
+export type CursorPageRequest = {
+  cursor?: string | null;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: SortOrder;
+};
+
+export const CURSOR_PAGE_SIZE = DEFAULT_CURSOR_PAGE_SIZE;
+
+/**
+ * Only the params the caller set are sent, so an omitted value keeps the
+ * server's own default rather than the client duplicating it. A null cursor is
+ * treated as "first page" and left off entirely.
+ */
+export function cursorParams({
+  cursor,
+  limit,
+  sortBy,
+  sortOrder
+}: CursorPageRequest): HttpParams {
   let params = new HttpParams();
-  if (page !== undefined) {
-    params = params.set('page', page.toString());
+  if (cursor) {
+    params = params.set('cursor', cursor);
   }
   if (limit !== undefined) {
     params = params.set('limit', limit.toString());
+  }
+  if (sortBy !== undefined && sortBy !== DEFAULT_SORT_BY) {
+    params = params.set('sortBy', sortBy);
+  }
+  if (sortOrder !== undefined && sortOrder !== DEFAULT_SORT_ORDER) {
+    params = params.set('sortOrder', sortOrder);
   }
   return params;
 }

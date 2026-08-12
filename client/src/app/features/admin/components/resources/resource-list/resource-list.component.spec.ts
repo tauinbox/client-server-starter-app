@@ -8,6 +8,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 
 import { ResourceListComponent } from './resource-list.component';
+import { ActionsStore } from '../../../store/actions.store';
 import { ResourcesStore } from '../../../store/resources.store';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { NotifyService } from '@core/services/notify.service';
@@ -43,11 +44,17 @@ describe('ResourceListComponent', () => {
   let fixture: ComponentFixture<ResourceListComponent>;
   let resourcesStoreMock: {
     loading: ReturnType<typeof signal<boolean>>;
+    isLoadingMore: ReturnType<typeof signal<boolean>>;
+    hasMore: ReturnType<typeof signal<boolean>>;
     resources: ReturnType<typeof signal<ResourceResponse[]>>;
-    actions: ReturnType<typeof signal<ActionResponse[]>>;
     load: ReturnType<typeof vi.fn>;
+    loadMore: ReturnType<typeof vi.fn>;
     updateResource: ReturnType<typeof vi.fn>;
     restoreResource: ReturnType<typeof vi.fn>;
+  };
+  let actionsStoreMock: {
+    actions: ReturnType<typeof signal<ActionResponse[]>>;
+    load: ReturnType<typeof vi.fn>;
   };
   let authStoreMock: { hasPermissions: ReturnType<typeof vi.fn> };
   let dialogMock: { open: ReturnType<typeof vi.fn> };
@@ -64,6 +71,7 @@ describe('ResourceListComponent', () => {
       providers: [
         provideNoopAnimations(),
         { provide: ResourcesStore, useValue: resourcesStoreMock },
+        { provide: ActionsStore, useValue: actionsStoreMock },
         { provide: AuthStore, useValue: authStoreMock },
         { provide: MatDialog, useValue: dialogMock },
         { provide: NotifyService, useValue: notifyMock }
@@ -77,12 +85,15 @@ describe('ResourceListComponent', () => {
   beforeEach(() => {
     resourcesStoreMock = {
       loading: signal(false),
+      isLoadingMore: signal(false),
+      hasMore: signal(false),
       resources: signal([mockResource]),
-      actions: signal([mockAction]),
       load: vi.fn(),
+      loadMore: vi.fn(),
       updateResource: vi.fn().mockReturnValue(of({} as ResourceResponse)),
       restoreResource: vi.fn().mockReturnValue(of({} as ResourceResponse))
     };
+    actionsStoreMock = { actions: signal([mockAction]), load: vi.fn() };
 
     authStoreMock = { hasPermissions: vi.fn().mockReturnValue(false) };
     dialogMock = { open: vi.fn() };

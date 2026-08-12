@@ -7,9 +7,11 @@ import {
 import { adminPanelGuard } from './guards/admin-panel.guard';
 import { UsersStore } from '@features/users/store/users.store';
 import { RolesStore } from './store/roles.store';
+import { ActionsStore } from './store/actions.store';
 import { ResourcesStore } from './store/resources.store';
 import { FeatureFlagsAdminStore } from './store/feature-flags-admin.store';
-import { BillingAdminStore } from './store/billing-admin.store';
+import { BillingInvoicesStore } from './store/billing-invoices.store';
+import { BillingSubscriptionsStore } from './store/billing-subscriptions.store';
 import { AuthStore } from '@features/auth/store/auth.store';
 
 export const adminRoutes: Routes = [
@@ -24,8 +26,10 @@ export const adminRoutes: Routes = [
       UsersStore,
       RolesStore,
       ResourcesStore,
+      ActionsStore,
       FeatureFlagsAdminStore,
-      BillingAdminStore
+      BillingSubscriptionsStore,
+      BillingInvoicesStore
     ],
     children: [
       {

@@ -14,7 +14,6 @@ import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { MAT_SNACK_BAR_DEFAULT_OPTIONS } from '@angular/material/snack-bar';
 import { MAT_TOOLTIP_DEFAULT_OPTIONS } from '@angular/material/tooltip';
 import { MatIconRegistry } from '@angular/material/icon';
-import { MatPaginatorIntl } from '@angular/material/paginator';
 import { DomSanitizer } from '@angular/platform-browser';
 import { firstValueFrom } from 'rxjs';
 import { jwtInterceptor } from '@features/auth/interceptors/jwt.interceptor';
@@ -27,7 +26,6 @@ import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.s
 import { TranslocoHttpLoader } from '@core/transloco-loader';
 import { LanguageService } from '@core/services/language.service';
 import { DisplayPreferencesService } from '@core/services/display-preferences.service';
-import { TranslocoPaginatorIntl } from '@shared/services/transloco-paginator-intl.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -107,7 +105,6 @@ export const appConfig: ApplicationConfig = {
       provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
       useValue: { appearance: 'outline' }
     },
-    { provide: MatPaginatorIntl, useClass: TranslocoPaginatorIntl },
     {
       provide: MAT_TOOLTIP_DEFAULT_OPTIONS,
       useValue: { showDelay: 0, hideDelay: 0, touchendHideDelay: 1500 }

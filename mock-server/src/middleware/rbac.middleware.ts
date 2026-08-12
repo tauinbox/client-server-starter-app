@@ -2,6 +2,16 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import {
+  ALLOWED_ACTION_SORT_COLUMNS,
+  ALLOWED_RESOURCE_SORT_COLUMNS
+} from '@app/shared/constants';
+import {
+  cursorPaginate,
+  cursorQueryErrors,
+  parseCursorQuery
+} from '../helpers/pagination.helpers';
+
+import {
   getState,
   logAudit,
   toResourceResponse,
@@ -28,6 +38,23 @@ router.get('/metadata', adminGuard, (_req, res) => {
 });
 
 // GET /api/v1/rbac/resources
+// GET /api/v1/rbac/resources/cursor
+router.get('/resources/cursor', adminGuard, (req, res) => {
+  const query = req.query as Record<string, unknown>;
+  const errors = cursorQueryErrors(query, {
+    sortColumns: ALLOWED_RESOURCE_SORT_COLUMNS
+  });
+  if (errors.length > 0) {
+    res.status(400).json(validationError(errors));
+    return;
+  }
+  const page = cursorPaginate(
+    Array.from(getState().resources.values()),
+    parseCursorQuery(query)
+  );
+  res.json({ data: page.data.map(toResourceResponse), meta: page.meta });
+});
+
 router.get('/resources', adminGuard, (_req, res) => {
   const resources = Array.from(getState().resources.values()).map(
     toResourceResponse
@@ -194,6 +221,23 @@ router.patch('/resources/:id', adminGuard, requireUuid('id'), (req, res) => {
 });
 
 // GET /api/v1/rbac/actions
+// GET /api/v1/rbac/actions/cursor
+router.get('/actions/cursor', adminGuard, (req, res) => {
+  const query = req.query as Record<string, unknown>;
+  const errors = cursorQueryErrors(query, {
+    sortColumns: ALLOWED_ACTION_SORT_COLUMNS
+  });
+  if (errors.length > 0) {
+    res.status(400).json(validationError(errors));
+    return;
+  }
+  const page = cursorPaginate(
+    Array.from(getState().actions.values()),
+    parseCursorQuery(query)
+  );
+  res.json({ data: page.data.map(toActionResponse), meta: page.meta });
+});
+
 router.get('/actions', adminGuard, (_req, res) => {
   const actions = Array.from(getState().actions.values()).map(toActionResponse);
   res.json(actions);

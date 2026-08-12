@@ -71,11 +71,11 @@ function seedInvoices(count: number): void {
 
 type InvoicePage = {
   data: Array<{ id: string; amountMinor: number }>;
-  meta: { page: number; limit: number; total: number; totalPages: number };
+  meta: { nextCursor: string | null; hasMore: boolean; limit: number };
 };
 
-describe('GET /admin/billing/invoices — pagination parity', () => {
-  it('returns the first page in the paginated envelope, newest first', async () => {
+describe('GET /admin/billing/invoices — cursor pagination parity', () => {
+  it('returns the first page in the cursor envelope, newest first', async () => {
     seedInvoices(25);
     const token = await login('admin@example.com');
 
@@ -84,31 +84,47 @@ describe('GET /admin/billing/invoices — pagination parity', () => {
     const body = (await res.json()) as InvoicePage;
 
     expect(body.data).toHaveLength(10);
-    expect(body.meta).toEqual({
-      page: 1,
-      limit: 10,
-      total: 25,
-      totalPages: 3
-    });
+    expect(body.meta.limit).toBe(10);
+    expect(body.meta.hasMore).toBe(true);
+    expect(body.meta.nextCursor).toEqual(expect.any(String));
     // Newest first: the last-seeded invoice carries the highest amount.
     expect(body.data[0].amountMinor).toBe(1024);
   });
 
-  it('serves a second page that does not overlap the first', async () => {
+  it('walks the cursor without repeating or dropping a row', async () => {
     seedInvoices(25);
     const token = await login('admin@example.com');
 
-    const first = (await (
-      await get(token, '/api/v1/admin/billing/invoices?page=1&limit=10')
-    ).json()) as InvoicePage;
-    const second = (await (
-      await get(token, '/api/v1/admin/billing/invoices?page=2&limit=10')
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    let pages = 0;
+
+    do {
+      const path = `/api/v1/admin/billing/invoices?limit=10${
+        cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''
+      }`;
+      const page = (await (await get(token, path)).json()) as InvoicePage;
+      seen.push(...page.data.map((i) => i.id));
+      cursor = page.meta.nextCursor;
+      pages += 1;
+    } while (cursor && pages < 10);
+
+    expect(pages).toBe(3);
+    expect(seen).toHaveLength(25);
+    expect(new Set(seen).size).toBe(25);
+  });
+
+  it('reports the last page with hasMore false and a null cursor', async () => {
+    seedInvoices(5);
+    const token = await login('admin@example.com');
+
+    const body = (await (
+      await get(token, '/api/v1/admin/billing/invoices?limit=10')
     ).json()) as InvoicePage;
 
-    expect(second.data).toHaveLength(10);
-    expect(second.meta.page).toBe(2);
-    const firstIds = new Set(first.data.map((i) => i.id));
-    expect(second.data.some((i) => firstIds.has(i.id))).toBe(false);
+    expect(body.data).toHaveLength(5);
+    expect(body.meta.hasMore).toBe(false);
+    expect(body.meta.nextCursor).toBeNull();
   });
 
   it('rejects a limit above the shared maximum (400)', async () => {
@@ -123,6 +139,18 @@ describe('GET /admin/billing/invoices — pagination parity', () => {
     expect(body.errors).toContain(
       `limit must not be greater than ${MAX_PAGE_SIZE}`
     );
+  });
+
+  it('rejects a sortBy outside the entity whitelist (400)', async () => {
+    const token = await login('admin@example.com');
+
+    const res = await get(
+      token,
+      '/api/v1/admin/billing/invoices?sortBy=amountMinor'
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { errors: string[] };
+    expect(body.errors[0]).toContain('sortBy must be one of');
   });
 
   it('rejects an unknown query param the way forbidNonWhitelisted does', async () => {
@@ -141,12 +169,12 @@ describe('GET /admin/billing/invoices — pagination parity', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as InvoicePage;
     expect(Array.isArray(body.data)).toBe(true);
-    expect(body.meta.page).toBe(1);
-    expect(body.meta.limit).toBe(10);
+    expect(body.meta.hasMore).toBe(false);
+    expect(body.meta.limit).toBe(20);
   });
 });
 
-describe('GET /billing/invoices — pagination parity', () => {
+describe('GET /billing/invoices — cursor pagination parity', () => {
   it('returns an empty page for a caller with no billing customer', async () => {
     const token = await login('user@example.com');
 
@@ -154,20 +182,16 @@ describe('GET /billing/invoices — pagination parity', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as InvoicePage;
     expect(body.data).toEqual([]);
-    expect(body.meta).toEqual({
-      page: 1,
-      limit: 10,
-      total: 0,
-      totalPages: 0
-    });
+    expect(body.meta.hasMore).toBe(false);
+    expect(body.meta.nextCursor).toBeNull();
   });
 
-  it('rejects an out-of-range page the way the DTO does', async () => {
+  it('rejects an out-of-range limit the way the DTO does', async () => {
     const token = await login('user@example.com');
 
-    const res = await get(token, '/api/v1/billing/invoices?page=0');
+    const res = await get(token, '/api/v1/billing/invoices?limit=0');
     expect(res.status).toBe(400);
     const body = (await res.json()) as { errors: string[] };
-    expect(body.errors).toContain('page must not be less than 1');
+    expect(body.errors).toContain('limit must not be less than 1');
   });
 });
