@@ -18,6 +18,7 @@ import {
 import { CursorPaginatedResponseDto } from '../../../common/dtos';
 import type { FeatureFlagCursorQueryDto } from '../../../common/dtos';
 import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
+import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
 
@@ -34,17 +35,6 @@ import {
 } from '../dtos/preview-flag-context.dto';
 import { validateRulePayload } from '../utils/validate-rule-payload.util';
 import { AttributeRegistryService } from './attribute-registry.service';
-
-const PG_UNIQUE_VIOLATION = '23505';
-
-function isUniqueViolation(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
-  const { code, driverError } = error as {
-    code?: string;
-    driverError?: { code?: string };
-  };
-  return (code ?? driverError?.code) === PG_UNIQUE_VIOLATION;
-}
 
 function keyExistsConflict(): HttpException {
   return new HttpException(

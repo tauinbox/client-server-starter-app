@@ -8,13 +8,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
+import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
 import { CreditService } from './credit.service';
-
-const PG_UNIQUE_VIOLATION = '23505';
 
 // A usage record only counts toward a subscription that is currently billable;
 // `canceled`/`incomplete` subscriptions cannot accrue metered usage.
@@ -118,8 +117,7 @@ export class UsageService {
       // Lost an insert race on the same idempotency key — the unique constraint
       // rejected the second writer. Return the record the winner persisted so the
       // call stays idempotent rather than surfacing a 500.
-      const code = (error as { code?: string }).code;
-      if (code === PG_UNIQUE_VIOLATION) {
+      if (isUniqueViolation(error)) {
         const winner = await this.usageRecords.findOne({
           where: {
             customerId: input.customerId,

@@ -251,6 +251,17 @@ describe('UsageService', () => {
     });
   });
 
+  it('recognises the unique violation when TypeORM wraps the driver error', async () => {
+    const winner = { id: 'usage-1', idempotencyKey: 'evt-1' } as UsageRecord;
+    subscriptions.findOne.mockResolvedValue(makeSubscription());
+    usageRecords.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(winner);
+    usageRecords.save.mockRejectedValue({ driverError: { code: '23505' } });
+
+    await expect(service.record(INPUT)).resolves.toBe(winner);
+  });
+
   it('rethrows a non-unique save failure', async () => {
     subscriptions.findOne.mockResolvedValue(makeSubscription());
     usageRecords.save.mockRejectedValue({ code: '08006' });

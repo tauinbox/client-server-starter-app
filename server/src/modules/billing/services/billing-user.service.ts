@@ -22,6 +22,7 @@ import type {
 } from '@app/shared/types';
 import { CursorPaginatedResponseDto } from '../../../common/dtos/cursor-paginated-response.dto';
 import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
+import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { User } from '../../users/entities/user.entity';
 import { CreditBalance } from '../entities/credit-balance.entity';
@@ -52,8 +53,6 @@ import { CreditService } from './credit.service';
 
 /** Subscriptions that grant access — re-checkout while one exists is blocked. */
 const ACTIVE_STATUSES = ['trialing', 'active', 'past_due'] as const;
-
-const PG_UNIQUE_VIOLATION = '23505';
 
 const ALREADY_SUBSCRIBED_MESSAGE =
   'You already have an active subscription. Cancel it before subscribing to another plan.';
@@ -437,7 +436,7 @@ export class BillingUserService {
         } catch (error: unknown) {
           // Lost the insert race against a concurrent checkout: the partial
           // unique index rejected the second open row.
-          if ((error as { code?: string }).code === PG_UNIQUE_VIOLATION) {
+          if (isUniqueViolation(error)) {
             throw new ConflictException(ALREADY_SUBSCRIBED_MESSAGE);
           }
           throw error;
@@ -1140,7 +1139,7 @@ export class BillingUserService {
       // Lost the insert race against a concurrent first billing action:
       // the unique constraint on user_id rejected the second row. Return
       // the row the winner created.
-      if ((error as { code?: string }).code === PG_UNIQUE_VIOLATION) {
+      if (isUniqueViolation(error)) {
         const winner = await this.customers.findOne({ where: { userId } });
         if (winner) return winner;
       }
