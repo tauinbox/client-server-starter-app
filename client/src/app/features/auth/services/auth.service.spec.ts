@@ -1,3 +1,4 @@
+import { signal, type WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
@@ -5,7 +6,7 @@ import {
   HttpTestingController,
   provideHttpClientTesting
 } from '@angular/common/http/testing';
-import { firstValueFrom, of, EMPTY } from 'rxjs';
+import { firstValueFrom, of, EMPTY, Subject } from 'rxjs';
 import { AuthService } from './auth.service';
 import { AuthStore } from '../store/auth.store';
 import { TokenService } from './token.service';
@@ -13,9 +14,10 @@ import { RbacMetadataService } from './rbac-metadata.service';
 import { RbacMetadataStore } from '../store/rbac-metadata.store';
 import { NotificationsService } from '@core/services/notifications.service';
 import { FeatureFlagsStore } from '../../feature-flags/store/feature-flags.store';
+import { EntitlementsStore } from '../../billing/store/entitlements.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import type { AuthResponse } from '../models/auth.types';
-import type { RoleResponse } from '@app/shared/types';
+import type { NotificationEvent, RoleResponse } from '@app/shared/types';
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
@@ -90,6 +92,12 @@ describe('AuthService', () => {
     reload: ReturnType<typeof vi.fn>;
     clear: ReturnType<typeof vi.fn>;
   };
+  let entitlementsStoreMock: {
+    loaded: WritableSignal<boolean>;
+    reload: ReturnType<typeof vi.fn>;
+    clear: ReturnType<typeof vi.fn>;
+  };
+  let entitlementsUpdated$: Subject<NotificationEvent>;
 
   beforeEach(() => {
     rbacMetadataServiceMock = {
@@ -125,6 +133,13 @@ describe('AuthService', () => {
       clear: vi.fn()
     };
 
+    entitlementsStoreMock = {
+      loaded: signal(false),
+      reload: vi.fn().mockResolvedValue(undefined),
+      clear: vi.fn()
+    };
+    entitlementsUpdated$ = new Subject<NotificationEvent>();
+
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -140,10 +155,12 @@ describe('AuthService', () => {
             connect: vi.fn(),
             disconnect: vi.fn(),
             permissionsUpdated$: EMPTY,
-            featureFlagsUpdated$: EMPTY
+            featureFlagsUpdated$: EMPTY,
+            entitlementsUpdated$: entitlementsUpdated$
           }
         },
-        { provide: FeatureFlagsStore, useValue: featureFlagsStoreMock }
+        { provide: FeatureFlagsStore, useValue: featureFlagsStoreMock },
+        { provide: EntitlementsStore, useValue: entitlementsStoreMock }
       ]
     });
 
@@ -350,6 +367,8 @@ describe('AuthService', () => {
 
       expect(authStoreMock.clearSession).toHaveBeenCalled();
       expect(rbacMetadataStoreMock.clear).toHaveBeenCalled();
+      // One session's entitlement mirror must never survive into the next.
+      expect(entitlementsStoreMock.clear).toHaveBeenCalled();
     });
 
     it('should not POST when not authenticated', () => {
@@ -359,6 +378,7 @@ describe('AuthService', () => {
 
       httpMock.expectNone(AuthApiEnum.Logout);
       expect(rbacMetadataStoreMock.clear).toHaveBeenCalled();
+      expect(entitlementsStoreMock.clear).toHaveBeenCalled();
     });
   });
 
@@ -399,6 +419,30 @@ describe('AuthService', () => {
       service.initSession();
 
       expect(scheduleSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('entitlements_updated push', () => {
+    it('re-fetches the mirror when it is already loaded', () => {
+      entitlementsStoreMock.loaded.set(true);
+
+      entitlementsUpdated$.next({
+        type: 'entitlements_updated',
+        userId: 'user-1'
+      });
+
+      expect(entitlementsStoreMock.reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays silent for a session that never resolved entitlements', () => {
+      entitlementsStoreMock.loaded.set(false);
+
+      entitlementsUpdated$.next({
+        type: 'entitlements_updated',
+        userId: 'user-1'
+      });
+
+      expect(entitlementsStoreMock.reload).not.toHaveBeenCalled();
     });
   });
 });

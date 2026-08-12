@@ -101,7 +101,7 @@ describe('Billing user self-service (e2e)', () => {
     getRegion: jest.fn(),
     setRegion: jest.fn()
   };
-  const entitlements = { has: jest.fn() };
+  const entitlements = { has: jest.fn(), capabilitiesFor: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -413,6 +413,59 @@ describe('Billing user self-service (e2e)', () => {
     expect((res.body as { cancelAtPeriodEnd: boolean }).cancelAtPeriodEnd).toBe(
       true
     );
+  });
+
+  describe('entitlements read (GET /billing/entitlements)', () => {
+    it('returns the whole resolved set - planKey, capabilities and limits', async () => {
+      entitlements.capabilitiesFor.mockResolvedValue({
+        planKey: 'pro',
+        capabilities: ['reports', 'data-export'],
+        limits: { sessions: 10 }
+      });
+
+      const res = await request(server)
+        .get('/api/v1/billing/entitlements')
+        .expect(200);
+
+      expect(res.body).toEqual({
+        planKey: 'pro',
+        capabilities: ['reports', 'data-export'],
+        limits: { sessions: 10 }
+      });
+    });
+
+    it('scopes the read to the authenticated caller (IDOR boundary)', async () => {
+      entitlements.capabilitiesFor.mockResolvedValue({
+        planKey: 'free',
+        capabilities: [],
+        limits: {}
+      });
+
+      await request(server)
+        .get('/api/v1/billing/entitlements')
+        .set('x-test-user', 'user-7')
+        .expect(200);
+
+      expect(entitlements.capabilitiesFor).toHaveBeenCalledWith('user-7');
+    });
+
+    it('reports the Free fallback rather than 404 when nothing is subscribed', async () => {
+      entitlements.capabilitiesFor.mockResolvedValue({
+        planKey: 'free',
+        capabilities: [],
+        limits: {}
+      });
+
+      const res = await request(server)
+        .get('/api/v1/billing/entitlements')
+        .expect(200);
+
+      expect(res.body).toEqual({
+        planKey: 'free',
+        capabilities: [],
+        limits: {}
+      });
+    });
   });
 
   describe('entitlement enforcement (@RequireEntitlement)', () => {

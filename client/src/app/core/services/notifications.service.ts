@@ -46,6 +46,10 @@ export class NotificationsService {
     this.#ofType('feature_flags_updated')
   );
 
+  readonly entitlementsUpdated$ = this.#events$.pipe(
+    this.#ofType('entitlements_updated')
+  );
+
   constructor() {
     // Subscribe once — service is a root singleton, no need to unsubscribe
     this.sessionInvalidated$.subscribe(() => {
