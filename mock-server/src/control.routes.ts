@@ -316,7 +316,8 @@ router.post('/notify', (req, res) => {
   }
   if (
     event.type === 'session_invalidated' ||
-    event.type === 'permissions_updated'
+    event.type === 'permissions_updated' ||
+    event.type === 'entitlements_updated'
   ) {
     pushToUser(event.userId, event);
   } else {
@@ -324,6 +325,17 @@ router.post('/notify', (req, res) => {
   }
   res.json({ ok: true });
 });
+
+/**
+ * Mirrors the server's entitlement-changed listener: every billing change that
+ * moves what a plan grants tells the affected client so its advisory mirror
+ * does not sit stale. Scoped to the one owner - never a broadcast.
+ */
+function notifyEntitlementsChanged(customerId: string): void {
+  const userId = getState().billingCustomers.get(customerId)?.userId;
+  if (!userId) return;
+  pushToUser(userId, { type: 'entitlements_updated', userId });
+}
 
 // POST /__control/billing/activate-subscription — simulate a successful
 // checkout + provider webhook for E2E (the real flow redirects to an external
@@ -458,6 +470,7 @@ router.post('/billing/activate-subscription', (req, res) => {
   };
   state.billingInvoices.set(invoice.id, invoice);
 
+  notifyEntitlementsChanged(customer.id);
   res.json(toSubscriptionResponse(subscription));
 });
 
@@ -606,6 +619,7 @@ router.post('/billing/complete-purchase', (req, res) => {
   }
 
   state.billingPurchaseSessions.delete(session.sessionRef);
+  notifyEntitlementsChanged(session.customerId);
   res.json(toInvoiceResponse(invoice));
 });
 
@@ -677,6 +691,7 @@ router.post('/billing/advance-renewal', (req, res) => {
       subscription.cancelAtPeriodEnd = false;
     }
     subscription.updatedAt = nowIso;
+    notifyEntitlementsChanged(subscription.customerId);
     res.json(toSubscriptionResponse(subscription));
     return;
   }
@@ -694,6 +709,7 @@ router.post('/billing/advance-renewal', (req, res) => {
   if (subscription.cancelAtPeriodEnd) {
     subscription.status = 'canceled';
     subscription.updatedAt = nowIso;
+    notifyEntitlementsChanged(subscription.customerId);
     res.json(toSubscriptionResponse(subscription));
     return;
   }
@@ -772,6 +788,7 @@ router.post('/billing/advance-renewal', (req, res) => {
   subscription.currentPeriodEnd = newEnd.toISOString();
   subscription.billingAnchorAt = billingAnchor.toISOString();
   subscription.updatedAt = nowIso;
+  notifyEntitlementsChanged(subscription.customerId);
   res.json(toSubscriptionResponse(subscription));
 });
 

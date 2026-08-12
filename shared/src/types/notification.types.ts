@@ -6,4 +6,8 @@ export type NotificationEvent =
       action: 'created' | 'updated' | 'deleted' | 'restored';
       userId: string;
     }
-  | { type: 'feature_flags_updated' };
+  | { type: 'feature_flags_updated' }
+  // Deliberately separate from `permissions_updated`: entitlements are a
+  // different access axis, and reusing the permissions event would make every
+  // billing change re-fetch CASL rules that did not move.
+  | { type: 'entitlements_updated'; userId: string };

@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
   BillingProviderId,
   BillingRegion,
+  EntitlementsResponse,
   PlanResponse,
   ProrationPreviewResponse,
   UsageSummaryResponse
@@ -20,6 +21,7 @@ import {
   toUsageResponse
 } from '../state';
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
+import { pushToUser } from '../sse-hub';
 import {
   ALLOWED_INVOICE_SORT_COLUMNS,
   ALLOWED_SUBSCRIPTION_SORT_COLUMNS
@@ -170,6 +172,73 @@ function findCustomer(userId: string): MockCustomer | undefined {
     if (customer.userId === userId) return customer;
   }
   return undefined;
+}
+
+/** Plan key of the default (no-subscription) tier - mirrors FREE_PLAN_KEY. */
+const FREE_PLAN_KEY = 'free';
+
+/**
+ * Mirrors the server's entitlement-changed listener: a billing change that
+ * moves what the plan grants tells that one client, never a broadcast.
+ */
+function notifyEntitlementsChanged(userId: string): void {
+  pushToUser(userId, { type: 'entitlements_updated', userId });
+}
+
+function findPlanByKey(key: string): MockPlan | undefined {
+  for (const plan of getState().plans.values()) {
+    if (plan.key === key) return plan;
+  }
+  return undefined;
+}
+
+function toResolvedEntitlements(plan: MockPlan): EntitlementsResponse {
+  return {
+    planKey: plan.key,
+    capabilities: plan.entitlements,
+    limits: plan.limits ?? {}
+  };
+}
+
+/**
+ * Mirrors the server's EntitlementService.capabilitiesFor: the entitled
+ * subscription's plan (or the Free tier when there is none), unioned with the
+ * customer's active - non-revoked, non-expired - one-time purchase grants.
+ * Deriving this from the plan catalog on the client would get all four rules
+ * wrong, which is why the endpoint exists.
+ */
+function resolveEntitlements(userId: string): EntitlementsResponse {
+  const customer = findCustomer(userId);
+  const freePlan = findPlanByKey(FREE_PLAN_KEY);
+  const free: EntitlementsResponse = freePlan
+    ? toResolvedEntitlements(freePlan)
+    : { planKey: FREE_PLAN_KEY, capabilities: [], limits: {} };
+
+  if (!customer) return free;
+
+  const subscription = [...getState().billingSubscriptions.values()]
+    .filter(
+      (s) => s.customerId === customer.id && ACTIVE_STATUSES.includes(s.status)
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  const plan = subscription ? findPlanByKey(subscription.planKey) : undefined;
+  const base = plan ? toResolvedEntitlements(plan) : free;
+
+  const now = Date.now();
+  const granted = [...getState().billingCustomerGrants.values()]
+    .filter(
+      (grant) =>
+        grant.customerId === customer.id &&
+        !grant.revokedAt &&
+        (!grant.expiresAt || Date.parse(grant.expiresAt) > now)
+    )
+    .map((grant) => grant.entitlement);
+  if (granted.length === 0) return base;
+
+  return {
+    ...base,
+    capabilities: [...new Set([...base.capabilities, ...granted])]
+  };
 }
 
 /**
@@ -391,6 +460,13 @@ billingRouter.get('/products', authGuard, (req: Request, res: Response) => {
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     .map(toProductResponse);
   res.json(products);
+});
+
+// GET /billing/entitlements — advisory read for the client mirror; the
+// entitlement guard stays the enforcement point.
+billingRouter.get('/entitlements', authGuard, (req: Request, res: Response) => {
+  const { user } = req as AuthenticatedRequest;
+  res.json(resolveEntitlements(user.id));
 });
 
 // GET /billing/credits — caller's prepaid credit balance, or null when no
@@ -819,6 +895,7 @@ billingRouter.post(
     sub.planKey = toPlan.key;
     sub.billingMode = toPlan.billingMode;
     sub.updatedAt = nowIso;
+    notifyEntitlementsChanged(customer.userId);
     res.json(toSubscriptionResponse(sub));
   }
 );
@@ -881,6 +958,9 @@ billingRouter.post(
       sub.cancelAtPeriodEnd = true;
     }
     sub.updatedAt = new Date().toISOString();
+    // Only an immediate cancel revokes access now; a period-end cancel leaves
+    // entitlements untouched until the boundary, so it pushes nothing.
+    if (mode === 'immediate') notifyEntitlementsChanged(user.id);
     res.json(toSubscriptionResponse(sub));
   }
 );
@@ -948,31 +1028,7 @@ billingRouter.get(
   authGuard,
   (req: Request, res: Response) => {
     const { user } = req as AuthenticatedRequest;
-    const customer = findCustomer(user.id);
-    const sub = customer
-      ? [...getState().billingSubscriptions.values()]
-          .filter(
-            (s) =>
-              s.customerId === customer.id && ACTIVE_STATUSES.includes(s.status)
-          )
-          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
-      : undefined;
-    const plan = sub
-      ? [...getState().plans.values()].find((p) => p.key === sub.planKey)
-      : undefined;
-    // Plan capabilities unioned with active (non-revoked, non-expired)
-    // one-time purchase grants — mirrors the server's EntitlementService.
-    const now = Date.now();
-    const granted = customer
-      ? [...getState().billingCustomerGrants.values()].some(
-          (grant) =>
-            grant.customerId === customer.id &&
-            grant.entitlement === 'reports' &&
-            !grant.revokedAt &&
-            (!grant.expiresAt || Date.parse(grant.expiresAt) > now)
-        )
-      : false;
-    if (!plan?.entitlements.includes('reports') && !granted) {
+    if (!resolveEntitlements(user.id).capabilities.includes('reports')) {
       res.status(403).json({
         message: 'This action requires the "reports" entitlement',
         statusCode: 403

@@ -72,6 +72,7 @@ export type {
   ProductResponse,
   CustomerGrantResponse,
   CreditBalanceResponse,
+  EntitlementsResponse,
   PlanResponse,
   CustomerResponse,
   PaymentMethodResponse,

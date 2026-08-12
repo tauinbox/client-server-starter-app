@@ -2,7 +2,7 @@
 // subscription is swept by RenewalService, charged off-session through the
 // provider seam, advanced (or walked down the dunning ladder), and the resulting
 // billing domain event flows through the REAL EventEmitter2 bus into the
-// entitlement-cache listener — proving the emitted event names match what the
+// entitlement-changed listener — proving the emitted event names match what the
 // listener subscribes to. Runs without PostgreSQL, Redis, or real YooKassa.
 
 import { Test } from '@nestjs/testing';
@@ -20,8 +20,9 @@ import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy
 import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { DUNNING_MAX_ATTEMPTS } from '../src/modules/billing/renewals/renewal-queue.constants';
-import { EntitlementCacheListener } from '../src/modules/billing/listeners/entitlement-cache.listener';
+import { EntitlementChangedListener } from '../src/modules/billing/listeners/entitlement-changed.listener';
 import { EntitlementService } from '../src/modules/billing/entitlements/entitlement.service';
+import { NotificationsService } from '../src/modules/notifications/notifications.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 
 interface StoredInvoice {
@@ -279,7 +280,7 @@ describe('Billing renewal scheduler (e2e)', () => {
             }
           }
         },
-        EntitlementCacheListener,
+        EntitlementChangedListener,
         {
           provide: getRepositoryToken(Subscription),
           useValue: subscriptionsRepo(store)
@@ -326,6 +327,7 @@ describe('Billing renewal scheduler (e2e)', () => {
           ]
         },
         { provide: EntitlementService, useValue: { invalidateUser } },
+        { provide: NotificationsService, useValue: { push: jest.fn() } },
         // No prepaid credits in this scenario set — the credits-as-usage flow
         // has its own coverage in billing-webhook.e2e-spec and the unit specs.
         {

@@ -17,10 +17,13 @@ import {
   ApiTags,
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
+import type { EntitlementsResponse } from '@app/shared/types';
 import type { JwtAuthRequest } from '../../auth/types/auth.request';
 import { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
+import { EntitlementService } from '../entitlements/entitlement.service';
 import { RequireEntitlement } from '../entitlements/require-entitlement.decorator';
 import { BillingUserService } from '../services/billing-user.service';
+import { EntitlementsResponseDto } from '../dtos/entitlements-response.dto';
 import { CheckoutRequestDto } from '../dtos/checkout-request.dto';
 import { CancelSubscriptionRequestDto } from '../dtos/cancel-subscription-request.dto';
 import { ChangeSubscriptionRequestDto } from '../dtos/change-subscription-request.dto';
@@ -45,7 +48,26 @@ import { PurchaseSessionResponseDto } from '../dtos/purchase-session-response.dt
 })
 @UseInterceptors(ClassSerializerInterceptor)
 export class BillingUserController {
-  constructor(private readonly billingUser: BillingUserService) {}
+  constructor(
+    private readonly billingUser: BillingUserService,
+    private readonly entitlements: EntitlementService
+  ) {}
+
+  /**
+   * Deliberately its own read rather than a field on `GET /billing/subscription`
+   * or on `/auth/me`: the subscription read answers `null` for the Free-plus-grant
+   * case that must stay representable, and `/auth/me` must keep working with the
+   * billing feature switched off.
+   */
+  @Get('entitlements')
+  @ApiOperation({
+    summary:
+      "The access the caller's billing state grants: plan in force, capabilities (plan unioned with active one-time grants) and numeric limits."
+  })
+  @ApiOkResponse({ type: EntitlementsResponseDto })
+  getEntitlements(@Req() req: JwtAuthRequest): Promise<EntitlementsResponse> {
+    return this.entitlements.capabilitiesFor(req.user.userId);
+  }
 
   @Get('subscription')
   @ApiOperation({ summary: "The caller's current subscription, or null." })

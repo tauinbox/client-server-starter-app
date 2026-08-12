@@ -7,6 +7,11 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/billing/entitlements",
+      "expectedStatus": 401
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/billing/subscription",
       "expectedStatus": 401
     },

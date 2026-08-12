@@ -290,6 +290,7 @@ To apply multiple restrictions simultaneously, either use `$and` in a single `cu
 - **One-time purchases** — a section below the plan grid (authenticated only) renders the `GET /api/v1/billing/products` catalog: fixed-price products as horizontal ticket cards (tonal icon, unlocked-entitlement meta, price + "Buy" split off by a dashed rule) and custom-amount products as a donation card (quick preset amounts derived from the catalog minimum, a bounded custom amount with client-side validation, an optional receipt note, and a pay button that always shows the live amount). The purchase session reference is parked in `sessionStorage` before the provider redirect; `/billing/success` detects it and polls the invoice list for the paid `one_time` invoice (keyed by the provider payment reference) instead of the subscription, ending in a thank-you card with the product and amount
 - **Prepaid credit packs** — `credits` products in the one-time catalog (seeded 500/1000/5000-unit packs) render as the same ticket cards; a paid pack tops up the customer's prepaid credit balance (`GET /api/v1/billing/credits`), which metered usage spends before money is charged — a usage period fully covered by credits settles as a paid zero invoice with no provider charge. Refunding a credit-pack invoice up to its full amount (in one leg or several partial ones — refunds accumulate) claws the units back; if they were already spent the balance goes negative and new usage recording is blocked (409) until topped up
 - **Credits wallet** — billing settings shows the balance as a wallet card sharing the catalog's ticket vocabulary (tonal toll icon, dashed punch line): a confident zero state ("0 credits — top up"), an overdrawn state in the error palette explaining that usage is paused, and a top-up/buy action leading to the credit packs on the pricing page
+- **Entitlements as a first-class access axis** — `GET /api/v1/billing/entitlements` reports what a caller's billing state actually grants (plan in force, capabilities, numeric limits), and the client mirrors it in an `EntitlementsStore` behind a `*nxsHasEntitlement` structural directive with an optional else-template for an upgrade prompt. The mirror is advisory — the server's entitlement guard stays the boundary — and the plan catalog is deliberately not used as a substitute: it expresses neither one-time purchase grants, nor their expiry, nor the Free fallback, nor the full entitlements retained through the `past_due` grace window. Any billing change pushes an `entitlements_updated` SSE event to that one user, so the mirror refreshes instead of waiting out the cache TTL
 - **Availability gating** — the billing nav entry and routes are hidden behind the public `billing` feature flag, which the server keeps off until at least one payment provider is configured
 - Fully internationalized (EN / RU) via a lazy-loaded `billing` Transloco scope
 
@@ -884,11 +885,11 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1881 tests passing |
-| Server E2E tests | Jest | Separate config in `test/` | 314 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 313 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and reports 307 passing, 7 skipped |
-| Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1025 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1887 tests passing |
+| Server E2E tests | Jest | Separate config in `test/` | 320 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 319 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and skips 7 |
+| Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1043 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 212 tests passing |
-| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 403 tests passing |
+| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 415 tests passing |
 
 ## CI/CD
 

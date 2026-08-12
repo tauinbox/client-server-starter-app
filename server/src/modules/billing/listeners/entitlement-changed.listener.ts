@@ -4,12 +4,15 @@ import {
   type OnApplicationBootstrap
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { EntitlementService } from '../entitlements/entitlement.service';
 import { ENTITLEMENT_CHANGING_EVENTS } from '../events/billing.events';
 
 /**
- * Invalidates a user's cached entitlements whenever a billing event changes what
- * their plan grants. Every entitlement-affecting event carries `userId`, so a
+ * Reacts to every billing event that changes what a user's plan grants:
+ * invalidates their cached entitlements, then tells the connected client so its
+ * advisory mirror does not sit stale for the cache TTL plus the time to the
+ * next navigation. Every entitlement-affecting event carries `userId`, so a
  * single handler keyed on the shared event list covers them all.
  *
  * Listeners are bound explicitly on bootstrap rather than via `@OnEvent`:
@@ -18,11 +21,12 @@ import { ENTITLEMENT_CHANGING_EVENTS } from '../events/billing.events';
  * event name in turn.
  */
 @Injectable()
-export class EntitlementCacheListener implements OnApplicationBootstrap {
-  private readonly logger = new Logger(EntitlementCacheListener.name);
+export class EntitlementChangedListener implements OnApplicationBootstrap {
+  private readonly logger = new Logger(EntitlementChangedListener.name);
 
   constructor(
     private readonly entitlements: EntitlementService,
+    private readonly notifications: NotificationsService,
     private readonly emitter: EventEmitter2
   ) {}
 
@@ -40,6 +44,12 @@ export class EntitlementCacheListener implements OnApplicationBootstrap {
   }
 
   async handleBillingChange(event: { userId: string }): Promise<void> {
+    // Invalidate before notifying: the push makes the client re-read, and a
+    // read issued against a still-cached value would re-cache the stale set.
     await this.entitlements.invalidateUser(event.userId);
+    this.notifications.push(event.userId, {
+      type: 'entitlements_updated',
+      userId: event.userId
+    });
   }
 }

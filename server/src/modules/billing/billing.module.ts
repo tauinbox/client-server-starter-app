@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { User } from '../users/entities/user.entity';
 import { parseRedisConnection } from '../../common/utils/parse-redis-connection';
 import { BillingService } from './billing.service';
@@ -22,7 +23,7 @@ import { UsageRecord } from './entities/usage-record.entity';
 import { WebhookEvent } from './entities/webhook-event.entity';
 import { EntitlementService } from './entitlements/entitlement.service';
 import { EntitlementGuard } from './entitlements/entitlement.guard';
-import { EntitlementCacheListener } from './listeners/entitlement-cache.listener';
+import { EntitlementChangedListener } from './listeners/entitlement-changed.listener';
 import { BillingUserDeletedListener } from './listeners/billing-user-deleted.listener';
 import { PaddleProvider } from './providers/paddle.provider';
 import { PADDLE_CLIENT, createPaddleClient } from './providers/paddle.client';
@@ -85,6 +86,7 @@ export class BillingModule {
       imports: [
         AuthModule,
         FeatureFlagsModule,
+        NotificationsModule,
         TypeOrmModule.forFeature([
           CreditBalance,
           CreditLedger,
@@ -136,7 +138,7 @@ export class BillingModule {
         BillingConfiguredAttributesRegistrar,
         EntitlementService,
         EntitlementGuard,
-        EntitlementCacheListener,
+        EntitlementChangedListener,
         BillingUserDeletedListener,
         PaddleProvider,
         YooKassaProvider,

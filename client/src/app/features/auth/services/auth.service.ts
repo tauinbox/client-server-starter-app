@@ -23,6 +23,7 @@ import { RbacMetadataService } from './rbac-metadata.service';
 import { RbacMetadataStore } from '../store/rbac-metadata.store';
 import { NotificationsService } from '@core/services/notifications.service';
 import { FeatureFlagsStore } from '../../feature-flags/store/feature-flags.store';
+import { EntitlementsStore } from '../../billing/store/entitlements.store';
 
 const silentContext = () =>
   new HttpContext().set(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN, true);
@@ -37,6 +38,7 @@ export class AuthService {
   readonly #rbacMetadataStore = inject(RbacMetadataStore);
   readonly #notificationsService = inject(NotificationsService);
   readonly #featureFlagsStore = inject(FeatureFlagsStore);
+  readonly #entitlementsStore = inject(EntitlementsStore);
   readonly #destroyRef = inject(DestroyRef);
 
   readonly isAuthenticated = this.#authStore.isAuthenticated;
@@ -57,6 +59,16 @@ export class AuthService {
       .subscribe(() => {
         void this.#featureFlagsStore.reload();
       });
+
+    this.#notificationsService.entitlementsUpdated$
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe(() => {
+        // The mirror loads lazily, so a session that never resolved
+        // entitlements has nothing stale to refresh.
+        if (this.#entitlementsStore.loaded()) {
+          void this.#entitlementsStore.reload();
+        }
+      });
   }
 
   login(credentials: LoginCredentials): Observable<AuthResponse> {
@@ -71,6 +83,9 @@ export class AuthService {
           // reload(), not load(): flags may already be loaded from the
           // anonymous bootstrap and the authenticated set can differ.
           void this.#featureFlagsStore.reload();
+          // Drop any mirror left by a previous session rather than re-fetching:
+          // the store is lazy, so the next gated surface loads it for this user.
+          this.#entitlementsStore.clear();
           return from(this.fetchPermissions()).pipe(
             tap(() => {
               void this.fetchRbacMetadata();
@@ -114,6 +129,7 @@ export class AuthService {
             this.#authStore.clearSession();
             this.#rbacMetadataStore.clear();
             this.#featureFlagsStore.clear();
+            this.#entitlementsStore.clear();
             completeLogout();
           })
         )
@@ -121,6 +137,7 @@ export class AuthService {
     } else {
       this.#rbacMetadataStore.clear();
       this.#featureFlagsStore.clear();
+      this.#entitlementsStore.clear();
       completeLogout();
     }
   }

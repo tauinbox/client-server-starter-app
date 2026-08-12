@@ -112,6 +112,20 @@ export type CreditBalanceResponse = {
   updatedAt: string;
 };
 
+/**
+ * The access the caller's billing state actually grants, as resolved by the
+ * server: the plan in force unioned with active one-time grants. The plan
+ * catalog is NOT a substitute — it cannot express purchased grants, grant
+ * expiry, the Free fallback, or the `past_due` grace window, so a client that
+ * derives capabilities from `PlanResponse.entitlements` will disagree with the
+ * server. Advisory only: `EntitlementGuard` stays the enforcement point.
+ */
+export type EntitlementsResponse = {
+  planKey: string;
+  capabilities: string[];
+  limits: Record<string, number>;
+};
+
 export type PlanResponse = {
   id: string;
   key: string;

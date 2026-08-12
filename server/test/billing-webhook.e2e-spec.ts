@@ -6,12 +6,14 @@
 // replay idempotency — without a running PostgreSQL or real Paddle.
 
 import { Test } from '@nestjs/testing';
+import { Reflector } from '@nestjs/core';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
 import { VersioningType, type INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
+import type { NextFunction, Request, Response } from 'express';
 import type { Server } from 'http';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { EntitlementService } from '../src/modules/billing/entitlements/entitlement.service';
@@ -39,6 +41,9 @@ import type {
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
 import { WebhookIngestionService } from '../src/modules/billing/webhooks/webhook-ingestion.service';
 import { BillingWebhooksController } from '../src/modules/billing/webhooks/billing-webhooks.controller';
+import { BillingUserController } from '../src/modules/billing/controllers/billing-user.controller';
+import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
+import { EntitlementGuard } from '../src/modules/billing/entitlements/entitlement.guard';
 import { UsageInvoicingService } from '../src/modules/billing/services/usage-invoicing.service';
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import {
@@ -307,12 +312,17 @@ describe('Billing Paddle webhook (e2e)', () => {
     // resolves into an active capability (the grant union), end to end.
     const cacheStore = new Map<string, unknown>();
     const moduleRef = await Test.createTestingModule({
-      controllers: [BillingWebhooksController],
+      controllers: [BillingWebhooksController, BillingUserController],
       providers: [
         WebhookIngestionService,
         BillingEventReducer,
         EntitlementService,
         CreditService,
+        // The entitlements read is served by EntitlementService directly, so
+        // the self-service controller needs no billing service here.
+        { provide: BillingUserService, useValue: {} },
+        EntitlementGuard,
+        Reflector,
         // WebhookIpAllowlistGuard dep; unset allowlist keeps the receivers open
         { provide: ConfigService, useValue: { get: () => undefined } },
         {
@@ -383,6 +393,14 @@ describe('Billing Paddle webhook (e2e)', () => {
     app = moduleRef.createNestApplication({ rawBody: true });
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
+    // Injects the authenticated user the global JwtAuthGuard sets in prod, so
+    // the self-service reads can be exercised without a live PostgreSQL.
+    app.use((req: Request, _res: Response, next: NextFunction) => {
+      (req as Request & { user: { userId: string } }).user = {
+        userId: 'user-1'
+      };
+      next();
+    });
     await app.init();
     server = app.getHttpServer() as Server;
   });
@@ -574,6 +592,36 @@ describe('Billing Paddle webhook (e2e)', () => {
 
     const after = await entitlements.capabilitiesFor('user-1');
     expect(after.capabilities).toContain('reports');
+  });
+
+  it('reports the granted capability over GET /billing/entitlements', async () => {
+    const before = await request(server)
+      .get('/api/v1/billing/entitlements')
+      .expect(200);
+    expect(
+      (before.body as { capabilities: string[] }).capabilities
+    ).not.toContain('reports');
+    await entitlements.invalidateUser('user-1');
+
+    await postWebhook(oneTimePaid('evt_ot_1', 'prod-sku'));
+    await entitlements.invalidateUser('user-1');
+
+    const after = await request(server)
+      .get('/api/v1/billing/entitlements')
+      .expect(200);
+    expect((after.body as { capabilities: string[] }).capabilities).toContain(
+      'reports'
+    );
+  });
+
+  it('gates premium-content on the same resolution the read reports', async () => {
+    await request(server).get('/api/v1/billing/premium-content').expect(403);
+
+    await entitlements.invalidateUser('user-1');
+    await postWebhook(oneTimePaid('evt_ot_1', 'prod-sku'));
+    await entitlements.invalidateUser('user-1');
+
+    await request(server).get('/api/v1/billing/premium-content').expect(200);
   });
 
   it('replays the one-time paid webhook without duplicating the invoice or the grant', async () => {
