@@ -6,7 +6,7 @@ import {
   NotFoundException
 } from '@nestjs/common';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { IsNull } from 'typeorm';
+import { In, IsNull } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import { DEFAULT_CURSOR_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
@@ -21,6 +21,7 @@ import { WebhookEvent } from '../entities/webhook-event.entity';
 import { EntitlementService } from '../entitlements/entitlement.service';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import { BillingService } from '../billing.service';
+import { OPEN_STATUSES } from '../utils/subscription-status.util';
 import { BillingAdminService } from './billing-admin.service';
 import { CreditService } from './credit.service';
 
@@ -297,6 +298,7 @@ describe('BillingAdminService', () => {
     it('marks period-end cancel without invalidating entitlements', async () => {
       const ctx = await build();
       ctx.subscriptions.findOne.mockResolvedValue(makeSubscription());
+      ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
 
       const saved = await ctx.service.cancelSubscription('sub-1', 'period_end');
 
@@ -312,6 +314,7 @@ describe('BillingAdminService', () => {
       );
       const yoo = providerStub('yookassa');
       ctx.billing.getProviderById.mockReturnValue(yoo);
+      ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
         userId: 'user-1'
@@ -323,10 +326,11 @@ describe('BillingAdminService', () => {
       expect(saved.status).toBe('canceled');
       expect(saved.cancelAtPeriodEnd).toBe(false);
       // Only the cancel columns are written — the entity predates the provider
-      // round-trip, so the whole row would carry that snapshot back.
+      // round-trip, so the whole row would carry that snapshot back. The status
+      // predicate is what makes a concurrent cancel lose rather than overwrite.
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
       expect(ctx.subscriptions.update).toHaveBeenCalledWith(
-        { id: 'sub-1' },
+        { id: 'sub-1', status: In([...OPEN_STATUSES]) },
         { status: 'canceled', cancelAtPeriodEnd: false }
       );
       expect(ctx.emit).toHaveBeenCalledWith(
@@ -340,10 +344,63 @@ describe('BillingAdminService', () => {
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSubscription({ providerSubscriptionId: null })
       );
+      ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
 
       await ctx.service.cancelSubscription('sub-1', 'period_end');
 
       expect(ctx.billing.getProviderById).not.toHaveBeenCalled();
+    });
+
+    it('refuses a second cancel of an already-canceled subscription', async () => {
+      const ctx = await build();
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSubscription({
+          status: 'canceled',
+          providerSubscriptionId: 'sub_ext_1'
+        })
+      );
+      const yoo = providerStub('yookassa');
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await expect(
+        ctx.service.cancelSubscription('sub-1', 'immediate')
+      ).rejects.toThrow(ConflictException);
+
+      expect(yoo.cancel).not.toHaveBeenCalled();
+      expect(ctx.subscriptions.update).not.toHaveBeenCalled();
+      expect(ctx.emit).not.toHaveBeenCalled();
+    });
+
+    it('refuses a period-end cancel of a canceled row rather than flagging it', async () => {
+      const ctx = await build();
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSubscription({ status: 'canceled' })
+      );
+
+      await expect(
+        ctx.service.cancelSubscription('sub-1', 'period_end')
+      ).rejects.toThrow(ConflictException);
+
+      // `canceled` together with `cancelAtPeriodEnd` is a pair no other writer
+      // in the module can produce.
+      expect(ctx.subscriptions.update).not.toHaveBeenCalled();
+    });
+
+    it('answers 409 when a concurrent cancel lands during the provider call', async () => {
+      const ctx = await build();
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSubscription({ providerSubscriptionId: 'sub_ext_1' })
+      );
+      const yoo = providerStub('yookassa');
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+      ctx.subscriptions.update.mockResolvedValue({ affected: 0 });
+
+      await expect(
+        ctx.service.cancelSubscription('sub-1', 'immediate')
+      ).rejects.toThrow(ConflictException);
+
+      expect(yoo.cancel).toHaveBeenCalledWith('sub_ext_1', 'immediate');
+      expect(ctx.emit).not.toHaveBeenCalled();
     });
   });
 

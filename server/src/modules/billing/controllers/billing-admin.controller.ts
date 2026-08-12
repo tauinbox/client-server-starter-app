@@ -13,6 +13,7 @@ import {
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -92,6 +93,7 @@ export class BillingAdminController {
   @ApiBody({ type: CancelSubscriptionRequestDto })
   @ApiOkResponse({ type: SubscriptionResponseDto })
   @ApiNotFoundResponse({ description: 'Subscription not found' })
+  @ApiConflictResponse({ description: 'Subscription is already canceled' })
   cancel(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: CancelSubscriptionRequestDto

@@ -1069,6 +1069,15 @@ billingAdminRouter.post(
         .json({ message: 'Subscription not found', statusCode: 404 });
       return;
     }
+    // Addressed by id, so a canceled row can be handed in — the self-service
+    // route cannot reach one because it looks up through the open statuses.
+    if (!OPEN_STATUSES.includes(sub.status)) {
+      res.status(409).json({
+        message: 'This subscription is already canceled.',
+        statusCode: 409
+      });
+      return;
+    }
 
     if (mode === 'immediate') {
       sub.status = 'canceled';

@@ -32,11 +32,7 @@ import { PaymentMethod } from '../entities/payment-method.entity';
 import { Plan } from '../entities/plan.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
-import {
-  InvoicePaidEvent,
-  PlanChangedEvent,
-  SubscriptionCanceledEvent
-} from '../events/billing.events';
+import { InvoicePaidEvent, PlanChangedEvent } from '../events/billing.events';
 import type {
   CancelMode,
   PaymentProvider
@@ -45,7 +41,8 @@ import { ProrationCalculator } from '../rating/proration-calculator';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
 import { addInterval } from '../utils/period.util';
-import { cancelFields } from '../utils/cancel-fields.util';
+import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
+import { OPEN_STATUSES } from '../utils/subscription-status.util';
 import { INVOICE_SORT_COLUMN_MAP } from '../utils/list-order.util';
 import type { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
 import { BillingService } from '../billing.service';
@@ -56,9 +53,6 @@ const ACTIVE_STATUSES = ['trialing', 'active', 'past_due'] as const;
 
 const ALREADY_SUBSCRIBED_MESSAGE =
   'You already have an active subscription. Cancel it before subscribing to another plan.';
-
-/** Non-canceled statuses — the "current" subscription for read/cancel/region. */
-const OPEN_STATUSES = ['incomplete', 'trialing', 'active', 'past_due'] as const;
 
 /**
  * Statuses a plan change is allowed from. `past_due` must settle its debt first
@@ -531,31 +525,16 @@ export class BillingUserService {
       userId,
       'No active subscription to cancel'
     );
-
-    // Provider-managed lifecycle: ask the provider to cancel; the resulting
-    // webhook reconciles status. Self-managed: there is no provider object — the
-    // renewal scheduler simply stops charging the saved card.
-    if (subscription.providerSubscriptionId) {
-      const provider = this.billing.getProviderById(subscription.provider);
-      if (provider) {
-        await provider.cancel(subscription.providerSubscriptionId, mode);
-      }
-    }
-
-    const fields = cancelFields(mode);
-    Object.assign(subscription, fields);
-    await this.subscriptions.update({ id: subscription.id }, fields);
-    const saved =
-      (await this.subscriptions.findOne({ where: { id: subscription.id } })) ??
-      subscription;
-
-    if (mode === 'immediate') {
-      this.events.emit(
-        SubscriptionCanceledEvent.name,
-        new SubscriptionCanceledEvent(userId, saved.id)
-      );
-    }
-    return saved;
+    return cancelOpenSubscription(
+      {
+        subscriptions: this.subscriptions,
+        billing: this.billing,
+        events: this.events
+      },
+      subscription,
+      mode,
+      () => Promise.resolve(userId)
+    );
   }
 
   /**
