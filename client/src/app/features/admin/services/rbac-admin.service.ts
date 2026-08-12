@@ -47,10 +47,6 @@ export class RbacAdminService {
     );
   }
 
-  getResources(): Observable<ResourceResponse[]> {
-    return this.#http.get<ResourceResponse[]>(`${RBAC_API_V1}/resources`);
-  }
-
   updateResource(
     id: string,
     dto: UpdateResource
@@ -78,6 +74,7 @@ export class RbacAdminService {
     );
   }
 
+  /** The whole catalog, for the resource editor's allowed-actions picker. */
   getActions(): Observable<ActionResponse[]> {
     return this.#http.get<ActionResponse[]>(`${RBAC_API_V1}/actions`);
   }
