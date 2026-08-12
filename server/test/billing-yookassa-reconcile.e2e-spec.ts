@@ -267,18 +267,26 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
                 store.subscriptions.find((s) => s.id === opts.where.id) ?? null
               ),
             createQueryBuilder: () => {
+              let take = Number.POSITIVE_INFINITY;
               const qb = {
                 innerJoin: () => qb,
                 where: () => qb,
                 andWhere: () => qb,
                 setParameters: () => qb,
                 orderBy: () => qb,
+                limit: (n: number) => {
+                  take = n;
+                  return qb;
+                },
                 getMany: () =>
                   Promise.resolve(
-                    store.subscriptions.filter(
-                      (s) =>
-                        s.lifecycleOwner === 'self' && s.currentPeriodEnd <= NOW
-                    )
+                    store.subscriptions
+                      .filter(
+                        (s) =>
+                          s.lifecycleOwner === 'self' &&
+                          s.currentPeriodEnd <= NOW
+                      )
+                      .slice(0, take)
                   )
               };
               return qb;

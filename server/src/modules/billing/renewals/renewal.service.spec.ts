@@ -27,7 +27,8 @@ import { CreditService } from '../services/credit.service';
 import { RenewalService } from './renewal.service';
 import {
   DUNNING_MAX_ATTEMPTS,
-  DUNNING_RETRY_DELAY_MS
+  DUNNING_RETRY_DELAY_MS,
+  RENEWAL_SCAN_MAX_PER_RUN
 } from './renewal-queue.constants';
 
 interface Store {
@@ -243,6 +244,7 @@ function subscriptionsRepo(store: Store) {
       values: Record<string, unknown>
     ) => updateSubscriptions(store, criteria, values),
     createQueryBuilder: () => {
+      let take: number | null = null;
       const qb = {
         innerJoin: (_entity: unknown, _alias: string, condition: string) => {
           store.capturedJoins.push(condition);
@@ -252,12 +254,17 @@ function subscriptionsRepo(store: Store) {
         andWhere: () => qb,
         setParameters: () => qb,
         orderBy: () => qb,
-        // Mirrors the non-time WHERE clauses (self + fixed + open status) and
-        // the soft-deleted-user join; the time-based due check is real code in
+        limit: (n: number) => {
+          take = n;
+          return qb;
+        },
+        // Mirrors the non-time WHERE clauses (self + fixed + open status), the
+        // soft-deleted-user join, the `currentPeriodEnd ASC` order and the
+        // per-run LIMIT; the time-based due check is real code in
         // RenewalService.processSubscription.
-        getMany: () =>
-          Promise.resolve(
-            store.subscriptions.filter((s) => {
+        getMany: () => {
+          const rows = store.subscriptions
+            .filter((s) => {
               const customer = store.customers.find(
                 (c) => c.id === s.customerId
               );
@@ -268,7 +275,12 @@ function subscriptionsRepo(store: Store) {
                 !store.deletedUserIds.has(customer.userId)
               );
             })
-          )
+            .sort(
+              (a, b) =>
+                a.currentPeriodEnd.getTime() - b.currentPeriodEnd.getTime()
+            );
+          return Promise.resolve(take === null ? rows : rows.slice(0, take));
+        }
       };
       return qb;
     }
@@ -458,6 +470,46 @@ describe('RenewalService', () => {
     // and the next scan reconciles it against `findOffSessionCharge`.
     expect(stalled.status).toBe('past_due');
     expect(stalled.dunningAttempts).toBe(1);
+  });
+
+  it('processes at most one run worth of due subscriptions and drains the rest on the next scan', async () => {
+    const total = RENEWAL_SCAN_MAX_PER_RUN + 5;
+    const subs = Array.from({ length: total }, (_, i) =>
+      makeSub({ id: `sub-${i + 1}` })
+    );
+    const store = baseStore(subs[0]);
+    store.subscriptions = subs;
+    const charge = jest
+      .fn()
+      .mockResolvedValue({ providerInvoiceRef: 'pay', status: 'captured' });
+    const warn = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+    const { service } = await build(store, charge);
+
+    await service.runDueRenewals(NOW);
+
+    expect(charge).toHaveBeenCalledTimes(RENEWAL_SCAN_MAX_PER_RUN);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('per-run ceiling')
+    );
+    const overflow = subs.slice(RENEWAL_SCAN_MAX_PER_RUN);
+    overflow.forEach((s) => {
+      expect(s.currentPeriodEnd).toEqual(new Date('2026-06-01T00:00:00Z'));
+    });
+
+    // The scan takes the oldest due first, so the next one picks up exactly the
+    // remainder: the advanced rows are no longer due and cost nothing.
+    await service.runDueRenewals(NOW);
+
+    expect(charge).toHaveBeenCalledTimes(total);
+    expect(store.invoices).toHaveLength(total);
+    subs.forEach((s) => {
+      expect(s.status).toBe('active');
+      expect(s.currentPeriodEnd).toEqual(new Date('2026-07-01T00:00:00Z'));
+    });
+
+    warn.mockRestore();
   });
 
   it('converts a trial at trial_end, anchoring the period there', async () => {

@@ -290,19 +290,26 @@ function subscriptionsRepo(stores: Stores) {
       ),
     save: (entity: Subscription) => Promise.resolve(entity),
     createQueryBuilder: () => {
+      let take = Number.POSITIVE_INFINITY;
       const qb = {
         innerJoin: () => qb,
         where: () => qb,
         andWhere: () => qb,
         setParameters: () => qb,
         orderBy: () => qb,
+        limit: (n: number) => {
+          take = n;
+          return qb;
+        },
         getMany: () =>
           Promise.resolve(
-            stores.subscriptions.filter(
-              (s) =>
-                s.lifecycleOwner === 'self' &&
-                ['trialing', 'active', 'past_due'].includes(s.status)
-            )
+            stores.subscriptions
+              .filter(
+                (s) =>
+                  s.lifecycleOwner === 'self' &&
+                  ['trialing', 'active', 'past_due'].includes(s.status)
+              )
+              .slice(0, take)
           )
       };
       return qb;
