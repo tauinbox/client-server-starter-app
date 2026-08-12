@@ -43,15 +43,24 @@
         }}</span>
         <mat-slide-toggle
           [checked]="isCustomMode()"
+          [disabled]="!actionsLoaded()"
           (change)="toggleCustomMode($event.checked)"
         >
           {{ t('admin.resourceForm.customToggle') }}
         </mat-slide-toggle>
       </div>
 
-      @if (isCustomMode()) {
+      @if (actionsFailed()) {
+        <p class="allowed-actions__hint" role="alert">
+          {{ t('admin.resourceForm.errorActionsFailed') }}
+        </p>
+      } @else if (!actionsLoaded()) {
+        <div class="allowed-actions__loading">
+          <mat-spinner [diameter]="24" />
+        </div>
+      } @else if (isCustomMode()) {
         <div class="allowed-actions__checkboxes">
-          @for (action of data.actions; track action.id) {
+          @for (action of actions(); track action.id) {
             <mat-checkbox
               [checked]="isActionSelected(action.name)"
               (change)="toggleAction(action.name)"

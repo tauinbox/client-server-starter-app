@@ -3,13 +3,14 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal } from '@angular/core';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { of } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 
 import { ResourceFormDialogComponent } from './resource-form-dialog.component';
 import type { ResourceFormDialogData } from './resource-form-dialog.component';
 import { ResourcesStore } from '../../../store/resources.store';
+import { RbacAdminService } from '../../../services/rbac-admin.service';
 import { NotifyService } from '@core/services/notify.service';
 import type {
   ActionResponse,
@@ -62,11 +63,11 @@ describe('ResourceFormDialogComponent', () => {
   let dialogRefMock: { close: ReturnType<typeof vi.fn> };
   let resourcesStoreMock: {
     resources: ReturnType<typeof signal<ResourceResponse[]>>;
-    actions: ReturnType<typeof signal<ActionResponse[]>>;
     loading: ReturnType<typeof signal<boolean>>;
     load: ReturnType<typeof vi.fn>;
     updateResource: ReturnType<typeof vi.fn>;
   };
+  let rbacServiceMock: { getActions: ReturnType<typeof vi.fn> };
   let notifyMock: {
     success: ReturnType<typeof vi.fn>;
     error: ReturnType<typeof vi.fn>;
@@ -75,10 +76,7 @@ describe('ResourceFormDialogComponent', () => {
   };
 
   function createComponent(
-    data: ResourceFormDialogData = {
-      resource: mockResource,
-      actions: mockActions
-    }
+    data: ResourceFormDialogData = { resource: mockResource }
   ): void {
     dialogRefMock = { close: vi.fn() };
 
@@ -89,6 +87,7 @@ describe('ResourceFormDialogComponent', () => {
         { provide: MatDialogRef, useValue: dialogRefMock },
         { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: ResourcesStore, useValue: resourcesStoreMock },
+        { provide: RbacAdminService, useValue: rbacServiceMock },
         { provide: NotifyService, useValue: notifyMock }
       ]
     });
@@ -102,11 +101,11 @@ describe('ResourceFormDialogComponent', () => {
     TestBed.resetTestingModule();
     resourcesStoreMock = {
       resources: signal([mockResource]),
-      actions: signal(mockActions),
       loading: signal(false),
       load: vi.fn(),
       updateResource: vi.fn().mockReturnValue(of(mockResource))
     };
+    rbacServiceMock = { getActions: vi.fn().mockReturnValue(of(mockActions)) };
     notifyMock = {
       success: vi.fn(),
       error: vi.fn(),
@@ -128,10 +127,7 @@ describe('ResourceFormDialogComponent', () => {
   });
 
   it('pre-fills description as empty string when resource description is null', () => {
-    createComponent({
-      resource: { ...mockResource, description: null },
-      actions: mockActions
-    });
+    createComponent({ resource: { ...mockResource, description: null } });
     expect(component.resourceModel().description).toBe('');
   });
 
@@ -224,6 +220,74 @@ describe('ResourceFormDialogComponent', () => {
     createComponent();
     component.cancel();
     expect(dialogRefMock.close).toHaveBeenCalledWith();
+  });
+
+  describe('allowed-actions catalog', () => {
+    function customToggle(): HTMLButtonElement {
+      return fixture.nativeElement.querySelector('button[role="switch"]');
+    }
+
+    it('loads the whole catalog rather than receiving it from the opener', () => {
+      createComponent();
+      expect(rbacServiceMock.getActions).toHaveBeenCalled();
+    });
+
+    it('renders a checkbox for every action in the catalog', () => {
+      createComponent({
+        resource: { ...mockResource, allowedActionNames: ['create'] }
+      });
+
+      const checkboxes = fixture.nativeElement.querySelectorAll('mat-checkbox');
+      expect(checkboxes.length).toBe(mockActions.length);
+    });
+
+    it('seeds custom mode from every default action in the catalog', () => {
+      createComponent();
+
+      customToggle().click();
+      fixture.detectChanges();
+      component.submit();
+
+      expect(resourcesStoreMock.updateResource).toHaveBeenCalledWith(
+        'res-1',
+        expect.objectContaining({ allowedActionNames: ['create', 'read'] })
+      );
+    });
+
+    it('cannot enter custom mode while the catalog is still loading', () => {
+      rbacServiceMock.getActions.mockReturnValue(new Subject());
+      createComponent();
+
+      expect(customToggle().disabled).toBe(true);
+
+      customToggle().click();
+      fixture.detectChanges();
+
+      expect(
+        fixture.nativeElement.querySelectorAll('mat-checkbox').length
+      ).toBe(0);
+    });
+
+    it('keeps the stored action list intact when the catalog fails to load', () => {
+      rbacServiceMock.getActions.mockReturnValue(
+        throwError(() => new Error('offline'))
+      );
+      createComponent({
+        resource: { ...mockResource, allowedActionNames: ['create', 'read'] }
+      });
+
+      component.resourceModel.set({
+        displayName: 'Updated',
+        description: 'User management'
+      });
+      TestBed.tick();
+      component.submit();
+
+      expect(resourcesStoreMock.updateResource).toHaveBeenCalledWith(
+        'res-1',
+        expect.objectContaining({ allowedActionNames: ['create', 'read'] })
+      );
+    });
   });
 
   it('does not call store.updateResource when form is invalid on submit', () => {
