@@ -20,6 +20,8 @@ import type {
   ProrationPreviewResponse,
   PurchaseSessionResponse
 } from '@app/shared/types';
+import type { PaginationQueryDto } from '../../../common/dtos/pagination-query.dto';
+import { PaginatedResponseDto } from '../../../common/dtos/paginated-response.dto';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { User } from '../../users/entities/user.entity';
 import { CreditBalance } from '../entities/credit-balance.entity';
@@ -43,6 +45,7 @@ import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
 import { addInterval } from '../utils/period.util';
 import { cancelFields } from '../utils/cancel-fields.util';
+import { invoiceOrder, sortDirection } from '../utils/list-order.util';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
 
@@ -155,13 +158,21 @@ export class BillingUserService {
     return this.findCurrentSubscription(customer.id);
   }
 
-  async listInvoices(userId: string): Promise<Invoice[]> {
+  async listInvoices(
+    userId: string,
+    query: PaginationQueryDto
+  ): Promise<PaginatedResponseDto<Invoice>> {
+    const { page, limit, sortBy, sortOrder } = query;
     const customer = await this.customers.findOne({ where: { userId } });
-    if (!customer) return [];
-    return this.invoices.find({
+    if (!customer) return new PaginatedResponseDto<Invoice>([], 0, page, limit);
+
+    const [data, total] = await this.invoices.findAndCount({
       where: { customerId: customer.id },
-      order: { createdAt: 'DESC' }
+      order: invoiceOrder(sortBy, sortDirection(sortOrder)),
+      skip: (page - 1) * limit,
+      take: limit
     });
+    return new PaginatedResponseDto(data, total, page, limit);
   }
 
   /**

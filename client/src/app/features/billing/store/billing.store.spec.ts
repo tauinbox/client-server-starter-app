@@ -3,13 +3,27 @@ import { of, throwError } from 'rxjs';
 import type {
   CreditBalanceResponse,
   InvoiceResponse,
+  PaginatedResponse,
   PlanResponse,
   SubscriptionResponse,
   UsageSummaryResponse
 } from '@app/shared/types';
+import { DEFAULT_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
 import { NotifyService } from '@core/services/notify.service';
 import { BillingService } from '../services/billing.service';
 import { BillingStore } from './billing.store';
+
+function page<T>(data: T[], total: number): PaginatedResponse<T> {
+  return {
+    data,
+    meta: {
+      page: 1,
+      limit: DEFAULT_PAGE_SIZE,
+      total,
+      totalPages: Math.ceil(total / DEFAULT_PAGE_SIZE)
+    }
+  };
+}
 
 const proPlan: PlanResponse = {
   id: 'plan-pro',
@@ -114,7 +128,7 @@ describe('BillingStore', () => {
     billingMock = {
       getPlans: vi.fn().mockReturnValue(of([proPlan])),
       getSubscription: vi.fn().mockReturnValue(of(activeSub)),
-      getInvoices: vi.fn().mockReturnValue(of([invoice])),
+      getInvoices: vi.fn().mockReturnValue(of(page([invoice], 1))),
       getPaymentMethod: vi.fn().mockReturnValue(of(null)),
       getUsage: vi.fn().mockReturnValue(of(usageSummary)),
       getCredits: vi.fn().mockReturnValue(of(creditBalance)),
@@ -256,6 +270,54 @@ describe('BillingStore', () => {
     expect(store.invoices()).toHaveLength(1);
   });
 
+  it('loadSettings requests only the first page of invoices and keeps the total', async () => {
+    billingMock.getInvoices.mockReturnValue(of(page([invoice], 37)));
+    const store = createStore();
+    await store.loadSettings();
+
+    expect(billingMock.getInvoices).toHaveBeenCalledWith({
+      page: 1,
+      limit: DEFAULT_PAGE_SIZE
+    });
+    expect(store.invoices()).toHaveLength(1);
+    expect(store.invoicesPage()).toEqual({
+      pageIndex: 0,
+      pageSize: DEFAULT_PAGE_SIZE,
+      total: 37
+    });
+  });
+
+  it('loadInvoicesPage moves to the 1-based page behind the paginator index', async () => {
+    const store = createStore();
+    await store.loadSettings();
+
+    billingMock.getInvoices.mockReturnValue(of(page([invoice], 37)));
+    await store.loadInvoicesPage(3, 10);
+
+    expect(billingMock.getInvoices).toHaveBeenLastCalledWith({
+      page: 4,
+      limit: 10
+    });
+    expect(store.invoicesPage()).toEqual({
+      pageIndex: 3,
+      pageSize: 10,
+      total: 37
+    });
+  });
+
+  it('refreshInvoices stays on the page the user is looking at', async () => {
+    const store = createStore();
+    await store.loadSettings();
+    await store.loadInvoicesPage(2, 25);
+
+    await store.refreshInvoices();
+
+    expect(billingMock.getInvoices).toHaveBeenLastCalledWith({
+      page: 3,
+      limit: 25
+    });
+  });
+
   it('checkout returns the provider session', async () => {
     const store = createStore();
     const session = await store.checkout('pro');
@@ -273,7 +335,9 @@ describe('BillingStore', () => {
 
   it('changePlan patches the subscription and refreshes invoices + usage', async () => {
     const changeInvoice = { ...invoice, id: 'inv-2', status: 'refunded' };
-    billingMock.getInvoices.mockReturnValue(of([invoice, changeInvoice]));
+    billingMock.getInvoices.mockReturnValue(
+      of(page([invoice, changeInvoice], 2))
+    );
     const store = createStore();
 
     const ok = await store.changePlan('business');

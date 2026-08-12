@@ -17,6 +17,7 @@ import {
 import { MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
+import { MatPaginator, type PageEvent } from '@angular/material/paginator';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatMenu, MatMenuItem, MatMenuTrigger } from '@angular/material/menu';
 import {
@@ -37,6 +38,7 @@ import { LayoutService } from '@core/services/layout.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { formatMoney } from '@features/billing/utils/billing-format';
+import { PAGE_SIZE_OPTIONS } from '@shared/utils/pagination.utils';
 import type { CancelMode } from '@features/billing/services/billing.service';
 import { BillingAdminStore } from '../../store/billing-admin.store';
 
@@ -59,6 +61,7 @@ import { BillingAdminStore } from '../../store/billing-admin.store';
     MatIconButton,
     MatIcon,
     MatProgressSpinner,
+    MatPaginator,
     MatTooltip,
     MatMenu,
     MatMenuItem,
@@ -91,6 +94,9 @@ export class BillingAdminListComponent implements OnInit {
   readonly working = this.#store.working;
   readonly subscriptions = this.#store.subscriptions;
   readonly invoices = this.#store.invoices;
+  readonly subscriptionsPage = this.#store.subscriptionsPage;
+  readonly invoicesPage = this.#store.invoicesPage;
+  readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
 
   readonly #lang = toSignal(this.#transloco.langChanges$, {
     initialValue: this.#transloco.getActiveLang()
@@ -120,6 +126,14 @@ export class BillingAdminListComponent implements OnInit {
 
   ngOnInit(): void {
     void this.#store.load();
+  }
+
+  onSubscriptionsPage(event: PageEvent): void {
+    void this.#store.loadSubscriptionsPage(event.pageIndex, event.pageSize);
+  }
+
+  onInvoicesPage(event: PageEvent): void {
+    void this.#store.loadInvoicesPage(event.pageIndex, event.pageSize);
   }
 
   invoiceAmount(invoice: InvoiceResponse): string {

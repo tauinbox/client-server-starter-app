@@ -1,9 +1,26 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
-import type { InvoiceResponse, SubscriptionResponse } from '@app/shared/types';
+import type {
+  InvoiceResponse,
+  PaginatedResponse,
+  SubscriptionResponse
+} from '@app/shared/types';
+import { DEFAULT_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
 import { NotifyService } from '@core/services/notify.service';
 import { BillingAdminService } from '../services/billing-admin.service';
 import { BillingAdminStore } from './billing-admin.store';
+
+function page<T>(data: T[], total: number): PaginatedResponse<T> {
+  return {
+    data,
+    meta: {
+      page: 1,
+      limit: DEFAULT_PAGE_SIZE,
+      total,
+      totalPages: Math.ceil(total / DEFAULT_PAGE_SIZE)
+    }
+  };
+}
 
 const activeSub: SubscriptionResponse = {
   id: 'sub-1',
@@ -60,8 +77,8 @@ describe('BillingAdminStore', () => {
 
   beforeEach(() => {
     billingMock = {
-      listSubscriptions: vi.fn().mockReturnValue(of([activeSub])),
-      listInvoices: vi.fn().mockReturnValue(of([paidInvoice])),
+      listSubscriptions: vi.fn().mockReturnValue(of(page([activeSub], 1))),
+      listInvoices: vi.fn().mockReturnValue(of(page([paidInvoice], 1))),
       cancelSubscription: vi
         .fn()
         .mockReturnValue(of({ ...activeSub, status: 'canceled' })),
@@ -87,6 +104,62 @@ describe('BillingAdminStore', () => {
     expect(store.subscriptions()).toHaveLength(1);
     expect(store.invoices()).toHaveLength(1);
     expect(store.loading()).toBe(false);
+  });
+
+  it('load asks for the first page of both lists and keeps the totals', async () => {
+    billingMock.listSubscriptions.mockReturnValue(of(page([activeSub], 42)));
+    billingMock.listInvoices.mockReturnValue(of(page([paidInvoice], 17)));
+    const store = createStore();
+    await store.load();
+
+    expect(billingMock.listSubscriptions).toHaveBeenCalledWith({
+      page: 1,
+      limit: DEFAULT_PAGE_SIZE
+    });
+    expect(billingMock.listInvoices).toHaveBeenCalledWith({
+      page: 1,
+      limit: DEFAULT_PAGE_SIZE
+    });
+    expect(store.subscriptionsPage().total).toBe(42);
+    expect(store.invoicesPage().total).toBe(17);
+  });
+
+  it('loadInvoicesPage requests the 1-based page behind the paginator index', async () => {
+    const store = createStore();
+    await store.load();
+
+    billingMock.listInvoices.mockReturnValue(of(page([paidInvoice], 60)));
+    await store.loadInvoicesPage(2, 25);
+
+    expect(billingMock.listInvoices).toHaveBeenLastCalledWith({
+      page: 3,
+      limit: 25
+    });
+    expect(store.invoicesPage()).toEqual({
+      pageIndex: 2,
+      pageSize: 25,
+      total: 60
+    });
+    // The subscriptions list is untouched by an invoice page change.
+    expect(billingMock.listSubscriptions).toHaveBeenCalledTimes(1);
+  });
+
+  it('loadSubscriptionsPage requests the 1-based page behind the paginator index', async () => {
+    const store = createStore();
+    await store.load();
+
+    billingMock.listSubscriptions.mockReturnValue(of(page([activeSub], 30)));
+    await store.loadSubscriptionsPage(1, 10);
+
+    expect(billingMock.listSubscriptions).toHaveBeenLastCalledWith({
+      page: 2,
+      limit: 10
+    });
+    expect(store.subscriptionsPage()).toEqual({
+      pageIndex: 1,
+      pageSize: 10,
+      total: 30
+    });
   });
 
   it('cancelSubscription replaces the row and notifies success', async () => {

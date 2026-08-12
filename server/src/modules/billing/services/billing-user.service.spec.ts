@@ -11,6 +11,11 @@ import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { In } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
+import {
+  DEFAULT_PAGE,
+  DEFAULT_PAGE_SIZE
+} from '@app/shared/constants/pagination.constants';
+import { PaginationQueryDto } from '../../../common/dtos/pagination-query.dto';
 import { User } from '../../users/entities/user.entity';
 import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
@@ -32,6 +37,7 @@ import { CreditService } from './credit.service';
 type RepoMock = {
   findOne: jest.Mock;
   find: jest.Mock;
+  findAndCount: jest.Mock;
   create: jest.Mock;
   save: jest.Mock;
   update: jest.Mock;
@@ -41,12 +47,17 @@ function repo(): RepoMock {
   return {
     findOne: jest.fn().mockResolvedValue(null),
     find: jest.fn().mockResolvedValue([]),
+    findAndCount: jest.fn().mockResolvedValue([[], 0]),
     create: jest.fn((data: object) => ({ ...data })),
     save: jest.fn((entity: { id?: string }) =>
       Promise.resolve({ id: 'generated-id', ...entity })
     ),
     update: jest.fn().mockResolvedValue({ affected: 1 })
   };
+}
+
+function pageQuery(overrides: Partial<PaginationQueryDto> = {}) {
+  return Object.assign(new PaginationQueryDto(), overrides);
 }
 
 type InsertedInvoice = Record<string, unknown> & {
@@ -1565,25 +1576,59 @@ describe('BillingUserService', () => {
   });
 
   describe('reads scope to the caller', () => {
-    it('returns null subscription and empty invoices when the user has no customer', async () => {
+    it('returns null subscription and an empty page when the user has no customer', async () => {
       const ctx = await build();
       ctx.customers.findOne.mockResolvedValue(null);
 
       expect(await ctx.service.getCurrentSubscription('user-1')).toBeNull();
-      expect(await ctx.service.listInvoices('user-1')).toEqual([]);
+      const invoices = await ctx.service.listInvoices('user-1', pageQuery());
+      expect(invoices.data).toEqual([]);
+      expect(invoices.meta).toEqual({
+        page: DEFAULT_PAGE,
+        limit: DEFAULT_PAGE_SIZE,
+        total: 0,
+        totalPages: 0
+      });
+      expect(ctx.invoices.findAndCount).not.toHaveBeenCalled();
       expect(await ctx.service.getDefaultPaymentMethod('user-1')).toBeNull();
     });
 
-    it('queries invoices keyed by the resolved customer id', async () => {
+    it('queries invoices keyed by the resolved customer id, one page at a time', async () => {
       const ctx = await build();
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-9' });
-      ctx.invoices.find.mockResolvedValue([]);
 
-      await ctx.service.listInvoices('user-1');
+      await ctx.service.listInvoices('user-1', pageQuery());
 
-      expect(ctx.invoices.find).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { customerId: 'cust-9' } })
+      expect(ctx.invoices.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { customerId: 'cust-9' },
+          order: { createdAt: 'DESC' },
+          skip: 0,
+          take: DEFAULT_PAGE_SIZE
+        })
       );
+    });
+
+    it('returns the requested page of the caller invoices with its total', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-9' });
+      ctx.invoices.findAndCount.mockResolvedValue([[{ id: 'inv-11' }], 21]);
+
+      const result = await ctx.service.listInvoices(
+        'user-1',
+        pageQuery({ page: 2, limit: 10 })
+      );
+
+      expect(ctx.invoices.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 10, take: 10 })
+      );
+      expect(result.data).toEqual([{ id: 'inv-11' }]);
+      expect(result.meta).toEqual({
+        page: 2,
+        limit: 10,
+        total: 21,
+        totalPages: 3
+      });
     });
   });
 

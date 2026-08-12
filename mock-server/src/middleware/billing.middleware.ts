@@ -20,6 +20,12 @@ import {
   toUsageResponse
 } from '../state';
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
+import type { PaginationQuery } from '../helpers/pagination.helpers';
+import {
+  paginate,
+  paginationQueryErrors,
+  parsePaginationQuery
+} from '../helpers/pagination.helpers';
 import { addInterval } from '../utils/period';
 import type {
   AuthenticatedRequest,
@@ -200,6 +206,63 @@ function getOrCreateCustomer(userId: string, locale: string): MockCustomer {
   return customer;
 }
 
+/**
+ * Mirrors the server's whitelisted `ORDER BY` for the billing lists
+ * (`list-order.util.ts`): an unrecognized `sortBy` falls back to `createdAt`.
+ * Nulls sort last on an ascending pass, as Postgres orders them.
+ */
+function byColumn<T>(
+  readers: Record<string, (item: T) => unknown>,
+  column: string,
+  sortOrder: 'asc' | 'desc'
+): (a: T, b: T) => number {
+  const read = readers[column] ?? readers['createdAt'];
+  const direction = sortOrder === 'asc' ? 1 : -1;
+  return (a, b) => {
+    const left = read(a);
+    const right = read(b);
+    if (left == null && right == null) return 0;
+    if (left == null) return 1;
+    if (right == null) return -1;
+    if (typeof left === 'number' && typeof right === 'number') {
+      return (left - right) * direction;
+    }
+    return String(left).localeCompare(String(right)) * direction;
+  };
+}
+
+const INVOICE_SORT_READERS: Record<string, (i: MockInvoice) => unknown> = {
+  createdAt: (i) => i.createdAt,
+  paidAt: (i) => i.paidAt,
+  amountMinor: (i) => i.amountMinor,
+  status: (i) => i.status
+};
+
+const SUBSCRIPTION_SORT_READERS: Record<
+  string,
+  (s: MockSubscription) => unknown
+> = {
+  createdAt: (s) => s.createdAt,
+  currentPeriodEnd: (s) => s.currentPeriodEnd,
+  status: (s) => s.status
+};
+
+function sortInvoices(
+  invoices: MockInvoice[],
+  { sortBy, sortOrder }: PaginationQuery
+): MockInvoice[] {
+  return [...invoices].sort(byColumn(INVOICE_SORT_READERS, sortBy, sortOrder));
+}
+
+function sortSubscriptions(
+  subscriptions: MockSubscription[],
+  { sortBy, sortOrder }: PaginationQuery
+): MockSubscription[] {
+  return [...subscriptions].sort(
+    byColumn(SUBSCRIPTION_SORT_READERS, sortBy, sortOrder)
+  );
+}
+
 function findCurrentSubscription(
   customerId: string
 ): MockSubscription | undefined {
@@ -219,19 +282,25 @@ billingRouter.get('/subscription', authGuard, (req: Request, res: Response) => {
   res.json(sub ? toSubscriptionResponse(sub) : null);
 });
 
-// GET /billing/invoices — caller's invoices, newest first.
+// GET /billing/invoices — caller's invoices, newest first (paginated).
 billingRouter.get('/invoices', authGuard, (req: Request, res: Response) => {
+  const query = req.query as Record<string, unknown>;
+  if (rejectInvalidBody(res, paginationQueryErrors(query))) return;
+  const params = parsePaginationQuery(query);
+
   const { user } = req as AuthenticatedRequest;
   const customer = findCustomer(user.id);
   if (!customer) {
-    res.json([]);
+    res.json(paginate([], params));
     return;
   }
-  const invoices = [...getState().billingInvoices.values()]
-    .filter((i) => i.customerId === customer.id)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .map(toInvoiceResponse);
-  res.json(invoices);
+  const invoices = sortInvoices(
+    [...getState().billingInvoices.values()].filter(
+      (i) => i.customerId === customer.id
+    ),
+    params
+  ).map(toInvoiceResponse);
+  res.json(paginate(invoices, params));
 });
 
 // GET /billing/payment-method — caller's default saved method or null.
@@ -995,22 +1064,32 @@ function auditAdminAction(
 billingAdminRouter.get(
   '/subscriptions',
   adminGuard,
-  (_req: Request, res: Response) => {
-    const subs = [...getState().billingSubscriptions.values()]
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map(toSubscriptionResponse);
-    res.json(subs);
+  (req: Request, res: Response) => {
+    const query = req.query as Record<string, unknown>;
+    if (rejectInvalidBody(res, paginationQueryErrors(query))) return;
+    const params = parsePaginationQuery(query);
+
+    const subs = sortSubscriptions(
+      [...getState().billingSubscriptions.values()],
+      params
+    ).map(toSubscriptionResponse);
+    res.json(paginate(subs, params));
   }
 );
 
 billingAdminRouter.get(
   '/invoices',
   adminGuard,
-  (_req: Request, res: Response) => {
-    const invoices = [...getState().billingInvoices.values()]
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map(toInvoiceResponse);
-    res.json(invoices);
+  (req: Request, res: Response) => {
+    const query = req.query as Record<string, unknown>;
+    if (rejectInvalidBody(res, paginationQueryErrors(query))) return;
+    const params = parsePaginationQuery(query);
+
+    const invoices = sortInvoices(
+      [...getState().billingInvoices.values()],
+      params
+    ).map(toInvoiceResponse);
+    res.json(paginate(invoices, params));
   }
 );
 

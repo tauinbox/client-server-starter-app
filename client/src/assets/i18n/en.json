@@ -20,7 +20,16 @@
     "actions": "Actions",
     "back": "Back",
     "skipToContent": "Skip to main content",
-    "emptyPlaceholder": "—"
+    "emptyPlaceholder": "—",
+    "paginator": {
+      "itemsPerPage": "Items per page:",
+      "first": "First page",
+      "last": "Last page",
+      "next": "Next page",
+      "previous": "Previous page",
+      "range": "{{start}} - {{end}} of {{total}}",
+      "rangeEmpty": "0 of {{total}}"
+    }
   },
   "header": {
     "login": "Login",

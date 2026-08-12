@@ -6,6 +6,7 @@ import {
   HttpCode,
   Post,
   Put,
+  Query,
   Req,
   UseInterceptors
 } from '@nestjs/common';
@@ -17,6 +18,7 @@ import {
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
 import type { JwtAuthRequest } from '../../auth/types/auth.request';
+import { PaginationQueryDto } from '../../../common/dtos/pagination-query.dto';
 import { RequireEntitlement } from '../entitlements/require-entitlement.decorator';
 import { BillingUserService } from '../services/billing-user.service';
 import { CheckoutRequestDto } from '../dtos/checkout-request.dto';
@@ -25,7 +27,6 @@ import { ChangeSubscriptionRequestDto } from '../dtos/change-subscription-reques
 import { ProrationPreviewResponseDto } from '../dtos/proration-preview-response.dto';
 import { RegionRequestDto } from '../dtos/region-request.dto';
 import { SubscriptionResponseDto } from '../dtos/subscription-response.dto';
-import { InvoiceResponseDto } from '../dtos/invoice-response.dto';
 import { PaymentMethodResponseDto } from '../dtos/payment-method-response.dto';
 import { CheckoutSessionResponseDto } from '../dtos/checkout-session-response.dto';
 import { BillingRegionResponseDto } from '../dtos/billing-region-response.dto';
@@ -54,10 +55,10 @@ export class BillingUserController {
   }
 
   @Get('invoices')
-  @ApiOperation({ summary: "The caller's invoices, newest first." })
-  @ApiOkResponse({ type: [InvoiceResponseDto] })
-  getInvoices(@Req() req: JwtAuthRequest) {
-    return this.billingUser.listInvoices(req.user.userId);
+  @ApiOperation({ summary: "The caller's invoices, newest first (paginated)." })
+  @ApiOkResponse({ description: "Paginated list of the caller's invoices" })
+  getInvoices(@Req() req: JwtAuthRequest, @Query() query: PaginationQueryDto) {
+    return this.billingUser.listInvoices(req.user.userId, query);
   }
 
   @Get('usage')

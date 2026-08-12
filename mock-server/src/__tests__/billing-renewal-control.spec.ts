@@ -59,7 +59,10 @@ async function listInvoices(
     headers: { authorization: `Bearer ${token}` }
   });
   expect(res.status).toBe(200);
-  return (await res.json()) as Array<Record<string, unknown>>;
+  const body = (await res.json()) as {
+    data: Array<Record<string, unknown>>;
+  };
+  return body.data;
 }
 
 describe('POST /__control/billing/advance-renewal', () => {

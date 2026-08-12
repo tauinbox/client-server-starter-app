@@ -23,6 +23,8 @@ import { EntitlementGuard } from '../src/modules/billing/entitlements/entitlemen
 import { EntitlementService } from '../src/modules/billing/entitlements/entitlement.service';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { BillingUserController } from '../src/modules/billing/controllers/billing-user.controller';
+import { MAX_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
+import { PaginatedResponseDto } from '../src/common/dtos/paginated-response.dto';
 
 function makeSubscription(): Subscription {
   return Object.assign(new Subscription(), {
@@ -158,16 +160,43 @@ describe('Billing user self-service (e2e)', () => {
   });
 
   it('serializes invoices without the provider event id', async () => {
-    billingUser.listInvoices.mockResolvedValue([makeInvoice()]);
+    billingUser.listInvoices.mockResolvedValue(
+      new PaginatedResponseDto([makeInvoice()], 1, 1, 10)
+    );
 
     const res = await request(server)
       .get('/api/v1/billing/invoices')
       .expect(200);
 
-    const invoices = res.body as Array<{ providerInvoiceRef: string }>;
-    expect(invoices).toHaveLength(1);
-    expect(invoices[0].providerInvoiceRef).toBe('pay_1');
-    expect(invoices[0]).not.toHaveProperty('providerEventId');
+    const body = res.body as {
+      data: Array<{ providerInvoiceRef: string }>;
+      meta: { total: number };
+    };
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].providerInvoiceRef).toBe('pay_1');
+    expect(body.data[0]).not.toHaveProperty('providerEventId');
+    expect(body.meta.total).toBe(1);
+  });
+
+  it('passes the requested page through and caps the page size', async () => {
+    billingUser.listInvoices.mockResolvedValue(
+      new PaginatedResponseDto([], 0, 2, 25)
+    );
+
+    await request(server)
+      .get('/api/v1/billing/invoices?page=2&limit=25')
+      .expect(200);
+
+    expect(billingUser.listInvoices).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ page: 2, limit: 25 })
+    );
+
+    await request(server)
+      .get(`/api/v1/billing/invoices?limit=${MAX_PAGE_SIZE + 1}`)
+      .expect(400);
+
+    expect(billingUser.listInvoices).toHaveBeenCalledTimes(1);
   });
 
   it('returns the current-period usage summary for the caller', async () => {

@@ -10,6 +10,17 @@ import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service'
 import { BillingAdminStore } from '../../store/billing-admin.store';
 import { BillingAdminListComponent } from './billing-admin-list.component';
 
+type PageState = { pageIndex: number; pageSize: number; total: number };
+
+/** Row cancel/refund buttons only — the paginator renders icon buttons too. */
+function rowActionButtons(host: HTMLElement): HTMLButtonElement[] {
+  return Array.from(
+    host.querySelectorAll<HTMLButtonElement>(
+      'button[mat-icon-button], button[matIconButton]'
+    )
+  ).filter((button) => button.closest('mat-paginator') === null);
+}
+
 const activeSub: SubscriptionResponse = {
   id: 'sub-1',
   customerId: 'cust-1',
@@ -53,7 +64,11 @@ describe('BillingAdminListComponent', () => {
     working: ReturnType<typeof signal<boolean>>;
     subscriptions: ReturnType<typeof signal<SubscriptionResponse[]>>;
     invoices: ReturnType<typeof signal<InvoiceResponse[]>>;
+    subscriptionsPage: ReturnType<typeof signal<PageState>>;
+    invoicesPage: ReturnType<typeof signal<PageState>>;
     load: ReturnType<typeof vi.fn>;
+    loadSubscriptionsPage: ReturnType<typeof vi.fn>;
+    loadInvoicesPage: ReturnType<typeof vi.fn>;
     cancelSubscription: ReturnType<typeof vi.fn>;
     refundInvoice: ReturnType<typeof vi.fn>;
   };
@@ -91,7 +106,11 @@ describe('BillingAdminListComponent', () => {
       working: signal(false),
       subscriptions: signal([activeSub]),
       invoices: signal([paidInvoice]),
+      subscriptionsPage: signal({ pageIndex: 0, pageSize: 10, total: 1 }),
+      invoicesPage: signal({ pageIndex: 0, pageSize: 10, total: 1 }),
       load: vi.fn(),
+      loadSubscriptionsPage: vi.fn(),
+      loadInvoicesPage: vi.fn(),
       cancelSubscription: vi.fn().mockResolvedValue(true),
       refundInvoice: vi.fn().mockResolvedValue(true)
     };
@@ -195,11 +214,7 @@ describe('BillingAdminListComponent', () => {
     storeMock.working.set(true);
     fixture.detectChanges();
 
-    const actionButtons = Array.from(
-      (
-        fixture.nativeElement as HTMLElement
-      ).querySelectorAll<HTMLButtonElement>('button[matIconButton]')
-    );
+    const actionButtons = rowActionButtons(fixture.nativeElement);
     expect(actionButtons.length).toBe(2);
     expect(actionButtons.every((button) => button.disabled)).toBe(true);
   });
@@ -208,10 +223,7 @@ describe('BillingAdminListComponent', () => {
     hasPermissions.mockReturnValue(false);
     const fixture = await setup();
     fixture.detectChanges();
-    const actionButtons = (
-      fixture.nativeElement as HTMLElement
-    ).querySelectorAll('button[mat-icon-button], button[matIconButton]');
-    expect(actionButtons.length).toBe(0);
+    expect(rowActionButtons(fixture.nativeElement).length).toBe(0);
   });
 
   it('exposes canCancel/canRefund guards matching server rules', async () => {

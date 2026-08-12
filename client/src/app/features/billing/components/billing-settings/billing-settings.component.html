@@ -210,6 +210,18 @@
             </tbody>
           </table>
         }
+
+        @let invoicesPage = store.invoicesPage();
+        @if (invoicesPage.total > 0) {
+          <mat-paginator
+            [length]="invoicesPage.total"
+            [pageIndex]="invoicesPage.pageIndex"
+            [pageSize]="invoicesPage.pageSize"
+            [pageSizeOptions]="pageSizeOptions"
+            [disabled]="store.loading()"
+            (page)="onInvoicesPage($event)"
+          />
+        }
       </mat-card-content>
     </mat-card>
   }

@@ -61,4 +61,50 @@ test.describe('Admin billing console', () => {
       .click();
     await expect(invoiceTable).toContainText('Refunded');
   });
+
+  // The invoice list is server-paginated: the page must never request the whole
+  // table, and moving the paginator must fetch the next slice from the server.
+  test('pages through the invoice list without loading every row', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, {
+      id: ADMIN_ID,
+      email: 'billadmin@example.com',
+      roles: ['admin']
+    });
+
+    const { id: subscriptionId } =
+      await _mockServer.activateBillingSubscription({
+        userId: ADMIN_ID,
+        planKey: 'pro'
+      });
+    // One invoice per renewal: 12 in total, so the default page size splits it.
+    for (let i = 0; i < 11; i += 1) {
+      await _mockServer.advanceBillingRenewal({ subscriptionId });
+    }
+
+    const invoiceRequests: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().includes('/admin/billing/invoices')) {
+        invoiceRequests.push(request.url());
+      }
+    });
+
+    await page.goto('/admin/billing');
+
+    const invoiceTable = page.locator('table').nth(1);
+    await expect(invoiceTable.locator('tbody tr')).toHaveCount(10);
+    expect(invoiceRequests[0]).toContain('page=1');
+    expect(invoiceRequests[0]).toContain('limit=10');
+
+    const invoicePaginator = page.locator('mat-paginator').nth(1);
+    await expect(invoicePaginator).toContainText('1 - 10 of 12');
+
+    await invoicePaginator.getByRole('button', { name: 'Next page' }).click();
+
+    await expect(invoiceTable.locator('tbody tr')).toHaveCount(2);
+    await expect(invoicePaginator).toContainText('11 - 12 of 12');
+    expect(invoiceRequests.at(-1)).toContain('page=2');
+  });
 });

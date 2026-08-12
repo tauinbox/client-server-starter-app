@@ -20,7 +20,16 @@
     "actions": "Действия",
     "back": "Назад",
     "skipToContent": "Перейти к основному содержимому",
-    "emptyPlaceholder": "—"
+    "emptyPlaceholder": "—",
+    "paginator": {
+      "itemsPerPage": "Записей на странице:",
+      "first": "Первая страница",
+      "last": "Последняя страница",
+      "next": "Следующая страница",
+      "previous": "Предыдущая страница",
+      "range": "{{start}} - {{end}} из {{total}}",
+      "rangeEmpty": "0 из {{total}}"
+    }
   },
   "header": {
     "login": "Войти",

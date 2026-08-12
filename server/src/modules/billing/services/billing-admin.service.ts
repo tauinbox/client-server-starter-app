@@ -9,6 +9,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
+import type { PaginationQueryDto } from '../../../common/dtos/pagination-query.dto';
+import { PaginatedResponseDto } from '../../../common/dtos/paginated-response.dto';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
 import { CustomerGrant } from '../entities/customer-grant.entity';
@@ -20,6 +22,11 @@ import { EntitlementService } from '../entitlements/entitlement.service';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import type { CancelMode } from '../providers/payment-provider.interface';
 import { cancelFields } from '../utils/cancel-fields.util';
+import {
+  invoiceOrder,
+  sortDirection,
+  subscriptionOrder
+} from '../utils/list-order.util';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
 
@@ -52,12 +59,28 @@ export class BillingAdminService {
     @InjectDataSource() private readonly dataSource: DataSource
   ) {}
 
-  listSubscriptions(): Promise<Subscription[]> {
-    return this.subscriptions.find({ order: { createdAt: 'DESC' } });
+  async listSubscriptions(
+    query: PaginationQueryDto
+  ): Promise<PaginatedResponseDto<Subscription>> {
+    const { page, limit, sortBy, sortOrder } = query;
+    const [data, total] = await this.subscriptions.findAndCount({
+      order: subscriptionOrder(sortBy, sortDirection(sortOrder)),
+      skip: (page - 1) * limit,
+      take: limit
+    });
+    return new PaginatedResponseDto(data, total, page, limit);
   }
 
-  listInvoices(): Promise<Invoice[]> {
-    return this.invoices.find({ order: { createdAt: 'DESC' } });
+  async listInvoices(
+    query: PaginationQueryDto
+  ): Promise<PaginatedResponseDto<Invoice>> {
+    const { page, limit, sortBy, sortOrder } = query;
+    const [data, total] = await this.invoices.findAndCount({
+      order: invoiceOrder(sortBy, sortDirection(sortOrder)),
+      skip: (page - 1) * limit,
+      take: limit
+    });
+    return new PaginatedResponseDto(data, total, page, limit);
   }
 
   /**

@@ -165,6 +165,18 @@
           </table>
         </div>
       }
+
+      @let subsPage = subscriptionsPage();
+      @if (subsPage.total > 0) {
+        <mat-paginator
+          [length]="subsPage.total"
+          [pageIndex]="subsPage.pageIndex"
+          [pageSize]="subsPage.pageSize"
+          [pageSizeOptions]="pageSizeOptions"
+          [disabled]="loading()"
+          (page)="onSubscriptionsPage($event)"
+        />
+      }
     </mat-card-content>
   </mat-card>
 
@@ -294,6 +306,18 @@
             <tr mat-row *matRowDef="let _; columns: invoiceColumns"></tr>
           </table>
         </div>
+      }
+
+      @let invoicesPageState = invoicesPage();
+      @if (invoicesPageState.total > 0) {
+        <mat-paginator
+          [length]="invoicesPageState.total"
+          [pageIndex]="invoicesPageState.pageIndex"
+          [pageSize]="invoicesPageState.pageSize"
+          [pageSizeOptions]="pageSizeOptions"
+          [disabled]="loading()"
+          (page)="onInvoicesPage($event)"
+        />
       }
     </mat-card-content>
   </mat-card>

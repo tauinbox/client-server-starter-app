@@ -9,6 +9,8 @@ import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { IsNull } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
+import { DEFAULT_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
+import { PaginationQueryDto } from '../../../common/dtos/pagination-query.dto';
 import { Customer } from '../entities/customer.entity';
 import { CustomerGrant } from '../entities/customer-grant.entity';
 import { Invoice } from '../entities/invoice.entity';
@@ -24,6 +26,7 @@ import { CreditService } from './credit.service';
 type RepoMock = {
   findOne: jest.Mock;
   find: jest.Mock;
+  findAndCount: jest.Mock;
   save: jest.Mock;
   update: jest.Mock;
 };
@@ -32,9 +35,14 @@ function repo(): RepoMock {
   return {
     findOne: jest.fn().mockResolvedValue(null),
     find: jest.fn().mockResolvedValue([]),
+    findAndCount: jest.fn().mockResolvedValue([[], 0]),
     save: jest.fn((entity: object) => Promise.resolve(entity)),
     update: jest.fn().mockResolvedValue({ affected: 0 })
   };
+}
+
+function pageQuery(overrides: Partial<PaginationQueryDto> = {}) {
+  return Object.assign(new PaginationQueryDto(), overrides);
 }
 
 function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
@@ -178,20 +186,62 @@ async function build() {
 
 describe('BillingAdminService', () => {
   describe('listSubscriptions / listInvoices', () => {
-    it('lists subscriptions newest first', async () => {
+    it('lists subscriptions newest first, bounded to the first page', async () => {
       const ctx = await build();
-      await ctx.service.listSubscriptions();
-      expect(ctx.subscriptions.find).toHaveBeenCalledWith({
-        order: { createdAt: 'DESC' }
+      await ctx.service.listSubscriptions(pageQuery());
+      expect(ctx.subscriptions.findAndCount).toHaveBeenCalledWith({
+        order: { createdAt: 'DESC' },
+        skip: 0,
+        take: DEFAULT_PAGE_SIZE
       });
     });
 
-    it('lists invoices newest first', async () => {
+    it('lists invoices newest first, bounded to the first page', async () => {
       const ctx = await build();
-      await ctx.service.listInvoices();
-      expect(ctx.invoices.find).toHaveBeenCalledWith({
-        order: { createdAt: 'DESC' }
+      await ctx.service.listInvoices(pageQuery());
+      expect(ctx.invoices.findAndCount).toHaveBeenCalledWith({
+        order: { createdAt: 'DESC' },
+        skip: 0,
+        take: DEFAULT_PAGE_SIZE
       });
+    });
+
+    it('offsets to the requested page and reports the total', async () => {
+      const ctx = await build();
+      const second = makeSubscription({ id: 'sub-2' });
+      ctx.subscriptions.findAndCount.mockResolvedValue([[second], 25]);
+
+      const result = await ctx.service.listSubscriptions(
+        pageQuery({ page: 3, limit: 10 })
+      );
+
+      expect(ctx.subscriptions.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 20, take: 10 })
+      );
+      expect(result.data).toEqual([second]);
+      expect(result.meta).toEqual({
+        page: 3,
+        limit: 10,
+        total: 25,
+        totalPages: 3
+      });
+    });
+
+    it('orders by a whitelisted column and falls back to createdAt', async () => {
+      const ctx = await build();
+
+      await ctx.service.listInvoices(
+        pageQuery({ sortBy: 'paidAt', sortOrder: 'asc' })
+      );
+      expect(ctx.invoices.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ order: { paidAt: 'ASC' } })
+      );
+
+      // An unknown column must never reach the query builder.
+      await ctx.service.listInvoices(pageQuery({ sortBy: 'amountMinor); --' }));
+      expect(ctx.invoices.findAndCount).toHaveBeenLastCalledWith(
+        expect.objectContaining({ order: { createdAt: 'DESC' } })
+      );
     });
   });
 

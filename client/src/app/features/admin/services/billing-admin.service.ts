@@ -1,7 +1,12 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import type { InvoiceResponse, SubscriptionResponse } from '@app/shared/types';
+import type {
+  InvoiceResponse,
+  PaginatedResponse,
+  SubscriptionResponse
+} from '@app/shared/types';
+import { pageParams, type PageRequest } from '@shared/utils/pagination.utils';
 import type { CancelMode } from '@features/billing/services/billing.service';
 
 const ADMIN_BILLING_API_V1 = '/api/v1/admin/billing';
@@ -15,15 +20,21 @@ const ADMIN_BILLING_API_V1 = '/api/v1/admin/billing';
 export class BillingAdminService {
   readonly #http = inject(HttpClient);
 
-  listSubscriptions(): Observable<SubscriptionResponse[]> {
-    return this.#http.get<SubscriptionResponse[]>(
-      `${ADMIN_BILLING_API_V1}/subscriptions`
+  listSubscriptions(
+    params: PageRequest = {}
+  ): Observable<PaginatedResponse<SubscriptionResponse>> {
+    return this.#http.get<PaginatedResponse<SubscriptionResponse>>(
+      `${ADMIN_BILLING_API_V1}/subscriptions`,
+      { params: pageParams(params) }
     );
   }
 
-  listInvoices(): Observable<InvoiceResponse[]> {
-    return this.#http.get<InvoiceResponse[]>(
-      `${ADMIN_BILLING_API_V1}/invoices`
+  listInvoices(
+    params: PageRequest = {}
+  ): Observable<PaginatedResponse<InvoiceResponse>> {
+    return this.#http.get<PaginatedResponse<InvoiceResponse>>(
+      `${ADMIN_BILLING_API_V1}/invoices`,
+      { params: pageParams(params) }
     );
   }
 

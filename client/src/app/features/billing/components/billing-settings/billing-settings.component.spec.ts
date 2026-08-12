@@ -92,6 +92,9 @@ describe('BillingSettingsComponent', () => {
   let storeMock: {
     subscription: ReturnType<typeof signal<SubscriptionResponse | null>>;
     invoices: ReturnType<typeof signal<InvoiceResponse[]>>;
+    invoicesPage: ReturnType<
+      typeof signal<{ pageIndex: number; pageSize: number; total: number }>
+    >;
     paymentMethod: ReturnType<typeof signal<null>>;
     usage: ReturnType<typeof signal<UsageSummaryResponse | null>>;
     credits: ReturnType<typeof signal<CreditBalanceResponse | null>>;
@@ -101,6 +104,7 @@ describe('BillingSettingsComponent', () => {
     currentPlan: ReturnType<typeof signal<PlanResponse | null>>;
     hasActiveSubscription: ReturnType<typeof signal<boolean>>;
     loadSettings: ReturnType<typeof vi.fn>;
+    loadInvoicesPage: ReturnType<typeof vi.fn>;
     cancel: ReturnType<typeof vi.fn>;
     changePlan: ReturnType<typeof vi.fn>;
     startPaymentMethodUpdate: ReturnType<typeof vi.fn>;
@@ -120,6 +124,11 @@ describe('BillingSettingsComponent', () => {
         hasSub ? (subscription ?? activeSub) : null
       ),
       invoices: signal<InvoiceResponse[]>(hasSub ? [invoice] : []),
+      invoicesPage: signal({
+        pageIndex: 0,
+        pageSize: 10,
+        total: hasSub ? 1 : 0
+      }),
       paymentMethod: signal(null),
       usage: signal<UsageSummaryResponse | null>(usage ?? null),
       credits: signal<CreditBalanceResponse | null>(credits ?? null),
@@ -129,6 +138,7 @@ describe('BillingSettingsComponent', () => {
       currentPlan: signal<PlanResponse | null>(hasSub ? proPlan : null),
       hasActiveSubscription: signal(hasSub),
       loadSettings: vi.fn().mockResolvedValue(undefined),
+      loadInvoicesPage: vi.fn().mockResolvedValue(undefined),
       cancel: vi.fn().mockResolvedValue(true),
       changePlan: vi.fn().mockResolvedValue(true),
       startPaymentMethodUpdate: vi.fn().mockResolvedValue(null)

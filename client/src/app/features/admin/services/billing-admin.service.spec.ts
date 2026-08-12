@@ -26,18 +26,29 @@ describe('BillingAdminService', () => {
 
   afterEach(() => httpMock.verify());
 
-  it('GETs all subscriptions', () => {
+  it('GETs subscriptions without page params when none are given', () => {
     service.listSubscriptions().subscribe();
     const req = httpMock.expectOne(`${ADMIN_BILLING_API_V1}/subscriptions`);
     expect(req.request.method).toBe('GET');
-    req.flush([]);
+    expect(req.request.params.keys()).toEqual([]);
+    req.flush({
+      data: [],
+      meta: { page: 1, limit: 10, total: 0, totalPages: 0 }
+    });
   });
 
-  it('GETs all invoices', () => {
-    service.listInvoices().subscribe();
-    const req = httpMock.expectOne(`${ADMIN_BILLING_API_V1}/invoices`);
+  it('GETs invoices with the requested page and limit', () => {
+    service.listInvoices({ page: 3, limit: 25 }).subscribe();
+    const req = httpMock.expectOne(
+      (r) => r.url === `${ADMIN_BILLING_API_V1}/invoices`
+    );
     expect(req.request.method).toBe('GET');
-    req.flush([]);
+    expect(req.request.params.get('page')).toBe('3');
+    expect(req.request.params.get('limit')).toBe('25');
+    req.flush({
+      data: [],
+      meta: { page: 3, limit: 25, total: 0, totalPages: 0 }
+    });
   });
 
   it('POSTs a cancel with the default period_end mode', () => {

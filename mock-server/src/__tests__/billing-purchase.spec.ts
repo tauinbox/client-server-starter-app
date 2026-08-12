@@ -198,8 +198,8 @@ describe('/__control/billing/complete-purchase', () => {
     const invoices = await fetch(`${baseUrl}/api/v1/billing/invoices`, {
       headers: { authorization: `Bearer ${token}` }
     });
-    const list = (await invoices.json()) as InvoiceResponse[];
-    expect(list.map((i) => i.id)).toContain(invoice.id);
+    const list = (await invoices.json()) as { data: InvoiceResponse[] };
+    expect(list.data.map((i) => i.id)).toContain(invoice.id);
 
     // Settlement is once-per-session — a replay finds nothing pending.
     const replay = await completePurchase({ sessionRef: session.sessionRef });
