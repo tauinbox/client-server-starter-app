@@ -153,7 +153,7 @@ export class BillingUserService {
   private readonly logger = new Logger(BillingUserService.name);
 
   async getCurrentSubscription(userId: string): Promise<Subscription | null> {
-    const customer = await this.customers.findOne({ where: { userId } });
+    const customer = await this.customerFor(userId);
     if (!customer) return null;
     return this.findCurrentSubscription(customer.id);
   }
@@ -163,7 +163,7 @@ export class BillingUserService {
     query: InvoiceCursorQueryDto
   ): Promise<CursorPaginatedResponseDto<Invoice>> {
     const { cursor, limit, sortBy, sortOrder } = query;
-    const customer = await this.customers.findOne({ where: { userId } });
+    const customer = await this.customerFor(userId);
     if (!customer) {
       return new CursorPaginatedResponseDto<Invoice>([], null, limit);
     }
@@ -192,7 +192,7 @@ export class BillingUserService {
   async getUsageSummary(
     userId: string
   ): Promise<UsageSummaryResponseDto | null> {
-    const customer = await this.customers.findOne({ where: { userId } });
+    const customer = await this.customerFor(userId);
     if (!customer) return null;
     const subscription = await this.findCurrentSubscription(customer.id);
     if (!subscription || subscription.billingMode !== 'usage') return null;
@@ -228,13 +228,13 @@ export class BillingUserService {
    * purchased — the client renders that as zero credits.
    */
   async getCredits(userId: string): Promise<CreditBalance | null> {
-    const customer = await this.customers.findOne({ where: { userId } });
+    const customer = await this.customerFor(userId);
     if (!customer) return null;
     return this.credits.getBalance(customer.id);
   }
 
   async getDefaultPaymentMethod(userId: string): Promise<PaymentMethod | null> {
-    const customer = await this.customers.findOne({ where: { userId } });
+    const customer = await this.customerFor(userId);
     if (!customer?.defaultPaymentMethodId) return null;
     return this.paymentMethods.findOne({
       where: { id: customer.defaultPaymentMethodId, customerId: customer.id }
@@ -250,7 +250,7 @@ export class BillingUserService {
    * while a provider is disabled.
    */
   async listProducts(userId: string): Promise<Product[]> {
-    const customer = await this.customers.findOne({ where: { userId } });
+    const customer = await this.customerFor(userId);
     const providerId = customer
       ? this.billing.effectiveProviderId(customer)
       : this.billing.geoDefaultFor(await this.detectCountry(userId));
@@ -491,15 +491,10 @@ export class BillingUserService {
   async startPaymentMethodUpdate(
     userId: string
   ): Promise<CheckoutSessionResponse> {
-    const customer = await this.customers.findOne({ where: { userId } });
-    const subscription = customer
-      ? await this.findCurrentSubscription(customer.id)
-      : null;
-    if (!customer || !subscription) {
-      throw new NotFoundException(
-        'No active subscription to update the payment method for'
-      );
-    }
+    const { customer, subscription } = await this.requireOpenSubscription(
+      userId,
+      'No active subscription to update the payment method for'
+    );
 
     const provider = this.billing.getProviderById(subscription.provider);
     if (!provider) {
@@ -532,13 +527,10 @@ export class BillingUserService {
     userId: string,
     mode: CancelMode = 'period_end'
   ): Promise<Subscription> {
-    const customer = await this.customers.findOne({ where: { userId } });
-    const subscription = customer
-      ? await this.findCurrentSubscription(customer.id)
-      : null;
-    if (!subscription) {
-      throw new NotFoundException('No active subscription to cancel');
-    }
+    const { subscription } = await this.requireOpenSubscription(
+      userId,
+      'No active subscription to cancel'
+    );
 
     // Provider-managed lifecycle: ask the provider to cancel; the resulting
     // webhook reconciles status. Self-managed: there is no provider object — the
@@ -859,13 +851,10 @@ export class BillingUserService {
     userId: string,
     planKey: string
   ): Promise<ChangeContext> {
-    const customer = await this.customers.findOne({ where: { userId } });
-    const subscription = customer
-      ? await this.findCurrentSubscription(customer.id)
-      : null;
-    if (!customer || !subscription) {
-      throw new NotFoundException('No active subscription to change');
-    }
+    const { customer, subscription } = await this.requireOpenSubscription(
+      userId,
+      'No active subscription to change'
+    );
     if (
       !(CHANGEABLE_STATUSES as readonly string[]).includes(subscription.status)
     ) {
@@ -1057,7 +1046,7 @@ export class BillingUserService {
     detectedProvider: BillingProviderId;
     effectiveProvider: BillingProviderId;
   }> {
-    const customer = await this.customers.findOne({ where: { userId } });
+    const customer = await this.customerFor(userId);
     if (customer) {
       return {
         region: regionForOverride(customer.providerOverride),
@@ -1145,6 +1134,30 @@ export class BillingUserService {
       }
       throw error;
     }
+  }
+
+  /** The caller's billing customer, or null when none was ever created. */
+  private async customerFor(userId: string): Promise<Customer | null> {
+    return this.customers.findOne({ where: { userId } });
+  }
+
+  /**
+   * The caller's customer together with its open subscription, for the
+   * mutations that need both. The 404 message is passed in — each flow keeps
+   * its own wording.
+   */
+  private async requireOpenSubscription(
+    userId: string,
+    notFoundMessage: string
+  ): Promise<{ customer: Customer; subscription: Subscription }> {
+    const customer = await this.customerFor(userId);
+    const subscription = customer
+      ? await this.findCurrentSubscription(customer.id)
+      : null;
+    if (!customer || !subscription) {
+      throw new NotFoundException(notFoundMessage);
+    }
+    return { customer, subscription };
   }
 
   private async findCurrentSubscription(
