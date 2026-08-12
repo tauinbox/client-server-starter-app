@@ -27,6 +27,7 @@ import {
   SubscriptionCanceledEvent
 } from '../events/billing.events';
 import { BillingService } from '../billing.service';
+import { OPEN_STATUSES } from '../utils/subscription-status.util';
 import { ProrationCalculator } from '../rating/proration-calculator';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import { BillingUserService } from './billing-user.service';
@@ -794,7 +795,7 @@ describe('BillingUserService', () => {
       // was cancelling, and the whole entity would carry it back.
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
       expect(ctx.subscriptions.update).toHaveBeenCalledWith(
-        { id: 'sub-1' },
+        { id: 'sub-1', status: In([...OPEN_STATUSES]) },
         { cancelAtPeriodEnd: true }
       );
     });
@@ -818,13 +819,31 @@ describe('BillingUserService', () => {
       expect(result.status).toBe('canceled');
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
       expect(ctx.subscriptions.update).toHaveBeenCalledWith(
-        { id: 'sub-1' },
+        { id: 'sub-1', status: In([...OPEN_STATUSES]) },
         { status: 'canceled', cancelAtPeriodEnd: false }
       );
       expect(ctx.emit).toHaveBeenCalledWith(
         SubscriptionCanceledEvent.name,
         expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
       );
+    });
+
+    it('answers 409 and emits nothing when a concurrent writer cancelled first', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        provider: 'yookassa' as const,
+        providerSubscriptionId: null,
+        status: 'active',
+        cancelAtPeriodEnd: false
+      });
+      ctx.subscriptions.update.mockResolvedValue({ affected: 0 });
+
+      await expect(
+        ctx.service.cancelSubscription('user-1', 'immediate')
+      ).rejects.toThrow(ConflictException);
+      expect(ctx.emit).not.toHaveBeenCalled();
     });
 
     it('throws when there is no subscription to cancel', async () => {

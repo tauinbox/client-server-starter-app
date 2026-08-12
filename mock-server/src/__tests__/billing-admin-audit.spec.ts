@@ -105,6 +105,26 @@ describe('admin billing mutations write audit entries', () => {
     });
   });
 
+  it('refuses a second cancel and writes no second audit entry', async () => {
+    const { token, userId } = await loginAdmin();
+    const { subscriptionId } = await activateSubscription(userId);
+    const path = `/admin/billing/subscriptions/${subscriptionId}/cancel`;
+
+    expect((await post(token, path, { mode: 'immediate' })).status).toBe(200);
+
+    const repeat = await post(token, path, { mode: 'immediate' });
+    expect(repeat.status).toBe(409);
+
+    // A period-end repeat must not flag a canceled row either.
+    const periodEnd = await post(token, path, { mode: 'period_end' });
+    expect(periodEnd.status).toBe(409);
+    expect(
+      getState().billingSubscriptions.get(subscriptionId)?.cancelAtPeriodEnd
+    ).toBe(false);
+
+    expect(entriesFor('BILLING_SUBSCRIPTION_CANCEL')).toHaveLength(1);
+  });
+
   it('audits a refund with the requested amount', async () => {
     const { token, userId } = await loginAdmin();
     const { customerId } = await activateSubscription(userId);

@@ -19,9 +19,8 @@ import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import { EntitlementService } from '../entitlements/entitlement.service';
-import { SubscriptionCanceledEvent } from '../events/billing.events';
 import type { CancelMode } from '../providers/payment-provider.interface';
-import { cancelFields } from '../utils/cancel-fields.util';
+import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
 import {
   INVOICE_SORT_COLUMN_MAP,
   SUBSCRIPTION_SORT_COLUMN_MAP
@@ -127,6 +126,12 @@ export class BillingAdminService {
     return { id, status: 'received' };
   }
 
+  /**
+   * Unlike the self-service route, which reaches its subscription through an
+   * open-status lookup, this one is addressed by id and so can be handed a
+   * canceled row — the open-status guard inside the shared tail is what refuses
+   * it.
+   */
   async cancelSubscription(
     id: string,
     mode: CancelMode = 'period_end'
@@ -135,35 +140,16 @@ export class BillingAdminService {
     if (!subscription) {
       throw new NotFoundException('Subscription not found');
     }
-
-    // Provider-managed lifecycle: ask the provider to cancel; the resulting
-    // webhook reconciles status. Self-managed: there is no provider object — the
-    // renewal scheduler simply stops charging the saved card.
-    if (subscription.providerSubscriptionId) {
-      const provider = this.billing.getProviderById(subscription.provider);
-      if (provider) {
-        await provider.cancel(subscription.providerSubscriptionId, mode);
-      }
-    }
-
-    const fields = cancelFields(mode);
-    Object.assign(subscription, fields);
-    await this.subscriptions.update({ id: subscription.id }, fields);
-    const saved =
-      (await this.subscriptions.findOne({ where: { id } })) ?? subscription;
-
-    // Immediate cancellation revokes access now, so the cached entitlements must
-    // be invalidated; a period-end cancel keeps access until the period closes.
-    if (mode === 'immediate') {
-      const userId = await this.resolveUserId(saved.customerId);
-      if (userId) {
-        this.events.emit(
-          SubscriptionCanceledEvent.name,
-          new SubscriptionCanceledEvent(userId, saved.id)
-        );
-      }
-    }
-    return saved;
+    return cancelOpenSubscription(
+      {
+        subscriptions: this.subscriptions,
+        billing: this.billing,
+        events: this.events
+      },
+      subscription,
+      mode,
+      (saved) => this.resolveUserId(saved.customerId)
+    );
   }
 
   /**
