@@ -29,7 +29,8 @@ import { CreditService } from '../services/credit.service';
 import { nextPeriodEnd } from '../utils/period.util';
 import {
   DUNNING_MAX_ATTEMPTS,
-  DUNNING_RETRY_DELAY_MS
+  DUNNING_RETRY_DELAY_MS,
+  RENEWAL_SCAN_MAX_PER_RUN
 } from './renewal-queue.constants';
 
 /**
@@ -83,6 +84,11 @@ export class RenewalService {
   /** Processes every due self-managed subscription; one failure never aborts the rest. */
   async runDueRenewals(now: Date = new Date()): Promise<void> {
     const due = await this.findDue(now);
+    if (due.length === RENEWAL_SCAN_MAX_PER_RUN) {
+      this.logger.warn(
+        `Renewal scan hit its per-run ceiling (${RENEWAL_SCAN_MAX_PER_RUN} subscriptions); any remaining due subscriptions are left for the next scan`
+      );
+    }
     for (const subscription of due) {
       try {
         await this.processSubscription(subscription.id, now);
@@ -104,6 +110,12 @@ export class RenewalService {
    * Subscriptions of a soft-deleted user are excluded: the user-deleted
    * listener cancels them locally, and the join guards any path that still
    * leaves a live row so a deleted user's saved method is never charged.
+   *
+   * Capped at `RENEWAL_SCAN_MAX_PER_RUN` and served oldest-due-first, so a
+   * backlog drains in due order across successive scans: `processSubscription`
+   * re-reads the row and re-checks the due moment, the provider charge is keyed
+   * per period, and the period advance is a CAS - deferring a subscription to a
+   * later scan is safe by construction.
    */
   private findDue(now: Date): Promise<Subscription[]> {
     return this.subscriptions
@@ -127,6 +139,7 @@ export class RenewalService {
         pastDue: 'past_due'
       })
       .orderBy('s.currentPeriodEnd', 'ASC')
+      .limit(RENEWAL_SCAN_MAX_PER_RUN)
       .getMany();
   }
 

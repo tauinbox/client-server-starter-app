@@ -10,6 +10,16 @@ export const BILLING_RENEWAL_SCHEDULER_ID = 'billing-renewal-scan';
 export const RENEWAL_SCAN_INTERVAL_MS = 60 * 60 * 1000;
 
 /**
+ * Most subscriptions one scan may process, so a due backlog is worked off over
+ * successive scans instead of one unbounded sequential pass that makes a
+ * provider round-trip per row. At the hourly interval above this is also the
+ * renewal throughput ceiling: 200 per hour ≈ 4800 per day. The scan takes the
+ * oldest due subscriptions first (`currentPeriodEnd ASC`), so a backlog drains
+ * in due order.
+ */
+export const RENEWAL_SCAN_MAX_PER_RUN = 200;
+
+/**
  * Dunning policy: a failed self-managed charge moves the
  * subscription to `past_due`; the scheduler retries up to this many times,
  * spaced `DUNNING_RETRY_DELAY_MS` apart (≈ a 7-day grace window), then cancels.
