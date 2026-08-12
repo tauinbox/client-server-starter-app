@@ -14,6 +14,7 @@ import { AuditService, AuditContext } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MailService } from '../../mail/mail.service';
 import { hashToken } from '../../../common/utils/hash-token';
+import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { SYSTEM_ROLES, ErrorKeys } from '@app/shared/constants';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
@@ -205,10 +206,7 @@ export class OAuthService {
         providerId
       );
     } catch (error: unknown) {
-      // PostgreSQL unique_violation error code
-      const PG_UNIQUE_VIOLATION = '23505';
-      const dbError = error as { code?: string };
-      if (dbError.code === PG_UNIQUE_VIOLATION) {
+      if (isUniqueViolation(error)) {
         const existing =
           await this.oauthAccountService.findByProviderAndProviderId(
             provider,

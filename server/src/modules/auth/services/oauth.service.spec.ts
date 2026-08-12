@@ -611,6 +611,22 @@ describe('OAuthService', () => {
       ).resolves.toBeUndefined();
     });
 
+    it('should recognise the unique violation when TypeORM wraps the driver error', async () => {
+      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockOAuthAccountService.createOAuthAccount.mockRejectedValue({
+        driverError: { code: '23505' }
+      });
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        userId: 'user-1',
+        provider: 'google',
+        providerId: 'google-123'
+      });
+
+      await expect(
+        service.linkOAuthToUser('user-1', 'google', 'google-123')
+      ).resolves.toBeUndefined();
+    });
+
     it('should rethrow non-unique-violation errors', async () => {
       mockUsersService.findOne.mockResolvedValue(mockUser);
       const dbError = new Error('Connection lost');

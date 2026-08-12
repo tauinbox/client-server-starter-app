@@ -1851,6 +1851,28 @@ describe('BillingUserService', () => {
       );
     });
 
+    it('recognises the unique violation when TypeORM wraps the driver error', async () => {
+      const ctx = await build();
+      const winner = {
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'RU',
+        providerOverride: null
+      };
+      ctx.customers.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(winner);
+      ctx.users.findOne.mockResolvedValue({ id: 'user-1', locale: 'ru' });
+      ctx.customers.save.mockRejectedValueOnce({
+        driverError: { code: '23505' }
+      });
+      ctx.subscriptions.findOne.mockResolvedValue(null);
+
+      await expect(
+        ctx.service.setRegion('user-1', 'ru')
+      ).resolves.toMatchObject({ region: 'ru' });
+    });
+
     it('rethrows non-unique-violation errors from customer creation', async () => {
       const ctx = await build();
       ctx.customers.findOne.mockResolvedValue(null);

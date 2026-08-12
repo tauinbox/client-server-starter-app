@@ -884,7 +884,7 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1874 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1877 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 314 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 313 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and reports 307 passing, 7 skipped |
 | Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1025 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 212 tests passing |
