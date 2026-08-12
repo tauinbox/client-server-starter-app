@@ -14,19 +14,17 @@ import {
 } from '../utils/validation';
 import {
   ALLOWED_USER_SORT_COLUMNS,
-  MAX_USER_FILTER_LENGTH,
-  type UserSortColumn
+  MAX_USER_FILTER_LENGTH
 } from '@app/shared/constants/user.constants';
+import type { PaginationQuery } from '../helpers/pagination.helpers';
 import {
-  DEFAULT_PAGE,
-  DEFAULT_PAGE_SIZE,
-  DEFAULT_CURSOR_PAGE_SIZE,
-  DEFAULT_SORT_BY,
-  DEFAULT_SORT_ORDER,
-  MAX_PAGE_SIZE
-} from '@app/shared/constants/pagination.constants';
-import type { SortOrder } from '@app/shared/types/pagination.types';
-import { decodeCursor, encodeCursor } from '../utils/cursor';
+  compareValues,
+  cursorPaginate,
+  cursorQueryErrors,
+  paginationQueryErrors,
+  parseCursorQuery,
+  parsePaginationQuery
+} from '../helpers/pagination.helpers';
 import {
   findUserByEmail,
   findUserById,
@@ -77,44 +75,15 @@ function revokeUserSessions(user: MockUser): void {
   }
 }
 
-interface PaginationParams {
-  page: number;
-  limit: number;
-  sortBy: UserSortColumn;
-  sortOrder: SortOrder;
-}
-
-function parsePaginationParams(
-  query: Record<string, unknown>
-): PaginationParams {
-  let page = Number(query['page']) || DEFAULT_PAGE;
-  if (page < 1) page = 1;
-
-  let limit = Number(query['limit']) || DEFAULT_PAGE_SIZE;
-  if (limit < 1) limit = 1;
-  if (limit > MAX_PAGE_SIZE) limit = MAX_PAGE_SIZE;
-
-  const sortByRaw = String(query['sortBy'] || DEFAULT_SORT_BY);
-  const sortBy = (ALLOWED_USER_SORT_COLUMNS as readonly string[]).includes(
-    sortByRaw
-  )
-    ? (sortByRaw as UserSortColumn)
-    : (DEFAULT_SORT_BY as UserSortColumn);
-
-  const sortOrderRaw = String(
-    query['sortOrder'] || DEFAULT_SORT_ORDER
-  ).toLowerCase();
-  const sortOrder: SortOrder = sortOrderRaw === 'asc' ? 'asc' : 'desc';
-
-  return { page, limit, sortBy, sortOrder };
-}
-
 // Mirrors the real server's UserFiltersQueryDto: an array-valued query param
 // (?q[]=a&q[]=b) must be rejected 400 rather than coerced, a filter longer
 // than the shared cap is a 400, and a boolean param that spells neither
 // "true" nor "false" is a 400 rather than a silently dropped filter.
 const STRING_FILTER_PARAMS = ['q', 'email', 'firstName', 'lastName', 'role'];
 const BOOLEAN_FILTER_PARAMS = ['isActive', 'includeDeleted'];
+
+/** Filters the user list routes carry on top of the shared paging params. */
+const USER_QUERY_KEYS = [...STRING_FILTER_PARAMS, ...BOOLEAN_FILTER_PARAMS];
 
 /** Mirrors the DTO's boolean @Transform: an empty param reads as unset. */
 function parseOptionalBoolean(value: unknown): boolean | undefined {
@@ -146,19 +115,30 @@ function findFilterValidationError(
   return null;
 }
 
-function compareValues(a: unknown, b: unknown): number {
-  if (typeof a === 'boolean' && typeof b === 'boolean') {
-    return Number(a) - Number(b);
-  }
-  if (typeof a === 'string' && typeof b === 'string') {
-    return a.localeCompare(b);
-  }
-  return String(a).localeCompare(String(b));
+/**
+ * Every user list route validates the shared paging params on top of its own
+ * filters. Filter messages come first so the existing envelope order is
+ * unchanged for a request that only trips a filter rule.
+ */
+function userQueryErrors(
+  query: Record<string, unknown>,
+  mode: 'offset' | 'cursor'
+): string[] {
+  const filterError = findFilterValidationError(query);
+  const options = {
+    extraAllowed: USER_QUERY_KEYS,
+    sortColumns: ALLOWED_USER_SORT_COLUMNS
+  };
+  const pagingErrors =
+    mode === 'cursor'
+      ? cursorQueryErrors(query, options)
+      : paginationQueryErrors(query, options);
+  return filterError ? [filterError, ...pagingErrors] : pagingErrors;
 }
 
 function paginateAndSort<T extends Record<string, unknown>>(
   items: T[],
-  params: PaginationParams
+  params: PaginationQuery
 ): {
   data: T[];
   meta: { page: number; limit: number; total: number; totalPages: number };
@@ -183,108 +163,6 @@ function paginateAndSort<T extends Record<string, unknown>>(
   const data = sorted.slice(start, start + limit);
 
   return { data, meta: { page, limit, total, totalPages } };
-}
-
-interface CursorPaginationParams {
-  cursor?: string;
-  limit: number;
-  sortBy: UserSortColumn;
-  sortOrder: SortOrder;
-}
-
-function parseCursorPaginationParams(
-  query: Record<string, unknown>
-): CursorPaginationParams {
-  const cursor = query['cursor'] ? String(query['cursor']) : undefined;
-
-  let limit = Number(query['limit']) || DEFAULT_CURSOR_PAGE_SIZE;
-  if (limit < 1) limit = 1;
-  if (limit > MAX_PAGE_SIZE) limit = MAX_PAGE_SIZE;
-
-  const sortByRaw = String(query['sortBy'] || DEFAULT_SORT_BY);
-  const sortBy = (ALLOWED_USER_SORT_COLUMNS as readonly string[]).includes(
-    sortByRaw
-  )
-    ? (sortByRaw as UserSortColumn)
-    : (DEFAULT_SORT_BY as UserSortColumn);
-
-  const sortOrderRaw = String(
-    query['sortOrder'] || DEFAULT_SORT_ORDER
-  ).toLowerCase();
-  const sortOrder: SortOrder = sortOrderRaw === 'asc' ? 'asc' : 'desc';
-
-  return { cursor, limit, sortBy, sortOrder };
-}
-
-function cursorPaginateAndSort<T extends Record<string, unknown>>(
-  items: T[],
-  params: CursorPaginationParams
-): {
-  data: T[];
-  meta: { nextCursor: string | null; hasMore: boolean; limit: number };
-} {
-  const { cursor, limit, sortBy, sortOrder } = params;
-
-  const sorted = [...items].sort((a, b) => {
-    const aVal: unknown = a[sortBy];
-    const bVal: unknown = b[sortBy];
-
-    if (aVal == null && bVal == null) return 0;
-    if (aVal == null) return 1;
-    if (bVal == null) return -1;
-
-    const cmp = compareValues(aVal, bVal);
-    const result = sortOrder === 'asc' ? cmp : -cmp;
-    if (result !== 0) return result;
-
-    const aId = String(a['id'] ?? '');
-    const bId = String(b['id'] ?? '');
-    const idCmp = aId.localeCompare(bId);
-    return sortOrder === 'asc' ? idCmp : -idCmp;
-  });
-
-  let startIndex = 0;
-
-  if (cursor) {
-    const decoded = decodeCursor(cursor);
-    if (decoded) {
-      const cursorSortValue = decoded.sortValue;
-      const cursorId = decoded.id;
-
-      startIndex = sorted.findIndex((item) => {
-        const itemSortVal = item[sortBy];
-        const itemId = String(item['id'] ?? '');
-
-        if (sortOrder === 'desc') {
-          const cmp = compareValues(itemSortVal, cursorSortValue);
-          if (cmp < 0) return true;
-          if (cmp === 0 && itemId.localeCompare(cursorId) < 0) return true;
-          return false;
-        } else {
-          const cmp = compareValues(itemSortVal, cursorSortValue);
-          if (cmp > 0) return true;
-          if (cmp === 0 && itemId.localeCompare(cursorId) > 0) return true;
-          return false;
-        }
-      });
-      if (startIndex === -1) startIndex = sorted.length;
-    }
-  }
-
-  const slice = sorted.slice(startIndex, startIndex + limit + 1);
-  const hasMore = slice.length > limit;
-  const data = hasMore ? slice.slice(0, limit) : slice;
-
-  const lastItem = data[data.length - 1];
-  const nextCursor =
-    hasMore && lastItem
-      ? encodeCursor({
-          sortValue: (lastItem[sortBy] as string | number | boolean) ?? null,
-          id: String(lastItem['id'] ?? '')
-        })
-      : null;
-
-  return { data, meta: { nextCursor, hasMore, limit } };
 }
 
 const router = Router();
@@ -380,11 +258,12 @@ router.post('/', adminGuard, (req, res) => {
 
 // GET /api/v1/users
 router.get('/', adminGuard, (req, res) => {
-  const filterError = findFilterValidationError(
-    req.query as Record<string, unknown>
+  const queryErrors = userQueryErrors(
+    req.query as Record<string, unknown>,
+    'offset'
   );
-  if (filterError) {
-    res.status(400).json(validationError(filterError));
+  if (queryErrors.length > 0) {
+    res.status(400).json(validationError(queryErrors));
     return;
   }
   const includeDeleted = String(req.query['includeDeleted']) === 'true';
@@ -393,18 +272,19 @@ router.get('/', adminGuard, (req, res) => {
     allUsers = allUsers.filter((u) => !u.deletedAt);
   }
   const users = allUsers.map(toAdminUserResponse);
-  const params = parsePaginationParams(req.query as Record<string, unknown>);
+  const params = parsePaginationQuery(req.query as Record<string, unknown>);
   const result = paginateAndSort(users, params);
   res.json(result);
 });
 
 // GET /api/v1/users/search
 router.get('/search', adminGuard, (req, res) => {
-  const filterError = findFilterValidationError(
-    req.query as Record<string, unknown>
+  const queryErrors = userQueryErrors(
+    req.query as Record<string, unknown>,
+    'offset'
   );
-  if (filterError) {
-    res.status(400).json(validationError(filterError));
+  if (queryErrors.length > 0) {
+    res.status(400).json(validationError(queryErrors));
     return;
   }
   const { q, email, firstName, lastName, role, isActive } = req.query;
@@ -447,18 +327,19 @@ router.get('/search', adminGuard, (req, res) => {
   }
 
   const userResponses = users.map(toAdminUserResponse);
-  const params = parsePaginationParams(req.query as Record<string, unknown>);
+  const params = parsePaginationQuery(req.query as Record<string, unknown>);
   const result = paginateAndSort(userResponses, params);
   res.json(result);
 });
 
 // GET /api/v1/users/cursor
 router.get('/cursor', adminGuard, (req, res) => {
-  const filterError = findFilterValidationError(
-    req.query as Record<string, unknown>
+  const queryErrors = userQueryErrors(
+    req.query as Record<string, unknown>,
+    'cursor'
   );
-  if (filterError) {
-    res.status(400).json(validationError(filterError));
+  if (queryErrors.length > 0) {
+    res.status(400).json(validationError(queryErrors));
     return;
   }
   const includeDeleted = String(req.query['includeDeleted']) === 'true';
@@ -467,20 +348,19 @@ router.get('/cursor', adminGuard, (req, res) => {
     allUsers = allUsers.filter((u) => !u.deletedAt);
   }
   const users = allUsers.map(toAdminUserResponse);
-  const params = parseCursorPaginationParams(
-    req.query as Record<string, unknown>
-  );
-  const result = cursorPaginateAndSort(users, params);
+  const params = parseCursorQuery(req.query as Record<string, unknown>);
+  const result = cursorPaginate(users, params);
   res.json(result);
 });
 
 // GET /api/v1/users/search/cursor
 router.get('/search/cursor', adminGuard, (req, res) => {
-  const filterError = findFilterValidationError(
-    req.query as Record<string, unknown>
+  const queryErrors = userQueryErrors(
+    req.query as Record<string, unknown>,
+    'cursor'
   );
-  if (filterError) {
-    res.status(400).json(validationError(filterError));
+  if (queryErrors.length > 0) {
+    res.status(400).json(validationError(queryErrors));
     return;
   }
   const { q, email, firstName, lastName, role, isActive } = req.query;
@@ -523,10 +403,8 @@ router.get('/search/cursor', adminGuard, (req, res) => {
   }
 
   const userResponses = users.map(toAdminUserResponse);
-  const params = parseCursorPaginationParams(
-    req.query as Record<string, unknown>
-  );
-  const result = cursorPaginateAndSort(userResponses, params);
+  const params = parseCursorQuery(req.query as Record<string, unknown>);
+  const result = cursorPaginate(userResponses, params);
   res.json(result);
 });
 

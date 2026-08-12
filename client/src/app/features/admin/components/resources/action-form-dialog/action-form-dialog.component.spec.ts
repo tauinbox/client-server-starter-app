@@ -9,7 +9,7 @@ import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/tr
 
 import { ActionFormDialogComponent } from './action-form-dialog.component';
 import type { ActionFormDialogData } from './action-form-dialog.component';
-import { ResourcesStore } from '../../../store/resources.store';
+import { ActionsStore } from '../../../store/actions.store';
 import { NotifyService } from '@core/services/notify.service';
 import type {
   ActionResponse,
@@ -29,7 +29,7 @@ describe('ActionFormDialogComponent', () => {
   let component: ActionFormDialogComponent;
   let fixture: ComponentFixture<ActionFormDialogComponent>;
   let dialogRefMock: { close: ReturnType<typeof vi.fn> };
-  let resourcesStoreMock: {
+  let actionsStoreMock: {
     resources: ReturnType<typeof signal<ResourceResponse[]>>;
     actions: ReturnType<typeof signal<ActionResponse[]>>;
     loading: ReturnType<typeof signal<boolean>>;
@@ -53,7 +53,7 @@ describe('ActionFormDialogComponent', () => {
         provideNoopAnimations(),
         { provide: MatDialogRef, useValue: dialogRefMock },
         { provide: MAT_DIALOG_DATA, useValue: data },
-        { provide: ResourcesStore, useValue: resourcesStoreMock },
+        { provide: ActionsStore, useValue: actionsStoreMock },
         { provide: NotifyService, useValue: notifyMock }
       ]
     });
@@ -65,7 +65,7 @@ describe('ActionFormDialogComponent', () => {
 
   beforeEach(() => {
     TestBed.resetTestingModule();
-    resourcesStoreMock = {
+    actionsStoreMock = {
       resources: signal([]),
       actions: signal([mockAction]),
       loading: signal(false),
@@ -225,7 +225,7 @@ describe('ActionFormDialogComponent', () => {
 
     component.submit();
 
-    expect(resourcesStoreMock.createAction).toHaveBeenCalledWith({
+    expect(actionsStoreMock.createAction).toHaveBeenCalledWith({
       name: 'publish',
       displayName: 'Publish',
       description: 'Publish desc'
@@ -244,7 +244,7 @@ describe('ActionFormDialogComponent', () => {
 
     component.submit();
 
-    expect(resourcesStoreMock.updateAction).toHaveBeenCalledWith('act-1', {
+    expect(actionsStoreMock.updateAction).toHaveBeenCalledWith('act-1', {
       displayName: 'Updated Read',
       description: 'Updated desc'
     });
@@ -262,7 +262,7 @@ describe('ActionFormDialogComponent', () => {
 
     component.submit();
 
-    expect(resourcesStoreMock.createAction).not.toHaveBeenCalled();
+    expect(actionsStoreMock.createAction).not.toHaveBeenCalled();
     expect(dialogRefMock.close).not.toHaveBeenCalled();
   });
 });

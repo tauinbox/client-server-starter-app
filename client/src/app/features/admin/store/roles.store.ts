@@ -1,62 +1,38 @@
 import { inject } from '@angular/core';
 import type { Observable } from 'rxjs';
-import { pipe, switchMap, tap } from 'rxjs';
-import { tapResponse } from '@ngrx/operators';
+import { tap } from 'rxjs';
 import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
-import {
-  removeEntity,
-  setAllEntities,
-  setEntity,
-  withEntities
-} from '@ngrx/signals/entities';
-import { rxMethod } from '@ngrx/signals/rxjs-interop';
-import { TranslocoService } from '@jsverse/transloco';
+import { removeEntity, setEntity, withEntities } from '@ngrx/signals/entities';
 import type { RoleAdminResponse } from '@app/shared/types/role.types';
-import { NotifyService } from '@core/services/notify.service';
+import { withCursorList } from '@shared/store/with-cursor-list';
 import type { CreateRole, UpdateRole } from '../services/role.service';
 import { RoleService } from '../services/role.service';
 
 type RolesState = {
   loading: boolean;
-  error: string | null;
 };
 
 export const RolesStore = signalStore(
   withEntities<RoleAdminResponse>(),
-  withState<RolesState>({
-    loading: false,
-    error: null
+  withState<RolesState>({ loading: false }),
+  withCursorList<RoleAdminResponse>({
+    errorKey: 'admin.store.errorLoadRolesFailed'
   }),
   withMethods((store) => {
     const roleService = inject(RoleService);
-    const notify = inject(NotifyService);
-    const translocoService = inject(TranslocoService);
 
     return {
-      load: rxMethod<void>(
-        pipe(
-          tap(() => patchState(store, { loading: true, error: null })),
-          switchMap(() =>
-            roleService.getAll().pipe(
-              tapResponse({
-                next: (roles) => {
-                  patchState(store, setAllEntities(roles));
-                  patchState(store, { loading: false });
-                },
-                error: () => {
-                  patchState(store, {
-                    loading: false,
-                    error: translocoService.translate(
-                      'admin.store.errorLoadRolesFailed'
-                    )
-                  });
-                  notify.error('admin.store.errorLoadRolesFailed');
-                }
-              })
-            )
-          )
-        )
-      ),
+      /** First page; a filter or sort change re-enters through here. */
+      load(): void {
+        void store.loadFirstPage((request) =>
+          roleService.getAllCursor(request)
+        );
+      },
+
+      /** Appends the next page; wired to the list's scroll sentinel. */
+      loadMore(): void {
+        void store.loadNextPage((request) => roleService.getAllCursor(request));
+      },
 
       createRole(data: CreateRole): Observable<RoleAdminResponse> {
         return roleService.create(data).pipe(

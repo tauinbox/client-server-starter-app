@@ -39,7 +39,8 @@ import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
-import { ResourcesStore } from '../../../store/resources.store';
+import { ActionsStore } from '../../../store/actions.store';
+import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
 import type { ActionFormDialogData } from '../action-form-dialog/action-form-dialog.component';
 import { ActionFormDialogComponent } from '../action-form-dialog/action-form-dialog.component';
 
@@ -55,6 +56,7 @@ import { ActionFormDialogComponent } from '../action-form-dialog/action-form-dia
     MatIconButton,
     MatIcon,
     MatProgressSpinner,
+    InfiniteScrollDirective,
     MatTooltip,
     MatChip,
     MatTable,
@@ -74,7 +76,7 @@ import { ActionFormDialogComponent } from '../action-form-dialog/action-form-dia
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ActionListComponent implements OnInit {
-  readonly #resourcesStore = inject(ResourcesStore);
+  readonly #actionsStore = inject(ActionsStore);
   readonly #dialog = inject(MatDialog);
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
   readonly #notify = inject(NotifyService);
@@ -83,8 +85,17 @@ export class ActionListComponent implements OnInit {
   readonly #viewContainerRef = inject(ViewContainerRef);
   protected readonly authStore = inject(AuthStore);
 
-  readonly loading = this.#resourcesStore.loading;
-  readonly actions = this.#resourcesStore.actions;
+  readonly loading = this.#actionsStore.loading;
+  readonly actions = this.#actionsStore.actions;
+  readonly hasMore = this.#actionsStore.hasMore;
+  readonly isLoadingMore = this.#actionsStore.isLoadingMore;
+  readonly busy = computed(
+    () => this.#actionsStore.loading() || this.#actionsStore.isLoadingMore()
+  );
+
+  loadMore(): void {
+    this.#actionsStore.loadMore();
+  }
 
   readonly actionColumns = [
     'displayName',
@@ -106,7 +117,7 @@ export class ActionListComponent implements OnInit {
   );
 
   ngOnInit(): void {
-    this.#resourcesStore.load();
+    this.#actionsStore.load();
   }
 
   openAddAction(): void {
@@ -144,7 +155,7 @@ export class ActionListComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((confirmed: boolean | undefined) => {
         if (confirmed) {
-          this.#resourcesStore
+          this.#actionsStore
             .deleteAction(action.id)
             .pipe(takeUntilDestroyed(this.#destroyRef))
             .subscribe({

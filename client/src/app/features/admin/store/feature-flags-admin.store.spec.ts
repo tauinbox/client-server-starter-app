@@ -27,6 +27,7 @@ const sampleFlag = (
 describe('FeatureFlagsAdminStore', () => {
   let service: {
     getAll: ReturnType<typeof vi.fn>;
+    getAllCursor: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
     toggle: ReturnType<typeof vi.fn>;
@@ -41,6 +42,12 @@ describe('FeatureFlagsAdminStore', () => {
   beforeEach(() => {
     service = {
       getAll: vi.fn().mockReturnValue(of([sampleFlag()])),
+      getAllCursor: vi.fn().mockReturnValue(
+        of({
+          data: [sampleFlag()],
+          meta: { nextCursor: null, hasMore: false, limit: 20 }
+        })
+      ),
       create: vi.fn(),
       update: vi.fn(),
       toggle: vi.fn(),
@@ -59,20 +66,27 @@ describe('FeatureFlagsAdminStore', () => {
     });
   });
 
-  it('load() populates entities and clears loading', () => {
+  it('load() populates entities and clears loading', async () => {
     const store = TestBed.inject(FeatureFlagsAdminStore);
     store.load();
+    await vi.waitFor(() => expect(store.loading()).toBe(false));
+
     expect(store.entities().length).toBe(1);
     expect(store.entities()[0].key).toBe('new-dashboard');
-    expect(store.loading()).toBe(false);
+    expect(service.getAllCursor).toHaveBeenCalledWith(
+      expect.objectContaining({ cursor: null })
+    );
   });
 
-  it('load() surfaces an error and notifies on failure', () => {
-    service.getAll.mockReturnValue(throwError(() => new Error('boom')));
+  it('load() notifies on failure and leaves the list empty', async () => {
+    service.getAllCursor.mockReturnValue(throwError(() => new Error('boom')));
     const store = TestBed.inject(FeatureFlagsAdminStore);
     store.load();
-    expect(store.error()).toBeTruthy();
+    await vi.waitFor(() => expect(store.loading()).toBe(false));
+
+    expect(store.entities()).toEqual([]);
     expect(notify.error).toHaveBeenCalledWith(
+      expect.anything(),
       'admin.featureFlags.errorLoadFailed'
     );
   });
@@ -82,6 +96,7 @@ describe('FeatureFlagsAdminStore', () => {
     service.update.mockReturnValue(of(updated));
     const store = TestBed.inject(FeatureFlagsAdminStore);
     store.load();
+    await vi.waitFor(() => expect(store.entities().length).toBe(1));
     const result = await firstValueFrom(
       store.updateFlag('flag-1', { enabled: true }, 1)
     );
@@ -101,6 +116,7 @@ describe('FeatureFlagsAdminStore', () => {
     service.update.mockReturnValue(throwError(() => conflict));
     const store = TestBed.inject(FeatureFlagsAdminStore);
     store.load();
+    await vi.waitFor(() => expect(store.entities().length).toBe(1));
     await expect(
       firstValueFrom(store.updateFlag('flag-1', { enabled: true }, 1))
     ).rejects.toBe(conflict);
@@ -112,6 +128,7 @@ describe('FeatureFlagsAdminStore', () => {
     );
     const store = TestBed.inject(FeatureFlagsAdminStore);
     store.load();
+    await vi.waitFor(() => expect(store.entities().length).toBe(1));
     await firstValueFrom(store.toggleFlag('flag-1'));
     expect(store.entities()[0].enabled).toBe(true);
   });
@@ -120,6 +137,7 @@ describe('FeatureFlagsAdminStore', () => {
     service.delete.mockReturnValue(of(undefined));
     const store = TestBed.inject(FeatureFlagsAdminStore);
     store.load();
+    await vi.waitFor(() => expect(store.entities().length).toBe(1));
     await firstValueFrom(store.deleteFlag('flag-1'));
     expect(store.entities().length).toBe(0);
   });

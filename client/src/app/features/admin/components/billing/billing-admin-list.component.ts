@@ -37,8 +37,10 @@ import { LayoutService } from '@core/services/layout.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { formatMoney } from '@features/billing/utils/billing-format';
+import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
 import type { CancelMode } from '@features/billing/services/billing.service';
-import { BillingAdminStore } from '../../store/billing-admin.store';
+import { BillingInvoicesStore } from '../../store/billing-invoices.store';
+import { BillingSubscriptionsStore } from '../../store/billing-subscriptions.store';
 
 /**
  * Admin-shell billing console: a read view of every
@@ -73,24 +75,43 @@ import { BillingAdminStore } from '../../store/billing-admin.store';
     MatHeaderRowDef,
     MatRowDef,
     MatCell,
-    TranslocoDirective
+    TranslocoDirective,
+    InfiniteScrollDirective
   ],
   templateUrl: './billing-admin-list.component.html',
   styleUrl: './billing-admin-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class BillingAdminListComponent implements OnInit {
-  readonly #store = inject(BillingAdminStore);
+  readonly #subscriptionsStore = inject(BillingSubscriptionsStore);
+  readonly #invoicesStore = inject(BillingInvoicesStore);
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #transloco = inject(TranslocoService);
   protected readonly layout = inject(LayoutService);
   protected readonly authStore = inject(AuthStore);
 
-  readonly loading = this.#store.loading;
-  readonly working = this.#store.working;
-  readonly subscriptions = this.#store.subscriptions;
-  readonly invoices = this.#store.invoices;
+  readonly subscriptions = this.#subscriptionsStore.subscriptions;
+  readonly invoices = this.#invoicesStore.invoices;
+  readonly subscriptionsLoading = this.#subscriptionsStore.loading;
+  readonly invoicesLoading = this.#invoicesStore.loading;
+  readonly subscriptionsBusy = computed(
+    () =>
+      this.#subscriptionsStore.loading() ||
+      this.#subscriptionsStore.isLoadingMore()
+  );
+  readonly invoicesBusy = computed(
+    () => this.#invoicesStore.loading() || this.#invoicesStore.isLoadingMore()
+  );
+  readonly subscriptionsHasMore = this.#subscriptionsStore.hasMore;
+  readonly invoicesHasMore = this.#invoicesStore.hasMore;
+  readonly subscriptionsLoadingMore = this.#subscriptionsStore.isLoadingMore;
+  readonly invoicesLoadingMore = this.#invoicesStore.isLoadingMore;
+
+  /** Either list having a mutation in flight disables both action columns. */
+  readonly working = computed(
+    () => this.#subscriptionsStore.working() || this.#invoicesStore.working()
+  );
 
   readonly #lang = toSignal(this.#transloco.langChanges$, {
     initialValue: this.#transloco.getActiveLang()
@@ -119,7 +140,16 @@ export class BillingAdminListComponent implements OnInit {
   );
 
   ngOnInit(): void {
-    void this.#store.load();
+    this.#subscriptionsStore.load();
+    this.#invoicesStore.load();
+  }
+
+  loadMoreSubscriptions(): void {
+    this.#subscriptionsStore.loadMore();
+  }
+
+  loadMoreInvoices(): void {
+    this.#invoicesStore.loadMore();
   }
 
   invoiceAmount(invoice: InvoiceResponse): string {
@@ -162,7 +192,10 @@ export class BillingAdminListComponent implements OnInit {
       .subscribe((confirmed) => {
         // Re-check: another mutation may have started while the dialog was open.
         if (confirmed && !this.working()) {
-          void this.#store.cancelSubscription(subscription.id, mode);
+          void this.#subscriptionsStore.cancelSubscription(
+            subscription.id,
+            mode
+          );
         }
       });
   }
@@ -186,7 +219,7 @@ export class BillingAdminListComponent implements OnInit {
       .subscribe((confirmed) => {
         // Re-check: another mutation may have started while the dialog was open.
         if (confirmed && !this.working()) {
-          void this.#store.refundInvoice(invoice.id);
+          void this.#invoicesStore.refundInvoice(invoice.id);
         }
       });
   }

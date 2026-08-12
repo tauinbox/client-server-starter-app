@@ -8,7 +8,7 @@
     </mat-card-header>
 
     <mat-card-content>
-      @if (loading() && subscriptions().length === 0) {
+      @if (subscriptionsLoading() && subscriptions().length === 0) {
         <div class="loading-container">
           <mat-spinner></mat-spinner>
         </div>
@@ -165,6 +165,20 @@
           </table>
         </div>
       }
+
+      <div
+        class="scroll-sentinel"
+        nxsInfiniteScroll
+        [hasMore]="subscriptionsHasMore()"
+        [busy]="subscriptionsBusy()"
+        (loadMore)="loadMoreSubscriptions()"
+      ></div>
+
+      @if (subscriptionsLoadingMore()) {
+        <div class="load-more-container">
+          <mat-spinner [diameter]="36"></mat-spinner>
+        </div>
+      }
     </mat-card-content>
   </mat-card>
 
@@ -175,7 +189,7 @@
     </mat-card-header>
 
     <mat-card-content>
-      @if (loading() && invoices().length === 0) {
+      @if (invoicesLoading() && invoices().length === 0) {
         <div class="loading-container">
           <mat-spinner></mat-spinner>
         </div>
@@ -293,6 +307,20 @@
             <tr mat-header-row *matHeaderRowDef="invoiceColumns"></tr>
             <tr mat-row *matRowDef="let _; columns: invoiceColumns"></tr>
           </table>
+        </div>
+      }
+
+      <div
+        class="scroll-sentinel"
+        nxsInfiniteScroll
+        [hasMore]="invoicesHasMore()"
+        [busy]="invoicesBusy()"
+        (loadMore)="loadMoreInvoices()"
+      ></div>
+
+      @if (invoicesLoadingMore()) {
+        <div class="load-more-container">
+          <mat-spinner [diameter]="36"></mat-spinner>
         </div>
       }
     </mat-card-content>

@@ -9,6 +9,9 @@ import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { IsNull } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
+import { DEFAULT_CURSOR_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
+import { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
+import { encodeCursor } from '../../../common/utils/cursor.util';
 import { Customer } from '../entities/customer.entity';
 import { CustomerGrant } from '../entities/customer-grant.entity';
 import { Invoice } from '../entities/invoice.entity';
@@ -21,20 +24,48 @@ import { BillingService } from '../billing.service';
 import { BillingAdminService } from './billing-admin.service';
 import { CreditService } from './credit.service';
 
+type QueryBuilderMock = {
+  andWhere: jest.Mock;
+  orderBy: jest.Mock;
+  addOrderBy: jest.Mock;
+  take: jest.Mock;
+  getMany: jest.Mock;
+};
+
 type RepoMock = {
   findOne: jest.Mock;
   find: jest.Mock;
+  createQueryBuilder: jest.Mock;
+  qb: QueryBuilderMock;
   save: jest.Mock;
   update: jest.Mock;
 };
 
+/** Chainable query-builder stub; `getMany` is what each test drives. */
+function queryBuilder(): QueryBuilderMock {
+  const qb: Partial<QueryBuilderMock> = {};
+  qb.andWhere = jest.fn().mockReturnValue(qb);
+  qb.orderBy = jest.fn().mockReturnValue(qb);
+  qb.addOrderBy = jest.fn().mockReturnValue(qb);
+  qb.take = jest.fn().mockReturnValue(qb);
+  qb.getMany = jest.fn().mockResolvedValue([]);
+  return qb as QueryBuilderMock;
+}
+
 function repo(): RepoMock {
+  const qb = queryBuilder();
   return {
     findOne: jest.fn().mockResolvedValue(null),
     find: jest.fn().mockResolvedValue([]),
+    createQueryBuilder: jest.fn().mockReturnValue(qb),
+    qb,
     save: jest.fn((entity: object) => Promise.resolve(entity)),
     update: jest.fn().mockResolvedValue({ affected: 0 })
   };
+}
+
+function cursorQuery(overrides: Partial<InvoiceCursorQueryDto> = {}) {
+  return Object.assign(new InvoiceCursorQueryDto(), overrides);
 }
 
 function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
@@ -178,20 +209,79 @@ async function build() {
 
 describe('BillingAdminService', () => {
   describe('listSubscriptions / listInvoices', () => {
-    it('lists subscriptions newest first', async () => {
+    it('lists subscriptions newest first, bounded to one page', async () => {
       const ctx = await build();
-      await ctx.service.listSubscriptions();
-      expect(ctx.subscriptions.find).toHaveBeenCalledWith({
-        order: { createdAt: 'DESC' }
-      });
+      await ctx.service.listSubscriptions(cursorQuery());
+
+      expect(ctx.subscriptions.qb.orderBy).toHaveBeenCalledWith(
+        'subscription.createdAt',
+        'DESC'
+      );
+      expect(ctx.subscriptions.qb.addOrderBy).toHaveBeenCalledWith(
+        'subscription.id',
+        'DESC'
+      );
+      // limit + 1: the extra row is what decides hasMore.
+      expect(ctx.subscriptions.qb.take).toHaveBeenCalledWith(
+        DEFAULT_CURSOR_PAGE_SIZE + 1
+      );
     });
 
-    it('lists invoices newest first', async () => {
+    it('lists invoices newest first, bounded to one page', async () => {
       const ctx = await build();
-      await ctx.service.listInvoices();
-      expect(ctx.invoices.find).toHaveBeenCalledWith({
-        order: { createdAt: 'DESC' }
+      await ctx.service.listInvoices(cursorQuery());
+
+      expect(ctx.invoices.qb.orderBy).toHaveBeenCalledWith(
+        'invoice.createdAt',
+        'DESC'
+      );
+      expect(ctx.invoices.qb.take).toHaveBeenCalledWith(
+        DEFAULT_CURSOR_PAGE_SIZE + 1
+      );
+    });
+
+    it('reports another page and mints a cursor when the extra row exists', async () => {
+      const ctx = await build();
+      const rows = Array.from({ length: 3 }, (_, i) =>
+        makeSubscription({ id: `sub-${i}` })
+      );
+      ctx.subscriptions.qb.getMany.mockResolvedValue(rows);
+
+      const result = await ctx.service.listSubscriptions(
+        cursorQuery({ limit: 2 })
+      );
+
+      // The third row is the lookahead: it is dropped from the page.
+      expect(result.data).toHaveLength(2);
+      expect(result.meta.hasMore).toBe(true);
+      expect(result.meta.nextCursor).toEqual(expect.any(String));
+      expect(result.meta.limit).toBe(2);
+    });
+
+    it('closes the list when no extra row comes back', async () => {
+      const ctx = await build();
+      ctx.invoices.qb.getMany.mockResolvedValue([makeInvoice()]);
+
+      const result = await ctx.service.listInvoices(cursorQuery({ limit: 2 }));
+
+      expect(result.data).toHaveLength(1);
+      expect(result.meta.hasMore).toBe(false);
+      expect(result.meta.nextCursor).toBeNull();
+    });
+
+    it('walks past the cursor row on a follow-up page', async () => {
+      const ctx = await build();
+      const cursor = encodeCursor({
+        sortValue: '2026-06-01T00:00:00.000Z',
+        id: 'inv-7'
       });
+
+      await ctx.service.listInvoices(cursorQuery({ limit: 1, cursor }));
+
+      expect(ctx.invoices.qb.andWhere).toHaveBeenCalledWith(
+        '(invoice.createdAt, invoice.id) < (:cursorSortValue, :cursorId)',
+        { cursorSortValue: '2026-06-01T00:00:00.000Z', cursorId: 'inv-7' }
+      );
     });
   });
 

@@ -8,7 +8,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 
 import { ActionListComponent } from './action-list.component';
-import { ResourcesStore } from '../../../store/resources.store';
+import { ActionsStore } from '../../../store/actions.store';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { NotifyService } from '@core/services/notify.service';
 import type { ActionResponse } from '@app/shared/types/rbac.types';
@@ -34,10 +34,13 @@ const mockDefaultAction: ActionResponse = {
 describe('ActionListComponent', () => {
   let component: ActionListComponent;
   let fixture: ComponentFixture<ActionListComponent>;
-  let resourcesStoreMock: {
+  let actionsStoreMock: {
     loading: ReturnType<typeof signal<boolean>>;
+    isLoadingMore: ReturnType<typeof signal<boolean>>;
+    hasMore: ReturnType<typeof signal<boolean>>;
     actions: ReturnType<typeof signal<ActionResponse[]>>;
     load: ReturnType<typeof vi.fn>;
+    loadMore: ReturnType<typeof vi.fn>;
     createAction: ReturnType<typeof vi.fn>;
     updateAction: ReturnType<typeof vi.fn>;
     deleteAction: ReturnType<typeof vi.fn>;
@@ -56,7 +59,7 @@ describe('ActionListComponent', () => {
       imports: [ActionListComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideNoopAnimations(),
-        { provide: ResourcesStore, useValue: resourcesStoreMock },
+        { provide: ActionsStore, useValue: actionsStoreMock },
         { provide: AuthStore, useValue: authStoreMock },
         { provide: MatDialog, useValue: dialogMock },
         { provide: NotifyService, useValue: notifyMock }
@@ -68,10 +71,13 @@ describe('ActionListComponent', () => {
   }
 
   beforeEach(() => {
-    resourcesStoreMock = {
+    actionsStoreMock = {
       loading: signal(false),
+      isLoadingMore: signal(false),
+      hasMore: signal(false),
       actions: signal([mockAction]),
       load: vi.fn(),
+      loadMore: vi.fn(),
       createAction: vi.fn().mockReturnValue(of({} as ActionResponse)),
       updateAction: vi.fn().mockReturnValue(of({} as ActionResponse)),
       deleteAction: vi.fn().mockReturnValue(of(undefined))
@@ -94,12 +100,12 @@ describe('ActionListComponent', () => {
   it('calls store.load() on init', async () => {
     await setupComponent();
     fixture.detectChanges();
-    expect(resourcesStoreMock.load).toHaveBeenCalled();
+    expect(actionsStoreMock.load).toHaveBeenCalled();
   });
 
   it('shows spinner when loading', async () => {
-    resourcesStoreMock.loading = signal(true);
-    resourcesStoreMock.actions = signal([]);
+    actionsStoreMock.loading = signal(true);
+    actionsStoreMock.actions = signal([]);
     await setupComponent();
     fixture.detectChanges();
 
@@ -180,7 +186,7 @@ describe('ActionListComponent', () => {
     });
 
     it('hides Delete Action button when action.isDefault is true even with canDelete', async () => {
-      resourcesStoreMock.actions = signal([mockDefaultAction]);
+      actionsStoreMock.actions = signal([mockDefaultAction]);
       authStoreMock.hasPermissions.mockReturnValue(true);
       await setupComponent();
       fixture.detectChanges();
@@ -238,7 +244,7 @@ describe('ActionListComponent', () => {
 
       component.confirmDeleteAction(mockAction);
 
-      expect(resourcesStoreMock.deleteAction).toHaveBeenCalledWith('act-1');
+      expect(actionsStoreMock.deleteAction).toHaveBeenCalledWith('act-1');
     });
 
     it('does not call store.deleteAction when ConfirmDialog is cancelled', async () => {
@@ -250,7 +256,7 @@ describe('ActionListComponent', () => {
 
       component.confirmDeleteAction(mockAction);
 
-      expect(resourcesStoreMock.deleteAction).not.toHaveBeenCalled();
+      expect(actionsStoreMock.deleteAction).not.toHaveBeenCalled();
     });
   });
 });

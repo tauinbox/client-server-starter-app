@@ -20,6 +20,8 @@ import type {
   ProrationPreviewResponse,
   PurchaseSessionResponse
 } from '@app/shared/types';
+import { CursorPaginatedResponseDto } from '../../../common/dtos/cursor-paginated-response.dto';
+import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { User } from '../../users/entities/user.entity';
 import { CreditBalance } from '../entities/credit-balance.entity';
@@ -43,6 +45,8 @@ import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
 import { addInterval } from '../utils/period.util';
 import { cancelFields } from '../utils/cancel-fields.util';
+import { INVOICE_SORT_COLUMN_MAP } from '../utils/list-order.util';
+import type { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
 
@@ -155,13 +159,29 @@ export class BillingUserService {
     return this.findCurrentSubscription(customer.id);
   }
 
-  async listInvoices(userId: string): Promise<Invoice[]> {
+  async listInvoices(
+    userId: string,
+    query: InvoiceCursorQueryDto
+  ): Promise<CursorPaginatedResponseDto<Invoice>> {
+    const { cursor, limit, sortBy, sortOrder } = query;
     const customer = await this.customers.findOne({ where: { userId } });
-    if (!customer) return [];
-    return this.invoices.find({
-      where: { customerId: customer.id },
-      order: { createdAt: 'DESC' }
+    if (!customer) {
+      return new CursorPaginatedResponseDto<Invoice>([], null, limit);
+    }
+
+    const qb = this.invoices
+      .createQueryBuilder('invoice')
+      .where('invoice.customerId = :customerId', { customerId: customer.id });
+
+    const { data, nextCursor } = await applyKeysetPagination(qb, {
+      cursor,
+      limit,
+      sortBy,
+      sortOrder,
+      sortColumnMap: INVOICE_SORT_COLUMN_MAP,
+      idColumn: 'invoice.id'
     });
+    return new CursorPaginatedResponseDto(data, nextCursor, limit);
   }
 
   /**

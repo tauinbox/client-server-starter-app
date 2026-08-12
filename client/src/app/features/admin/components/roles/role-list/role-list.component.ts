@@ -32,6 +32,7 @@ import {
   MatRowDef,
   MatTable
 } from '@angular/material/table';
+import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { RoleAdminResponse } from '@app/shared/types/role.types';
 import { NotifyService } from '@core/services/notify.service';
@@ -72,6 +73,7 @@ import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-
     MatHeaderRowDef,
     MatRowDef,
     MatCell,
+    InfiniteScrollDirective,
     TranslocoDirective
   ],
   templateUrl: './role-list.component.html',
@@ -89,6 +91,15 @@ export class RoleListComponent implements OnInit {
   protected readonly authStore = inject(AuthStore);
 
   readonly loading = this.#rolesStore.loading;
+  readonly hasMore = this.#rolesStore.hasMore;
+  readonly isLoadingMore = this.#rolesStore.isLoadingMore;
+  readonly busy = computed(
+    () => this.#rolesStore.loading() || this.#rolesStore.isLoadingMore()
+  );
+
+  loadMore(): void {
+    this.#rolesStore.loadMore();
+  }
   readonly roles = this.#rolesStore.entities;
 
   readonly displayedColumns = [

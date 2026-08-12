@@ -26,18 +26,42 @@ describe('BillingAdminService', () => {
 
   afterEach(() => httpMock.verify());
 
-  it('GETs all subscriptions', () => {
+  it('GETs subscriptions without params when none are given', () => {
     service.listSubscriptions().subscribe();
     const req = httpMock.expectOne(`${ADMIN_BILLING_API_V1}/subscriptions`);
     expect(req.request.method).toBe('GET');
-    req.flush([]);
+    expect(req.request.params.keys()).toEqual([]);
+    req.flush({
+      data: [],
+      meta: { nextCursor: null, hasMore: false, limit: 20 }
+    });
   });
 
-  it('GETs all invoices', () => {
-    service.listInvoices().subscribe();
-    const req = httpMock.expectOne(`${ADMIN_BILLING_API_V1}/invoices`);
+  it('GETs invoices with the cursor and limit', () => {
+    service.listInvoices({ cursor: 'abc', limit: 25 }).subscribe();
+    const req = httpMock.expectOne(
+      (r) => r.url === `${ADMIN_BILLING_API_V1}/invoices`
+    );
     expect(req.request.method).toBe('GET');
-    req.flush([]);
+    expect(req.request.params.get('cursor')).toBe('abc');
+    expect(req.request.params.get('limit')).toBe('25');
+    req.flush({
+      data: [],
+      meta: { nextCursor: null, hasMore: false, limit: 25 }
+    });
+  });
+
+  it('omits the cursor on a first-page request', () => {
+    service.listInvoices({ cursor: null, limit: 10 }).subscribe();
+    const req = httpMock.expectOne(
+      (r) => r.url === `${ADMIN_BILLING_API_V1}/invoices`
+    );
+    expect(req.request.params.has('cursor')).toBe(false);
+    expect(req.request.params.get('limit')).toBe('10');
+    req.flush({
+      data: [],
+      meta: { nextCursor: null, hasMore: false, limit: 10 }
+    });
   });
 
   it('POSTs a cancel with the default period_end mode', () => {

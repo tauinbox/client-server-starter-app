@@ -11,6 +11,9 @@ import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { In } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
+import { DEFAULT_CURSOR_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
+import { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
+import { encodeCursor } from '../../../common/utils/cursor.util';
 import { User } from '../../users/entities/user.entity';
 import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
@@ -29,24 +32,54 @@ import { UsageRating } from '../rating/usage-rating.strategy';
 import { BillingUserService } from './billing-user.service';
 import { CreditService } from './credit.service';
 
+type QueryBuilderMock = {
+  where: jest.Mock;
+  andWhere: jest.Mock;
+  orderBy: jest.Mock;
+  addOrderBy: jest.Mock;
+  take: jest.Mock;
+  getMany: jest.Mock;
+};
+
 type RepoMock = {
   findOne: jest.Mock;
   find: jest.Mock;
+  createQueryBuilder: jest.Mock;
+  qb: QueryBuilderMock;
   create: jest.Mock;
   save: jest.Mock;
   update: jest.Mock;
 };
 
+/** Chainable query-builder stub; `getMany` is what each test drives. */
+function queryBuilder(): QueryBuilderMock {
+  const qb: Partial<QueryBuilderMock> = {};
+  qb.where = jest.fn().mockReturnValue(qb);
+  qb.andWhere = jest.fn().mockReturnValue(qb);
+  qb.orderBy = jest.fn().mockReturnValue(qb);
+  qb.addOrderBy = jest.fn().mockReturnValue(qb);
+  qb.take = jest.fn().mockReturnValue(qb);
+  qb.getMany = jest.fn().mockResolvedValue([]);
+  return qb as QueryBuilderMock;
+}
+
 function repo(): RepoMock {
+  const qb = queryBuilder();
   return {
     findOne: jest.fn().mockResolvedValue(null),
     find: jest.fn().mockResolvedValue([]),
+    createQueryBuilder: jest.fn().mockReturnValue(qb),
+    qb,
     create: jest.fn((data: object) => ({ ...data })),
     save: jest.fn((entity: { id?: string }) =>
       Promise.resolve({ id: 'generated-id', ...entity })
     ),
     update: jest.fn().mockResolvedValue({ affected: 1 })
   };
+}
+
+function cursorQuery(overrides: Partial<InvoiceCursorQueryDto> = {}) {
+  return Object.assign(new InvoiceCursorQueryDto(), overrides);
 }
 
 type InsertedInvoice = Record<string, unknown> & {
@@ -1565,24 +1598,89 @@ describe('BillingUserService', () => {
   });
 
   describe('reads scope to the caller', () => {
-    it('returns null subscription and empty invoices when the user has no customer', async () => {
+    it('returns null subscription and an empty page when the user has no customer', async () => {
       const ctx = await build();
       ctx.customers.findOne.mockResolvedValue(null);
 
       expect(await ctx.service.getCurrentSubscription('user-1')).toBeNull();
-      expect(await ctx.service.listInvoices('user-1')).toEqual([]);
+      const invoices = await ctx.service.listInvoices('user-1', cursorQuery());
+      expect(invoices.data).toEqual([]);
+      expect(invoices.meta).toEqual({
+        nextCursor: null,
+        hasMore: false,
+        limit: DEFAULT_CURSOR_PAGE_SIZE
+      });
+      // No customer means no invoice query is issued at all.
+      expect(ctx.invoices.createQueryBuilder).not.toHaveBeenCalled();
       expect(await ctx.service.getDefaultPaymentMethod('user-1')).toBeNull();
     });
 
-    it('queries invoices keyed by the resolved customer id', async () => {
+    it('scopes the invoice page to the resolved customer id', async () => {
       const ctx = await build();
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-9' });
-      ctx.invoices.find.mockResolvedValue([]);
 
-      await ctx.service.listInvoices('user-1');
+      await ctx.service.listInvoices('user-1', cursorQuery());
 
-      expect(ctx.invoices.find).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { customerId: 'cust-9' } })
+      expect(ctx.invoices.qb.where).toHaveBeenCalledWith(
+        'invoice.customerId = :customerId',
+        { customerId: 'cust-9' }
+      );
+      expect(ctx.invoices.qb.orderBy).toHaveBeenCalledWith(
+        'invoice.createdAt',
+        'DESC'
+      );
+      expect(ctx.invoices.qb.take).toHaveBeenCalledWith(
+        DEFAULT_CURSOR_PAGE_SIZE + 1
+      );
+    });
+
+    it('mints a cursor only while another page exists', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-9' });
+      ctx.invoices.qb.getMany.mockResolvedValue([
+        { id: 'inv-1', createdAt: new Date('2026-06-02T00:00:00Z') },
+        { id: 'inv-2', createdAt: new Date('2026-06-01T00:00:00Z') }
+      ]);
+
+      const page = await ctx.service.listInvoices(
+        'user-1',
+        cursorQuery({ limit: 1 })
+      );
+
+      expect(page.data).toHaveLength(1);
+      expect(page.meta.hasMore).toBe(true);
+      expect(page.meta.nextCursor).toEqual(expect.any(String));
+
+      ctx.invoices.qb.getMany.mockResolvedValue([
+        { id: 'inv-2', createdAt: new Date('2026-06-01T00:00:00Z') }
+      ]);
+      const last = await ctx.service.listInvoices(
+        'user-1',
+        cursorQuery({ limit: 1 })
+      );
+      expect(last.meta.hasMore).toBe(false);
+      expect(last.meta.nextCursor).toBeNull();
+    });
+
+    it('carries the caller scope into the cursor page too', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-9' });
+      const cursor = encodeCursor({
+        sortValue: '2026-06-01T00:00:00.000Z',
+        id: 'inv-5'
+      });
+
+      await ctx.service.listInvoices('user-1', cursorQuery({ cursor }));
+
+      // Scope first, keyset second - a follow-up page must not widen to
+      // another customer's invoices.
+      expect(ctx.invoices.qb.where).toHaveBeenCalledWith(
+        'invoice.customerId = :customerId',
+        { customerId: 'cust-9' }
+      );
+      expect(ctx.invoices.qb.andWhere).toHaveBeenCalledWith(
+        '(invoice.createdAt, invoice.id) < (:cursorSortValue, :cursorId)',
+        { cursorSortValue: '2026-06-01T00:00:00.000Z', cursorId: 'inv-5' }
       );
     });
   });

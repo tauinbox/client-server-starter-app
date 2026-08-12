@@ -9,6 +9,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
+import { CursorPaginatedResponseDto } from '../../../common/dtos/cursor-paginated-response.dto';
+import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
 import { CustomerGrant } from '../entities/customer-grant.entity';
@@ -20,6 +22,14 @@ import { EntitlementService } from '../entitlements/entitlement.service';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import type { CancelMode } from '../providers/payment-provider.interface';
 import { cancelFields } from '../utils/cancel-fields.util';
+import {
+  INVOICE_SORT_COLUMN_MAP,
+  SUBSCRIPTION_SORT_COLUMN_MAP
+} from '../utils/list-order.util';
+import type {
+  InvoiceCursorQueryDto,
+  SubscriptionCursorQueryDto
+} from '../dtos/billing-cursor-query.dto';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
 
@@ -52,12 +62,40 @@ export class BillingAdminService {
     @InjectDataSource() private readonly dataSource: DataSource
   ) {}
 
-  listSubscriptions(): Promise<Subscription[]> {
-    return this.subscriptions.find({ order: { createdAt: 'DESC' } });
+  async listSubscriptions(
+    query: SubscriptionCursorQueryDto
+  ): Promise<CursorPaginatedResponseDto<Subscription>> {
+    const { cursor, limit, sortBy, sortOrder } = query;
+    const { data, nextCursor } = await applyKeysetPagination(
+      this.subscriptions.createQueryBuilder('subscription'),
+      {
+        cursor,
+        limit,
+        sortBy,
+        sortOrder,
+        sortColumnMap: SUBSCRIPTION_SORT_COLUMN_MAP,
+        idColumn: 'subscription.id'
+      }
+    );
+    return new CursorPaginatedResponseDto(data, nextCursor, limit);
   }
 
-  listInvoices(): Promise<Invoice[]> {
-    return this.invoices.find({ order: { createdAt: 'DESC' } });
+  async listInvoices(
+    query: InvoiceCursorQueryDto
+  ): Promise<CursorPaginatedResponseDto<Invoice>> {
+    const { cursor, limit, sortBy, sortOrder } = query;
+    const { data, nextCursor } = await applyKeysetPagination(
+      this.invoices.createQueryBuilder('invoice'),
+      {
+        cursor,
+        limit,
+        sortBy,
+        sortOrder,
+        sortColumnMap: INVOICE_SORT_COLUMN_MAP,
+        idColumn: 'invoice.id'
+      }
+    );
+    return new CursorPaginatedResponseDto(data, nextCursor, limit);
   }
 
   /**

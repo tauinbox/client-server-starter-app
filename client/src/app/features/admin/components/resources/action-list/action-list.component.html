@@ -109,5 +109,18 @@
         </table>
       </div>
     }
+    <div
+      class="scroll-sentinel"
+      nxsInfiniteScroll
+      [hasMore]="hasMore()"
+      [busy]="busy()"
+      (loadMore)="loadMore()"
+    ></div>
+
+    @if (isLoadingMore()) {
+      <div class="load-more-container">
+        <mat-spinner [diameter]="36"></mat-spinner>
+      </div>
+    }
   </mat-card-content>
 </mat-card>

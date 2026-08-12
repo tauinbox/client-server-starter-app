@@ -23,6 +23,12 @@ export type UpdateAction = {
   description?: string;
 };
 
+import type { CursorPaginatedResponse } from '@app/shared/types';
+import {
+  cursorParams,
+  type CursorPageRequest
+} from '@shared/utils/pagination.utils';
+
 export const RBAC_API_V1 = '/api/v1/rbac';
 
 @Injectable({
@@ -30,6 +36,16 @@ export const RBAC_API_V1 = '/api/v1/rbac';
 })
 export class RbacAdminService {
   readonly #http = inject(HttpClient);
+
+  /** One page of resources for the admin list page. */
+  getResourcesCursor(
+    request: CursorPageRequest
+  ): Observable<CursorPaginatedResponse<ResourceResponse>> {
+    return this.#http.get<CursorPaginatedResponse<ResourceResponse>>(
+      `${RBAC_API_V1}/resources/cursor`,
+      { params: cursorParams(request) }
+    );
+  }
 
   getResources(): Observable<ResourceResponse[]> {
     return this.#http.get<ResourceResponse[]>(`${RBAC_API_V1}/resources`);
@@ -49,6 +65,16 @@ export class RbacAdminService {
     return this.#http.post<ResourceResponse>(
       `${RBAC_API_V1}/resources/${id}/restore`,
       {}
+    );
+  }
+
+  /** One page of actions for the admin list page. */
+  getActionsCursor(
+    request: CursorPageRequest
+  ): Observable<CursorPaginatedResponse<ActionResponse>> {
+    return this.#http.get<CursorPaginatedResponse<ActionResponse>>(
+      `${RBAC_API_V1}/actions/cursor`,
+      { params: cursorParams(request) }
     );
   }
 

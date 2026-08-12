@@ -1,7 +1,15 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import type { InvoiceResponse, SubscriptionResponse } from '@app/shared/types';
+import type {
+  CursorPaginatedResponse,
+  InvoiceResponse,
+  SubscriptionResponse
+} from '@app/shared/types';
+import {
+  cursorParams,
+  type CursorPageRequest
+} from '@shared/utils/pagination.utils';
 import type { CancelMode } from '@features/billing/services/billing.service';
 
 const ADMIN_BILLING_API_V1 = '/api/v1/admin/billing';
@@ -15,15 +23,21 @@ const ADMIN_BILLING_API_V1 = '/api/v1/admin/billing';
 export class BillingAdminService {
   readonly #http = inject(HttpClient);
 
-  listSubscriptions(): Observable<SubscriptionResponse[]> {
-    return this.#http.get<SubscriptionResponse[]>(
-      `${ADMIN_BILLING_API_V1}/subscriptions`
+  listSubscriptions(
+    request: CursorPageRequest = {}
+  ): Observable<CursorPaginatedResponse<SubscriptionResponse>> {
+    return this.#http.get<CursorPaginatedResponse<SubscriptionResponse>>(
+      `${ADMIN_BILLING_API_V1}/subscriptions`,
+      { params: cursorParams(request) }
     );
   }
 
-  listInvoices(): Observable<InvoiceResponse[]> {
-    return this.#http.get<InvoiceResponse[]>(
-      `${ADMIN_BILLING_API_V1}/invoices`
+  listInvoices(
+    request: CursorPageRequest = {}
+  ): Observable<CursorPaginatedResponse<InvoiceResponse>> {
+    return this.#http.get<CursorPaginatedResponse<InvoiceResponse>>(
+      `${ADMIN_BILLING_API_V1}/invoices`,
+      { params: cursorParams(request) }
     );
   }
 

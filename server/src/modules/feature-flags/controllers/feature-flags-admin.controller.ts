@@ -14,6 +14,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   Req,
   UseInterceptors
 } from '@nestjs/common';
@@ -32,6 +33,7 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { FeatureFlagCursorQueryDto } from '../../../common/dtos';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
 import { RegisterResource } from '../../auth/decorators/register-resource.decorator';
 import { LogAudit } from '../../audit/decorators/log-audit.decorator';
@@ -61,6 +63,16 @@ export class FeatureFlagsAdminController {
     private readonly flagService: FeatureFlagService,
     private readonly eventEmitter: EventEmitter2
   ) {}
+
+  @Get('cursor')
+  @Authorize(['manage', 'FeatureFlag'])
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cursor-paginated feature flags for the list page' })
+  @ApiOkResponse({ description: 'Cursor-paginated list of feature flags' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  findAllCursor(@Query() query: FeatureFlagCursorQueryDto) {
+    return this.flagService.findCursorPaginated(query);
+  }
 
   @Get()
   @Authorize(['manage', 'FeatureFlag'])

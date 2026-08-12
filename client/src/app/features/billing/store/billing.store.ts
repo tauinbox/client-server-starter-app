@@ -6,6 +6,7 @@ import {
   withMethods,
   withState
 } from '@ngrx/signals';
+import { withEntities } from '@ngrx/signals/entities';
 import { firstValueFrom } from 'rxjs';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type {
@@ -22,6 +23,7 @@ import type {
   UsageSummaryResponse
 } from '@app/shared/types';
 import { NotifyService } from '@core/services/notify.service';
+import { withCursorList } from '@shared/store/with-cursor-list';
 import {
   BillingService,
   type CancelMode,
@@ -32,7 +34,6 @@ type BillingState = {
   plans: PlanResponse[];
   products: ProductResponse[];
   subscription: SubscriptionResponse | null;
-  invoices: InvoiceResponse[];
   paymentMethod: PaymentMethodResponse | null;
   usage: UsageSummaryResponse | null;
   credits: CreditBalanceResponse | null;
@@ -45,7 +46,6 @@ const initialState: BillingState = {
   plans: [],
   products: [],
   subscription: null,
-  invoices: [],
   paymentMethod: null,
   usage: null,
   credits: null,
@@ -63,7 +63,9 @@ const ACTIVE_STATUSES: readonly SubscriptionResponse['status'][] = [
 ];
 
 export const BillingStore = signalStore(
+  withEntities<InvoiceResponse>(),
   withState(initialState),
+  withCursorList<InvoiceResponse>({ errorKey: 'billing.errors.loadFailed' }),
   withComputed((store) => ({
     /** The plan the caller is currently subscribed to, if any. */
     currentPlan: computed(() => {
@@ -131,28 +133,21 @@ export const BillingStore = signalStore(
      */
     async function loadSettings(): Promise<void> {
       patchState(store, { loading: true });
+      // Opening the page always restarts the invoice list at its first page.
+      void store.loadFirstPage((request) => billing.getInvoices(request));
       const results = await Promise.allSettled([
         firstValueFrom(billing.getSubscription()),
-        firstValueFrom(billing.getInvoices()),
         firstValueFrom(billing.getPaymentMethod()),
         firstValueFrom(billing.getUsage()),
         firstValueFrom(billing.getCredits()),
         firstValueFrom(billing.getPlans()),
         firstValueFrom(billing.getRegion())
       ]);
-      const [
-        subscription,
-        invoices,
-        paymentMethod,
-        usage,
-        credits,
-        plans,
-        region
-      ] = results;
+      const [subscription, paymentMethod, usage, credits, plans, region] =
+        results;
       const patch: Partial<BillingState> = { loading: false };
       if (subscription.status === 'fulfilled')
         patch.subscription = subscription.value;
-      if (invoices.status === 'fulfilled') patch.invoices = invoices.value;
       if (paymentMethod.status === 'fulfilled')
         patch.paymentMethod = paymentMethod.value;
       if (usage.status === 'fulfilled') patch.usage = usage.value;
@@ -230,15 +225,18 @@ export const BillingStore = signalStore(
      * Refresh just the invoices (e.g. while a one-time purchase return waits
      * for the provider webhook to settle the paid invoice).
      */
+    /**
+     * Re-reads the invoice list from its first page (a purchase or plan change
+     * lands at the top, and a cursor already handed out cannot see it).
+     */
     async function refreshInvoices(): Promise<InvoiceResponse[]> {
-      try {
-        const invoices = await firstValueFrom(billing.getInvoices());
-        patchState(store, { invoices });
-        return invoices;
-      } catch (error) {
-        notify.error(error as HttpErrorResponse, 'billing.errors.loadFailed');
-        return store.invoices();
-      }
+      await store.loadFirstPage((request) => billing.getInvoices(request));
+      return store.entities();
+    }
+
+    /** Appends the next page; wired to the list's scroll sentinel. */
+    function loadMoreInvoices(): void {
+      void store.loadNextPage((request) => billing.getInvoices(request));
     }
 
     /**
@@ -260,11 +258,11 @@ export const BillingStore = signalStore(
         patchState(store, { working: false });
       }
       try {
-        const [invoices, usage] = await Promise.all([
-          firstValueFrom(billing.getInvoices()),
-          firstValueFrom(billing.getUsage())
+        const [usage] = await Promise.all([
+          firstValueFrom(billing.getUsage()),
+          refreshInvoices()
         ]);
-        patchState(store, { invoices, usage });
+        patchState(store, { usage });
       } catch {
         // The switch itself succeeded and was reported; a stale invoice list
         // self-heals on the next settings load.
@@ -328,6 +326,7 @@ export const BillingStore = signalStore(
       loadSettings,
       refreshSubscription,
       refreshInvoices,
+      loadMoreInvoices,
       checkout,
       purchase,
       changePlan,

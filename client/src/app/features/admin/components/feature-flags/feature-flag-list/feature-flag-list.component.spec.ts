@@ -36,6 +36,7 @@ describe('FeatureFlagListComponent', () => {
   let dialogOpen: ReturnType<typeof vi.fn>;
   let serviceMock: {
     getAll: ReturnType<typeof vi.fn>;
+    getAllCursor: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
@@ -54,6 +55,12 @@ describe('FeatureFlagListComponent', () => {
 
     serviceMock = {
       getAll: vi.fn().mockReturnValue(of([flag])),
+      getAllCursor: vi.fn().mockReturnValue(
+        of({
+          data: [flag],
+          meta: { nextCursor: null, hasMore: false, limit: 20 }
+        })
+      ),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
@@ -105,8 +112,10 @@ describe('FeatureFlagListComponent', () => {
     dialogOpen.mockReturnValue({ afterClosed: () => of(result) });
   }
 
-  it('renders the desktop table with one row per flag', () => {
+  it('renders the desktop table with one row per flag', async () => {
     const fixture = TestBed.createComponent(FeatureFlagListComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
     fixture.detectChanges();
     const rows = (fixture.nativeElement as HTMLElement).querySelectorAll(
       'table tbody tr'
@@ -117,9 +126,11 @@ describe('FeatureFlagListComponent', () => {
     );
   });
 
-  it('switches to a card list on handset', () => {
+  it('switches to a card list on handset', async () => {
     layoutHandset.set(true);
     const fixture = TestBed.createComponent(FeatureFlagListComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
     fixture.detectChanges();
     const cards = (fixture.nativeElement as HTMLElement).querySelectorAll(
       '.flag-card'
@@ -131,7 +142,7 @@ describe('FeatureFlagListComponent', () => {
     expect(fab).not.toBeNull();
   });
 
-  it('toggleFlag() calls the store and notifies success', () => {
+  it('toggleFlag() calls the store and notifies success', async () => {
     const includedFlag = {
       ...flag,
       rules: [
@@ -147,30 +158,36 @@ describe('FeatureFlagListComponent', () => {
     };
     const fixture = TestBed.createComponent(FeatureFlagListComponent);
     fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
     fixture.componentInstance.toggleFlag(includedFlag);
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(toggleSpy).toHaveBeenCalledWith('flag-1');
   });
 
   describe('enable-without-rules confirmation', () => {
-    it('confirms before enabling a disabled flag with no include rules', () => {
+    it('confirms before enabling a disabled flag with no include rules', async () => {
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
       fixture.componentInstance.toggleFlag(flag); // disabled, rules: []
       expect(confirmSpy).toHaveBeenCalledTimes(1);
       expect(toggleSpy).toHaveBeenCalledWith('flag-1');
     });
 
-    it('does not toggle when the confirmation is cancelled', () => {
+    it('does not toggle when the confirmation is cancelled', async () => {
       confirmSpy.mockReturnValue(of(false));
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
       fixture.componentInstance.toggleFlag(flag);
       expect(confirmSpy).toHaveBeenCalledTimes(1);
       expect(toggleSpy).not.toHaveBeenCalled();
     });
 
-    it('skips the confirmation when an include rule exists', () => {
+    it('skips the confirmation when an include rule exists', async () => {
       const includedFlag = {
         ...flag,
         rules: [
@@ -186,14 +203,18 @@ describe('FeatureFlagListComponent', () => {
       };
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
       fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
       fixture.componentInstance.toggleFlag(includedFlag);
       expect(confirmSpy).not.toHaveBeenCalled();
       expect(toggleSpy).toHaveBeenCalledWith('flag-1');
     });
 
-    it('skips the confirmation when disabling an enabled flag', () => {
+    it('skips the confirmation when disabling an enabled flag', async () => {
       const enabledNoRules = { ...flag, enabled: true };
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
       fixture.componentInstance.toggleFlag(enabledNoRules);
       expect(confirmSpy).not.toHaveBeenCalled();
@@ -202,11 +223,18 @@ describe('FeatureFlagListComponent', () => {
   });
 
   describe('FF-UX-007 — handset shows "All environments" when list is empty', () => {
-    it('renders the environments dt/dd pair with "All environments" label', () => {
+    it('renders the environments dt/dd pair with "All environments" label', async () => {
       const flagAllEnvs = { ...flag, id: 'flag-all', environments: [] };
-      serviceMock.getAll.mockReturnValue(of([flagAllEnvs]));
+      serviceMock.getAllCursor.mockReturnValue(
+        of({
+          data: [flagAllEnvs],
+          meta: { nextCursor: null, hasMore: false, limit: 20 }
+        })
+      );
       layoutHandset.set(true);
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
       const card = (fixture.nativeElement as HTMLElement).querySelector(
         '.flag-card'
@@ -217,9 +245,11 @@ describe('FeatureFlagListComponent', () => {
       expect(cardText).toContain('All environments');
     });
 
-    it('omits the "All environments" label when the flag has specific environments', () => {
+    it('omits the "All environments" label when the flag has specific environments', async () => {
       layoutHandset.set(true);
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
       const cardText =
         (fixture.nativeElement as HTMLElement).querySelector('.flag-card')
@@ -249,12 +279,14 @@ describe('FeatureFlagListComponent', () => {
       rulesChanged: true
     };
 
-    it('defers success snackbar until replaceRules resolves', () => {
+    it('defers success snackbar until replaceRules resolves', async () => {
       serviceMock.create.mockReturnValue(of(createdFlag));
       serviceMock.replaceRules.mockReturnValue(of(createdFlag));
       stubDialogResult(dialogResult);
 
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
       fixture.componentInstance.openCreateDialog();
 
@@ -271,11 +303,13 @@ describe('FeatureFlagListComponent', () => {
       expect(notifyError).not.toHaveBeenCalled();
     });
 
-    it('fires success snackbar immediately when there are no rules to save', () => {
+    it('fires success snackbar immediately when there are no rules to save', async () => {
       serviceMock.create.mockReturnValue(of(createdFlag));
       stubDialogResult({ ...dialogResult, rules: [] });
 
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
       fixture.componentInstance.openCreateDialog();
 
@@ -286,7 +320,7 @@ describe('FeatureFlagListComponent', () => {
       );
     });
 
-    it('on replaceRules failure: no success snackbar, distinct error snackbar, flag marked', () => {
+    it('on replaceRules failure: no success snackbar, distinct error snackbar, flag marked', async () => {
       serviceMock.create.mockReturnValue(of(createdFlag));
       serviceMock.replaceRules.mockReturnValue(
         throwError(() => new Error('boom'))
@@ -294,6 +328,8 @@ describe('FeatureFlagListComponent', () => {
       stubDialogResult(dialogResult);
 
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
       fixture.componentInstance.openCreateDialog();
 
@@ -307,7 +343,7 @@ describe('FeatureFlagListComponent', () => {
       ).toBe(true);
     });
 
-    it('successful re-save clears the rules-failed marker', () => {
+    it('successful re-save clears the rules-failed marker', async () => {
       serviceMock.create.mockReturnValueOnce(of(createdFlag));
       serviceMock.replaceRules.mockReturnValueOnce(
         throwError(() => new Error('boom'))
@@ -315,6 +351,8 @@ describe('FeatureFlagListComponent', () => {
       stubDialogResult(dialogResult);
 
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
       fixture.componentInstance.openCreateDialog();
       expect(
@@ -351,12 +389,14 @@ describe('FeatureFlagListComponent', () => {
       rulesChanged: true
     };
 
-    it('defers success snackbar until replaceRules resolves', () => {
+    it('defers success snackbar until replaceRules resolves', async () => {
       serviceMock.update.mockReturnValue(of(flag));
       serviceMock.replaceRules.mockReturnValue(of(flag));
       stubDialogResult(dialogResult);
 
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
       fixture.componentInstance.openEditDialog(flag);
 
@@ -367,7 +407,7 @@ describe('FeatureFlagListComponent', () => {
       );
     });
 
-    it('on replaceRules failure: no success snackbar, distinct error snackbar, flag marked', () => {
+    it('on replaceRules failure: no success snackbar, distinct error snackbar, flag marked', async () => {
       serviceMock.update.mockReturnValue(of(flag));
       serviceMock.replaceRules.mockReturnValue(
         throwError(() => new Error('boom'))
@@ -375,6 +415,8 @@ describe('FeatureFlagListComponent', () => {
       stubDialogResult(dialogResult);
 
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
       fixture.componentInstance.openEditDialog(flag);
 
@@ -388,11 +430,13 @@ describe('FeatureFlagListComponent', () => {
       );
     });
 
-    it('fires success snackbar immediately when rulesChanged is false', () => {
+    it('fires success snackbar immediately when rulesChanged is false', async () => {
       serviceMock.update.mockReturnValue(of(flag));
       stubDialogResult({ ...dialogResult, rulesChanged: false });
 
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
       fixture.componentInstance.openEditDialog(flag);
 
@@ -407,12 +451,14 @@ describe('FeatureFlagListComponent', () => {
     // We MUST still PUT the empty array so the server-side rules are wiped —
     // an earlier refactor short-circuited on rules.length===0 and silently
     // dropped the clear-all operation.
-    it('calls replaceRules with empty array when user removed all rules', () => {
+    it('calls replaceRules with empty array when user removed all rules', async () => {
       serviceMock.update.mockReturnValue(of(flag));
       serviceMock.replaceRules.mockReturnValue(of(flag));
       stubDialogResult({ ...dialogResult, rules: [], rulesChanged: true });
 
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
       fixture.componentInstance.openEditDialog(flag);
 
@@ -425,8 +471,10 @@ describe('FeatureFlagListComponent', () => {
   });
 
   describe('FF-UX-008 — warning marker in desktop table', () => {
-    it('renders the warning icon next to the key when rules failed', () => {
+    it('renders the warning icon next to the key when rules failed', async () => {
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
       fixture.detectChanges();
 
       const before = (fixture.nativeElement as HTMLElement).querySelector(

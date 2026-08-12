@@ -1,5 +1,4 @@
 import { computed, inject } from '@angular/core';
-import { TranslocoService } from '@jsverse/transloco';
 import type { Observable } from 'rxjs';
 import { pipe, switchMap, tap } from 'rxjs';
 import { tapResponse } from '@ngrx/operators';
@@ -12,74 +11,63 @@ import {
 } from '@ngrx/signals';
 import {
   removeEntity,
-  setAllEntities,
   setEntity,
   updateEntity,
-  upsertEntities,
   withEntities
 } from '@ngrx/signals/entities';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
-import { DEFAULT_SORT_BY, DEFAULT_SORT_ORDER } from '@app/shared/constants';
 import { NotifyService } from '@core/services/notify.service';
+import { withCursorList } from '@shared/store/with-cursor-list';
+import type { CursorPageRequest } from '@shared/utils/pagination.utils';
 import { UserService } from '../services/user.service';
 import type {
-  PaginatedResponse,
+  CursorPaginatedResponse,
   SortOrder,
   UpdateUser,
   User,
-  UserListParams,
+  UserCursorListParams,
   UserSearch,
   UserSortColumn
 } from '../models/user.types';
 
-const INFINITE_SCROLL_PAGE_SIZE = 20;
-
 type UsersState = {
-  loading: boolean;
-  isLoadingMore: boolean;
   detailLoading: boolean;
-  error: string | null;
   detailError: string | null;
-  currentPage: number;
-  pageSize: number;
-  totalUsers: number;
-  sortBy: UserSortColumn;
-  sortOrder: SortOrder;
   filters: UserSearch;
 };
 
 export const UsersStore = signalStore(
   withEntities<User>(),
   withState<UsersState>({
-    loading: false,
-    isLoadingMore: false,
     detailLoading: false,
-    error: null,
     detailError: null,
-    currentPage: 0,
-    pageSize: INFINITE_SCROLL_PAGE_SIZE,
-    totalUsers: 0,
-    sortBy: DEFAULT_SORT_BY as UserSortColumn,
-    sortOrder: DEFAULT_SORT_ORDER,
     filters: {}
   }),
+  withCursorList<User>({ errorKey: 'users.store.errorLoadFailed' }),
   withComputed((store) => ({
     displayedUsers: computed(() => store.entities()),
-    hasMore: computed(() => store.totalUsers() > store.ids().length)
+    // Keyset pagination reports no total, so the count shown is what has been
+    // loaded so far; `hasMore` is what tells the UI there is more behind it.
+    loadedUsers: computed(() => store.ids().length)
   })),
   withMethods((store) => {
     const userService = inject(UserService);
     const notify = inject(NotifyService);
-    const translocoService = inject(TranslocoService);
 
-    function buildRequest(page: number): Observable<PaginatedResponse<User>> {
-      const params: UserListParams = {
-        page,
-        limit: store.pageSize(),
-        sortBy: store.sortBy(),
-        sortOrder: store.sortOrder()
-      };
+    /**
+     * Filters decide which of the two cursor endpoints answers, so the fetcher
+     * is rebuilt per call rather than captured once.
+     */
+    function fetchPage(
+      request: CursorPageRequest
+    ): Observable<CursorPaginatedResponse<User>> {
       const filters = store.filters();
+      const params: UserCursorListParams = {
+        cursor: request.cursor ?? undefined,
+        limit: request.limit ?? 20,
+        sortBy: (request.sortBy as UserSortColumn) ?? 'createdAt',
+        sortOrder: request.sortOrder ?? 'desc'
+      };
       const hasFilters = !!(
         filters.q ||
         filters.role ||
@@ -87,75 +75,18 @@ export const UsersStore = signalStore(
         filters.includeDeleted
       );
       return hasFilters
-        ? userService.search(filters, params)
-        : userService.getAll(params);
+        ? userService.searchCursor(filters, params)
+        : userService.getAllCursor(params);
     }
 
     return {
-      load: rxMethod<void>(
-        pipe(
-          tap(() =>
-            patchState(store, { loading: true, error: null, currentPage: 0 })
-          ),
-          switchMap(() =>
-            buildRequest(1).pipe(
-              tapResponse({
-                next: (response) => {
-                  patchState(store, setAllEntities(response.data));
-                  patchState(store, {
-                    loading: false,
-                    totalUsers: response.meta.total
-                  });
-                },
-                error: () => {
-                  patchState(store, {
-                    loading: false,
-                    error: translocoService.translate(
-                      'users.store.errorLoadFailed'
-                    )
-                  });
-                  notify.error('users.store.errorLoadFailed');
-                }
-              })
-            )
-          )
-        )
-      ),
+      load(): void {
+        void store.loadFirstPage(fetchPage);
+      },
 
-      loadMore: rxMethod<void>(
-        pipe(
-          tap(() => {
-            patchState(store, {
-              isLoadingMore: true,
-              error: null,
-              currentPage: store.currentPage() + 1
-            });
-          }),
-          switchMap(() =>
-            buildRequest(store.currentPage() + 1).pipe(
-              tapResponse({
-                next: (response) => {
-                  patchState(store, upsertEntities(response.data));
-                  patchState(store, {
-                    isLoadingMore: false,
-                    totalUsers: response.meta.total
-                  });
-                },
-                error: () => {
-                  patchState(store, {
-                    isLoadingMore: false,
-                    currentPage: store.currentPage() - 1,
-                    error: translocoService.translate(
-                      'users.store.errorLoadMoreFailed'
-                    )
-                  });
-                  notify.error('users.store.errorLoadMoreFailed');
-                }
-              })
-            )
-          )
-        )
-      ),
+      loadMore(): void {
+        void store.loadNextPage(fetchPage);
+      },
 
       loadOne: rxMethod<string>(
         pipe(
@@ -172,9 +103,7 @@ export const UsersStore = signalStore(
                 error: () => {
                   patchState(store, {
                     detailLoading: false,
-                    detailError: translocoService.translate(
-                      'users.store.errorLoadDetailsFailed'
-                    )
+                    detailError: 'users.store.errorLoadDetailsFailed'
                   });
                   notify.error('users.store.errorLoadDetailsFailed');
                 }
@@ -208,9 +137,6 @@ export const UsersStore = signalStore(
               return;
             }
             patchState(store, removeEntity(id));
-            patchState(store, {
-              totalUsers: Math.max(0, store.totalUsers() - 1)
-            });
           })
         );
       },
@@ -228,7 +154,7 @@ export const UsersStore = signalStore(
       },
 
       setSorting(sortBy: UserSortColumn, sortOrder: SortOrder): void {
-        patchState(store, { sortBy, sortOrder });
+        store.setSorting(sortBy, sortOrder);
       }
     };
   })

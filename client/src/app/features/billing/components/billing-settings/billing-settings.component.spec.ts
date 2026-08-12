@@ -91,7 +91,9 @@ describe('BillingSettingsComponent', () => {
   let fixture: ComponentFixture<BillingSettingsComponent>;
   let storeMock: {
     subscription: ReturnType<typeof signal<SubscriptionResponse | null>>;
-    invoices: ReturnType<typeof signal<InvoiceResponse[]>>;
+    entities: ReturnType<typeof signal<InvoiceResponse[]>>;
+    hasMore: ReturnType<typeof signal<boolean>>;
+    isLoadingMore: ReturnType<typeof signal<boolean>>;
     paymentMethod: ReturnType<typeof signal<null>>;
     usage: ReturnType<typeof signal<UsageSummaryResponse | null>>;
     credits: ReturnType<typeof signal<CreditBalanceResponse | null>>;
@@ -101,6 +103,7 @@ describe('BillingSettingsComponent', () => {
     currentPlan: ReturnType<typeof signal<PlanResponse | null>>;
     hasActiveSubscription: ReturnType<typeof signal<boolean>>;
     loadSettings: ReturnType<typeof vi.fn>;
+    loadMoreInvoices: ReturnType<typeof vi.fn>;
     cancel: ReturnType<typeof vi.fn>;
     changePlan: ReturnType<typeof vi.fn>;
     startPaymentMethodUpdate: ReturnType<typeof vi.fn>;
@@ -119,7 +122,9 @@ describe('BillingSettingsComponent', () => {
       subscription: signal<SubscriptionResponse | null>(
         hasSub ? (subscription ?? activeSub) : null
       ),
-      invoices: signal<InvoiceResponse[]>(hasSub ? [invoice] : []),
+      entities: signal<InvoiceResponse[]>(hasSub ? [invoice] : []),
+      hasMore: signal(false),
+      isLoadingMore: signal(false),
       paymentMethod: signal(null),
       usage: signal<UsageSummaryResponse | null>(usage ?? null),
       credits: signal<CreditBalanceResponse | null>(credits ?? null),
@@ -129,6 +134,7 @@ describe('BillingSettingsComponent', () => {
       currentPlan: signal<PlanResponse | null>(hasSub ? proPlan : null),
       hasActiveSubscription: signal(hasSub),
       loadSettings: vi.fn().mockResolvedValue(undefined),
+      loadMoreInvoices: vi.fn(),
       cancel: vi.fn().mockResolvedValue(true),
       changePlan: vi.fn().mockResolvedValue(true),
       startPaymentMethodUpdate: vi.fn().mockResolvedValue(null)

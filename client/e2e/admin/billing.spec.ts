@@ -61,4 +61,58 @@ test.describe('Admin billing console', () => {
       .click();
     await expect(invoiceTable).toContainText('Refunded');
   });
+
+  // The invoice list is cursor-paginated behind an infinite scroll: the page
+  // must never request the whole table, and scrolling must fetch the next slice
+  // from the server rather than filtering rows already in memory.
+  test('pages through the invoice list without loading every row', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, {
+      id: ADMIN_ID,
+      email: 'billadmin@example.com',
+      roles: ['admin']
+    });
+
+    const { id: subscriptionId } =
+      await _mockServer.activateBillingSubscription({
+        userId: ADMIN_ID,
+        planKey: 'pro'
+      });
+    // One invoice per renewal: 25 in total, so the default page size splits it.
+    for (let i = 0; i < 24; i += 1) {
+      await _mockServer.advanceBillingRenewal({ subscriptionId });
+    }
+
+    const invoiceRequests: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().includes('/admin/billing/invoices')) {
+        invoiceRequests.push(request.url());
+      }
+    });
+
+    await page.goto('/admin/billing');
+
+    const invoiceTable = page.locator('table').nth(1);
+    // The sentinel keeps pulling pages while it stays in view, so the list
+    // fills the viewport on open and settles once the server stops handing out
+    // cursors - all 25 rows, never in one request.
+    await expect(invoiceTable.locator('tbody tr')).toHaveCount(25);
+
+    // The first request opens the sequence without a cursor; every later one
+    // continues from the previous page rather than re-reading the table.
+    expect(invoiceRequests[0]).not.toContain('cursor=');
+    expect(invoiceRequests[0]).toContain('limit=');
+    expect(
+      invoiceRequests.slice(1).every((url) => url.includes('cursor='))
+    ).toBe(true);
+    // 25 rows at a 20-row page: two requests, not one unbounded read.
+    expect(invoiceRequests).toHaveLength(2);
+
+    // Exhausted: scrolling again asks for nothing more.
+    await invoiceTable.locator('tbody tr').last().scrollIntoViewIfNeeded();
+    await page.waitForTimeout(500);
+    expect(invoiceRequests).toHaveLength(2);
+  });
 });

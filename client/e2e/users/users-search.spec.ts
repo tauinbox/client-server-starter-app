@@ -106,7 +106,7 @@ test.describe('Inline user search (User Management page)', () => {
   }) => {
     const capturedUrls: string[] = [];
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.route('**/api/v1/users/search*', (route) => {
+    await page.route('**/api/v1/users/search/cursor*', (route) => {
       capturedUrls.push(route.request().url());
       return route.fallback();
     });

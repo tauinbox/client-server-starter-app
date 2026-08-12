@@ -31,7 +31,7 @@ import type {
   CreateAction,
   UpdateAction
 } from '../../../services/rbac-admin.service';
-import { ResourcesStore } from '../../../store/resources.store';
+import { ActionsStore } from '../../../store/actions.store';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NotifyService } from '@core/services/notify.service';
 import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
@@ -65,7 +65,7 @@ const ACTION_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
 })
 export class ActionFormDialogComponent implements OnInit, OnDestroy {
   readonly #dialogRef = inject(MatDialogRef<ActionFormDialogComponent>);
-  readonly #resourcesStore = inject(ResourcesStore);
+  readonly #actionsStore = inject(ActionsStore);
   readonly #notify = inject(NotifyService);
   readonly #translocoService = inject(TranslocoService);
   readonly #destroyRef = inject(DestroyRef);
@@ -133,7 +133,7 @@ export class ActionFormDialogComponent implements OnInit, OnDestroy {
         displayName: displayName.trim(),
         description: description.trim()
       };
-      this.#resourcesStore
+      this.#actionsStore
         .updateAction(this.data.action.id, dto)
         .pipe(takeUntilDestroyed(this.#destroyRef))
         .subscribe({
@@ -158,7 +158,7 @@ export class ActionFormDialogComponent implements OnInit, OnDestroy {
         displayName: displayName.trim(),
         description: description.trim() || undefined
       };
-      this.#resourcesStore
+      this.#actionsStore
         .createAction(dto)
         .pipe(takeUntilDestroyed(this.#destroyRef))
         .subscribe({

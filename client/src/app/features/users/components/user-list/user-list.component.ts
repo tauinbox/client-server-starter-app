@@ -1,16 +1,13 @@
-import type { ElementRef, OnInit } from '@angular/core';
+import type { OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
-  effect,
   inject,
-  Injector,
-  signal,
-  untracked,
-  viewChild
+  signal
 } from '@angular/core';
-import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   MatCard,
   MatCardContent,
@@ -26,7 +23,6 @@ import { MatCheckbox } from '@angular/material/checkbox';
 import { MatDivider } from '@angular/material/divider';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import type { Sort } from '@angular/material/sort';
-import { filter, merge } from 'rxjs';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { LayoutService } from '@core/services/layout.service';
 import { NotificationsService } from '@core/services/notifications.service';
@@ -40,6 +36,7 @@ import {
 } from '../user-table/user-table.component';
 import { UserCardListComponent } from '../user-card-list/user-card-list.component';
 import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
 import { RoleService } from '@features/admin/services/role.service';
 import type { RoleAdminResponse } from '@app/shared/types';
 import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants/user.constants';
@@ -71,7 +68,8 @@ const INITIAL_FILTER: FilterModel = {
     UserTableComponent,
     UserCardListComponent,
     TranslocoDirective,
-    AppFormFieldComponent
+    AppFormFieldComponent,
+    InfiniteScrollDirective
   ],
   templateUrl: './user-list.component.html',
   styleUrl: './user-list.component.scss',
@@ -82,7 +80,6 @@ export class UserListComponent implements OnInit {
   readonly #notify = inject(NotifyService);
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
   readonly #destroyRef = inject(DestroyRef);
-  readonly #injector = inject(Injector);
   readonly #notificationsService = inject(NotificationsService);
   readonly #translocoService = inject(TranslocoService);
   readonly #roleService = inject(RoleService);
@@ -100,56 +97,15 @@ export class UserListComponent implements OnInit {
   readonly roles = signal<RoleAdminResponse[]>([]);
 
   readonly loading = this.#usersStore.loading;
-  readonly totalUsers = this.#usersStore.totalUsers;
   readonly displayedUsers = this.#usersStore.displayedUsers;
   readonly hasMore = this.#usersStore.hasMore;
   readonly isLoadingMore = this.#usersStore.isLoadingMore;
+  readonly busy = computed(
+    () => this.#usersStore.loading() || this.#usersStore.isLoadingMore()
+  );
 
-  readonly scrollSentinel = viewChild<ElementRef>('scrollSentinel');
-
-  constructor() {
-    // Set up IntersectionObserver reactively: the sentinel lives inside a
-    // *transloco structural directive, so it only appears in the DOM after
-    // translations load. The effect re-runs when the signal becomes non-null.
-    let observerAttached = false;
-    effect(() => {
-      const sentinelEl = this.scrollSentinel()?.nativeElement as
-        | HTMLElement
-        | undefined;
-      if (!sentinelEl || observerAttached) return;
-      observerAttached = true;
-
-      untracked(() => {
-        const loadMoreIfVisible = () => {
-          if (this.hasMore() && !this.isLoadingMore() && !this.loading()) {
-            const rect = sentinelEl.getBoundingClientRect();
-            if (rect.top <= window.innerHeight) {
-              this.#usersStore.loadMore();
-            }
-          }
-        };
-
-        const observer = new IntersectionObserver(
-          (entries) => {
-            if (entries[0].isIntersecting) loadMoreIfVisible();
-          },
-          { threshold: 0 }
-        );
-
-        observer.observe(sentinelEl);
-        this.#destroyRef.onDestroy(() => observer.disconnect());
-
-        merge(
-          toObservable(this.loading, { injector: this.#injector }),
-          toObservable(this.isLoadingMore, { injector: this.#injector })
-        )
-          .pipe(
-            filter((isLoading) => !isLoading),
-            takeUntilDestroyed(this.#destroyRef)
-          )
-          .subscribe(() => loadMoreIfVisible());
-      });
-    });
+  loadMore(): void {
+    this.#usersStore.loadMore();
   }
 
   ngOnInit(): void {

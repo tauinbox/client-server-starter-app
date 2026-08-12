@@ -16,6 +16,12 @@ import type {
   FeatureFlagRuleType
 } from '@app/shared/types';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ALLOWED_FEATURE_FLAG_SORT_COLUMNS } from '@app/shared/constants';
+import {
+  cursorPaginate,
+  cursorQueryErrors,
+  parseCursorQuery
+} from '../helpers/pagination.helpers';
 import {
   APP_ENVIRONMENTS,
   BILLING_CONFIGURED_ATTRIBUTE,
@@ -528,6 +534,22 @@ publicRouter.get('/', (req, res) => {
 const adminRouter = Router();
 
 adminRouter.use(adminGuard);
+
+adminRouter.get('/cursor', (req, res) => {
+  const query = req.query as Record<string, unknown>;
+  const errors = cursorQueryErrors(query, {
+    sortColumns: ALLOWED_FEATURE_FLAG_SORT_COLUMNS
+  });
+  if (errors.length > 0) {
+    res.status(400).json(validationError(errors));
+    return;
+  }
+  const page = cursorPaginate(
+    Array.from(getState().featureFlags.values()),
+    parseCursorQuery(query)
+  );
+  res.json({ data: page.data.map(toFeatureFlagResponse), meta: page.meta });
+});
 
 adminRouter.get('/', (_req, res) => {
   const flags: FeatureFlagResponse[] = [];

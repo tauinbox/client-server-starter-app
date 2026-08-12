@@ -1,6 +1,11 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { Observable } from 'rxjs';
+import type { CursorPaginatedResponse } from '@app/shared/types';
+import {
+  cursorParams,
+  type CursorPageRequest
+} from '@shared/utils/pagination.utils';
 import type {
   BillingRegion,
   BillingRegionResponse,
@@ -49,8 +54,14 @@ export class BillingService {
     );
   }
 
-  getInvoices(): Observable<InvoiceResponse[]> {
-    return this.#http.get<InvoiceResponse[]>(`${BILLING_API_V1}/invoices`);
+  /** One page of the caller's invoices, newest first. */
+  getInvoices(
+    request: CursorPageRequest = {}
+  ): Observable<CursorPaginatedResponse<InvoiceResponse>> {
+    return this.#http.get<CursorPaginatedResponse<InvoiceResponse>>(
+      `${BILLING_API_V1}/invoices`,
+      { params: cursorParams(request) }
+    );
   }
 
   getUsage(): Observable<UsageSummaryResponse | null> {

@@ -31,14 +31,14 @@ test.describe('User List page — handset layout', () => {
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.route('**/api/v1/users?*', (route) => {
+    await page.route('**/api/v1/users/cursor?*', (route) => {
       if (route.request().method() === 'GET') {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
             data: [],
-            meta: { page: 1, limit: 10, total: 0, totalPages: 0 }
+            meta: { nextCursor: null, hasMore: false, limit: 10 }
           })
         });
       }
@@ -69,7 +69,7 @@ test.describe('User List page — handset layout', () => {
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z'
     };
-    await page.route('**/api/v1/users?*', (route) => {
+    await page.route('**/api/v1/users/cursor?*', (route) => {
       if (
         route.request().method() === 'GET' &&
         !route.request().url().includes('/search')
@@ -79,7 +79,7 @@ test.describe('User List page — handset layout', () => {
           contentType: 'application/json',
           body: JSON.stringify({
             data: [knownUser],
-            meta: { page: 1, limit: 10, total: 1, totalPages: 1 }
+            meta: { nextCursor: null, hasMore: false, limit: 10 }
           })
         });
       }
@@ -140,7 +140,7 @@ test.describe('User List page — handset layout', () => {
         updatedAt: '2025-01-01T00:00:00.000Z'
       }
     ];
-    await page.route('**/api/v1/users?*', (route) => {
+    await page.route('**/api/v1/users/cursor?*', (route) => {
       if (
         route.request().method() === 'GET' &&
         !route.request().url().includes('/search')
@@ -150,7 +150,7 @@ test.describe('User List page — handset layout', () => {
           contentType: 'application/json',
           body: JSON.stringify({
             data: longNameUsers,
-            meta: { page: 1, limit: 10, total: 2, totalPages: 1 }
+            meta: { nextCursor: null, hasMore: false, limit: 10 }
           })
         });
       }
@@ -210,7 +210,7 @@ test.describe('User List page — handset layout', () => {
       createdAt: '2025-02-01T00:00:00.000Z',
       updatedAt: '2025-02-01T00:00:00.000Z'
     };
-    await page.route('**/api/v1/users?*', (route) => {
+    await page.route('**/api/v1/users/cursor?*', (route) => {
       if (
         route.request().method() === 'GET' &&
         !route.request().url().includes('/search')
@@ -220,7 +220,7 @@ test.describe('User List page — handset layout', () => {
           contentType: 'application/json',
           body: JSON.stringify({
             data: [knownUser],
-            meta: { page: 1, limit: 10, total: 1, totalPages: 1 }
+            meta: { nextCursor: null, hasMore: false, limit: 10 }
           })
         });
       }

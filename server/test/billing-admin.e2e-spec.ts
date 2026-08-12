@@ -27,6 +27,8 @@ import { BillingAdminController } from '../src/modules/billing/controllers/billi
 import { AuditService } from '../src/modules/audit/audit.service';
 import { AuditLogInterceptor } from '../src/modules/audit/interceptors/audit-log.interceptor';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { MAX_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
+import { CursorPaginatedResponseDto } from '../src/common/dtos/cursor-paginated-response.dto';
 
 class TestPermissionsGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
@@ -152,29 +154,80 @@ describe('Billing admin (e2e)', () => {
   });
 
   it('lists subscriptions for an admin without the internal provider ref', async () => {
-    billingAdmin.listSubscriptions.mockResolvedValue([makeSubscription()]);
+    billingAdmin.listSubscriptions.mockResolvedValue(
+      new CursorPaginatedResponseDto([makeSubscription()], null, 20)
+    );
 
     const res = await request(server)
       .get('/api/v1/admin/billing/subscriptions')
       .set('x-test-role', 'admin')
       .expect(200);
 
-    const subs = res.body as Array<Record<string, unknown>>;
-    expect(subs).toHaveLength(1);
-    expect(subs[0]).not.toHaveProperty('providerSubscriptionId');
+    const body = res.body as { data: Array<Record<string, unknown>> };
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0]).not.toHaveProperty('providerSubscriptionId');
   });
 
   it('lists invoices for an admin without the provider event id', async () => {
-    billingAdmin.listInvoices.mockResolvedValue([makeInvoice()]);
+    billingAdmin.listInvoices.mockResolvedValue(
+      new CursorPaginatedResponseDto([makeInvoice()], 'cursor-1', 20)
+    );
 
     const res = await request(server)
       .get('/api/v1/admin/billing/invoices')
       .set('x-test-role', 'admin')
       .expect(200);
 
-    const invoices = res.body as Array<{ providerInvoiceRef: string }>;
-    expect(invoices[0]).not.toHaveProperty('providerEventId');
-    expect(invoices[0].providerInvoiceRef).toBe('pay_1');
+    const body = res.body as {
+      data: Array<{ providerInvoiceRef: string }>;
+      meta: { nextCursor: string | null; hasMore: boolean; limit: number };
+    };
+    expect(body.data[0]).not.toHaveProperty('providerEventId');
+    expect(body.data[0].providerInvoiceRef).toBe('pay_1');
+    expect(body.meta).toEqual({
+      nextCursor: 'cursor-1',
+      hasMore: true,
+      limit: 20
+    });
+  });
+
+  it('passes the cursor and limit through to the service', async () => {
+    billingAdmin.listInvoices.mockResolvedValue(
+      new CursorPaginatedResponseDto([], null, 25)
+    );
+
+    await request(server)
+      .get('/api/v1/admin/billing/invoices?cursor=abc&limit=25')
+      .set('x-test-role', 'admin')
+      .expect(200);
+
+    expect(billingAdmin.listInvoices).toHaveBeenCalledWith(
+      expect.objectContaining({ cursor: 'abc', limit: 25 })
+    );
+  });
+
+  it('rejects a sortBy outside the invoice whitelist (400)', async () => {
+    await request(server)
+      .get('/api/v1/admin/billing/invoices?sortBy=amountMinor')
+      .set('x-test-role', 'admin')
+      .expect(400);
+
+    expect(billingAdmin.listInvoices).not.toHaveBeenCalled();
+  });
+
+  it('rejects a limit above the maximum page size (400)', async () => {
+    await request(server)
+      .get(`/api/v1/admin/billing/invoices?limit=${MAX_PAGE_SIZE + 1}`)
+      .set('x-test-role', 'admin')
+      .expect(400);
+
+    await request(server)
+      .get(`/api/v1/admin/billing/subscriptions?limit=${MAX_PAGE_SIZE + 1}`)
+      .set('x-test-role', 'admin')
+      .expect(400);
+
+    expect(billingAdmin.listInvoices).not.toHaveBeenCalled();
+    expect(billingAdmin.listSubscriptions).not.toHaveBeenCalled();
   });
 
   it('cancels a subscription by id (immediate)', async () => {

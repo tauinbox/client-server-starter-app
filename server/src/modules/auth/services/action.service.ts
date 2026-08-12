@@ -2,6 +2,10 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Action } from '../entities/action.entity';
+import { CursorPaginatedResponseDto } from '../../../common/dtos';
+import type { ActionCursorQueryDto } from '../../../common/dtos';
+import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
+import { ACTION_SORT_COLUMN_MAP } from '../utils/rbac-sort-columns.util';
 import { Permission } from '../entities/permission.entity';
 import { Resource } from '../entities/resource.entity';
 import { RolePermission } from '../entities/role-permission.entity';
@@ -23,6 +27,28 @@ export class ActionService {
 
   async findAll(): Promise<Action[]> {
     return this.actionRepository.find({ order: { name: 'ASC' } });
+  }
+
+  /**
+   * Cursor-paginated actions for the admin list page. The unpaginated findAll
+   * above stays: the resource editor needs every action to build its picker.
+   */
+  async findCursorPaginated(
+    query: ActionCursorQueryDto
+  ): Promise<CursorPaginatedResponseDto<Action>> {
+    const { cursor, limit, sortBy, sortOrder } = query;
+    const { data, nextCursor } = await applyKeysetPagination(
+      this.actionRepository.createQueryBuilder('action'),
+      {
+        cursor,
+        limit,
+        sortBy,
+        sortOrder,
+        sortColumnMap: ACTION_SORT_COLUMN_MAP,
+        idColumn: 'action.id'
+      }
+    );
+    return new CursorPaginatedResponseDto(data, nextCursor, limit);
   }
 
   async findOne(id: string): Promise<Action> {

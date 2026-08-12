@@ -59,6 +59,11 @@
       "method": "DELETE",
       "path": "/api/v1/roles/assign/1/role-admin",
       "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/roles/cursor",
+      "expectedStatus": 401
     }
   ]
 }

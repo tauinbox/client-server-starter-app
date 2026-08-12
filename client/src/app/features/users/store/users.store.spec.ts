@@ -38,10 +38,16 @@ const page = (users: User[]): PaginatedResponse<User> => ({
   meta: { total: users.length, page: 1, limit: 20, totalPages: 1 }
 });
 
+/** Lets the in-flight page settle; the cursor feature resolves on a promise. */
+async function settled(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 describe('UsersStore', () => {
   let userServiceMock: {
-    getAll: ReturnType<typeof vi.fn>;
-    search: ReturnType<typeof vi.fn>;
+    getAllCursor: ReturnType<typeof vi.fn>;
+    searchCursor: ReturnType<typeof vi.fn>;
     getById: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
@@ -51,8 +57,8 @@ describe('UsersStore', () => {
 
   beforeEach(() => {
     userServiceMock = {
-      getAll: vi.fn().mockReturnValue(of(page([mockUser]))),
-      search: vi.fn().mockReturnValue(of(page([mockUser]))),
+      getAllCursor: vi.fn().mockReturnValue(of(page([mockUser]))),
+      searchCursor: vi.fn().mockReturnValue(of(page([mockUser]))),
       getById: vi.fn().mockReturnValue(of(mockUser)),
       update: vi.fn().mockReturnValue(of(mockUser)),
       delete: vi.fn().mockReturnValue(of(void 0)),
@@ -75,51 +81,56 @@ describe('UsersStore', () => {
   });
 
   describe('includeDeleted', () => {
-    it('routes the request through search so the flag reaches the API', () => {
+    it('routes the request through search so the flag reaches the API', async () => {
       store.setFilters({ includeDeleted: true });
       store.load();
+      await settled();
 
-      expect(userServiceMock.search).toHaveBeenCalledWith(
+      expect(userServiceMock.searchCursor).toHaveBeenCalledWith(
         expect.objectContaining({ includeDeleted: true }),
         expect.anything()
       );
-      expect(userServiceMock.getAll).not.toHaveBeenCalled();
+      expect(userServiceMock.getAllCursor).not.toHaveBeenCalled();
     });
 
-    it('uses the plain list endpoint when no filter is set', () => {
+    it('uses the plain list endpoint when no filter is set', async () => {
       store.load();
+      await settled();
 
-      expect(userServiceMock.getAll).toHaveBeenCalled();
-      expect(userServiceMock.search).not.toHaveBeenCalled();
+      expect(userServiceMock.getAllCursor).toHaveBeenCalled();
+      expect(userServiceMock.searchCursor).not.toHaveBeenCalled();
     });
   });
 
   describe('deleteUser', () => {
-    it('drops the row from the list by default', () => {
+    it('drops the row from the list by default', async () => {
       store.load();
+      await settled();
       store.deleteUser('user-1').subscribe();
 
       expect(store.entities()).toEqual([]);
-      expect(store.totalUsers()).toBe(0);
+      expect(store.entities()).toHaveLength(0);
     });
 
-    it('keeps the row and marks it deleted while deleted users are shown', () => {
+    it('keeps the row and marks it deleted while deleted users are shown', async () => {
       store.setFilters({ includeDeleted: true });
       store.load();
+      await settled();
       store.deleteUser('user-1').subscribe();
 
       const [entity] = store.entities();
       expect(entity.id).toBe('user-1');
       expect(entity.deletedAt).not.toBeNull();
-      expect(store.totalUsers()).toBe(1);
+      expect(store.entities()).toHaveLength(1);
     });
   });
 
   describe('restoreUser', () => {
-    it('replaces the row with the restored user returned by the API', () => {
+    it('replaces the row with the restored user returned by the API', async () => {
       const deleted: User = { ...mockUser, deletedAt: '2024-02-01T00:00:00Z' };
-      userServiceMock.getAll.mockReturnValue(of(page([deleted])));
+      userServiceMock.getAllCursor.mockReturnValue(of(page([deleted])));
       store.load();
+      await settled();
 
       store.restoreUser('user-1').subscribe();
 
@@ -127,10 +138,11 @@ describe('UsersStore', () => {
       expect(store.entities()[0].deletedAt).toBeNull();
     });
 
-    it('preserves the deactivated state the server returns', () => {
+    it('preserves the deactivated state the server returns', async () => {
       const deactivated: User = { ...mockUser, isActive: false };
       userServiceMock.restore.mockReturnValue(of(deactivated));
       store.load();
+      await settled();
 
       store.restoreUser('user-1').subscribe();
 

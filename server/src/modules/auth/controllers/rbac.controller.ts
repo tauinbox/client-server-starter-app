@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Request
 } from '@nestjs/common';
 import {
@@ -30,6 +31,10 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { subject } from '@casl/ability';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
+import {
+  ActionCursorQueryDto,
+  ResourceCursorQueryDto
+} from '../../../common/dtos';
 import { ResourceService } from '../services/resource.service';
 import { ActionService } from '../services/action.service';
 import { Authorize } from '../decorators/authorize.decorator';
@@ -94,6 +99,17 @@ export class RbacController {
   }
 
   // ── Resources (read + update display info only) ──────────────────
+
+  @Get('resources/cursor')
+  @Authorize(['read', 'Permission'])
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cursor-paginated resources for the list page' })
+  @ApiOkResponse({ description: 'Cursor-paginated list of resources' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden' })
+  findAllResourcesCursor(@Query() query: ResourceCursorQueryDto) {
+    return this.resourceService.findCursorPaginated(query);
+  }
 
   @Get('resources')
   @Authorize(['read', 'Permission'])
@@ -200,6 +216,15 @@ export class RbacController {
   }
 
   // ── Actions (full CRUD) ──────────────────────────────────────────
+
+  @Get('actions/cursor')
+  @Authorize(['read', 'Permission'])
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cursor-paginated actions for the list page' })
+  @ApiOkResponse({ description: 'Cursor-paginated list of actions' })
+  findAllActionsCursor(@Query() query: ActionCursorQueryDto) {
+    return this.actionService.findCursorPaginated(query);
+  }
 
   @Get('actions')
   @Authorize(['read', 'Permission'])

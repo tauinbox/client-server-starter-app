@@ -1,16 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { of, throwError } from 'rxjs';
+import { firstValueFrom, of, throwError } from 'rxjs';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 
 import { ResourcesStore } from './resources.store';
 import { RbacAdminService } from '../services/rbac-admin.service';
 import { AuthService } from '@features/auth/services/auth.service';
 import { NotifyService } from '@core/services/notify.service';
-import type {
-  ResourceResponse,
-  ActionResponse
-} from '@app/shared/types/rbac.types';
+import type { ResourceResponse } from '@app/shared/types/rbac.types';
 
 const mockResource: ResourceResponse = {
   id: 'res-1',
@@ -38,33 +35,18 @@ const mockResource2: ResourceResponse = {
   createdAt: '2024-01-01T00:00:00.000Z'
 };
 
-const mockAction: ActionResponse = {
-  id: 'act-1',
-  name: 'read',
-  displayName: 'Read',
-  description: 'Read access',
-  isDefault: true,
-  createdAt: '2024-01-01T00:00:00.000Z'
-};
-
-const mockAction2: ActionResponse = {
-  id: 'act-2',
-  name: 'write',
-  displayName: 'Write',
-  description: 'Write access',
-  isDefault: false,
-  createdAt: '2024-01-02T00:00:00.000Z'
-};
+function cursorPage<T>(data: T[], nextCursor: string | null = null) {
+  return {
+    data,
+    meta: { nextCursor, hasMore: nextCursor !== null, limit: 20 }
+  };
+}
 
 describe('ResourcesStore', () => {
   let rbacServiceMock: {
-    getResources: ReturnType<typeof vi.fn>;
-    getActions: ReturnType<typeof vi.fn>;
+    getResourcesCursor: ReturnType<typeof vi.fn>;
     updateResource: ReturnType<typeof vi.fn>;
     restoreResource: ReturnType<typeof vi.fn>;
-    createAction: ReturnType<typeof vi.fn>;
-    updateAction: ReturnType<typeof vi.fn>;
-    deleteAction: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: { fetchRbacMetadata: ReturnType<typeof vi.fn> };
   let notifyMock: {
@@ -76,13 +58,11 @@ describe('ResourcesStore', () => {
 
   function createStore() {
     rbacServiceMock = {
-      getResources: vi.fn().mockReturnValue(of([mockResource])),
-      getActions: vi.fn().mockReturnValue(of([mockAction])),
+      getResourcesCursor: vi
+        .fn()
+        .mockReturnValue(of(cursorPage([mockResource]))),
       updateResource: vi.fn(),
-      restoreResource: vi.fn(),
-      createAction: vi.fn(),
-      updateAction: vi.fn(),
-      deleteAction: vi.fn()
+      restoreResource: vi.fn()
     };
 
     authServiceMock = {
@@ -114,204 +94,84 @@ describe('ResourcesStore', () => {
   });
 
   describe('load()', () => {
-    it('fetches resources and actions in parallel, sets both arrays in state', () => {
-      rbacServiceMock = {
-        getResources: vi
-          .fn()
-          .mockReturnValue(of([mockResource, mockResource2])),
-        getActions: vi.fn().mockReturnValue(of([mockAction, mockAction2])),
-        updateResource: vi.fn(),
-        restoreResource: vi.fn(),
-        createAction: vi.fn(),
-        updateAction: vi.fn(),
-        deleteAction: vi.fn()
-      };
-      authServiceMock = {
-        fetchRbacMetadata: vi.fn().mockResolvedValue(undefined)
-      };
-      notifyMock = {
-        success: vi.fn(),
-        error: vi.fn(),
-        info: vi.fn(),
-        warn: vi.fn()
-      };
-
-      TestBed.configureTestingModule({
-        imports: [TranslocoTestingModuleWithLangs],
-        providers: [
-          ResourcesStore,
-          { provide: RbacAdminService, useValue: rbacServiceMock },
-          { provide: AuthService, useValue: authServiceMock },
-          { provide: NotifyService, useValue: notifyMock }
-        ]
-      });
-
-      const store = TestBed.inject(ResourcesStore);
+    it('asks for the first page and fills the collection', async () => {
+      const store = createStore();
       store.load();
+      await vi.waitFor(() => expect(store.loading()).toBe(false));
 
-      expect(rbacServiceMock.getResources).toHaveBeenCalled();
-      expect(rbacServiceMock.getActions).toHaveBeenCalled();
-      expect(store.resources()).toEqual([mockResource, mockResource2]);
-      expect(store.actions()).toEqual([mockAction, mockAction2]);
-      expect(store.loading()).toBe(false);
+      expect(rbacServiceMock.getResourcesCursor).toHaveBeenCalledWith(
+        expect.objectContaining({ cursor: null })
+      );
+      expect(store.resources()).toEqual([mockResource]);
+      expect(store.hasMore()).toBe(false);
     });
 
-    it('shows snackbar on error', () => {
-      rbacServiceMock = {
-        getResources: vi
-          .fn()
-          .mockReturnValue(throwError(() => new Error('Network error'))),
-        getActions: vi.fn().mockReturnValue(of([])),
-        updateResource: vi.fn(),
-        restoreResource: vi.fn(),
-        createAction: vi.fn(),
-        updateAction: vi.fn(),
-        deleteAction: vi.fn()
-      };
-      authServiceMock = {
-        fetchRbacMetadata: vi.fn().mockResolvedValue(undefined)
-      };
-      notifyMock = {
-        success: vi.fn(),
-        error: vi.fn(),
-        info: vi.fn(),
-        warn: vi.fn()
-      };
-
-      TestBed.configureTestingModule({
-        imports: [TranslocoTestingModuleWithLangs],
-        providers: [
-          ResourcesStore,
-          { provide: RbacAdminService, useValue: rbacServiceMock },
-          { provide: AuthService, useValue: authServiceMock },
-          { provide: NotifyService, useValue: notifyMock }
-        ]
-      });
-
-      const store = TestBed.inject(ResourcesStore);
+    it('appends the next page instead of replacing the first', async () => {
+      const store = createStore();
+      rbacServiceMock.getResourcesCursor.mockReturnValue(
+        of(cursorPage([mockResource], 'cur-1'))
+      );
       store.load();
+      await vi.waitFor(() => expect(store.resources()).toHaveLength(1));
+
+      rbacServiceMock.getResourcesCursor.mockReturnValue(
+        of(cursorPage([mockResource2]))
+      );
+      store.loadMore();
+      await vi.waitFor(() => expect(store.resources()).toHaveLength(2));
+
+      expect(rbacServiceMock.getResourcesCursor).toHaveBeenLastCalledWith(
+        expect.objectContaining({ cursor: 'cur-1' })
+      );
+      expect(store.hasMore()).toBe(false);
+    });
+
+    it('shows a snackbar on error', async () => {
+      const store = createStore();
+      rbacServiceMock.getResourcesCursor.mockReturnValue(
+        throwError(() => new Error('boom'))
+      );
+      store.load();
+      await vi.waitFor(() => expect(store.loading()).toBe(false));
 
       expect(notifyMock.error).toHaveBeenCalledWith(
+        expect.anything(),
         'admin.store.errorLoadResourcesFailed'
       );
-      expect(store.loading()).toBe(false);
+      expect(store.resources()).toEqual([]);
     });
   });
 
   describe('updateResource()', () => {
-    it('replaces item in resources array and calls authService.fetchRbacMetadata', () => {
+    it('replaces the row and refreshes the RBAC metadata', async () => {
       const store = createStore();
-      store.load(); // seed resources: [mockResource]
+      store.load();
+      await vi.waitFor(() => expect(store.resources()).toHaveLength(1));
 
-      const updatedResource: ResourceResponse = {
-        ...mockResource,
-        displayName: 'Updated Users'
-      };
-      rbacServiceMock.updateResource.mockReturnValue(of(updatedResource));
+      const updated = { ...mockResource, displayName: 'People' };
+      rbacServiceMock.updateResource.mockReturnValue(of(updated));
 
-      let result: ResourceResponse | undefined;
-      store
-        .updateResource('res-1', { displayName: 'Updated Users' })
-        .subscribe((r) => {
-          result = r;
-        });
+      await firstValueFrom(
+        store.updateResource('res-1', { displayName: 'People' })
+      );
 
-      expect(result).toEqual(updatedResource);
-      expect(store.resources()).toEqual([updatedResource]);
+      expect(store.resources()[0].displayName).toBe('People');
       expect(authServiceMock.fetchRbacMetadata).toHaveBeenCalled();
     });
   });
 
-  describe('createAction()', () => {
-    it('appends to actions array, sorts by name, and calls authService.fetchRbacMetadata', () => {
+  describe('restoreResource()', () => {
+    it('replaces the row and refreshes the RBAC metadata', async () => {
       const store = createStore();
-      store.load(); // seed actions: [mockAction (read)]
+      store.load();
+      await vi.waitFor(() => expect(store.resources()).toHaveLength(1));
 
-      const newAction: ActionResponse = {
-        id: 'act-new',
-        name: 'archive',
-        displayName: 'Archive',
-        description: '',
-        isDefault: false,
-        createdAt: '2024-01-03T00:00:00.000Z'
-      };
-      rbacServiceMock.createAction.mockReturnValue(of(newAction));
+      const restored = { ...mockResource, isOrphaned: false };
+      rbacServiceMock.restoreResource.mockReturnValue(of(restored));
 
-      store
-        .createAction({
-          name: 'archive',
-          displayName: 'Archive'
-        })
-        .subscribe();
+      await firstValueFrom(store.restoreResource('res-1'));
 
-      // 'archive' < 'read' alphabetically
-      expect(store.actions()[0].name).toBe('archive');
-      expect(store.actions()[1].name).toBe('read');
-      expect(authServiceMock.fetchRbacMetadata).toHaveBeenCalled();
-    });
-  });
-
-  describe('updateAction()', () => {
-    it('replaces item in actions array and calls authService.fetchRbacMetadata', () => {
-      const store = createStore();
-      store.load(); // seed actions: [mockAction]
-
-      const updatedAction: ActionResponse = {
-        ...mockAction,
-        displayName: 'Read All'
-      };
-      rbacServiceMock.updateAction.mockReturnValue(of(updatedAction));
-
-      let result: ActionResponse | undefined;
-      store
-        .updateAction('act-1', { displayName: 'Read All' })
-        .subscribe((r) => {
-          result = r;
-        });
-
-      expect(result).toEqual(updatedAction);
-      expect(store.actions()).toEqual([updatedAction]);
-      expect(authServiceMock.fetchRbacMetadata).toHaveBeenCalled();
-    });
-  });
-
-  describe('deleteAction()', () => {
-    it('removes item from actions array and calls authService.fetchRbacMetadata', () => {
-      rbacServiceMock = {
-        getResources: vi.fn().mockReturnValue(of([mockResource])),
-        getActions: vi.fn().mockReturnValue(of([mockAction, mockAction2])),
-        updateResource: vi.fn(),
-        restoreResource: vi.fn(),
-        createAction: vi.fn(),
-        updateAction: vi.fn(),
-        deleteAction: vi.fn().mockReturnValue(of(undefined))
-      };
-      authServiceMock = {
-        fetchRbacMetadata: vi.fn().mockResolvedValue(undefined)
-      };
-      notifyMock = {
-        success: vi.fn(),
-        error: vi.fn(),
-        info: vi.fn(),
-        warn: vi.fn()
-      };
-
-      TestBed.configureTestingModule({
-        imports: [TranslocoTestingModuleWithLangs],
-        providers: [
-          ResourcesStore,
-          { provide: RbacAdminService, useValue: rbacServiceMock },
-          { provide: AuthService, useValue: authServiceMock },
-          { provide: NotifyService, useValue: notifyMock }
-        ]
-      });
-
-      const store = TestBed.inject(ResourcesStore);
-      store.load(); // seed actions: [mockAction, mockAction2]
-
-      store.deleteAction('act-1').subscribe();
-
-      expect(store.actions()).toEqual([mockAction2]);
+      expect(store.resources()[0].isOrphaned).toBe(false);
       expect(authServiceMock.fetchRbacMetadata).toHaveBeenCalled();
     });
   });
