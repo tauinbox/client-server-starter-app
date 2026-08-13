@@ -10,6 +10,7 @@ import { In, IsNull } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import { DEFAULT_CURSOR_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
+import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
 import { encodeCursor } from '../../../common/utils/cursor.util';
 import { Customer } from '../entities/customer.entity';
@@ -21,7 +22,7 @@ import { WebhookEvent } from '../entities/webhook-event.entity';
 import { EntitlementService } from '../../entitlements/entitlement.service';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import { BillingService } from '../billing.service';
-import { OPEN_STATUSES } from '../utils/subscription-status.util';
+
 import { BillingAdminService } from './billing-admin.service';
 import { CreditService } from './credit.service';
 
@@ -330,7 +331,7 @@ describe('BillingAdminService', () => {
       // predicate is what makes a concurrent cancel lose rather than overwrite.
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
       expect(ctx.subscriptions.update).toHaveBeenCalledWith(
-        { id: 'sub-1', status: In([...OPEN_STATUSES]) },
+        { id: 'sub-1', status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
         { status: 'canceled', cancelAtPeriodEnd: false }
       );
       expect(ctx.emit).toHaveBeenCalledWith(

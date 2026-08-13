@@ -4,6 +4,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { Brackets, DataSource, In, Repository } from 'typeorm';
 import type { SubscriptionStatus } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
+import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { User } from '../../users/entities/user.entity';
 import { Customer } from '../entities/customer.entity';
@@ -32,13 +33,6 @@ import {
   DUNNING_RETRY_DELAY_MS,
   RENEWAL_SCAN_MAX_PER_RUN
 } from './renewal-queue.constants';
-
-/**
- * Statuses a scan may charge and advance - the set `findDue` selects on, and
- * the guard on the period advance. `cancelAtPeriodEnd` is deliberately absent:
- * the period just paid for should still open, and the flag stops the next one.
- */
-const CHARGEABLE_STATUSES = ['trialing', 'active', 'past_due'] as const;
 
 /**
  * Drives the self-managed (YooKassa) subscription lifecycle the core owns:
@@ -601,15 +595,16 @@ export class RenewalService {
         );
       }
 
-      // CAS on the period end and status read at scan start: cancel writers
-      // leave `currentPeriodEnd` untouched, so a cancel landing during the
-      // provider round-trip would otherwise be flipped back to `active`.
+      // CAS on the period end and status read at scan start: a cancel landing
+      // during the provider round-trip leaves `currentPeriodEnd` untouched and
+      // must not be flipped back to `active`. `cancelAtPeriodEnd` is absent on
+      // purpose — the period just paid for opens, the flag stops the next one.
       const advance = await manager.update(
         Subscription,
         {
           id: subscription.id,
           currentPeriodEnd: subscription.currentPeriodEnd,
-          status: In([...CHARGEABLE_STATUSES])
+          status: In([...ENTITLED_SUBSCRIPTION_STATUSES])
         },
         {
           status: 'active',
@@ -631,7 +626,7 @@ export class RenewalService {
         });
         if (
           current &&
-          !(CHARGEABLE_STATUSES as readonly string[]).includes(current.status)
+          !ENTITLED_SUBSCRIPTION_STATUSES.includes(current.status)
         ) {
           blockedBy = current.status;
         }
@@ -675,7 +670,7 @@ export class RenewalService {
       {
         id: subscription.id,
         dunningAttempts: subscription.dunningAttempts,
-        status: In([...CHARGEABLE_STATUSES])
+        status: In([...ENTITLED_SUBSCRIPTION_STATUSES])
       },
       exhausted
         ? {
@@ -722,7 +717,7 @@ export class RenewalService {
     const applied = await this.subscriptions.update(
       {
         id: subscription.id,
-        status: In([...CHARGEABLE_STATUSES]),
+        status: In([...ENTITLED_SUBSCRIPTION_STATUSES]),
         cancelAtPeriodEnd: true
       },
       { status: 'canceled', nextRenewalAttemptAt: null }

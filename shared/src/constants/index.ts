@@ -56,6 +56,13 @@ export {
 } from './billing-flags.constants';
 
 export {
+  ENTITLED_SUBSCRIPTION_STATUSES,
+  OPEN_SUBSCRIPTION_STATUSES,
+  CHANGEABLE_SUBSCRIPTION_STATUSES,
+  isOpenStatus
+} from './subscription-status.constants';
+
+export {
   ALLOWED_INVOICE_SORT_COLUMNS,
   ALLOWED_SUBSCRIPTION_SORT_COLUMNS,
   ALLOWED_ROLE_SORT_COLUMNS,

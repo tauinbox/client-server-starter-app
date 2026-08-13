@@ -11,6 +11,13 @@ import type {
   UsageSummaryResponse
 } from '@app/shared/types';
 import {
+  ALLOWED_INVOICE_SORT_COLUMNS,
+  ALLOWED_SUBSCRIPTION_SORT_COLUMNS,
+  CHANGEABLE_SUBSCRIPTION_STATUSES,
+  ENTITLED_SUBSCRIPTION_STATUSES,
+  OPEN_SUBSCRIPTION_STATUSES
+} from '@app/shared/constants';
+import {
   getState,
   logAudit,
   toCreditBalanceResponse,
@@ -23,10 +30,6 @@ import {
 } from '../state';
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
 import { pushToUser } from '../sse-hub';
-import {
-  ALLOWED_INVOICE_SORT_COLUMNS,
-  ALLOWED_SUBSCRIPTION_SORT_COLUMNS
-} from '@app/shared/constants';
 import {
   cursorPaginate,
   cursorQueryErrors,
@@ -122,20 +125,6 @@ billingRouter.get('/plans', (_req: Request, res: Response) => {
   res.json(plans);
 });
 
-// Non-canceled statuses — the "current" subscription for read/cancel/region.
-const OPEN_STATUSES: ReadonlyArray<MockSubscription['status']> = [
-  'incomplete',
-  'trialing',
-  'active',
-  'past_due'
-];
-// Entitlement-granting statuses (block re-checkout, resolve capabilities).
-const ACTIVE_STATUSES: ReadonlyArray<MockSubscription['status']> = [
-  'trialing',
-  'active',
-  'past_due'
-];
-
 function geoFromLocale(locale: string): { country: string; currency: string } {
   return locale.toLowerCase().startsWith('ru')
     ? { country: 'RU', currency: 'RUB' }
@@ -219,7 +208,9 @@ function resolveEntitlements(userId: string): EntitlementsResponse {
 
   const subscription = [...getState().billingSubscriptions.values()]
     .filter(
-      (s) => s.customerId === customer.id && ACTIVE_STATUSES.includes(s.status)
+      (s) =>
+        s.customerId === customer.id &&
+        ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   const plan = subscription ? findPlanByKey(subscription.planKey) : undefined;
@@ -301,7 +292,9 @@ function findCurrentSubscription(
 ): MockSubscription | undefined {
   const subs = [...getState().billingSubscriptions.values()]
     .filter(
-      (s) => s.customerId === customerId && OPEN_STATUSES.includes(s.status)
+      (s) =>
+        s.customerId === customerId &&
+        OPEN_SUBSCRIPTION_STATUSES.includes(s.status)
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return subs[0];
@@ -628,7 +621,9 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
   const customer = getOrCreateCustomer(user.id, user.locale);
 
   const hasActive = [...getState().billingSubscriptions.values()].some(
-    (s) => s.customerId === customer.id && ACTIVE_STATUSES.includes(s.status)
+    (s) =>
+      s.customerId === customer.id &&
+      ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
   );
   if (hasActive) {
     res.status(409).json({
@@ -701,10 +696,6 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
 // synchronous way — the documented divergence is timing, not shape.
 // ---------------------------------------------------------------------------
 const DAY_MS = 86_400_000;
-const CHANGEABLE_STATUSES: ReadonlyArray<MockSubscription['status']> = [
-  'trialing',
-  'active'
-];
 
 interface MockProrationQuote {
   remainderDays: number;
@@ -765,7 +756,7 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
       .json({ message: 'No active subscription to change', statusCode: 404 });
     return null;
   }
-  if (!CHANGEABLE_STATUSES.includes(sub.status)) {
+  if (!CHANGEABLE_SUBSCRIPTION_STATUSES.includes(sub.status)) {
     res.status(409).json({
       message:
         'The subscription must be active to change plans. Settle any outstanding payment first.',
@@ -1140,7 +1131,7 @@ billingAdminRouter.post(
     }
     // Addressed by id, so a canceled row can be handed in — the self-service
     // route cannot reach one because it looks up through the open statuses.
-    if (!OPEN_STATUSES.includes(sub.status)) {
+    if (!OPEN_SUBSCRIPTION_STATUSES.includes(sub.status)) {
       res.status(409).json({
         message: 'This subscription is already canceled.',
         statusCode: 409
@@ -1280,8 +1271,6 @@ billingAdminRouter.post(
 // Metering ingest. Mirrors RecordUsageRequestDto validation, the
 // active-subscription requirement, and idempotency on `idempotencyKey`. There is
 // no public meter endpoint — this lives under the `manage Billing` admin guard.
-const USAGE_ACTIVE_STATUSES = ['trialing', 'active', 'past_due'];
-
 billingAdminRouter.post('/usage', adminGuard, (req: Request, res: Response) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const occurredAtRaw = body['occurredAt'];
@@ -1357,7 +1346,8 @@ billingAdminRouter.post('/usage', adminGuard, (req: Request, res: Response) => {
   const subscription = [...state.billingSubscriptions.values()]
     .filter(
       (s) =>
-        s.customerId === customerId && USAGE_ACTIVE_STATUSES.includes(s.status)
+        s.customerId === customerId &&
+        ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   if (!subscription) {

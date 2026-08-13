@@ -1,12 +1,15 @@
 import { ConflictException } from '@nestjs/common';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { In, type Repository } from 'typeorm';
+import {
+  OPEN_SUBSCRIPTION_STATUSES,
+  isOpenStatus
+} from '@app/shared/constants';
 import type { BillingService } from '../billing.service';
 import type { Subscription } from '../entities/subscription.entity';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import type { CancelMode } from '../providers/payment-provider.interface';
 import { cancelFields } from './cancel-fields.util';
-import { OPEN_STATUSES, isOpenStatus } from './subscription-status.util';
 
 export const ALREADY_CANCELED_MESSAGE =
   'This subscription is already canceled.';
@@ -54,7 +57,7 @@ export async function cancelOpenSubscription(
 
   const fields = cancelFields(mode);
   const applied = await deps.subscriptions.update(
-    { id: subscription.id, status: In([...OPEN_STATUSES]) },
+    { id: subscription.id, status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
     fields
   );
   if (applied.affected !== 1) {

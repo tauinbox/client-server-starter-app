@@ -8,16 +8,13 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
+import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
 import { CreditService } from './credit.service';
-
-// A usage record only counts toward a subscription that is currently billable;
-// `canceled`/`incomplete` subscriptions cannot accrue metered usage.
-const ACTIVE_STATUSES = ['trialing', 'active', 'past_due'] as const;
 
 export interface RecordUsageInput {
   customerId: string;
@@ -159,8 +156,10 @@ export class UsageService {
   private findActiveSubscription(
     customerId: string
   ): Promise<Subscription | null> {
+    // A usage record only counts toward a subscription that is currently
+    // billable; `canceled`/`incomplete` ones cannot accrue metered usage.
     return this.subscriptions.findOne({
-      where: { customerId, status: In([...ACTIVE_STATUSES]) },
+      where: { customerId, status: In([...ENTITLED_SUBSCRIPTION_STATUSES]) },
       order: { createdAt: 'DESC' }
     });
   }

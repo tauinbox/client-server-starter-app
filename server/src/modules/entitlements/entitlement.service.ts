@@ -3,10 +3,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
 import { In, IsNull, Repository } from 'typeorm';
-import type {
-  EntitlementLimitKey,
-  SubscriptionStatus
-} from '@app/shared/types';
+import type { EntitlementLimitKey } from '@app/shared/types';
+import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { CacheVersionCounter } from '../../common/utils/cache-version-counter';
 import { MetricsService } from '../core/metrics/metrics.service';
 import { Customer } from '../billing/entities/customer.entity';
@@ -18,17 +16,6 @@ import {
   type EntitlementCapability,
   type ResolvedEntitlements
 } from './entitlement.types';
-
-/**
- * Statuses that keep full entitlements: `active`/`trialing`, plus
- * `past_due` through the dunning grace window. The drop to Free happens on the
- * `past_due → canceled` transition, not on entering `past_due`.
- */
-const ENTITLED_STATUSES: SubscriptionStatus[] = [
-  'active',
-  'trialing',
-  'past_due'
-];
 
 const VERSION_KEY = 'entitlements:version';
 const VERSION_COUNTER_KEY = 'entitlements:version:counter';
@@ -132,8 +119,10 @@ export class EntitlementService {
   private async subscriptionEntitlements(
     customerId: string
   ): Promise<ResolvedEntitlements> {
+    // The drop to Free happens on the `past_due -> canceled` transition, not on
+    // entering `past_due` — the dunning grace window keeps full entitlements.
     const subscription = await this.subscriptions.findOne({
-      where: { customerId, status: In(ENTITLED_STATUSES) },
+      where: { customerId, status: In([...ENTITLED_SUBSCRIPTION_STATUSES]) },
       order: { createdAt: 'DESC' }
     });
     if (subscription) {
