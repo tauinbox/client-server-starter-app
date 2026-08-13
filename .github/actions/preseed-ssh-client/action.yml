@@ -1,0 +1,79 @@
+name: Preseed SSH client
+description: >-
+  Installs the drone-ssh client that appleboy/ssh-action downloads at run time,
+  taking it from the Actions cache and verifying it against a pinned checksum.
+  The action's entrypoint skips its own download when the binary is already
+  present, so a deploy no longer depends on a third-party release URL being
+  reachable, and the executable that runs with the VPS key is pinned by digest
+  instead of being trusted on arrival.
+
+inputs:
+  version:
+    description: drone-ssh release to install. Must match the version appleboy/ssh-action expects.
+    required: false
+    default: '1.8.2'
+  sha256:
+    description: >-
+      sha256 of the linux-amd64 asset for that release, from the release's
+      checksums.txt. Bump together with `version`.
+    required: false
+    default: '1e10a9972eef167d9ddbc39e1ba80f7d44a011b4a6bc4f6149434154d9b6bb24'
+
+outputs:
+  cache-hit:
+    description: >-
+      'true' when the client came from the cache, so the run touched no
+      third-party release URL at all.
+    value: ${{ steps.cache.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    # Keyed on the checksum, so a version bump can never restore the old binary
+    # and the key never has to be invalidated by hand.
+    - name: Restore the SSH client from the cache
+      id: cache
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/drone-ssh
+        key: drone-ssh-${{ inputs.version }}-linux-amd64-${{ inputs.sha256 }}
+
+    # Only reached on a cache miss (first run after a version bump, or after the
+    # 7-day eviction). Retries harder than the action's own curl, which gave up
+    # after 6 attempts during the 2026-08-12 release-URL outage.
+    - name: Download the SSH client
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        BIN="drone-ssh-${VERSION}-linux-amd64"
+        mkdir -p ~/.cache/drone-ssh
+        curl -fsSL --retry 10 --retry-all-errors --retry-delay 5 \
+          -o ~/.cache/drone-ssh/"${BIN}" \
+          "https://github.com/appleboy/drone-ssh/releases/download/v${VERSION}/${BIN}"
+
+    - name: Verify the checksum and install it into the action path
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        SHA256: ${{ inputs.sha256 }}
+      run: |
+        set -euo pipefail
+        BIN="drone-ssh-${VERSION}-linux-amd64"
+        echo "${SHA256}  ${HOME}/.cache/drone-ssh/${BIN}" | sha256sum -c -
+
+        # Where the action's entrypoint looks: "${GITHUB_ACTION_PATH}/${BIN}",
+        # with GITHUB_ACTION_PATH being the runner's checkout of the action.
+        ACTION_DIR="$(dirname "${RUNNER_WORKSPACE}")/_actions/appleboy/ssh-action/v1"
+        if [ ! -d "${ACTION_DIR}" ]; then
+          echo "ERROR: ${ACTION_DIR} does not exist — appleboy/ssh-action@v1 is not used by this job, or its checkout path changed." >&2
+          exit 1
+        fi
+        install -m 0755 ~/.cache/drone-ssh/"${BIN}" "${ACTION_DIR}/${BIN}"
+
+        # Pin the version for the action itself: it defaults to a version of its
+        # own choosing, and a future @v1 release could move it off the binary
+        # installed here, silently putting the download back on the deploy path.
+        echo "DRONE_SSH_VERSION=${VERSION}" >> "${GITHUB_ENV}"
