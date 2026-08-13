@@ -12,6 +12,7 @@ import { In } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import { DEFAULT_CURSOR_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
+import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
 import { encodeCursor } from '../../../common/utils/cursor.util';
 import { User } from '../../users/entities/user.entity';
@@ -27,7 +28,7 @@ import {
   SubscriptionCanceledEvent
 } from '../events/billing.events';
 import { BillingService } from '../billing.service';
-import { OPEN_STATUSES } from '../utils/subscription-status.util';
+
 import { ProrationCalculator } from '../rating/proration-calculator';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import { BillingUserService } from './billing-user.service';
@@ -795,7 +796,7 @@ describe('BillingUserService', () => {
       // was cancelling, and the whole entity would carry it back.
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
       expect(ctx.subscriptions.update).toHaveBeenCalledWith(
-        { id: 'sub-1', status: In([...OPEN_STATUSES]) },
+        { id: 'sub-1', status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
         { cancelAtPeriodEnd: true }
       );
     });
@@ -819,7 +820,7 @@ describe('BillingUserService', () => {
       expect(result.status).toBe('canceled');
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
       expect(ctx.subscriptions.update).toHaveBeenCalledWith(
-        { id: 'sub-1', status: In([...OPEN_STATUSES]) },
+        { id: 'sub-1', status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
         { status: 'canceled', cancelAtPeriodEnd: false }
       );
       expect(ctx.emit).toHaveBeenCalledWith(

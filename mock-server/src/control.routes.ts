@@ -24,6 +24,7 @@ import type {
   OAuthAccount,
   State
 } from './types';
+import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import type { BillingProviderId } from '@app/shared/types';
 import type { NotificationEvent } from '@app/shared/types';
 import { pushToAll, pushToUser } from './sse-hub';
@@ -626,10 +627,6 @@ router.post('/billing/complete-purchase', (req, res) => {
 // Mirrors the server's dunning policy (renewal-queue.constants).
 const DUNNING_MAX_ATTEMPTS = 3;
 
-// Mirrors RenewalService.CHARGEABLE_STATUSES: the statuses a scan may charge
-// and advance. A canceled row is not addressable by either lookup branch.
-const CHARGEABLE_STATUSES = ['trialing', 'active', 'past_due'];
-
 // POST /__control/billing/advance-renewal — renewal-clock advance for E2E:
 // treats the subscription's current period as due NOW and runs one scheduler
 // pass on it, mirroring the server's period-close semantics. `outcome:
@@ -654,12 +651,16 @@ router.post('/billing/advance-renewal', (req, res) => {
     return;
   }
 
+  // A canceled row is not addressable by either lookup branch — a scan may
+  // only charge and advance what the server's scan would.
   const state = getState();
   const byId = subscriptionId
     ? state.billingSubscriptions.get(subscriptionId)
     : undefined;
   let subscription =
-    byId && CHARGEABLE_STATUSES.includes(byId.status) ? byId : undefined;
+    byId && ENTITLED_SUBSCRIPTION_STATUSES.includes(byId.status)
+      ? byId
+      : undefined;
   if (!subscription && userId) {
     const customer = [...state.billingCustomers.values()].find(
       (c) => c.userId === userId
@@ -669,7 +670,7 @@ router.post('/billing/advance-renewal', (req, res) => {
           .filter(
             (s) =>
               s.customerId === customer.id &&
-              CHARGEABLE_STATUSES.includes(s.status)
+              ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
           )
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
       : undefined;

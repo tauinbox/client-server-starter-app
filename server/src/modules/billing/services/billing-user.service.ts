@@ -12,6 +12,11 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
+import {
+  CHANGEABLE_SUBSCRIPTION_STATUSES,
+  ENTITLED_SUBSCRIPTION_STATUSES,
+  OPEN_SUBSCRIPTION_STATUSES
+} from '@app/shared/constants';
 import type {
   BillingProviderId,
   BillingRegion,
@@ -42,24 +47,13 @@ import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
 import { addInterval } from '../utils/period.util';
 import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
-import { OPEN_STATUSES } from '../utils/subscription-status.util';
 import { INVOICE_SORT_COLUMN_MAP } from '../utils/list-order.util';
 import type { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
 
-/** Subscriptions that grant access — re-checkout while one exists is blocked. */
-const ACTIVE_STATUSES = ['trialing', 'active', 'past_due'] as const;
-
 const ALREADY_SUBSCRIBED_MESSAGE =
   'You already have an active subscription. Cancel it before subscribing to another plan.';
-
-/**
- * Statuses a plan change is allowed from. `past_due` must settle its debt first
- * (a switch would tangle proration with dunning); `incomplete` has nothing to
- * prorate yet.
- */
-const CHANGEABLE_STATUSES = ['trialing', 'active'] as const;
 
 /** Everything a plan change / proration preview operates on. */
 interface ChangeContext {
@@ -379,8 +373,12 @@ export class BillingUserService {
 
     const customer = await this.getOrCreateCustomer(userId);
 
+    // Re-checkout while an access-granting subscription exists is blocked.
     const active = await this.subscriptions.findOne({
-      where: { customerId: customer.id, status: In([...ACTIVE_STATUSES]) }
+      where: {
+        customerId: customer.id,
+        status: In([...ENTITLED_SUBSCRIPTION_STATUSES])
+      }
     });
     if (active) {
       throw new ConflictException(ALREADY_SUBSCRIBED_MESSAGE);
@@ -720,7 +718,7 @@ export class BillingUserService {
       {
         id: subscription.id,
         version: subscription.version,
-        status: In([...CHANGEABLE_STATUSES]),
+        status: In([...CHANGEABLE_SUBSCRIPTION_STATUSES]),
         cancelAtPeriodEnd: false
       },
       { planKey: toPlan.key, billingMode: toPlan.billingMode }
@@ -746,7 +744,7 @@ export class BillingUserService {
       {
         id: subscription.id,
         version: subscription.version,
-        status: In([...CHANGEABLE_STATUSES]),
+        status: In([...CHANGEABLE_SUBSCRIPTION_STATUSES]),
         cancelAtPeriodEnd: false
       },
       { version: subscription.version + 1 }
@@ -834,9 +832,7 @@ export class BillingUserService {
       userId,
       'No active subscription to change'
     );
-    if (
-      !(CHANGEABLE_STATUSES as readonly string[]).includes(subscription.status)
-    ) {
+    if (!CHANGEABLE_SUBSCRIPTION_STATUSES.includes(subscription.status)) {
       throw new ConflictException(
         'The subscription must be active to change plans. Settle any outstanding payment first.'
       );
@@ -1061,7 +1057,10 @@ export class BillingUserService {
     // No in-place cross-provider migration: if a live subscription
     // is on a different provider than the new region resolves to, reject.
     const open = await this.subscriptions.findOne({
-      where: { customerId: customer.id, status: In([...OPEN_STATUSES]) }
+      where: {
+        customerId: customer.id,
+        status: In([...OPEN_SUBSCRIPTION_STATUSES])
+      }
     });
     if (open && open.provider !== newEffective) {
       throw new ConflictException(
@@ -1143,7 +1142,7 @@ export class BillingUserService {
     customerId: string
   ): Promise<Subscription | null> {
     return this.subscriptions.findOne({
-      where: { customerId, status: In([...OPEN_STATUSES]) },
+      where: { customerId, status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
       order: { createdAt: 'DESC' }
     });
   }

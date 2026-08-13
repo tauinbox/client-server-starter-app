@@ -4,6 +4,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, In, type EntityManager } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
+import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
 import { CustomerGrant } from '../entities/customer-grant.entity';
@@ -48,14 +49,6 @@ function parseDate(iso: string | null, fallback: Date): Date {
 function lifecycleOwnerFor(provider: BillingProviderId): 'provider' | 'self' {
   return provider === 'yookassa' ? 'self' : 'provider';
 }
-
-/** Non-canceled subscription statuses a self-managed first payment can land on. */
-const SELF_MANAGED_OPEN_STATUSES = [
-  'incomplete',
-  'trialing',
-  'active',
-  'past_due'
-] as const;
 
 /**
  * Reduces a verified, provider-agnostic `NormalizedEvent` onto our
@@ -165,7 +158,7 @@ export class BillingEventReducer {
         const openExisting = await manager.findOne(Subscription, {
           where: {
             customerId: payload.ref.customerId,
-            status: In([...SELF_MANAGED_OPEN_STATUSES])
+            status: In([...OPEN_SUBSCRIPTION_STATUSES])
           }
         });
         if (openExisting) {
@@ -436,7 +429,7 @@ export class BillingEventReducer {
             ? await manager.findOne(Subscription, {
                 where: {
                   customerId,
-                  status: In([...SELF_MANAGED_OPEN_STATUSES])
+                  status: In([...OPEN_SUBSCRIPTION_STATUSES])
                 },
                 order: { createdAt: 'DESC' }
               })
@@ -656,7 +649,7 @@ export class BillingEventReducer {
       );
 
       const subscription = await manager.findOne(Subscription, {
-        where: { customerId, status: In([...SELF_MANAGED_OPEN_STATUSES]) },
+        where: { customerId, status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
         order: { createdAt: 'DESC' }
       });
       if (subscription) {

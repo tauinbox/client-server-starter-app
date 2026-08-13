@@ -4,6 +4,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import KeyvRedis from '@keyv/redis';
 import { In, IsNull } from 'typeorm';
 import type { SubscriptionStatus } from '@app/shared/types';
+import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { MetricsService } from '../core/metrics/metrics.service';
 import { Customer } from '../billing/entities/customer.entity';
 import { CustomerGrant } from '../billing/entities/customer-grant.entity';
@@ -98,7 +99,7 @@ describe('EntitlementService', () => {
       expect(subscriptions.findOne).toHaveBeenCalledWith({
         where: {
           customerId: 'cust-1',
-          status: In(['active', 'trialing', 'past_due'])
+          status: In([...ENTITLED_SUBSCRIPTION_STATUSES])
         },
         order: { createdAt: 'DESC' }
       });

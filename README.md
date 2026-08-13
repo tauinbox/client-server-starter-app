@@ -328,7 +328,8 @@ fullstack-starter-app/
 │       ├── types/          # UserResponse, AdminUserResponse, AuthResponse, PaginatedResponse<T>,
 │       │                   # RoleResponse (public) / RoleAdminResponse (with isSystem/isSuper),
 │       │                   # PermissionResponse, UserPermissionsResponse, etc.
-│       ├── constants/      # PASSWORD_REGEX, pagination defaults, SYSTEM_ROLES, MAX_CONCURRENT_SESSIONS, etc.
+│       ├── constants/      # PASSWORD_REGEX, pagination defaults, SYSTEM_ROLES, MAX_CONCURRENT_SESSIONS,
+│       │                   # ENTITLED/OPEN/CHANGEABLE_SUBSCRIPTION_STATUSES (one definition each), etc.
 │       └── utils/          # feature-flag-evaluator, mongo-query-safety, time (Temporal barrel), money (BigInt value object)
 ├── client/                 # Angular 21 SPA
 │   ├── src/app/
