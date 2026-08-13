@@ -623,7 +623,7 @@ Set `GRAFANA_ADMIN_PASSWORD` as a shell environment variable before running `doc
 
 `.github/dependabot.yml` — keeps the `@sha256` base-image digests pinned in `server/Dockerfile` and `client/Dockerfile` current (docker ecosystem, weekly; major `node`/`nginx` bumps ignored), so builds are reproducible while still receiving reviewed upstream base updates.
 
-All VPS-facing workflows share a `deploy-production` concurrency group to prevent race conditions.
+All VPS-facing workflows share a `deploy-production` concurrency group to prevent race conditions. `rollback.yml` is the one member that sets `cancel-in-progress: true`, so an emergency rollback preempts whatever holds the group instead of queueing behind it — otherwise a wedged deploy blocks the rollback that exists to undo it. Every job that opens an SSH session also carries `timeout-minutes`, because the SSH action's own connect and command timeouts have been observed not to end a session against an unresponsive host.
 
 ### Production credentials & secrets
 
