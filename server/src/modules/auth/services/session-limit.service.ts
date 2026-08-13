@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
-import { EntitlementService } from '../../billing/entitlements/entitlement.service';
+import { EntitlementService } from '../../entitlements/entitlement.service';
 
 /**
  * Resolves how many refresh tokens a user may hold at once. Paid tiers raise the

@@ -21,7 +21,7 @@ import { Plan } from './entities/plan.entity';
 import { Subscription } from './entities/subscription.entity';
 import { UsageRecord } from './entities/usage-record.entity';
 import { WebhookEvent } from './entities/webhook-event.entity';
-import { EntitlementsModule } from './entitlements/entitlements.module';
+import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { EntitlementChangedListener } from './listeners/entitlement-changed.listener';
 import { BillingUserDeletedListener } from './listeners/billing-user-deleted.listener';
 import { PaddleProvider } from './providers/paddle.provider';

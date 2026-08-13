@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Customer } from '../entities/customer.entity';
-import { CustomerGrant } from '../entities/customer-grant.entity';
-import { Plan } from '../entities/plan.entity';
-import { Subscription } from '../entities/subscription.entity';
+import { Customer } from '../billing/entities/customer.entity';
+import { CustomerGrant } from '../billing/entities/customer-grant.entity';
+import { Plan } from '../billing/entities/plan.entity';
+import { Subscription } from '../billing/entities/subscription.entity';
 import { EntitlementService } from './entitlement.service';
 import { EntitlementGuard } from './entitlement.guard';
 

@@ -20,7 +20,7 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { SessionLimitService } from './session-limit.service';
-import { EntitlementService } from '../../billing/entitlements/entitlement.service';
+import { EntitlementService } from '../../entitlements/entitlement.service';
 
 describe('AuthService', () => {
   let service: AuthService;

@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationsService } from '../../notifications/notifications.service';
-import { EntitlementService } from '../entitlements/entitlement.service';
+import { EntitlementService } from '../../entitlements/entitlement.service';
 import { EntitlementChangedListener } from './entitlement-changed.listener';
 import {
   ENTITLEMENT_CHANGING_EVENTS,

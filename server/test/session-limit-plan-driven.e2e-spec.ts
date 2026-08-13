@@ -13,7 +13,7 @@ import { AuthService } from '../src/modules/auth/services/auth.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
 import { SessionLimitService } from '../src/modules/auth/services/session-limit.service';
 import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity';
-import { EntitlementService } from '../src/modules/billing/entitlements/entitlement.service';
+import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { CustomerGrant } from '../src/modules/billing/entities/customer-grant.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';

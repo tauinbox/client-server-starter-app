@@ -1,9 +1,9 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { JwtAuthRequest } from '../../auth/types/auth.request';
+import type { JwtAuthRequest } from '../auth/types/auth.request';
 import { EntitlementGuard } from './entitlement.guard';
 import { EntitlementService } from './entitlement.service';
-import { createMockExecutionContext } from '../../../common/testing/execution-context.mock';
+import { createMockExecutionContext } from '../../common/testing/execution-context.mock';
 
 describe('EntitlementGuard', () => {
   let guard: EntitlementGuard;

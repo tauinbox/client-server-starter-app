@@ -7,12 +7,12 @@ import type {
   EntitlementLimitKey,
   SubscriptionStatus
 } from '@app/shared/types';
-import { CacheVersionCounter } from '../../../common/utils/cache-version-counter';
-import { MetricsService } from '../../core/metrics/metrics.service';
-import { Customer } from '../entities/customer.entity';
-import { CustomerGrant } from '../entities/customer-grant.entity';
-import { Plan } from '../entities/plan.entity';
-import { Subscription } from '../entities/subscription.entity';
+import { CacheVersionCounter } from '../../common/utils/cache-version-counter';
+import { MetricsService } from '../core/metrics/metrics.service';
+import { Customer } from '../billing/entities/customer.entity';
+import { CustomerGrant } from '../billing/entities/customer-grant.entity';
+import { Plan } from '../billing/entities/plan.entity';
+import { Subscription } from '../billing/entities/subscription.entity';
 import {
   FREE_PLAN_KEY,
   type EntitlementCapability,

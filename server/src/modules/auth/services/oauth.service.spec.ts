@@ -9,7 +9,7 @@ import { RefreshTokenService } from './refresh-token.service';
 import { OAuthAccountService } from './oauth-account.service';
 import { RoleService } from './role.service';
 import { SessionLimitService } from './session-limit.service';
-import { EntitlementService } from '../../billing/entitlements/entitlement.service';
+import { EntitlementService } from '../../entitlements/entitlement.service';
 import { TokenGeneratorService } from './token-generator.service';
 import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';

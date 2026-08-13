@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationsService } from '../../notifications/notifications.service';
-import { EntitlementService } from '../entitlements/entitlement.service';
+import { EntitlementService } from '../../entitlements/entitlement.service';
 import { ENTITLEMENT_CHANGING_EVENTS } from '../events/billing.events';
 
 /**

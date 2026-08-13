@@ -8,7 +8,7 @@ import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { CustomerGrant } from '../src/modules/billing/entities/customer-grant.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
-import { EntitlementService } from '../src/modules/billing/entitlements/entitlement.service';
+import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 
 const REDIS_URL = process.env['REDIS_URL'];

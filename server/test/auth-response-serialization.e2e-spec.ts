@@ -29,7 +29,7 @@ import { UsersService } from '../src/modules/users/services/users.service';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { SessionLimitService } from '../src/modules/auth/services/session-limit.service';
-import { EntitlementService } from '../src/modules/billing/entitlements/entitlement.service';
+import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';

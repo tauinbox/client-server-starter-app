@@ -26,7 +26,7 @@ import { VkStrategy } from './strategies/vk.strategy';
 import { User } from '../users/entities/user.entity';
 import { CaslModule } from './casl/casl.module';
 import { CaptchaModule } from './captcha/captcha.module';
-import { EntitlementsModule } from '../billing/entitlements/entitlements.module';
+import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { SessionLimitService } from './services/session-limit.service';
 import { RoleService } from './services/role.service';
 import { RolesController } from './controllers/roles.controller';

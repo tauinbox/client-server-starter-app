@@ -27,7 +27,7 @@ import { BILLING_PROVIDERS } from '../src/modules/billing/providers/payment-prov
 import { FixedRating } from '../src/modules/billing/rating/fixed-rating.strategy';
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { BillingService } from '../src/modules/billing/billing.service';
-import { EntitlementService } from '../src/modules/billing/entitlements/entitlement.service';
+import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import { UsageService } from '../src/modules/billing/services/usage.service';
 import { UsageInvoicingService } from '../src/modules/billing/services/usage-invoicing.service';
