@@ -14,7 +14,21 @@ concurrency:
 jobs:
   build-push:
     name: Build & Push Images
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # The `branches: [master]` filter above matches the TRIGGERING run's head
+    # branch, and CI also runs on pull_request. A fork ships with a branch
+    # called `master`, so a pull request opened from it produced a CI run that
+    # satisfied the filter, and this job then checked out `head_sha` — the
+    # fork's commit — built it and deployed it to production with every secret
+    # in `envs:` below. Nothing else gated it: the repository is public and has
+    # no environment with a manual approval. So pin all three axes of the
+    # trigger, not just its conclusion: the source event, the source branch and
+    # the source repository.
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'master' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
