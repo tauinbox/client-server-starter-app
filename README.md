@@ -619,6 +619,8 @@ Set `GRAFANA_ADMIN_PASSWORD` as a shell environment variable before running `doc
 
 `.github/workflows/edge-patch-cleanup.yml` — quarterly check that creates a PR to remove the Dockerfile `CVE_PATCHES` blocks once the fixes are present in the base image.
 
+`.github/actions/preseed-ssh-client` — local composite action that installs the `drone-ssh` client used by `appleboy/ssh-action` before that action runs. The action downloads its worker binary from a GitHub release on every invocation and aborts the job when that URL is unavailable, which is how a deploy failed on six consecutive 503s. The composite action restores the binary from the Actions cache, checks it against a pinned sha256 and installs it where the action looks for it, so the action skips its own download. Two properties follow: in the steady state a deploy contacts no third-party release URL at all, and the executable that runs with the VPS SSH key is pinned by digest instead of being trusted on arrival. The pinned version and checksum live in that one file — bump them together, taking the value from the release's `checksums.txt`. Wired into `deploy.yml`; `rebuild.yml`, `rollback.yml` and `rotate-keys.yml` still let the action fetch its own binary.
+
 `.github/dependabot.yml` — keeps the `@sha256` base-image digests pinned in `server/Dockerfile` and `client/Dockerfile` current (docker ecosystem, weekly; major `node`/`nginx` bumps ignored), so builds are reproducible while still receiving reviewed upstream base updates.
 
 All VPS-facing workflows share a `deploy-production` concurrency group to prevent race conditions.

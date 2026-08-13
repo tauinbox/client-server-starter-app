@@ -132,6 +132,19 @@ jobs:
     needs: build-push
     runs-on: ubuntu-latest
     steps:
+      # Checked out only to make the local composite action below available;
+      # nothing else in this job reads the workspace.
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # appleboy/ssh-action fetches its worker binary from a GitHub release on
+      # every run and aborts the deploy when that URL is unavailable, which is
+      # how run 31621702560 failed on six consecutive 503s. Installing the
+      # binary from the cache first makes the action skip that download.
+      - name: Preseed the SSH client
+        uses: ./.github/actions/preseed-ssh-client
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
