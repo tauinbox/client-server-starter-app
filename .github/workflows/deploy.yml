@@ -195,77 +195,6 @@ jobs:
               exit 1
             fi
 
-            # TEMPORARY INSTRUMENTATION — remove once one deploy has been measured.
-            #
-            # On 2026-08-13 a deploy exhausted this host and it stopped scheduling
-            # userspace until it was power-cycled. Which phase consumes the memory
-            # is not known: the plausible candidates are layer decompression during
-            # the pull and the server container's boot peak (179 MB against 71 MB
-            # at rest), and `docker compose up -d` recreates sequentially, so the
-            # "old and new container alive together" theory does not hold. Sampling
-            # answers it; guessing does not.
-            #
-            # The sampler is bounded to 150 iterations (5 min) rather than looping
-            # forever, because the same incident showed the script can stop being
-            # executed entirely — an unbounded background loop would then outlive
-            # the session on the very host that ran out of resources. Reading
-            # /proc/meminfo costs nothing; nothing heavier runs here.
-            # mktemp rather than a fixed /tmp path: a predictable name in a
-            # world-writable directory can be pre-created as a symlink, and this
-            # script runs as the deploy user, so the truncation would land on
-            # whatever that user can write — the repository or server/.env.
-            # Falling back to /dev/null keeps a failure here from aborting a
-            # deploy; diagnostics must never decide whether a release ships.
-            MEM_LOG=$(mktemp /tmp/deploy-mem.XXXXXX 2>/dev/null || echo /dev/null)
-            VMSTAT_BEFORE=$(awk '/^pswpin|^pswpout/{printf "%s=%s ", $1, $2}' /proc/vmstat)
-            # stdin/stdout/stderr are detached deliberately. A backgrounded process
-            # that keeps the SSH channel's descriptors open stops the session from
-            # closing, and a deploy that hangs on its own diagnostics would be the
-            # exact failure this instrumentation exists to explain.
-            (
-              for _ in $(seq 1 150); do
-                awk -v t="$(date +%H:%M:%S)" \
-                  '/^MemAvailable:/{a=$2} /^SwapFree:/{s=$2} END{print t, a, s}' \
-                  /proc/meminfo >> "$MEM_LOG"
-                sleep 2
-              done
-            ) </dev/null >/dev/null 2>&1 &
-            MEM_SAMPLER=$!
-
-            # Diagnostics must never change the outcome of a deploy. `set -e` is
-            # disabled inside the report so one unavailable counter cannot cut it
-            # short, and the entry status is captured first and re-raised at the
-            # end — without that, a failing command in an EXIT trap replaces the
-            # script's exit code and reports a successful deploy as a failure.
-            report_memory() {
-              rc=$?
-              set +e
-              kill "$MEM_SAMPLER" 2>/dev/null
-              echo "=== deploy memory report ==="
-              echo "--- lowest MemAvailable samples (time, MemAvailable kB, SwapFree kB) ---"
-              sort -k2 -n "$MEM_LOG" | head -8
-              echo "--- last sample ---"
-              tail -1 "$MEM_LOG"
-              echo "--- pswpin/pswpout before: ${VMSTAT_BEFORE}"
-              printf -- "--- pswpin/pswpout after:  "
-              awk '/^pswpin|^pswpout/{printf "%s=%s ", $1, $2}' /proc/vmstat
-              echo
-              echo "--- container memory (name, current bytes, peak bytes) ---"
-              for c in $(docker ps --format '{{.Names}}' 2>/dev/null); do
-                pid=$(docker inspect -f '{{.State.Pid}}' "$c" 2>/dev/null)
-                rel=$(awk -F: '$1=="0"{print $3}' "/proc/${pid}/cgroup" 2>/dev/null)
-                cur=$(cat "/sys/fs/cgroup${rel}/memory.current" 2>/dev/null || echo n/a)
-                peak=$(cat "/sys/fs/cgroup${rel}/memory.peak" 2>/dev/null || echo n/a)
-                echo "$c $cur $peak"
-              done
-              echo "=== end memory report ==="
-              if [ "$MEM_LOG" != /dev/null ]; then rm -f "$MEM_LOG"; fi
-              exit "$rc"
-            }
-            trap report_memory EXIT
-
-            echo "PHASE sync-env $(date +%H:%M:%S)"
-
             # Sync managed credentials (SMTP, JWT keys, DB_PASSWORD, OAuth, etc.)
             # from GitHub Secrets into server/.env (and root .env for DB_PASSWORD).
             # Source of truth is the secrets, so a from-scratch rebuild restores
@@ -273,11 +202,8 @@ jobs:
             # is a safe no-op for any secret not yet populated. See the script.
             bash scripts/sync-prod-env.sh
 
-            echo "PHASE pull $(date +%H:%M:%S)"
             docker compose pull
-            echo "PHASE up $(date +%H:%M:%S)"
             docker compose up -d --remove-orphans
-            echo "PHASE health $(date +%H:%M:%S)"
 
             # Health check with timeout — require ALL services with healthcheck to be healthy
             echo "Waiting for services to become healthy..."
