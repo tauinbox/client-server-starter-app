@@ -156,6 +156,16 @@ jobs:
     # a no-cache image build and legitimately takes far longer.
     timeout-minutes: 15
     steps:
+      # This job is separate from rebuild-push, so it needs its own checkout —
+      # only to make the local composite action below available. No `ref:`:
+      # this workflow is scheduled or dispatched, so the default is correct.
+      - uses: actions/checkout@v6
+
+      # Keeps the third-party release download off the deploy path — see
+      # deploy.yml for the full rationale.
+      - name: Preseed the SSH client
+        uses: ./.github/actions/preseed-ssh-client
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:

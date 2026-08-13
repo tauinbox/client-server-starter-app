@@ -111,6 +111,17 @@ jobs:
     # comment in deploy.yml.
     timeout-minutes: 15
     steps:
+      # Checked out only to make the local composite action below available.
+      # No `ref:` — this workflow is dispatched, so the default is correct.
+      - uses: actions/checkout@v6
+
+      # The action downloads its worker binary from a GitHub release on every
+      # run; a 503 there aborts the job before it connects. This is the site
+      # where that matters most — an emergency rollback failing on the same
+      # outage as the deploy it undoes. See deploy.yml for the full rationale.
+      - name: Preseed the SSH client
+        uses: ./.github/actions/preseed-ssh-client
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
