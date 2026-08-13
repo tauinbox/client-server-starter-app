@@ -31,6 +31,15 @@ jobs:
             echo "value=" >> $GITHUB_OUTPUT
           fi
 
+      # Checked out only to make the local composite action below available.
+      # No `ref:` — this workflow is dispatched, so the default is correct.
+      - uses: actions/checkout@v6
+
+      # Keeps the third-party release download off the path that rewrites the
+      # JWT keys — see deploy.yml for the full rationale.
+      - name: Preseed the SSH client
+        uses: ./.github/actions/preseed-ssh-client
+
       - name: Rotate keys via SSH
         uses: appleboy/ssh-action@v1
         with:
