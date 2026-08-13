@@ -8,6 +8,8 @@ import { UsersService } from '../../users/services/users.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { OAuthAccountService } from './oauth-account.service';
 import { RoleService } from './role.service';
+import { SessionLimitService } from './session-limit.service';
+import { EntitlementService } from '../../entitlements/entitlement.service';
 import { TokenGeneratorService } from './token-generator.service';
 import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
@@ -59,6 +61,9 @@ describe('OAuthService', () => {
   };
   let mockMailService: {
     sendEmailVerification: jest.Mock;
+  };
+  let mockEntitlementService: {
+    limitFor: jest.Mock;
   };
 
   const mockUserRole = {
@@ -160,9 +165,17 @@ describe('OAuthService', () => {
       sendEmailVerification: jest.fn().mockResolvedValue(undefined)
     };
 
+    // Free tier by default: no plan-specific allowance, so pruning must fall
+    // back to the constant. Individual tests raise or break it.
+    mockEntitlementService = {
+      limitFor: jest.fn().mockResolvedValue(null)
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OAuthService,
+        SessionLimitService,
+        { provide: EntitlementService, useValue: mockEntitlementService },
         { provide: DataSource, useValue: mockDataSource },
         { provide: UsersService, useValue: mockUsersService },
         { provide: ConfigService, useValue: mockConfigService },
@@ -225,6 +238,52 @@ describe('OAuthService', () => {
       );
       // OAuth response must carry roles as RoleResponse[] (not string[]).
       expect(result.user.roles).toEqual([mockUserRole]);
+    });
+
+    it('prunes to the plan allowance when the plan carries a sessions limit', async () => {
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        id: '1',
+        provider: 'google',
+        providerId: 'google-123',
+        userId: 'oauth-user-1'
+      });
+      mockUsersService.findOne.mockResolvedValue(oauthUser);
+      mockEntitlementService.limitFor.mockResolvedValue(10);
+
+      await service.loginWithOAuth(oauthProfile);
+
+      // A paid allowance must survive the provider path too: trimming to the
+      // constant here would evict devices the user paid for the moment they
+      // signed in with Google rather than a password.
+      expect(mockEntitlementService.limitFor).toHaveBeenCalledWith(
+        'oauth-user-1',
+        'sessions'
+      );
+      expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
+        'oauth-user-1',
+        10
+      );
+    });
+
+    it('still signs in on the default allowance when entitlement resolution throws', async () => {
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        id: '1',
+        provider: 'google',
+        providerId: 'google-123',
+        userId: 'oauth-user-1'
+      });
+      mockUsersService.findOne.mockResolvedValue(oauthUser);
+      mockEntitlementService.limitFor.mockRejectedValue(
+        new Error('billing unavailable')
+      );
+
+      const result = await service.loginWithOAuth(oauthProfile);
+
+      expect(result.tokens).toBeDefined();
+      expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
+        'oauth-user-1',
+        MAX_CONCURRENT_SESSIONS
+      );
     });
 
     it('should return the User entity instance so @Exclude() fields can be stripped downstream', async () => {

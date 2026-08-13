@@ -10,6 +10,7 @@ import { RefreshToken } from '../entities/refresh-token.entity';
 import { LocalAuthRequest } from '../types/auth.request';
 import { RefreshTokenService } from './refresh-token.service';
 import { RoleService } from './role.service';
+import { SessionLimitService } from './session-limit.service';
 import { TokenGeneratorService } from './token-generator.service';
 import { MailService } from '../../mail/mail.service';
 import { AuditService, AuditContext } from '../../audit/audit.service';
@@ -23,7 +24,6 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
   MAX_FAILED_ATTEMPTS,
   LOCKOUT_DURATION_MS,
-  MAX_CONCURRENT_SESSIONS,
   BCRYPT_SALT_ROUNDS,
   EMAIL_CHANGE_TOKEN_EXPIRY_MS
 } from '@app/shared/constants/auth.constants';
@@ -87,7 +87,8 @@ export class AuthService {
     private tokenGenerator: TokenGeneratorService,
     private mailService: MailService,
     private auditService: AuditService,
-    private metricsService: MetricsService
+    private metricsService: MetricsService,
+    private sessionLimitService: SessionLimitService
   ) {}
 
   // Dummy hash for constant-time rejection (prevents timing attacks).
@@ -207,7 +208,7 @@ export class AuthService {
     );
     await this.refreshTokenService.pruneOldestTokens(
       user.id,
-      MAX_CONCURRENT_SESSIONS
+      await this.sessionLimitService.maxSessionsFor(user.id)
     );
 
     return {

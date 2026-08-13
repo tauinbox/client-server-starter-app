@@ -16,6 +16,7 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { InvoiceResponse } from '@app/shared/types';
+import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
 import { LayoutService } from '@core/services/layout.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
@@ -23,6 +24,7 @@ import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.dire
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
 import { BillingStore } from '../../store/billing.store';
+import { EntitlementsStore } from '../../store/entitlements.store';
 import { formatMoney, planPriceFor } from '../../utils/billing-format';
 import type {
   ChangePlanDialogData,
@@ -53,6 +55,7 @@ import { UsageMeterComponent } from '../usage-meter/usage-meter.component';
 })
 export class BillingSettingsComponent implements OnInit {
   protected readonly store = inject(BillingStore);
+  readonly #entitlements = inject(EntitlementsStore);
   readonly #layout = inject(LayoutService);
   readonly #dialog = inject(AdaptiveDialogService);
   readonly #matDialog = inject(MatDialog);
@@ -74,6 +77,17 @@ export class BillingSettingsComponent implements OnInit {
   readonly #lang = toSignal(this.#transloco.langChanges$, {
     initialValue: this.#transloco.getActiveLang()
   });
+
+  readonly #sessionsLimit = this.#entitlements.limit('sessions');
+
+  /**
+   * Read from the resolved-entitlements mirror rather than the plan catalog:
+   * the catalog cannot express the Free fallback, and the server applies the
+   * same `?? MAX_CONCURRENT_SESSIONS` when the plan carries no limit.
+   */
+  protected readonly deviceAllowance = computed(
+    () => this.#sessionsLimit() ?? MAX_CONCURRENT_SESSIONS
+  );
 
   protected readonly currentPriceLabel = computed(() => {
     const sub = this.store.subscription();
@@ -114,6 +128,7 @@ export class BillingSettingsComponent implements OnInit {
 
   ngOnInit(): void {
     void this.store.loadSettings();
+    void this.#entitlements.load();
   }
 
   protected loadMoreInvoices(): void {

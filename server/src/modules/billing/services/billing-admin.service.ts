@@ -18,7 +18,7 @@ import { Invoice } from '../entities/invoice.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { WebhookEvent } from '../entities/webhook-event.entity';
-import { EntitlementService } from '../entitlements/entitlement.service';
+import { EntitlementService } from '../../entitlements/entitlement.service';
 import type { CancelMode } from '../providers/payment-provider.interface';
 import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
 import {

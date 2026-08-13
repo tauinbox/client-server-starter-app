@@ -29,6 +29,7 @@ import {
   toUserResponse
 } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
+import { resolveEntitlementLimit } from './billing.middleware';
 import {
   CAPTCHA_ROUTE_LIMITS,
   evaluateCaptcha,
@@ -293,7 +294,13 @@ router.post('/login', (req, res) => {
 
   const tokens = generateTokens(user);
   state.refreshTokens.set(tokens.refresh_token, user.id);
-  pruneOldestUserTokens(state.refreshTokens, user.id, MAX_CONCURRENT_SESSIONS);
+  // Concurrent-session allowance is plan-driven; a plan carrying no `sessions`
+  // limit (Free, usage) keeps the constant, exactly as the server resolves it.
+  pruneOldestUserTokens(
+    state.refreshTokens,
+    user.id,
+    resolveEntitlementLimit(user.id, 'sessions') ?? MAX_CONCURRENT_SESSIONS
+  );
 
   logAudit('USER_LOGIN_SUCCESS', {
     actorId: user.id,

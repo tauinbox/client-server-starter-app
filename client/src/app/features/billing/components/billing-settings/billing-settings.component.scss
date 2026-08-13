@@ -86,6 +86,25 @@
   @include mix.form-actions(flex-start);
 }
 
+.device-allowance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: vars.$spacing-xs vars.$spacing-sm;
+  align-items: center;
+  padding-top: vars.$spacing-md;
+  margin: vars.$spacing-md 0 0;
+  font-size: vars.$font-size-sm;
+  border-top: func.rem(1) solid var(--mat-sys-outline-variant);
+
+  mat-icon {
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .hint {
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
 .empty-state {
   @include mix.empty-state;
 }

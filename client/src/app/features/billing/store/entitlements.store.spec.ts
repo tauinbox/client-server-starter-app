@@ -52,12 +52,19 @@ describe('EntitlementsStore', () => {
     expect(store.has('priority-support')()).toBe(false);
   });
 
-  it('limit(key) reports the plan number, null when the plan carries none', async () => {
+  it('limit(key) reports the plan number', async () => {
     const store = TestBed.inject(EntitlementsStore);
     await store.load();
 
     expect(store.limit('sessions')()).toBe(10);
-    expect(store.limit('records')()).toBeNull();
+  });
+
+  it('limit(key) is null when the plan in force carries no such limit', async () => {
+    getEntitlements.mockReturnValue(of(FREE));
+    const store = TestBed.inject(EntitlementsStore);
+    await store.load();
+
+    expect(store.limit('sessions')()).toBeNull();
   });
 
   it('concurrent load() calls share one request', async () => {

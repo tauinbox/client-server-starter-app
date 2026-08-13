@@ -21,8 +21,7 @@ import { Plan } from './entities/plan.entity';
 import { Subscription } from './entities/subscription.entity';
 import { UsageRecord } from './entities/usage-record.entity';
 import { WebhookEvent } from './entities/webhook-event.entity';
-import { EntitlementService } from './entitlements/entitlement.service';
-import { EntitlementGuard } from './entitlements/entitlement.guard';
+import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { EntitlementChangedListener } from './listeners/entitlement-changed.listener';
 import { BillingUserDeletedListener } from './listeners/billing-user-deleted.listener';
 import { PaddleProvider } from './providers/paddle.provider';
@@ -85,6 +84,7 @@ export class BillingModule {
       module: BillingModule,
       imports: [
         AuthModule,
+        EntitlementsModule,
         FeatureFlagsModule,
         NotificationsModule,
         TypeOrmModule.forFeature([
@@ -136,8 +136,6 @@ export class BillingModule {
         UsageService,
         UsageInvoicingService,
         BillingConfiguredAttributesRegistrar,
-        EntitlementService,
-        EntitlementGuard,
         EntitlementChangedListener,
         BillingUserDeletedListener,
         PaddleProvider,
@@ -188,8 +186,10 @@ export class BillingModule {
       exports: [
         BillingService,
         BillingConfigService,
-        EntitlementService,
-        EntitlementGuard,
+        // Re-exported as a module: `EntitlementService`/`EntitlementGuard` are
+        // provided by `EntitlementsModule`, so importers of `BillingModule`
+        // keep resolving both without changing an import path.
+        EntitlementsModule,
         UsageService,
         CreditService,
         BILLING_PROVIDERS

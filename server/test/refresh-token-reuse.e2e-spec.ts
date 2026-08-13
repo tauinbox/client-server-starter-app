@@ -11,6 +11,8 @@ import { DataSource, Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
+import { SessionLimitService } from '../src/modules/auth/services/session-limit.service';
+import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
@@ -172,6 +174,13 @@ describe('Refresh token reuse detection (e2e)', () => {
       providers: [
         AuthService,
         RefreshTokenService,
+        // Real resolver over a plan carrying no `sessions` limit, so pruning
+        // falls back to MAX_CONCURRENT_SESSIONS exactly as Free tier does.
+        SessionLimitService,
+        {
+          provide: EntitlementService,
+          useValue: { limitFor: jest.fn().mockResolvedValue(null) }
+        },
         { provide: getRepositoryToken(RefreshToken), useValue: rtRepo },
         { provide: DataSource, useValue: ds },
         {

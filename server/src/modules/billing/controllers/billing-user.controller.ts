@@ -20,8 +20,8 @@ import {
 import type { EntitlementsResponse } from '@app/shared/types';
 import type { JwtAuthRequest } from '../../auth/types/auth.request';
 import { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
-import { EntitlementService } from '../entitlements/entitlement.service';
-import { RequireEntitlement } from '../entitlements/require-entitlement.decorator';
+import { EntitlementService } from '../../entitlements/entitlement.service';
+import { RequireEntitlement } from '../../entitlements/require-entitlement.decorator';
 import { BillingUserService } from '../services/billing-user.service';
 import { EntitlementsResponseDto } from '../dtos/entitlements-response.dto';
 import { CheckoutRequestDto } from '../dtos/checkout-request.dto';

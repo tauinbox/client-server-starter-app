@@ -9,6 +9,7 @@ import {
 import type {
   BillingMode,
   BillingProviderId,
+  EntitlementLimits,
   PlanInterval,
   PlanPrice
 } from '@app/shared/types';
@@ -41,7 +42,7 @@ export class Plan {
   entitlements: string[];
 
   @Column({ type: 'jsonb', nullable: true })
-  limits: Record<string, number> | null;
+  limits: EntitlementLimits | null;
 
   @Column({ name: 'trial_days', type: 'integer', default: 0 })
   trialDays: number;

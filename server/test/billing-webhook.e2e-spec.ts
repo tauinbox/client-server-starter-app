@@ -16,7 +16,7 @@ import * as request from 'supertest';
 import type { NextFunction, Request, Response } from 'express';
 import type { Server } from 'http';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
-import { EntitlementService } from '../src/modules/billing/entitlements/entitlement.service';
+import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import { CreditBalance } from '../src/modules/billing/entities/credit-balance.entity';
 import { CreditLedger } from '../src/modules/billing/entities/credit-ledger.entity';
@@ -43,7 +43,7 @@ import { WebhookIngestionService } from '../src/modules/billing/webhooks/webhook
 import { BillingWebhooksController } from '../src/modules/billing/webhooks/billing-webhooks.controller';
 import { BillingUserController } from '../src/modules/billing/controllers/billing-user.controller';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
-import { EntitlementGuard } from '../src/modules/billing/entitlements/entitlement.guard';
+import { EntitlementGuard } from '../src/modules/entitlements/entitlement.guard';
 import { UsageInvoicingService } from '../src/modules/billing/services/usage-invoicing.service';
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import {

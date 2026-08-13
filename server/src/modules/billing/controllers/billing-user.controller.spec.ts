@@ -3,7 +3,7 @@ import type { EntitlementsResponse } from '@app/shared/types';
 import type { JwtAuthRequest } from '../../auth/types/auth.request';
 import { BillingUserController } from './billing-user.controller';
 import { BillingUserService } from '../services/billing-user.service';
-import { EntitlementService } from '../entitlements/entitlement.service';
+import { EntitlementService } from '../../entitlements/entitlement.service';
 
 function mockJwtRequest(userId = 'user-1'): { user: JwtAuthRequest['user'] } {
   return { user: { userId, email: 'user@example.com', roles: [] } };

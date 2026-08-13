@@ -19,6 +19,8 @@ import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { SessionLimitService } from './session-limit.service';
+import { EntitlementService } from '../../entitlements/entitlement.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -87,6 +89,9 @@ describe('AuthService', () => {
   };
   let mockMetricsService: {
     recordAuthEvent: jest.Mock;
+  };
+  let mockEntitlementService: {
+    limitFor: jest.Mock;
   };
 
   const mockUserRole = {
@@ -237,9 +242,17 @@ describe('AuthService', () => {
       recordAuthEvent: jest.fn()
     };
 
+    // Free tier by default: no plan-specific allowance, so pruning must fall
+    // back to the constant. Individual tests raise or break it.
+    mockEntitlementService = {
+      limitFor: jest.fn().mockResolvedValue(null)
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
+        SessionLimitService,
+        { provide: EntitlementService, useValue: mockEntitlementService },
         { provide: DataSource, useValue: mockDataSource },
         { provide: UsersService, useValue: mockUsersService },
         { provide: ConfigService, useValue: mockConfigService },
@@ -505,6 +518,36 @@ describe('AuthService', () => {
       // controller boundary.
       expect(result.user).toEqual(mockUser);
       expect(result.user.roles).toEqual([mockUserRole]);
+    });
+
+    it('prunes to the plan allowance when the plan carries a sessions limit', async () => {
+      mockEntitlementService.limitFor.mockResolvedValue(10);
+
+      await service.login(mockUser);
+
+      expect(mockEntitlementService.limitFor).toHaveBeenCalledWith(
+        'user-1',
+        'sessions'
+      );
+      expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
+        'user-1',
+        10
+      );
+    });
+
+    it('still logs in on the default allowance when entitlement resolution throws', async () => {
+      mockEntitlementService.limitFor.mockRejectedValue(
+        new Error('billing unavailable')
+      );
+
+      // A billing outage must never become a login outage.
+      const result = await service.login(mockUser);
+
+      expect(result.tokens.access_token).toBe('mock-access-token');
+      expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
+        'user-1',
+        MAX_CONCURRENT_SESSIONS
+      );
     });
 
     it('should throw when config values are missing', async () => {

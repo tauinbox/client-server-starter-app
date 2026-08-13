@@ -16,7 +16,7 @@ import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
-import { EntitlementService } from '../src/modules/billing/entitlements/entitlement.service';
+import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { BillingAdminService } from '../src/modules/billing/services/billing-admin.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 

@@ -30,6 +30,21 @@ export type ProductType = 'sku' | 'credits' | 'custom';
 export type BillingRegion = 'auto' | 'ru' | 'world';
 
 /**
+ * The numeric entitlement axis, closed the same way `EntitlementCapability` is.
+ * A free-form key space is what let a limit be seeded against a key no code
+ * ever read, so a key earns its place here only once something enforces it:
+ * `sessions` caps concurrent refresh tokens per user.
+ *
+ * What the union buys, stated precisely: an invented or misspelled key is a
+ * compile error. It does NOT catch a key that is declared, typed and simply
+ * stops being read — only a test asserting the limit reaches its consumer does.
+ */
+export type EntitlementLimitKey = 'sessions';
+
+/** Plan-carried numeric limits. An absent key means "no plan-specific limit". */
+export type EntitlementLimits = Partial<Record<EntitlementLimitKey, number>>;
+
+/**
  * One provider's price for a plan. Two prices per tier (RUB via YooKassa, USD
  * via Paddle) live keyed by provider — the resolved provider selects which is
  * charged/shown. `unitPriceMinor`/`includedUnits` apply to usage plans only.
@@ -123,7 +138,7 @@ export type CreditBalanceResponse = {
 export type EntitlementsResponse = {
   planKey: string;
   capabilities: string[];
-  limits: Record<string, number>;
+  limits: EntitlementLimits;
 };
 
 export type PlanResponse = {
@@ -135,7 +150,7 @@ export type PlanResponse = {
   interval: PlanInterval;
   meterKey: string | null;
   entitlements: string[];
-  limits: Record<string, number> | null;
+  limits: EntitlementLimits | null;
   trialDays: number;
   active: boolean;
   prices: Partial<Record<BillingProviderId, PlanPrice>>;

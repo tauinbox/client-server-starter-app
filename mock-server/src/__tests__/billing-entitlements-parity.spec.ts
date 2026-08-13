@@ -4,6 +4,7 @@
 
 import type { Server } from 'http';
 import type { EntitlementsResponse } from '@app/shared/types';
+import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
@@ -101,7 +102,7 @@ describe('GET /billing/entitlements', () => {
     await expect(readEntitlements(token)).resolves.toEqual({
       planKey: 'pro',
       capabilities: ['reports', 'api-access', 'data-export'],
-      limits: { records: 10000 }
+      limits: { sessions: 10 }
     });
   });
 
@@ -226,6 +227,47 @@ describe('GET /billing/entitlements', () => {
       capabilities: [],
       limits: {}
     });
+  });
+});
+
+describe('the concurrent-session allowance is plan-driven', () => {
+  function tokensHeldBy(userId: string): number {
+    let held = 0;
+    for (const uid of getState().refreshTokens.values()) {
+      if (uid === userId) held++;
+    }
+    return held;
+  }
+
+  it('trims to MAX_CONCURRENT_SESSIONS for a plan carrying no sessions limit', async () => {
+    for (let i = 0; i < MAX_CONCURRENT_SESSIONS + 3; i++) await login();
+
+    expect(tokensHeldBy(currentUserId())).toBe(MAX_CONCURRENT_SESSIONS);
+  });
+
+  it('keeps the raised allowance once the plan carries one', async () => {
+    await login();
+    expect((await activateSubscription(currentUserId(), 'pro')).status).toBe(
+      200
+    );
+
+    // Pro seeds `{ sessions: 10 }`, so sign-ins past the constant must survive.
+    for (let i = 0; i < 9; i++) await login();
+
+    expect(tokensHeldBy(currentUserId())).toBe(10);
+  });
+
+  it('evicts rather than rejects once the allowance is reached', async () => {
+    await login();
+    expect(
+      (await activateSubscription(currentUserId(), 'business')).status
+    ).toBe(200);
+
+    // Business seeds `{ sessions: 25 }`; the 26th sign-in still succeeds and
+    // silently drops the oldest device - login never 403s on this path.
+    for (let i = 0; i < 25; i++) await login();
+
+    expect(tokensHeldBy(currentUserId())).toBe(25);
   });
 });
 

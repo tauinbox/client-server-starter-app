@@ -4,11 +4,11 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import KeyvRedis from '@keyv/redis';
 import { In, IsNull } from 'typeorm';
 import type { SubscriptionStatus } from '@app/shared/types';
-import { MetricsService } from '../../core/metrics/metrics.service';
-import { Customer } from '../entities/customer.entity';
-import { CustomerGrant } from '../entities/customer-grant.entity';
-import { Plan } from '../entities/plan.entity';
-import { Subscription } from '../entities/subscription.entity';
+import { MetricsService } from '../core/metrics/metrics.service';
+import { Customer } from '../billing/entities/customer.entity';
+import { CustomerGrant } from '../billing/entities/customer-grant.entity';
+import { Plan } from '../billing/entities/plan.entity';
+import { Subscription } from '../billing/entities/subscription.entity';
 import { EntitlementService } from './entitlement.service';
 import { FREE_PLAN_KEY } from './entitlement.types';
 
@@ -25,7 +25,7 @@ describe('EntitlementService', () => {
   const PRO_PLAN: Partial<Plan> = {
     key: 'pro',
     entitlements: ['reports', 'api-access', 'data-export'],
-    limits: { records: 10000 }
+    limits: { sessions: 10 }
   };
   const FREE_PLAN: Partial<Plan> = {
     key: FREE_PLAN_KEY,
@@ -87,7 +87,7 @@ describe('EntitlementService', () => {
         expect(resolved).toEqual({
           planKey: 'pro',
           capabilities: ['reports', 'api-access', 'data-export'],
-          limits: { records: 10000 }
+          limits: { sessions: 10 }
         });
       }
     );
@@ -219,6 +219,38 @@ describe('EntitlementService', () => {
       withProSubscription('active');
       expect(await service.has('user-1', 'reports')).toBe(true);
       expect(await service.has('user-1', 'priority-support')).toBe(false);
+    });
+  });
+
+  describe('limitFor', () => {
+    it('returns the numeric limit the plan in force carries', async () => {
+      withProSubscription('active');
+      expect(await service.limitFor('user-1', 'sessions')).toBe(10);
+    });
+
+    it('returns null for a plan that carries no limit under the key', async () => {
+      customers.findOne.mockResolvedValue({ id: 'cust-1', userId: 'user-1' });
+      subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        customerId: 'cust-1',
+        planKey: FREE_PLAN_KEY,
+        status: 'active'
+      });
+      plans.findOne.mockResolvedValue(FREE_PLAN);
+      expect(await service.limitFor('user-1', 'sessions')).toBeNull();
+    });
+
+    it('returns null for a user with no customer record', async () => {
+      plans.findOne.mockResolvedValue(FREE_PLAN);
+      expect(await service.limitFor('user-1', 'sessions')).toBeNull();
+      expect(subscriptions.findOne).not.toHaveBeenCalled();
+    });
+
+    it('rides the same per-user cache as has(), issuing no extra query', async () => {
+      withProSubscription('active');
+      await service.capabilitiesFor('user-1');
+      await service.limitFor('user-1', 'sessions');
+      expect(customers.findOne).toHaveBeenCalledTimes(1);
     });
   });
 

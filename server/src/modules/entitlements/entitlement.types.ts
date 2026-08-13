@@ -1,8 +1,11 @@
+import type { EntitlementLimits } from '@app/shared/types';
+
 /**
  * Billing capabilities — a separate axis from feature flags:
  * flags are admin-toggled rollout tools, entitlements are what a paid plan grants.
- * Free = empty set (base access only). The numeric limit dimension (records/seats)
- * travels alongside the capability set in `ResolvedEntitlements.limits`.
+ * Free = empty set (base access only). The numeric limit dimension travels
+ * alongside the capability set in `ResolvedEntitlements.limits`, keyed by the
+ * shared `EntitlementLimitKey` union.
  */
 export type EntitlementCapability =
   | 'reports'
@@ -22,5 +25,5 @@ export const FREE_PLAN_KEY = 'free';
 export interface ResolvedEntitlements {
   planKey: string;
   capabilities: string[];
-  limits: Record<string, number>;
+  limits: EntitlementLimits;
 }

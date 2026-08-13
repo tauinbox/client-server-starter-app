@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import type {
   BillingMode,
   BillingProviderId,
+  EntitlementLimits,
   PlanInterval,
   PlanPrice,
   PlanResponse,
@@ -39,9 +40,9 @@ export class PlanResponseDto {
     type: 'object',
     additionalProperties: { type: 'number' },
     nullable: true,
-    example: { records: 10000 }
+    example: { sessions: 10 }
   })
-  limits: Record<string, number> | null;
+  limits: EntitlementLimits | null;
 
   @ApiProperty({ example: 0 })
   trialDays: number;

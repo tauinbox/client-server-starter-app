@@ -12,11 +12,13 @@ import type {
   SubscriptionResponse,
   UsageSummaryResponse
 } from '@app/shared/types';
+import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
 import { LayoutService } from '@core/services/layout.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
 import { BillingStore } from '../../store/billing.store';
+import { EntitlementsStore } from '../../store/entitlements.store';
 import { ChangePlanDialogComponent } from '../change-plan-dialog/change-plan-dialog.component';
 import { BillingSettingsComponent } from './billing-settings.component';
 
@@ -111,12 +113,17 @@ describe('BillingSettingsComponent', () => {
   let dialogMock: { openConfirm: ReturnType<typeof vi.fn> };
   let matDialogMock: { open: ReturnType<typeof vi.fn> };
   let redirectMock: { redirect: ReturnType<typeof vi.fn> };
+  let entitlementsMock: {
+    load: ReturnType<typeof vi.fn>;
+    limit: ReturnType<typeof vi.fn>;
+  };
 
   async function setup(
     hasSub: boolean,
     usage?: UsageSummaryResponse,
     subscription?: SubscriptionResponse,
-    credits?: CreditBalanceResponse
+    credits?: CreditBalanceResponse,
+    sessionsLimit: number | null = null
   ): Promise<void> {
     storeMock = {
       subscription: signal<SubscriptionResponse | null>(
@@ -139,6 +146,10 @@ describe('BillingSettingsComponent', () => {
       changePlan: vi.fn().mockResolvedValue(true),
       startPaymentMethodUpdate: vi.fn().mockResolvedValue(null)
     };
+    entitlementsMock = {
+      load: vi.fn().mockResolvedValue(undefined),
+      limit: vi.fn().mockReturnValue(signal(sessionsLimit))
+    };
     dialogMock = { openConfirm: vi.fn().mockReturnValue(of(true)) };
     redirectMock = { redirect: vi.fn() };
     matDialogMock = {
@@ -153,6 +164,7 @@ describe('BillingSettingsComponent', () => {
         provideNoopAnimations(),
         provideRouter([]),
         { provide: BillingStore, useValue: storeMock },
+        { provide: EntitlementsStore, useValue: entitlementsMock },
         { provide: AdaptiveDialogService, useValue: dialogMock },
         { provide: MatDialog, useValue: matDialogMock },
         { provide: LayoutService, useValue: { isHandset: signal(false) } },
@@ -170,6 +182,21 @@ describe('BillingSettingsComponent', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Pro');
     expect(text).toContain('$12.00');
+  });
+
+  it('shows the plan device allowance and its eviction semantics', async () => {
+    await setup(true, undefined, undefined, undefined, 10);
+    expect(entitlementsMock.load).toHaveBeenCalled();
+    expect(entitlementsMock.limit).toHaveBeenCalledWith('sessions');
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Devices at once: 10');
+    expect(text).toContain('drops your oldest session');
+  });
+
+  it('falls back to the default allowance when the plan carries no sessions limit', async () => {
+    await setup(false);
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain(`Devices at once: ${MAX_CONCURRENT_SESSIONS}`);
   });
 
   it('renders billing-boundary dates in UTC regardless of the browser timezone', async () => {

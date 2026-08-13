@@ -18,7 +18,7 @@ import { Invoice } from '../entities/invoice.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { WebhookEvent } from '../entities/webhook-event.entity';
-import { EntitlementService } from '../entitlements/entitlement.service';
+import { EntitlementService } from '../../entitlements/entitlement.service';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import { BillingService } from '../billing.service';
 import { OPEN_STATUSES } from '../utils/subscription-status.util';

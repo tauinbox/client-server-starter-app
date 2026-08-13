@@ -81,6 +81,18 @@
               </a>
             </div>
           }
+
+          <p class="device-allowance">
+            <mat-icon aria-hidden="true">devices</mat-icon>
+            <span>{{
+              t('billing.settings.deviceAllowance', {
+                count: deviceAllowance()
+              })
+            }}</span>
+            <span class="hint">{{
+              t('billing.settings.deviceAllowanceHint')
+            }}</span>
+          </p>
         </mat-card-content>
       </mat-card>
 

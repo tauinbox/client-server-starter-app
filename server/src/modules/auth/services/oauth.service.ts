@@ -8,6 +8,7 @@ import { OAuthAccount } from '../entities/oauth-account.entity';
 import { RefreshTokenService } from './refresh-token.service';
 import { OAuthAccountService } from './oauth-account.service';
 import { RoleService } from './role.service';
+import { SessionLimitService } from './session-limit.service';
 import { TokenGeneratorService } from './token-generator.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { AuditService, AuditContext } from '../../audit/audit.service';
@@ -17,7 +18,6 @@ import { hashToken } from '../../../common/utils/hash-token';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { SYSTEM_ROLES, ErrorKeys } from '@app/shared/constants';
-import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 
 const VERIFICATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -35,7 +35,8 @@ export class OAuthService {
     private readonly roleService: RoleService,
     private readonly auditService: AuditService,
     private readonly tokenGenerator: TokenGeneratorService,
-    private readonly mailService: MailService
+    private readonly mailService: MailService,
+    private readonly sessionLimitService: SessionLimitService
   ) {}
 
   async loginWithOAuth(profile: OAuthUserProfile) {
@@ -177,7 +178,7 @@ export class OAuthService {
     );
     await this.refreshTokenService.pruneOldestTokens(
       user.id,
-      MAX_CONCURRENT_SESSIONS
+      await this.sessionLimitService.maxSessionsFor(user.id)
     );
 
     // Entity, not a spread: a plain object carries no class-transformer

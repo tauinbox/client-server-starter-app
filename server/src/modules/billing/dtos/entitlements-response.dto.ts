@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import type {
+  EntitlementLimits,
   EntitlementsResponse,
   StructuralDiff,
   WireType,
@@ -27,7 +28,7 @@ export class EntitlementsResponseDto {
     description: 'Numeric limits carried by the plan in force.',
     additionalProperties: { type: 'number' }
   })
-  limits: Record<string, number>;
+  limits: EntitlementLimits;
 }
 
 type _DtoMatchesShared = _AssertNever<
