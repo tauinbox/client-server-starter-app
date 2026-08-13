@@ -210,8 +210,13 @@ jobs:
             # executed entirely — an unbounded background loop would then outlive
             # the session on the very host that ran out of resources. Reading
             # /proc/meminfo costs nothing; nothing heavier runs here.
-            MEM_LOG=/tmp/deploy-mem.log
-            : > "$MEM_LOG"
+            # mktemp rather than a fixed /tmp path: a predictable name in a
+            # world-writable directory can be pre-created as a symlink, and this
+            # script runs as the deploy user, so the truncation would land on
+            # whatever that user can write — the repository or server/.env.
+            # Falling back to /dev/null keeps a failure here from aborting a
+            # deploy; diagnostics must never decide whether a release ships.
+            MEM_LOG=$(mktemp /tmp/deploy-mem.XXXXXX 2>/dev/null || echo /dev/null)
             VMSTAT_BEFORE=$(awk '/^pswpin|^pswpout/{printf "%s=%s ", $1, $2}' /proc/vmstat)
             # stdin/stdout/stderr are detached deliberately. A backgrounded process
             # that keeps the SSH channel's descriptors open stops the session from
@@ -254,6 +259,7 @@ jobs:
                 echo "$c $cur $peak"
               done
               echo "=== end memory report ==="
+              if [ "$MEM_LOG" != /dev/null ]; then rm -f "$MEM_LOG"; fi
               exit "$rc"
             }
             trap report_memory EXIT
