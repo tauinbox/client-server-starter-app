@@ -17,6 +17,10 @@ jobs:
   rotate:
     name: Rotate JWT keys on VPS
     runs-on: ubuntu-latest
+    # Same bound as the other VPS jobs — see the comment in deploy.yml. This
+    # script is the lightest of the four (rewrite server/.env, recreate one
+    # container, 60 s of health checks), so 15 min is pure headroom.
+    timeout-minutes: 15
     steps:
       - name: Compute JWT_MIN_IAT
         id: min-iat

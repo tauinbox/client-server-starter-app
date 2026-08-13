@@ -10,12 +10,24 @@ on:
 
 concurrency:
   group: deploy-production
-  cancel-in-progress: false
+  # The only workflow in this group that preempts instead of queueing. The
+  # group exists so that two workflows never run `docker compose` on the VPS at
+  # once, but with `cancel-in-progress: false` here a wedged deploy also held
+  # the rollback that exists to undo it: on 2026-08-13 a deploy occupied the
+  # group for 52 min, and a rollback dispatched in that window would have sat
+  # pending for the whole outage. An operator asking for a rollback is asking
+  # for the in-flight deploy to stop, so it cancels that deploy and takes the
+  # group. A stack left half-recreated by the cancellation is then repaired by
+  # this workflow's own `docker compose up -d --force-recreate`.
+  cancel-in-progress: true
 
 jobs:
   resolve:
     name: Resolve Target Version
     runs-on: ubuntu-latest
+    # Reads one file over SSH. `ConnectTimeout=10` bounds the connect only, not
+    # a session that stalls after it is established.
+    timeout-minutes: 5
     outputs:
       version: ${{ steps.resolve.outputs.version }}
     steps:
@@ -95,6 +107,9 @@ jobs:
     name: Deploy Rolled-Back Version to VPS
     needs: [resolve, retag]
     runs-on: ubuntu-latest
+    # Same bound as the deploy job it undoes, and for the same reason — see the
+    # comment in deploy.yml.
+    timeout-minutes: 15
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1

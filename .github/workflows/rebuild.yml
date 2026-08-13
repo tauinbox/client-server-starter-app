@@ -151,6 +151,10 @@ jobs:
     name: Deploy to VPS
     needs: rebuild-push
     runs-on: ubuntu-latest
+    # Same bound as deploy.yml's SSH job, and for the same reason — see the
+    # comment there. Only this job is bounded: the rebuild-push job above runs
+    # a no-cache image build and legitimately takes far longer.
+    timeout-minutes: 15
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1

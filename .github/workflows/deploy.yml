@@ -131,6 +131,16 @@ jobs:
     name: Deploy to VPS
     needs: build-push
     runs-on: ubuntu-latest
+    # A healthy run of this job takes about a minute (24-63 s across the last
+    # nine successful deploys). On 2026-08-13 the VPS ran out of memory during
+    # the image pull and stopped scheduling userspace, and this job hung for
+    # 52 min until it was cancelled by hand — the action's own `timeout` (30 s
+    # connect) and `command_timeout` (10 m) were both in force and neither
+    # bounded it. Only a job-level limit is enforced by the runner rather than
+    # by the SSH client, so that is what bounds it here. 15 min still clears
+    # the script's own worst case: two image pulls, 120 s of health checks,
+    # then the rollback branch pulling two more and checking for another 120 s.
+    timeout-minutes: 15
     steps:
       # Checked out only to make the local composite action below available;
       # nothing else in this job reads the workspace.
