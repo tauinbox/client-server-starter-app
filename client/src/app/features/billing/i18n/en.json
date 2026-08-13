@@ -76,7 +76,9 @@
     "invoiceDate": "Date",
     "invoiceStatus": "Status",
     "invoiceAmount": "Amount",
-    "receipt": "Receipt"
+    "receipt": "Receipt",
+    "deviceAllowance": "Devices at once: {{ count }}",
+    "deviceAllowanceHint": "Signing in beyond this drops your oldest session."
   },
   "usage": {
     "title": "Usage this period",

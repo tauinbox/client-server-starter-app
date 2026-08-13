@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
   BillingProviderId,
   BillingRegion,
+  EntitlementLimitKey,
   EntitlementsResponse,
   PlanResponse,
   ProrationPreviewResponse,
@@ -239,6 +240,18 @@ function resolveEntitlements(userId: string): EntitlementsResponse {
     ...base,
     capabilities: [...new Set([...base.capabilities, ...granted])]
   };
+}
+
+/**
+ * Mirrors the server's EntitlementService.limitFor: the numeric allowance the
+ * plan in force carries under `key`, or null when it carries none and the
+ * caller must apply its own default.
+ */
+export function resolveEntitlementLimit(
+  userId: string,
+  key: EntitlementLimitKey
+): number | null {
+  return resolveEntitlements(userId).limits[key] ?? null;
 }
 
 /**

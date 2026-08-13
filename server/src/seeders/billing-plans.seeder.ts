@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import type {
   BillingMode,
   BillingProviderId,
+  EntitlementLimits,
   PlanInterval,
   PlanPrice
 } from '@app/shared/types';
@@ -16,7 +17,7 @@ type SeedPlan = {
   interval: PlanInterval;
   meterKey: string | null;
   entitlements: string[];
-  limits: Record<string, number> | null;
+  limits: EntitlementLimits | null;
   trialDays: number;
   active: boolean;
   prices: Partial<Record<BillingProviderId, PlanPrice>>;
@@ -51,7 +52,7 @@ const PLANS: SeedPlan[] = [
     interval: 'month',
     meterKey: null,
     entitlements: ['reports', 'api-access', 'data-export'],
-    limits: { records: 10000 },
+    limits: { sessions: 10 },
     trialDays: 0,
     active: true,
     prices: {
@@ -62,12 +63,12 @@ const PLANS: SeedPlan[] = [
   {
     key: 'business',
     name: 'Business',
-    description: 'Advanced limits and priority support',
+    description: 'More concurrent devices and priority support',
     billingMode: 'fixed',
     interval: 'month',
     meterKey: null,
     entitlements: ['reports', 'api-access', 'data-export', 'priority-support'],
-    limits: { records: 100000 },
+    limits: { sessions: 25 },
     trialDays: 0,
     active: true,
     prices: {

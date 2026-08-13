@@ -65,6 +65,8 @@ export type {
   InvoiceStatus,
   InvoiceKind,
   BillingRegion,
+  EntitlementLimitKey,
+  EntitlementLimits,
   PlanPrice,
   ProductType,
   ProductPrice,

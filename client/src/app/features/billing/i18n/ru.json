@@ -76,7 +76,9 @@
     "invoiceDate": "Дата",
     "invoiceStatus": "Статус",
     "invoiceAmount": "Сумма",
-    "receipt": "Чек"
+    "receipt": "Чек",
+    "deviceAllowance": "Одновременных устройств: {{ count }}",
+    "deviceAllowanceHint": "Вход сверх лимита отключает самую старую сессию."
   },
   "usage": {
     "title": "Потребление за период",

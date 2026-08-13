@@ -3,7 +3,10 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
 import { In, IsNull, Repository } from 'typeorm';
-import type { SubscriptionStatus } from '@app/shared/types';
+import type {
+  EntitlementLimitKey,
+  SubscriptionStatus
+} from '@app/shared/types';
 import { CacheVersionCounter } from '../../../common/utils/cache-version-counter';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { Customer } from '../entities/customer.entity';
@@ -79,6 +82,20 @@ export class EntitlementService {
   ): Promise<boolean> {
     const { capabilities } = await this.capabilitiesFor(userId);
     return capabilities.includes(capability);
+  }
+
+  /**
+   * The numeric allowance the user's plan carries under `key`, or `null` when
+   * the plan sets none — the caller then applies its own default. Reads the
+   * already-resolved limits, so it rides the same per-user cache as `has()`
+   * and costs no extra query.
+   */
+  async limitFor(
+    userId: string,
+    key: EntitlementLimitKey
+  ): Promise<number | null> {
+    const { limits } = await this.capabilitiesFor(userId);
+    return limits[key] ?? null;
   }
 
   /** Drops the cached entitlements for a single user (subscription change). */

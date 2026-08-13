@@ -1,12 +1,13 @@
 import { computed, inject, type Signal } from '@angular/core';
 import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
 import { firstValueFrom } from 'rxjs';
+import type { EntitlementLimitKey, EntitlementLimits } from '@app/shared/types';
 import { BillingService } from '../services/billing.service';
 
 type EntitlementsState = {
   planKey: string | null;
   capabilities: string[];
-  limits: Record<string, number>;
+  limits: EntitlementLimits;
   loaded: boolean;
 };
 
@@ -84,7 +85,7 @@ export const EntitlementsStore = signalStore(
     }
 
     /** `null` when the plan in force carries no limit under that key. */
-    function limit(key: string): Signal<number | null> {
+    function limit(key: EntitlementLimitKey): Signal<number | null> {
       return computed(() => store.limits()[key] ?? null);
     }
 

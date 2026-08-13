@@ -128,7 +128,7 @@ export interface MockPlan {
   interval: import('@app/shared/types').PlanInterval;
   meterKey: string | null;
   entitlements: string[];
-  limits: Record<string, number> | null;
+  limits: import('@app/shared/types').EntitlementLimits | null;
   trialDays: number;
   active: boolean;
   prices: Partial<

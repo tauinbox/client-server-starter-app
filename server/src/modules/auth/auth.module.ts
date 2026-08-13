@@ -26,6 +26,8 @@ import { VkStrategy } from './strategies/vk.strategy';
 import { User } from '../users/entities/user.entity';
 import { CaslModule } from './casl/casl.module';
 import { CaptchaModule } from './captcha/captcha.module';
+import { EntitlementsModule } from '../billing/entitlements/entitlements.module';
+import { SessionLimitService } from './services/session-limit.service';
 import { RoleService } from './services/role.service';
 import { RolesController } from './controllers/roles.controller';
 import { RbacController } from './controllers/rbac.controller';
@@ -59,6 +61,9 @@ function conditionalProvider(
     UsersModule,
     CaslModule,
     CaptchaModule,
+    // The concurrent-session allowance is plan-driven; the resolver carries no
+    // auth dependency of its own, so this edge is one-way.
+    EntitlementsModule,
     PassportModule,
     TypeOrmModule.forFeature([
       RefreshToken,
@@ -89,6 +94,7 @@ function conditionalProvider(
     LocalStrategy,
     JwtStrategy,
     RefreshTokenService,
+    SessionLimitService,
     TokenCleanupService,
     OAuthAccountService,
     RoleService,

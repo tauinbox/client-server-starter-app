@@ -602,7 +602,7 @@ function generatePlans(): MockPlan[] {
       billingMode: 'fixed',
       meterKey: null,
       entitlements: ['reports', 'api-access', 'data-export'],
-      limits: { records: 10000 },
+      limits: { sessions: 10 },
       active: true,
       prices: {
         yookassa: { currency: 'RUB', amountMinor: 99000 },
@@ -614,7 +614,7 @@ function generatePlans(): MockPlan[] {
       id: 'plan-business',
       key: 'business',
       name: 'Business',
-      description: 'Advanced limits and priority support',
+      description: 'More concurrent devices and priority support',
       billingMode: 'fixed',
       meterKey: null,
       entitlements: [
@@ -623,7 +623,7 @@ function generatePlans(): MockPlan[] {
         'data-export',
         'priority-support'
       ],
-      limits: { records: 100000 },
+      limits: { sessions: 25 },
       active: true,
       prices: {
         yookassa: { currency: 'RUB', amountMinor: 290000 },
