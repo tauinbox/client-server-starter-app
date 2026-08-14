@@ -1,4 +1,4 @@
 {
-  "version": "0.1.21",
+  "version": "0.2.0",
   "description": "API route manifest index. Route entries live in per-feature files under contracts/routes/*.json (one file per server module). Consumers glob that directory and flatten all `routes` arrays — add a new feature by dropping a new file there; no edit to this index is required. The `version` field is kept in sync with the server package version by the release process."
 }
