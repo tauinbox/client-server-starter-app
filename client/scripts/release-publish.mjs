@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { escapeMentions, findMentions } from './at-mentions.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -26,7 +27,19 @@ if (sectionStart === -1) {
 
 const nextSection = changelog.indexOf('## [', sectionStart + 1);
 const sectionEnd = nextSection === -1 ? changelog.length : nextSection;
-const notes = changelog.slice(sectionStart, sectionEnd).trim();
+const section = changelog.slice(sectionStart, sectionEnd).trim();
+
+// The commit-msg hook keeps mentions out of new subjects, but bot commits and
+// `--no-verify` never see it, so the published body is escaped regardless.
+const mentions = findMentions(section);
+if (mentions.length > 0) {
+  console.warn(
+    `Escaping ${mentions.length} mention(s) in the release notes: ${mentions
+      .map((login) => `@${login}`)
+      .join(', ')}`
+  );
+}
+const notes = escapeMentions(section);
 
 const notesFile = resolve(tmpdir(), `release-notes-${version}.md`);
 writeFileSync(notesFile, notes, 'utf-8');
