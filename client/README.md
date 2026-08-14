@@ -353,7 +353,7 @@ npm run release    # bumps client + server + mock-server package.json, writes re
 git push --follow-tags
 ```
 
-Commits must follow [Conventional Commits](https://www.conventionalcommits.org/) — enforced by the `commit-msg` husky hook.
+Commits must follow [Conventional Commits](https://www.conventionalcommits.org/) — enforced by the `commit-msg` husky hook. The same hook rejects a bare `@name` in the message: it reaches `CHANGELOG.md` and the release page as a GitHub user mention, crediting an unrelated account, so code identifiers must be backticked (`` `@Authorize` ``). `scripts/at-mentions.mjs` escapes any that slip past the hook — during changelog generation and again in `npm run release:publish`.
 
 ## Tech Stack
 

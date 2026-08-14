@@ -315,6 +315,7 @@ To apply multiple restrictions simultaneously, either use `$and` in a single `cu
 - `client/scripts/version.mjs` auto-generates `src/environments/version.ts` before every build/start/test
 - `npm run release` (from `client/`) bumps all `package.json` files, generates `CHANGELOG.md`, and creates a git tag
 - Conventional Commits enforced via commitlint + husky `commit-msg` hook
+- A `@name` written bare in a commit subject becomes a GitHub user mention in `CHANGELOG.md` and on the release page, crediting an unrelated account. Write code identifiers in backticks (`` `@Authorize` ``); commitlint rejects the bare form, and `client/scripts/at-mentions.mjs` escapes any that still get through — on changelog generation (`postchangelog`) and again before the release body is published
 
 ## Project Structure
 
@@ -888,7 +889,7 @@ A pre-commit hook (via [husky](https://typicode.github.io/husky/)) runs **lint-s
 | `shared/src/**/*.ts` | Prettier |
 | `{.lintstagedrc.mjs,eslint.base.config.mjs}` | Prettier |
 
-A commit-msg hook (`client/.husky/commit-msg`) additionally runs **commitlint** to enforce [Conventional Commits](https://www.conventionalcommits.org/) format.
+A commit-msg hook (`client/.husky/commit-msg`) additionally runs **commitlint** to enforce [Conventional Commits](https://www.conventionalcommits.org/) format and to reject bare `@name` mentions in the subject or body (see [Versioning](#versioning)).
 
 Husky, lint-staged, and commitlint are installed in the `client/` sub-package. Running `npm install` inside `client/` activates the git hooks via the `prepare` script.
 

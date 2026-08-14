@@ -180,7 +180,7 @@ All notable changes to this project will be documented in this file. See [commit
 * **rbac:** make action description optional and align mock validation with the DTOs ([90f8bb5](https://github.com/tauinbox/client-server-starter-app/commit/90f8bb59cbd32c2d71ffd1badc8fe1c38ab03780))
 * **rbac:** reject $-prefixed keys in structured permission conditions ([a5215c3](https://github.com/tauinbox/client-server-starter-app/commit/a5215c3ede2ceba4c408a07843a2cc4a8be44fa7))
 * **rbac:** reject CASL reserved keywords when building ability rules ([48d46b7](https://github.com/tauinbox/client-server-starter-app/commit/48d46b7b3f195a860991bf38900110c965cecde8))
-* **rbac:** require at least one permission check on @Authorize ([94f544a](https://github.com/tauinbox/client-server-starter-app/commit/94f544a577f34179061a880a3eb4862a6334ed44))
+* **rbac:** require at least one permission check on `@Authorize` ([94f544a](https://github.com/tauinbox/client-server-starter-app/commit/94f544a577f34179061a880a3eb4862a6334ed44))
 * **rbac:** resolve the target user before a role assign or unassign ([dce7e81](https://github.com/tauinbox/client-server-starter-app/commit/dce7e811bd3e9b7c01ef6c7c0518b38e763e8ad1))
 * **rbac:** scalar-check $in/$nin elements on write and in the SQL translator ([659c482](https://github.com/tauinbox/client-server-starter-app/commit/659c4823b01d32ab833eb1340e49aaf8930d1e48))
 * **rbac:** screen runtime custom conditions with the write layer's allow-list ([d4f89aa](https://github.com/tauinbox/client-server-starter-app/commit/d4f89aa46be282dbe3819318132b4e47697def74))
@@ -287,7 +287,7 @@ All notable changes to this project will be documented in this file. See [commit
 * **rbac:** fail-closed CASL→SQL translator with full operator support ([#181](https://github.com/tauinbox/client-server-starter-app/issues/181)) ([63da029](https://github.com/tauinbox/client-server-starter-app/commit/63da02961e4f0eb13e236a2d4fc756a1e5a7f178))
 * **security:** hide privileged User/Role fields from non-admin responses ([#179](https://github.com/tauinbox/client-server-starter-app/issues/179)) ([7cfb1f5](https://github.com/tauinbox/client-server-starter-app/commit/7cfb1f53ef1ce681435d4e835edd5b7b08ec28b8))
 * **server:** honour TRUSTED_PROXIES env for deployment behind reverse proxy ([#171](https://github.com/tauinbox/client-server-starter-app/issues/171)) ([6d6e396](https://github.com/tauinbox/client-server-starter-app/commit/6d6e396b31c953b581ff70229bf65479ccd0ddbe))
-* **server:** secure-by-default with global JwtAuthGuard + @Public() opt-out ([#175](https://github.com/tauinbox/client-server-starter-app/issues/175)) ([3cf1cdc](https://github.com/tauinbox/client-server-starter-app/commit/3cf1cdc8a04a8e8b2fdcf8596a6a24f5297830da))
+* **server:** secure-by-default with global JwtAuthGuard + `@Public()` opt-out ([#175](https://github.com/tauinbox/client-server-starter-app/issues/175)) ([3cf1cdc](https://github.com/tauinbox/client-server-starter-app/commit/3cf1cdc8a04a8e8b2fdcf8596a6a24f5297830da))
 * **shared:** structural wire-contract check between DTO and shared types ([#188](https://github.com/tauinbox/client-server-starter-app/issues/188)) ([0d13aa4](https://github.com/tauinbox/client-server-starter-app/commit/0d13aa491bd690467a559a5bce5383c8e4134915))
 
 
@@ -452,7 +452,7 @@ All notable changes to this project will be documented in this file. See [commit
 * **ci:** pin actions/checkout and trivy-action versions in edge-patch-cleanup ([5cb8bfc](https://github.com/tauinbox/client-server-starter-app/commit/5cb8bfccc1555c9cdd9f23f726ccfdecbbfc30e5))
 * **ci:** pin trivy-action to v0.35.0 to avoid Node.js 20 deprecation warning ([9b01679](https://github.com/tauinbox/client-server-starter-app/commit/9b01679eef31dd06deabdf4148a646d8c6ccb047))
 * **ci:** replace heredoc with env var in edge-patch-cleanup to fix YAML parse error ([303acb7](https://github.com/tauinbox/client-server-starter-app/commit/303acb73efba782a17b65a6fd31af22fd890ede5))
-* **ci:** replace non-existent actions/checkout@v6 with [@v4](https://github.com/v4) in scheduled workflows ([5cf5700](https://github.com/tauinbox/client-server-starter-app/commit/5cf5700688c3e91e252c82c8267229b889014b40))
+* **ci:** replace non-existent actions/checkout@v6 with `@v4` in scheduled workflows ([5cf5700](https://github.com/tauinbox/client-server-starter-app/commit/5cf5700688c3e91e252c82c8267229b889014b40))
 * **ci:** upgrade GitHub Actions to Node.js 24 compatible versions ([f1a1a09](https://github.com/tauinbox/client-server-starter-app/commit/f1a1a099a5e088b3144b1607a373f9532926925e))
 * **ci:** use compose config for health count, clean dirty tree, fix Playwright cache ([26e037b](https://github.com/tauinbox/client-server-starter-app/commit/26e037beb48bed54a3de361ae03f96d0fe662504))
 * **ci:** use compose config for health count, clean dirty tree, fix Playwright cache ([c432ca2](https://github.com/tauinbox/client-server-starter-app/commit/c432ca2f480c4487245aa28573b603a8ff56a804))
@@ -536,8 +536,8 @@ All notable changes to this project will be documented in this file. See [commit
 
 ### Bug Fixes
 
-* move [@ts-expect-error](https://github.com/ts-expect-error) to argument lines in permissions.guard.spec.ts ([356a6fa](https://github.com/tauinbox/client-server-starter-app/commit/356a6fa6c8b0d3e56e9ed60ee53a58402085b453))
-* remove redundant [@ts-expect-error](https://github.com/ts-expect-error) before caslAbilityFactory argument ([6deb8cc](https://github.com/tauinbox/client-server-starter-app/commit/6deb8cc9defaff5bb1519c2a691dc47602e75905))
+* move `@ts-expect-error` to argument lines in permissions.guard.spec.ts ([356a6fa](https://github.com/tauinbox/client-server-starter-app/commit/356a6fa6c8b0d3e56e9ed60ee53a58402085b453))
+* remove redundant `@ts-expect-error` before caslAbilityFactory argument ([6deb8cc](https://github.com/tauinbox/client-server-starter-app/commit/6deb8cc9defaff5bb1519c2a691dc47602e75905))
 * **security:** seal API field leaks and add compile-time type contracts ([97c2d50](https://github.com/tauinbox/client-server-starter-app/commit/97c2d50057f82c37627d44863aba910c0901334a))
 * **server:** extract CaslModule to break PermissionsGuard DI dependency ([91e6f32](https://github.com/tauinbox/client-server-starter-app/commit/91e6f32652965a3363257db0d7f657c781577a3f))
 * **server:** improve reliability — CORS, restore atomicity, startup validation ([d86c69b](https://github.com/tauinbox/client-server-starter-app/commit/d86c69bd4a865f6c3666a78916f681009815c6e6))
