@@ -14,7 +14,8 @@ inputs:
   host_key:
     description: >-
       The VPS host's public key in `ssh-keyscan` output format, from the
-      VPS_HOST_KEY secret. Exactly one key line.
+      VPS_HOST_KEY secret. Exactly one key line, and it must be the ECDSA one
+      — see the note on the derivation step.
     required: true
   version:
     description: drone-ssh release to install. Must match the version appleboy/ssh-action expects.
@@ -49,6 +50,15 @@ runs:
     # ssh.InsecureIgnoreHostKey() when the fingerprint is empty, and a runner
     # starts every run with an empty known_hosts, so an unset secret would
     # silently restore the unverified behaviour this exists to remove.
+    #
+    # The secret must hold the host's ECDSA key specifically. A host answering
+    # with three host keys hands over whichever one the client asks for, and
+    # drone-ssh's Go client puts ecdsa-sha2-nistp256 above ssh-ed25519 in
+    # golang.org/x/crypto's defaultHostKeyAlgos — so an ed25519 fingerprint
+    # here is compared against an ECDSA key and every job fails with
+    # "host key fingerprint mismatch". Local OpenSSH prefers ed25519 and will
+    # happily verify against it, which makes the wrong key look correct until
+    # a real run.
     - name: Derive the host fingerprint
       id: host-key
       shell: bash
@@ -57,7 +67,7 @@ runs:
       run: |
         set -euo pipefail
         if [ -z "${HOST_KEY:-}" ]; then
-          echo "ERROR: host_key is empty — refusing to connect without verifying the host. Set the VPS_HOST_KEY repository secret to the output of 'ssh-keyscan -t ed25519 <host>', checked against /etc/ssh/ssh_host_ed25519_key.pub on the host itself." >&2
+          echo "ERROR: host_key is empty — refusing to connect without verifying the host. Set the VPS_HOST_KEY repository secret to the output of 'ssh-keyscan -t ecdsa <host>', checked against /etc/ssh/ssh_host_ecdsa_key.pub on the host itself." >&2
           exit 1
         fi
 
@@ -70,6 +80,14 @@ runs:
         KEY_COUNT="$(ssh-keygen -lf "${KEY_FILE}" | wc -l)"
         if [ "${KEY_COUNT}" -ne 1 ]; then
           echo "ERROR: VPS_HOST_KEY holds ${KEY_COUNT} keys, expected exactly 1." >&2
+          exit 1
+        fi
+
+        # Catch the wrong key type here rather than as an opaque
+        # "host key fingerprint mismatch" from the client three steps later.
+        KEY_TYPE="$(ssh-keygen -lf "${KEY_FILE}" | sed -n 's/.*(\(.*\))$/\1/p')"
+        if [ "${KEY_TYPE}" != "ECDSA" ]; then
+          echo "ERROR: VPS_HOST_KEY is an ${KEY_TYPE} key; the client negotiates ECDSA and would compare its fingerprint against this one. Re-take the secret with 'ssh-keyscan -t ecdsa <host>'." >&2
           exit 1
         fi
 

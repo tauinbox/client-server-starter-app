@@ -50,7 +50,7 @@ jobs:
             # fingerprint derived in the preseed action; this job does not check
             # the repository out, so it seeds known_hosts itself.
             if [ -z "${VPS_HOST_KEY:-}" ]; then
-              echo "ERROR: VPS_HOST_KEY is empty — refusing to connect without verifying the host. Set the repository secret to the output of 'ssh-keyscan -t ed25519 <host>', checked against /etc/ssh/ssh_host_ed25519_key.pub on the host itself." >&2
+              echo "ERROR: VPS_HOST_KEY is empty — refusing to connect without verifying the host. Set the repository secret to the output of 'ssh-keyscan -t ecdsa <host>', checked against /etc/ssh/ssh_host_ecdsa_key.pub on the host itself." >&2
               exit 1
             fi
             mkdir -p ~/.ssh
@@ -66,7 +66,14 @@ jobs:
               exit 1
             fi
             printf '%s %s\n' "$VPS_HOST" "$HOST_KEY_FIELDS" > ~/.ssh/known_hosts
-            PREV=$(ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=10 \
+            # Pin the algorithm to the pinned key's own, taken from the line
+            # rather than written out again. The host offers three host keys
+            # and each client picks a different one by default, which is how
+            # the first run of this change passed here and failed in the other
+            # three jobs: OpenSSH negotiated ed25519, Go's client ECDSA.
+            HOST_KEY_ALGO=$(printf '%s' "$HOST_KEY_FIELDS" | cut -d ' ' -f1)
+            PREV=$(ssh -o HostKeyAlgorithms="$HOST_KEY_ALGO" \
+              -o StrictHostKeyChecking=yes -o ConnectTimeout=10 \
               -i ~/.ssh/deploy_key \
               "$VPS_USER@$VPS_HOST" \
               'cat /home/deploy/nexus/.prev-deployed-sha 2>/dev/null || echo ""')
