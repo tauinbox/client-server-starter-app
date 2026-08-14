@@ -47,6 +47,11 @@ import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
 import { addInterval } from '../utils/period.util';
 import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
+import {
+  lockInvoice,
+  releaseRefund,
+  reserveRefund
+} from '../utils/refund-reservation.util';
 import { INVOICE_SORT_COLUMN_MAP } from '../utils/list-order.util';
 import type { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
 import { BillingService } from '../billing.service';
@@ -893,52 +898,44 @@ export class BillingUserService {
     refundMinor: number
   ): Promise<{ source: Invoice; minor: number } | null> {
     return withTransaction(this.dataSource, async (manager) => {
-      const source = await manager.findOne(Invoice, {
+      const source = await lockInvoice(manager, {
         where: {
           subscriptionId: subscription.id,
           status: 'paid',
           billingMode: 'fixed'
         },
-        order: { createdAt: 'DESC' },
-        lock: { mode: 'pessimistic_write' }
+        order: { createdAt: 'DESC' }
       });
       if (!source) return null;
 
-      const refundable = source.amountMinor
-        .sub(source.refundedMinor)
-        .toNumber();
-      const minor = Math.min(refundMinor, refundable);
+      // Capping silently is this leg's policy: a switch is not refused because
+      // its source invoice has less left on it than the quote assumed.
+      const { reserved } = await reserveRefund(
+        manager,
+        source,
+        Money.fromMinor(refundMinor)
+      );
+      const minor = reserved.toNumber();
       if (minor <= 0) return null;
 
-      source.refundedMinor = source.refundedMinor.add(Money.fromMinor(minor));
-      await manager.save(Invoice, source);
       return { source, minor };
     });
   }
 
   /**
-   * Gives a proration reservation back when its provider call failed. Mirrors
-   * the admin refund's compensating release: the row is only moved by a
-   * reservation or a release, so subtracting this leg cannot disturb another.
+   * Gives a proration reservation back when its provider call failed. A release
+   * that itself fails is only logged: the switch has already gone through, and
+   * an invoice showing more refunded than was paid out is the safe direction to
+   * fail in.
    */
   private async releaseProrationRefund(
     sourceId: string,
     minor: number
   ): Promise<void> {
     try {
-      await withTransaction(this.dataSource, async (manager) => {
-        const source = await manager.findOne(Invoice, {
-          where: { id: sourceId },
-          lock: { mode: 'pessimistic_write' }
-        });
-        if (!source) return;
-        const released = source.refundedMinor.sub(Money.fromMinor(minor));
-        source.refundedMinor =
-          released.compare(Money.fromMinor(0)) < 0
-            ? Money.fromMinor(0)
-            : released;
-        await manager.save(Invoice, source);
-      });
+      await withTransaction(this.dataSource, (manager) =>
+        releaseRefund(manager, sourceId, Money.fromMinor(minor))
+      );
     } catch (error) {
       this.logger.error(
         `Failed to release proration refund reservation of ${minor} minor on invoice ${sourceId}: ${(error as Error).message}`
