@@ -167,7 +167,10 @@ jobs:
       # how run 31621702560 failed on six consecutive 503s. Installing the
       # binary from the cache first makes the action skip that download.
       - name: Preseed the SSH client
+        id: ssh-client
         uses: ./.github/actions/preseed-ssh-client
+        with:
+          host_key: ${{ secrets.VPS_HOST_KEY }}
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
@@ -175,6 +178,10 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          # Without this the client accepts whatever key answers on the far
+          # side, so a redirected connection collects the deploy key and every
+          # secret forwarded through `envs` below.
+          fingerprint: ${{ steps.ssh-client.outputs.fingerprint }}
           envs: DEPLOY_SHA,OWNER,GRAFANA_ADMIN_PASSWORD,GRAFANA_ROOT_URL,ALERT_WEBHOOK_URL,JWT_PRIVATE_KEY,JWT_PUBLIC_KEY,DB_PASSWORD,GOOGLE_CLIENT_SECRET,FACEBOOK_CLIENT_SECRET,VK_CLIENT_SECRET,ADMIN_PASSWORD,SMTP_HOST,SMTP_PORT,SMTP_USER,SMTP_PASS,SMTP_FROM,TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,PADDLE_API_KEY,PADDLE_WEBHOOK_SECRET,YOOKASSA_SHOP_ID,YOOKASSA_SECRET_KEY
           script: |
             set -euo pipefail

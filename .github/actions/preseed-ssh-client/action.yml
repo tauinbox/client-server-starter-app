@@ -7,7 +7,15 @@ description: >-
   reachable, and the executable that runs with the VPS key is pinned by digest
   instead of being trusted on arrival.
 
+  It also derives the host fingerprint every SSH job needs, so that derivation
+  lives here once instead of at each call site.
+
 inputs:
+  host_key:
+    description: >-
+      The VPS host's public key in `ssh-keyscan` output format, from the
+      VPS_HOST_KEY secret. Exactly one key line.
+    required: true
   version:
     description: drone-ssh release to install. Must match the version appleboy/ssh-action expects.
     required: false
@@ -25,10 +33,48 @@ outputs:
       'true' when the client came from the cache, so the run touched no
       third-party release URL at all.
     value: ${{ steps.cache.outputs.cache-hit }}
+  fingerprint:
+    description: >-
+      SHA256 fingerprint of `host_key`, in the `SHA256:...` form the
+      `fingerprint` input of appleboy/ssh-action expects. Pass it there so the
+      client verifies which host it is handing the deploy key to.
+    value: ${{ steps.host-key.outputs.fingerprint }}
 
 runs:
   using: composite
   steps:
+    # First, so an unusable host key fails before any work is done.
+    #
+    # The guard is not defensive noise: drone-ssh falls back to
+    # ssh.InsecureIgnoreHostKey() when the fingerprint is empty, and a runner
+    # starts every run with an empty known_hosts, so an unset secret would
+    # silently restore the unverified behaviour this exists to remove.
+    - name: Derive the host fingerprint
+      id: host-key
+      shell: bash
+      env:
+        HOST_KEY: ${{ inputs.host_key }}
+      run: |
+        set -euo pipefail
+        if [ -z "${HOST_KEY:-}" ]; then
+          echo "ERROR: host_key is empty — refusing to connect without verifying the host. Set the VPS_HOST_KEY repository secret to the output of 'ssh-keyscan -t ed25519 <host>', checked against /etc/ssh/ssh_host_ed25519_key.pub on the host itself." >&2
+          exit 1
+        fi
+
+        KEY_FILE="${RUNNER_TEMP}/vps_host_key"
+        printf '%s\n' "${HOST_KEY}" > "${KEY_FILE}"
+
+        # One key in, one fingerprint out. The action's input takes a single
+        # value, so a secret holding several keys would quietly verify against
+        # whichever one came first.
+        KEY_COUNT="$(ssh-keygen -lf "${KEY_FILE}" | wc -l)"
+        if [ "${KEY_COUNT}" -ne 1 ]; then
+          echo "ERROR: VPS_HOST_KEY holds ${KEY_COUNT} keys, expected exactly 1." >&2
+          exit 1
+        fi
+
+        echo "fingerprint=$(ssh-keygen -lf "${KEY_FILE}" | cut -d ' ' -f2)" >> "${GITHUB_OUTPUT}"
+
     # Keyed on the checksum, so a version bump can never restore the old binary
     # and the key never has to be invalidated by hand.
     - name: Restore the SSH client from the cache

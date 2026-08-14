@@ -44,11 +44,29 @@ jobs:
             echo "version=$VERSION" >> $GITHUB_OUTPUT
           else
             echo "No version provided — fetching previous from VPS"
+            # A runner starts with an empty known_hosts, so without this the
+            # client would take whatever key answers and hand the deploy key to
+            # it. The other three SSH jobs get the same protection from the
+            # fingerprint derived in the preseed action; this job does not check
+            # the repository out, so it seeds known_hosts itself.
+            if [ -z "${VPS_HOST_KEY:-}" ]; then
+              echo "ERROR: VPS_HOST_KEY is empty — refusing to connect without verifying the host. Set the repository secret to the output of 'ssh-keyscan -t ed25519 <host>', checked against /etc/ssh/ssh_host_ed25519_key.pub on the host itself." >&2
+              exit 1
+            fi
             mkdir -p ~/.ssh
             printf '%s' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
             chmod 600 ~/.ssh/deploy_key
             trap 'rm -f ~/.ssh/deploy_key' EXIT
-            PREV=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            # The secret holds the line as `ssh-keyscan` printed it; the host
+            # field is rewritten so the entry matches whatever VPS_HOST is,
+            # scan host and connect host being spelled differently otherwise.
+            HOST_KEY_FIELDS=$(printf '%s\n' "$VPS_HOST_KEY" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' | head -1 | cut -d ' ' -f2-)
+            if [ -z "$HOST_KEY_FIELDS" ]; then
+              echo "ERROR: VPS_HOST_KEY holds no key line." >&2
+              exit 1
+            fi
+            printf '%s %s\n' "$VPS_HOST" "$HOST_KEY_FIELDS" > ~/.ssh/known_hosts
+            PREV=$(ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=10 \
               -i ~/.ssh/deploy_key \
               "$VPS_USER@$VPS_HOST" \
               'cat /home/deploy/nexus/.prev-deployed-sha 2>/dev/null || echo ""')
@@ -63,6 +81,7 @@ jobs:
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_HOST_KEY: ${{ secrets.VPS_HOST_KEY }}
           VPS_USER: ${{ secrets.VPS_USER }}
 
   retag:
@@ -120,7 +139,10 @@ jobs:
       # where that matters most — an emergency rollback failing on the same
       # outage as the deploy it undoes. See deploy.yml for the full rationale.
       - name: Preseed the SSH client
+        id: ssh-client
         uses: ./.github/actions/preseed-ssh-client
+        with:
+          host_key: ${{ secrets.VPS_HOST_KEY }}
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
@@ -128,6 +150,9 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          # See deploy.yml. An emergency rollback is exactly when nobody is
+          # going to notice that the far side answered with the wrong key.
+          fingerprint: ${{ steps.ssh-client.outputs.fingerprint }}
           envs: VERSION
           script: |
             set -euo pipefail
