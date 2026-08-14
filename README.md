@@ -629,6 +629,8 @@ The same action also derives the SHA256 fingerprint of the `VPS_HOST_KEY` secret
 
 `.github/dependabot.yml` — keeps the `@sha256` base-image digests pinned in `server/Dockerfile` and `client/Dockerfile` current (docker ecosystem, weekly; major `node`/`nginx` bumps ignored), so builds are reproducible while still receiving reviewed upstream base updates.
 
+Both deploy paths refresh the host checkout with `git pull --ff-only` and then check `docker-compose.yml` out at the commit whose images they are deploying, so a merge that lands while a deploy is in flight cannot pair a newer compose file with older images. `rollback.yml` does the same for its own target SHA. The next run restores the file before pulling.
+
 All VPS-facing workflows share a `deploy-production` concurrency group to prevent race conditions. `rollback.yml` is the one member that sets `cancel-in-progress: true`, so an emergency rollback preempts whatever holds the group instead of queueing behind it — otherwise a wedged deploy blocks the rollback that exists to undo it. Every job that opens an SSH session also carries `timeout-minutes`, because the SSH action's own connect and command timeouts have been observed not to end a session against an unresponsive host.
 
 ### Production credentials & secrets
@@ -913,6 +915,8 @@ GitHub Actions runs on every push and pull request to `master` with 5 jobs:
 | **Client E2E** | mock-server | typecheck:e2e (after installing mock-server), ng build → serve (static), Playwright Chromium | HTML report, test results |
 
 Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file required — all tests run against mocks.
+
+Every job sets an explicit `timeout-minutes` (10 for the two check jobs, 15 for `Client`, 20 for `Server – Tests & Build` and `Client E2E`). Without one a job inherits the six-hour default, so a hung step burns six hours of runner time before it fails. The bounds are several times each job's normal duration, so only a hang reaches them.
 
 The `audit (high)` step in all three jobs runs `npm run audit:ci`, which wraps `npm audit --audit-level=high --omit=dev` in `scripts/audit-ci.mjs`. The wrapper exists because `npm audit` POSTs to the registry's advisory endpoint and the underlying fetch layer never retries POST requests, so a single 5xx from the registry reds the job with no source change. It retries up to 3 times, 15 s apart, **only** when the output carries `audit endpoint returned an error`; a genuine high-severity finding still fails on the first attempt.
 

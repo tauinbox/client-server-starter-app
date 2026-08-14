@@ -186,9 +186,18 @@ jobs:
           script: |
             set -euo pipefail
             cd /home/deploy/nexus
-            # Clean up docker-compose.yml if a previous rollback left it modified
+            # Clean up docker-compose.yml if an earlier deploy or rollback left
+            # it checked out at another commit
             git checkout HEAD -- docker-compose.yml 2>/dev/null || true
             git pull --ff-only
+
+            # Pin the compose file to the commit whose images this run built.
+            # The pull above lands the tip of master, which may already carry a
+            # later merge, so without this a deploy can compose file N+1 with
+            # images N. Same shape as the rollback path, which checks the file
+            # out at its own target SHA. Failing here aborts before any
+            # container is touched.
+            git checkout "${DEPLOY_SHA}" -- docker-compose.yml
 
             # Read the previously successful SHA (empty on first deploy)
             PREV_SHA=""
