@@ -110,7 +110,16 @@ jobs:
             explicit CVE patch blocks are now fixed in the base image (or its stable Alpine
             repositories). The explicit upgrade blocks are no longer needed.
 
+            ## Required first action: start CI
+            This pull request was opened by a workflow authenticated with `GITHUB_TOKEN`, and
+            GitHub does not start workflow runs for events raised by that token, so **no CI has
+            run on this branch**. Before reviewing anything else: **close this pull request and
+            immediately reopen it.** The reopen comes from your account, not the token, and
+            starts the full CI suite. Do not merge until those checks are green: this PR
+            changes the Dockerfiles that build the production images.
+
             ## Test plan
+            - [ ] Closed and reopened this PR so CI runs, and every check is green
             - [ ] Images built and scanned without the CVE patch blocks — Trivy passed
             - [ ] Verify next deploy succeeds after merge
         run: |
@@ -124,6 +133,7 @@ jobs:
 
           EXISTING=$(gh pr list --head "$BRANCH" --json number -q '.[0].number' 2>/dev/null || true)
           if [ -n "$EXISTING" ]; then
+            gh pr edit "$EXISTING" --body "$PR_BODY"
             echo "PR #$EXISTING updated with latest changes"
           else
             gh pr create \
