@@ -97,7 +97,7 @@ open_or_update_pr() {
   git add server/Dockerfile client/Dockerfile
   git commit -m "fix(docker): patch newly detected CVEs in base image packages"
   git push --force origin "$branch"
-  body=$(printf '## Summary\nScheduled rebuild detected HIGH/CRITICAL CVEs in Alpine OS packages and patched them (verified by re-scan).\n\n**Patched images:** %s\n\n## Test plan\n- [ ] Trivy scan passes on CI after merge\n- [ ] Next scheduled rebuild deploys cleanly\n' "${PATCHED[*]}")
+  body=$(printf '## Summary\nScheduled rebuild detected HIGH/CRITICAL CVEs in Alpine OS packages and patched them (verified by re-scan).\n\n**Patched images:** %s\n\n## Required first action: start CI\nThis pull request was opened by a workflow authenticated with `GITHUB_TOKEN`, and GitHub does not start workflow runs for events raised by that token, so **no CI has run on this branch**. Before reviewing anything else: **close this pull request and immediately reopen it.** The reopen comes from your account, not the token, and starts the full CI suite. Do not merge until those checks are green: this PR changes the Dockerfiles that build the production images.\n\n## Test plan\n- [ ] Closed and reopened this PR so CI runs, and every check is green\n- [ ] Trivy scan passes on CI after merge\n- [ ] Next scheduled rebuild deploys cleanly\n' "${PATCHED[*]}")
   existing=$(gh pr list --head "$branch" --json number -q '.[0].number' 2>/dev/null || true)
   if [[ -n "$existing" ]]; then
     gh pr edit "$existing" --body "$body"
