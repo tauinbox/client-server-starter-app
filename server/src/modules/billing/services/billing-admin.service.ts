@@ -25,6 +25,12 @@ import {
   INVOICE_SORT_COLUMN_MAP,
   SUBSCRIPTION_SORT_COLUMN_MAP
 } from '../utils/list-order.util';
+import {
+  lockInvoice,
+  releaseRefund,
+  remainingRefundable,
+  reserveRefund
+} from '../utils/refund-reservation.util';
 import type {
   InvoiceCursorQueryDto,
   SubscriptionCursorQueryDto
@@ -173,10 +179,7 @@ export class BillingAdminService {
   async refundInvoice(id: string, amountMinor?: number): Promise<Invoice> {
     const { refundAmount, cumulativeRefunded, providerRef } =
       await withTransaction(this.dataSource, async (manager) => {
-        const invoice = await manager.findOne(Invoice, {
-          where: { id },
-          lock: { mode: 'pessimistic_write' }
-        });
+        const invoice = await lockInvoice(manager, { where: { id } });
         if (!invoice) {
           throw new NotFoundException('Invoice not found');
         }
@@ -184,21 +187,19 @@ export class BillingAdminService {
           throw new ConflictException('Only paid invoices can be refunded');
         }
 
-        const remaining = invoice.amountMinor.sub(invoice.refundedMinor);
-        const refundAmount =
+        // Rejecting rather than capping is this route's policy: an admin who
+        // asked for more than is left gets told, not quietly given less.
+        const remaining = remainingRefundable(invoice);
+        const requested =
           amountMinor != null ? Money.fromMinor(amountMinor) : remaining;
-        if (
-          refundAmount.compare(ZERO) <= 0 ||
-          refundAmount.compare(remaining) > 0
-        ) {
+        if (requested.compare(ZERO) <= 0 || requested.compare(remaining) > 0) {
           throw new BadRequestException(
             'Refund amount must be between 1 and the remaining refundable total'
           );
         }
 
-        const cumulativeRefunded = invoice.refundedMinor.add(refundAmount);
-        invoice.refundedMinor = cumulativeRefunded;
-        await manager.save(Invoice, invoice);
+        const { reserved: refundAmount, cumulative: cumulativeRefunded } =
+          await reserveRefund(manager, invoice, requested);
 
         return {
           refundAmount,
@@ -230,10 +231,7 @@ export class BillingAdminService {
     const { saved, invalidateUserId } = await withTransaction(
       this.dataSource,
       async (manager) => {
-        const invoice = await manager.findOne(Invoice, {
-          where: { id },
-          lock: { mode: 'pessimistic_write' }
-        });
+        const invoice = await lockInvoice(manager, { where: { id } });
         if (!invoice) {
           throw new NotFoundException('Invoice not found');
         }
@@ -267,15 +265,13 @@ export class BillingAdminService {
   }
 
   /**
-   * Gives back a reservation whose provider call failed. `refundedMinor` is
-   * only ever moved by a reservation (up) or this release (down), so
-   * subtracting this leg's own amount under the lock cannot disturb a
-   * concurrent one. A refund that reached the provider despite the error is not
-   * lost: the retry prices from the released total, so it recomputes the same
-   * idempotency key and the providers' key scans collapse it into the original
-   * money move. A release that itself fails leaves the reservation standing -
-   * the invoice then shows more refunded than was paid out until an operator
-   * reconciles it, which is the safe direction to fail in.
+   * Gives back a reservation whose provider call failed. A refund that reached
+   * the provider despite the error is not lost: the retry prices from the
+   * released total, so it recomputes the same idempotency key and the
+   * providers' key scans collapse it into the original money move. A release
+   * that itself fails leaves the reservation standing - the invoice then shows
+   * more refunded than was paid out until an operator reconciles it, which is
+   * the safe direction to fail in.
    */
   private async releaseReservation(
     id: string,
@@ -283,17 +279,8 @@ export class BillingAdminService {
   ): Promise<void> {
     try {
       await withTransaction(this.dataSource, async (manager) => {
-        const invoice = await manager.findOne(Invoice, {
-          where: { id },
-          lock: { mode: 'pessimistic_write' }
-        });
-        if (!invoice) {
-          return;
-        }
-        const released = invoice.refundedMinor.sub(refundAmount);
-        invoice.refundedMinor = released.compare(ZERO) < 0 ? ZERO : released;
-        await manager.save(Invoice, invoice);
-        if (invoice.status === 'refunded') {
+        const invoice = await releaseRefund(manager, id, refundAmount);
+        if (invoice?.status === 'refunded') {
           this.logger.error(
             `Invoice ${id} is marked refunded but a leg of ${refundAmount.toMinorString()} was released; reconcile against the provider`
           );
