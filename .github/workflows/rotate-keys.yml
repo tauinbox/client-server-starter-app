@@ -38,7 +38,10 @@ jobs:
       # Keeps the third-party release download off the path that rewrites the
       # JWT keys — see deploy.yml for the full rationale.
       - name: Preseed the SSH client
+        id: ssh-client
         uses: ./.github/actions/preseed-ssh-client
+        with:
+          host_key: ${{ secrets.VPS_HOST_KEY }}
 
       - name: Rotate keys via SSH
         uses: appleboy/ssh-action@v1
@@ -46,6 +49,9 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          # See deploy.yml — this job hands the signing keys themselves over
+          # the same connection.
+          fingerprint: ${{ steps.ssh-client.outputs.fingerprint }}
           envs: JWT_PRIVATE_KEY,JWT_PUBLIC_KEY,JWT_MIN_IAT
           script: |
             set -euo pipefail
