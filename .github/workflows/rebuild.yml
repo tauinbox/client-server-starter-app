@@ -182,9 +182,14 @@ jobs:
           script: |
             set -euo pipefail
             cd /home/deploy/nexus
-            # Clean up docker-compose.yml if a previous rollback left it modified
+            # Clean up docker-compose.yml if an earlier deploy or rollback left
+            # it checked out at another commit
             git checkout HEAD -- docker-compose.yml 2>/dev/null || true
             git pull --ff-only
+
+            # Pin the compose file to the commit the images were rebuilt from —
+            # master can move between the rebuild and this deploy. See deploy.yml.
+            git checkout "${DEPLOY_SHA}" -- docker-compose.yml
 
             PREV_SHA=""
             if [ -f .deployed-sha ]; then

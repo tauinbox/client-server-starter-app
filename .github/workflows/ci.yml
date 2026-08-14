@@ -11,9 +11,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Every job carries an explicit timeout-minutes. Without one a job inherits
+  # the 6-hour default, so a hang — the browser-install stall guarded below was
+  # one — burns six hours of runner time before it fails. The bounds are set at
+  # several times each job's worst observed duration on master, so only a hang
+  # can reach them.
   server-checks:
     name: Server – Checks
     runs-on: ubuntu-latest
+    # Worst observed: ~1.2 min.
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: server
@@ -44,6 +51,8 @@ jobs:
     name: Server – Tests & Build
     needs: [server-checks]
     runs-on: ubuntu-latest
+    # Worst observed: ~2.7 min, plus the postgres and mailpit service containers.
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: server
@@ -120,6 +129,8 @@ jobs:
   mock-server:
     name: Mock Server
     runs-on: ubuntu-latest
+    # Worst observed: ~40 s.
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: mock-server
@@ -145,6 +156,8 @@ jobs:
   client:
     name: Client
     runs-on: ubuntu-latest
+    # Worst observed: ~1.9 min.
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: client
@@ -182,6 +195,8 @@ jobs:
     name: Client E2E
     needs: [mock-server]
     runs-on: ubuntu-latest
+    # Worst observed: ~4.2 min, including the browser download on a cache miss.
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: client
@@ -211,7 +226,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('client/package-lock.json') }}
