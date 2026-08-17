@@ -867,8 +867,10 @@ Nine tables managed via TypeORM migrations:
 
 | Tool | Scope | Config |
 |------|-------|--------|
-| ESLint | Client (angular-eslint, unused-imports, import cycles — needs the `import/parsers` setting to work on `.ts`) | `eslint.config.mjs` |
-| ESLint | Server (@typescript-eslint + prettier) | `eslint.config.ts` |
+| ESLint | Client (angular-eslint, unused-imports, import cycles) | `eslint.config.mjs` |
+| ESLint | Server (@typescript-eslint + prettier, import cycles) | `eslint.config.ts` |
+| ESLint | Mock server (@typescript-eslint + prettier, import cycles) | `eslint.config.ts` |
+| — | All three need `settings['import/parsers']` mapping `.ts` to `@typescript-eslint/parser`, or `import/no-cycle` silently passes on everything | — |
 | ESLint | Shared rules for both workspaces (incl. a `no-restricted-syntax` ban on `as unknown as T` double casts) | `eslint.base.config.mjs` |
 | Prettier | Both (single quotes, no trailing commas) | `.prettierrc` |
 | Stylelint | Client SCSS (recess property order, no `px` units outside breakpoints) | `.stylelintrc.json` |
@@ -896,10 +898,21 @@ whole repository, so one run covers everything) enforces three rules:
    `server/src/modules/core/filters`.
 
 The check is written in dependency-free Node rather than as an ESLint rule
-because ESLint cannot lint files outside the directory containing its config —
-so no workspace lints `shared/` — and `eslint-plugin-import` is installed in the
-client only. It carries a `--self-test` that builds synthetic fixtures and fails
-if any detector stops firing; CI runs that before the check itself.
+because ESLint cannot lint files outside the directory containing its config, so
+**`shared/` is linted by no workspace** — and that is exactly where the two
+largest barrels live. It carries a `--self-test` that builds synthetic fixtures
+and fails if any detector stops firing; CI runs that before the check itself.
+
+`import/no-cycle` additionally runs in all three workspaces so a cycle surfaces
+in the editor while you are writing it, rather than in CI. That rule is the fast
+feedback loop; `check-imports.mjs` is the enforcement, and it is the only one of
+the two that sees `shared/`. `server/` and `mock-server/` exempt `**/*.entity.ts`
+for the TypeORM reason above, matching the script.
+
+> **Changing either cycle rule?** Prove it still detects. Write a throwaway
+> two-file cycle in that workspace's `src/`, confirm ESLint reports it, delete
+> it. A green lint run is not evidence: this rule's failure mode is silence, and
+> it sat dead in the client for exactly that reason.
 
 ### Git Hooks
 
