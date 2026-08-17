@@ -19,6 +19,7 @@ import { MailService } from '../../mail/mail.service';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { SessionIssuerService } from './session-issuer.service';
 import { SessionLimitService } from './session-limit.service';
 import { EntitlementService } from '../../entitlements/entitlement.service';
 
@@ -251,6 +252,7 @@ describe('AuthService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
+        SessionIssuerService,
         SessionLimitService,
         { provide: EntitlementService, useValue: mockEntitlementService },
         { provide: DataSource, useValue: mockDataSource },

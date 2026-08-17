@@ -28,6 +28,7 @@ import { CaslModule } from './casl/casl.module';
 import { CaptchaModule } from './captcha/captcha.module';
 import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { SessionLimitService } from './services/session-limit.service';
+import { SessionIssuerService } from './services/session-issuer.service';
 import { RoleService } from './services/role.service';
 import { RolesController } from './controllers/roles.controller';
 import { RbacController } from './controllers/rbac.controller';
@@ -95,6 +96,7 @@ function conditionalProvider(
     JwtStrategy,
     RefreshTokenService,
     SessionLimitService,
+    SessionIssuerService,
     TokenCleanupService,
     OAuthAccountService,
     RoleService,

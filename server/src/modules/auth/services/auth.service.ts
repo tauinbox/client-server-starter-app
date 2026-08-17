@@ -10,7 +10,7 @@ import { RefreshToken } from '../entities/refresh-token.entity';
 import { LocalAuthRequest } from '../types/auth.request';
 import { RefreshTokenService } from './refresh-token.service';
 import { RoleService } from './role.service';
-import { SessionLimitService } from './session-limit.service';
+import { SessionIssuerService } from './session-issuer.service';
 import { TokenGeneratorService } from './token-generator.service';
 import { MailService } from '../../mail/mail.service';
 import { AuditService, AuditContext } from '../../audit/audit.service';
@@ -89,7 +89,7 @@ export class AuthService {
     private mailService: MailService,
     private auditService: AuditService,
     private metricsService: MetricsService,
-    private sessionLimitService: SessionLimitService
+    private sessionIssuer: SessionIssuerService
   ) {}
 
   // Dummy hash for constant-time rejection (prevents timing attacks).
@@ -191,31 +191,7 @@ export class AuthService {
   }
 
   async login(user: LocalAuthRequest['user']) {
-    const roleNames = user.roles.map((r) => r.name);
-    const tokens = this.tokenGenerator.generateTokens(
-      user.id,
-      user.email,
-      roleNames
-    );
-
-    const expiresIn = parseInt(
-      this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION'),
-      10
-    );
-    await this.refreshTokenService.createRefreshToken(
-      user.id,
-      tokens.refresh_token,
-      expiresIn
-    );
-    await this.refreshTokenService.pruneOldestTokens(
-      user.id,
-      await this.sessionLimitService.maxSessionsFor(user.id)
-    );
-
-    return {
-      tokens,
-      user
-    };
+    return this.sessionIssuer.issueSession(user);
   }
 
   async register(

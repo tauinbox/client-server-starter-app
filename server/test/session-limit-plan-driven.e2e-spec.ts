@@ -11,6 +11,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
+import { SessionIssuerService } from '../src/modules/auth/services/session-issuer.service';
 import { SessionLimitService } from '../src/modules/auth/services/session-limit.service';
 import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity';
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
@@ -170,6 +171,7 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
       providers: [
         AuthService,
         RefreshTokenService,
+        SessionIssuerService,
         SessionLimitService,
         EntitlementService,
         { provide: getRepositoryToken(RefreshToken), useValue: rt.repo },

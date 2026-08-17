@@ -1,15 +1,12 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { DataSource } from 'typeorm';
 import { UsersService } from '../../users/services/users.service';
 import { User } from '../../users/entities/user.entity';
 import { OAuthAccount } from '../entities/oauth-account.entity';
-import { RefreshTokenService } from './refresh-token.service';
 import { OAuthAccountService } from './oauth-account.service';
 import { RoleService } from './role.service';
-import { SessionLimitService } from './session-limit.service';
-import { TokenGeneratorService } from './token-generator.service';
+import { SessionIssuerService } from './session-issuer.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { AuditService, AuditContext } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -29,14 +26,11 @@ export class OAuthService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly usersService: UsersService,
-    private readonly configService: ConfigService,
-    private readonly refreshTokenService: RefreshTokenService,
     private readonly oauthAccountService: OAuthAccountService,
     private readonly roleService: RoleService,
     private readonly auditService: AuditService,
-    private readonly tokenGenerator: TokenGeneratorService,
     private readonly mailService: MailService,
-    private readonly sessionLimitService: SessionLimitService
+    private readonly sessionIssuer: SessionIssuerService
   ) {}
 
   async loginWithOAuth(profile: OAuthUserProfile) {
@@ -160,33 +154,7 @@ export class OAuthService {
       user = await this.usersService.findOne(createdUserId);
     }
 
-    const roleNames = user.roles.map((r) => r.name);
-    const tokens = this.tokenGenerator.generateTokens(
-      user.id,
-      user.email,
-      roleNames
-    );
-
-    const expiresIn = parseInt(
-      this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION'),
-      10
-    );
-    await this.refreshTokenService.createRefreshToken(
-      user.id,
-      tokens.refresh_token,
-      expiresIn
-    );
-    await this.refreshTokenService.pruneOldestTokens(
-      user.id,
-      await this.sessionLimitService.maxSessionsFor(user.id)
-    );
-
-    // Entity, not a spread: a plain object carries no class-transformer
-    // metadata, so @Exclude() fields could not be stripped downstream.
-    return {
-      tokens,
-      user
-    };
+    return this.sessionIssuer.issueSession(user);
   }
 
   /** A provider vouching for a different mailbox says nothing about this one. */

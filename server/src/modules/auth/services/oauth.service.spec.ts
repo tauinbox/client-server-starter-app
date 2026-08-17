@@ -8,6 +8,7 @@ import { UsersService } from '../../users/services/users.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { OAuthAccountService } from './oauth-account.service';
 import { RoleService } from './role.service';
+import { SessionIssuerService } from './session-issuer.service';
 import { SessionLimitService } from './session-limit.service';
 import { EntitlementService } from '../../entitlements/entitlement.service';
 import { TokenGeneratorService } from './token-generator.service';
@@ -173,6 +174,7 @@ describe('OAuthService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OAuthService,
+        SessionIssuerService,
         SessionLimitService,
         { provide: EntitlementService, useValue: mockEntitlementService },
         { provide: DataSource, useValue: mockDataSource },
