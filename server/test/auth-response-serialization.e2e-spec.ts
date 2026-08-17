@@ -28,6 +28,7 @@ import { CaptchaRequiredGuard } from '../src/modules/auth/captcha/captcha-requir
 import { UsersService } from '../src/modules/users/services/users.service';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
+import { SessionIssuerService } from '../src/modules/auth/services/session-issuer.service';
 import { SessionLimitService } from '../src/modules/auth/services/session-limit.service';
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { User } from '../src/modules/users/entities/user.entity';
@@ -156,6 +157,7 @@ describe('Auth response serialization (e2e)', () => {
       providers: [
         AuthService,
         OAuthService,
+        SessionIssuerService,
         SessionLimitService,
         {
           provide: EntitlementService,

@@ -11,6 +11,7 @@ import { DataSource, Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
+import { SessionIssuerService } from '../src/modules/auth/services/session-issuer.service';
 import { SessionLimitService } from '../src/modules/auth/services/session-limit.service';
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity';
@@ -176,6 +177,7 @@ describe('Refresh token reuse detection (e2e)', () => {
         RefreshTokenService,
         // Real resolver over a plan carrying no `sessions` limit, so pruning
         // falls back to MAX_CONCURRENT_SESSIONS exactly as Free tier does.
+        SessionIssuerService,
         SessionLimitService,
         {
           provide: EntitlementService,
