@@ -1,27 +1,20 @@
 import { IsIn, IsObject } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import type {
-  FeatureFlagRuleEffect,
-  FeatureFlagRulePayload,
-  FeatureFlagRuleType
-} from '@app/shared/types';
-
-const RULE_TYPES: FeatureFlagRuleType[] = [
-  'user',
-  'role',
-  'percentage',
-  'attribute'
-];
-
-const RULE_EFFECTS: FeatureFlagRuleEffect[] = ['include', 'exclude'];
+import {
+  FEATURE_FLAG_RULE_EFFECTS,
+  FEATURE_FLAG_RULE_TYPES,
+  type FeatureFlagRuleEffect,
+  type FeatureFlagRuleType
+} from '@app/shared/constants';
+import type { FeatureFlagRulePayload } from '@app/shared/types';
 
 export class FeatureFlagRuleDto {
-  @ApiProperty({ enum: RULE_EFFECTS })
-  @IsIn(RULE_EFFECTS)
+  @ApiProperty({ enum: FEATURE_FLAG_RULE_EFFECTS })
+  @IsIn(FEATURE_FLAG_RULE_EFFECTS)
   effect: FeatureFlagRuleEffect;
 
-  @ApiProperty({ enum: RULE_TYPES })
-  @IsIn(RULE_TYPES)
+  @ApiProperty({ enum: FEATURE_FLAG_RULE_TYPES })
+  @IsIn(FEATURE_FLAG_RULE_TYPES)
   type: FeatureFlagRuleType;
 
   @ApiProperty({

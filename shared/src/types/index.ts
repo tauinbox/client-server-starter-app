@@ -44,15 +44,10 @@ export type {
 export type { NotificationEvent } from './notification.types';
 
 export type {
-  FeatureFlagRuleType,
-  FeatureFlagRuleEffect,
-  FeatureFlagAttributeField,
-  FeatureFlagAttributeOp,
   FeatureFlagRulePayload,
   FeatureFlagRuleResponse,
   FeatureFlagResponse,
   EvaluatedFeatureFlagsResponse,
-  FeatureFlagPreviewReason,
   FeatureFlagPreviewMatchedRule,
   FeatureFlagPreviewResult
 } from './feature-flag.types';

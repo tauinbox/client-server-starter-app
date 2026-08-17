@@ -4,13 +4,11 @@ import {
   BILLING_CONFIGURED_ATTRIBUTE,
   BILLING_FLAG_KEY,
   BILLING_PROVIDER_FLAGS,
-  OAUTH_PROVIDER_FLAGS
+  OAUTH_PROVIDER_FLAGS,
+  type FeatureFlagRuleEffect,
+  type FeatureFlagRuleType
 } from '@app/shared/constants';
-import type {
-  FeatureFlagRuleEffect,
-  FeatureFlagRulePayload,
-  FeatureFlagRuleType
-} from '@app/shared/types';
+import type { FeatureFlagRulePayload } from '@app/shared/types';
 import { FeatureFlag } from '../modules/feature-flags/entities/feature-flag.entity';
 import { FeatureFlagRule } from '../modules/feature-flags/entities/feature-flag-rule.entity';
 

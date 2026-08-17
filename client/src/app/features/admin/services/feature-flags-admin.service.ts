@@ -2,11 +2,13 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import type {
+  FeatureFlagRuleEffect,
+  FeatureFlagRuleType
+} from '@app/shared/constants';
+import type {
   FeatureFlagPreviewResult,
   FeatureFlagResponse,
-  FeatureFlagRuleEffect,
-  FeatureFlagRulePayload,
-  FeatureFlagRuleType
+  FeatureFlagRulePayload
 } from '@app/shared/types';
 
 import type { CursorPaginatedResponse } from '@app/shared/types';

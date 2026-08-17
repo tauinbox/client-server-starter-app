@@ -1,10 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
+import {
+  FEATURE_FLAG_PREVIEW_REASONS,
+  FEATURE_FLAG_RULE_EFFECTS,
+  FEATURE_FLAG_RULE_TYPES,
+  type FeatureFlagPreviewReason,
+  type FeatureFlagRuleEffect,
+  type FeatureFlagRuleType
+} from '@app/shared/constants';
 import type {
   FeatureFlagPreviewMatchedRule,
-  FeatureFlagPreviewReason,
   FeatureFlagPreviewResult,
-  FeatureFlagRuleEffect,
-  FeatureFlagRuleType,
   StructuralDiff,
   WireType,
   _AssertNever
@@ -14,13 +19,10 @@ export class PreviewFlagMatchedRuleDto {
   @ApiProperty({ example: 0 })
   index: number;
 
-  @ApiProperty({
-    enum: ['user', 'role', 'percentage', 'attribute'],
-    example: 'role'
-  })
+  @ApiProperty({ enum: FEATURE_FLAG_RULE_TYPES, example: 'role' })
   type: FeatureFlagRuleType;
 
-  @ApiProperty({ enum: ['include', 'exclude'], example: 'include' })
+  @ApiProperty({ enum: FEATURE_FLAG_RULE_EFFECTS, example: 'include' })
   effect: FeatureFlagRuleEffect;
 }
 
@@ -29,13 +31,7 @@ export class PreviewFlagResponseDto {
   result: boolean;
 
   @ApiProperty({
-    enum: [
-      'disabled',
-      'env-mismatch',
-      'excluded',
-      'included-by-rule',
-      'no-rules-default-on'
-    ],
+    enum: FEATURE_FLAG_PREVIEW_REASONS,
     example: 'included-by-rule'
   })
   reason: FeatureFlagPreviewReason;

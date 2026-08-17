@@ -1,9 +1,64 @@
 import { BadRequestException } from '@nestjs/common';
 import {
+  FEATURE_FLAG_ATTRIBUTE_FIELDS,
+  FEATURE_FLAG_ATTRIBUTE_OPS,
+  FEATURE_FLAG_PREVIEW_REASONS,
+  FEATURE_FLAG_RULE_EFFECTS,
+  FEATURE_FLAG_RULE_TYPES
+} from '@app/shared/constants';
+import {
   ATTRIBUTE_VALUE_MAX_ITEMS,
   ATTRIBUTE_VALUE_MAX_LENGTH
 } from '@app/shared/utils/feature-flag-attribute-value';
 import { validateRulePayload } from './validate-rule-payload.util';
+
+// The unions are derived from these arrays, so dropping a member no longer
+// fails to compile anywhere - it silently narrows the type in all three
+// workspaces at once. These lists are a wire contract with every stored rule,
+// so they are pinned here rather than left to the type system.
+describe('feature-flag rule vocabulary', () => {
+  it('pins the rule types', () => {
+    expect(FEATURE_FLAG_RULE_TYPES).toEqual([
+      'user',
+      'role',
+      'percentage',
+      'attribute'
+    ]);
+  });
+
+  it('pins the rule effects', () => {
+    expect(FEATURE_FLAG_RULE_EFFECTS).toEqual(['include', 'exclude']);
+  });
+
+  it('pins the attribute fields', () => {
+    expect(FEATURE_FLAG_ATTRIBUTE_FIELDS).toEqual([
+      'email',
+      'emailDomain',
+      'createdAt',
+      'custom'
+    ]);
+  });
+
+  it('pins the attribute operators', () => {
+    expect(FEATURE_FLAG_ATTRIBUTE_OPS).toEqual([
+      'eq',
+      'in',
+      'endsWith',
+      'before',
+      'after'
+    ]);
+  });
+
+  it('pins the preview reasons', () => {
+    expect(FEATURE_FLAG_PREVIEW_REASONS).toEqual([
+      'disabled',
+      'env-mismatch',
+      'excluded',
+      'included-by-rule',
+      'no-rules-default-on'
+    ]);
+  });
+});
 
 describe('validateRulePayload attribute value', () => {
   const knownCustomKeys = new Set<string>(['oauth.google.configured']);

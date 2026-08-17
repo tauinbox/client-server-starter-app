@@ -1,4 +1,4 @@
-import type { FeatureFlagAttributeOp } from '../types/feature-flag.types';
+import type { FeatureFlagAttributeOp } from '../constants/feature-flag.constants';
 import { toTimestamp } from './feature-flag-evaluator';
 
 export const ATTRIBUTE_VALUE_MAX_LENGTH = 200;
