@@ -16,7 +16,7 @@ import type {
   EvaluatedFeatureFlagsResponse,
   RoleResponse
 } from '@app/shared/types';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ErrorKeys } from '@app/shared/constants';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { FeatureFlagService } from '@features/feature-flags/services/feature-flag.service';
 import { SessionStorageService } from '@core/services/session-storage.service';

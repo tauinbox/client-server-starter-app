@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ErrorKeys } from '@app/shared/constants';
 import { OAuthAccount } from '../entities/oauth-account.entity';
 import { User } from '../../users/entities/user.entity';
 

@@ -1,6 +1,6 @@
 import { ApiPropertyOptional, IntersectionType } from '@nestjs/swagger';
 import { IsIn, IsOptional } from 'class-validator';
-import { ALLOWED_USER_SORT_COLUMNS } from '@app/shared/constants/user.constants';
+import { ALLOWED_USER_SORT_COLUMNS } from '@app/shared/constants';
 import { CursorPaginationQueryDto } from '../../../common/dtos';
 import { UserFiltersQueryDto } from './user-filters-query.dto';
 

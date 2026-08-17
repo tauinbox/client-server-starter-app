@@ -12,8 +12,7 @@ import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { ErrorKeys } from '@app/shared/constants';
-import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
+import { ErrorKeys, TOKEN_PURPOSE } from '@app/shared/constants';
 
 function mockJwtRequest(userId: string): {
   user: JwtAuthRequest['user'];

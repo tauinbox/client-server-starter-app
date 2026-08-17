@@ -16,7 +16,7 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { InvoiceResponse } from '@app/shared/types';
-import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
+import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 import { LayoutService } from '@core/services/layout.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';

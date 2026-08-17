@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ErrorKeys } from '@app/shared/constants';
 import { getState, logAudit } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';

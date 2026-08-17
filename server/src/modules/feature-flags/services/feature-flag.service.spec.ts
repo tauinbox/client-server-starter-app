@@ -3,7 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { HttpException } from '@nestjs/common';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ErrorKeys } from '@app/shared/constants';
 import { FeatureFlagService } from './feature-flag.service';
 import { AttributeRegistryService } from './attribute-registry.service';
 import { FeatureFlag } from '../entities/feature-flag.entity';

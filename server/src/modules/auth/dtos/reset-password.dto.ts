@@ -6,10 +6,7 @@ import {
   MaxLength,
   MinLength
 } from 'class-validator';
-import {
-  PASSWORD_REGEX,
-  PASSWORD_ERROR
-} from '@app/shared/constants/password.constants';
+import { PASSWORD_ERROR, PASSWORD_REGEX } from '@app/shared/constants';
 
 export class ResetPasswordDto {
   @ApiProperty({

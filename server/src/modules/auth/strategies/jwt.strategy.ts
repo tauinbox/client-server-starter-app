@@ -5,12 +5,12 @@ import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { CustomJwtPayload, PayloadFromJwt } from '../types/jwt-payload';
 import { User } from '../../users/entities/user.entity';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
 import {
+  ErrorKeys,
   JWT_AUDIENCE,
   JWT_ISSUER,
   TOKEN_PURPOSE
-} from '@app/shared/constants/auth.constants';
+} from '@app/shared/constants';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {

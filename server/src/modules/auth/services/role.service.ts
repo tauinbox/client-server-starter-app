@@ -18,7 +18,7 @@ import { RolePermission } from '../entities/role-permission.entity';
 import { User } from '../../users/entities/user.entity';
 import { PermissionService } from './permission.service';
 import { PermissionCondition } from '@app/shared/types';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ErrorKeys } from '@app/shared/constants';
 import type { AppAbility } from '../casl/app-ability';
 import {
   assertCanGrantPermissions,

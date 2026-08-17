@@ -4,8 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { JwtStrategy } from './jwt.strategy';
 import { CustomJwtPayload } from '../types/jwt-payload';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
-import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
+import { ErrorKeys, TOKEN_PURPOSE } from '@app/shared/constants';
 
 function buildConfigService(overrides: Record<string, unknown> = {}): {
   get: jest.Mock;

@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
-import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants/user.constants';
+import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
 
 /**
  * Recognises the two spellings a query string can carry for a boolean and

@@ -39,8 +39,7 @@ import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
-import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
+import { ErrorKeys, TOKEN_PURPOSE } from '@app/shared/constants';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authentication-exception.filter';
 import {

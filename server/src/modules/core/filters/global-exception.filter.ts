@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import { QueryFailedError, EntityNotFoundError } from 'typeorm';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ErrorKeys } from '@app/shared/constants';
 import { ErrorResponse } from './error-response.interface';
 
 const PG_ERROR_MAP: Record<

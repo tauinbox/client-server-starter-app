@@ -6,7 +6,7 @@ import {
   DEFAULT_SORT_BY,
   DEFAULT_SORT_ORDER,
   MAX_PAGE_SIZE
-} from '@app/shared/constants/pagination.constants';
+} from '@app/shared/constants';
 
 export class CursorPaginationQueryDto {
   @ApiPropertyOptional({

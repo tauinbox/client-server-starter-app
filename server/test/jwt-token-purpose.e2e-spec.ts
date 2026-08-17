@@ -15,7 +15,7 @@ import type { Server } from 'http';
 import { JwtStrategy } from '../src/modules/auth/strategies/jwt.strategy';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { buildJwtModuleOptions } from '../src/modules/auth/jwt-module-options.factory';
-import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
+import { TOKEN_PURPOSE } from '@app/shared/constants';
 
 const TEST_SECRET = 'test-secret-for-token-purpose-e2e';
 

@@ -1,7 +1,7 @@
 import type { JwtModuleOptions } from '@nestjs/jwt';
 import type { ConfigService } from '@nestjs/config';
 import type { StringValue } from 'ms';
-import { JWT_AUDIENCE, JWT_ISSUER } from '@app/shared/constants/auth.constants';
+import { JWT_AUDIENCE, JWT_ISSUER } from '@app/shared/constants';
 
 /**
  * Single source of the signing and verification options, so the two can never

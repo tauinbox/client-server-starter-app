@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import {
+  ALLOWED_USER_SORT_COLUMNS,
+  ErrorKeys,
+  MAX_USER_FILTER_LENGTH,
   PASSWORD_ERROR,
   PASSWORD_REGEX
-} from '@app/shared/constants/password.constants';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+} from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
   isValidEmail,
@@ -12,10 +14,6 @@ import {
   validateMaxLength,
   validateMinLength
 } from '../utils/validation';
-import {
-  ALLOWED_USER_SORT_COLUMNS,
-  MAX_USER_FILTER_LENGTH
-} from '@app/shared/constants/user.constants';
 import type { PaginationQuery } from '../helpers/pagination.helpers';
 import {
   compareValues,

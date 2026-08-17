@@ -32,7 +32,7 @@ import {
 } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ErrorKeys } from '@app/shared/constants';
 import { FeatureFlagCursorQueryDto } from '../../../common/dtos';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
 import { RegisterResource } from '../../auth/decorators/register-resource.decorator';

@@ -1,7 +1,7 @@
 import type { Observable, OperatorFunction } from 'rxjs';
 import { debounceTime, distinctUntilChanged, map, switchMap } from 'rxjs';
 import type { RoleAdminResponse } from '@app/shared/types/role.types';
-import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants/user.constants';
+import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
 import type { ChipOption } from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
 import type { UserService } from '@features/users/services/user.service';
 import type { User } from '@features/users/models/user.types';

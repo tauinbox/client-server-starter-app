@@ -1,5 +1,5 @@
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ErrorKeys } from '@app/shared/constants';
 
 // These tests verify that when the server returns an `errorKey` in the error
 // response, the client shows the translated text (not the raw English `message`).

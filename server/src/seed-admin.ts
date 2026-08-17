@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
-import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants/auth.constants';
+import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants';
 import { postgresConfig } from './postgres.config';
 import { User } from './modules/users/entities/user.entity';
 import { Role } from './modules/auth/entities/role.entity';

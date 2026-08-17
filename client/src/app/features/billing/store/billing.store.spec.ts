@@ -8,7 +8,7 @@ import type {
   SubscriptionResponse,
   UsageSummaryResponse
 } from '@app/shared/types';
-import { DEFAULT_CURSOR_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
+import { DEFAULT_CURSOR_PAGE_SIZE } from '@app/shared/constants';
 import { NotifyService } from '@core/services/notify.service';
 import { BillingService } from '../services/billing.service';
 import { BillingStore } from './billing.store';

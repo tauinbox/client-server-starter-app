@@ -23,7 +23,7 @@ import { EntitlementGuard } from '../src/modules/entitlements/entitlement.guard'
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { BillingUserController } from '../src/modules/billing/controllers/billing-user.controller';
-import { MAX_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
+import { MAX_PAGE_SIZE } from '@app/shared/constants';
 import { CursorPaginatedResponseDto } from '../src/common/dtos/cursor-paginated-response.dto';
 
 function makeSubscription(): Subscription {

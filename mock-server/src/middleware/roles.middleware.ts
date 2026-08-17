@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
-import { ALLOWED_ROLE_SORT_COLUMNS } from '@app/shared/constants';
+import { ALLOWED_ROLE_SORT_COLUMNS, ErrorKeys } from '@app/shared/constants';
 import {
   cursorPaginate,
   cursorQueryErrors,

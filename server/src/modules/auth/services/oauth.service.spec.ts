@@ -15,8 +15,7 @@ import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { User } from '../../users/entities/user.entity';
-import { ErrorKeys } from '@app/shared/constants';
-import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
+import { ErrorKeys, MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 
 describe('OAuthService', () => {
   let service: OAuthService;

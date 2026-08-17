@@ -30,7 +30,7 @@ import { Throttle } from '@nestjs/throttler';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { subject } from '@casl/ability';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ErrorKeys } from '@app/shared/constants';
 import {
   ActionCursorQueryDto,
   ResourceCursorQueryDto

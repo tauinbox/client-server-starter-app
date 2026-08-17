@@ -3,7 +3,7 @@ import {
   DEFAULT_CURSOR_PAGE_SIZE,
   DEFAULT_SORT_BY,
   DEFAULT_SORT_ORDER
-} from '@app/shared/constants/pagination.constants';
+} from '@app/shared/constants';
 import type { SortOrder } from '@app/shared/types';
 
 /**
