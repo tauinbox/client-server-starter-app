@@ -1,9 +1,10 @@
 import type {
   FeatureFlagAttributeField,
   FeatureFlagAttributeOp,
+  FeatureFlagPreviewReason,
   FeatureFlagRuleEffect,
   FeatureFlagRuleType
-} from '../constants/feature-flag-rule.constants';
+} from '../constants/feature-flag.constants';
 
 export type FeatureFlagRulePayload =
   | { type: 'user'; userIds: string[] }
@@ -44,13 +45,6 @@ export type EvaluatedFeatureFlagsResponse = {
   flags: Record<string, boolean>;
   evaluatedAt: string;
 };
-
-export type FeatureFlagPreviewReason =
-  | 'disabled'
-  | 'env-mismatch'
-  | 'excluded'
-  | 'included-by-rule'
-  | 'no-rules-default-on';
 
 export type FeatureFlagPreviewMatchedRule = {
   index: number;

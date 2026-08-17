@@ -61,11 +61,13 @@ export {
   FEATURE_FLAG_RULE_EFFECTS,
   FEATURE_FLAG_ATTRIBUTE_FIELDS,
   FEATURE_FLAG_ATTRIBUTE_OPS,
+  FEATURE_FLAG_PREVIEW_REASONS,
   type FeatureFlagRuleType,
   type FeatureFlagRuleEffect,
   type FeatureFlagAttributeField,
-  type FeatureFlagAttributeOp
-} from './feature-flag-rule.constants';
+  type FeatureFlagAttributeOp,
+  type FeatureFlagPreviewReason
+} from './feature-flag.constants';
 
 export {
   ENTITLED_SUBSCRIPTION_STATUSES,

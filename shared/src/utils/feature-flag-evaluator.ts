@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type {
   FeatureFlagAttributeOp,
   FeatureFlagRuleEffect
-} from '../constants/feature-flag-rule.constants';
+} from '../constants/feature-flag.constants';
 import type {
   FeatureFlagPreviewResult,
   FeatureFlagRulePayload

@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import {
   FEATURE_FLAG_ATTRIBUTE_FIELDS,
   FEATURE_FLAG_ATTRIBUTE_OPS,
+  FEATURE_FLAG_PREVIEW_REASONS,
   FEATURE_FLAG_RULE_EFFECTS,
   FEATURE_FLAG_RULE_TYPES
 } from '@app/shared/constants';
@@ -45,6 +46,16 @@ describe('feature-flag rule vocabulary', () => {
       'endsWith',
       'before',
       'after'
+    ]);
+  });
+
+  it('pins the preview reasons', () => {
+    expect(FEATURE_FLAG_PREVIEW_REASONS).toEqual([
+      'disabled',
+      'env-mismatch',
+      'excluded',
+      'included-by-rule',
+      'no-rules-default-on'
     ]);
   });
 });
