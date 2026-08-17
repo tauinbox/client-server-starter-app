@@ -9,10 +9,10 @@ import {
   ValidateIf
 } from 'class-validator';
 import {
+  PASSWORD_ERROR,
   PASSWORD_REGEX,
-  PASSWORD_ERROR
-} from '@app/shared/constants/password.constants';
-import { SUPPORTED_LOCALES } from '@app/shared/constants';
+  SUPPORTED_LOCALES
+} from '@app/shared/constants';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 
 export class UpdateProfileDto {

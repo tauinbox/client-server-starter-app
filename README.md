@@ -897,6 +897,16 @@ whole repository, so one run covers everything) enforces three rules:
    a package all three workspaces consume) plus `server/src/common/dtos` and
    `server/src/modules/core/filters`.
 
+**Importing from `shared/`:** always through the barrel — `from
+'@app/shared/constants'`, never `from '@app/shared/constants/auth.constants'`.
+Both styles used to be in use; the barrel won because it makes `constants`
+consistent with `types` and because the counter-argument turned out to be
+empty — the client bundle measures 846.90 kB raw with deep imports and 846.83 kB
+with the barrel, so nothing is lost to tree-shaking. A symbol you can only reach
+by deep path is a barrel that needs the export added, not a deep import to
+write. `shared/src/utils/` and `shared/src/enums/` have no barrel and are still
+imported by full path.
+
 The check is written in dependency-free Node rather than as an ESLint rule
 because ESLint cannot lint files outside the directory containing its config, so
 **`shared/` is linted by no workspace** — and that is exactly where the two

@@ -1,5 +1,5 @@
 import type { Server } from 'http';
-import { MAX_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
+import { MAX_PAGE_SIZE } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';

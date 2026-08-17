@@ -15,20 +15,20 @@ import type {
   FeatureFlagRulePayload,
   FeatureFlagRuleType
 } from '@app/shared/types';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
-import { ALLOWED_FEATURE_FLAG_SORT_COLUMNS } from '@app/shared/constants';
+import {
+  ALLOWED_FEATURE_FLAG_SORT_COLUMNS,
+  APP_ENVIRONMENTS,
+  BILLING_CONFIGURED_ATTRIBUTE,
+  BILLING_PROVIDER_FLAGS,
+  ErrorKeys,
+  OAUTH_PROVIDER_FLAGS,
+  normalizeEnvironmentList
+} from '@app/shared/constants';
 import {
   cursorPaginate,
   cursorQueryErrors,
   parseCursorQuery
 } from '../helpers/pagination.helpers';
-import {
-  APP_ENVIRONMENTS,
-  BILLING_CONFIGURED_ATTRIBUTE,
-  BILLING_PROVIDER_FLAGS,
-  normalizeEnvironmentList,
-  OAUTH_PROVIDER_FLAGS
-} from '@app/shared/constants';
 import { attributeValueError } from '@app/shared/utils/feature-flag-attribute-value';
 import { adminGuard, authenticateRequest } from '../helpers/auth.helpers';
 import {

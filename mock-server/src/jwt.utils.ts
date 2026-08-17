@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
+import { TOKEN_PURPOSE } from '@app/shared/constants';
 import type { MockUser } from './types';
 
 function base64url(obj: Record<string, unknown>): string {

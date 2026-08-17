@@ -20,7 +20,7 @@ import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factor
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
-import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants/user.constants';
+import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
 
 const EMPTY_PAGE = {
   data: [],

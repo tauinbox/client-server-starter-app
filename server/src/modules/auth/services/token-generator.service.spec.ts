@@ -1,6 +1,6 @@
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
+import { TOKEN_PURPOSE } from '@app/shared/constants';
 import { TokenGeneratorService } from './token-generator.service';
 
 describe('TokenGeneratorService', () => {

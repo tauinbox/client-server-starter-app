@@ -27,7 +27,7 @@ import { BillingAdminController } from '../src/modules/billing/controllers/billi
 import { AuditService } from '../src/modules/audit/audit.service';
 import { AuditLogInterceptor } from '../src/modules/audit/interceptors/audit-log.interceptor';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { MAX_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
+import { MAX_PAGE_SIZE } from '@app/shared/constants';
 import { CursorPaginatedResponseDto } from '../src/common/dtos/cursor-paginated-response.dto';
 
 class TestPermissionsGuard implements CanActivate {

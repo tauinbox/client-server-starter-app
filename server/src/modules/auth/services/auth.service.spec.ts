@@ -12,12 +12,12 @@ import { RoleService } from './role.service';
 import { TokenGeneratorService } from './token-generator.service';
 import {
   BCRYPT_SALT_ROUNDS,
+  ErrorKeys,
   MAX_CONCURRENT_SESSIONS
-} from '@app/shared/constants/auth.constants';
+} from '@app/shared/constants';
 import { MailService } from '../../mail/mail.service';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { SessionLimitService } from './session-limit.service';
 import { EntitlementService } from '../../entitlements/entitlement.service';

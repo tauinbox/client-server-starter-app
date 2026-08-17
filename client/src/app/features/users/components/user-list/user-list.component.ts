@@ -39,7 +39,7 @@ import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-fie
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
 import { RoleService } from '@features/admin/services/role.service';
 import type { RoleAdminResponse } from '@app/shared/types';
-import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants/user.constants';
+import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
 
 type FilterModel = {
   q: string;

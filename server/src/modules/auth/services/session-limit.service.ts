@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
+import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 import { EntitlementService } from '../../entitlements/entitlement.service';
 
 /**

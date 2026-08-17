@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ErrorKeys } from '@app/shared/constants';
 import type { PermissionCondition } from '@app/shared/types';
 import type { AppAbility, Subjects } from '../casl/app-ability';
 

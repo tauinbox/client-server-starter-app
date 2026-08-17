@@ -18,7 +18,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS
-} from '@app/shared/constants/auth.constants';
+} from '@app/shared/constants';
 import { GlobalExceptionFilter } from './filters';
 import { MailModule } from '../mail/mail.module';
 import { HealthModule } from './health/health.module';

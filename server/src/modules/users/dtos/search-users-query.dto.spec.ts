@@ -1,5 +1,5 @@
 import { BadRequestException, Type, ValidationPipe } from '@nestjs/common';
-import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants/user.constants';
+import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
 import { SearchUsersQueryDto } from './search-users-query.dto';
 import { SearchUsersCursorQueryDto } from './search-users-cursor-query.dto';
 

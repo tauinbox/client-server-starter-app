@@ -14,7 +14,7 @@ import { NotifyService } from '@core/services/notify.service';
 import { RoleService } from '@features/admin/services/role.service';
 import type { User } from '../../models/user.types';
 import type { RoleAdminResponse } from '@app/shared/types';
-import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants/user.constants';
+import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
 
 const mockUserRole: RoleAdminResponse = {
   id: 'role-user',

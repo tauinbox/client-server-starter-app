@@ -17,7 +17,7 @@ import { Throttle } from '@nestjs/throttler';
 import {
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS
-} from '@app/shared/constants/auth.constants';
+} from '@app/shared/constants';
 import {
   ApiBearerAuth,
   ApiBody,

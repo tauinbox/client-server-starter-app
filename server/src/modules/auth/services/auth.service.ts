@@ -19,14 +19,15 @@ import { hashToken } from '../../../common/utils/hash-token';
 import { issueEmailVerificationToken } from '../../../common/utils/issue-verification-token.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
-import { SYSTEM_ROLES, ErrorKeys } from '@app/shared/constants';
-import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
-  MAX_FAILED_ATTEMPTS,
-  LOCKOUT_DURATION_MS,
   BCRYPT_SALT_ROUNDS,
-  EMAIL_CHANGE_TOKEN_EXPIRY_MS
-} from '@app/shared/constants/auth.constants';
+  EMAIL_CHANGE_TOKEN_EXPIRY_MS,
+  ErrorKeys,
+  LOCKOUT_DURATION_MS,
+  MAX_FAILED_ATTEMPTS,
+  SYSTEM_ROLES
+} from '@app/shared/constants';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
 
 const RESET_TOKEN_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes

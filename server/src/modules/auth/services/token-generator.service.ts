@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
-import { TOKEN_PURPOSE } from '@app/shared/constants/auth.constants';
+import { TOKEN_PURPOSE } from '@app/shared/constants';
 import { CustomJwtPayload } from '../types/jwt-payload';
 import { TokensResponseDto } from '../dtos/auth-response.dto';
 

@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository, UpdateResult } from 'typeorm';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ErrorKeys } from '@app/shared/constants';
 import type { FeatureFlagPreviewResult } from '@app/shared/types';
 import {
   previewFeatureFlag,

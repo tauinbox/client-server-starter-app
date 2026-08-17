@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { DataSource, Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
+import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
 import { SessionLimitService } from '../src/modules/auth/services/session-limit.service';

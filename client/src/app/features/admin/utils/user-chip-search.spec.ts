@@ -4,7 +4,7 @@ import { toArray } from 'rxjs';
 import type { RoleAdminResponse } from '@app/shared/types/role.types';
 import { UserService } from '@features/users/services/user.service';
 import type { User } from '@features/users/models/user.types';
-import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants/user.constants';
+import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
 import {
   debouncedUserSearch,
   isSearchableTerm,

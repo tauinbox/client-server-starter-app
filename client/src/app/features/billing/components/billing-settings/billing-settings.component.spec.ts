@@ -12,7 +12,7 @@ import type {
   SubscriptionResponse,
   UsageSummaryResponse
 } from '@app/shared/types';
-import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
+import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 import { LayoutService } from '@core/services/layout.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';

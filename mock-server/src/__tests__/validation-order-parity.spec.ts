@@ -1,6 +1,5 @@
 import type { Server } from 'http';
-import { PASSWORD_ERROR } from '@app/shared/constants/password.constants';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ErrorKeys, PASSWORD_ERROR } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState } from '../state';

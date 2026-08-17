@@ -14,7 +14,7 @@ import type { Server } from 'http';
 import {
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS
-} from '@app/shared/constants/auth.constants';
+} from '@app/shared/constants';
 import { LoginThrottlerGuard } from '../src/modules/core/login-throttler.guard';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { BILLING_PROVIDERS } from '../src/modules/billing/providers/payment-provider.interface';

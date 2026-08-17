@@ -10,7 +10,7 @@ import { Permission } from '../entities/permission.entity';
 import { Resource } from '../entities/resource.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { CASL_RESERVED_ACTION_NAMES } from '../casl/constants';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ErrorKeys } from '@app/shared/constants';
 
 @Injectable()
 export class ActionService {

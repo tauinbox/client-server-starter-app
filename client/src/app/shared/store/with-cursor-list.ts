@@ -11,10 +11,7 @@ import {
 import type { EntityState } from '@ngrx/signals/entities';
 import { setAllEntities, upsertEntities } from '@ngrx/signals/entities';
 import type { HttpErrorResponse } from '@angular/common/http';
-import {
-  DEFAULT_SORT_BY,
-  DEFAULT_SORT_ORDER
-} from '@app/shared/constants/pagination.constants';
+import { DEFAULT_SORT_BY, DEFAULT_SORT_ORDER } from '@app/shared/constants';
 import type { CursorPaginatedResponse, SortOrder } from '@app/shared/types';
 import { NotifyService } from '@core/services/notify.service';
 import {

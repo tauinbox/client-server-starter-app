@@ -11,8 +11,10 @@ import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { In } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
-import { DEFAULT_CURSOR_PAGE_SIZE } from '@app/shared/constants/pagination.constants';
-import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
+import {
+  DEFAULT_CURSOR_PAGE_SIZE,
+  OPEN_SUBSCRIPTION_STATUSES
+} from '@app/shared/constants';
 import { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
 import { encodeCursor } from '../../../common/utils/cursor.util';
 import { User } from '../../users/entities/user.entity';

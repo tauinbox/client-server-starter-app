@@ -4,7 +4,7 @@
 
 import type { Server } from 'http';
 import type { EntitlementsResponse } from '@app/shared/types';
-import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants/auth.constants';
+import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';

@@ -15,7 +15,7 @@ import type { ResourceCursorQueryDto } from '../../../common/dtos';
 import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
 import { RESOURCE_SORT_COLUMN_MAP } from '../utils/rbac-sort-columns.util';
 import { CASL_RESERVED_SUBJECT_NAMES } from '../casl/constants';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+import { ErrorKeys } from '@app/shared/constants';
 import { ResourceRegistryService } from './resource-registry.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 

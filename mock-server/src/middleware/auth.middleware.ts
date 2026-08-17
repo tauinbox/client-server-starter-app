@@ -2,16 +2,14 @@ import { Router } from 'express';
 import type { CookieOptions } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  MAX_FAILED_ATTEMPTS,
+  EMAIL_CHANGE_TOKEN_EXPIRY_MS,
+  ErrorKeys,
   LOCKOUT_DURATION_MS,
   MAX_CONCURRENT_SESSIONS,
-  EMAIL_CHANGE_TOKEN_EXPIRY_MS
-} from '@app/shared/constants/auth.constants';
-import {
-  PASSWORD_REGEX,
-  PASSWORD_ERROR
-} from '@app/shared/constants/password.constants';
-import { ErrorKeys } from '@app/shared/constants/error-keys';
+  MAX_FAILED_ATTEMPTS,
+  PASSWORD_ERROR,
+  PASSWORD_REGEX
+} from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
   isValidEmail,
