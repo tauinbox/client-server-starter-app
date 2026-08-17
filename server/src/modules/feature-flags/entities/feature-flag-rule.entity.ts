@@ -8,9 +8,9 @@ import {
 } from 'typeorm';
 import type {
   FeatureFlagRuleEffect,
-  FeatureFlagRulePayload,
   FeatureFlagRuleType
-} from '@app/shared/types';
+} from '@app/shared/constants';
+import type { FeatureFlagRulePayload } from '@app/shared/types';
 import { FeatureFlag } from './feature-flag.entity';
 
 @Entity('feature_flag_rules')

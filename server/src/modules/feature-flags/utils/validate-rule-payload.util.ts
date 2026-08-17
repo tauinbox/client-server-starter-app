@@ -1,26 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
-import type {
-  FeatureFlagAttributeField,
-  FeatureFlagAttributeOp,
-  FeatureFlagRulePayload,
-  FeatureFlagRuleType
-} from '@app/shared/types';
+import {
+  FEATURE_FLAG_ATTRIBUTE_FIELDS,
+  FEATURE_FLAG_ATTRIBUTE_OPS,
+  type FeatureFlagAttributeField,
+  type FeatureFlagAttributeOp,
+  type FeatureFlagRuleType
+} from '@app/shared/constants';
+import type { FeatureFlagRulePayload } from '@app/shared/types';
 import { attributeValueError } from '@app/shared/utils/feature-flag-attribute-value';
-
-const ATTRIBUTE_FIELDS: FeatureFlagAttributeField[] = [
-  'email',
-  'emailDomain',
-  'createdAt',
-  'custom'
-];
-
-const ATTRIBUTE_OPS: FeatureFlagAttributeOp[] = [
-  'eq',
-  'in',
-  'endsWith',
-  'before',
-  'after'
-];
 
 export function validateRulePayload(
   type: FeatureFlagRuleType,
@@ -80,18 +67,20 @@ export function validateRulePayload(
       const customKey = p['customKey'];
       if (
         typeof field !== 'string' ||
-        !ATTRIBUTE_FIELDS.includes(field as FeatureFlagAttributeField)
+        !FEATURE_FLAG_ATTRIBUTE_FIELDS.includes(
+          field as FeatureFlagAttributeField
+        )
       ) {
         throw new BadRequestException(
-          `attribute rule requires field ∈ ${ATTRIBUTE_FIELDS.join(', ')}`
+          `attribute rule requires field ∈ ${FEATURE_FLAG_ATTRIBUTE_FIELDS.join(', ')}`
         );
       }
       if (
         typeof op !== 'string' ||
-        !ATTRIBUTE_OPS.includes(op as FeatureFlagAttributeOp)
+        !FEATURE_FLAG_ATTRIBUTE_OPS.includes(op as FeatureFlagAttributeOp)
       ) {
         throw new BadRequestException(
-          `attribute rule requires op ∈ ${ATTRIBUTE_OPS.join(', ')}`
+          `attribute rule requires op ∈ ${FEATURE_FLAG_ATTRIBUTE_OPS.join(', ')}`
         );
       }
       if (field === 'custom') {

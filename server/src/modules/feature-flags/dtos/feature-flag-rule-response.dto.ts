@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
+import type { FeatureFlagRuleEffect } from '@app/shared/constants';
 import type {
   FeatureFlagRulePayload,
-  FeatureFlagRuleEffect,
   FeatureFlagRuleResponse,
   StructuralDiff,
   WireType,

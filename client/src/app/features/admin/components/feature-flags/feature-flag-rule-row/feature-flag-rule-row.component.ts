@@ -30,13 +30,17 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { TranslocoDirective } from '@jsverse/transloco';
 import { forkJoin, of, Subject } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
-import type {
-  FeatureFlagAttributeField,
-  FeatureFlagAttributeOp,
-  FeatureFlagRuleEffect,
-  FeatureFlagRulePayload,
-  FeatureFlagRuleType
-} from '@app/shared/types';
+import {
+  FEATURE_FLAG_ATTRIBUTE_FIELDS,
+  FEATURE_FLAG_ATTRIBUTE_OPS,
+  FEATURE_FLAG_RULE_EFFECTS,
+  FEATURE_FLAG_RULE_TYPES,
+  type FeatureFlagAttributeField,
+  type FeatureFlagAttributeOp,
+  type FeatureFlagRuleEffect,
+  type FeatureFlagRuleType
+} from '@app/shared/constants';
+import type { FeatureFlagRulePayload } from '@app/shared/types';
 import { LayoutService } from '@core/services/layout.service';
 import {
   ChipsAutocompleteComponent,
@@ -62,27 +66,6 @@ export type FeatureFlagRuleDraft = {
 };
 
 type AttributePayload = Extract<FeatureFlagRulePayload, { type: 'attribute' }>;
-
-const RULE_TYPES: FeatureFlagRuleType[] = [
-  'user',
-  'role',
-  'percentage',
-  'attribute'
-];
-const RULE_EFFECTS: FeatureFlagRuleEffect[] = ['include', 'exclude'];
-const ATTRIBUTE_FIELDS: FeatureFlagAttributeField[] = [
-  'email',
-  'emailDomain',
-  'createdAt',
-  'custom'
-];
-const ATTRIBUTE_OPS: FeatureFlagAttributeOp[] = [
-  'eq',
-  'in',
-  'endsWith',
-  'before',
-  'after'
-];
 
 const PERCENT_STEP = 5;
 
@@ -128,10 +111,10 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   readonly #userService = inject(UserService);
   readonly #destroyRef = inject(DestroyRef);
 
-  protected readonly types = RULE_TYPES;
-  protected readonly effects = RULE_EFFECTS;
-  protected readonly attributeFields = ATTRIBUTE_FIELDS;
-  protected readonly attributeOps = ATTRIBUTE_OPS;
+  protected readonly types = FEATURE_FLAG_RULE_TYPES;
+  protected readonly effects = FEATURE_FLAG_RULE_EFFECTS;
+  protected readonly attributeFields = FEATURE_FLAG_ATTRIBUTE_FIELDS;
+  protected readonly attributeOps = FEATURE_FLAG_ATTRIBUTE_OPS;
 
   // Chip-label caches — keyed by the underlying API value (user UUID or role
   // name) so subsequent edits keep the human-readable display even if the

@@ -8,12 +8,8 @@ import {
   type FeatureFlagEvaluationContext
 } from '@app/shared/utils/feature-flag-evaluator';
 import type {
-  FeatureFlagAttributeField,
-  FeatureFlagAttributeOp,
   FeatureFlagResponse,
-  FeatureFlagRuleEffect,
-  FeatureFlagRulePayload,
-  FeatureFlagRuleType
+  FeatureFlagRulePayload
 } from '@app/shared/types';
 import {
   ALLOWED_FEATURE_FLAG_SORT_COLUMNS,
@@ -21,8 +17,16 @@ import {
   BILLING_CONFIGURED_ATTRIBUTE,
   BILLING_PROVIDER_FLAGS,
   ErrorKeys,
+  FEATURE_FLAG_ATTRIBUTE_FIELDS,
+  FEATURE_FLAG_ATTRIBUTE_OPS,
+  FEATURE_FLAG_RULE_EFFECTS,
+  FEATURE_FLAG_RULE_TYPES,
   OAUTH_PROVIDER_FLAGS,
-  normalizeEnvironmentList
+  normalizeEnvironmentList,
+  type FeatureFlagAttributeField,
+  type FeatureFlagAttributeOp,
+  type FeatureFlagRuleEffect,
+  type FeatureFlagRuleType
 } from '@app/shared/constants';
 import {
   cursorPaginate,
@@ -39,27 +43,6 @@ import { pushToAll } from '../sse-hub';
 import { getState, logAudit, toFeatureFlagResponse } from '../state';
 import type { MockFeatureFlag, MockFeatureFlagRule } from '../types';
 import { ANON_ID_COOKIE } from './anon-id.middleware';
-
-const RULE_TYPES: readonly FeatureFlagRuleType[] = [
-  'user',
-  'role',
-  'percentage',
-  'attribute'
-];
-const RULE_EFFECTS: readonly FeatureFlagRuleEffect[] = ['include', 'exclude'];
-const ATTRIBUTE_FIELDS: readonly FeatureFlagAttributeField[] = [
-  'email',
-  'emailDomain',
-  'createdAt',
-  'custom'
-];
-const ATTRIBUTE_OPS: readonly FeatureFlagAttributeOp[] = [
-  'eq',
-  'in',
-  'endsWith',
-  'before',
-  'after'
-];
 
 const KEY_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 
@@ -319,18 +302,20 @@ function validateRulePayload(
       const customKey = p['customKey'];
       if (
         typeof field !== 'string' ||
-        !ATTRIBUTE_FIELDS.includes(field as FeatureFlagAttributeField)
+        !FEATURE_FLAG_ATTRIBUTE_FIELDS.includes(
+          field as FeatureFlagAttributeField
+        )
       ) {
         return serviceFail(
-          `attribute rule requires field ∈ ${ATTRIBUTE_FIELDS.join(', ')}`
+          `attribute rule requires field ∈ ${FEATURE_FLAG_ATTRIBUTE_FIELDS.join(', ')}`
         );
       }
       if (
         typeof op !== 'string' ||
-        !ATTRIBUTE_OPS.includes(op as FeatureFlagAttributeOp)
+        !FEATURE_FLAG_ATTRIBUTE_OPS.includes(op as FeatureFlagAttributeOp)
       ) {
         return serviceFail(
-          `attribute rule requires op ∈ ${ATTRIBUTE_OPS.join(', ')}`
+          `attribute rule requires op ∈ ${FEATURE_FLAG_ATTRIBUTE_OPS.join(', ')}`
         );
       }
       if (field === 'custom') {
@@ -384,14 +369,16 @@ function validateRules(
   const out: ValidatedRule[] = [];
   for (let i = 0; i < input.length; i++) {
     const r = input[i] as IncomingRule;
-    if (!RULE_EFFECTS.includes(r.effect as FeatureFlagRuleEffect)) {
+    if (
+      !FEATURE_FLAG_RULE_EFFECTS.includes(r.effect as FeatureFlagRuleEffect)
+    ) {
       return dtoFail(
-        `rules[${i}].effect must be one of: ${RULE_EFFECTS.join(', ')}`
+        `rules[${i}].effect must be one of: ${FEATURE_FLAG_RULE_EFFECTS.join(', ')}`
       );
     }
-    if (!RULE_TYPES.includes(r.type as FeatureFlagRuleType)) {
+    if (!FEATURE_FLAG_RULE_TYPES.includes(r.type as FeatureFlagRuleType)) {
       return dtoFail(
-        `rules[${i}].type must be one of: ${RULE_TYPES.join(', ')}`
+        `rules[${i}].type must be one of: ${FEATURE_FLAG_RULE_TYPES.join(', ')}`
       );
     }
     const validated = validateRulePayload(

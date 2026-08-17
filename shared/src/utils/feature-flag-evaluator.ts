@@ -2,8 +2,10 @@ import { createHash } from 'node:crypto';
 
 import type {
   FeatureFlagAttributeOp,
+  FeatureFlagRuleEffect
+} from '../constants/feature-flag-rule.constants';
+import type {
   FeatureFlagPreviewResult,
-  FeatureFlagRuleEffect,
   FeatureFlagRulePayload
 } from '../types/feature-flag.types';
 

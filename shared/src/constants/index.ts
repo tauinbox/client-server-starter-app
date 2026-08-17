@@ -57,6 +57,17 @@ export {
 } from './billing-flags.constants';
 
 export {
+  FEATURE_FLAG_RULE_TYPES,
+  FEATURE_FLAG_RULE_EFFECTS,
+  FEATURE_FLAG_ATTRIBUTE_FIELDS,
+  FEATURE_FLAG_ATTRIBUTE_OPS,
+  type FeatureFlagRuleType,
+  type FeatureFlagRuleEffect,
+  type FeatureFlagAttributeField,
+  type FeatureFlagAttributeOp
+} from './feature-flag-rule.constants';
+
+export {
   ENTITLED_SUBSCRIPTION_STATUSES,
   OPEN_SUBSCRIPTION_STATUSES,
   CHANGEABLE_SUBSCRIPTION_STATUSES,

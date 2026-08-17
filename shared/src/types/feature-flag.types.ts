@@ -1,19 +1,9 @@
-export type FeatureFlagRuleType = 'user' | 'role' | 'percentage' | 'attribute';
-
-export type FeatureFlagRuleEffect = 'include' | 'exclude';
-
-export type FeatureFlagAttributeField =
-  | 'email'
-  | 'emailDomain'
-  | 'createdAt'
-  | 'custom';
-
-export type FeatureFlagAttributeOp =
-  | 'eq'
-  | 'in'
-  | 'endsWith'
-  | 'before'
-  | 'after';
+import type {
+  FeatureFlagAttributeField,
+  FeatureFlagAttributeOp,
+  FeatureFlagRuleEffect,
+  FeatureFlagRuleType
+} from '../constants/feature-flag-rule.constants';
 
 export type FeatureFlagRulePayload =
   | { type: 'user'; userIds: string[] }
