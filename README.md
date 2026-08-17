@@ -786,6 +786,7 @@ npm run start:dev          # Start with watch mode (ts-node-dev)
 npm run typecheck          # tsc --noEmit (no build script — this is the type gate)
 npm run lint               # Lint check
 npm run format:check       # Prettier check
+npm run check:imports      # Repo-wide cycle + barrel check (same script in all workspaces)
 ```
 
 ### Server (`cd server`)
@@ -800,6 +801,7 @@ npm run format:check       # Prettier check
 npm run format             # Prettier format
 npm test                   # Unit tests (Jest)
 npm run test:cov           # Test coverage
+npm run check:imports      # Repo-wide cycle + barrel check (all four source roots)
 npm run test:e2e           # E2E tests (pinned to Redis DB E2E_REDIS_DB, default 15, wiped per run)
 npm run migrations:run     # Run migrations (build first)
 npm run migrations:gen -- ./src/migrations/<kebab-name>  # Generate migration (build first)
@@ -816,6 +818,7 @@ npm run typecheck:e2e      # tsc --noEmit over e2e/ + playwright.config.ts (need
 npm run lint               # Lint check
 npm run lint:fix           # Lint and auto-fix (TS + SCSS)
 npm test                   # Unit tests (Vitest)
+npm run check:imports      # Repo-wide cycle + barrel check (same script in all workspaces)
 npm run test:e2e           # E2E tests (Playwright, uses mock-server)
 npm run test:e2e:ui        # E2E tests (interactive UI)
 npm run release            # Bump versions, generate CHANGELOG.md, create git tag
@@ -864,7 +867,7 @@ Nine tables managed via TypeORM migrations:
 
 | Tool | Scope | Config |
 |------|-------|--------|
-| ESLint | Client (angular-eslint, unused-imports, import cycles) | `eslint.config.mjs` |
+| ESLint | Client (angular-eslint, unused-imports, import cycles — needs the `import/parsers` setting to work on `.ts`) | `eslint.config.mjs` |
 | ESLint | Server (@typescript-eslint + prettier) | `eslint.config.ts` |
 | ESLint | Shared rules for both workspaces (incl. a `no-restricted-syntax` ban on `as unknown as T` double casts) | `eslint.base.config.mjs` |
 | Prettier | Both (single quotes, no trailing commas) | `.prettierrc` |
@@ -872,6 +875,31 @@ Nine tables managed via TypeORM migrations:
 | Husky + lint-staged | Pre-commit hook (auto-fix staged files) | `.lintstagedrc.mjs` |
 | Commitlint | Conventional Commits enforcement | `client/commitlint.config.mjs` |
 | commit-and-tag-version | Automated versioning + CHANGELOG | `client/.versionrc.json` |
+| check-imports | Repo-wide cycles, barrel rules (all four source roots) | `scripts/check-imports.mjs` |
+
+### Import hygiene and barrels
+
+`npm run check:imports` (available from any of the three workspaces; it walks the
+whole repository, so one run covers everything) enforces three rules:
+
+1. **Dependency cycles are an error.** TypeORM entity files are exempt — a
+   bidirectional relation needs the related class as a value inside a lazily
+   evaluated arrow, so `import type` is not available and the cycle is inherent
+   to the ORM. Cycles whose every edge is `import type` are also skipped, since
+   they are erased at compile time.
+2. **A file must not import through a barrel that lives in its own directory.**
+   Import the sibling module directly. This single pattern is what turns a
+   barrel from a facade into a cycle.
+3. **New barrels are an error.** Four are grandfathered in `ALLOWED_BARRELS`:
+   `shared/src/types`, `shared/src/constants` (the cross-workspace public API of
+   a package all three workspaces consume) plus `server/src/common/dtos` and
+   `server/src/modules/core/filters`.
+
+The check is written in dependency-free Node rather than as an ESLint rule
+because ESLint cannot lint files outside the directory containing its config —
+so no workspace lints `shared/` — and `eslint-plugin-import` is installed in the
+client only. It carries a `--self-test` that builds synthetic fixtures and fails
+if any detector stops firing; CI runs that before the check itself.
 
 ### Git Hooks
 
@@ -909,7 +937,7 @@ GitHub Actions runs on every push and pull request to `master` with 5 jobs:
 
 | Job | Depends on | Steps | Artifacts |
 |-----|-----------|-------|-----------|
-| **Server – Checks** | — | audit (high), lint, format:check, typecheck, check:routes, check:enums, check:permissions, check:i18n (validates all `ErrorKeys` values exist in every client i18n JSON) | — |
+| **Server – Checks** | — | audit (high), lint, format:check, typecheck, check:routes, check:enums, check:permissions, check:i18n (validates all `ErrorKeys` values exist in every client i18n JSON), check:imports (repo-wide, preceded by its own `--self-test`) | — |
 | **Server – Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
 | **Mock Server** | — | audit (high), lint, format:check, typecheck, test | — |
 | **Client** | — | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |

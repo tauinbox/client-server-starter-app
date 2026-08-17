@@ -1,7 +1,6 @@
 import { applyDecorators, SetMetadata, UseGuards } from '@nestjs/common';
 import { FeatureFlagGuard } from '../guards/feature-flag.guard';
-
-export const FEATURE_FLAG_KEY = 'feature_flag_key';
+import { FEATURE_FLAG_KEY } from '../constants/feature-flag-metadata.constants';
 
 /**
  * Guards a route by feature flag. Returns 404 when the flag is disabled for

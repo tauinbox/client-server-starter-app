@@ -38,8 +38,10 @@ import type {
   FeatureFlagRuleType
 } from '@app/shared/types';
 import { LayoutService } from '@core/services/layout.service';
-import type { ChipOption } from '@shared/forms';
-import { ChipsAutocompleteComponent } from '@shared/forms';
+import {
+  ChipsAutocompleteComponent,
+  type ChipOption
+} from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
 import { RoleService } from '../../../services/role.service';
 import { UserService } from '../../../../users/services/user.service';
 import type { User } from '../../../../users/models/user.types';

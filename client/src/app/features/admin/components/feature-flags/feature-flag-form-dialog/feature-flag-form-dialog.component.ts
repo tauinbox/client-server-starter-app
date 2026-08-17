@@ -36,8 +36,10 @@ import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.serv
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { deepEqual } from '@shared/utils/deep-equal.utils';
-import type { ChipOption } from '@shared/forms';
-import { ChipsAutocompleteComponent } from '@shared/forms';
+import {
+  ChipsAutocompleteComponent,
+  type ChipOption
+} from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
 import type { FeatureFlagRuleDraft } from '../feature-flag-rule-row/feature-flag-rule-row.component';
 import { FeatureFlagRuleRowComponent } from '../feature-flag-rule-row/feature-flag-rule-row.component';
 import { FeatureFlagPreviewComponent } from '../feature-flag-preview/feature-flag-preview.component';

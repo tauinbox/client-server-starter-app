@@ -46,6 +46,12 @@ jobs:
       - run: npm run check:enums
       - run: npm run check:permissions
       - run: npm run check:i18n
+      # Repo-wide, not server-scoped: it walks all four source roots, and
+      # `shared/` is linted by no workspace because ESLint cannot reach outside
+      # the directory holding its config. The self-test runs first so a check
+      # that has stopped detecting anything fails loudly instead of passing.
+      - run: node ../scripts/check-imports.mjs --self-test
+      - run: npm run check:imports
 
   server-tests:
     name: Server – Tests & Build

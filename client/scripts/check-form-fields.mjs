@@ -1,6 +1,6 @@
 /**
  * Lint check: ensures <mat-form-field> is only used inside the
- * app-form-field wrapper (shared/forms/) or in documented exceptions.
+ * nxs-form-field wrapper (shared/forms/) or in documented exceptions.
  *
  * Allowed locations:
  *  - shared/forms/          — the wrapper itself + tests
@@ -8,8 +8,8 @@
  *  - user-edit              — mat-select for roles
  *  - role-permissions-dialog — mat-select fields in admin
  *  - condition-builder      — mat-select/input in admin condition builder
- *  - feature-flag-rule-row  — admin rule editor; all fields set subscriptSizing="dynamic", no app-form-field siblings
- *  - feature-flag-preview   — admin dry-run preview; standalone JSON/attribute inputs, no app-form-field siblings
+ *  - feature-flag-rule-row  — admin rule editor; all fields set subscriptSizing="dynamic", no nxs-form-field siblings
+ *  - feature-flag-preview   — admin dry-run preview; standalone JSON/attribute inputs, no nxs-form-field siblings
  *
  * Exit code 1 if violations found.
  */
@@ -71,8 +71,8 @@ for (const filePath of files) {
 
 if (violations.length > 0) {
   console.error(
-    'ERROR: <mat-form-field> used outside <app-form-field> wrapper.\n' +
-      'Use <app-form-field> instead, or add an exception to\n' +
+    'ERROR: <mat-form-field> used outside <nxs-form-field> wrapper.\n' +
+      'Use <nxs-form-field> instead, or add an exception to\n' +
       'scripts/check-form-fields.mjs if this is a documented case.\n'
   );
   console.error('Violations:');

@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { JwtAuthRequest } from '../../auth/types/auth.request';
-import { FEATURE_FLAG_KEY } from '../decorators/require-feature.decorator';
+import { FEATURE_FLAG_KEY } from '../constants/feature-flag-metadata.constants';
 import { FeatureFlagResolverService } from '../services/feature-flag-resolver.service';
 
 @Injectable()
