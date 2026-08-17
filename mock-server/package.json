@@ -12,6 +12,7 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"*.ts\"",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "check:imports": "node ../scripts/check-imports.mjs",
     "audit:ci": "node ../scripts/audit-ci.mjs"
   },
   "dependencies": {

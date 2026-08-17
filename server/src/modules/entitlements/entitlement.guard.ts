@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { JwtAuthRequest } from '../auth/types/auth.request';
-import { ENTITLEMENT_KEY } from './require-entitlement.decorator';
+import { ENTITLEMENT_KEY } from './entitlement.constants';
 import { EntitlementService } from './entitlement.service';
 import type { EntitlementCapability } from './entitlement.types';
 

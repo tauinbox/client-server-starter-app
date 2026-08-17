@@ -1,8 +1,7 @@
 import { applyDecorators, SetMetadata, UseGuards } from '@nestjs/common';
 import { EntitlementGuard } from './entitlement.guard';
+import { ENTITLEMENT_KEY } from './entitlement.constants';
 import type { EntitlementCapability } from './entitlement.types';
-
-export const ENTITLEMENT_KEY = 'entitlement_capability';
 
 /**
  * Gates a route behind a billing capability. Returns 403 when the

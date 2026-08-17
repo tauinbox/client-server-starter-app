@@ -111,6 +111,13 @@ export default tseslint.config(
   },
   {
     settings: {
+      // Without this the plugin cannot parse an imported .ts file under flat
+      // config, builds an empty graph, and `import/no-cycle` silently passes
+      // on everything. `npm run check:imports` is the workspace-independent
+      // backstop for exactly that failure mode.
+      'import/parsers': {
+        '@typescript-eslint/parser': ['.ts']
+      },
       'import/resolver': {
         typescript: true,
         node: true

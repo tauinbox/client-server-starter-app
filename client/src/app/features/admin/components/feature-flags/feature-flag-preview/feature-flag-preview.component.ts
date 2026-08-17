@@ -18,7 +18,10 @@ import { MatCheckbox } from '@angular/material/checkbox';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { of, Subject } from 'rxjs';
 import type { FeatureFlagPreviewResult } from '@app/shared/types';
-import { ChipsAutocompleteComponent, type ChipOption } from '@shared/forms';
+import {
+  ChipsAutocompleteComponent,
+  type ChipOption
+} from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
 import { NotifyService } from '@core/services/notify.service';
 import { RoleService } from '../../../services/role.service';
 import { UserService } from '../../../../users/services/user.service';

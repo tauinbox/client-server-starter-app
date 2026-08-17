@@ -199,6 +199,7 @@ src/
 │   ├── services/attribute-registry.service.ts    # Extensibility seam — registerAttribute(key, resolver) from other modules' onModuleInit
 │   ├── controllers/feature-flags-admin.controller.ts # 7 admin endpoints under /admin/feature-flags; @Authorize(['manage','FeatureFlag']) + @LogAudit
 │   ├── controllers/feature-flags.controller.ts       # GET /feature-flags — @OptionalAuth(); authenticated → flags resolving true + public flags (disabled non-public omitted); anon → public flags only
+│   ├── constants/feature-flag-metadata.constants.ts  # FEATURE_FLAG_KEY — owned here, not by the decorator, so guard and decorator do not import each other (see the barrel/cycle rules in the root README)
 │   ├── decorators/require-feature.decorator.ts       # @RequireFeature('key') convenience — RBAC remains the real gate
 │   ├── guards/feature-flag.guard.ts                  # Returns 404 (anti-enumeration) when the named flag is disabled for the caller
 │   ├── middleware/anon-id.middleware.ts              # Issues nxs_anon_id cookie (SameSite=Lax, Secure in prod, 1yr, httpOnly=false) on first request
@@ -224,6 +225,7 @@ src/
 │   ├── entitlements.module.ts  # Imports only TypeOrmModule.forFeature([Customer, CustomerGrant, Plan, Subscription]) — no auth edge, so AuthModule -> EntitlementsModule and BillingModule -> EntitlementsModule are both one-way and the pre-existing BillingModule -> AuthModule edge stays acyclic (no forwardRef). BillingModule re-exports it, so consumers that import BillingModule keep resolving the service and guard unchanged. It reaches into billing/entities/ for the four rows it reads, which is a schema dependency, not a behavioural one
 │   ├── entitlement.service.ts  # capabilitiesFor(userId) (active/trialing/past_due-in-grace -> plan.entitlements, else Free, unioned with active CustomerGrants — non-revoked, non-expired — from paid one-time sku purchases), per-user cache keyed by the shared CacheVersionCounter (common/utils/cache-version-counter.ts — atomic Redis INCR, in-memory read-modify-write fallback); limitFor(userId, key) reads the already-resolved limits off that same cache (null = the plan carries no limit under that key and the caller applies its own default)
 │   ├── entitlement.guard.ts    # EntitlementGuard (403); @RequireEntitlement('<cap>') in require-entitlement.decorator.ts
+│   ├── entitlement.constants.ts # ENTITLEMENT_KEY — owned here, not by the decorator, so guard and decorator do not import each other (see the barrel/cycle rules in the root README)
 │   └── entitlement.types.ts    # EntitlementCapability union + ResolvedEntitlements (limits typed by the shared EntitlementLimits map)
 │                           # NOT here: EntitlementChangedListener stays in billing/listeners/ — it binds billing-owned events and pushes through NotificationsService
 └── users/
