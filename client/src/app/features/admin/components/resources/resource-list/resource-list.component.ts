@@ -33,7 +33,7 @@ import {
   MatRowDef,
   MatTable
 } from '@angular/material/table';
-import type { ResourceResponse } from '@app/shared/types/rbac.types';
+import type { ResourceResponse } from '@app/shared/types';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';

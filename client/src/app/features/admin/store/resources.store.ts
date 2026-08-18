@@ -8,7 +8,7 @@ import {
   withMethods
 } from '@ngrx/signals';
 import { updateEntity, withEntities } from '@ngrx/signals/entities';
-import type { ResourceResponse } from '@app/shared/types/rbac.types';
+import type { ResourceResponse } from '@app/shared/types';
 import { AuthService } from '@features/auth/services/auth.service';
 import { withCursorList } from '@shared/store/with-cursor-list';
 import type { UpdateResource } from '../services/rbac-admin.service';

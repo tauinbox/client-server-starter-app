@@ -34,7 +34,7 @@ import {
 } from '@angular/material/table';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
-import type { RoleAdminResponse } from '@app/shared/types/role.types';
+import type { RoleAdminResponse } from '@app/shared/types';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AuthService } from '@features/auth/services/auth.service';

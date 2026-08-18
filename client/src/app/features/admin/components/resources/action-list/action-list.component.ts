@@ -34,7 +34,7 @@ import {
   MatRowDef,
   MatTable
 } from '@angular/material/table';
-import type { ActionResponse } from '@app/shared/types/rbac.types';
+import type { ActionResponse } from '@app/shared/types';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';

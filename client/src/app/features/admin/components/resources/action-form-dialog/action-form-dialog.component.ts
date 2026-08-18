@@ -26,7 +26,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
-import type { ActionResponse } from '@app/shared/types/rbac.types';
+import type { ActionResponse } from '@app/shared/types';
 import type {
   CreateAction,
   UpdateAction

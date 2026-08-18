@@ -25,7 +25,7 @@ import type {
   ProrationPreviewResponse,
   PurchaseSessionResponse
 } from '@app/shared/types';
-import { CursorPaginatedResponseDto } from '../../../common/dtos/cursor-paginated-response.dto';
+import { CursorPaginatedResponseDto } from '../../../common/dtos';
 import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';

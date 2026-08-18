@@ -11,10 +11,7 @@ import { ActionFormDialogComponent } from './action-form-dialog.component';
 import type { ActionFormDialogData } from './action-form-dialog.component';
 import { ActionsStore } from '../../../store/actions.store';
 import { NotifyService } from '@core/services/notify.service';
-import type {
-  ActionResponse,
-  ResourceResponse
-} from '@app/shared/types/rbac.types';
+import type { ActionResponse, ResourceResponse } from '@app/shared/types';
 
 const mockAction: ActionResponse = {
   id: 'act-1',

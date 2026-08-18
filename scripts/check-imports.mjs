@@ -3,14 +3,21 @@
  * any workspace, because `shared/` has no package.json of its own and ESLint
  * cannot lint files outside the directory holding its config.
  *
- * Enforces three rules:
+ * Enforces four rules:
  *   1. No dependency cycles between modules.
  *   2. No file may import through a barrel that lives in its own directory —
  *      siblings are imported directly. That import is what turns a barrel from
  *      a facade into a cycle.
  *   3. No new barrels outside the allowlist below.
+ *   4. A directory that HAS a barrel is entered through it — no deep path from
+ *      outside. Rules 2 and 4 are the same principle read from either side: the
+ *      barrel is the outside face of a directory and never its inside face.
+ *      Without this, "always import shared/ through the barrel" was convention
+ *      only, and 25 sites had drifted off it by the time the rule was written.
+ *      Directories with no barrel (`shared/src/utils`, `shared/src/enums`) are
+ *      untouched — deep paths are the only way in and stay correct.
  *
- * `--self-test` runs the three detectors against synthetic fixtures and fails
+ * `--self-test` runs the four detectors against synthetic fixtures and fails
  * if any of them stays silent. A check that always passes is indistinguishable
  * from a clean repo, which is exactly how `import/no-cycle` sat dead.
  *
@@ -61,6 +68,18 @@ const ALLOWED_BARRELS = [
   'server/src/common/dtos/index.ts',
   'server/src/modules/core/filters/index.ts'
 ];
+
+/**
+ * Roots whose barrels are a package's *outside* face only. Files within such a
+ * root import each other by deep path and must never route through the barrel:
+ * `shared/src/types/index.ts` re-exports `feature-flag.types`, which imports
+ * `../constants/feature-flag.constants`, while `constants/index.ts` re-exports
+ * `billing-flags.constants`, which imports `../types/billing.types` — routing
+ * either through its barrel closes a four-node cycle across the two barrels.
+ * Rule 4 therefore skips importers inside these roots; deep paths there are the
+ * thing keeping the public barrels acyclic, not drift away from them.
+ */
+const PACKAGE_API_ROOTS = [SHARED];
 
 const SKIP_DIRS = new Set([
   'node_modules',
@@ -132,9 +151,14 @@ function resolveSpec(spec, fromFile, alias) {
   return null;
 }
 
-function analyse({ base, roots, allowed }) {
+function analyse({ base, roots, allowed, packageApiRoots = [] }) {
   const rel = (p) => relative(base, p).split(sep).join('/');
-  const violations = { cycles: [], selfBarrel: [], newBarrel: [] };
+  const violations = {
+    cycles: [],
+    selfBarrel: [],
+    newBarrel: [],
+    deepImport: []
+  };
 
   const barrels = new Set();
   for (const { dir } of roots) {
@@ -147,11 +171,24 @@ function analyse({ base, roots, allowed }) {
     }
   }
 
+  // Deepest barrel whose directory contains the file, so a nested barrel wins
+  // over an outer one instead of both claiming the same target.
+  const barrelOwning = (file) => {
+    let owner = null;
+    for (const barrel of barrels) {
+      const inside = `${dirname(barrel)}${sep}`;
+      if (!file.startsWith(inside)) continue;
+      if (!owner || inside.length > `${dirname(owner)}${sep}`.length) {
+        owner = barrel;
+      }
+    }
+    return owner;
+  };
+
   const graph = new Map();
   const typeOnly = new Set();
   for (const { dir, alias } of roots) {
     for (const file of walk(dir)) {
-      if (SPEC.test(file)) continue;
       const deps = [];
       for (const { spec, typeOnly: isType } of specifiers(
         readFileSync(file, 'utf8')
@@ -166,8 +203,26 @@ function analyse({ base, roots, allowed }) {
         ) {
           violations.selfBarrel.push(`${rel(file)} -> ${spec}`);
         }
+        const owner = barrelOwning(target);
+        const internalToPackage = packageApiRoots.some(
+          (root) =>
+            file.startsWith(`${root}${sep}`) &&
+            owner?.startsWith(`${root}${sep}`)
+        );
+        if (
+          owner &&
+          target !== owner &&
+          !internalToPackage &&
+          !file.startsWith(`${dirname(owner)}${sep}`)
+        ) {
+          violations.deepImport.push(
+            `${rel(file)} -> ${spec}  (use ${rel(dirname(owner))})`
+          );
+        }
       }
-      graph.set(file, deps);
+      // Specs are checked for import hygiene but kept out of the graph: a spec
+      // is a leaf nothing imports, so it cannot participate in a runtime cycle.
+      if (!SPEC.test(file)) graph.set(file, deps);
     }
   }
 
@@ -239,6 +294,18 @@ function report({ violations }) {
     console.error('');
   }
 
+  if (violations.deepImport.length) {
+    failed = true;
+    console.error(
+      'ERROR: deep import into a directory that has a barrel.\n' +
+        'Import the directory itself — the barrel is its public face. If the\n' +
+        'symbol is missing from the barrel, add the re-export there.\n'
+    );
+    for (const v of [...new Set(violations.deepImport)])
+      console.error(`  ${v}`);
+    console.error('');
+  }
+
   return failed;
 }
 
@@ -268,6 +335,23 @@ function selfTest() {
       "import { other } from './index';\nexport const thing = other;\n"
     );
     write('src/pkg/other.ts', 'export const other = 1;\n');
+    write(
+      'src/deep-consumer.ts',
+      "import { other } from './pkg/other';\nexport const used = other;\n"
+    );
+    write(
+      'src/pkg/sibling.ts',
+      "import { other } from './other';\nexport const near = other;\n"
+    );
+    write('src/unbarrelled/loose.ts', 'export const loose = 1;\n');
+    write(
+      'src/unbarrelled-consumer.ts',
+      "import { loose } from './unbarrelled/loose';\nexport const used2 = loose;\n"
+    );
+    write(
+      'src/deep-consumer.spec.ts',
+      "import { other } from './pkg/other';\nexport const spec = other;\n"
+    );
     write(
       'src/one.entity.ts',
       "import { Two } from './two.entity';\nexport class One { t: Two; }\n"
@@ -308,6 +392,26 @@ function selfTest() {
       'type-only cycle was reported despite being erased at compile time',
       !violations.cycles.some((c) => c.join(' ').includes('t-a.ts'))
     );
+    expect(
+      'deep-import detector stayed silent on a barrelled directory',
+      violations.deepImport.some((v) => v.startsWith('src/deep-consumer.ts'))
+    );
+    expect(
+      'deep-import detector skipped a spec file',
+      violations.deepImport.some((v) =>
+        v.startsWith('src/deep-consumer.spec.ts')
+      )
+    );
+    expect(
+      'deep-import detector fired on a sibling inside the barrelled directory',
+      !violations.deepImport.some((v) => v.startsWith('src/pkg/sibling.ts'))
+    );
+    expect(
+      'deep-import detector fired on a directory with no barrel',
+      !violations.deepImport.some((v) =>
+        v.startsWith('src/unbarrelled-consumer.ts')
+      )
+    );
 
     const clean = analyse({
       base: dir,
@@ -338,7 +442,8 @@ if (process.argv.includes('--self-test')) {
   const result = analyse({
     base: ROOT,
     roots: REPO_ROOTS,
-    allowed: ALLOWED_BARRELS
+    allowed: ALLOWED_BARRELS,
+    packageApiRoots: PACKAGE_API_ROOTS
   });
   if (report(result)) process.exit(1);
   console.log(
