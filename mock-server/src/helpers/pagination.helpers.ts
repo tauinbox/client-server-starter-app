@@ -7,7 +7,7 @@ import {
   MAX_PAGE_SIZE
 } from '@app/shared/constants';
 import type { SortOrder } from '@app/shared/types';
-import { decodeCursor, encodeCursor } from '../utils/cursor';
+import { encodeCursor, parseCursor } from '@app/shared/utils/cursor';
 
 export interface PaginationQuery {
   page: number;
@@ -204,7 +204,7 @@ export function cursorPaginate<T extends { id: string }>(
 
   let startIndex = 0;
   if (cursor) {
-    const decoded = decodeCursor(cursor);
+    const decoded = parseCursor(cursor);
     if (decoded) {
       startIndex = sorted.findIndex((item) => {
         const cmp =
