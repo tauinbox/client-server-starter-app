@@ -4,10 +4,10 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 import type { ChipOption } from './nxs-chips-autocomplete.component';
-import { ChipsAutocompleteComponent } from './nxs-chips-autocomplete.component';
+import { NxsChipsAutocompleteComponent } from './nxs-chips-autocomplete.component';
 
 @Component({
-  imports: [ChipsAutocompleteComponent],
+  imports: [NxsChipsAutocompleteComponent],
   template: `<nxs-chips-autocomplete
     [selected]="selected()"
     [options]="options()"
@@ -45,7 +45,7 @@ function getChipTexts(fixture: ComponentFixture<HostComponent>): string[] {
   ).map((c) => c.textContent?.trim().replace(/\s*cancel\s*$/i, '') ?? '');
 }
 
-describe('ChipsAutocompleteComponent', () => {
+describe('NxsChipsAutocompleteComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [HostComponent, TranslocoTestingModuleWithLangs],
@@ -69,7 +69,7 @@ describe('ChipsAutocompleteComponent', () => {
     fixture.detectChanges();
 
     const cmp = fixture.debugElement.children[0]
-      .componentInstance as ChipsAutocompleteComponent;
+      .componentInstance as NxsChipsAutocompleteComponent;
     cmp['addFromTokenEnd'](
       // @ts-expect-error testing mock — minimal MatChipInputEvent with value
       { value: 'qa-eu', input: null, chipInput: null }
@@ -86,7 +86,7 @@ describe('ChipsAutocompleteComponent', () => {
     fixture.detectChanges();
 
     const cmp = fixture.debugElement.children[0]
-      .componentInstance as ChipsAutocompleteComponent;
+      .componentInstance as NxsChipsAutocompleteComponent;
     cmp['addFromTokenEnd'](
       // @ts-expect-error testing mock — minimal MatChipInputEvent with value
       { value: 'qa-eu', input: null, chipInput: null }
@@ -104,7 +104,7 @@ describe('ChipsAutocompleteComponent', () => {
     fixture.detectChanges();
 
     const cmp = fixture.debugElement.children[0]
-      .componentInstance as ChipsAutocompleteComponent;
+      .componentInstance as NxsChipsAutocompleteComponent;
     cmp['addFromTokenEnd'](
       // @ts-expect-error testing mock — minimal MatChipInputEvent with value
       { value: 'production', input: null, chipInput: null }
@@ -123,7 +123,7 @@ describe('ChipsAutocompleteComponent', () => {
     fixture.detectChanges();
 
     const cmp = fixture.debugElement.children[0]
-      .componentInstance as ChipsAutocompleteComponent;
+      .componentInstance as NxsChipsAutocompleteComponent;
     cmp['removeChip'](chip);
 
     expect(fixture.componentInstance.lastEmitted).toEqual([
@@ -144,7 +144,7 @@ describe('ChipsAutocompleteComponent', () => {
     fixture.detectChanges();
 
     const cmp = fixture.debugElement.children[0]
-      .componentInstance as ChipsAutocompleteComponent;
+      .componentInstance as NxsChipsAutocompleteComponent;
     cmp['inputValue'].set('prod');
     expect(cmp['filteredOptions']().map((o) => o.value)).toEqual([
       'production'

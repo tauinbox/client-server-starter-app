@@ -32,7 +32,7 @@ import { RbacAdminService } from '../../../services/rbac-admin.service';
 import { ResourcesStore } from '../../../store/resources.store';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NotifyService } from '@core/services/notify.service';
-import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 
 export type ResourceFormDialogData = {
   resource: ResourceResponse;
@@ -55,7 +55,7 @@ type ResourceFormData = {
     MatIconModule,
     MatTooltipModule,
     TranslocoDirective,
-    AppFormFieldComponent
+    NxsFormFieldComponent
   ],
   templateUrl: './resource-form-dialog.component.html',
   styleUrl: './resource-form-dialog.component.scss',

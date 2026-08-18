@@ -104,7 +104,7 @@ src/app/
     │   ├── password-strength/         # PasswordStrengthComponent — 4-bar meter + aria-live label, score 0..4 mapped to PASSWORD_REGEX rules; used in register, profile, reset-password
     │   ├── password-toggle/           # PasswordToggleComponent (reusable password visibility toggle)
     │   └── captcha-widget/            # CaptchaWidgetComponent — Cloudflare Turnstile soft-trigger widget (renders only when register/forgot-password backend returns CAPTCHA_REQUIRED, fed by CaptchaService config + lazy script loader)
-    ├── forms/              # AppFormFieldComponent (<nxs-form-field>, Signal Forms wrapper), ChipsAutocompleteComponent (<nxs-chips-autocomplete>: mat-chip-grid + mat-autocomplete, free-text mode or static/async option lists), DEFAULT_ERROR_KEYS registry. No barrel — import each module directly (see "Import hygiene and barrels" in the root README)
+    ├── forms/              # NxsFormFieldComponent (<nxs-form-field>, Signal Forms wrapper), NxsChipsAutocompleteComponent (<nxs-chips-autocomplete>: mat-chip-grid + mat-autocomplete, free-text mode or static/async option lists), DEFAULT_ERROR_KEYS registry. No barrel — import each module directly (see "Import hygiene and barrels" in the root README)
     ├── models/             # user.types
     ├── directives/         # InfiniteScrollDirective (nxsInfiniteScroll) — the sentinel every list page mounts after its
     │                       # rows; emits loadMore while hasMore and not busy, and re-arms after each page so a short

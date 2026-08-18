@@ -34,7 +34,7 @@ import type {
 import { ActionsStore } from '../../../store/actions.store';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NotifyService } from '@core/services/notify.service';
-import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 
 export type ActionFormDialogData = {
   action?: ActionResponse;
@@ -57,7 +57,7 @@ const ACTION_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
     MatProgressSpinner,
     MatTooltipModule,
     TranslocoDirective,
-    AppFormFieldComponent
+    NxsFormFieldComponent
   ],
   templateUrl: './action-form-dialog.component.html',
   styleUrl: './action-form-dialog.component.scss',

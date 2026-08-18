@@ -35,7 +35,7 @@ import {
   UserTableComponent
 } from '../user-table/user-table.component';
 import { UserCardListComponent } from '../user-card-list/user-card-list.component';
-import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
 import { RoleService } from '@features/admin/services/role.service';
 import type { RoleAdminResponse } from '@app/shared/types';
@@ -68,7 +68,7 @@ const INITIAL_FILTER: FilterModel = {
     UserTableComponent,
     UserCardListComponent,
     TranslocoDirective,
-    AppFormFieldComponent,
+    NxsFormFieldComponent,
     InfiniteScrollDirective
   ],
   templateUrl: './user-list.component.html',

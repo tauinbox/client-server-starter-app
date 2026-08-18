@@ -19,7 +19,7 @@ import {
   form,
   required
 } from '@angular/forms/signals';
-import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { MatIcon } from '@angular/material/icon';
 import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
@@ -66,7 +66,7 @@ const OAUTH_ERROR_KEYS: Record<string, string> = {
     MatCardActions,
     MatDivider,
     RouterLink,
-    AppFormFieldComponent,
+    NxsFormFieldComponent,
     PasswordToggleComponent,
     TranslocoDirective
   ],

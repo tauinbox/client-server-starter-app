@@ -19,7 +19,7 @@ import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { of, Subject } from 'rxjs';
 import type { FeatureFlagPreviewResult } from '@app/shared/types';
 import {
-  ChipsAutocompleteComponent,
+  NxsChipsAutocompleteComponent,
   type ChipOption
 } from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
 import { NotifyService } from '@core/services/notify.service';
@@ -47,7 +47,7 @@ import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.
     MatProgressSpinner,
     MatCheckbox,
     TranslocoDirective,
-    ChipsAutocompleteComponent
+    NxsChipsAutocompleteComponent
   ],
   templateUrl: './feature-flag-preview.component.html',
   styleUrl: './feature-flag-preview.component.scss',
@@ -119,7 +119,7 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
 
   // Preview accepts ONE synthetic user — newest chip wins; older ones are
   // dropped to keep the picker a single-selection control without changing
-  // the shared ChipsAutocompleteComponent API.
+  // the shared NxsChipsAutocompleteComponent API.
   onUserChipsChange(chips: ChipOption[]): void {
     if (chips.length <= 1) {
       this.selectedUser.set(chips);

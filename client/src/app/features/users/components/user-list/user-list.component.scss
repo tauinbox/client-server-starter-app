@@ -16,11 +16,11 @@
       minmax(func.rem(250), 2fr)
       minmax(func.rem(160), 1fr)
       minmax(func.rem(160), 1fr);
-    column-gap: vars.$spacing-md; // AppFormFieldComponent host margin owns row rhythm
+    column-gap: vars.$spacing-md; // NxsFormFieldComponent host margin owns row rhythm
     align-items: start;
 
     // Raw <mat-form-field> selects (Role, Status) don't carry the
-    // AppFormFieldComponent :host margin-bottom, so they would stack flush
+    // NxsFormFieldComponent :host margin-bottom, so they would stack flush
     // against each other once the grid collapses to one column. Give the
     // direct-child selects the same row rhythm; the `>` keeps this off the
     // search field's mat-form-field nested inside <nxs-form-field>.

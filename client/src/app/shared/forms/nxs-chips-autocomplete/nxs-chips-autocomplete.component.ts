@@ -56,7 +56,7 @@ export type ChipOption = {
   styleUrl: './nxs-chips-autocomplete.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ChipsAutocompleteComponent {
+export class NxsChipsAutocompleteComponent {
   readonly selected = input.required<ChipOption[]>();
   readonly options = input<ChipOption[]>([]);
   readonly allowFreeText = input(false);

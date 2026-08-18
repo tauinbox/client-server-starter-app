@@ -38,7 +38,7 @@ import { isOAuthProvider, OAUTH_URLS } from '../../constants/auth-api.const';
 import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
-import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import {
   isAdminRole,
   roleIcon,
@@ -105,7 +105,7 @@ const INITIAL_PROFILE: ProfileData = {
     DatePipe,
     PasswordToggleComponent,
     PasswordStrengthComponent,
-    AppFormFieldComponent,
+    NxsFormFieldComponent,
     TranslocoDirective,
     MatButtonToggle,
     MatButtonToggleGroup,

@@ -43,7 +43,7 @@ import {
 import type { FeatureFlagRulePayload } from '@app/shared/types';
 import { LayoutService } from '@core/services/layout.service';
 import {
-  ChipsAutocompleteComponent,
+  NxsChipsAutocompleteComponent,
   type ChipOption
 } from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
 import { RoleService } from '../../../services/role.service';
@@ -95,7 +95,7 @@ function userMatchesTerm(user: User, lowered: string): boolean {
     MatSlider,
     MatSliderThumb,
     MatTooltip,
-    ChipsAutocompleteComponent,
+    NxsChipsAutocompleteComponent,
     TranslocoDirective
   ],
   templateUrl: './feature-flag-rule-row.component.html',

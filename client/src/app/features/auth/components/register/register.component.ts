@@ -18,7 +18,7 @@ import {
   minLength,
   required
 } from '@angular/forms/signals';
-import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { Router, RouterLink } from '@angular/router';
@@ -50,7 +50,7 @@ type RegisterData = {
     MatProgressSpinner,
     MatCardActions,
     RouterLink,
-    AppFormFieldComponent,
+    NxsFormFieldComponent,
     PasswordToggleComponent,
     PasswordStrengthComponent,
     CaptchaWidgetComponent,
