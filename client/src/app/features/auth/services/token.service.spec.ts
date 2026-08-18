@@ -7,7 +7,7 @@ import {
 } from '@angular/common/http/testing';
 import { firstValueFrom } from 'rxjs';
 import { TokenService } from './token.service';
-import { AuthStore } from '../store/auth.store';
+import { AUTH_USER_KEY, AuthStore } from '../store/auth.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import type { AuthResponse } from '../models/auth.types';
 import type { RoleResponse } from '@app/shared/types';
@@ -137,6 +137,28 @@ describe('TokenService', () => {
       expect(tokens1).toEqual(newAuth.tokens);
       expect(tokens2).toEqual(newAuth.tokens);
     });
+
+    it('should keep a newer refresh deduplicated when a superseded one completes', async () => {
+      const supersededPromise = firstValueFrom(service.refreshTokens());
+      const supersededReq = httpMock.expectOne(AuthApiEnum.RefreshToken);
+
+      service.cancelRefresh();
+
+      const currentPromise = firstValueFrom(service.refreshTokens());
+      const currentReq = httpMock.expectOne(AuthApiEnum.RefreshToken);
+
+      supersededReq.flush(createMockAuthResponse());
+      await expect(supersededPromise).resolves.toBeNull();
+
+      const joinedPromise = firstValueFrom(service.refreshTokens());
+      httpMock.expectNone(AuthApiEnum.RefreshToken);
+
+      const newAuth = createMockAuthResponse();
+      currentReq.flush(newAuth);
+
+      await expect(currentPromise).resolves.toEqual(newAuth.tokens);
+      await expect(joinedPromise).resolves.toEqual(newAuth.tokens);
+    });
   });
 
   describe('forceLogout', () => {
@@ -163,6 +185,64 @@ describe('TokenService', () => {
         ['/login'],
         expect.objectContaining({ queryParams: { returnUrl: '/dashboard' } })
       );
+    });
+  });
+
+  describe('teardown while a refresh is in flight', () => {
+    let authStore: InstanceType<typeof AuthStore>;
+
+    beforeEach(() => {
+      // The real store, not the mock: the regression is about what survives in
+      // localStorage after a logout.
+      TestBed.resetTestingModule();
+      localStorage.clear();
+
+      TestBed.configureTestingModule({
+        providers: [
+          provideRouter([]),
+          provideHttpClient(),
+          provideHttpClientTesting()
+        ]
+      });
+
+      service = TestBed.inject(TokenService);
+      httpMock = TestBed.inject(HttpTestingController);
+      authStore = TestBed.inject(AuthStore);
+    });
+
+    afterEach(() => {
+      // Drops the refresh timer a successful response schedules.
+      service.cancelRefresh();
+      localStorage.clear();
+    });
+
+    it('should not restore the session when the response lands after logout', async () => {
+      const tokensPromise = firstValueFrom(service.refreshTokens());
+      const req = httpMock.expectOne(AuthApiEnum.RefreshToken);
+
+      service.cancelRefresh();
+      authStore.clearSession();
+
+      req.flush(createMockAuthResponse());
+
+      await expect(tokensPromise).resolves.toBeNull();
+      expect(authStore.isAuthenticated()).toBe(false);
+      expect(authStore.user()).toBeNull();
+      expect(localStorage.getItem(AUTH_USER_KEY)).toBeNull();
+    });
+
+    it('should still store a refresh started after the teardown', async () => {
+      service.cancelRefresh();
+      authStore.clearSession();
+
+      const newAuth = createMockAuthResponse();
+      const tokensPromise = firstValueFrom(service.refreshTokens());
+      httpMock.expectOne(AuthApiEnum.RefreshToken).flush(newAuth);
+
+      await expect(tokensPromise).resolves.toEqual(newAuth.tokens);
+      expect(authStore.isAuthenticated()).toBe(true);
+      expect(authStore.user()).toEqual(newAuth.user);
+      expect(localStorage.getItem(AUTH_USER_KEY)).not.toBeNull();
     });
   });
 });
