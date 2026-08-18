@@ -43,7 +43,7 @@ import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { UsersStore } from '../../store/users.store';
-import type { RoleAdminResponse } from '@app/shared/types/role.types';
+import type { RoleAdminResponse } from '@app/shared/types';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 

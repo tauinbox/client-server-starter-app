@@ -882,7 +882,7 @@ Nine tables managed via TypeORM migrations:
 ### Import hygiene and barrels
 
 `npm run check:imports` (available from any of the three workspaces; it walks the
-whole repository, so one run covers everything) enforces three rules:
+whole repository, so one run covers everything) enforces four rules:
 
 1. **Dependency cycles are an error.** TypeORM entity files are exempt — a
    bidirectional relation needs the related class as a value inside a lazily
@@ -896,6 +896,16 @@ whole repository, so one run covers everything) enforces three rules:
    `shared/src/types`, `shared/src/constants` (the cross-workspace public API of
    a package all three workspaces consume) plus `server/src/common/dtos` and
    `server/src/modules/core/filters`.
+4. **A directory that has a barrel is entered through it.** No deep path from
+   outside: `from '@app/shared/types'`, never
+   `from '@app/shared/types/role.types'`. Rules 2 and 4 are one principle read
+   from either side — the barrel is a directory's outside face and never its
+   inside face. **Files inside `shared/src/` are exempt and must keep using deep
+   paths**, because routing them through the barrels would close a cycle:
+   `types/index.ts` re-exports `feature-flag.types`, which imports
+   `../constants/feature-flag.constants`, while `constants/index.ts` re-exports
+   `billing-flags.constants`, which imports `../types/billing.types`. That
+   carve-out is `PACKAGE_API_ROOTS` in the script.
 
 **Importing from `shared/`:** always through the barrel — `from
 '@app/shared/constants'`, never `from '@app/shared/constants/auth.constants'`.
@@ -904,8 +914,10 @@ consistent with `types` and because the counter-argument turned out to be
 empty — the client bundle measures 846.90 kB raw with deep imports and 846.83 kB
 with the barrel, so nothing is lost to tree-shaking. A symbol you can only reach
 by deep path is a barrel that needs the export added, not a deep import to
-write. `shared/src/utils/` and `shared/src/enums/` have no barrel and are still
-imported by full path.
+write. This was convention only until rule 4 was added, and 25 sites had drifted
+off it by then. `shared/src/utils/` and `shared/src/enums/` have no barrel and
+are still imported by full path — rule 4 says nothing about directories without
+one.
 
 The check is written in dependency-free Node rather than as an ESLint rule
 because ESLint cannot lint files outside the directory containing its config, so

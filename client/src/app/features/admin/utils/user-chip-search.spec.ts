@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom, of, Subject } from 'rxjs';
 import { toArray } from 'rxjs';
-import type { RoleAdminResponse } from '@app/shared/types/role.types';
+import type { RoleAdminResponse } from '@app/shared/types';
 import { UserService } from '@features/users/services/user.service';
 import type { User } from '@features/users/models/user.types';
 import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';

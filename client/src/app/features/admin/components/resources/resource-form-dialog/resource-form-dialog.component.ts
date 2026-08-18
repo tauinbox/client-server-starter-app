@@ -23,10 +23,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
-import type {
-  ActionResponse,
-  ResourceResponse
-} from '@app/shared/types/rbac.types';
+import type { ActionResponse, ResourceResponse } from '@app/shared/types';
 import type { UpdateResource } from '../../../services/rbac-admin.service';
 import { RbacAdminService } from '../../../services/rbac-admin.service';
 import { ResourcesStore } from '../../../store/resources.store';

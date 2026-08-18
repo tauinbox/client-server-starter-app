@@ -7,7 +7,7 @@ import { ResourcesStore } from './resources.store';
 import { RbacAdminService } from '../services/rbac-admin.service';
 import { AuthService } from '@features/auth/services/auth.service';
 import { NotifyService } from '@core/services/notify.service';
-import type { ResourceResponse } from '@app/shared/types/rbac.types';
+import type { ResourceResponse } from '@app/shared/types';
 
 const mockResource: ResourceResponse = {
   id: 'res-1',

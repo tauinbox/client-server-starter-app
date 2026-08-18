@@ -4,10 +4,7 @@ import { of } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
-import type {
-  PermissionCondition,
-  RoleAdminResponse
-} from '@app/shared/types/role.types';
+import type { PermissionCondition, RoleAdminResponse } from '@app/shared/types';
 import { NotifyService } from '@core/services/notify.service';
 import type { RolePermissionItem } from '../../../services/role.service';
 import { RoleService } from '../../../services/role.service';

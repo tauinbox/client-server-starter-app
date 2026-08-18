@@ -12,10 +12,7 @@ import type { ResourceFormDialogData } from './resource-form-dialog.component';
 import { ResourcesStore } from '../../../store/resources.store';
 import { RbacAdminService } from '../../../services/rbac-admin.service';
 import { NotifyService } from '@core/services/notify.service';
-import type {
-  ActionResponse,
-  ResourceResponse
-} from '@app/shared/types/rbac.types';
+import type { ActionResponse, ResourceResponse } from '@app/shared/types';
 
 const mockResource: ResourceResponse = {
   id: 'res-1',
