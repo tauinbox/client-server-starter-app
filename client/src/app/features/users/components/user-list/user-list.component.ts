@@ -37,7 +37,7 @@ import {
 import { UserCardListComponent } from '../user-card-list/user-card-list.component';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
-import { RoleService } from '@features/admin/services/role.service';
+import { RoleCatalogService } from '@core/services/role-catalog.service';
 import type { RoleAdminResponse } from '@app/shared/types';
 import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
 
@@ -82,7 +82,7 @@ export class UserListComponent implements OnInit {
   readonly #destroyRef = inject(DestroyRef);
   readonly #notificationsService = inject(NotificationsService);
   readonly #translocoService = inject(TranslocoService);
-  readonly #roleService = inject(RoleService);
+  readonly #roleCatalog = inject(RoleCatalogService);
 
   readonly layout = inject(LayoutService);
 
@@ -110,7 +110,7 @@ export class UserListComponent implements OnInit {
 
   ngOnInit(): void {
     this.#usersStore.load();
-    this.#roleService
+    this.#roleCatalog
       .getAll()
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((roles) => this.roles.set(roles));

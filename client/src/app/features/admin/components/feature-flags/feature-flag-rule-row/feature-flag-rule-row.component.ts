@@ -46,7 +46,7 @@ import {
   NxsChipsAutocompleteComponent,
   type ChipOption
 } from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
-import { RoleService } from '../../../services/role.service';
+import { RoleCatalogService } from '@core/services/role-catalog.service';
 import { UserService } from '../../../../users/services/user.service';
 import type { User } from '../../../../users/models/user.types';
 import {
@@ -107,7 +107,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   readonly remove = output<void>();
 
   protected readonly layout = inject(LayoutService);
-  readonly #roleService = inject(RoleService);
+  readonly #roleCatalog = inject(RoleCatalogService);
   readonly #userService = inject(UserService);
   readonly #destroyRef = inject(DestroyRef);
 
@@ -219,7 +219,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
         this.userOptions.set(chips);
       });
 
-    this.#roleService
+    this.#roleCatalog
       .getAll()
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((roles) => {

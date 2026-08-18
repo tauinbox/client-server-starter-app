@@ -31,7 +31,8 @@ import { MatChipSet, MatChip, MatChipAvatar } from '@angular/material/chips';
 import { MatSelect } from '@angular/material/select';
 import { MatOption } from '@angular/material/core';
 import { UserService } from '../../services/user.service';
-import { RoleService } from '../../../admin/services/role.service';
+import { RoleCatalogService } from '@core/services/role-catalog.service';
+import { UserRoleService } from '../../services/user-role.service';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '../../../auth/store/auth.store';
 import type { UpdateUser, User } from '../../models/user.types';
@@ -92,7 +93,8 @@ const INITIAL_USER_FORM: UserFormData = {
 })
 export class UserEditComponent implements OnInit, OnDestroy {
   readonly #userService = inject(UserService);
-  readonly #roleService = inject(RoleService);
+  readonly #roleCatalog = inject(RoleCatalogService);
+  readonly #userRoleService = inject(UserRoleService);
   readonly #usersStore = inject(UsersStore);
   readonly #authStore = inject(AuthStore);
   readonly #router = inject(Router);
@@ -202,7 +204,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
 
     forkJoin({
       user: this.#userService.getById(this.id()),
-      roles: this.#roleService.getAll().pipe(catchError(() => of([])))
+      roles: this.#roleCatalog.getAll().pipe(catchError(() => of([])))
     })
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
@@ -310,10 +312,10 @@ export class UserEditComponent implements OnInit, OnDestroy {
       const toRemove = initial.filter((id) => !selected.includes(id));
 
       for (const roleId of toAdd) {
-        ops.push(this.#roleService.assignRoleToUser(this.id(), roleId));
+        ops.push(this.#userRoleService.assignRole(this.id(), roleId));
       }
       for (const roleId of toRemove) {
-        ops.push(this.#roleService.removeRoleFromUser(this.id(), roleId));
+        ops.push(this.#userRoleService.removeRole(this.id(), roleId));
       }
     }
 

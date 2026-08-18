@@ -11,6 +11,7 @@ import {
   cursorParams,
   type CursorPageRequest
 } from '@shared/utils/pagination.utils';
+import { ROLES_API_V1 } from '@core/services/role-catalog.service';
 
 export type CreateRole = {
   name: string;
@@ -30,18 +31,16 @@ export type RolePermissionItem = {
   permission: PermissionResponse;
 };
 
-export const ROLES_API_V1 = '/api/v1/roles';
-
+/**
+ * Role administration. Reading the role catalog for a picker or a filter is
+ * `RoleCatalogService` in core - do not add a list read back here.
+ */
 @Injectable({
   providedIn: 'root'
 })
 export class RoleService {
   readonly #http = inject(HttpClient);
 
-  /**
-   * One page of roles for the admin list. `getAll` below stays for the callers
-   * that need every option at once (assign-role picker, rule editor).
-   */
   getAllCursor(
     request: CursorPageRequest
   ): Observable<CursorPaginatedResponse<RoleAdminResponse>> {
@@ -49,10 +48,6 @@ export class RoleService {
       `${ROLES_API_V1}/cursor`,
       { params: cursorParams(request) }
     );
-  }
-
-  getAll(): Observable<RoleAdminResponse[]> {
-    return this.#http.get<RoleAdminResponse[]>(ROLES_API_V1);
   }
 
   getAllPermissions(): Observable<PermissionResponse[]> {
@@ -84,34 +79,5 @@ export class RoleService {
     return this.#http.put<void>(`${ROLES_API_V1}/${roleId}/permissions`, {
       items
     });
-  }
-
-  assignPermissions(
-    roleId: string,
-    permissionIds: string[],
-    conditions?: PermissionCondition | null
-  ): Observable<void> {
-    return this.#http.post<void>(`${ROLES_API_V1}/${roleId}/permissions`, {
-      permissionIds,
-      ...(conditions != null ? { conditions } : {})
-    });
-  }
-
-  removePermission(roleId: string, permissionId: string): Observable<void> {
-    return this.#http.delete<void>(
-      `${ROLES_API_V1}/${roleId}/permissions/${permissionId}`
-    );
-  }
-
-  assignRoleToUser(userId: string, roleId: string): Observable<void> {
-    return this.#http.post<void>(`${ROLES_API_V1}/assign/${userId}`, {
-      roleId
-    });
-  }
-
-  removeRoleFromUser(userId: string, roleId: string): Observable<void> {
-    return this.#http.delete<void>(
-      `${ROLES_API_V1}/assign/${userId}/${roleId}`
-    );
   }
 }

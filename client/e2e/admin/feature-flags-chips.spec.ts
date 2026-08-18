@@ -59,7 +59,7 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
     await ruleRow.getByRole('combobox', { name: 'Type' }).click();
     await page.getByRole('option', { name: 'Role', exact: true }).click();
 
-    // Roles are loaded via RoleService.getAll() on init; wait for option to appear
+    // Roles are loaded via RoleCatalogService.getAll() on init; wait for option to appear
     const roleInput = ruleRow.getByRole('combobox', { name: 'Role names' });
     await roleInput.click();
     await roleInput.fill('user');

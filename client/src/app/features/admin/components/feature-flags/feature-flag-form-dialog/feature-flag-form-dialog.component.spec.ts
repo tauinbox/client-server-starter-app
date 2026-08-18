@@ -11,7 +11,7 @@ import { APP_ENVIRONMENTS } from '@app/shared/constants';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
-import { RoleService } from '../../../services/role.service';
+import { RoleCatalogService } from '@core/services/role-catalog.service';
 import { UserService } from '../../../../users/services/user.service';
 import type { FeatureFlagFormDialogResult } from './feature-flag-form-dialog.component';
 import { FeatureFlagFormDialogComponent } from './feature-flag-form-dialog.component';
@@ -45,7 +45,10 @@ describe('FeatureFlagFormDialogComponent', () => {
           provide: AdaptiveDialogService,
           useValue: { openConfirm: confirmSpy }
         },
-        { provide: RoleService, useValue: { getAll: vi.fn(() => of([])) } },
+        {
+          provide: RoleCatalogService,
+          useValue: { getAll: vi.fn(() => of([])) }
+        },
         {
           provide: UserService,
           useValue: {
