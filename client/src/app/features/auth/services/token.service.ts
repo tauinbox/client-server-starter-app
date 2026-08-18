@@ -33,6 +33,7 @@ export class TokenService {
 
   #refreshSubscription: Subscription | undefined;
   #refreshInFlight$: Observable<TokensResponse | null> | null = null;
+  #sessionEpoch = 0;
 
   refreshTokens(): Observable<TokensResponse | null> {
     if (this.#refreshInFlight$) {
@@ -41,14 +42,19 @@ export class TokenService {
 
     // defer, not from: the lock is taken and the request fired on the first
     // subscription, so a caller that never subscribes costs nothing.
-    this.#refreshInFlight$ = defer(() => this.#acquireRefreshLock()).pipe(
+    const inFlight$ = defer(() => this.#acquireRefreshLock()).pipe(
       finalize(() => {
-        this.#refreshInFlight$ = null;
+        // Only clear the slot this observable owns: a teardown may already have
+        // dropped it and a newer refresh may be parked there.
+        if (this.#refreshInFlight$ === inFlight$) {
+          this.#refreshInFlight$ = null;
+        }
       }),
       shareReplay({ bufferSize: 1, refCount: true })
     );
+    this.#refreshInFlight$ = inFlight$;
 
-    return this.#refreshInFlight$;
+    return inFlight$;
   }
 
   scheduleTokenRefresh(): void {
@@ -86,6 +92,9 @@ export class TokenService {
   cancelRefresh(): void {
     this.#refreshSubscription?.unsubscribe();
     this.#refreshInFlight$ = null;
+    // The HTTP call itself cannot be cancelled here (it is owned by the promise
+    // inside the lock), so bump the epoch to make its late response inert.
+    this.#sessionEpoch++;
   }
 
   /**
@@ -137,6 +146,8 @@ export class TokenService {
    * The refresh token is sent automatically as an HttpOnly cookie.
    */
   async #doRefresh(): Promise<TokensResponse | null> {
+    const epoch = this.#sessionEpoch;
+
     const response = await firstValueFrom(
       this.#http.post<AuthResponse>(
         AuthApiEnum.RefreshToken,
@@ -144,6 +155,10 @@ export class TokenService {
         { context: silentContext(), withCredentials: true }
       )
     );
+
+    // The session was torn down while this request was on the wire: dropping the
+    // response is what keeps a logout from being undone by it.
+    if (epoch !== this.#sessionEpoch) return null;
 
     this.#authStore.saveAuthResponse(response);
     this.scheduleTokenRefresh();
