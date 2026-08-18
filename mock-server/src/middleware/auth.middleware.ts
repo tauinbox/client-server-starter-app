@@ -13,9 +13,9 @@ import {
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
   isValidEmail,
+  passwordLengthError,
   validateLocale,
-  validateMaxLength,
-  validateMinLength
+  validateMaxLength
 } from '../utils/validation';
 import { generateTokens } from '../jwt.utils';
 import {
@@ -27,22 +27,18 @@ import {
   toUserResponse
 } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
+import {
+  buildMockUser,
+  validateCreateUserBody
+} from '../helpers/user-create.helpers';
 import { resolveEntitlementLimit } from './billing.middleware';
 import {
   CAPTCHA_ROUTE_LIMITS,
   evaluateCaptcha,
   trackAttemptAndSetHeader
 } from '../helpers/captcha.helpers';
-import type { AuthenticatedRequest, MockUser } from '../types';
+import type { AuthenticatedRequest } from '../types';
 import { validationError } from '../helpers/validation-error.helpers';
-
-function findUserByPendingEmail(email: string): MockUser | undefined {
-  const state = getState();
-  for (const user of state.users.values()) {
-    if (user.pendingEmail === email && !user.deletedAt) return user;
-  }
-  return undefined;
-}
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
 const COOKIE_OPTIONS: CookieOptions = {
@@ -94,72 +90,13 @@ router.post('/register', (req, res) => {
     return;
   }
 
-  const { firstName, lastName, password } = req.body;
-  const email = normalizeEmail(req.body.email) ?? '';
-
-  if (!email || !firstName || !lastName || !password) {
-    res.status(400).json(validationError('All fields are required'));
+  const validated = validateCreateUserBody(req.body);
+  if (!validated.ok) {
+    res.status(validated.status).json(validated.body);
     return;
   }
 
-  if (!isValidEmail(email)) {
-    res.status(400).json(validationError('email must be an email'));
-    return;
-  }
-
-  const emailMaxErr = validateMaxLength(email, 255, 'email');
-  const fnMaxErr = validateMaxLength(firstName, 255, 'firstName');
-  const lnMaxErr = validateMaxLength(lastName, 255, 'lastName');
-  const pwMinErr = validateMinLength(password, 8, 'password');
-  const pwMaxErr = validateMaxLength(password, 128, 'password');
-  const lengthErr = emailMaxErr || fnMaxErr || lnMaxErr || pwMinErr || pwMaxErr;
-  if (lengthErr) {
-    res.status(400).json(validationError(lengthErr));
-    return;
-  }
-
-  if (!PASSWORD_REGEX.test(password)) {
-    res.status(400).json(validationError(PASSWORD_ERROR));
-    return;
-  }
-
-  const locale: unknown = req.body.locale;
-  const localeErr = validateLocale(locale);
-  if (localeErr) {
-    res.status(400).json(validationError(localeErr));
-    return;
-  }
-
-  if (findUserByEmail(email) || findUserByPendingEmail(email)) {
-    res.status(409).json({
-      message: 'User with this email already exists',
-      statusCode: 409,
-      errorKey: ErrorKeys.USERS.EMAIL_EXISTS
-    });
-    return;
-  }
-
-  const now = new Date().toISOString();
-  const user: MockUser = {
-    id: uuidv4(),
-    email,
-    firstName,
-    lastName,
-    password, // Stored as plaintext — mock only. Real server uses bcrypt.
-    isActive: true,
-    roles: ['user'],
-    isEmailVerified: false,
-    locale: (locale as string) ?? 'en',
-    failedLoginAttempts: 0,
-    lockedUntil: null,
-    tokenRevokedAt: null,
-    pendingEmail: null,
-    pendingEmailToken: null,
-    pendingEmailExpiresAt: null,
-    createdAt: now,
-    updatedAt: now,
-    deletedAt: null
-  };
+  const user = buildMockUser(validated.fields, { isEmailVerified: false });
 
   const state = getState();
   state.users.set(user.id, user);
@@ -177,7 +114,9 @@ router.post('/register', (req, res) => {
   });
 
   const verifyUrl = `http://localhost:4200/verify-email?token=${verificationToken}`;
-  console.log(`[EMAIL VERIFICATION] To: ${email}\n  Verify URL: ${verifyUrl}`);
+  console.log(
+    `[EMAIL VERIFICATION] To: ${user.email}\n  Verify URL: ${verifyUrl}`
+  );
 
   res.status(201).json({
     message:
@@ -487,9 +426,7 @@ router.post('/reset-password', (req, res) => {
     return;
   }
 
-  const pwLenErr =
-    validateMinLength(password, 8, 'password') ??
-    validateMaxLength(password, 128, 'password');
+  const pwLenErr = passwordLengthError(password);
   if (pwLenErr) {
     res.status(400).json(validationError(pwLenErr));
     return;
@@ -725,9 +662,7 @@ router.patch('/profile', authGuard, (req, res) => {
   }
 
   if (password !== undefined) {
-    const pwLenErr =
-      validateMinLength(password, 8, 'password') ??
-      validateMaxLength(password, 128, 'password');
+    const pwLenErr = passwordLengthError(password);
     if (pwLenErr) {
       res.status(400).json(validationError(pwLenErr));
       return;
