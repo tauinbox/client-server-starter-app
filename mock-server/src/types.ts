@@ -288,9 +288,19 @@ export interface CaptchaAttemptWindow {
   timestamps: number[];
 }
 
+export interface MockOAuthData {
+  userId: string;
+  tokens: { access_token: string; refresh_token: string; expires_in: number };
+  expiresAt: number;
+}
+
 export interface State {
   users: Map<string, MockUser>;
   oauthAccounts: Map<string, OAuthAccount[]>;
+  // Keyed by the opaque value of the `oauth_data` cookie. The real server
+  // signs the payload into the cookie itself; keeping it server-side here is
+  // observably identical and needs no signing key.
+  oauthDataTokens: Map<string, MockOAuthData>;
   refreshTokens: Map<string, string>;
   // Revoked refresh tokens — kept around to detect token reuse (OAuth 2.0 BCP).
   // If a token was rotated (moved to this map) and is presented again before

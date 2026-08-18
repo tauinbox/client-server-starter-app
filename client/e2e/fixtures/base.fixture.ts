@@ -98,6 +98,14 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           body: JSON.stringify({ userId, accounts })
         });
       },
+      async issueOAuthData(userId) {
+        const res = await fetch(`${baseUrl}/__control/oauth-data`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        return res.json();
+      },
       async seedRoles(roles) {
         await fetch(`${baseUrl}/__control/roles`, {
           method: 'POST',

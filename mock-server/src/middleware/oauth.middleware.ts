@@ -1,7 +1,14 @@
 import { Router } from 'express';
 import { ErrorKeys } from '@app/shared/constants';
-import { getState, logAudit } from '../state';
+import { findUserById, getState, logAudit, toUserResponse } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
+import {
+  OAUTH_DATA_COOKIE,
+  OAUTH_DATA_COOKIE_PATH,
+  OAUTH_PROVIDERS,
+  REFRESH_COOKIE_OPTIONS,
+  REFRESH_TOKEN_COOKIE
+} from '../constants';
 import type { AuthenticatedRequest } from '../types';
 
 const router = Router();
@@ -22,8 +29,7 @@ router.get('/accounts', authGuard, (req, res) => {
 router.delete('/accounts/:provider', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const provider = req.params['provider'] as string;
-  const validProviders = ['google', 'facebook', 'vk'];
-  if (!validProviders.includes(provider)) {
+  if (!OAUTH_PROVIDERS.includes(provider)) {
     res.status(400).json({
       message: `Invalid OAuth provider: ${provider}`,
       statusCode: 400,
@@ -73,8 +79,10 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
   res.json({ message: `${provider} account unlinked successfully` });
 });
 
-// Stub OAuth redirect endpoints
-for (const provider of ['google', 'facebook', 'vk']) {
+// The provider round trip needs a real identity provider, so both halves stay
+// stubs. What the round trip *produces* - the `oauth_data` cookie - is minted
+// by POST /__control/oauth-data instead, which is how E2E drives the exchange.
+for (const provider of OAUTH_PROVIDERS) {
   router.get(`/${provider}`, (_req, res) => {
     res.status(501).json({
       message: `OAuth ${provider} redirect requires a real backend. Use the mock-server for API-level testing only.`,
@@ -90,13 +98,41 @@ for (const provider of ['google', 'facebook', 'vk']) {
   });
 }
 
-// POST /api/v1/auth/oauth/exchange (stub)
-router.post('/exchange', (_req, res) => {
-  res.status(501).json({
-    message:
-      'OAuth exchange requires a real backend. Use the mock-server for API-level testing only.',
-    statusCode: 501
-  });
+// POST /api/v1/auth/oauth/exchange
+router.post('/exchange', (req, res) => {
+  const cookie = (req.cookies as Record<string, string> | undefined)?.[
+    OAUTH_DATA_COOKIE
+  ];
+
+  res.clearCookie(OAUTH_DATA_COOKIE, { path: OAUTH_DATA_COOKIE_PATH });
+
+  if (!cookie) {
+    res.status(400).json({
+      message: 'Missing OAuth data',
+      statusCode: 400,
+      errorKey: ErrorKeys.AUTH.MISSING_OAUTH_DATA
+    });
+    return;
+  }
+
+  const state = getState();
+  const pending = state.oauthDataTokens.get(cookie);
+  // One-shot, like the cookie the real server clears on exchange.
+  state.oauthDataTokens.delete(cookie);
+  const user = pending ? findUserById(pending.userId) : undefined;
+
+  if (!pending || pending.expiresAt < Date.now() || !user) {
+    res.status(400).json({
+      message: 'Invalid or expired OAuth data',
+      statusCode: 400,
+      errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA
+    });
+    return;
+  }
+
+  const { refresh_token, ...publicTokens } = pending.tokens;
+  res.cookie(REFRESH_TOKEN_COOKIE, refresh_token, REFRESH_COOKIE_OPTIONS);
+  res.json({ tokens: publicTokens, user: toUserResponse(user) });
 });
 
 // POST /api/v1/auth/oauth/link-init (stub)

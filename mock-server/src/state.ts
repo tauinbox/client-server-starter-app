@@ -81,6 +81,7 @@ export function resetState(): void {
         v.map((a) => ({ ...a }))
       ])
     ),
+    oauthDataTokens: new Map(),
     refreshTokens: new Map(),
     revokedRefreshTokens: new Map(),
     emailVerificationTokens: new Map(),

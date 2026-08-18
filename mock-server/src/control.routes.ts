@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import {
   addOAuthAccounts,
+  findUserById,
   getState,
   resetState,
   toInvoiceResponse,
@@ -24,7 +25,14 @@ import type {
   OAuthAccount,
   State
 } from './types';
-import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
+import {
+  ENTITLED_SUBSCRIPTION_STATUSES,
+  MAX_CONCURRENT_SESSIONS
+} from '@app/shared/constants';
+import { OAUTH_DATA_MAX_AGE_MS } from './constants';
+import { generateTokens } from './jwt.utils';
+import { pruneOldestUserTokens } from './helpers/auth.helpers';
+import { resolveEntitlementLimit } from './middleware/billing.middleware';
 import type { BillingProviderId } from '@app/shared/types';
 import type { NotificationEvent } from '@app/shared/types';
 import { pushToAll, pushToUser } from './sse-hub';
@@ -40,6 +48,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
   return {
     users: Array.from(state.users.values()).map(toUserResponse),
     oauthAccounts: Object.fromEntries(state.oauthAccounts),
+    oauthDataTokens: state.oauthDataTokens.size,
     refreshTokens: state.refreshTokens.size,
     revokedRefreshTokens: state.revokedRefreshTokens.size,
     emailVerificationTokens: state.emailVerificationTokens.size,
@@ -123,6 +132,35 @@ router.post('/oauth-accounts', (req, res) => {
   res.json({
     message: `Added ${accounts.length} OAuth account(s) for user ${userId}`
   });
+});
+
+// POST /__control/oauth-data — mint an `oauth_data` cookie value for a user
+router.post('/oauth-data', (req, res) => {
+  const { userId }: { userId: string } = req.body;
+  const user = userId ? findUserById(userId) : undefined;
+
+  if (!user) {
+    res.status(400).json({ message: 'Body must have a known userId' });
+    return;
+  }
+
+  const state = getState();
+  const tokens = generateTokens(user);
+  state.refreshTokens.set(tokens.refresh_token, user.id);
+  pruneOldestUserTokens(
+    state.refreshTokens,
+    user.id,
+    resolveEntitlementLimit(user.id, 'sessions') ?? MAX_CONCURRENT_SESSIONS
+  );
+
+  const token = randomUUID();
+  state.oauthDataTokens.set(token, {
+    userId: user.id,
+    tokens,
+    expiresAt: Date.now() + OAUTH_DATA_MAX_AGE_MS
+  });
+
+  res.json({ token });
 });
 
 // POST /__control/roles — add or override roles
