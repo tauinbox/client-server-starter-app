@@ -83,7 +83,7 @@ form {
 .form-name-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  column-gap: vars.$spacing-md; // AppFormFieldComponent host margin owns row rhythm
+  column-gap: vars.$spacing-md; // NxsFormFieldComponent host margin owns row rhythm
   align-items: start;
 
   mat-form-field {

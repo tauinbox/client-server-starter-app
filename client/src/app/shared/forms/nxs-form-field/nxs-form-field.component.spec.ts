@@ -4,11 +4,11 @@ import { Component, signal, viewChild } from '@angular/core';
 import { form, required, email } from '@angular/forms/signals';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
-import { AppFormFieldComponent } from './nxs-form-field.component';
+import { NxsFormFieldComponent } from './nxs-form-field.component';
 
 @Component({
   selector: 'nxs-test-host',
-  imports: [AppFormFieldComponent],
+  imports: [NxsFormFieldComponent],
   template: `
     <nxs-form-field
       [field]="testForm.email"
@@ -34,10 +34,10 @@ class TestHostComponent {
   prefixIcon = 'email';
   autocomplete = 'on';
 
-  readonly formField = viewChild(AppFormFieldComponent);
+  readonly formField = viewChild(NxsFormFieldComponent);
 }
 
-describe('AppFormFieldComponent', () => {
+describe('NxsFormFieldComponent', () => {
   let fixture: ComponentFixture<TestHostComponent>;
   let host: TestHostComponent;
 

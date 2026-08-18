@@ -16,7 +16,7 @@ import { form, maxLength, validate } from '@angular/forms/signals';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { BillingProviderId, ProductResponse } from '@app/shared/types';
-import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import {
   formatMoney,
   parseAmountToMinor,
@@ -52,7 +52,7 @@ type DonationFormData = {
     MatButton,
     MatButtonToggleModule,
     MatIcon,
-    AppFormFieldComponent,
+    NxsFormFieldComponent,
     TranslocoDirective
   ],
   templateUrl: './donation-card.component.html',

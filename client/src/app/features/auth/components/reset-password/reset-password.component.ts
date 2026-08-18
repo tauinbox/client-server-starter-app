@@ -23,7 +23,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
-import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 
@@ -45,7 +45,7 @@ type ResetPasswordData = {
     RouterLink,
     PasswordToggleComponent,
     PasswordStrengthComponent,
-    AppFormFieldComponent,
+    NxsFormFieldComponent,
     TranslocoDirective
   ],
   templateUrl: './reset-password.component.html',

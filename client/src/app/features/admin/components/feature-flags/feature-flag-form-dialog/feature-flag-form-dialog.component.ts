@@ -34,10 +34,10 @@ import type { FeatureFlagResponse } from '@app/shared/types';
 import { APP_ENVIRONMENTS } from '@app/shared/constants';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
-import { AppFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { deepEqual } from '@shared/utils/deep-equal.utils';
 import {
-  ChipsAutocompleteComponent,
+  NxsChipsAutocompleteComponent,
   type ChipOption
 } from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
 import type { FeatureFlagRuleDraft } from '../feature-flag-rule-row/feature-flag-rule-row.component';
@@ -74,8 +74,8 @@ function envToChip(name: string): ChipOption {
     MatExpansionModule,
     MatIcon,
     TranslocoDirective,
-    AppFormFieldComponent,
-    ChipsAutocompleteComponent,
+    NxsFormFieldComponent,
+    NxsChipsAutocompleteComponent,
     FeatureFlagRuleRowComponent,
     FeatureFlagPreviewComponent
   ],

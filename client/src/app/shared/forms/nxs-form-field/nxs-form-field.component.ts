@@ -50,7 +50,7 @@ let nextId = 0;
   styleUrl: './nxs-form-field.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class AppFormFieldComponent {
+export class NxsFormFieldComponent {
   /** Signal Forms field bound to the input. */
   readonly field = input.required<Field<string>>();
 
