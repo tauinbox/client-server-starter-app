@@ -5,7 +5,7 @@ import { of, throwError } from 'rxjs';
 import type { FeatureFlagPreviewResult } from '@app/shared/types';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { NotifyService } from '@core/services/notify.service';
-import { RoleService } from '../../../services/role.service';
+import { RoleCatalogService } from '@core/services/role-catalog.service';
 import { UserService } from '../../../../users/services/user.service';
 import type { User } from '../../../../users/models/user.types';
 import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.service';
@@ -37,7 +37,7 @@ describe('FeatureFlagPreviewComponent', () => {
           provide: FeatureFlagsAdminService,
           useValue: { preview: previewSpy }
         },
-        { provide: RoleService, useValue: { getAll: getAllRolesSpy } },
+        { provide: RoleCatalogService, useValue: { getAll: getAllRolesSpy } },
         { provide: UserService, useValue: { searchCursor: searchUsersSpy } },
         { provide: NotifyService, useValue: { error: notifyError } }
       ]
@@ -61,7 +61,7 @@ describe('FeatureFlagPreviewComponent', () => {
       providers: [
         provideNoopAnimations(),
         { provide: FeatureFlagsAdminService, useValue: { preview: vi.fn() } },
-        { provide: RoleService, useValue: { getAll: getAllRolesSpy } },
+        { provide: RoleCatalogService, useValue: { getAll: getAllRolesSpy } },
         {
           provide: UserService,
           useValue: {

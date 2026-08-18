@@ -4,7 +4,7 @@ import { provideNativeDateAdapter } from '@angular/material/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
-import { RoleService } from '../../../services/role.service';
+import { RoleCatalogService } from '@core/services/role-catalog.service';
 import { UserService } from '../../../../users/services/user.service';
 import type { User } from '../../../../users/models/user.types';
 import type { FeatureFlagRuleDraft } from './feature-flag-rule-row.component';
@@ -29,7 +29,7 @@ class HostComponent {
   }
 }
 
-const roleServiceStub = {
+const roleCatalogStub = {
   getAll: vi.fn(() =>
     of([
       {
@@ -66,7 +66,7 @@ const userServiceStub: {
 
 describe('FeatureFlagRuleRowComponent', () => {
   beforeEach(async () => {
-    roleServiceStub.getAll.mockClear();
+    roleCatalogStub.getAll.mockClear();
     userServiceStub.searchCursor.mockClear();
     userServiceStub.getById.mockClear();
     await TestBed.configureTestingModule({
@@ -74,7 +74,7 @@ describe('FeatureFlagRuleRowComponent', () => {
       providers: [
         provideNoopAnimations(),
         provideNativeDateAdapter(),
-        { provide: RoleService, useValue: roleServiceStub },
+        { provide: RoleCatalogService, useValue: roleCatalogStub },
         { provide: UserService, useValue: userServiceStub }
       ]
     }).compileComponents();
@@ -636,7 +636,7 @@ describe('FeatureFlagRuleRowComponent', () => {
   it('loads roles into the autocomplete options on init', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.detectChanges();
-    expect(roleServiceStub.getAll).toHaveBeenCalledTimes(1);
+    expect(roleCatalogStub.getAll).toHaveBeenCalledTimes(1);
   });
 
   it('user search debounces and issues a single request with unified q', async () => {

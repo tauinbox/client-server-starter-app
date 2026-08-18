@@ -23,7 +23,7 @@ import {
   type ChipOption
 } from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
 import { NotifyService } from '@core/services/notify.service';
-import { RoleService } from '../../../services/role.service';
+import { RoleCatalogService } from '@core/services/role-catalog.service';
 import { UserService } from '../../../../users/services/user.service';
 import type { User } from '../../../../users/models/user.types';
 import {
@@ -55,7 +55,7 @@ import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.
 })
 export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
   readonly #adminService = inject(FeatureFlagsAdminService);
-  readonly #roleService = inject(RoleService);
+  readonly #roleCatalog = inject(RoleCatalogService);
   readonly #userService = inject(UserService);
   readonly #notify = inject(NotifyService);
   readonly #transloco = inject(TranslocoService);
@@ -91,7 +91,7 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.#roleService
+    this.#roleCatalog
       .getAll()
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({

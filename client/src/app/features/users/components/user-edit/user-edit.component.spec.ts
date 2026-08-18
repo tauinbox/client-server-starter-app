@@ -13,7 +13,8 @@ import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/trans
 
 import { UserEditComponent } from './user-edit.component';
 import { UserService } from '../../services/user.service';
-import { RoleService } from '../../../admin/services/role.service';
+import { RoleCatalogService } from '@core/services/role-catalog.service';
+import { UserRoleService } from '../../services/user-role.service';
 import { UsersStore } from '../../store/users.store';
 import { AuthStore } from '../../../auth/store/auth.store';
 import { NotifyService } from '@core/services/notify.service';
@@ -50,10 +51,10 @@ describe('UserEditComponent', () => {
   let component: UserEditComponent;
   let fixture: ComponentFixture<UserEditComponent>;
   let userServiceMock: { getById: ReturnType<typeof vi.fn> };
-  let roleServiceMock: {
-    getAll: ReturnType<typeof vi.fn>;
-    assignRoleToUser: ReturnType<typeof vi.fn>;
-    removeRoleFromUser: ReturnType<typeof vi.fn>;
+  let roleCatalogMock: { getAll: ReturnType<typeof vi.fn> };
+  let userRoleServiceMock: {
+    assignRole: ReturnType<typeof vi.fn>;
+    removeRole: ReturnType<typeof vi.fn>;
   };
   let usersStoreMock: {
     updateUser: ReturnType<typeof vi.fn>;
@@ -83,10 +84,11 @@ describe('UserEditComponent', () => {
       getById: vi.fn().mockReturnValue(of(mockUser))
     };
 
-    roleServiceMock = {
-      getAll: vi.fn().mockReturnValue(of([])),
-      assignRoleToUser: vi.fn().mockReturnValue(of(void 0)),
-      removeRoleFromUser: vi.fn().mockReturnValue(of(void 0))
+    roleCatalogMock = { getAll: vi.fn().mockReturnValue(of([])) };
+
+    userRoleServiceMock = {
+      assignRole: vi.fn().mockReturnValue(of(void 0)),
+      removeRole: vi.fn().mockReturnValue(of(void 0))
     };
 
     usersStoreMock = {
@@ -116,7 +118,8 @@ describe('UserEditComponent', () => {
         provideHttpClientTesting(),
         provideNoopAnimations(),
         { provide: UserService, useValue: userServiceMock },
-        { provide: RoleService, useValue: roleServiceMock },
+        { provide: RoleCatalogService, useValue: roleCatalogMock },
+        { provide: UserRoleService, useValue: userRoleServiceMock },
         { provide: UsersStore, useValue: usersStoreMock },
         { provide: AuthStore, useValue: authStoreMock },
         { provide: NotifyService, useValue: notifyMock },
@@ -649,7 +652,7 @@ describe('UserEditComponent', () => {
     ];
 
     beforeEach(() => {
-      roleServiceMock.getAll.mockReturnValue(of(mockRoles));
+      roleCatalogMock.getAll.mockReturnValue(of(mockRoles));
       fixture.detectChanges();
     });
 
@@ -681,7 +684,7 @@ describe('UserEditComponent', () => {
       component.onRolesChange(['role-user', 'role-admin']);
       component.onSubmit();
 
-      expect(roleServiceMock.assignRoleToUser).toHaveBeenCalledWith(
+      expect(userRoleServiceMock.assignRole).toHaveBeenCalledWith(
         'user-1',
         'role-admin'
       );
@@ -691,7 +694,7 @@ describe('UserEditComponent', () => {
       component.onRolesChange([]);
       component.onSubmit();
 
-      expect(roleServiceMock.removeRoleFromUser).toHaveBeenCalledWith(
+      expect(userRoleServiceMock.removeRole).toHaveBeenCalledWith(
         'user-1',
         'role-user'
       );

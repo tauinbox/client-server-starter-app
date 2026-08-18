@@ -11,7 +11,7 @@ import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/trans
 import { UserListComponent } from './user-list.component';
 import { UsersStore } from '../../store/users.store';
 import { NotifyService } from '@core/services/notify.service';
-import { RoleService } from '@features/admin/services/role.service';
+import { RoleCatalogService } from '@core/services/role-catalog.service';
 import type { User } from '../../models/user.types';
 import type { RoleAdminResponse } from '@app/shared/types';
 import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
@@ -66,7 +66,7 @@ describe('UserListComponent', () => {
     warn: ReturnType<typeof vi.fn>;
   };
   let dialogMock: { open: ReturnType<typeof vi.fn> };
-  let roleServiceMock: { getAll: ReturnType<typeof vi.fn> };
+  let roleCatalogMock: { getAll: ReturnType<typeof vi.fn> };
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -102,7 +102,7 @@ describe('UserListComponent', () => {
       warn: vi.fn()
     };
     dialogMock = { open: vi.fn() };
-    roleServiceMock = { getAll: vi.fn().mockReturnValue(of([mockUserRole])) };
+    roleCatalogMock = { getAll: vi.fn().mockReturnValue(of([mockUserRole])) };
 
     await TestBed.configureTestingModule({
       imports: [UserListComponent, TranslocoTestingModuleWithLangs],
@@ -112,7 +112,7 @@ describe('UserListComponent', () => {
         { provide: UsersStore, useValue: usersStoreMock },
         { provide: NotifyService, useValue: notifyMock },
         { provide: MatDialog, useValue: dialogMock },
-        { provide: RoleService, useValue: roleServiceMock }
+        { provide: RoleCatalogService, useValue: roleCatalogMock }
       ]
     }).compileComponents();
 
@@ -130,7 +130,7 @@ describe('UserListComponent', () => {
   });
 
   it('should fetch roles on init and expose them for the filter select', () => {
-    expect(roleServiceMock.getAll).toHaveBeenCalled();
+    expect(roleCatalogMock.getAll).toHaveBeenCalled();
     expect(component.roles()).toEqual([mockUserRole]);
   });
 
