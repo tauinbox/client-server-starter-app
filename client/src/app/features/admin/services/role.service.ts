@@ -2,11 +2,11 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import type {
+  CursorPaginatedResponse,
   PermissionCondition,
   PermissionResponse,
   RoleAdminResponse
-} from '@app/shared/types/role.types';
-import type { CursorPaginatedResponse } from '@app/shared/types';
+} from '@app/shared/types';
 import {
   cursorParams,
   type CursorPageRequest

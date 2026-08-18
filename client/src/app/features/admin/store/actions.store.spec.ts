@@ -7,7 +7,7 @@ import { ActionsStore } from './actions.store';
 import { RbacAdminService } from '../services/rbac-admin.service';
 import { AuthService } from '@features/auth/services/auth.service';
 import { NotifyService } from '@core/services/notify.service';
-import type { ActionResponse } from '@app/shared/types/rbac.types';
+import type { ActionResponse } from '@app/shared/types';
 
 const mockAction: ActionResponse = {
   id: 'act-1',

@@ -30,7 +30,7 @@ import type {
   PermissionEffect,
   PermissionResponse,
   RoleAdminResponse
-} from '@app/shared/types/role.types';
+} from '@app/shared/types';
 import {
   findFieldMatchShapeError,
   findOwnershipShapeError,

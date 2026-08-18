@@ -13,7 +13,7 @@ import {
   updateEntity,
   withEntities
 } from '@ngrx/signals/entities';
-import type { ActionResponse } from '@app/shared/types/rbac.types';
+import type { ActionResponse } from '@app/shared/types';
 import { AuthService } from '@features/auth/services/auth.service';
 import { withCursorList } from '@shared/store/with-cursor-list';
 import type {

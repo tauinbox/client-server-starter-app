@@ -3,7 +3,7 @@ import type { Observable } from 'rxjs';
 import { tap } from 'rxjs';
 import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
 import { removeEntity, setEntity, withEntities } from '@ngrx/signals/entities';
-import type { RoleAdminResponse } from '@app/shared/types/role.types';
+import type { RoleAdminResponse } from '@app/shared/types';
 import { withCursorList } from '@shared/store/with-cursor-list';
 import type { CreateRole, UpdateRole } from '../services/role.service';
 import { RoleService } from '../services/role.service';

@@ -1,10 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import type {
-  ActionResponse,
-  ResourceResponse
-} from '@app/shared/types/rbac.types';
+import type { ActionResponse, ResourceResponse } from '@app/shared/types';
 
 export type UpdateResource = {
   displayName?: string;

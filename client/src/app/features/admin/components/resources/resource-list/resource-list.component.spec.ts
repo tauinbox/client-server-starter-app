@@ -11,7 +11,7 @@ import { ResourceListComponent } from './resource-list.component';
 import { ResourcesStore } from '../../../store/resources.store';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { NotifyService } from '@core/services/notify.service';
-import type { ResourceResponse } from '@app/shared/types/rbac.types';
+import type { ResourceResponse } from '@app/shared/types';
 
 const mockResource: ResourceResponse = {
   id: 'res-1',
