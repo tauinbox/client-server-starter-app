@@ -108,7 +108,10 @@ src/app/
     ├── models/             # user.types
     ├── directives/         # InfiniteScrollDirective (nxsInfiniteScroll) — the sentinel every list page mounts after its
     │                       # rows; emits loadMore while hasMore and not busy, and re-arms after each page so a short
-    │                       # first page still fills the viewport
+    │                       # first page still fills the viewport.
+    │                       # TemplateBranch — abstract base the three gating directives (nxsRequirePermissions,
+    │                       # nxsHasFeature, nxsHasEntitlement) extend; owns the then/else view-container bookkeeping
+    │                       # so each directive only supplies its predicate and else-template
     ├── services/           # AdaptiveDialogService — opens confirm dialogs as bottom sheets (handset) or dialogs (desktop)
     ├── store/              # withCursorList<T>({ errorKey }) — the shared cursor-list feature every list store composes:
     │                       # cursor bookkeeping, in-flight guards, append-on-next-page and a stale-response guard

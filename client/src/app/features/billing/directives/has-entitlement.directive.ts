@@ -1,12 +1,7 @@
-import {
-  Directive,
-  effect,
-  inject,
-  input,
-  TemplateRef,
-  ViewContainerRef
-} from '@angular/core';
+import { Directive, effect, inject, input } from '@angular/core';
+import type { TemplateRef } from '@angular/core';
 import { EntitlementsStore } from '../store/entitlements.store';
+import { TemplateBranch } from '@shared/directives/template-branch';
 
 /**
  * Structural directive that renders the host template only while the caller's
@@ -23,42 +18,22 @@ import { EntitlementsStore } from '../store/entitlements.store';
 @Directive({
   selector: '[nxsHasEntitlement]'
 })
-export class HasEntitlementDirective {
+export class HasEntitlementDirective extends TemplateBranch {
   readonly nxsHasEntitlement = input.required<string>();
   readonly nxsHasEntitlementElse = input<TemplateRef<unknown> | null>(null);
 
-  readonly #templateRef = inject(TemplateRef<unknown>);
-  readonly #viewContainer = inject(ViewContainerRef);
   readonly #entitlementsStore = inject(EntitlementsStore);
 
-  #currentBranch: 'then' | 'else' | null = null;
-
   constructor() {
+    super();
+
     void this.#entitlementsStore.load();
 
     effect(() => {
-      const granted = this.#entitlementsStore.has(this.nxsHasEntitlement())();
-      const elseTemplate = this.nxsHasEntitlementElse();
-
-      const nextBranch: 'then' | 'else' | null = granted
-        ? 'then'
-        : elseTemplate
-          ? 'else'
-          : null;
-
-      if (nextBranch === this.#currentBranch) {
-        return;
-      }
-
-      this.#viewContainer.clear();
-
-      if (nextBranch === 'then') {
-        this.#viewContainer.createEmbeddedView(this.#templateRef);
-      } else if (nextBranch === 'else' && elseTemplate) {
-        this.#viewContainer.createEmbeddedView(elseTemplate);
-      }
-
-      this.#currentBranch = nextBranch;
+      this.render(
+        this.#entitlementsStore.has(this.nxsHasEntitlement())(),
+        this.nxsHasEntitlementElse()
+      );
     });
   }
 }
