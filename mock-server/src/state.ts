@@ -123,6 +123,13 @@ export function findUserByEmail(email: string): MockUser | undefined {
   return undefined;
 }
 
+export function findUserByPendingEmail(email: string): MockUser | undefined {
+  for (const user of state.users.values()) {
+    if (user.pendingEmail === email && !user.deletedAt) return user;
+  }
+  return undefined;
+}
+
 export function findUserById(id: string): MockUser | undefined {
   const user = state.users.get(id);
   return user && !user.deletedAt ? user : undefined;

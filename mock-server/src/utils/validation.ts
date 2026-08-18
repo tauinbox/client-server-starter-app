@@ -53,6 +53,14 @@ export function validateMinLength(
   return null;
 }
 
+/** The `@MinLength(8) @MaxLength(128)` pair every password field carries. */
+export function passwordLengthError(value: unknown): string | null {
+  return (
+    validateMinLength(value, 8, 'password') ??
+    validateMaxLength(value, 128, 'password')
+  );
+}
+
 /**
  * Mirrors `whitelist` + `forbidNonWhitelisted`. class-validator whitelists
  * before it validates, so a caller must report these ahead of its field errors.

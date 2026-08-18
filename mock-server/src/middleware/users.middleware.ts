@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
 import {
   ALLOWED_USER_SORT_COLUMNS,
   ErrorKeys,
@@ -10,9 +9,9 @@ import {
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
   isValidEmail,
+  passwordLengthError,
   validateLocale,
-  validateMaxLength,
-  validateMinLength
+  validateMaxLength
 } from '../utils/validation';
 import type { PaginationQuery } from '../helpers/pagination.helpers';
 import {
@@ -34,6 +33,10 @@ import {
   toAdminUserResponse
 } from '../state';
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
+import {
+  buildMockUser,
+  validateCreateUserBody
+} from '../helpers/user-create.helpers';
 import { cancelSubscriptionsForDeletedUser } from './billing.middleware';
 import type { AuthenticatedRequest, MockUser } from '../types';
 import { pushToUser, pushToUsersMatching } from '../sse-hub';
@@ -167,77 +170,13 @@ const router = Router();
 
 // POST /api/v1/users
 router.post('/', adminGuard, (req, res) => {
-  const { firstName, lastName, password } = req.body;
-  const email = normalizeEmail(req.body.email) ?? '';
-
-  if (!email || !firstName || !lastName || !password) {
-    res.status(400).json(validationError('All fields are required'));
+  const validated = validateCreateUserBody(req.body);
+  if (!validated.ok) {
+    res.status(validated.status).json(validated.body);
     return;
   }
 
-  if (!isValidEmail(email)) {
-    res.status(400).json(validationError('email must be an email'));
-    return;
-  }
-
-  const emailMaxErr = validateMaxLength(email, 255, 'email');
-  const fnMaxErr = validateMaxLength(firstName, 255, 'firstName');
-  const lnMaxErr = validateMaxLength(lastName, 255, 'lastName');
-  const pwMinErr = validateMinLength(password, 8, 'password');
-  const pwMaxErr = validateMaxLength(password, 128, 'password');
-  const lengthErr = emailMaxErr || fnMaxErr || lnMaxErr || pwMinErr || pwMaxErr;
-  if (lengthErr) {
-    res.status(400).json(validationError(lengthErr));
-    return;
-  }
-
-  if (!PASSWORD_REGEX.test(password)) {
-    res.status(400).json(validationError(PASSWORD_ERROR));
-    return;
-  }
-
-  const locale: unknown = req.body.locale;
-  const localeErr = validateLocale(locale);
-  if (localeErr) {
-    res.status(400).json(validationError(localeErr));
-    return;
-  }
-
-  if (
-    findUserByEmail(email) ||
-    Array.from(getState().users.values()).some(
-      (u) => !u.deletedAt && u.pendingEmail === email
-    )
-  ) {
-    res.status(409).json({
-      message: 'User with this email already exists',
-      statusCode: 409,
-      errorKey: ErrorKeys.USERS.EMAIL_EXISTS
-    });
-    return;
-  }
-
-  const now = new Date().toISOString();
-  const user: MockUser = {
-    id: uuidv4(),
-    email,
-    firstName,
-    lastName,
-    password,
-    isActive: true,
-    roles: ['user'],
-    isEmailVerified: true,
-    locale: (locale as string) ?? 'en',
-    failedLoginAttempts: 0,
-    lockedUntil: null,
-    tokenRevokedAt: null,
-    pendingEmail: null,
-    pendingEmailToken: null,
-    pendingEmailExpiresAt: null,
-    createdAt: now,
-    updatedAt: now,
-    deletedAt: null
-  };
+  const user = buildMockUser(validated.fields, { isEmailVerified: true });
 
   getState().users.set(user.id, user);
 
@@ -491,9 +430,7 @@ router.patch('/:id', adminGuard, requireUuid('id'), (req, res) => {
   }
 
   if (password !== undefined) {
-    const pwLenErr =
-      validateMinLength(password, 8, 'password') ??
-      validateMaxLength(password, 128, 'password');
+    const pwLenErr = passwordLengthError(password);
     if (pwLenErr) {
       res.status(400).json(validationError(pwLenErr));
       return;
