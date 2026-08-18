@@ -72,3 +72,24 @@ export function adminGuard(req: Request, res: Response, next: NextFunction) {
   (req as AuthenticatedRequest).user = result.user;
   next();
 }
+
+/**
+ * Concurrent-session cap, applied wherever a session is created. The oldest
+ * refresh tokens go first, matching the real server's SessionLimitService.
+ */
+export function pruneOldestUserTokens(
+  refreshTokens: Map<string, string>,
+  userId: string,
+  maxSessions: number
+): void {
+  const userTokens: string[] = [];
+  for (const [token, uid] of refreshTokens.entries()) {
+    if (uid === userId) userTokens.push(token);
+  }
+  if (userTokens.length > maxSessions) {
+    const excess = userTokens.length - maxSessions;
+    for (let i = 0; i < excess; i++) {
+      refreshTokens.delete(userTokens[i]);
+    }
+  }
+}

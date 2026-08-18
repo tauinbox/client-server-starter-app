@@ -79,22 +79,30 @@ export class AuthService {
       .pipe(
         switchMap((response) => {
           this.#authStore.saveAuthResponse(response);
-          this.scheduleTokenRefresh();
-          // reload(), not load(): flags may already be loaded from the
-          // anonymous bootstrap and the authenticated set can differ.
-          void this.#featureFlagsStore.reload();
-          // Drop any mirror left by a previous session rather than re-fetching:
-          // the store is lazy, so the next gated surface loads it for this user.
-          this.#entitlementsStore.clear();
-          return from(this.fetchPermissions()).pipe(
-            tap(() => {
-              void this.fetchRbacMetadata();
-              this.#notificationsService.connect();
-            }),
+          return from(this.completeAuthentication()).pipe(
             switchMap(() => [response])
           );
         })
       );
+  }
+
+  /**
+   * Everything a session needs after `saveAuthResponse`. Shared by the password
+   * login and the OAuth callback: skipping it leaves the CASL ability null, so
+   * every permission-guarded route denies without issuing a request.
+   */
+  completeAuthentication(): Promise<void> {
+    this.scheduleTokenRefresh();
+    // reload(), not load(): flags may already be loaded from the
+    // anonymous bootstrap and the authenticated set can differ.
+    void this.#featureFlagsStore.reload();
+    // Drop any mirror left by a previous session rather than re-fetching:
+    // the store is lazy, so the next gated surface loads it for this user.
+    this.#entitlementsStore.clear();
+    return this.fetchPermissions().then(() => {
+      void this.fetchRbacMetadata();
+      this.#notificationsService.connect();
+    });
   }
 
   register(

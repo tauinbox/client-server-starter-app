@@ -49,7 +49,6 @@ export class OAuthCallbackComponent implements OnInit {
         }
 
         this.#authStore.saveAuthResponse(authResponse);
-        this.#authService.scheduleTokenRefresh();
 
         const returnUrl =
           this.#sessionStorage.getItem<string>('oauth_return_url');
@@ -59,7 +58,13 @@ export class OAuthCallbackComponent implements OnInit {
           ? returnUrl
           : `/${AppRouteSegmentEnum.Profile}`;
 
-        void this.#router.navigateByUrl(safeUrl, { replaceUrl: true });
+        // Navigate only once the permissions are in: a guarded destination
+        // evaluates its guard against the ability this call populates.
+        void this.#authService
+          .completeAuthentication()
+          .then(() =>
+            this.#router.navigateByUrl(safeUrl, { replaceUrl: true })
+          );
       },
       error: () => {
         this.#redirectToLogin('auth_failed');

@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import type { CookieOptions } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import {
   EMAIL_CHANGE_TOKEN_EXPIRY_MS,
@@ -26,7 +25,7 @@ import {
   logAudit,
   toUserResponse
 } from '../state';
-import { authGuard } from '../helpers/auth.helpers';
+import { authGuard, pruneOldestUserTokens } from '../helpers/auth.helpers';
 import {
   buildMockUser,
   validateCreateUserBody
@@ -39,33 +38,9 @@ import {
 } from '../helpers/captcha.helpers';
 import type { AuthenticatedRequest } from '../types';
 import { validationError } from '../helpers/validation-error.helpers';
-
-const REFRESH_TOKEN_COOKIE = 'refresh_token';
-const COOKIE_OPTIONS: CookieOptions = {
-  httpOnly: true,
-  sameSite: 'strict',
-  path: '/api/v1/auth',
-  maxAge: 7 * 24 * 60 * 60 * 1000
-};
+import { REFRESH_COOKIE_OPTIONS, REFRESH_TOKEN_COOKIE } from '../constants';
 
 const router = Router();
-
-function pruneOldestUserTokens(
-  refreshTokens: Map<string, string>,
-  userId: string,
-  maxSessions: number
-): void {
-  const userTokens: string[] = [];
-  for (const [token, uid] of refreshTokens.entries()) {
-    if (uid === userId) userTokens.push(token);
-  }
-  if (userTokens.length > maxSessions) {
-    const excess = userTokens.length - maxSessions;
-    for (let i = 0; i < excess; i++) {
-      refreshTokens.delete(userTokens[i]);
-    }
-  }
-}
 
 // GET /api/v1/auth/captcha-config — public configuration consumed by the client
 router.get('/captcha-config', (_req, res) => {
@@ -248,7 +223,7 @@ router.post('/login', (req, res) => {
   });
 
   const { refresh_token, ...publicTokens } = tokens;
-  res.cookie(REFRESH_TOKEN_COOKIE, refresh_token, COOKIE_OPTIONS);
+  res.cookie(REFRESH_TOKEN_COOKIE, refresh_token, REFRESH_COOKIE_OPTIONS);
   res.json({ tokens: publicTokens, user: toUserResponse(user) });
 });
 
@@ -589,7 +564,7 @@ router.post('/refresh-token', (req, res) => {
   state.refreshTokens.set(tokens.refresh_token, user.id);
 
   const { refresh_token, ...publicTokens } = tokens;
-  res.cookie(REFRESH_TOKEN_COOKIE, refresh_token, COOKIE_OPTIONS);
+  res.cookie(REFRESH_TOKEN_COOKIE, refresh_token, REFRESH_COOKIE_OPTIONS);
   res.json({ tokens: publicTokens, user: toUserResponse(user) });
 });
 
