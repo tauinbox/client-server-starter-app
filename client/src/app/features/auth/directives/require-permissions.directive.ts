@@ -1,56 +1,29 @@
-import {
-  Directive,
-  effect,
-  inject,
-  input,
-  TemplateRef,
-  ViewContainerRef
-} from '@angular/core';
+import { Directive, effect, inject, input } from '@angular/core';
+import type { TemplateRef } from '@angular/core';
 import { AuthStore } from '../store/auth.store';
+import { TemplateBranch } from '@shared/directives/template-branch';
 import type { PermissionCheck } from '../casl/app-ability';
 
 @Directive({
   selector: '[nxsRequirePermissions]'
 })
-export class RequirePermissionsDirective {
+export class RequirePermissionsDirective extends TemplateBranch {
   readonly nxsRequirePermissions = input.required<
     PermissionCheck | PermissionCheck[]
   >();
 
   readonly nxsRequirePermissionsElse = input<TemplateRef<unknown> | null>(null);
 
-  readonly #templateRef = inject(TemplateRef<unknown>);
-  readonly #viewContainer = inject(ViewContainerRef);
   readonly #authStore = inject(AuthStore);
 
-  #currentBranch: 'then' | 'else' | null = null;
-
   constructor() {
+    super();
+
     effect(() => {
-      const hasPermissions = this.#authStore.hasPermissions(
-        this.nxsRequirePermissions()
+      this.render(
+        this.#authStore.hasPermissions(this.nxsRequirePermissions()),
+        this.nxsRequirePermissionsElse()
       );
-      const elseTemplate = this.nxsRequirePermissionsElse();
-
-      const nextBranch: 'then' | 'else' | null = hasPermissions
-        ? 'then'
-        : elseTemplate
-          ? 'else'
-          : null;
-
-      if (nextBranch === this.#currentBranch) {
-        return;
-      }
-
-      this.#viewContainer.clear();
-
-      if (nextBranch === 'then') {
-        this.#viewContainer.createEmbeddedView(this.#templateRef);
-      } else if (nextBranch === 'else' && elseTemplate) {
-        this.#viewContainer.createEmbeddedView(elseTemplate);
-      }
-
-      this.#currentBranch = nextBranch;
     });
   }
 }
