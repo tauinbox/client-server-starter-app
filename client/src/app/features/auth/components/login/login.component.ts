@@ -122,6 +122,12 @@ export class LoginComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    // The session teardown clears the flag store, and a bootstrap whose refresh
+    // failed never populates it, so this route can be reached with an empty map
+    // and no OAuth buttons. `load()` joins an in-flight fetch and is a no-op
+    // once the flags are loaded, so it costs nothing on the ordinary paths.
+    void this.#flagsStore.load();
+
     const oauthError = this.#route.snapshot.queryParams['oauth_error'];
     if (oauthError) {
       const fullKey =

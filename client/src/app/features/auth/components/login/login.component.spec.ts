@@ -380,11 +380,13 @@ describe('LoginComponent', () => {
   });
 
   describe('OAuth provider buttons', () => {
+    // `reload()`, not `load()`: the component loads the flags in ngOnInit, so
+    // the store is already marked loaded by the time a test re-arms the mock.
     async function loadFlags(flags: Record<string, boolean>): Promise<void> {
       featureFlagServiceMock.getEvaluatedFlags.mockReturnValue(
         of<EvaluatedFeatureFlagsResponse>({ flags, evaluatedAt: '' })
       );
-      await TestBed.inject(FeatureFlagsStore).load();
+      await TestBed.inject(FeatureFlagsStore).reload();
       fixture.detectChanges();
       await fixture.whenStable();
     }
@@ -417,6 +419,45 @@ describe('LoginComponent', () => {
         'vk'
       ]);
       expect(oauthButtonCount()).toBe(2);
+    });
+
+    it('loads the flags on init, so an empty store still renders the buttons', async () => {
+      TestBed.resetTestingModule();
+      featureFlagServiceMock.getEvaluatedFlags.mockReturnValue(
+        of<EvaluatedFeatureFlagsResponse>({
+          flags: { 'oauth-google': true },
+          evaluatedAt: ''
+        })
+      );
+      TestBed.configureTestingModule({
+        imports: [LoginComponent, TranslocoTestingModuleWithLangs],
+        providers: [
+          provideRouter([]),
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          provideNoopAnimations(),
+          { provide: AuthService, useValue: authServiceMock },
+          { provide: FeatureFlagService, useValue: featureFlagServiceMock },
+          {
+            provide: ActivatedRoute,
+            useValue: { snapshot: { queryParams: {} } }
+          }
+        ]
+      });
+
+      // The state the store is left in by a logout or a failed bootstrap
+      // refresh: nothing on this route has ever fetched the flags.
+      expect(TestBed.inject(FeatureFlagsStore).flagKeys()).toEqual([]);
+
+      const newFixture = TestBed.createComponent(LoginComponent);
+      newFixture.detectChanges();
+      await newFixture.whenStable();
+      newFixture.detectChanges();
+
+      expect(featureFlagServiceMock.getEvaluatedFlags).toHaveBeenCalled();
+      expect(
+        newFixture.nativeElement.querySelectorAll('.oauth-button')
+      ).toHaveLength(1);
     });
 
     it('ignores a provider that is not a known OAuth provider', () => {
