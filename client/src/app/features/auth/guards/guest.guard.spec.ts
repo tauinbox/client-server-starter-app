@@ -14,10 +14,10 @@ describe('guestGuard', () => {
   let authStoreMock: {
     isAuthenticated: ReturnType<typeof vi.fn>;
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
-    clearSession: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
+    clearSession: ReturnType<typeof vi.fn>;
   };
 
   const mockRoute = {} as ActivatedRouteSnapshot;
@@ -26,12 +26,12 @@ describe('guestGuard', () => {
   beforeEach(() => {
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(false),
-      isAccessTokenExpired: vi.fn().mockReturnValue(true),
-      clearSession: vi.fn()
+      isAccessTokenExpired: vi.fn().mockReturnValue(true)
     };
 
     authServiceMock = {
-      refreshTokens: vi.fn().mockReturnValue(of(null))
+      refreshTokens: vi.fn().mockReturnValue(of(null)),
+      clearSession: vi.fn()
     };
 
     TestBed.configureTestingModule({
@@ -94,7 +94,7 @@ describe('guestGuard', () => {
 
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(true);
-    expect(authStoreMock.clearSession).toHaveBeenCalled();
+    expect(authServiceMock.clearSession).toHaveBeenCalled();
   });
 
   it('should allow access when token expired and refresh throws error', async () => {
@@ -110,6 +110,6 @@ describe('guestGuard', () => {
 
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(true);
-    expect(authStoreMock.clearSession).toHaveBeenCalled();
+    expect(authServiceMock.clearSession).toHaveBeenCalled();
   });
 });

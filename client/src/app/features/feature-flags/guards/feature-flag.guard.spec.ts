@@ -16,9 +16,11 @@ describe('featureFlagGuard', () => {
     isAuthenticated: ReturnType<typeof vi.fn>;
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
     hasPersistedUser: ReturnType<typeof vi.fn>;
+  };
+  let authServiceMock: {
+    refreshTokens: ReturnType<typeof vi.fn>;
     clearSession: ReturnType<typeof vi.fn>;
   };
-  let authServiceMock: { refreshTokens: ReturnType<typeof vi.fn> };
   let load: ReturnType<typeof vi.fn>;
   let isEnabled: ReturnType<typeof vi.fn>;
 
@@ -43,10 +45,12 @@ describe('featureFlagGuard', () => {
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(true),
       isAccessTokenExpired: vi.fn().mockReturnValue(false),
-      hasPersistedUser: vi.fn().mockReturnValue(true),
+      hasPersistedUser: vi.fn().mockReturnValue(true)
+    };
+    authServiceMock = {
+      refreshTokens: vi.fn().mockReturnValue(of(null)),
       clearSession: vi.fn()
     };
-    authServiceMock = { refreshTokens: vi.fn().mockReturnValue(of(null)) };
     load = vi.fn().mockResolvedValue(undefined);
     isEnabled = vi.fn().mockReturnValue(() => false);
 
@@ -114,7 +118,7 @@ describe('featureFlagGuard', () => {
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate');
     expect(await resolve(run())).toBe(false);
-    expect(authStoreMock.clearSession).toHaveBeenCalled();
+    expect(authServiceMock.clearSession).toHaveBeenCalled();
     expect(router.navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/dashboard' }
     });

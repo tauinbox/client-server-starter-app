@@ -16,10 +16,10 @@ describe('permissionGuard', () => {
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
     hasPersistedUser: ReturnType<typeof vi.fn>;
     hasPermissions: ReturnType<typeof vi.fn>;
-    clearSession: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
+    clearSession: ReturnType<typeof vi.fn>;
   };
 
   const mockRoute = {} as ActivatedRouteSnapshot;
@@ -30,12 +30,12 @@ describe('permissionGuard', () => {
       isAuthenticated: vi.fn().mockReturnValue(true),
       isAccessTokenExpired: vi.fn().mockReturnValue(false),
       hasPersistedUser: vi.fn().mockReturnValue(true),
-      hasPermissions: vi.fn().mockReturnValue(false),
-      clearSession: vi.fn()
+      hasPermissions: vi.fn().mockReturnValue(false)
     };
 
     authServiceMock = {
-      refreshTokens: vi.fn().mockReturnValue(of(null))
+      refreshTokens: vi.fn().mockReturnValue(of(null)),
+      clearSession: vi.fn()
     };
 
     TestBed.configureTestingModule({
@@ -83,7 +83,7 @@ describe('permissionGuard', () => {
 
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(false);
-    expect(authStoreMock.clearSession).toHaveBeenCalled();
+    expect(authServiceMock.clearSession).toHaveBeenCalled();
     expect(router.navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/users' }
     });
@@ -131,10 +131,10 @@ describe('instancePermissionGuard', () => {
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
     hasPersistedUser: ReturnType<typeof vi.fn>;
     hasPermissions: ReturnType<typeof vi.fn>;
-    clearSession: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
+    clearSession: ReturnType<typeof vi.fn>;
   };
 
   // @ts-expect-error testing mock — minimal ActivatedRouteSnapshot with params
@@ -148,12 +148,12 @@ describe('instancePermissionGuard', () => {
       isAuthenticated: vi.fn().mockReturnValue(true),
       isAccessTokenExpired: vi.fn().mockReturnValue(false),
       hasPersistedUser: vi.fn().mockReturnValue(true),
-      hasPermissions: vi.fn().mockReturnValue(false),
-      clearSession: vi.fn()
+      hasPermissions: vi.fn().mockReturnValue(false)
     };
 
     authServiceMock = {
-      refreshTokens: vi.fn().mockReturnValue(of(null))
+      refreshTokens: vi.fn().mockReturnValue(of(null)),
+      clearSession: vi.fn()
     };
 
     TestBed.configureTestingModule({
@@ -223,7 +223,7 @@ describe('instancePermissionGuard', () => {
 
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(false);
-    expect(authStoreMock.clearSession).toHaveBeenCalled();
+    expect(authServiceMock.clearSession).toHaveBeenCalled();
     expect(router.navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/admin/users/user-1/edit' }
     });

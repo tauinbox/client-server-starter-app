@@ -6,11 +6,11 @@ type AuthStoreLike = {
   isAuthenticated: () => boolean;
   isAccessTokenExpired: () => boolean;
   hasPersistedUser: () => boolean;
-  clearSession: () => void;
 };
 
 type AuthServiceLike = {
   refreshTokens: () => Observable<unknown>;
+  clearSession: () => void;
 };
 
 export function ensureAuthenticated(
@@ -28,7 +28,7 @@ export function ensureAuthenticated(
   // belongs to a session we never had, so the round-trip is a guaranteed 401 on
   // every guarded navigation an anonymous visitor makes.
   if (!authStore.hasPersistedUser()) {
-    authStore.clearSession();
+    authService.clearSession();
     navigateToLogin(router, returnUrl);
     return false;
   }
@@ -40,12 +40,12 @@ export function ensureAuthenticated(
         return result instanceof Observable ? result : of(result);
       }
 
-      authStore.clearSession();
+      authService.clearSession();
       navigateToLogin(router, returnUrl);
       return of(false);
     }),
     catchError(() => {
-      authStore.clearSession();
+      authService.clearSession();
       navigateToLogin(router, returnUrl);
       return of(false);
     })

@@ -15,10 +15,10 @@ describe('authGuard', () => {
     isAuthenticated: ReturnType<typeof vi.fn>;
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
     hasPersistedUser: ReturnType<typeof vi.fn>;
-    clearSession: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
+    clearSession: ReturnType<typeof vi.fn>;
   };
 
   const mockRoute = {} as ActivatedRouteSnapshot;
@@ -28,12 +28,12 @@ describe('authGuard', () => {
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(false),
       isAccessTokenExpired: vi.fn().mockReturnValue(true),
-      hasPersistedUser: vi.fn().mockReturnValue(true),
-      clearSession: vi.fn()
+      hasPersistedUser: vi.fn().mockReturnValue(true)
     };
 
     authServiceMock = {
-      refreshTokens: vi.fn().mockReturnValue(of(null))
+      refreshTokens: vi.fn().mockReturnValue(of(null)),
+      clearSession: vi.fn()
     };
 
     TestBed.configureTestingModule({
@@ -67,7 +67,7 @@ describe('authGuard', () => {
 
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(false);
-    expect(authStoreMock.clearSession).toHaveBeenCalled();
+    expect(authServiceMock.clearSession).toHaveBeenCalled();
     expect(router.navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/protected' }
     });
@@ -131,7 +131,7 @@ describe('authGuard', () => {
 
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(false);
-    expect(authStoreMock.clearSession).toHaveBeenCalled();
+    expect(authServiceMock.clearSession).toHaveBeenCalled();
     expect(router.navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/protected' }
     });

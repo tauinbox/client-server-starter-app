@@ -1,17 +1,25 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
+import type {
+  ActivatedRouteSnapshot,
+  RouterStateSnapshot
+} from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting
 } from '@angular/common/http/testing';
-import { EMPTY } from 'rxjs';
+import type { Observable } from 'rxjs';
+import { EMPTY, firstValueFrom } from 'rxjs';
 import { AuthService } from './auth.service';
 import { TokenService } from './token.service';
 import { AUTH_USER_KEY, AuthStore } from '../store/auth.store';
 import { RbacMetadataStore } from '../store/rbac-metadata.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
+import { guestGuard } from '../guards/guest.guard';
+import { ensureAuthenticated } from '../utils/ensure-authenticated';
+import type { AuthResponse } from '../models/auth.types';
 import { NotificationsService } from '@core/services/notifications.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { EntitlementsStore } from '@features/billing/store/entitlements.store';
@@ -51,6 +59,28 @@ const cachedMetadata = {
   ],
   actions: []
 };
+
+function createExpiredAuthResponse(): AuthResponse {
+  const encode = (obj: Record<string, unknown>) =>
+    btoa(JSON.stringify(obj))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  const header = encode({ alg: 'HS256', typ: 'JWT' });
+  const payload = encode({
+    sub: '1',
+    email: cachedUser.email,
+    exp: Math.floor(Date.now() / 1000) - 60
+  });
+
+  return {
+    tokens: {
+      access_token: `${header}.${payload}.fake-signature`,
+      expires_in: 3600
+    },
+    user: cachedUser
+  };
+}
 
 const entitlements: EntitlementsResponse = {
   planKey: 'pro',
@@ -183,5 +213,67 @@ describe('session teardown', () => {
     expect(
       fixture.nativeElement.querySelectorAll('.oauth-button')
     ).toHaveLength(1);
+  });
+
+  it('the expired session a guarded navigation finds clears the cached RBAC catalog', async () => {
+    const authService = TestBed.inject(AuthService);
+    const authStore = TestBed.inject(AuthStore);
+    const rbacMetadataStore = TestBed.inject(RbacMetadataStore);
+    const router = TestBed.inject(Router);
+    const { featureFlagsStore, entitlementsStore } = await loadCaches();
+
+    expect(rbacMetadataStore.resources()).toHaveLength(1);
+
+    const guarded = ensureAuthenticated(
+      authStore,
+      authService,
+      router,
+      '/users',
+      () => true
+    ) as Observable<boolean>;
+    const settled = firstValueFrom(guarded);
+    httpMock
+      .expectOne(AuthApiEnum.RefreshToken)
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    expect(await settled).toBe(false);
+    expect(localStorage.getItem(AUTH_USER_KEY)).toBeNull();
+    expect(localStorage.getItem(RBAC_CACHE_KEY)).toBeNull();
+    expect(rbacMetadataStore.resources()).toEqual([]);
+    expect(featureFlagsStore.isEnabled('beta')()).toBe(false);
+    expect(entitlementsStore.planKey()).toBeNull();
+    expect(notificationsServiceMock.disconnect).toHaveBeenCalled();
+  });
+
+  it('the guest guard clears the same state when the refresh fails', async () => {
+    const authStore = TestBed.inject(AuthStore);
+    const rbacMetadataStore = TestBed.inject(RbacMetadataStore);
+    const { featureFlagsStore, entitlementsStore } = await loadCaches();
+
+    // The guard only reaches the refresh when a session exists but its access
+    // token has expired - the state a returning tab lands on /login with.
+    authStore.saveAuthResponse(createExpiredAuthResponse());
+    expect(rbacMetadataStore.resources()).toHaveLength(1);
+
+    const guarded = TestBed.runInInjectionContext(() =>
+      guestGuard(
+        {} as ActivatedRouteSnapshot,
+        {
+          url: '/login'
+        } as RouterStateSnapshot
+      )
+    ) as Observable<boolean>;
+    const settled = firstValueFrom(guarded);
+    httpMock
+      .expectOne(AuthApiEnum.RefreshToken)
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    expect(await settled).toBe(true);
+    expect(localStorage.getItem(AUTH_USER_KEY)).toBeNull();
+    expect(localStorage.getItem(RBAC_CACHE_KEY)).toBeNull();
+    expect(rbacMetadataStore.resources()).toEqual([]);
+    expect(featureFlagsStore.isEnabled('beta')()).toBe(false);
+    expect(entitlementsStore.planKey()).toBeNull();
+    expect(notificationsServiceMock.disconnect).toHaveBeenCalled();
   });
 });

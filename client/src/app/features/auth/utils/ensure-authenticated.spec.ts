@@ -9,10 +9,10 @@ describe('ensureAuthenticated', () => {
     isAuthenticated: ReturnType<typeof vi.fn>;
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
     hasPersistedUser: ReturnType<typeof vi.fn>;
-    clearSession: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
+    clearSession: ReturnType<typeof vi.fn>;
   };
   let router: Router;
   let navigateSpy: Mock<Router['navigate']>;
@@ -26,12 +26,12 @@ describe('ensureAuthenticated', () => {
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(false),
       isAccessTokenExpired: vi.fn().mockReturnValue(true),
-      hasPersistedUser: vi.fn().mockReturnValue(true),
-      clearSession: vi.fn()
+      hasPersistedUser: vi.fn().mockReturnValue(true)
     };
 
     authServiceMock = {
-      refreshTokens: vi.fn()
+      refreshTokens: vi.fn(),
+      clearSession: vi.fn()
     };
 
     navigateSpy = vi.fn<Router['navigate']>();
@@ -120,7 +120,7 @@ describe('ensureAuthenticated', () => {
 
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(false);
-    expect(authStoreMock.clearSession).toHaveBeenCalled();
+    expect(authServiceMock.clearSession).toHaveBeenCalled();
     expect(navigateSpy).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/dashboard' }
     });
@@ -141,7 +141,7 @@ describe('ensureAuthenticated', () => {
 
     const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(false);
-    expect(authStoreMock.clearSession).toHaveBeenCalled();
+    expect(authServiceMock.clearSession).toHaveBeenCalled();
     expect(navigateSpy).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/settings' }
     });
