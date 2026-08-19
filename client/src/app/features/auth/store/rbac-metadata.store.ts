@@ -8,6 +8,7 @@ import {
 } from '@ngrx/signals';
 import type { ResourceResponse, ActionResponse } from '@app/shared/types';
 import { LocalStorageService } from '@core/services/local-storage.service';
+import { isCachedRbacMetadata } from './storage-guards';
 
 const RBAC_CACHE_KEY = 'rbac_metadata';
 
@@ -21,10 +22,7 @@ export const RbacMetadataStore = signalStore(
   { providedIn: 'root' },
   withState<RbacMetadataState>(() => {
     const storage = inject(LocalStorageService);
-    const cached = storage.getItem<{
-      resources: ResourceResponse[];
-      actions: ActionResponse[];
-    }>(RBAC_CACHE_KEY);
+    const cached = storage.getItem(RBAC_CACHE_KEY, isCachedRbacMetadata);
     return {
       resources: cached?.resources ?? [],
       actions: cached?.actions ?? [],

@@ -19,6 +19,7 @@ import type {
 import type { AuthResponse, CustomJwtPayload } from '../models/auth.types';
 import type { AppAbility, PermissionCheck } from '../casl/app-ability';
 import { LocalStorageService } from '@core/services/local-storage.service';
+import { isPersistedUser } from './storage-guards';
 
 export const AUTH_USER_KEY = 'auth_user';
 
@@ -34,7 +35,7 @@ export const AuthStore = signalStore(
     const storage = inject(LocalStorageService);
     return {
       accessToken: null,
-      user: storage.getItem<UserResponse>(AUTH_USER_KEY) ?? null,
+      user: storage.getItem(AUTH_USER_KEY, isPersistedUser) ?? null,
       ability: null
     };
   }),
