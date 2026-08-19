@@ -336,6 +336,29 @@ describe('LoginComponent', () => {
       expect(component['loading']()).toBe(false);
     });
 
+    it('detects an unverified email from the shared errorKey alone', async () => {
+      const httpError = new HttpErrorResponse({
+        error: {
+          message: 'Please verify your email address before logging in',
+          errorKey: ErrorKeys.AUTH.EMAIL_NOT_VERIFIED
+        },
+        status: 403
+      });
+      authServiceMock.login.mockReturnValue(throwError(() => httpError));
+
+      component.loginModel.set({
+        email: 'test@example.com',
+        password: 'password123'
+      });
+      await fixture.whenStable();
+      component.onSubmit();
+
+      expect(component['emailNotVerified']()).toBe(true);
+      expect(component['error']()).toBe(
+        'Please verify your email address before logging in'
+      );
+    });
+
     it('should show fallback error message when no server message', async () => {
       const httpError = new HttpErrorResponse({
         error: null,

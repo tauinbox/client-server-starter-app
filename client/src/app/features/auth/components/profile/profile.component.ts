@@ -34,7 +34,11 @@ import type { UserResponse } from '@app/shared/types';
 import type { UpdateProfile } from '../../models/auth.types';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { isOAuthProvider, OAUTH_URLS } from '../../constants/auth-api.const';
+import {
+  isOAuthProvider,
+  OAUTH_URLS,
+  type OAuthProvider
+} from '../../constants/auth-api.const';
 import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
@@ -75,7 +79,8 @@ type OAuthAccountInfo = {
   createdAt: string;
 };
 
-const PROVIDER_KEYS: Record<string, string> = {
+/** Keyed by OAuthProvider so a new entry in OAUTH_URLS fails the build until it gets a label. */
+const PROVIDER_KEYS: Record<OAuthProvider, string> = {
   google: 'auth.providers.google',
   facebook: 'auth.providers.facebook',
   vk: 'auth.providers.vk'
@@ -235,12 +240,12 @@ export class ProfileComponent implements OnInit {
     const error = this.#route.snapshot.queryParamMap.get('oauth_error');
 
     if (provider) {
-      const providerLabel = this.#transloco.translate(
-        PROVIDER_KEYS[provider] || 'auth.providers.' + provider
-      );
-      this.#notify.success('auth.profile.oauthConnected', {
-        provider: providerLabel
-      });
+      // A forged ?oauth_linked= value never linked anything, so it gets no toast.
+      if (isOAuthProvider(provider)) {
+        this.#notify.success('auth.profile.oauthConnected', {
+          provider: this.#providerLabel(provider)
+        });
+      }
       void this.#router.navigate([], {
         queryParams: { oauth_linked: null },
         queryParamsHandling: 'merge'
@@ -256,6 +261,13 @@ export class ProfileComponent implements OnInit {
         queryParamsHandling: 'merge'
       });
     }
+  }
+
+  /** Unknown providers cannot reach a label key, so the raw name is the last resort. */
+  #providerLabel(provider: string): string {
+    return isOAuthProvider(provider)
+      ? this.#transloco.translate(PROVIDER_KEYS[provider])
+      : provider;
   }
 
   loadProfile(): void {
@@ -372,11 +384,8 @@ export class ProfileComponent implements OnInit {
           this.oauthAccounts.update((accounts) =>
             accounts.filter((a) => a.provider !== provider)
           );
-          const providerLabel = this.#transloco.translate(
-            PROVIDER_KEYS[provider] || 'auth.providers.' + provider
-          );
           this.#notify.success('auth.profile.oauthDisconnected', {
-            provider: providerLabel
+            provider: this.#providerLabel(provider)
           });
         },
         error: (err: HttpErrorResponse) => {

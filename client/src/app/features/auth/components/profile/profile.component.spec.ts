@@ -143,6 +143,28 @@ describe('ProfileComponent', () => {
     });
   });
 
+  describe('oauth_linked query parameter', () => {
+    it('announces a known provider by its translated label', () => {
+      activatedRouteMock.snapshot.queryParamMap.set('oauth_linked', 'google');
+      fixture.detectChanges();
+
+      expect(notifyMock.success).toHaveBeenCalledWith(
+        'auth.profile.oauthConnected',
+        { provider: 'Google' }
+      );
+    });
+
+    it('stays silent for a forged provider value', () => {
+      activatedRouteMock.snapshot.queryParamMap.set(
+        'oauth_linked',
+        'constructor'
+      );
+      fixture.detectChanges();
+
+      expect(notifyMock.success).not.toHaveBeenCalled();
+    });
+  });
+
   describe('ngOnInit / loadProfile', () => {
     it('should load profile and set model on init', () => {
       fixture.detectChanges();

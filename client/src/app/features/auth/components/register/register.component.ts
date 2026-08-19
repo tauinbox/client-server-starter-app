@@ -31,6 +31,7 @@ import { PasswordStrengthComponent } from '@shared/components/password-strength/
 import { CaptchaWidgetComponent } from '@shared/components/captcha-widget/captcha-widget.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { ErrorKeys } from '@app/shared/constants';
+import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 
 type RegisterData = {
   email: string;
@@ -129,7 +130,7 @@ export class RegisterComponent {
           ) {
             this.captchaRequired.set(true);
             this.captchaToken.set(null);
-            this.error.set(this.#translocoService.translate(errorKey));
+            this.error.set(parseHttpErrorMessage(err, this.#translocoService));
             return;
           }
           if (err.status === 409) {
@@ -138,9 +139,11 @@ export class RegisterComponent {
             );
           } else {
             this.error.set(
-              errorKey
-                ? this.#translocoService.translate(errorKey)
-                : this.#translocoService.translate('auth.register.errorFailed')
+              parseHttpErrorMessage(
+                err,
+                this.#translocoService,
+                'auth.register.errorFailed'
+              )
             );
           }
         }

@@ -212,6 +212,25 @@ describe('RegisterComponent', () => {
       expect(component['error']()).toBe('Internal server error');
     });
 
+    it('never renders an untranslated errorKey as a dot-path', async () => {
+      const httpError = new HttpErrorResponse({
+        error: {
+          message: 'Registration is closed for this tenant',
+          errorKey: 'errors.auth.keyAddedByTheServerFirst'
+        },
+        status: 400
+      });
+      authServiceMock.register.mockReturnValue(throwError(() => httpError));
+
+      component.registerModel.set(validForm);
+      await fixture.whenStable();
+      component.onSubmit();
+
+      expect(component['error']()).toBe(
+        'Registration failed. Please try again.'
+      );
+    });
+
     it('should show fallback error message when no server message', async () => {
       const httpError = new HttpErrorResponse({
         error: null,
