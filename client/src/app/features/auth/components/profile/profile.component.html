@@ -75,7 +75,7 @@
                 label="auth.profile.newPassword"
                 [type]="pwdToggle.show() ? 'text' : 'password'"
                 prefixIcon="lock"
-                autocomplete="off"
+                autocomplete="new-password"
               >
                 <nxs-password-toggle formFieldSuffix #pwdToggle />
               </nxs-form-field>
@@ -100,7 +100,7 @@
                   label="auth.profile.confirmPassword"
                   [type]="confirmPwdToggle.show() ? 'text' : 'password'"
                   prefixIcon="lock"
-                  autocomplete="off"
+                  autocomplete="new-password"
                 >
                   <nxs-password-toggle formFieldSuffix #confirmPwdToggle />
                 </nxs-form-field>

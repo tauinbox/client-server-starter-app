@@ -115,6 +115,30 @@ describe('ProfileComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('marks each password field for password managers by its role', async () => {
+    fixture.detectChanges();
+    component.profileModel.set({
+      email: 'test@example.com',
+      firstName: 'Test',
+      lastName: 'User',
+      currentPassword: '',
+      password: 'newpassword123',
+      confirmPassword: 'newpassword123'
+    });
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const values = Array.from(
+      fixture.nativeElement.querySelectorAll('input[type="password"]')
+    ).map((input) => (input as HTMLInputElement).getAttribute('autocomplete'));
+
+    expect(values).toEqual([
+      'new-password',
+      'current-password',
+      'new-password'
+    ]);
+  });
+
   describe('oauth_error query parameter', () => {
     it('reports a cancelled link attempt as a notice, not a failure', () => {
       activatedRouteMock.snapshot.queryParamMap.set(

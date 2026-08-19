@@ -138,6 +138,16 @@ describe('UserEditComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('marks the password field as a new password for password managers', () => {
+    fixture.detectChanges();
+
+    const input: HTMLInputElement = fixture.nativeElement.querySelector(
+      'input[type="password"]'
+    );
+
+    expect(input.getAttribute('autocomplete')).toBe('new-password');
+  });
+
   describe('ngOnInit / loadUser', () => {
     it('should load user on init and set model', () => {
       fixture.detectChanges();
