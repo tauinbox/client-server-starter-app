@@ -201,7 +201,10 @@ jobs:
     name: Client E2E
     needs: [mock-server]
     runs-on: ubuntu-latest
-    # Worst observed: ~4.2 min, including the browser download on a cache miss.
+    # Typical: ~4.2 min, including the browser download on a cache miss. The
+    # ceiling stays generous because the apt step below is at the mercy of the
+    # Ubuntu mirror; it is bounded on its own so it can no longer spend this
+    # whole budget.
     timeout-minutes: 20
     defaults:
       run:
@@ -238,6 +241,17 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('client/package-lock.json') }}
 
       - name: Install Playwright system dependencies
+        # Every shared library chromium needs is already on the ubuntu-latest
+        # image - apt reports each one as "already the newest version" - so this
+        # step only adds ~21 MB of CJK/Thai/Cyrillic font packages, and no spec
+        # compares pixels. Nothing here is cacheable (the cache above covers
+        # ~/.cache/ms-playwright only), so a slow azure.archive.ubuntu.com
+        # mirror is paid on every run: measured 11-20 s for weeks, then 132 s,
+        # 377 s, 438 s and one full stall that ate the 20-minute job budget and
+        # reported red without running a single test. Bound it and let the suite
+        # proceed; a genuinely missing library fails loudly at browser launch.
+        timeout-minutes: 4
+        continue-on-error: true
         run: npx playwright install-deps chromium
 
       - name: Install Playwright Chromium
