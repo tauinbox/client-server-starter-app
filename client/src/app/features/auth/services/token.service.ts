@@ -7,6 +7,7 @@ import {
   finalize,
   firstValueFrom,
   shareReplay,
+  Subject,
   switchMap,
   timer
 } from 'rxjs';
@@ -34,6 +35,12 @@ export class TokenService {
   #refreshSubscription: Subscription | undefined;
   #refreshInFlight$: Observable<TokensResponse | null> | null = null;
   #sessionEpoch = 0;
+  readonly #sessionCleared = new Subject<void>();
+
+  // AuthService imports TokenService, so the dependency can only run this way
+  // round: forceLogout announces the teardown and AuthService clears the caches
+  // it owns.
+  readonly sessionCleared$ = this.#sessionCleared.asObservable();
 
   refreshTokens(): Observable<TokensResponse | null> {
     if (this.#refreshInFlight$) {
@@ -104,6 +111,7 @@ export class TokenService {
   forceLogout(returnUrl?: string): void {
     this.cancelRefresh();
     this.#authStore.clearSession();
+    this.#sessionCleared.next();
 
     if (returnUrl) {
       navigateToLogin(this.#router, returnUrl);

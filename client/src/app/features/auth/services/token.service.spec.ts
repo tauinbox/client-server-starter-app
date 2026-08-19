@@ -186,6 +186,17 @@ describe('TokenService', () => {
         expect.objectContaining({ queryParams: { returnUrl: '/dashboard' } })
       );
     });
+
+    it('should announce the teardown before navigating away', () => {
+      const router = TestBed.inject(Router);
+      vi.spyOn(router, 'navigate').mockResolvedValue(true);
+      const cleared = vi.fn();
+      service.sessionCleared$.subscribe(cleared);
+
+      service.forceLogout();
+
+      expect(cleared).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('teardown while a refresh is in flight', () => {

@@ -86,6 +86,7 @@ describe('AuthService', () => {
     scheduleTokenRefresh: ReturnType<typeof vi.fn>;
     cancelRefresh: ReturnType<typeof vi.fn>;
     forceLogout: ReturnType<typeof vi.fn>;
+    sessionCleared$: Subject<void>;
   };
   let featureFlagsStoreMock: {
     load: ReturnType<typeof vi.fn>;
@@ -124,7 +125,8 @@ describe('AuthService', () => {
       refreshTokens: vi.fn().mockReturnValue(of(null)),
       scheduleTokenRefresh: vi.fn(),
       cancelRefresh: vi.fn(),
-      forceLogout: vi.fn()
+      forceLogout: vi.fn(),
+      sessionCleared$: new Subject<void>()
     };
 
     featureFlagsStoreMock = {
@@ -377,8 +379,22 @@ describe('AuthService', () => {
       service.logout();
 
       httpMock.expectNone(AuthApiEnum.Logout);
+      // The menu is gated on isAuthenticated(), but the branch must still not
+      // leave the persisted user behind.
+      expect(authStoreMock.clearSession).toHaveBeenCalled();
       expect(rbacMetadataStoreMock.clear).toHaveBeenCalled();
       expect(entitlementsStoreMock.clear).toHaveBeenCalled();
+    });
+  });
+
+  describe('sessionCleared$ teardown', () => {
+    it('clears every cached store when TokenService tears the session down', () => {
+      tokenServiceMock.sessionCleared$.next();
+
+      expect(rbacMetadataStoreMock.clear).toHaveBeenCalled();
+      expect(featureFlagsStoreMock.clear).toHaveBeenCalled();
+      expect(entitlementsStoreMock.clear).toHaveBeenCalled();
+      expect(authStoreMock.clearSession).toHaveBeenCalled();
     });
   });
 
