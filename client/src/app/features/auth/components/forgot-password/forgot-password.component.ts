@@ -29,6 +29,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { CaptchaWidgetComponent } from '@shared/components/captcha-widget/captcha-widget.component';
 import { ErrorKeys } from '@app/shared/constants';
+import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import type { HttpErrorResponse } from '@angular/common/http';
 
 type ForgotPasswordData = {
@@ -112,7 +113,7 @@ export class ForgotPasswordComponent {
           ) {
             this.captchaRequired.set(true);
             this.captchaToken.set(null);
-            this.error.set(this.#translocoService.translate(errorKey));
+            this.error.set(parseHttpErrorMessage(err, this.#translocoService));
             return;
           }
           this.error.set(

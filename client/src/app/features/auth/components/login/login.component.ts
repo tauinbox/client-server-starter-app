@@ -39,7 +39,7 @@ import { PasswordToggleComponent } from '@shared/components/password-toggle/pass
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
-import { OAUTH_PROVIDER_FLAGS } from '@app/shared/constants';
+import { ErrorKeys, OAUTH_PROVIDER_FLAGS } from '@app/shared/constants';
 
 type LoginData = {
   email: string;
@@ -215,7 +215,10 @@ export class LoginComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (err.status === 403 && err.error?.errorCode === 'EMAIL_NOT_VERIFIED') {
+    if (
+      err.status === 403 &&
+      err.error?.errorKey === ErrorKeys.AUTH.EMAIL_NOT_VERIFIED
+    ) {
       this.emailNotVerified.set(true);
       this.error.set(
         this.#resolveErrorMessage(err, 'errors.auth.emailNotVerified')
