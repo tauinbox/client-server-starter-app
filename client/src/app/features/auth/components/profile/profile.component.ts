@@ -64,6 +64,7 @@ import {
 } from '@core/services/display-preferences.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { OAUTH_PROVIDER_FLAGS } from '@app/shared/constants';
+import { normalizeEmail } from '@app/shared/utils/email';
 
 type ProfileData = {
   email: string;
@@ -94,6 +95,15 @@ const INITIAL_PROFILE: ProfileData = {
   password: '',
   confirmPassword: ''
 };
+
+/**
+ * Both sides of every "did the e-mail change?" comparison go through the shared
+ * canonicalizer: comparing a normalised form value against a raw stored address
+ * reports a change for an address that only differs in case.
+ */
+function canonicalEmail(value: string | undefined): string {
+  return normalizeEmail(value) ?? '';
+}
 
 @Component({
   selector: 'nxs-profile',
@@ -186,8 +196,8 @@ export class ProfileComponent implements OnInit {
     });
     validate(path.currentPassword, ({ value, valueOf }) => {
       const password = valueOf(path.password);
-      const emailValue = valueOf(path.email).trim().toLowerCase();
-      const loaded = this.user()?.email ?? '';
+      const emailValue = canonicalEmail(valueOf(path.email));
+      const loaded = canonicalEmail(this.user()?.email);
       const emailChanged = !!loaded && emailValue !== loaded;
       if (!password && !emailChanged) return null;
       if (!value().trim()) {
@@ -224,9 +234,9 @@ export class ProfileComponent implements OnInit {
   protected readonly requiresCurrentPassword = computed(() => {
     const data = this.profileModel();
     if (data.password) return true;
-    const loaded = this.user()?.email ?? '';
+    const loaded = canonicalEmail(this.user()?.email);
     if (!loaded) return false;
-    return data.email.trim().toLowerCase() !== loaded;
+    return canonicalEmail(data.email) !== loaded;
   });
 
   ngOnInit() {
@@ -374,6 +384,8 @@ export class ProfileComponent implements OnInit {
   }
 
   disconnectProvider(provider: string): void {
+    if (!isOAuthProvider(provider)) return;
+
     this.oauthLoading.set(true);
     this.#authService
       .unlinkOAuthAccount(provider)
@@ -400,8 +412,8 @@ export class ProfileComponent implements OnInit {
     if (this.profileForm().invalid() || !u) return;
 
     const formValues = this.profileModel();
-    const newEmail = formValues.email.trim().toLowerCase();
-    const emailChanged = !!u.email && newEmail !== u.email;
+    const newEmail = canonicalEmail(formValues.email);
+    const emailChanged = !!u.email && newEmail !== canonicalEmail(u.email);
 
     if (emailChanged) {
       this.#adaptiveDialog

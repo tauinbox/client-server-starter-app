@@ -220,7 +220,7 @@ export class AuthService {
 
   unlinkOAuthAccount(provider: string): Observable<{ message: string }> {
     return this.#http.delete<{ message: string }>(
-      `${AuthApiEnum.OAuthAccounts}/${provider}`
+      `${AuthApiEnum.OAuthAccounts}/${encodeURIComponent(provider)}`
     );
   }
 
