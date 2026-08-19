@@ -59,6 +59,16 @@ describe('ResetPasswordComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('marks both password fields as new passwords for password managers', () => {
+    createComponent('valid-token');
+
+    const values = Array.from(
+      fixture.nativeElement.querySelectorAll('input[type="password"]')
+    ).map((input) => (input as HTMLInputElement).getAttribute('autocomplete'));
+
+    expect(values).toEqual(['new-password', 'new-password']);
+  });
+
   describe('ngOnInit — token handling', () => {
     it('should read token from query params', () => {
       createComponent('my-reset-token');

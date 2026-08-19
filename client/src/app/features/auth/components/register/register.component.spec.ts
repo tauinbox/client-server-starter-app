@@ -47,6 +47,14 @@ describe('RegisterComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('marks the password field as a new password for password managers', () => {
+    const input: HTMLInputElement = fixture.nativeElement.querySelector(
+      'input[type="password"]'
+    );
+
+    expect(input.getAttribute('autocomplete')).toBe('new-password');
+  });
+
   describe('form validation', () => {
     it('should be invalid when empty', () => {
       expect(component.registerForm().valid()).toBe(false);

@@ -104,6 +104,14 @@ describe('LoginComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('exposes the password field to password managers as the current password', () => {
+    const input: HTMLInputElement = fixture.nativeElement.querySelector(
+      'input[type="password"]'
+    );
+
+    expect(input.getAttribute('autocomplete')).toBe('current-password');
+  });
+
   describe('oauth_error query parameter', () => {
     const renderWithOAuthError = (error: string) => {
       queryParams['oauth_error'] = error;
