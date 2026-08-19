@@ -50,7 +50,8 @@ export class CaptchaService {
 
   /**
    * Fetches the public captcha configuration once per session. Subsequent
-   * calls return the cached value.
+   * calls return the cached value. A failure is never cached: caching one
+   * would latch the captcha off for the rest of the session.
    */
   loadConfig(): Promise<CaptchaConfigResponse> {
     const cached = this.#config();
@@ -71,13 +72,6 @@ export class CaptchaService {
         return cfg;
       })
       .catch((err: unknown) => {
-        // Treat fetch failure as "captcha disabled" — let auth flows continue.
-        const fallback: CaptchaConfigResponse = {
-          enabled: false,
-          provider: 'turnstile',
-          siteKey: null
-        };
-        this.#config.set(fallback);
         this.#configRequest = null;
         // Re-throw so subscribers can react if they care; default-handler
         // suppression is set on the request context above.
@@ -89,37 +83,56 @@ export class CaptchaService {
 
   /**
    * Lazily injects the Turnstile script and resolves with the global
-   * `turnstile` API. Idempotent — subsequent calls return the same promise.
+   * `turnstile` API. Idempotent while the load is in flight or has succeeded;
+   * a failed load is discarded so the next call starts a fresh attempt.
    */
   loadScript(): Promise<TurnstileApi> {
     if (this.#scriptLoad) return this.#scriptLoad;
 
-    this.#scriptLoad = new Promise<TurnstileApi>((resolve, reject) => {
-      if (this.#document.defaultView?.turnstile) {
-        resolve(this.#document.defaultView.turnstile);
+    const load = this.#requestScript().catch((err: unknown) => {
+      this.#scriptLoad = null;
+      throw err;
+    });
+    this.#scriptLoad = load;
+    return load;
+  }
+
+  #requestScript(): Promise<TurnstileApi> {
+    return new Promise<TurnstileApi>((resolve, reject) => {
+      const loaded = this.#document.defaultView?.turnstile;
+      if (loaded) {
+        resolve(loaded);
         return;
       }
+
+      // A tag left behind by a failed attempt never fires another event, so it
+      // is dropped on failure and the next attempt appends a fresh one.
+      const attach = (script: HTMLScriptElement) => {
+        const fail = (message: string) => {
+          script.remove();
+          reject(new Error(message));
+        };
+        script.addEventListener(
+          'load',
+          () => {
+            const api = this.#document.defaultView?.turnstile;
+            if (api) resolve(api);
+            else fail('Turnstile script loaded without exposing API');
+          },
+          { once: true }
+        );
+        script.addEventListener(
+          'error',
+          () => fail('Failed to load Turnstile script'),
+          { once: true }
+        );
+      };
 
       const existing = this.#document.getElementById(
         TURNSTILE_SCRIPT_ID
       ) as HTMLScriptElement | null;
-      const handleReady = () => {
-        const api = this.#document.defaultView?.turnstile;
-        if (api) resolve(api);
-        else reject(new Error('Turnstile script loaded without exposing API'));
-      };
-
       if (existing) {
-        if (this.#document.defaultView?.turnstile) {
-          handleReady();
-        } else {
-          existing.addEventListener('load', handleReady, { once: true });
-          existing.addEventListener(
-            'error',
-            () => reject(new Error('Failed to load Turnstile script')),
-            { once: true }
-          );
-        }
+        attach(existing);
         return;
       }
 
@@ -128,18 +141,8 @@ export class CaptchaService {
       script.src = TURNSTILE_SCRIPT_URL;
       script.async = true;
       script.defer = true;
-      script.addEventListener('load', handleReady, { once: true });
-      script.addEventListener(
-        'error',
-        () => {
-          this.#scriptLoad = null;
-          reject(new Error('Failed to load Turnstile script'));
-        },
-        { once: true }
-      );
+      attach(script);
       this.#document.head.appendChild(script);
     });
-
-    return this.#scriptLoad;
   }
 }
