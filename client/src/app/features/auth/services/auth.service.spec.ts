@@ -13,6 +13,7 @@ import { TokenService } from './token.service';
 import { RbacMetadataService } from './rbac-metadata.service';
 import { RbacMetadataStore } from '../store/rbac-metadata.store';
 import { NotificationsService } from '@core/services/notifications.service';
+import { NotifyService } from '@core/services/notify.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { EntitlementsStore } from '@features/billing/store/entitlements.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
@@ -99,6 +100,7 @@ describe('AuthService', () => {
     clear: ReturnType<typeof vi.fn>;
   };
   let entitlementsUpdated$: Subject<NotificationEvent>;
+  let notifyMock: { error: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     rbacMetadataServiceMock = {
@@ -141,6 +143,7 @@ describe('AuthService', () => {
       clear: vi.fn()
     };
     entitlementsUpdated$ = new Subject<NotificationEvent>();
+    notifyMock = { error: vi.fn() };
 
     TestBed.configureTestingModule({
       providers: [
@@ -162,7 +165,8 @@ describe('AuthService', () => {
           }
         },
         { provide: FeatureFlagsStore, useValue: featureFlagsStoreMock },
-        { provide: EntitlementsStore, useValue: entitlementsStoreMock }
+        { provide: EntitlementsStore, useValue: entitlementsStoreMock },
+        { provide: NotifyService, useValue: notifyMock }
       ]
     });
 
@@ -229,6 +233,29 @@ describe('AuthService', () => {
       await loginPromise;
 
       expect(rbacMetadataServiceMock.getMetadata).toHaveBeenCalled();
+    });
+  });
+
+  describe('fetchPermissions', () => {
+    it('surfaces a failed permissions request instead of failing silently', async () => {
+      const promise = service.fetchPermissions();
+
+      httpMock
+        .expectOne(AuthApiEnum.Permissions)
+        .flush(
+          { message: 'Service unavailable' },
+          { status: 503, statusText: 'Service Unavailable' }
+        );
+
+      // The promise must still resolve: callers chain fetchRbacMetadata() on it.
+      await expect(promise).resolves.toBeUndefined();
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 503 }),
+        'errors.general.permissionsUnavailable'
+      );
+      // Fail closed: no rules are written, so the ability stays null and every
+      // permission-guarded route keeps denying.
+      expect(authStoreMock.setRules).not.toHaveBeenCalled();
     });
   });
 

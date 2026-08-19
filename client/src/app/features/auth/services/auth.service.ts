@@ -1,6 +1,7 @@
 import { DestroyRef, inject, Injectable } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpContext } from '@angular/common/http';
+import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import { finalize, firstValueFrom, from, switchMap, tap } from 'rxjs';
 import { Router } from '@angular/router';
@@ -22,6 +23,7 @@ import { TokenService } from './token.service';
 import { RbacMetadataService } from './rbac-metadata.service';
 import { RbacMetadataStore } from '../store/rbac-metadata.store';
 import { NotificationsService } from '@core/services/notifications.service';
+import { NotifyService } from '@core/services/notify.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { EntitlementsStore } from '@features/billing/store/entitlements.store';
 
@@ -37,6 +39,7 @@ export class AuthService {
   readonly #rbacMetadataService = inject(RbacMetadataService);
   readonly #rbacMetadataStore = inject(RbacMetadataStore);
   readonly #notificationsService = inject(NotificationsService);
+  readonly #notify = inject(NotifyService);
   readonly #featureFlagsStore = inject(FeatureFlagsStore);
   readonly #entitlementsStore = inject(EntitlementsStore);
   readonly #destroyRef = inject(DestroyRef);
@@ -287,8 +290,10 @@ export class AuthService {
       .then((response) => {
         this.#authStore.setRules(response.rules);
       })
-      .catch((error) => {
-        console.error('Failed to fetch permissions:', error);
+      .catch((error: HttpErrorResponse) => {
+        // Fail closed: the ability stays null and every guarded route denies,
+        // so the user must be told the denial comes from a failed request.
+        this.#notify.error(error, 'errors.general.permissionsUnavailable');
       });
   }
 
