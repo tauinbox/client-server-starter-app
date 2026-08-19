@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
@@ -15,6 +16,8 @@ import { NotificationsService } from '@core/services/notifications.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { EntitlementsStore } from '@features/billing/store/entitlements.store';
 import type { EntitlementsResponse, UserResponse } from '@app/shared/types';
+import { LoginComponent } from '../components/login/login.component';
+import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 
 const RBAC_CACHE_KEY = 'rbac_metadata';
 const FEATURE_FLAGS_URL = '/api/v1/feature-flags';
@@ -83,10 +86,12 @@ describe('session teardown', () => {
     };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
+        provideNoopAnimations(),
         { provide: NotificationsService, useValue: notificationsServiceMock }
       ]
     });
@@ -156,5 +161,27 @@ describe('session teardown', () => {
     expect(rbacMetadataStore.resources()).toEqual([]);
     expect(featureFlagsStore.isEnabled('beta')()).toBe(false);
     expect(entitlementsStore.planKey()).toBeNull();
+  });
+
+  it('the login page the teardown lands on re-fetches the flags it cleared', async () => {
+    const authService = TestBed.inject(AuthService);
+    const { featureFlagsStore } = await loadCaches();
+
+    authService.logout();
+    httpMock.expectNone(AuthApiEnum.Logout);
+    expect(featureFlagsStore.isEnabled('beta')()).toBe(false);
+
+    const fixture = TestBed.createComponent(LoginComponent);
+    fixture.detectChanges();
+
+    httpMock
+      .expectOne(FEATURE_FLAGS_URL)
+      .flush({ flags: { 'oauth-google': true }, evaluatedAt: '' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelectorAll('.oauth-button')
+    ).toHaveLength(1);
   });
 });
