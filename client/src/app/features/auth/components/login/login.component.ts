@@ -213,8 +213,21 @@ export class LoginComponent implements OnInit, OnDestroy {
 
   #handleLoginError(err: HttpErrorResponse): void {
     if (err.status === 423) {
-      const data = err.error as LockoutErrorData;
-      this.#startLockoutCountdown(data.retryAfter);
+      // A 423 from anything but the API (proxy/CDN error page, empty body) has
+      // no `retryAfter`: read it defensively so the message is still shown and
+      // the countdown interval is never seeded with NaN.
+      const data =
+        typeof err.error === 'object' && err.error !== null
+          ? (err.error as Partial<LockoutErrorData>)
+          : null;
+      const retryAfter = data?.retryAfter;
+      if (
+        typeof retryAfter === 'number' &&
+        Number.isFinite(retryAfter) &&
+        retryAfter > 0
+      ) {
+        this.#startLockoutCountdown(retryAfter);
+      }
       this.error.set(
         this.#resolveErrorMessage(err, 'errors.auth.accountLocked')
       );

@@ -379,6 +379,56 @@ describe('LoginComponent', () => {
     });
   });
 
+  describe('lockout (423) handling', () => {
+    async function submitWith(error: unknown): Promise<void> {
+      component.loginModel.set({
+        email: 'test@example.com',
+        password: 'password123'
+      });
+      await fixture.whenStable();
+      authServiceMock.login.mockReturnValue(
+        throwError(() => new HttpErrorResponse({ error, status: 423 }))
+      );
+      // Faked only from here: whenStable() above needs the real scheduler.
+      vi.useFakeTimers();
+      component.onSubmit();
+    }
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('starts the countdown from a well-formed lockout body', async () => {
+      await submitWith({
+        message: 'Account is temporarily locked',
+        lockedUntil: '2024-01-01T00:05:00.000Z',
+        retryAfter: 3
+      });
+
+      expect(component['lockoutSeconds']()).toBe(3);
+      vi.advanceTimersByTime(3000);
+      expect(component['lockoutSeconds']()).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('still shows the message and leaves no timer running for an empty body', async () => {
+      await submitWith(null);
+
+      expect(component['error']()).toBe(
+        'Account is temporarily locked due to too many failed login attempts'
+      );
+      expect(component['lockoutSeconds']()).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('ignores a non-numeric retryAfter instead of counting down from NaN', async () => {
+      await submitWith({ message: 'Locked', retryAfter: 'soon' });
+
+      expect(component['lockoutSeconds']()).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  });
+
   describe('OAuth provider buttons', () => {
     // `reload()`, not `load()`: the component loads the flags in ngOnInit, so
     // the store is already marked loaded by the time a test re-arms the mock.
