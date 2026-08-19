@@ -69,6 +69,10 @@ export class AuthService {
           void this.#entitlementsStore.reload();
         }
       });
+
+    this.#tokenService.sessionCleared$
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe(() => this.#clearSessionState());
   }
 
   login(credentials: LoginCredentials): Observable<AuthResponse> {
@@ -133,21 +137,28 @@ export class AuthService {
         .post(AuthApiEnum.Logout, {}, { context: silentContext() })
         .pipe(
           finalize(() => {
-            this.#notificationsService.disconnect();
-            this.#authStore.clearSession();
-            this.#rbacMetadataStore.clear();
-            this.#featureFlagsStore.clear();
-            this.#entitlementsStore.clear();
+            this.#clearSessionState();
             completeLogout();
           })
         )
         .subscribe();
     } else {
-      this.#rbacMetadataStore.clear();
-      this.#featureFlagsStore.clear();
-      this.#entitlementsStore.clear();
+      this.#clearSessionState();
       completeLogout();
     }
+  }
+
+  /**
+   * The single teardown for every exit path: an explicit logout and a
+   * `TokenService.forceLogout()` must leave the same empty state behind, or the
+   * caches one of them skips outlive the session on a shared device.
+   */
+  #clearSessionState(): void {
+    this.#notificationsService.disconnect();
+    this.#authStore.clearSession();
+    this.#rbacMetadataStore.clear();
+    this.#featureFlagsStore.clear();
+    this.#entitlementsStore.clear();
   }
 
   getProfile(): Observable<User> {

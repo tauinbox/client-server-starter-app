@@ -308,7 +308,8 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
             scheduleTokenRefresh: vi.fn(),
             refreshTokens: vi.fn().mockReturnValue(of(null)),
             cancelRefresh: vi.fn(),
-            forceLogout: vi.fn()
+            forceLogout: vi.fn(),
+            sessionCleared$: EMPTY
           }
         },
         {
