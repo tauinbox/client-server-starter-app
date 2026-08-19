@@ -571,4 +571,69 @@ describe('ProfileComponent', () => {
       expect(providerRowCount()).toBe(2);
     });
   });
+
+  describe('email comparison ignores the stored address casing', () => {
+    beforeEach(() => {
+      authServiceMock.getProfile.mockReturnValue(
+        of({ ...mockUser, email: 'User@Example.com' })
+      );
+      fixture.detectChanges();
+    });
+
+    it('does not ask for the current password when nothing was edited', async () => {
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component['requiresCurrentPassword']()).toBe(false);
+      expect(
+        fixture.nativeElement.querySelector(
+          'input[autocomplete="current-password"]'
+        )
+      ).toBeNull();
+    });
+
+    it('saves personal fields directly instead of starting an email change', async () => {
+      authServiceMock.updateProfile.mockReturnValue(
+        of({ ...mockUser, email: 'User@Example.com', firstName: 'Updated' })
+      );
+
+      component.profileModel.set({
+        email: 'User@Example.com',
+        firstName: 'Updated',
+        lastName: 'User',
+        currentPassword: '',
+        password: '',
+        confirmPassword: ''
+      });
+      await fixture.whenStable();
+      component.onSubmit();
+
+      expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
+        firstName: 'Updated',
+        lastName: 'User'
+      });
+    });
+  });
+
+  describe('disconnectProvider', () => {
+    it('ignores a provider name it does not know', () => {
+      fixture.detectChanges();
+
+      component.disconnectProvider('unknown-provider');
+
+      expect(authServiceMock.unlinkOAuthAccount).not.toHaveBeenCalled();
+      expect(component['oauthLoading']()).toBe(false);
+    });
+
+    it('unlinks a known provider', () => {
+      authServiceMock.unlinkOAuthAccount.mockReturnValue(
+        of({ message: 'Unlinked' })
+      );
+      fixture.detectChanges();
+
+      component.disconnectProvider('google');
+
+      expect(authServiceMock.unlinkOAuthAccount).toHaveBeenCalledWith('google');
+    });
+  });
 });

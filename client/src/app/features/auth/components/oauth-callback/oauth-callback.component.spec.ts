@@ -208,6 +208,22 @@ describe('OAuthCallbackComponent', () => {
       replaceUrl: true
     });
   });
+
+  it('should redirect to login when the post-authentication routine rejects', async () => {
+    authServiceMock.completeAuthentication.mockRejectedValue(
+      new Error('permissions unavailable')
+    );
+
+    fixture = TestBed.createComponent(OAuthCallbackComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
+      queryParams: { oauth_error: 'auth_failed' },
+      replaceUrl: true
+    });
+  });
 });
 
 // The post-authentication routine driven through the real AuthStore and the

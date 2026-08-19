@@ -62,9 +62,10 @@ export class OAuthCallbackComponent implements OnInit {
         // evaluates its guard against the ability this call populates.
         void this.#authService
           .completeAuthentication()
-          .then(() =>
-            this.#router.navigateByUrl(safeUrl, { replaceUrl: true })
-          );
+          .then(() => this.#router.navigateByUrl(safeUrl, { replaceUrl: true }))
+          // The spinner is this component's only state, so an unhandled
+          // rejection would leave the user on it forever.
+          .catch(() => this.#redirectToLogin('auth_failed'));
       },
       error: () => {
         this.#redirectToLogin('auth_failed');

@@ -468,4 +468,18 @@ describe('AuthService', () => {
       expect(entitlementsStoreMock.reload).not.toHaveBeenCalled();
     });
   });
+
+  describe('unlinkOAuthAccount', () => {
+    it('percent-encodes the provider name in the path', () => {
+      const unlinkPromise = firstValueFrom(
+        service.unlinkOAuthAccount('goo/gle')
+      );
+
+      const req = httpMock.expectOne(`${AuthApiEnum.OAuthAccounts}/goo%2Fgle`);
+      expect(req.request.method).toBe('DELETE');
+      req.flush({ message: 'Unlinked' });
+
+      return expect(unlinkPromise).resolves.toEqual({ message: 'Unlinked' });
+    });
+  });
 });
