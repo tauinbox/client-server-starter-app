@@ -64,6 +64,30 @@ describe('CaptchaService', () => {
 
       await expect(a).resolves.toEqual(await b);
     });
+
+    it('retries after a failed fetch instead of latching the captcha off', async () => {
+      const first = service.loadConfig();
+      httpMock
+        .expectOne(AuthApiEnum.CaptchaConfig)
+        .flush('boom', { status: 500, statusText: 'Server Error' });
+
+      await expect(first).rejects.toBeDefined();
+      expect(service.config()).toBeNull();
+
+      const second = service.loadConfig();
+      httpMock.expectOne(AuthApiEnum.CaptchaConfig).flush({
+        enabled: true,
+        provider: 'turnstile',
+        siteKey: 'site-1'
+      });
+
+      await expect(second).resolves.toEqual({
+        enabled: true,
+        provider: 'turnstile',
+        siteKey: 'site-1'
+      });
+      expect(service.config()?.enabled).toBe(true);
+    });
   });
 
   describe('loadScript', () => {
@@ -96,6 +120,38 @@ describe('CaptchaService', () => {
       const a = service.loadScript();
       const b = service.loadScript();
       expect(a).toBe(b);
+    });
+
+    it('starts a fresh attempt after a failed load on a pre-existing tag', async () => {
+      const stale = document.createElement('script');
+      stale.id = 'cf-turnstile-script';
+      document.head.appendChild(stale);
+
+      const first = service.loadScript();
+      stale.dispatchEvent(new Event('error'));
+
+      await expect(first).rejects.toThrow('Failed to load Turnstile script');
+      expect(document.getElementById('cf-turnstile-script')).toBeNull();
+
+      const second = service.loadScript();
+      expect(second).not.toBe(first);
+
+      const fresh = document.getElementById(
+        'cf-turnstile-script'
+      ) as HTMLScriptElement | null;
+      expect(fresh).toBeTruthy();
+      expect(fresh).not.toBe(stale);
+
+      const fakeApi = {
+        render: vi.fn(),
+        reset: vi.fn(),
+        remove: vi.fn(),
+        getResponse: vi.fn()
+      };
+      (window as { turnstile?: unknown }).turnstile = fakeApi;
+      fresh?.dispatchEvent(new Event('load'));
+
+      await expect(second).resolves.toBe(fakeApi);
     });
   });
 });
