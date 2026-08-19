@@ -20,7 +20,7 @@ export const FeatureFlagsAdminStore = signalStore(
   withEntities<FeatureFlagResponse>(),
   withState<FeatureFlagsAdminState>({ loading: false }),
   withCursorList<FeatureFlagResponse>({
-    errorKey: 'admin.featureFlags.errorLoadFailed'
+    fallbackKey: 'admin.featureFlags.errorLoadFailed'
   }),
   withMethods((store) => {
     const service = inject(FeatureFlagsAdminService);

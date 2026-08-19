@@ -25,7 +25,7 @@ export const BillingSubscriptionsStore = signalStore(
   withEntities<SubscriptionResponse>(),
   withState({ working: false }),
   withCursorList<SubscriptionResponse>({
-    errorKey: 'admin.billing.errors.loadFailed'
+    fallbackKey: 'admin.billing.errors.loadFailed'
   }),
   withComputed((store) => ({
     subscriptions: computed(() => store.entities())

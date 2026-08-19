@@ -19,7 +19,7 @@ export const BillingInvoicesStore = signalStore(
   withEntities<InvoiceResponse>(),
   withState({ working: false }),
   withCursorList<InvoiceResponse>({
-    errorKey: 'admin.billing.errors.loadFailed'
+    fallbackKey: 'admin.billing.errors.loadFailed'
   }),
   withComputed((store) => ({
     invoices: computed(() => store.entities())

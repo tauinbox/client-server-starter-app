@@ -16,7 +16,7 @@ export const RolesStore = signalStore(
   withEntities<RoleAdminResponse>(),
   withState<RolesState>({ loading: false }),
   withCursorList<RoleAdminResponse>({
-    errorKey: 'admin.store.errorLoadRolesFailed'
+    fallbackKey: 'admin.store.errorLoadRolesFailed'
   }),
   withMethods((store) => {
     const roleService = inject(RoleService);

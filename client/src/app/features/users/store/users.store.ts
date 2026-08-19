@@ -43,7 +43,7 @@ export const UsersStore = signalStore(
     detailError: null,
     filters: {}
   }),
-  withCursorList<User>({ errorKey: 'users.store.errorLoadFailed' }),
+  withCursorList<User>({ fallbackKey: 'users.store.errorLoadFailed' }),
   withComputed((store) => ({
     displayedUsers: computed(() => store.entities()),
     // Keyset pagination reports no total, so the count shown is what has been
