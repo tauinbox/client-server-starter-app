@@ -88,7 +88,7 @@ export class SidenavStateService {
       const userId = this.#authStore.user()?.id;
       if (userId) {
         this.#isWide.set(
-          this.#storage.getItem<boolean>(WIDE_KEY(userId)) ?? false
+          this.#storage.getItem<boolean>(WIDE_KEY(userId)) === true
         );
       } else {
         this.#isWide.set(false);

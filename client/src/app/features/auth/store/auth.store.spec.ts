@@ -347,4 +347,50 @@ describe('AuthStore', () => {
       );
     });
   });
+
+  describe('persisted user validation (real storage)', () => {
+    function createStoreOverRealStorage() {
+      TestBed.configureTestingModule({});
+      return TestBed.inject(AuthStore);
+    }
+
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    afterEach(() => {
+      localStorage.clear();
+    });
+
+    it('should ignore a persisted user missing the fields the app renders', () => {
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify({ id: '1' }));
+
+      const store = createStoreOverRealStorage();
+
+      expect(store.user()).toBeNull();
+      expect(store.hasPersistedUser()).toBe(false);
+      expect(store.roles()).toEqual([]);
+    });
+
+    it('should ignore a persisted user whose roles is not an array', () => {
+      localStorage.setItem(
+        AUTH_USER_KEY,
+        JSON.stringify({ ...createMockUser(), roles: 'admin' })
+      );
+
+      const store = createStoreOverRealStorage();
+
+      expect(store.user()).toBeNull();
+    });
+
+    it('should restore a well-formed persisted user', () => {
+      const savedUser = createMockUser();
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(savedUser));
+
+      const store = createStoreOverRealStorage();
+
+      expect(store.user()).toEqual(savedUser);
+      expect(store.hasPersistedUser()).toBe(true);
+    });
+  });
 });

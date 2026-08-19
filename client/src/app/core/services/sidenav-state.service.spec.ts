@@ -13,7 +13,7 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
   let billingSignal: ReturnType<typeof signal<boolean>>;
   let userSignal: ReturnType<typeof signal<{ id: string } | null>>;
 
-  function setup(): SidenavStateService {
+  function setup(storedWide: unknown = null): SidenavStateService {
     adminAccessSignal = signal(false);
     billingSignal = signal(false);
     userSignal = signal<{ id: string } | null>(null);
@@ -24,7 +24,7 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
     };
 
     const storageMock = {
-      getItem: vi.fn().mockReturnValue(null),
+      getItem: vi.fn().mockReturnValue(storedWide),
       setItem: vi.fn(),
       removeItem: vi.fn()
     };
@@ -140,6 +140,23 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
       billingSignal.set(true);
       expect(service.navLinks()).toHaveLength(1);
       expect(service.defaultRoute()).toBe('/profile');
+    });
+  });
+  describe('isWide (persisted, user-writable)', () => {
+    it('restores a stored true', () => {
+      const service = setup(true);
+      userSignal.set({ id: 'u1' });
+      TestBed.tick();
+
+      expect(service.isWide()).toBe(true);
+    });
+
+    it('ignores a stored value that is not a boolean', () => {
+      const service = setup('yes');
+      userSignal.set({ id: 'u1' });
+      TestBed.tick();
+
+      expect(service.isWide()).toBe(false);
     });
   });
 });
