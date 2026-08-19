@@ -76,7 +76,7 @@ export const appConfig: ApplicationConfig = {
           ]);
           notificationsService.connect();
         } catch {
-          authStore.clearSession();
+          authService.clearSession();
         }
       } else {
         // Anonymous bootstrap — still load public flags so the landing page

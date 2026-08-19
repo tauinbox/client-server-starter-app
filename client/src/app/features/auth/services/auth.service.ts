@@ -189,6 +189,14 @@ export class AuthService {
     this.#tokenService.cancelRefresh();
   }
 
+  /**
+   * Exposes the teardown to the guards and the bootstrap initializer, which
+   * end a session without navigating through `logout()` or `forceLogout()`.
+   */
+  clearSession(): void {
+    this.#clearSessionState();
+  }
+
   getOAuthAccounts(): Observable<{ provider: string; createdAt: string }[]> {
     return this.#http.get<{ provider: string; createdAt: string }[]>(
       AuthApiEnum.OAuthAccounts
