@@ -54,8 +54,12 @@ const initialCursorListState: CursorListState = {
  * in the consuming store's own state.
  */
 export function withCursorList<Entity extends { id: string }>(config: {
-  /** Translation key for a failed load; both paths report through it. */
-  errorKey: string;
+  /**
+   * Client-owned translation key for a failed load; both paths report through
+   * it. Not a server `errorKey` - that word is reserved for the key the server
+   * sends, which may have no translation and must never be rendered directly.
+   */
+  fallbackKey: string;
   limit?: number;
 }) {
   const limit = config.limit ?? CURSOR_PAGE_SIZE;
@@ -95,7 +99,7 @@ export function withCursorList<Entity extends { id: string }>(config: {
           });
         } catch (error) {
           if (token !== sequence) return;
-          notify.error(error as HttpErrorResponse, config.errorKey);
+          notify.error(error as HttpErrorResponse, config.fallbackKey);
         } finally {
           if (token === sequence) patchState(store, { loading: false });
         }
@@ -131,7 +135,7 @@ export function withCursorList<Entity extends { id: string }>(config: {
           });
         } catch (error) {
           if (token !== sequence) return;
-          notify.error(error as HttpErrorResponse, config.errorKey);
+          notify.error(error as HttpErrorResponse, config.fallbackKey);
         } finally {
           if (token === sequence) patchState(store, { isLoadingMore: false });
         }

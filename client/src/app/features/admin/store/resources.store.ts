@@ -22,7 +22,7 @@ import { RbacAdminService } from '../services/rbac-admin.service';
 export const ResourcesStore = signalStore(
   withEntities<ResourceResponse>(),
   withCursorList<ResourceResponse>({
-    errorKey: 'admin.store.errorLoadResourcesFailed'
+    fallbackKey: 'admin.store.errorLoadResourcesFailed'
   }),
   withComputed((store) => ({
     resources: computed(() => store.entities())

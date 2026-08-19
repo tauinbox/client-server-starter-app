@@ -65,7 +65,7 @@ const ACTIVE_STATUSES: readonly SubscriptionResponse['status'][] = [
 export const BillingStore = signalStore(
   withEntities<InvoiceResponse>(),
   withState(initialState),
-  withCursorList<InvoiceResponse>({ errorKey: 'billing.errors.loadFailed' }),
+  withCursorList<InvoiceResponse>({ fallbackKey: 'billing.errors.loadFailed' }),
   withComputed((store) => ({
     /** The plan the caller is currently subscribed to, if any. */
     currentPlan: computed(() => {

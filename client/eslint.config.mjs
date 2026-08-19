@@ -105,6 +105,33 @@ export default tseslint.config(
             'TSAsExpression > TSAsExpression.expression > TSUnknownKeyword.typeAnnotation',
           message:
             'Do not use `as unknown as T` double casts. Fix the type at its root (widen the parameter, use a typed partial mock), or use `// @ts-expect-error` in tests.'
+        },
+        {
+          // A server errorKey is only a translation key when a translation for
+          // it exists; rendering it directly puts a raw dot-path on screen the
+          // first time the server ships a key ahead of the client i18n file.
+          selector:
+            "CallExpression[callee.property.name='translate'] MemberExpression[property.name='errorKey']",
+          message:
+            'Do not translate a server errorKey directly. Route the whole HttpErrorResponse through parseHttpErrorMessage (or NotifyService.error), which falls back to the server message when the key has no translation.'
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name='translate'] Identifier[name='errorKey']",
+          message:
+            'Do not translate a server errorKey directly. Route the whole HttpErrorResponse through parseHttpErrorMessage (or NotifyService.error), which falls back to the server message when the key has no translation.'
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name=/^(success|info|warn|error)$/][arguments.0.name='errorKey']",
+          message:
+            'Do not pass a server errorKey as a NotifyService message key. Pass the HttpErrorResponse itself and a client-owned fallback key.'
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name=/^(success|info|warn|error)$/][arguments.0.property.name='errorKey']",
+          message:
+            'Do not pass a server errorKey as a NotifyService message key. Pass the HttpErrorResponse itself and a client-owned fallback key.'
         }
       ]
     }

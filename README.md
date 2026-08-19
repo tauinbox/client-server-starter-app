@@ -871,7 +871,7 @@ Nine tables managed via TypeORM migrations:
 | ESLint | Server (@typescript-eslint + prettier, import cycles) | `eslint.config.ts` |
 | ESLint | Mock server (@typescript-eslint + prettier, import cycles) | `eslint.config.ts` |
 | — | All three need `settings['import/parsers']` mapping `.ts` to `@typescript-eslint/parser`, or `import/no-cycle` silently passes on everything | — |
-| ESLint | Shared rules for both workspaces (incl. a `no-restricted-syntax` ban on `as unknown as T` double casts) | `eslint.base.config.mjs` |
+| ESLint | Shared rules for both workspaces (incl. a `no-restricted-syntax` ban on `as unknown as T` double casts); the client config adds selectors banning the `'admin'` role literal and the rendering of a server `errorKey` outside `parseHttpErrorMessage` | `eslint.base.config.mjs`, `client/eslint.config.mjs` |
 | Prettier | Both (single quotes, no trailing commas) | `.prettierrc` |
 | Stylelint | Client SCSS (recess property order, no `px` units outside breakpoints) | `.stylelintrc.json` |
 | Husky + lint-staged | Pre-commit hook (auto-fix staged files) | `.lintstagedrc.mjs` |

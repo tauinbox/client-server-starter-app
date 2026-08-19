@@ -26,7 +26,7 @@ import { RbacAdminService } from '../services/rbac-admin.service';
 export const ActionsStore = signalStore(
   withEntities<ActionResponse>(),
   withCursorList<ActionResponse>({
-    errorKey: 'admin.store.errorLoadActionsFailed'
+    fallbackKey: 'admin.store.errorLoadActionsFailed'
   }),
   withComputed((store) => ({
     actions: computed(() => store.entities())
