@@ -22,8 +22,8 @@ import { TokenService } from './token.service';
 import { RbacMetadataService } from './rbac-metadata.service';
 import { RbacMetadataStore } from '../store/rbac-metadata.store';
 import { NotificationsService } from '@core/services/notifications.service';
-import { FeatureFlagsStore } from '../../feature-flags/store/feature-flags.store';
-import { EntitlementsStore } from '../../billing/store/entitlements.store';
+import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
+import { EntitlementsStore } from '@features/billing/store/entitlements.store';
 
 const silentContext = () =>
   new HttpContext().set(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN, true);
@@ -307,14 +307,6 @@ export class AuthService {
       return Promise.resolve();
     }
     return load();
-  }
-
-  initSession(): void {
-    if (this.isAuthenticated()) {
-      this.scheduleTokenRefresh();
-      void this.fetchPermissions();
-      void this.#featureFlagsStore.reload();
-    }
   }
 }
 

@@ -13,8 +13,8 @@ import { TokenService } from './token.service';
 import { RbacMetadataService } from './rbac-metadata.service';
 import { RbacMetadataStore } from '../store/rbac-metadata.store';
 import { NotificationsService } from '@core/services/notifications.service';
-import { FeatureFlagsStore } from '../../feature-flags/store/feature-flags.store';
-import { EntitlementsStore } from '../../billing/store/entitlements.store';
+import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
+import { EntitlementsStore } from '@features/billing/store/entitlements.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import type { AuthResponse } from '../models/auth.types';
 import type { NotificationEvent, RoleResponse } from '@app/shared/types';
@@ -415,26 +415,6 @@ describe('AuthService', () => {
 
       authStoreMock.hasPersistedUser.mockReturnValue(false);
       expect(service.hasPersistedUser()).toBe(false);
-    });
-  });
-
-  describe('initSession', () => {
-    it('should not schedule refresh when not authenticated', () => {
-      authStoreMock.isAuthenticated.mockReturnValue(false);
-      const scheduleSpy = vi.spyOn(service, 'scheduleTokenRefresh');
-
-      service.initSession();
-
-      expect(scheduleSpy).not.toHaveBeenCalled();
-    });
-
-    it('should schedule refresh when authenticated', () => {
-      authStoreMock.isAuthenticated.mockReturnValue(true);
-      const scheduleSpy = vi.spyOn(service, 'scheduleTokenRefresh');
-
-      service.initSession();
-
-      expect(scheduleSpy).toHaveBeenCalled();
     });
   });
 
