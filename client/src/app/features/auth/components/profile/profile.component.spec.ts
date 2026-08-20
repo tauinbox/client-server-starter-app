@@ -12,6 +12,7 @@ import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/trans
 import { ProfileComponent } from './profile.component';
 import { AuthService } from '../../services/auth.service';
 import { NotifyService } from '@core/services/notify.service';
+import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import type {
   EvaluatedFeatureFlagsResponse,
   RoleResponse,
@@ -48,6 +49,7 @@ describe('ProfileComponent', () => {
   let authServiceMock: {
     getProfile: ReturnType<typeof vi.fn>;
     updateProfile: ReturnType<typeof vi.fn>;
+    initiateEmailChange: ReturnType<typeof vi.fn>;
     getOAuthAccounts: ReturnType<typeof vi.fn>;
     unlinkOAuthAccount: ReturnType<typeof vi.fn>;
     initOAuthLink: ReturnType<typeof vi.fn>;
@@ -58,6 +60,7 @@ describe('ProfileComponent', () => {
     info: ReturnType<typeof vi.fn>;
     warn: ReturnType<typeof vi.fn>;
   };
+  let adaptiveDialogMock: { openConfirm: ReturnType<typeof vi.fn> };
   let activatedRouteMock: { snapshot: { queryParamMap: Map<string, string> } };
   let featureFlagServiceMock: {
     getEvaluatedFlags: ReturnType<typeof vi.fn>;
@@ -67,6 +70,7 @@ describe('ProfileComponent', () => {
     authServiceMock = {
       getProfile: vi.fn().mockReturnValue(of(mockUser)),
       updateProfile: vi.fn(),
+      initiateEmailChange: vi.fn(),
       getOAuthAccounts: vi.fn().mockReturnValue(of([])),
       unlinkOAuthAccount: vi.fn(),
       initOAuthLink: vi.fn().mockReturnValue(of({ message: 'Link initiated' }))
@@ -86,6 +90,8 @@ describe('ProfileComponent', () => {
       warn: vi.fn()
     };
 
+    adaptiveDialogMock = { openConfirm: vi.fn().mockReturnValue(of(true)) };
+
     activatedRouteMock = {
       snapshot: {
         queryParamMap: new Map()
@@ -101,6 +107,7 @@ describe('ProfileComponent', () => {
         provideNoopAnimations(),
         { provide: AuthService, useValue: authServiceMock },
         { provide: NotifyService, useValue: notifyMock },
+        { provide: AdaptiveDialogService, useValue: adaptiveDialogMock },
         { provide: FeatureFlagService, useValue: featureFlagServiceMock },
         { provide: ActivatedRoute, useValue: activatedRouteMock }
       ]
@@ -634,6 +641,181 @@ describe('ProfileComponent', () => {
       component.disconnectProvider('google');
 
       expect(authServiceMock.unlinkOAuthAccount).toHaveBeenCalledWith('google');
+    });
+  });
+
+  describe('submitting an email change alongside other edits', () => {
+    const renamedUser: UserResponse = {
+      ...mockUser,
+      firstName: 'Renamed',
+      lastName: 'Person'
+    };
+
+    beforeEach(() => {
+      authServiceMock.initiateEmailChange.mockReturnValue(
+        of({ message: 'Confirmation link sent' })
+      );
+      authServiceMock.updateProfile.mockReturnValue(of(renamedUser));
+      fixture.detectChanges();
+    });
+
+    function saveButton(): HTMLButtonElement {
+      return fixture.nativeElement.querySelector(
+        'form button[type="submit"]'
+      ) as HTMLButtonElement;
+    }
+
+    /** Real typing, so the field is marked dirty the way a user marks it. */
+    async function typeInto(selector: string, value: string): Promise<void> {
+      const input = fixture.nativeElement.querySelector(
+        selector
+      ) as HTMLInputElement;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    it('persists the name typed alongside the new email', async () => {
+      component.profileModel.set({
+        email: 'new@example.com',
+        firstName: 'Renamed',
+        lastName: 'Person',
+        currentPassword: 'Password1',
+        password: '',
+        confirmPassword: ''
+      });
+      await fixture.whenStable();
+
+      component.onSubmit();
+      await fixture.whenStable();
+
+      expect(authServiceMock.initiateEmailChange).toHaveBeenCalledWith(
+        'new@example.com',
+        'Password1'
+      );
+      expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
+        firstName: 'Renamed',
+        lastName: 'Person'
+      });
+      expect(notifyMock.success).toHaveBeenCalledWith(
+        'auth.profile.emailChangeInitiatedWithProfile'
+      );
+    });
+
+    it('leaves the persisted name on screen and the email unchanged', async () => {
+      component.profileModel.set({
+        email: 'new@example.com',
+        firstName: 'Renamed',
+        lastName: 'Person',
+        currentPassword: 'Password1',
+        password: '',
+        confirmPassword: ''
+      });
+      await fixture.whenStable();
+
+      component.onSubmit();
+      await fixture.whenStable();
+
+      // Nothing may be left on screen that only looks saved: the fields must
+      // match the record the server returned.
+      expect(component['user']()?.firstName).toBe('Renamed');
+      expect(component.profileModel().firstName).toBe(
+        component['user']()?.firstName
+      );
+      expect(component.profileModel().lastName).toBe(
+        component['user']()?.lastName
+      );
+      // The address only changes once the link in the new inbox is clicked.
+      expect(component.profileModel().email).toBe('test@example.com');
+    });
+
+    it('sends the password change too, and initiates the email first', async () => {
+      component.profileModel.set({
+        email: 'new@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        currentPassword: 'Password1',
+        password: 'newpassword123',
+        confirmPassword: 'newpassword123'
+      });
+      await fixture.whenStable();
+
+      component.onSubmit();
+      await fixture.whenStable();
+
+      expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
+        firstName: 'Test',
+        lastName: 'User',
+        password: 'newpassword123',
+        currentPassword: 'Password1'
+      });
+      // The update rehashes the current password and revokes the session, so an
+      // initiate that ran after it would be rejected.
+      expect(
+        authServiceMock.initiateEmailChange.mock.invocationCallOrder[0]
+      ).toBeLessThan(authServiceMock.updateProfile.mock.invocationCallOrder[0]);
+    });
+
+    it('sends no profile update when only the email changed', async () => {
+      component.profileModel.set({
+        email: 'new@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        currentPassword: 'Password1',
+        password: '',
+        confirmPassword: ''
+      });
+      await fixture.whenStable();
+
+      component.onSubmit();
+      await fixture.whenStable();
+
+      expect(authServiceMock.updateProfile).not.toHaveBeenCalled();
+      expect(notifyMock.success).toHaveBeenCalledWith(
+        'auth.profile.emailChangeInitiated'
+      );
+    });
+
+    it('does not touch the profile when the email initiation fails', async () => {
+      authServiceMock.initiateEmailChange.mockReturnValue(
+        throwError(() => new HttpErrorResponse({ error: null, status: 400 }))
+      );
+
+      component.profileModel.set({
+        email: 'new@example.com',
+        firstName: 'Renamed',
+        lastName: 'Person',
+        currentPassword: 'WrongPassword',
+        password: '',
+        confirmPassword: ''
+      });
+      await fixture.whenStable();
+
+      component.onSubmit();
+      await fixture.whenStable();
+
+      expect(authServiceMock.updateProfile).not.toHaveBeenCalled();
+      expect(component['error']()).toBe(
+        'Failed to initiate email change. Please try again.'
+      );
+    });
+
+    it('sends nothing and keeps Save available when the dialog is cancelled', async () => {
+      adaptiveDialogMock.openConfirm.mockReturnValue(of(false));
+
+      await typeInto('input[autocomplete="given-name"]', 'Renamed');
+      await typeInto('input[autocomplete="email"]', 'new@example.com');
+      await typeInto('input[autocomplete="current-password"]', 'Password1');
+
+      component.onSubmit();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(authServiceMock.initiateEmailChange).not.toHaveBeenCalled();
+      expect(authServiceMock.updateProfile).not.toHaveBeenCalled();
+      expect(component.profileForm().dirty()).toBe(true);
+      expect(saveButton().disabled).toBe(false);
     });
   });
 });
