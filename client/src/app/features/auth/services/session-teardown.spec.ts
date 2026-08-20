@@ -277,4 +277,91 @@ describe('session teardown', () => {
     expect(entitlementsStore.planKey()).toBeNull();
     expect(notificationsServiceMock.disconnect).toHaveBeenCalled();
   });
+
+  describe('another tab', () => {
+    // The real event carries the area it came from and the value the key was
+    // left at; the listener keys on both, so the specs must supply both.
+    function dispatchStorageEvent(init: StorageEventInit): void {
+      window.dispatchEvent(
+        new StorageEvent('storage', { storageArea: localStorage, ...init })
+      );
+    }
+
+    it('logging out elsewhere tears this session down and lands it on /login', async () => {
+      TestBed.inject(AuthService);
+      const rbacMetadataStore = TestBed.inject(RbacMetadataStore);
+      const router = TestBed.inject(Router);
+      const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+      const { featureFlagsStore, entitlementsStore } = await loadCaches();
+
+      expect(rbacMetadataStore.resources()).toHaveLength(1);
+
+      // What the other tab actually did: the key is gone before the event
+      // reaches this one.
+      localStorage.removeItem(AUTH_USER_KEY);
+      dispatchStorageEvent({ key: AUTH_USER_KEY, newValue: null });
+
+      expect(localStorage.getItem(RBAC_CACHE_KEY)).toBeNull();
+      expect(rbacMetadataStore.resources()).toEqual([]);
+      expect(featureFlagsStore.isEnabled('beta')()).toBe(false);
+      expect(entitlementsStore.planKey()).toBeNull();
+      expect(notificationsServiceMock.disconnect).toHaveBeenCalled();
+      expect(navigate).toHaveBeenCalledWith(['/login'], {
+        queryParams: { returnUrl: '/' }
+      });
+    });
+
+    it('logging in elsewhere leaves this session untouched', async () => {
+      TestBed.inject(AuthService);
+      const rbacMetadataStore = TestBed.inject(RbacMetadataStore);
+      const router = TestBed.inject(Router);
+      const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+      const { featureFlagsStore, entitlementsStore } = await loadCaches();
+
+      // A login writes the key rather than removing it. Tearing down here would
+      // fight the session the other tab is establishing.
+      const otherUser = { ...cachedUser, id: '2', email: 'other@example.com' };
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(otherUser));
+      dispatchStorageEvent({
+        key: AUTH_USER_KEY,
+        newValue: JSON.stringify(otherUser)
+      });
+
+      expect(rbacMetadataStore.resources()).toHaveLength(1);
+      expect(featureFlagsStore.isEnabled('beta')()).toBe(true);
+      expect(entitlementsStore.planKey()).toBe('pro');
+      expect(notificationsServiceMock.disconnect).not.toHaveBeenCalled();
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('clearing an unrelated key leaves this session untouched', async () => {
+      TestBed.inject(AuthService);
+      const rbacMetadataStore = TestBed.inject(RbacMetadataStore);
+      const router = TestBed.inject(Router);
+      const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+      const { featureFlagsStore } = await loadCaches();
+
+      dispatchStorageEvent({ key: RBAC_CACHE_KEY, newValue: null });
+
+      expect(rbacMetadataStore.resources()).toHaveLength(1);
+      expect(featureFlagsStore.isEnabled('beta')()).toBe(true);
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('logging out elsewhere does not disturb a tab that has no session', async () => {
+      // Order matters: the store reads the key when it is first injected.
+      localStorage.removeItem(AUTH_USER_KEY);
+      TestBed.inject(AuthService);
+      const rbacMetadataStore = TestBed.inject(RbacMetadataStore);
+      const router = TestBed.inject(Router);
+      const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+      const { featureFlagsStore } = await loadCaches();
+
+      dispatchStorageEvent({ key: AUTH_USER_KEY, newValue: null });
+
+      expect(rbacMetadataStore.resources()).toHaveLength(1);
+      expect(featureFlagsStore.isEnabled('beta')()).toBe(true);
+      expect(navigate).not.toHaveBeenCalled();
+    });
+  });
 });

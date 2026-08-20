@@ -1,5 +1,6 @@
 import { DestroyRef, inject, Injectable } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DOCUMENT } from '@angular/common';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
@@ -43,6 +44,7 @@ export class AuthService {
   readonly #featureFlagsStore = inject(FeatureFlagsStore);
   readonly #entitlementsStore = inject(EntitlementsStore);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #window = inject(DOCUMENT).defaultView;
 
   readonly isAuthenticated = this.#authStore.isAuthenticated;
 
@@ -76,6 +78,51 @@ export class AuthService {
     this.#tokenService.sessionCleared$
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe(() => this.#clearSessionState());
+
+    this.#listenForCrossTabLogout();
+  }
+
+  /**
+   * The access token lives in memory per tab, so a logout elsewhere leaves this
+   * tab fully usable until that token expires - up to a full token lifetime on
+   * a shared device. The `storage` event is the signal: it fires in every other
+   * same-origin tab and never in the one that made the change.
+   */
+  #listenForCrossTabLogout(): void {
+    const win = this.#window;
+    if (!win) return;
+
+    const onStorage = (event: StorageEvent) => this.#onSessionKeyChanged(event);
+    win.addEventListener('storage', onStorage);
+    this.#destroyRef.onDestroy(() =>
+      win.removeEventListener('storage', onStorage)
+    );
+  }
+
+  #onSessionKeyChanged(event: StorageEvent): void {
+    // Removal of exactly this key, in this area. A write is a login in another
+    // tab and must leave this one alone, and the app persists other keys
+    // (the RBAC catalog, the display preferences) in the same storage.
+    if (
+      event.storageArea !== this.#window?.localStorage ||
+      event.key !== AUTH_USER_KEY ||
+      event.newValue !== null
+    ) {
+      return;
+    }
+
+    // A tab that never held a session has nothing to tear down, and pulling it
+    // off the public page it is on would be a regression, not a logout.
+    if (
+      !this.#authStore.isAuthenticated() &&
+      !this.#authStore.hasPersistedUser()
+    ) {
+      return;
+    }
+
+    // The other tab already revoked the session server-side, so this is exactly
+    // the forceLogout case: full teardown, no HTTP call, land on /login.
+    this.#tokenService.forceLogout(this.#router.url);
   }
 
   login(credentials: LoginCredentials): Observable<AuthResponse> {

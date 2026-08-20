@@ -33,6 +33,42 @@ export async function openedDialog(page: Page): Promise<Locator> {
 }
 
 /**
+ * Point a page's `/api` traffic at the worker's mock server and stub the SSE
+ * stream with an empty body. `base.fixture` applies this to the fixture `page`;
+ * a test that opens a second tab must apply it to that tab itself, because
+ * routes are registered per page, not per context.
+ */
+export async function routeApiToMockServer(
+  page: Page,
+  mockServerUrl: string
+): Promise<void> {
+  const { port } = new URL(mockServerUrl);
+
+  await page.route(/\/api\//, (route) => {
+    const url = route
+      .request()
+      .url()
+      .replace(/localhost:\d+/, `localhost:${port}`);
+    return route.continue({ url });
+  });
+
+  // A persistent SSE connection blocks waitForLoadState('networkidle') in
+  // loginViaUi() because Playwright counts streaming XHR as active until the
+  // connection closes. Registered after the general route so it takes priority
+  // (Playwright: last = first matched).
+  await page.route(/\/api\/.*\/notifications\/stream/, (route) =>
+    route.fulfill({
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache'
+      },
+      body: ''
+    })
+  );
+}
+
+/**
  * Seed a test user in mock-server state and log in via the UI.
  */
 export async function loginViaUi(

@@ -7,6 +7,7 @@ import {
 } from '../../../mock-server/src/utils/listen';
 import type { ControlApi } from '../../../mock-server/src/control.types';
 import type { Server } from 'http';
+import { routeApiToMockServer } from './helpers';
 
 // ControlApi is the single source of truth for all __control endpoints.
 // TypeScript enforces that every ControlApi method is implemented in the
@@ -47,29 +48,8 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     // Reset state before each test
     resetState();
 
-    // Redirect all /api requests to worker's mock-server
-    await page.route(/\/api\//, (route) => {
-      const url = route
-        .request()
-        .url()
-        .replace(/localhost:\d+/, `localhost:${port}`);
-      return route.continue({ url });
-    });
-
-    // Immediately fulfill SSE stream with an empty body so it completes cleanly.
-    // A persistent SSE connection blocks waitForLoadState('networkidle') in loginViaUi()
-    // because Playwright counts streaming XHR as active until the connection closes.
-    // Registered after the general route so it takes priority (Playwright: last = first matched).
-    await page.route(/\/api\/.*\/notifications\/stream/, (route) =>
-      route.fulfill({
-        status: 200,
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache'
-        },
-        body: ''
-      })
-    );
+    // Redirect all /api requests to worker's mock-server and stub the SSE stream
+    await routeApiToMockServer(page, baseUrl);
 
     const api: MockServerApi = {
       url: baseUrl,
@@ -229,5 +209,6 @@ export {
   loginViaUiKeepSse,
   expectAuthRedirect,
   expectForbiddenRedirect,
-  openedDialog
+  openedDialog,
+  routeApiToMockServer
 } from './helpers';
