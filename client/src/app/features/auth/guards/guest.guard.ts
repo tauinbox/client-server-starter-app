@@ -17,16 +17,14 @@ export const guestGuard: CanActivateFn = () => {
 
   // Token is valid — redirect to profile
   if (!authStore.isAccessTokenExpired()) {
-    void router.navigate([`/${AppRouteSegmentEnum.Profile}`]);
-    return false;
+    return router.createUrlTree([`/${AppRouteSegmentEnum.Profile}`]);
   }
 
   // Token expired — attempt refresh before deciding
   return authService.refreshTokens().pipe(
     map((tokens) => {
       if (tokens) {
-        void router.navigate([`/${AppRouteSegmentEnum.Profile}`]);
-        return false;
+        return router.createUrlTree([`/${AppRouteSegmentEnum.Profile}`]);
       }
 
       authService.clearSession();

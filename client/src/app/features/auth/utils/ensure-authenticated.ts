@@ -1,6 +1,6 @@
 import { catchError, Observable, of, switchMap } from 'rxjs';
-import type { Router } from '@angular/router';
-import { navigateToLogin } from './navigate-to-login';
+import type { GuardResult, Router } from '@angular/router';
+import { loginUrlTree } from './navigate-to-login';
 
 type AuthStoreLike = {
   isAuthenticated: () => boolean;
@@ -18,8 +18,8 @@ export function ensureAuthenticated(
   authService: AuthServiceLike,
   router: Router,
   returnUrl: string,
-  onAuthenticated: () => boolean | Observable<boolean>
-): boolean | Observable<boolean> {
+  onAuthenticated: () => GuardResult | Observable<GuardResult>
+): GuardResult | Observable<GuardResult> {
   if (authStore.isAuthenticated() && !authStore.isAccessTokenExpired()) {
     return onAuthenticated();
   }
@@ -29,8 +29,7 @@ export function ensureAuthenticated(
   // every guarded navigation an anonymous visitor makes.
   if (!authStore.hasPersistedUser()) {
     authService.clearSession();
-    navigateToLogin(router, returnUrl);
-    return false;
+    return loginUrlTree(router, returnUrl);
   }
 
   return authService.refreshTokens().pipe(
@@ -41,13 +40,11 @@ export function ensureAuthenticated(
       }
 
       authService.clearSession();
-      navigateToLogin(router, returnUrl);
-      return of(false);
+      return of(loginUrlTree(router, returnUrl));
     }),
     catchError(() => {
       authService.clearSession();
-      navigateToLogin(router, returnUrl);
-      return of(false);
+      return of(loginUrlTree(router, returnUrl));
     })
   );
 }

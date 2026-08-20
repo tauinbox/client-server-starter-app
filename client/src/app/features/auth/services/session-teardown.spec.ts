@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import type {
   ActivatedRouteSnapshot,
+  GuardResult,
   RouterStateSnapshot
 } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -230,13 +231,13 @@ describe('session teardown', () => {
       router,
       '/users',
       () => true
-    ) as Observable<boolean>;
+    ) as Observable<GuardResult>;
     const settled = firstValueFrom(guarded);
     httpMock
       .expectOne(AuthApiEnum.RefreshToken)
       .flush(null, { status: 401, statusText: 'Unauthorized' });
 
-    expect(await settled).toBe(false);
+    expect(String(await settled)).toBe('/login?returnUrl=%2Fusers');
     expect(localStorage.getItem(AUTH_USER_KEY)).toBeNull();
     expect(localStorage.getItem(RBAC_CACHE_KEY)).toBeNull();
     expect(rbacMetadataStore.resources()).toEqual([]);

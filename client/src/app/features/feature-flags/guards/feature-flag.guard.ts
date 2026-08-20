@@ -1,5 +1,5 @@
 import { inject } from '@angular/core';
-import { Router, type CanActivateFn } from '@angular/router';
+import { Router, type CanActivateFn, type GuardResult } from '@angular/router';
 import { from } from 'rxjs';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { AuthService } from '../../auth/services/auth.service';
@@ -34,10 +34,9 @@ export function featureFlagGuard(
       router,
       state.url,
       () => {
-        const evaluate = (): boolean => {
+        const evaluate = (): GuardResult => {
           if (flagsStore.isEnabled(key)()) return true;
-          void router.navigate([redirectTo]);
-          return false;
+          return router.parseUrl(redirectTo);
         };
         // Flags are loaded fire-and-forget at login/bootstrap; without
         // awaiting, a fast first navigation evaluates an empty flag dict

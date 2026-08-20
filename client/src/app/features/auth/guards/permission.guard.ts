@@ -23,8 +23,7 @@ export function permissionGuard(
       state.url,
       () => {
         if (authStore.hasPermissions({ action, subject })) return true;
-        void router.navigate([`/${AppRouteSegmentEnum.Forbidden}`]);
-        return false;
+        return router.createUrlTree([`/${AppRouteSegmentEnum.Forbidden}`]);
       }
     );
   };
@@ -49,8 +48,7 @@ export function instancePermissionGuard(
         const instance = instanceFactory(route);
         if (authStore.hasPermissions({ action, subject, instance }))
           return true;
-        void router.navigate([`/${AppRouteSegmentEnum.Forbidden}`]);
-        return false;
+        return router.createUrlTree([`/${AppRouteSegmentEnum.Forbidden}`]);
       }
     );
   };

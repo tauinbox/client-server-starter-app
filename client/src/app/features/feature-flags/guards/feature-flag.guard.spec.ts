@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import type {
   ActivatedRouteSnapshot,
+  GuardResult,
   RouterStateSnapshot
 } from '@angular/router';
 import type { Observable } from 'rxjs';
@@ -35,10 +36,8 @@ describe('featureFlagGuard', () => {
     );
   }
 
-  async function resolve(
-    result: ReturnType<typeof run>
-  ): Promise<boolean | unknown> {
-    return firstValueFrom(result as Observable<boolean>);
+  async function resolve(result: ReturnType<typeof run>): Promise<GuardResult> {
+    return firstValueFrom(result as Observable<GuardResult>);
   }
 
   beforeEach(() => {
@@ -85,20 +84,19 @@ describe('featureFlagGuard', () => {
     expect(router.navigate).not.toHaveBeenCalled();
   });
 
-  it('navigates to /forbidden when the flag is off', async () => {
+  it('redirects to /forbidden when the flag is off', async () => {
     isEnabled.mockReturnValue(() => false);
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate');
-    expect(await resolve(run())).toBe(false);
-    expect(router.navigate).toHaveBeenCalledWith(['/forbidden']);
+    expect(String(await resolve(run()))).toBe('/forbidden');
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   it('honors a custom redirectTo', async () => {
     isEnabled.mockReturnValue(() => false);
-    const router = TestBed.inject(Router);
-    vi.spyOn(router, 'navigate');
-    await resolve(run('new-dashboard', '/coming-soon'));
-    expect(router.navigate).toHaveBeenCalledWith(['/coming-soon']);
+    expect(String(await resolve(run('new-dashboard', '/coming-soon')))).toBe(
+      '/coming-soon'
+    );
   });
 
   it('triggers refresh-tokens then evaluates the flag', async () => {
@@ -115,12 +113,7 @@ describe('featureFlagGuard', () => {
     authStoreMock.isAuthenticated.mockReturnValue(false);
     authStoreMock.isAccessTokenExpired.mockReturnValue(true);
     authServiceMock.refreshTokens.mockReturnValue(of(null));
-    const router = TestBed.inject(Router);
-    vi.spyOn(router, 'navigate');
-    expect(await resolve(run())).toBe(false);
+    expect(String(await resolve(run()))).toBe('/login?returnUrl=%2Fdashboard');
     expect(authServiceMock.clearSession).toHaveBeenCalled();
-    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
-      queryParams: { returnUrl: '/dashboard' }
-    });
   });
 });
