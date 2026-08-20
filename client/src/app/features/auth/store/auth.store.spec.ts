@@ -332,6 +332,24 @@ describe('AuthStore', () => {
       );
     });
 
+    it('should return false for an empty check list even with manage+all', () => {
+      const store = createStore(null);
+      const ability = createMongoAbility<AppAbility>([
+        { action: 'manage', subject: 'all' }
+      ]);
+      const packed = packRules(ability.rules) as unknown[][];
+
+      store.setRules(packed);
+
+      expect(store.hasPermissions([])).toBe(false);
+    });
+
+    it('should return false for an empty check list when no rules are set', () => {
+      const store = createStore(null);
+
+      expect(store.hasPermissions([])).toBe(false);
+    });
+
     it('should reset ability to null on clearSession', () => {
       const store = createStore(null);
       const ability = createMongoAbility<AppAbility>([
