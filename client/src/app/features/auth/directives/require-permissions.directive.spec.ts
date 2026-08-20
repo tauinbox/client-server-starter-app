@@ -3,9 +3,13 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { createMongoAbility } from '@casl/ability';
+import { packRules } from '@casl/ability/extra';
+
 import { RequirePermissionsDirective } from './require-permissions.directive';
 import { AuthStore } from '../store/auth.store';
-import type { PermissionCheck } from '../casl/app-ability';
+import { LocalStorageService } from '@core/services/local-storage.service';
+import type { AppAbility, PermissionCheck } from '../casl/app-ability';
 
 @Component({
   imports: [RequirePermissionsDirective],
@@ -38,6 +42,19 @@ class HostWithoutElseComponent {
     action: 'read',
     subject: 'User'
   });
+}
+
+@Component({
+  selector: 'nxs-host-check-list',
+  imports: [RequirePermissionsDirective],
+  template: `
+    <span data-testid="granted" *nxsRequirePermissions="checks()">
+      ALLOWED
+    </span>
+  `
+})
+class HostWithCheckListComponent {
+  readonly checks = signal<PermissionCheck[]>([]);
 }
 
 describe('RequirePermissionsDirective', () => {
@@ -103,6 +120,64 @@ describe('RequirePermissionsDirective', () => {
 
       expect(text(fixture, 'granted')).toBe('ALLOWED');
       expect(text(fixture, 'denied')).toBeNull();
+    });
+  });
+
+  describe('against the real AuthStore', () => {
+    const configureWithRealStore = async (): Promise<
+      ComponentFixture<HostWithCheckListComponent>
+    > => {
+      await TestBed.configureTestingModule({
+        imports: [HostWithCheckListComponent],
+        providers: [
+          {
+            provide: LocalStorageService,
+            useValue: {
+              getItem: vi.fn().mockReturnValue(null),
+              setItem: vi.fn(),
+              removeItem: vi.fn()
+            }
+          }
+        ]
+      }).compileComponents();
+
+      const fixture = TestBed.createComponent(HostWithCheckListComponent);
+      fixture.detectChanges();
+      return fixture;
+    };
+
+    const grantEverything = (): void => {
+      const ability = createMongoAbility<AppAbility>([
+        { action: 'manage', subject: 'all' }
+      ]);
+      TestBed.inject(AuthStore).setRules(
+        packRules(ability.rules) as unknown[][]
+      );
+    };
+
+    it('renders nothing for an empty check list, before and after the ability arrives', async () => {
+      const fixture = await configureWithRealStore();
+
+      expect(text(fixture, 'granted')).toBeNull();
+
+      grantEverything();
+      fixture.detectChanges();
+
+      expect(text(fixture, 'granted')).toBeNull();
+    });
+
+    it('renders once a real check replaces the empty list after the ability arrived', async () => {
+      const fixture = await configureWithRealStore();
+
+      grantEverything();
+      fixture.detectChanges();
+
+      fixture.componentInstance.checks.set([
+        { action: 'read', subject: 'User' }
+      ]);
+      fixture.detectChanges();
+
+      expect(text(fixture, 'granted')).toBe('ALLOWED');
     });
   });
 

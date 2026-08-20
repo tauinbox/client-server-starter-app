@@ -112,9 +112,12 @@ export const AuthStore = signalStore(
       check: PermissionCheck | PermissionCheck[]
     ): boolean {
       const checks = Array.isArray(check) ? check : [check];
+      // Read the ability before the emptiness bail so the signal stays tracked
+      // by callers reacting to it, and deny an empty list instead of the
+      // fail-open `[].every() === true`.
+      const ability = store.ability();
+      if (!ability || checks.length === 0) return false;
       return checks.every(({ action, subject: subjectName, instance }) => {
-        const ability = store.ability();
-        if (!ability) return false;
         if (instance !== undefined) {
           return ability.can(action, subject(subjectName, instance));
         }
