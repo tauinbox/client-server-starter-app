@@ -28,7 +28,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 - **Provider buttons are auto-gated by configuration** — each provider is exposed as a public feature flag (`oauth-google` / `oauth-facebook` / `oauth-vk`) carrying an attribute rule on a server-registered, env-derived signal (`oauth<Provider>Configured`, true when `*_CLIENT_ID` is set). A button shows only when the provider is configured **and** its flag is enabled (the manual override); the login page hides the whole OAuth block when none qualify, and the profile "connected accounts" card hides providers that are neither configured nor already linked. Admins toggle the flags from `/admin/feature-flags`
 - JWT access tokens (1h, stored in-memory only) + opaque refresh tokens (7d, stored as HttpOnly `SameSite=Strict` cookie — never readable by JavaScript)
 - Session restored on page reload via cookie-refresh in `provideAppInitializer` before route guards run
-- Automatic token refresh 60 seconds before expiry; a response that lands after the session was torn down is discarded instead of restoring it
+- Automatic token refresh 60 seconds before expiry; a response that lands after the session was torn down is discarded instead of restoring it. The refresh window lives in `shared/` and the server floors `JWT_EXPIRATION` at twice it, so a token lifetime the client cannot schedule against is rejected at boot rather than turning every open tab into a refresh loop
 - 401 handling with request retry in JWT interceptor
 - **Reactive permission refresh on 403** — `errorInterceptor` detects mid-session 403s, silently re-fetches `/api/v1/auth/permissions`, updates `AuthStore.ability`, and retries the request; `RequirePermissionsDirective` reacts via Angular `effect()` without a page reload
 - **Real-time notifications via SSE** — `GET /api/v1/notifications/stream` (JWT-protected) pushes three event types: `session_invalidated` (force-logout on admin password change or user delete), `permissions_updated` (silent permissions re-fetch when a user's roles change or when a role they hold has its permission set changed — fanned out to every connected holder of that role), `user_crud_events` (admin user list auto-refresh on create/update/delete/restore — delivered only to connected clients whose current abilities allow `users:search`, so ordinary users never see them). Client uses `HttpClient` with `observe: 'events'` so the existing JWT interceptor attaches the Bearer token; `NotificationsService` connects on login and disconnects on logout with exponential-backoff reconnect, and recycles the connection every 4–8 h (jittered) so the transport buffers Angular retains for the life of a request cannot grow unbounded on long-lived tabs
@@ -433,7 +433,7 @@ Edit `.env` with your database credentials and settings:
 | `JWT_PRIVATE_KEY` | - | Base64-encoded RSA private key PEM (required when `JWT_ALGORITHM=RS256`) |
 | `JWT_PUBLIC_KEY` | - | Base64-encoded RSA public key PEM (required when `JWT_ALGORITHM=RS256`) |
 | `JWT_MIN_IAT` | - | Unix timestamp; tokens issued before this value are rejected (key rotation) |
-| `JWT_EXPIRATION` | `3600` | Access token lifetime (seconds) |
+| `JWT_EXPIRATION` | `3600` | Access token lifetime (seconds); minimum `120` |
 | `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime (seconds) |
 | `GOOGLE_CLIENT_ID` | - | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | - | Google OAuth client secret |
@@ -960,9 +960,9 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1935 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1937 tests passing |
 | Server E2E tests | Jest | Separate config in `test/` | 325 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 324 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and skips 7 |
-| Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1119 tests passing |
+| Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1122 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 217 tests passing |
 | Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 427 tests passing |
 

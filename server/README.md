@@ -79,7 +79,7 @@ Copy `.env.example` to `.env` and configure:
 | `JWT_PRIVATE_KEY` | - | Base64-encoded RSA private key PEM (required when `JWT_ALGORITHM=RS256`) |
 | `JWT_PUBLIC_KEY` | - | Base64-encoded RSA public key PEM (required when `JWT_ALGORITHM=RS256`) |
 | `JWT_MIN_IAT` | - | Unix timestamp; tokens issued before this value are rejected (used during key rotation) |
-| `JWT_EXPIRATION` | `3600` | Access token lifetime in seconds (1h) |
+| `JWT_EXPIRATION` | `3600` | Access token lifetime in seconds (1h). Minimum `120` - the client refreshes 60 s before expiry |
 | `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime in seconds (7d) |
 | `GOOGLE_CLIENT_ID` | - | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | - | Google OAuth client secret |

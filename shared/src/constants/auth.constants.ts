@@ -25,3 +25,18 @@ export const TOKEN_PURPOSE = {
 } as const;
 
 export type TokenPurpose = (typeof TOKEN_PURPOSE)[keyof typeof TOKEN_PURPOSE];
+
+/**
+ * How long before an access token expires the client refreshes it.
+ *
+ * Paired with MIN_JWT_EXPIRATION_SECONDS: a token whose whole lifetime fits
+ * inside this window leaves no gap to wait out, so the two must not overlap.
+ */
+export const TOKEN_REFRESH_WINDOW_SECONDS = 60;
+
+/**
+ * Lower bound the server enforces on JWT_EXPIRATION. Kept strictly above the
+ * client's refresh window so every issued token has a real interval to schedule
+ * against.
+ */
+export const MIN_JWT_EXPIRATION_SECONDS = 2 * TOKEN_REFRESH_WINDOW_SECONDS;

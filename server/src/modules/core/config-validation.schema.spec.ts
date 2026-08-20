@@ -1,3 +1,4 @@
+import { MIN_JWT_EXPIRATION_SECONDS } from '@app/shared/constants';
 import { configValidationSchema } from './config-validation.schema';
 
 // Mirrors the validationOptions ConfigModule uses in core.module.ts.
@@ -54,6 +55,24 @@ describe('configValidationSchema', () => {
     const { error } = configValidationSchema.validate(env, options);
 
     expect(error?.message).toContain('JWT_REFRESH_EXPIRATION');
+  });
+
+  it('rejects a JWT_EXPIRATION below the client refresh window', () => {
+    const { error } = configValidationSchema.validate(
+      { ...validEnv, JWT_EXPIRATION: String(MIN_JWT_EXPIRATION_SECONDS - 1) },
+      options
+    );
+
+    expect(error?.message).toContain('JWT_EXPIRATION');
+  });
+
+  it('accepts a JWT_EXPIRATION exactly at the floor', () => {
+    const { error } = configValidationSchema.validate(
+      { ...validEnv, JWT_EXPIRATION: String(MIN_JWT_EXPIRATION_SECONDS) },
+      options
+    );
+
+    expect(error).toBeUndefined();
   });
 
   it('rejects a missing JWT_SECRET when the algorithm is HS256', () => {
