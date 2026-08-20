@@ -34,6 +34,8 @@ import type { UserResponse } from '@app/shared/types';
 import type { UpdateProfile } from '../../models/auth.types';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import type { Observable } from 'rxjs';
+import { concat, defer, tap } from 'rxjs';
 import {
   isOAuthProvider,
   OAUTH_URLS,
@@ -411,109 +413,88 @@ export class ProfileComponent implements OnInit {
     const u = this.user();
     if (this.profileForm().invalid() || !u) return;
 
-    const formValues = this.profileModel();
-    const newEmail = canonicalEmail(formValues.email);
+    const newEmail = canonicalEmail(this.profileModel().email);
     const emailChanged = !!u.email && newEmail !== canonicalEmail(u.email);
 
-    if (emailChanged) {
-      this.#adaptiveDialog
-        .openConfirm({
-          title: this.#transloco.translate(
-            'auth.profile.confirmEmailChangeTitle'
-          ),
-          message: this.#transloco.translate(
-            'auth.profile.confirmEmailChangeMessage',
-            { newEmail }
-          ),
-          confirmButton: this.#transloco.translate(
-            'auth.profile.confirmEmailChangeButton'
-          ),
-          cancelButton: this.#transloco.translate('common.cancel'),
-          icon: 'mark_email_unread'
-        })
-        .pipe(takeUntilDestroyed(this.#destroyRef))
-        .subscribe((confirmed) => {
-          if (confirmed) {
-            this.#initiateEmailChange(newEmail, formValues.currentPassword);
-          }
-        });
+    if (!emailChanged) {
+      this.#save(null);
       return;
     }
 
-    this.#savePersonalUpdates();
-  }
-
-  #initiateEmailChange(newEmail: string, currentPassword: string): void {
-    this.saving.set(true);
-    this.error.set(null);
-
-    this.#authService
-      .initiateEmailChange(newEmail, currentPassword)
+    this.#adaptiveDialog
+      .openConfirm({
+        title: this.#transloco.translate(
+          'auth.profile.confirmEmailChangeTitle'
+        ),
+        message: this.#transloco.translate(
+          'auth.profile.confirmEmailChangeMessage',
+          { newEmail }
+        ),
+        confirmButton: this.#transloco.translate(
+          'auth.profile.confirmEmailChangeButton'
+        ),
+        cancelButton: this.#transloco.translate('common.cancel'),
+        icon: 'mark_email_unread'
+      })
       .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe({
-        next: () => {
-          this.saving.set(false);
-          this.#notify.success('auth.profile.emailChangeInitiated');
-          // Revert the form's email back to the loaded address — the change
-          // is not applied until the user confirms via the email link.
-          const current = this.user();
-          if (current) {
-            this.profileModel.update((data) => ({
-              ...data,
-              email: current.email,
-              currentPassword: ''
-            }));
-            this.profileForm().reset();
-          }
-        },
-        error: (err: HttpErrorResponse) => {
-          this.saving.set(false);
-          this.error.set(
-            parseHttpErrorMessage(
-              err,
-              this.#transloco,
-              'auth.profile.errorEmailChangeFailed'
-            )
-          );
-        }
+      .subscribe((confirmed) => {
+        if (confirmed) this.#save(newEmail);
       });
   }
 
-  #savePersonalUpdates(): void {
-    const formValues = this.profileModel();
+  /**
+   * One submit carries every edit on the form, so an email change never
+   * discards the name or password typed alongside it. The two requests run in
+   * sequence and in this order because they share the current password: the
+   * profile update rehashes it and revokes the session, so an initiate sent
+   * afterwards would be rejected as a wrong password.
+   */
+  #save(newEmail: string | null): void {
+    const values = this.profileModel();
+    const updateData = this.#buildProfileUpdate(values, newEmail !== null);
 
-    const updateData: UpdateProfile = {
-      firstName: formValues.firstName,
-      lastName: formValues.lastName
-    };
+    this.saving.set(true);
+    this.error.set(null);
 
-    if (formValues.password.trim()) {
-      updateData.password = formValues.password;
-      updateData.currentPassword = formValues.currentPassword;
+    const ops: Observable<unknown>[] = [];
+    let emailInitiated = false;
+    let savedUser: UserResponse | null = null;
+
+    if (newEmail !== null) {
+      ops.push(
+        this.#authService
+          .initiateEmailChange(newEmail, values.currentPassword)
+          .pipe(
+            tap({
+              complete: () => {
+                emailInitiated = true;
+              }
+            })
+          )
+      );
     }
 
-    this.saving.set(true);
-    this.error.set(null);
+    if (updateData) {
+      // Deferred so a failed email initiation leaves the profile untouched:
+      // the request is never even built, let alone sent.
+      ops.push(
+        defer(() => this.#authService.updateProfile(updateData)).pipe(
+          tap((user) => {
+            savedUser = user;
+          })
+        )
+      );
+    }
 
-    this.#authService
-      .updateProfile(updateData)
+    concat(...ops)
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
-        next: (updatedUser) => {
+        complete: () => {
           this.saving.set(false);
-          this.user.set(updatedUser);
-
-          this.profileModel.set({
-            email: updatedUser.email,
-            firstName: updatedUser.firstName,
-            lastName: updatedUser.lastName,
-            currentPassword: '',
-            password: '',
-            confirmPassword: ''
-          });
-          this.profileForm().reset();
-
-          this.#notify.success('auth.profile.successUpdated');
+          this.#applySavedProfile(savedUser);
+          this.#notify.success(
+            this.#successKey(newEmail !== null, !!savedUser)
+          );
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
@@ -521,10 +502,69 @@ export class ProfileComponent implements OnInit {
             parseHttpErrorMessage(
               err,
               this.#transloco,
-              'auth.profile.errorUpdateFailed'
+              newEmail !== null && !emailInitiated
+                ? 'auth.profile.errorEmailChangeFailed'
+                : 'auth.profile.errorUpdateFailed'
             )
           );
         }
       });
+  }
+
+  /**
+   * Returns null only when an email change is in flight and no other field was
+   * touched - without one, a submit always persists the personal fields, so a
+   * revert-to-original edit still gets its confirmation.
+   */
+  #buildProfileUpdate(
+    values: ProfileData,
+    emailChanging: boolean
+  ): UpdateProfile | null {
+    const u = this.user();
+    const passwordChanged = !!values.password.trim();
+    const nameChanged =
+      !u || values.firstName !== u.firstName || values.lastName !== u.lastName;
+
+    if (emailChanging && !nameChanged && !passwordChanged) return null;
+
+    const updateData: UpdateProfile = {
+      firstName: values.firstName,
+      lastName: values.lastName
+    };
+
+    if (passwordChanged) {
+      updateData.password = values.password;
+      updateData.currentPassword = values.currentPassword;
+    }
+
+    return updateData;
+  }
+
+  #successKey(emailChanging: boolean, profileSaved: boolean): string {
+    if (!emailChanging) return 'auth.profile.successUpdated';
+    return profileSaved
+      ? 'auth.profile.emailChangeInitiatedWithProfile'
+      : 'auth.profile.emailChangeInitiated';
+  }
+
+  /**
+   * The email field goes back to the stored address on purpose: a requested
+   * change is not applied until the user confirms it from the link.
+   */
+  #applySavedProfile(savedUser: UserResponse | null): void {
+    if (savedUser) this.user.set(savedUser);
+
+    const current = this.user();
+    if (!current) return;
+
+    this.profileModel.set({
+      email: current.email,
+      firstName: current.firstName,
+      lastName: current.lastName,
+      currentPassword: '',
+      password: '',
+      confirmPassword: ''
+    });
+    this.profileForm().reset();
   }
 }

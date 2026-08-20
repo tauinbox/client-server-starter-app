@@ -134,6 +134,7 @@
     "confirmEmailChangeMessage": "We'll send a confirmation link to {{ newEmail }}. Your email won't change until you click it. You'll also get a notification at your current address.",
     "confirmEmailChangeButton": "Send link",
     "emailChangeInitiated": "Confirmation link sent. Check your new email inbox to complete the change.",
+    "emailChangeInitiatedWithProfile": "Profile updated. Confirmation link sent - check your new email inbox to complete the address change.",
     "errorEmailChangeFailed": "Failed to initiate email change. Please try again."
   },
   "confirmEmailChange": {

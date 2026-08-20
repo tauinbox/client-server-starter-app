@@ -244,6 +244,28 @@ test.describe('Profile page', () => {
     ).toBeDisabled();
   });
 
+  test('saves the name typed alongside an email change', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url);
+
+    await page.getByLabel('First Name').fill('Jane');
+    await page.getByLabel('First Name').blur();
+    await page.getByLabel('Email').fill('changed@example.com');
+    await page.getByLabel('Email').blur();
+    await page.getByLabel('Current Password').fill('Password1');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByRole('button', { name: 'Send link' }).click();
+
+    await expect(
+      page.getByText(/Profile updated\. Confirmation link sent/)
+    ).toBeVisible();
+    // The name reached the server; the address waits for the emailed link.
+    await expect(page.getByRole('heading', { name: 'Jane Doe' })).toBeVisible();
+    await expect(page.getByLabel('Email')).toHaveValue('testlogin@example.com');
+  });
+
   test('should show error on update failure', async ({ _mockServer, page }) => {
     await loginViaUi(page, _mockServer.url);
     // Intercept PATCH profile to return 500
