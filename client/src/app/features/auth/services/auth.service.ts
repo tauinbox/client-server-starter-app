@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import { finalize, firstValueFrom, from, switchMap, tap } from 'rxjs';
+import { EMPTY, finalize, firstValueFrom, from, switchMap, tap } from 'rxjs';
 import { Router } from '@angular/router';
 import type { User } from '@shared/models/user.types';
 import type { UserPermissionsResponse } from '@app/shared/types';
@@ -135,20 +135,47 @@ export class AuthService {
       }
     };
 
-    if (this.#authStore.isAuthenticated()) {
-      this.#http
-        .post(AuthApiEnum.Logout, {}, { context: silentContext() })
-        .pipe(
-          finalize(() => {
-            this.#clearSessionState();
-            completeLogout();
-          })
-        )
-        .subscribe();
-    } else {
+    if (!this.#authStore.isAuthenticated()) {
       this.#clearSessionState();
       completeLogout();
+      return;
     }
+
+    const revokeSession$ = this.#http.post(
+      AuthApiEnum.Logout,
+      {},
+      { context: silentContext() }
+    );
+
+    // `isAuthenticated()` reports token presence, not usability: a tab that slept
+    // past the access token's lifetime still holds one, and the logout route is
+    // JWT-guarded and excluded from the interceptor's refresh-and-retry. Minting a
+    // usable token first is what makes the server revoke the refresh token instead
+    // of answering 401 and leaving the session alive behind a logged-out UI.
+    const request$ = this.#authStore.isAccessTokenExpired()
+      ? this.#tokenService
+          .refreshTokens()
+          .pipe(switchMap((tokens) => (tokens ? revokeSession$ : EMPTY)))
+      : revokeSession$;
+
+    request$
+      .pipe(
+        finalize(() => {
+          // A refresh on the branch above schedules the next one; the session is
+          // ending, so that timer must not outlive the teardown.
+          this.#tokenService.cancelRefresh();
+          this.#clearSessionState();
+          completeLogout();
+        })
+      )
+      .subscribe({
+        // A logout the server never accepted (an unrefreshable session, 5xx,
+        // offline) still tears the session down in `finalize` above, and a
+        // session the refresh could not revive is one the server has already
+        // invalidated. Nothing is left for the user to act on, so the failure is
+        // swallowed deliberately rather than shown on a successful log out.
+        error: () => undefined
+      });
   }
 
   /**
