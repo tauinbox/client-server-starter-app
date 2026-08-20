@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import { finalize, firstValueFrom, from, switchMap, tap } from 'rxjs';
+import { EMPTY, finalize, firstValueFrom, from, switchMap, tap } from 'rxjs';
 import { Router } from '@angular/router';
 import type { User } from '@shared/models/user.types';
 import type { UserPermissionsResponse } from '@app/shared/types';
@@ -135,20 +135,42 @@ export class AuthService {
       }
     };
 
-    if (this.#authStore.isAuthenticated()) {
-      this.#http
-        .post(AuthApiEnum.Logout, {}, { context: silentContext() })
-        .pipe(
-          finalize(() => {
-            this.#clearSessionState();
-            completeLogout();
-          })
-        )
-        .subscribe();
-    } else {
+    if (!this.#authStore.isAuthenticated()) {
       this.#clearSessionState();
       completeLogout();
+      return;
     }
+
+    const revokeSession$ = this.#http.post(
+      AuthApiEnum.Logout,
+      {},
+      { context: silentContext() }
+    );
+
+    // `isAuthenticated()` reports token presence, not usability, and the logout
+    // route is JWT-guarded and excluded from the interceptor's refresh-and-retry:
+    // posted with a stale token it answers 401 and the refresh token survives.
+    const request$ = this.#authStore.isAccessTokenExpired()
+      ? this.#tokenService
+          .refreshTokens()
+          .pipe(switchMap((tokens) => (tokens ? revokeSession$ : EMPTY)))
+      : revokeSession$;
+
+    request$
+      .pipe(
+        finalize(() => {
+          // The refresh above scheduled the next one; it must not outlive this.
+          this.#tokenService.cancelRefresh();
+          this.#clearSessionState();
+          completeLogout();
+        })
+      )
+      .subscribe({
+        // `finalize` above ends the session either way, and a session the refresh
+        // could not revive is one the server already invalidated: nothing is left
+        // for the user to act on, so the failure is swallowed rather than shown.
+        error: () => undefined
+      });
   }
 
   /**

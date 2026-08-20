@@ -73,6 +73,7 @@ describe('AuthService', () => {
   };
   let authStoreMock: {
     isAuthenticated: ReturnType<typeof vi.fn>;
+    isAccessTokenExpired: ReturnType<typeof vi.fn>;
     getAccessToken: ReturnType<typeof vi.fn>;
     hasPersistedUser: ReturnType<typeof vi.fn>;
     getTokenExpiryTime: ReturnType<typeof vi.fn>;
@@ -113,6 +114,7 @@ describe('AuthService', () => {
     };
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(false),
+      isAccessTokenExpired: vi.fn().mockReturnValue(false),
       getAccessToken: vi.fn().mockReturnValue(null),
       hasPersistedUser: vi.fn().mockReturnValue(false),
       getTokenExpiryTime: vi.fn().mockReturnValue(null),
@@ -398,6 +400,21 @@ describe('AuthService', () => {
       expect(rbacMetadataStoreMock.clear).toHaveBeenCalled();
       // One session's entitlement mirror must never survive into the next.
       expect(entitlementsStoreMock.clear).toHaveBeenCalled();
+    });
+
+    it('should refresh an expired access token before POSTing the logout', () => {
+      authStoreMock.isAuthenticated.mockReturnValue(true);
+      authStoreMock.isAccessTokenExpired.mockReturnValue(true);
+      tokenServiceMock.refreshTokens.mockReturnValue(
+        of(createMockAuthResponse().tokens)
+      );
+
+      service.logout();
+
+      expect(tokenServiceMock.refreshTokens).toHaveBeenCalled();
+      httpMock.expectOne(AuthApiEnum.Logout).flush({});
+
+      expect(authStoreMock.clearSession).toHaveBeenCalled();
     });
 
     it('should not POST when not authenticated', () => {
