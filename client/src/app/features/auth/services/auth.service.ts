@@ -147,11 +147,9 @@ export class AuthService {
       { context: silentContext() }
     );
 
-    // `isAuthenticated()` reports token presence, not usability: a tab that slept
-    // past the access token's lifetime still holds one, and the logout route is
-    // JWT-guarded and excluded from the interceptor's refresh-and-retry. Minting a
-    // usable token first is what makes the server revoke the refresh token instead
-    // of answering 401 and leaving the session alive behind a logged-out UI.
+    // `isAuthenticated()` reports token presence, not usability, and the logout
+    // route is JWT-guarded and excluded from the interceptor's refresh-and-retry:
+    // posted with a stale token it answers 401 and the refresh token survives.
     const request$ = this.#authStore.isAccessTokenExpired()
       ? this.#tokenService
           .refreshTokens()
@@ -161,19 +159,16 @@ export class AuthService {
     request$
       .pipe(
         finalize(() => {
-          // A refresh on the branch above schedules the next one; the session is
-          // ending, so that timer must not outlive the teardown.
+          // The refresh above scheduled the next one; it must not outlive this.
           this.#tokenService.cancelRefresh();
           this.#clearSessionState();
           completeLogout();
         })
       )
       .subscribe({
-        // A logout the server never accepted (an unrefreshable session, 5xx,
-        // offline) still tears the session down in `finalize` above, and a
-        // session the refresh could not revive is one the server has already
-        // invalidated. Nothing is left for the user to act on, so the failure is
-        // swallowed deliberately rather than shown on a successful log out.
+        // `finalize` above ends the session either way, and a session the refresh
+        // could not revive is one the server already invalidated: nothing is left
+        // for the user to act on, so the failure is swallowed rather than shown.
         error: () => undefined
       });
   }

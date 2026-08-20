@@ -1,24 +1,14 @@
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
 
-// Regression for the logout that never reached the server. `logout()` decided
-// whether to call the API from the presence of an access token, so a tab whose
-// token had gone stale POSTed /auth/logout with a token the server rejects: the
-// UI emptied, the toast stayed silent, and the refresh token kept minting
-// sessions until its own expiry.
-//
-// Given a tab that slept past its access token's lifetime (the wall clock jumps
-// forward without the scheduled refresh ever firing, and the server no longer
-// accepts the token the tab still holds),
-// when the user clicks Logout,
-// then the client refreshes first and the logout the server accepts leaves no
-// refresh token behind.
+// Regression: `logout()` used to POST /auth/logout with whatever access token
+// the tab held, so a stale one got a 401 and the refresh token kept minting
+// sessions behind a logged-out UI.
 test.describe('Logout after the access token has gone stale', () => {
   test('refreshes first so the server drops the refresh token', async ({
     _mockServer,
     page
   }) => {
-    // Installed before any navigation so the page loads on a running clock; the
-    // jump comes later, once the session is established.
+    // Before any navigation, so the page still loads on a running clock.
     await page.clock.install();
 
     const userId = '100';
@@ -34,15 +24,15 @@ test.describe('Logout after the access token has gone stale', () => {
       }
     });
 
-    // The mock compares `decoded.iat < tokenRevokedAt / 1000` at whole-second
-    // precision, so the revocation and the refresh that follows it must land on
-    // different seconds - see reactive-token-refresh.spec.ts.
+    // The mock compares `iat < tokenRevokedAt / 1000`, so the revocation and the
+    // refresh after it must land on different seconds - see
+    // reactive-token-refresh.spec.ts.
     await waitForNextSecondBoundary();
     await _mockServer.invalidateAccessTokens(userId);
     await waitForNextSecondBoundary();
 
-    // The laptop lid closes for two hours: `Date.now()` jumps, the refresh timer
-    // never runs, and the tab wakes up holding a token nobody accepts.
+    // The laptop lid closes for two hours: the clock jumps, the refresh timer
+    // never runs.
     await page.clock.setSystemTime(Date.now() + 2 * 60 * 60 * 1000);
 
     await page.getByRole('button', { name: /John Doe/i }).click();
@@ -51,8 +41,7 @@ test.describe('Logout after the access token has gone stale', () => {
 
     expect(logoutStatuses).toEqual([200]);
 
-    // The credential that outlived the old logout: gone from the server, both
-    // as an active token and as a rotated one kept for reuse detection.
+    // Gone as an active token and as a rotated one kept for reuse detection.
     const loggedOut = await _mockServer.getState();
     expect(loggedOut.refreshTokens).toBe(0);
     expect(loggedOut.revokedRefreshTokens).toBe(0);

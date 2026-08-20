@@ -55,10 +55,9 @@ function createAuthResponse(expiresInSeconds: number): AuthResponse {
 }
 
 /**
- * The interceptor chain is the point of this file: with a bare
- * `provideHttpClient()` the logout request carries no Authorization header at
- * all, so it cannot show whether the server would have accepted it. These specs
- * wire the real interceptors for that reason.
+ * With a bare `provideHttpClient()` the logout request carries no Authorization
+ * header at all and cannot show whether the server would have accepted it, so
+ * these specs wire the real interceptor chain.
  */
 describe('logout with an expired access token', () => {
   let httpMock: HttpTestingController;
@@ -106,8 +105,8 @@ describe('logout with an expired access token', () => {
     }
   });
 
-  // The refresh resolves through the Web Locks promise, so the logout it gates
-  // is issued a turn later than the flush that unblocks it.
+  // The refresh resolves through a promise, so the logout it gates is issued a
+  // turn after the flush that unblocks it.
   const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
   it('refreshes first so the server actually revokes the session', async () => {
@@ -158,8 +157,7 @@ describe('logout with an expired access token', () => {
       .flush(null, { status: 401, statusText: 'Unauthorized' });
     await settle();
 
-    // The refresh token the logout would have revoked is one the server has
-    // already rejected, so there is nothing left to call.
+    // The server already rejected that refresh token; nothing left to call.
     httpMock.expectNone(AuthApiEnum.Logout);
     expect(authStore.isAuthenticated()).toBe(false);
     expect(localStorage.getItem(AUTH_USER_KEY)).toBeNull();
@@ -174,8 +172,8 @@ describe('logout with an expired access token', () => {
     httpMock
       .expectOne(AuthApiEnum.Logout)
       .flush(null, { status: 500, statusText: 'Internal Server Error' });
-    // RxJS reports an unhandled subscriber error from a timeout, so the hook
-    // has to still be installed when that turn runs.
+    // RxJS reports an unhandled error from a timeout: the hook must still be
+    // installed when that turn runs.
     await settle();
 
     expect(authStore.isAuthenticated()).toBe(false);
