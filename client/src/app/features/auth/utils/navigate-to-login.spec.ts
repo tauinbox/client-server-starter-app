@@ -1,6 +1,7 @@
 import type { Mock } from 'vitest';
-import type { Router } from '@angular/router';
-import { navigateToLogin } from './navigate-to-login';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
+import { loginUrlTree, navigateToLogin } from './navigate-to-login';
 
 describe('navigateToLogin', () => {
   let router: Router;
@@ -8,7 +9,7 @@ describe('navigateToLogin', () => {
 
   beforeEach(() => {
     navigateSpy = vi.fn<Router['navigate']>();
-    // @ts-expect-error testing mock — partial Router, only navigate is used
+    // @ts-expect-error testing mock - partial Router, only navigate is used
     router = { navigate: navigateSpy };
   });
 
@@ -26,5 +27,19 @@ describe('navigateToLogin', () => {
     expect(navigateSpy).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/' }
     });
+  });
+});
+
+describe('loginUrlTree', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+  });
+
+  it('should build the target the imperative helper navigates to', () => {
+    const router = TestBed.inject(Router);
+
+    expect(loginUrlTree(router, '/dashboard').toString()).toBe(
+      '/login?returnUrl=%2Fdashboard'
+    );
   });
 });

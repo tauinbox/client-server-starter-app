@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import type {
   ActivatedRouteSnapshot,
+  GuardResult,
   RouterStateSnapshot
 } from '@angular/router';
 import { guestGuard } from './guest.guard';
@@ -61,8 +62,8 @@ describe('guestGuard', () => {
       guestGuard(mockRoute, mockState)
     );
 
-    expect(result).toBe(false);
-    expect(router.navigate).toHaveBeenCalledWith(['/profile']);
+    expect(String(result)).toBe('/profile');
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   it('should redirect to profile when token expired but refresh succeeds', async () => {
@@ -71,16 +72,13 @@ describe('guestGuard', () => {
     authServiceMock.refreshTokens.mockReturnValue(
       of({ access_token: 'new', expires_in: 3600 })
     );
-    const router = TestBed.inject(Router);
-    vi.spyOn(router, 'navigate');
 
     const result = TestBed.runInInjectionContext(() =>
       guestGuard(mockRoute, mockState)
     );
 
-    const value = await firstValueFrom(result as Observable<boolean>);
-    expect(value).toBe(false);
-    expect(router.navigate).toHaveBeenCalledWith(['/profile']);
+    const value = await firstValueFrom(result as Observable<GuardResult>);
+    expect(String(value)).toBe('/profile');
   });
 
   it('should allow access when token expired and refresh returns null', async () => {

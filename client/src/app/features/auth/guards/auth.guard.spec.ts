@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import type {
   ActivatedRouteSnapshot,
+  GuardResult,
   RouterStateSnapshot
 } from '@angular/router';
 import { authGuard } from './auth.guard';
@@ -56,7 +57,7 @@ describe('authGuard', () => {
     expect(result).toBe(true);
   });
 
-  it('should navigate to login when not authenticated and refresh fails', async () => {
+  it('should redirect to login when not authenticated and refresh fails', async () => {
     authServiceMock.refreshTokens.mockReturnValue(of(null));
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate');
@@ -65,28 +66,21 @@ describe('authGuard', () => {
       authGuard(mockRoute, mockState)
     );
 
-    const value = await firstValueFrom(result as Observable<boolean>);
-    expect(value).toBe(false);
+    const value = await firstValueFrom(result as Observable<GuardResult>);
+    expect(String(value)).toBe('/login?returnUrl=%2Fprotected');
     expect(authServiceMock.clearSession).toHaveBeenCalled();
-    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
-      queryParams: { returnUrl: '/protected' }
-    });
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   it('should redirect an anonymous visitor without attempting a refresh', () => {
     authStoreMock.hasPersistedUser.mockReturnValue(false);
-    const router = TestBed.inject(Router);
-    vi.spyOn(router, 'navigate');
 
     const result = TestBed.runInInjectionContext(() =>
       authGuard(mockRoute, mockState)
     );
 
-    expect(result).toBe(false);
+    expect(String(result)).toBe('/login?returnUrl=%2Fprotected');
     expect(authServiceMock.refreshTokens).not.toHaveBeenCalled();
-    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
-      queryParams: { returnUrl: '/protected' }
-    });
   });
 
   it('should return true after successful token refresh', async () => {
@@ -122,18 +116,13 @@ describe('authGuard', () => {
     authStoreMock.isAuthenticated.mockReturnValue(true);
     authStoreMock.isAccessTokenExpired.mockReturnValue(true);
     authServiceMock.refreshTokens.mockReturnValue(of(null));
-    const router = TestBed.inject(Router);
-    vi.spyOn(router, 'navigate');
 
     const result = TestBed.runInInjectionContext(() =>
       authGuard(mockRoute, mockState)
     );
 
-    const value = await firstValueFrom(result as Observable<boolean>);
-    expect(value).toBe(false);
+    const value = await firstValueFrom(result as Observable<GuardResult>);
+    expect(String(value)).toBe('/login?returnUrl=%2Fprotected');
     expect(authServiceMock.clearSession).toHaveBeenCalled();
-    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
-      queryParams: { returnUrl: '/protected' }
-    });
   });
 });

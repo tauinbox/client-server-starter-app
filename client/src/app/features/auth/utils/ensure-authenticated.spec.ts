@@ -1,6 +1,7 @@
 import { of, throwError, Observable, firstValueFrom } from 'rxjs';
-import type { Mock } from 'vitest';
-import type { Router } from '@angular/router';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
+import type { GuardResult } from '@angular/router';
 import { ensureAuthenticated } from './ensure-authenticated';
 import type { TokensResponse } from '../models/auth.types';
 
@@ -15,12 +16,24 @@ describe('ensureAuthenticated', () => {
     clearSession: ReturnType<typeof vi.fn>;
   };
   let router: Router;
-  let navigateSpy: Mock<Router['navigate']>;
+  let navigateSpy: ReturnType<typeof vi.spyOn>;
 
   const mockTokens: TokensResponse = {
     access_token: 'access',
     expires_in: 3600
   };
+
+  const run = (
+    returnUrl: string,
+    onAuthenticated: () => GuardResult | Observable<GuardResult> = () => true
+  ) =>
+    ensureAuthenticated(
+      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
+      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
+      router,
+      returnUrl,
+      onAuthenticated
+    );
 
   beforeEach(() => {
     authStoreMock = {
@@ -34,24 +47,16 @@ describe('ensureAuthenticated', () => {
       clearSession: vi.fn()
     };
 
-    navigateSpy = vi.fn<Router['navigate']>();
-    // @ts-expect-error testing mock — partial Router, only navigate is used
-    router = { navigate: navigateSpy };
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    router = TestBed.inject(Router);
+    navigateSpy = vi.spyOn(router, 'navigate');
   });
 
   it('should call onAuthenticated directly when authenticated and token valid', () => {
     authStoreMock.isAuthenticated.mockReturnValue(true);
     authStoreMock.isAccessTokenExpired.mockReturnValue(false);
 
-    const result = ensureAuthenticated(
-      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
-      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      router,
-      '/dashboard',
-      () => true
-    );
-
-    expect(result).toBe(true);
+    expect(run('/dashboard')).toBe(true);
     expect(authServiceMock.refreshTokens).not.toHaveBeenCalled();
   });
 
@@ -59,35 +64,19 @@ describe('ensureAuthenticated', () => {
     authStoreMock.isAuthenticated.mockReturnValue(false);
     authServiceMock.refreshTokens.mockReturnValue(of(mockTokens));
 
-    const result = ensureAuthenticated(
-      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
-      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      router,
-      '/dashboard',
-      () => true
-    );
+    const result = run('/dashboard');
 
     expect(result).toBeInstanceOf(Observable);
-    const value = await firstValueFrom(result as Observable<boolean>);
+    const value = await firstValueFrom(result as Observable<GuardResult>);
     expect(value).toBe(true);
   });
 
   it('should skip the refresh round-trip when no user was ever persisted', () => {
     authStoreMock.hasPersistedUser.mockReturnValue(false);
 
-    const result = ensureAuthenticated(
-      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
-      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      router,
-      '/dashboard',
-      () => true
-    );
-
-    expect(result).toBe(false);
+    expect(String(run('/dashboard'))).toBe('/login?returnUrl=%2Fdashboard');
     expect(authServiceMock.refreshTokens).not.toHaveBeenCalled();
-    expect(navigateSpy).toHaveBeenCalledWith(['/login'], {
-      queryParams: { returnUrl: '/dashboard' }
-    });
+    expect(navigateSpy).not.toHaveBeenCalled();
   });
 
   it('should refresh tokens when authenticated but token expired', async () => {
@@ -95,70 +84,54 @@ describe('ensureAuthenticated', () => {
     authStoreMock.isAccessTokenExpired.mockReturnValue(true);
     authServiceMock.refreshTokens.mockReturnValue(of(mockTokens));
 
-    const result = ensureAuthenticated(
-      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
-      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      router,
-      '/dashboard',
-      () => true
+    const value = await firstValueFrom(
+      run('/dashboard') as Observable<GuardResult>
     );
-
-    const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(true);
   });
 
-  it('should navigate to login when refresh returns null', async () => {
+  it('should redirect to login when refresh returns null', async () => {
     authServiceMock.refreshTokens.mockReturnValue(of(null));
 
-    const result = ensureAuthenticated(
-      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
-      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      router,
-      '/dashboard',
-      () => true
+    const value = await firstValueFrom(
+      run('/dashboard') as Observable<GuardResult>
     );
 
-    const value = await firstValueFrom(result as Observable<boolean>);
-    expect(value).toBe(false);
+    expect(String(value)).toBe('/login?returnUrl=%2Fdashboard');
     expect(authServiceMock.clearSession).toHaveBeenCalled();
-    expect(navigateSpy).toHaveBeenCalledWith(['/login'], {
-      queryParams: { returnUrl: '/dashboard' }
-    });
+    expect(navigateSpy).not.toHaveBeenCalled();
   });
 
-  it('should navigate to login on refresh error', async () => {
+  it('should redirect to login on refresh error', async () => {
     authServiceMock.refreshTokens.mockReturnValue(
       throwError(() => new Error('Network error'))
     );
 
-    const result = ensureAuthenticated(
-      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
-      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      router,
-      '/settings',
-      () => true
+    const value = await firstValueFrom(
+      run('/settings') as Observable<GuardResult>
     );
 
-    const value = await firstValueFrom(result as Observable<boolean>);
-    expect(value).toBe(false);
+    expect(String(value)).toBe('/login?returnUrl=%2Fsettings');
     expect(authServiceMock.clearSession).toHaveBeenCalled();
-    expect(navigateSpy).toHaveBeenCalledWith(['/login'], {
-      queryParams: { returnUrl: '/settings' }
-    });
   });
 
   it('should handle onAuthenticated returning an Observable', async () => {
     authServiceMock.refreshTokens.mockReturnValue(of(mockTokens));
 
-    const result = ensureAuthenticated(
-      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
-      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      router,
-      '/dashboard',
-      () => of(true)
+    const value = await firstValueFrom(
+      run('/dashboard', () => of(true)) as Observable<GuardResult>
     );
-
-    const value = await firstValueFrom(result as Observable<boolean>);
     expect(value).toBe(true);
+  });
+
+  it('should pass a UrlTree from onAuthenticated straight through', async () => {
+    authServiceMock.refreshTokens.mockReturnValue(of(mockTokens));
+
+    const value = await firstValueFrom(
+      run('/dashboard', () =>
+        router.createUrlTree(['/forbidden'])
+      ) as Observable<GuardResult>
+    );
+    expect(String(value)).toBe('/forbidden');
   });
 });

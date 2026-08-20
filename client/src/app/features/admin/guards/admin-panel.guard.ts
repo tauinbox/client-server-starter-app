@@ -14,7 +14,6 @@ export const adminPanelGuard: CanActivateFn = (route, state) => {
 
   return ensureAuthenticated(authStore, authService, router, state.url, () => {
     if (canAccessAdminPanel(authStore)) return true;
-    void router.navigate([`/${AppRouteSegmentEnum.Forbidden}`]);
-    return false;
+    return router.createUrlTree([`/${AppRouteSegmentEnum.Forbidden}`]);
   });
 };

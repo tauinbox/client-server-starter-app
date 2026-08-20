@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import type {
   ActivatedRouteSnapshot,
+  GuardResult,
   RouterStateSnapshot
 } from '@angular/router';
 import { instancePermissionGuard, permissionGuard } from './permission.guard';
@@ -57,7 +58,7 @@ describe('permissionGuard', () => {
     expect(result).toBe(true);
   });
 
-  it('should navigate to forbidden when user lacks the required permission', () => {
+  it('should redirect to forbidden when user lacks the required permission', () => {
     authStoreMock.hasPermissions.mockReturnValue(false);
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate');
@@ -66,27 +67,22 @@ describe('permissionGuard', () => {
       permissionGuard('search', 'User')(mockRoute, mockState)
     );
 
-    expect(result).toBe(false);
-    expect(router.navigate).toHaveBeenCalledWith(['/forbidden']);
+    expect(String(result)).toBe('/forbidden');
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   it('should attempt refresh when not authenticated', async () => {
     authStoreMock.isAuthenticated.mockReturnValue(false);
     authStoreMock.isAccessTokenExpired.mockReturnValue(true);
     authServiceMock.refreshTokens.mockReturnValue(of(null));
-    const router = TestBed.inject(Router);
-    vi.spyOn(router, 'navigate');
 
     const result = TestBed.runInInjectionContext(() =>
       permissionGuard('search', 'User')(mockRoute, mockState)
     );
 
-    const value = await firstValueFrom(result as Observable<boolean>);
-    expect(value).toBe(false);
+    const value = await firstValueFrom(result as Observable<GuardResult>);
+    expect(String(value)).toBe('/login?returnUrl=%2Fusers');
     expect(authServiceMock.clearSession).toHaveBeenCalled();
-    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
-      queryParams: { returnUrl: '/users' }
-    });
   });
 
   it('should return true after successful refresh when user has permission', async () => {
@@ -112,16 +108,13 @@ describe('permissionGuard', () => {
       of({ access_token: 'new', expires_in: 3600 })
     );
     authStoreMock.hasPermissions.mockReturnValue(false);
-    const router = TestBed.inject(Router);
-    vi.spyOn(router, 'navigate');
 
     const result = TestBed.runInInjectionContext(() =>
       permissionGuard('search', 'User')(mockRoute, mockState)
     );
 
-    const value = await firstValueFrom(result as Observable<boolean>);
-    expect(value).toBe(false);
-    expect(router.navigate).toHaveBeenCalledWith(['/forbidden']);
+    const value = await firstValueFrom(result as Observable<GuardResult>);
+    expect(String(value)).toBe('/forbidden');
   });
 });
 
@@ -193,7 +186,7 @@ describe('instancePermissionGuard', () => {
     });
   });
 
-  it('should navigate to forbidden when instance-level permission is denied', () => {
+  it('should redirect to forbidden when instance-level permission is denied', () => {
     authStoreMock.hasPermissions.mockReturnValue(false);
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate');
@@ -204,16 +197,14 @@ describe('instancePermissionGuard', () => {
       }))(mockRoute, mockState)
     );
 
-    expect(result).toBe(false);
-    expect(router.navigate).toHaveBeenCalledWith(['/forbidden']);
+    expect(String(result)).toBe('/forbidden');
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   it('should attempt refresh when not authenticated', async () => {
     authStoreMock.isAuthenticated.mockReturnValue(false);
     authStoreMock.isAccessTokenExpired.mockReturnValue(true);
     authServiceMock.refreshTokens.mockReturnValue(of(null));
-    const router = TestBed.inject(Router);
-    vi.spyOn(router, 'navigate');
 
     const result = TestBed.runInInjectionContext(() =>
       instancePermissionGuard('update', 'User', (route) => ({
@@ -221,12 +212,11 @@ describe('instancePermissionGuard', () => {
       }))(mockRoute, mockState)
     );
 
-    const value = await firstValueFrom(result as Observable<boolean>);
-    expect(value).toBe(false);
+    const value = await firstValueFrom(result as Observable<GuardResult>);
+    expect(String(value)).toBe(
+      '/login?returnUrl=%2Fadmin%2Fusers%2Fuser-1%2Fedit'
+    );
     expect(authServiceMock.clearSession).toHaveBeenCalled();
-    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
-      queryParams: { returnUrl: '/admin/users/user-1/edit' }
-    });
   });
 
   it('should return true after successful refresh when instance permission granted', async () => {
