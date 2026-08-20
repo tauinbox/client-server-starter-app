@@ -1,5 +1,8 @@
 import * as Joi from 'joi';
-import { APP_ENVIRONMENTS } from '@app/shared/constants';
+import {
+  APP_ENVIRONMENTS,
+  MIN_JWT_EXPIRATION_SECONDS
+} from '@app/shared/constants';
 import { DEFAULT_BILLING_PROVIDER_TIMEOUT_MS } from '../billing/providers/provider-deadline';
 import {
   DEFAULT_WEBHOOK_PAYLOAD_RETENTION_DAYS,
@@ -37,7 +40,9 @@ export const configValidationSchema = Joi.object({
     otherwise: Joi.optional()
   }),
   JWT_MIN_IAT: Joi.number().integer().min(0).optional(),
-  JWT_EXPIRATION: Joi.number().required(),
+  // Below the client's refresh window there is no interval to schedule, so
+  // every open tab would refresh once per round trip.
+  JWT_EXPIRATION: Joi.number().min(MIN_JWT_EXPIRATION_SECONDS).required(),
   JWT_REFRESH_EXPIRATION: Joi.number().required(),
   AUDIT_LOG_RETENTION_DAYS: Joi.number().min(1).default(90),
   DB_POOL_MAX: Joi.number().min(1).default(10),

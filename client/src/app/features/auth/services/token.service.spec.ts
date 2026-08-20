@@ -11,6 +11,7 @@ import { AUTH_USER_KEY, AuthStore } from '../store/auth.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import type { AuthResponse } from '../models/auth.types';
 import type { RoleResponse } from '@app/shared/types';
+import { TOKEN_REFRESH_WINDOW_SECONDS } from '@app/shared/constants';
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
@@ -158,6 +159,66 @@ describe('TokenService', () => {
 
       await expect(currentPromise).resolves.toEqual(newAuth.tokens);
       await expect(joinedPromise).resolves.toEqual(newAuth.tokens);
+    });
+  });
+
+  describe('scheduleTokenRefresh', () => {
+    const expiryIn = (seconds: number) => () => Date.now() + seconds * 1000;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      service.cancelRefresh();
+      vi.useRealTimers();
+    });
+
+    it('should schedule the refresh one window ahead of expiry', async () => {
+      authStoreMock.getTokenExpiryTime.mockImplementation(expiryIn(3600));
+
+      service.scheduleTokenRefresh();
+      httpMock.expectNone(AuthApiEnum.RefreshToken);
+
+      await vi.advanceTimersByTimeAsync(
+        (3600 - TOKEN_REFRESH_WINDOW_SECONDS) * 1000
+      );
+      httpMock
+        .expectOne(AuthApiEnum.RefreshToken)
+        .flush(createMockAuthResponse());
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    it('should wait out a timer instead of refreshing per round trip when the lifetime fits inside the window', async () => {
+      // A lifetime the server now refuses, but an older one can still issue.
+      authStoreMock.getTokenExpiryTime.mockImplementation(expiryIn(30));
+
+      service.scheduleTokenRefresh();
+      httpMock.expectNone(AuthApiEnum.RefreshToken);
+
+      await vi.advanceTimersByTimeAsync(15_000);
+      httpMock
+        .expectOne(AuthApiEnum.RefreshToken)
+        .flush(createMockAuthResponse());
+      await vi.advanceTimersByTimeAsync(0);
+
+      // The follow-up from #doRefresh must be a timer too.
+      httpMock.expectNone(AuthApiEnum.RefreshToken);
+
+      await vi.advanceTimersByTimeAsync(15_000);
+      httpMock
+        .expectOne(AuthApiEnum.RefreshToken)
+        .flush(createMockAuthResponse());
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    it('should not schedule anything for an already expired token', () => {
+      authStoreMock.getTokenExpiryTime.mockImplementation(expiryIn(-1));
+
+      service.scheduleTokenRefresh();
+
+      vi.advanceTimersByTime(60_000);
+      httpMock.expectNone(AuthApiEnum.RefreshToken);
     });
   });
 
