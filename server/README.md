@@ -346,7 +346,7 @@ editable from the client profile.
 
 ### Database
 
-Core tables managed via TypeORM migrations:
+Core tables managed via TypeORM migrations. Every timestamp column offered as a keyset `sortBy` is `timestamptz(3)`: the cursor encodes the sort value at millisecond precision, so a wider column names a point before the row it was taken from and silently drops or repeats rows across pages (`test/instants-timestamptz.e2e-spec.ts` enforces this).
 
 | Table | Description |
 |-------|-------------|

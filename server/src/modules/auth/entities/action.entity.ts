@@ -27,6 +27,6 @@ export class Action {
   @OneToMany(() => Permission, (p) => p.action)
   permissions: Permission[];
 
-  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz', precision: 3 })
   createdAt: Date;
 }
