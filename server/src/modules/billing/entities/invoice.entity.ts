@@ -115,7 +115,7 @@ export class Invoice {
   @Column({ name: 'receipt_ref', type: 'varchar', length: 255, nullable: true })
   receiptRef: string | null;
 
-  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz', precision: 3 })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })

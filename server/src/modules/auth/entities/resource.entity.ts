@@ -47,6 +47,6 @@ export class Resource {
   @OneToMany(() => Permission, (p) => p.resource)
   permissions: Permission[];
 
-  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz', precision: 3 })
   createdAt: Date;
 }

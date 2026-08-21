@@ -45,7 +45,7 @@ export class Subscription {
   @Column({ name: 'current_period_start', type: 'timestamptz' })
   currentPeriodStart: Date;
 
-  @Column({ name: 'current_period_end', type: 'timestamptz' })
+  @Column({ name: 'current_period_end', type: 'timestamptz', precision: 3 })
   currentPeriodEnd: Date;
 
   /**
@@ -103,7 +103,7 @@ export class Subscription {
   @Exclude()
   nextRenewalAttemptAt: Date | null;
 
-  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz', precision: 3 })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })

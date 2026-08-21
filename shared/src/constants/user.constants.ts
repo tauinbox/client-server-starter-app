@@ -1,3 +1,6 @@
+// Same rules as the other keyset whitelists - see the header of
+// `sort-columns.constants.ts`: NOT NULL only, and no precision the cursor
+// cannot carry.
 export const ALLOWED_USER_SORT_COLUMNS = [
   'email',
   'firstName',

@@ -39,7 +39,7 @@ export class FeatureFlag {
   @OneToMany(() => FeatureFlagRule, (rule) => rule.flag, { cascade: true })
   rules: FeatureFlagRule[];
 
-  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz', precision: 3 })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
