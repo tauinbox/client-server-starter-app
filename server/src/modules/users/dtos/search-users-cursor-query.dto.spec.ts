@@ -1,17 +1,12 @@
-import { BadRequestException, Type, ValidationPipe } from '@nestjs/common';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
-import { SearchUsersQueryDto } from './search-users-query.dto';
 import { SearchUsersCursorQueryDto } from './search-users-cursor-query.dto';
 
-// Both DTOs pull their filters from the same UserFiltersQueryDto through
-// IntersectionType, so every case below is asserted against both to prove the
-// composition actually carries the validation and transformation metadata.
-const DTOS: [string, Type<object>][] = [
-  ['SearchUsersQueryDto', SearchUsersQueryDto],
-  ['SearchUsersCursorQueryDto', SearchUsersCursorQueryDto]
-];
-
-describe.each(DTOS)('%s filters', (_name, metatype) => {
+// The DTO pulls its filters from UserFiltersQueryDto through IntersectionType,
+// so every case below proves the composition actually carries the validation
+// and transformation metadata.
+describe('SearchUsersCursorQueryDto filters', () => {
+  const metatype = SearchUsersCursorQueryDto;
   const pipe = new ValidationPipe({
     transform: true,
     whitelist: true,

@@ -7,16 +7,6 @@
     },
     {
       "method": "GET",
-      "path": "/api/v1/users",
-      "expectedStatus": 401
-    },
-    {
-      "method": "GET",
-      "path": "/api/v1/users/search",
-      "expectedStatus": 401
-    },
-    {
-      "method": "GET",
       "path": "/api/v1/users/cursor",
       "expectedStatus": 401
     },

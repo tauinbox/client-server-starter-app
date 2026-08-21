@@ -15,7 +15,6 @@ import { PermissionsGuard } from '../../auth/guards/permissions.guard';
 import { UserDeletedEvent } from '../events/user-deleted.event';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
-import { SearchUsersQueryDto } from '../dtos/search-users-query.dto';
 import { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto';
 import { UserPasswordChangedByAdminEvent } from '../events/user-password-changed-by-admin.event';
 import { UserSessionRevocationRequiredEvent } from '../events/user-session-revocation-required.event';
@@ -48,7 +47,6 @@ describe('UsersController', () => {
   let controller: UsersController;
   let usersServiceMock: {
     create: jest.Mock;
-    findPaginated: jest.Mock;
     findCursorPaginated: jest.Mock;
     findOne: jest.Mock;
     update: jest.Mock;
@@ -67,7 +65,6 @@ describe('UsersController', () => {
   beforeEach(async () => {
     usersServiceMock = {
       create: jest.fn(),
-      findPaginated: jest.fn(),
       findCursorPaginated: jest.fn(),
       findOne: jest.fn(),
       update: jest.fn(),
@@ -240,48 +237,6 @@ describe('UsersController', () => {
           controller.create(dto, req, build())
         ).rejects.toBeInstanceOf(ForbiddenException);
       });
-    });
-  });
-
-  // ── findAll ───────────────────────────────────────────────────────
-
-  describe('findAll', () => {
-    it('should call usersService.findPaginated with the query and return the result', () => {
-      const query = new SearchUsersQueryDto();
-      const paginatedResult = { data: [], total: 0, page: 1, limit: 10 };
-      usersServiceMock.findPaginated.mockReturnValue(paginatedResult);
-
-      const result = controller.findAll(query, mockAbility);
-
-      expect(usersServiceMock.findPaginated).toHaveBeenCalledWith(
-        query,
-        mockAbility
-      );
-      expect(result).toBe(paginatedResult);
-    });
-  });
-
-  // ── searchUsers ───────────────────────────────────────────────────
-
-  describe('searchUsers', () => {
-    it('should call usersService.findPaginated with the query and return the result', () => {
-      const query = new SearchUsersQueryDto();
-      query.email = 'partial@example.com';
-      const paginatedResult = {
-        data: [{ id: 'u1' }],
-        total: 1,
-        page: 1,
-        limit: 10
-      };
-      usersServiceMock.findPaginated.mockReturnValue(paginatedResult);
-
-      const result = controller.searchUsers(query, mockAbility);
-
-      expect(usersServiceMock.findPaginated).toHaveBeenCalledWith(
-        query,
-        mockAbility
-      );
-      expect(result).toBe(paginatedResult);
     });
   });
 

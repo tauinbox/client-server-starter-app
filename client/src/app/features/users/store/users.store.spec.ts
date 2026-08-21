@@ -5,7 +5,7 @@ import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloc
 import { UsersStore } from './users.store';
 import { UserService } from '../services/user.service';
 import { NotifyService } from '@core/services/notify.service';
-import type { PaginatedResponse, User } from '../models/user.types';
+import type { CursorPaginatedResponse, User } from '../models/user.types';
 import type { RoleAdminResponse } from '@app/shared/types';
 
 const mockUserRole: RoleAdminResponse = {
@@ -33,9 +33,9 @@ const mockUser: User = {
   deletedAt: null
 };
 
-const page = (users: User[]): PaginatedResponse<User> => ({
+const page = (users: User[]): CursorPaginatedResponse<User> => ({
   data: users,
-  meta: { total: users.length, page: 1, limit: 20, totalPages: 1 }
+  meta: { nextCursor: null, hasMore: false, limit: 20 }
 });
 
 /** Lets the in-flight page settle; the cursor feature resolves on a promise. */

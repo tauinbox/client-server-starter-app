@@ -1,20 +1,11 @@
 import {
   DEFAULT_CURSOR_PAGE_SIZE,
-  DEFAULT_PAGE,
-  DEFAULT_PAGE_SIZE,
   DEFAULT_SORT_BY,
   DEFAULT_SORT_ORDER,
   MAX_PAGE_SIZE
 } from '@app/shared/constants';
 import type { SortOrder } from '@app/shared/types';
 import { encodeCursor, parseCursor } from '@app/shared/utils/cursor';
-
-export interface PaginationQuery {
-  page: number;
-  limit: number;
-  sortBy: string;
-  sortOrder: SortOrder;
-}
 
 export interface CursorQuery {
   cursor?: string;
@@ -23,7 +14,6 @@ export interface CursorQuery {
   sortOrder: SortOrder;
 }
 
-const OFFSET_KEYS = ['page', 'limit', 'sortBy', 'sortOrder'];
 const CURSOR_KEYS = ['cursor', 'limit', 'sortBy', 'sortOrder'];
 
 function integerErrors(name: string, raw: unknown, max: number): string[] {
@@ -57,32 +47,14 @@ function sortByErrors(raw: unknown, allowed: readonly string[]): string[] {
 }
 
 /**
- * Mirrors `PaginationQueryDto` under the server's global ValidationPipe
+ * Mirrors `CursorPaginationQueryDto` under the server's global ValidationPipe
  * (`transform` + `whitelist` + `forbidNonWhitelisted`): an out-of-range or
- * non-integer `page`/`limit` is a 400, never a silent clamp, and an unknown
- * query param is a 400.
+ * non-integer `limit` is a 400, never a silent clamp, and an unknown query
+ * param is a 400.
  *
  * `extraAllowed` lists the params a route legitimately carries on top of the
  * shared ones (the user list's filters), so they are not reported as unknown.
  */
-export function paginationQueryErrors(
-  query: Record<string, unknown>,
-  options: {
-    extraAllowed?: readonly string[];
-    sortColumns?: readonly string[];
-  } = {}
-): string[] {
-  const { extraAllowed = [], sortColumns = [] } = options;
-  return [
-    ...unknownKeyErrors(query, OFFSET_KEYS, extraAllowed),
-    ...integerErrors('page', query['page'], Number.MAX_SAFE_INTEGER),
-    ...integerErrors('limit', query['limit'], MAX_PAGE_SIZE),
-    ...sortByErrors(query['sortBy'], sortColumns),
-    ...sortOrderErrors(query['sortOrder'])
-  ];
-}
-
-/** Same contract as `paginationQueryErrors`, for `CursorPaginationQueryDto`. */
 export function cursorQueryErrors(
   query: Record<string, unknown>,
   options: {
@@ -99,20 +71,7 @@ export function cursorQueryErrors(
   ];
 }
 
-/** Call only after the matching `*QueryErrors` returned no errors. */
-export function parsePaginationQuery(
-  query: Record<string, unknown>
-): PaginationQuery {
-  return {
-    page: query['page'] === undefined ? DEFAULT_PAGE : Number(query['page']),
-    limit:
-      query['limit'] === undefined ? DEFAULT_PAGE_SIZE : Number(query['limit']),
-    sortBy:
-      query['sortBy'] === undefined ? DEFAULT_SORT_BY : String(query['sortBy']),
-    sortOrder: query['sortOrder'] === 'asc' ? 'asc' : DEFAULT_SORT_ORDER
-  };
-}
-
+/** Call only after `cursorQueryErrors` returned no errors. */
 export function parseCursorQuery(query: Record<string, unknown>): CursorQuery {
   return {
     cursor: query['cursor'] ? String(query['cursor']) : undefined,
@@ -126,31 +85,9 @@ export function parseCursorQuery(query: Record<string, unknown>): CursorQuery {
   };
 }
 
-export interface PaginatedBody<T> {
-  data: T[];
-  meta: { page: number; limit: number; total: number; totalPages: number };
-}
-
 export interface CursorPaginatedBody<T> {
   data: T[];
   meta: { nextCursor: string | null; hasMore: boolean; limit: number };
-}
-
-/** Slices an already-sorted list into the requested page. */
-export function paginate<T>(
-  items: T[],
-  { page, limit }: PaginationQuery
-): PaginatedBody<T> {
-  const start = (page - 1) * limit;
-  return {
-    data: items.slice(start, start + limit),
-    meta: {
-      page,
-      limit,
-      total: items.length,
-      totalPages: Math.ceil(items.length / limit)
-    }
-  };
 }
 
 /** The cursor payload only carries primitives; a Date is sent as its ISO text. */

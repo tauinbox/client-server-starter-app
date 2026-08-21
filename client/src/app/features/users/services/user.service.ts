@@ -5,11 +5,9 @@ import type { UserEffectivePermissionsResponse } from '@app/shared/types';
 import type {
   CreateUser,
   CursorPaginatedResponse,
-  PaginatedResponse,
   UpdateUser,
   User,
   UserCursorListParams,
-  UserListParams,
   UserSearch
 } from '../models/user.types';
 
@@ -20,13 +18,6 @@ export const USERS_API_V1 = '/api/v1/users';
 })
 export class UserService {
   readonly #http = inject(HttpClient);
-
-  getAll(params: UserListParams): Observable<PaginatedResponse<User>> {
-    const httpParams = this.#buildPaginationParams(params);
-    return this.#http.get<PaginatedResponse<User>>(USERS_API_V1, {
-      params: httpParams
-    });
-  }
 
   getById(id: string): Observable<User> {
     return this.#http.get<User>(`${USERS_API_V1}/${id}`);
@@ -79,20 +70,6 @@ export class UserService {
     );
   }
 
-  search(
-    criteria: UserSearch,
-    params: UserListParams
-  ): Observable<PaginatedResponse<User>> {
-    const httpParams = this.#applySearchCriteria(
-      this.#buildPaginationParams(params),
-      criteria
-    );
-
-    return this.#http.get<PaginatedResponse<User>>(`${USERS_API_V1}/search`, {
-      params: httpParams
-    });
-  }
-
   #applySearchCriteria(
     httpParams: HttpParams,
     criteria: UserSearch
@@ -141,13 +118,5 @@ export class UserService {
     }
 
     return httpParams;
-  }
-
-  #buildPaginationParams(params: UserListParams): HttpParams {
-    return new HttpParams()
-      .set('page', params.page.toString())
-      .set('limit', params.limit.toString())
-      .set('sortBy', params.sortBy)
-      .set('sortOrder', params.sortOrder);
   }
 }

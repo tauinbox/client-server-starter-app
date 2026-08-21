@@ -24,7 +24,7 @@ import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
 
 const EMPTY_PAGE = {
   data: [],
-  meta: { page: 1, limit: 10, total: 0, totalPages: 0 }
+  meta: { nextCursor: null, hasMore: false, limit: 20 }
 };
 
 const FILTER_FIELDS = ['q', 'email', 'firstName', 'lastName', 'role'] as const;
@@ -33,13 +33,11 @@ describe('User search query DTO validation (e2e)', () => {
   let app: INestApplication;
   let server: Server;
   const usersService = {
-    findPaginated: jest.fn(),
     findCursorPaginated: jest.fn()
   };
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    usersService.findPaginated.mockResolvedValue(EMPTY_PAGE);
     usersService.findCursorPaginated.mockResolvedValue(EMPTY_PAGE);
 
     const moduleRef = await Test.createTestingModule({
@@ -88,41 +86,32 @@ describe('User search query DTO validation (e2e)', () => {
   });
 
   it.each(FILTER_FIELDS)(
-    'rejects an array-valued %s on GET /users/search (400)',
+    'rejects an array-valued %s on GET /users/search/cursor (400)',
     async (field) => {
       const res = await request(server)
-        .get(`/api/v1/users/search?${field}=a&${field}=b`)
+        .get(`/api/v1/users/search/cursor?${field}=a&${field}=b`)
         .expect(400);
 
       const body = res.body as { message: string[] };
       expect(body.message).toEqual(
         expect.arrayContaining([`${field} must be a string`])
       );
-      expect(usersService.findPaginated).not.toHaveBeenCalled();
+      expect(usersService.findCursorPaginated).not.toHaveBeenCalled();
     }
   );
 
-  it('rejects an array-valued q on GET /users (400)', async () => {
-    await request(server).get('/api/v1/users?q=a&q=b').expect(400);
-
-    expect(usersService.findPaginated).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ['/api/v1/users/cursor?email=a&email=b'],
-    ['/api/v1/users/search/cursor?role=a&role=b']
-  ])('rejects an array-valued filter on cursor route %s (400)', async (url) => {
-    await request(server).get(url).expect(400);
+  it('rejects an array-valued q on GET /users/cursor (400)', async () => {
+    await request(server).get('/api/v1/users/cursor?q=a&q=b').expect(400);
 
     expect(usersService.findCursorPaginated).not.toHaveBeenCalled();
   });
 
   it.each(FILTER_FIELDS)(
-    'rejects an over-long %s on GET /users/search (400)',
+    'rejects an over-long %s on GET /users/search/cursor (400)',
     async (field) => {
       const res = await request(server)
         .get(
-          `/api/v1/users/search?${field}=${'x'.repeat(MAX_USER_FILTER_LENGTH + 1)}`
+          `/api/v1/users/search/cursor?${field}=${'x'.repeat(MAX_USER_FILTER_LENGTH + 1)}`
         )
         .expect(400);
 
@@ -132,7 +121,7 @@ describe('User search query DTO validation (e2e)', () => {
           `${field} must be shorter than or equal to ${MAX_USER_FILTER_LENGTH} characters`
         ])
       );
-      expect(usersService.findPaginated).not.toHaveBeenCalled();
+      expect(usersService.findCursorPaginated).not.toHaveBeenCalled();
     }
   );
 
@@ -140,21 +129,23 @@ describe('User search query DTO validation (e2e)', () => {
     'rejects a non-boolean %s instead of dropping the filter (400)',
     async (field) => {
       const res = await request(server)
-        .get(`/api/v1/users/search?${field}=maybe`)
+        .get(`/api/v1/users/search/cursor?${field}=maybe`)
         .expect(400);
 
       const body = res.body as { message: string[] };
       expect(body.message).toEqual(
         expect.arrayContaining([`${field} must be a boolean value`])
       );
-      expect(usersService.findPaginated).not.toHaveBeenCalled();
+      expect(usersService.findCursorPaginated).not.toHaveBeenCalled();
     }
   );
 
   it('reads an empty isActive as unset', async () => {
-    await request(server).get('/api/v1/users/search?isActive=').expect(200);
+    await request(server)
+      .get('/api/v1/users/search/cursor?isActive=')
+      .expect(200);
 
-    expect(usersService.findPaginated).toHaveBeenCalledWith(
+    expect(usersService.findCursorPaginated).toHaveBeenCalledWith(
       expect.objectContaining({ isActive: undefined }),
       undefined
     );
@@ -162,10 +153,10 @@ describe('User search query DTO validation (e2e)', () => {
 
   it('accepts scalar filters and dispatches the search', async () => {
     await request(server)
-      .get('/api/v1/users/search?q=alice&role=admin')
+      .get('/api/v1/users/search/cursor?q=alice&role=admin')
       .expect(200);
 
-    expect(usersService.findPaginated).toHaveBeenCalledWith(
+    expect(usersService.findCursorPaginated).toHaveBeenCalledWith(
       expect.objectContaining({ q: 'alice', role: 'admin' }),
       undefined
     );

@@ -101,7 +101,7 @@ describe('listenOnUnblockedPort', () => {
   it('binds the mock server on a port fetch accepts', async () => {
     const server = await listenOnUnblockedPort(createApp());
 
-    const response = await fetch(`${baseUrlOf(server)}/api/v1/users`);
+    const response = await fetch(`${baseUrlOf(server)}/api/v1/users/cursor`);
 
     expect(response.status).toBe(401);
     await close(server);
