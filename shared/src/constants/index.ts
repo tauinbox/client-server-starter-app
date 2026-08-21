@@ -15,8 +15,6 @@ export {
 } from './auth.constants';
 
 export {
-  DEFAULT_PAGE,
-  DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
   DEFAULT_SORT_ORDER,
   DEFAULT_SORT_BY,

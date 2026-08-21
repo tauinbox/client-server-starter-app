@@ -165,7 +165,7 @@ The value is a **JSON string** (stringified MongoDB query). It is parsed and mer
 
 Security: prototype pollution keys (`__proto__`, `constructor`, `prototype`) are silently skipped during parsing.
 
-> **Server-side SQL translation (`apply-ability.util.ts`)** — when CASL conditions are translated into SQL `WHERE` fragments for the `GET /users` listing, the translator supports exactly the operators above (`$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$and`, `$or`, `$nor`, `$not`) against the user fields `id`, `email`, `firstName`, `lastName`, `isActive`. Input validation rejects any other operator up front, so the accepted set and the translatable set are identical (a drift-guard test enforces this). Operands must be scalars on both sides: a comparison value and every element of a `$in`/`$nin` array are checked, since only a scalar can be bound into `IN (:...p)`. As defense-in-depth for pre-existing data, any rule using an unsupported operator or field, or a list holding a non-scalar element, is still **dropped entirely** (fail-closed) and a warning is logged. Run `npm run check:role-conditions` (in `server/`) against a staging dump to surface any existing rows that would be affected.
+> **Server-side SQL translation (`apply-ability.util.ts`)** — when CASL conditions are translated into SQL `WHERE` fragments for the user listing, the translator supports exactly the operators above (`$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$and`, `$or`, `$nor`, `$not`) against the user fields `id`, `email`, `firstName`, `lastName`, `isActive`. Input validation rejects any other operator up front, so the accepted set and the translatable set are identical (a drift-guard test enforces this). Operands must be scalars on both sides: a comparison value and every element of a `$in`/`$nin` array are checked, since only a scalar can be bound into `IN (:...p)`. As defense-in-depth for pre-existing data, any rule using an unsupported operator or field, or a list holding a non-scalar element, is still **dropped entirely** (fail-closed) and a warning is logged. Run `npm run check:role-conditions` (in `server/`) against a staging dump to surface any existing rows that would be affected.
 >
 > `deny` rules are translated too: allow and deny groups are built separately and combined as `allow AND NOT deny`, so a deny narrows the listing exactly as it narrows a single-record check. An unconditional deny reduces the listing to no rows. The fail-closed rule is asymmetric — dropping an untranslatable allow only narrows the result, but dropping a deny would widen it, so an untranslatable deny reduces the whole query to no rows instead of being skipped.
 
@@ -266,7 +266,7 @@ Example: if Role A grants `update:User` with `{ ownership: { userField: "id" } }
 To apply multiple restrictions simultaneously, either use `$and` in a single `custom` condition on one role, or move the extra restrictions to a separate role with `effect: 'deny'`.
 
 ### User Management (Admin)
-- **Unified Manage Users page** — inline filter form (single unified search field, role select, status) on the same page as the user list; empty filters load all users, filled filters trigger a search via `GET /users/search`. The `q` search is OR-matched across id/email/firstName/lastName; the `role` filter narrows to users having a role with that exact name
+- **Unified Manage Users page** — inline filter form (single unified search field, role select, status) on the same page as the user list; empty filters load all users, filled filters trigger a search via `GET /users/search/cursor`. The `q` search is OR-matched across id/email/firstName/lastName; the `role` filter narrows to users having a role with that exact name
 - **Infinite scroll** with column sorting — loads 20 users at a time through the cursor endpoints; the shared `nxsInfiniteScroll` sentinel requests the next page as the user scrolls, and keeps filling until the viewport is covered or the server stops handing out cursors
 - User detail, edit, and **soft delete** — records are preserved with a `deleted_at` timestamp; all active sessions are revoked on delete; count decremented inline (no reload)
 - **Restore** soft-deleted users via `POST /users/:id/restore` — clears `deleted_at` only. An account deactivated before deletion comes back deactivated; reactivation stays a `PATCH /users/:id { "isActive": true }` operation, so holding `users:delete` alone cannot re-enable a disabled account through a delete/restore round trip
@@ -326,7 +326,7 @@ fullstack-starter-app/
 ├── shared/                 # Shared types and constants (no build step)
 │   ├── tsconfig.json       # Minimal config for IDE support
 │   └── src/
-│       ├── types/          # UserResponse, AdminUserResponse, AuthResponse, PaginatedResponse<T>,
+│       ├── types/          # UserResponse, AdminUserResponse, AuthResponse, CursorPaginatedResponse<T>,
 │       │                   # RoleResponse (public) / RoleAdminResponse (with isSystem/isSuper),
 │       │                   # PermissionResponse, UserPermissionsResponse, etc.
 │       ├── constants/      # PASSWORD_REGEX, pagination defaults, SYSTEM_ROLES, MAX_CONCURRENT_SESSIONS,
@@ -960,11 +960,11 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1937 tests passing |
-| Server E2E tests | Jest | Separate config in `test/` | 328 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 327 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and skips 7 |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1905 tests passing |
+| Server E2E tests | Jest | Separate config in `test/` | 324 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 323 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and skips 7 |
 | Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1135 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 219 tests passing |
-| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 427 tests passing |
+| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 415 tests passing |
 
 ## CI/CD
 

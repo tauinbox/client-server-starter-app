@@ -39,9 +39,7 @@ function get(token: string, path: string): Promise<Response> {
   });
 }
 
-const OFFSET_ROUTES = ['/api/v1/users', '/api/v1/users/search'];
-const CURSOR_ROUTES = ['/api/v1/users/cursor', '/api/v1/users/search/cursor'];
-const ALL_ROUTES = [...OFFSET_ROUTES, ...CURSOR_ROUTES];
+const ALL_ROUTES = ['/api/v1/users/cursor', '/api/v1/users/search/cursor'];
 
 /**
  * The mock used to clamp an oversized `limit` and answer 200 while the server
@@ -76,15 +74,6 @@ describe('user list routes reject out-of-range paging like the server', () => {
     expect(res.status).toBe(200);
   });
 
-  it.each(OFFSET_ROUTES)('rejects page below 1 on %s', async (path) => {
-    const token = await loginAdmin();
-
-    const res = await get(token, `${path}?page=0`);
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { errors: string[] };
-    expect(body.errors).toContain('page must not be less than 1');
-  });
-
   it.each(ALL_ROUTES)(
     'rejects a sortBy outside the whitelist on %s',
     async (path) => {
@@ -102,7 +91,7 @@ describe('user list routes reject out-of-range paging like the server', () => {
 
     const res = await get(
       token,
-      '/api/v1/users/search?q=admin&isActive=true&limit=5&page=1'
+      '/api/v1/users/search/cursor?q=admin&isActive=true&limit=5'
     );
     expect(res.status).toBe(200);
   });

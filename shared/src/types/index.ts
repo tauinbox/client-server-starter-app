@@ -14,8 +14,6 @@ export type {
 } from './auth.types';
 
 export type {
-  PaginationMeta,
-  PaginatedResponse,
   CursorPaginationMeta,
   CursorPaginatedResponse,
   SortOrder

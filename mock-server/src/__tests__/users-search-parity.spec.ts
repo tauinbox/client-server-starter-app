@@ -50,11 +50,11 @@ async function getUsers(
 
 describe('User list/search filter-param validation parity with server', () => {
   it.each(['q', 'email', 'firstName', 'lastName', 'role'])(
-    'rejects an array-valued %s on GET /users/search with 400',
+    'rejects an array-valued %s on GET /users/search/cursor with 400',
     async (field) => {
       const token = await loginAsAdmin();
 
-      const res = await getUsers(token, `/search?${field}=a&${field}=b`);
+      const res = await getUsers(token, `/search/cursor?${field}=a&${field}=b`);
 
       expect(res.status).toBe(400);
       const body = (await res.json()) as { message: string };
@@ -63,7 +63,7 @@ describe('User list/search filter-param validation parity with server', () => {
   );
 
   it.each([
-    ['?q=a&q=b'],
+    ['/cursor?q=a&q=b'],
     ['/cursor?email=a&email=b'],
     ['/search/cursor?role=a&role=b']
   ])('rejects an array-valued filter on GET /users%s with 400', async (url) => {
@@ -75,13 +75,13 @@ describe('User list/search filter-param validation parity with server', () => {
   });
 
   it.each(['q', 'email', 'firstName', 'lastName', 'role'])(
-    'rejects an over-long %s on GET /users/search with 400',
+    'rejects an over-long %s on GET /users/search/cursor with 400',
     async (field) => {
       const token = await loginAsAdmin();
 
       const res = await getUsers(
         token,
-        `/search?${field}=${'x'.repeat(MAX_USER_FILTER_LENGTH + 1)}`
+        `/search/cursor?${field}=${'x'.repeat(MAX_USER_FILTER_LENGTH + 1)}`
       );
 
       expect(res.status).toBe(400);
@@ -93,11 +93,11 @@ describe('User list/search filter-param validation parity with server', () => {
   );
 
   it.each(['isActive', 'includeDeleted'])(
-    'rejects a non-boolean %s on GET /users/search with 400',
+    'rejects a non-boolean %s on GET /users/search/cursor with 400',
     async (field) => {
       const token = await loginAsAdmin();
 
-      const res = await getUsers(token, `/search?${field}=maybe`);
+      const res = await getUsers(token, `/search/cursor?${field}=maybe`);
 
       expect(res.status).toBe(400);
       const body = (await res.json()) as { message: string };
@@ -106,7 +106,7 @@ describe('User list/search filter-param validation parity with server', () => {
   );
 
   it.each([
-    ['?includeDeleted=maybe'],
+    ['/cursor?includeDeleted=maybe'],
     ['/cursor?isActive=maybe'],
     ['/search/cursor?q=' + 'x'.repeat(MAX_USER_FILTER_LENGTH + 1)]
   ])('rejects an invalid filter on GET /users%s with 400', async (url) => {
@@ -120,8 +120,8 @@ describe('User list/search filter-param validation parity with server', () => {
   it('reads an empty isActive as unset, like the DTO transform', async () => {
     const token = await loginAsAdmin();
 
-    const withFilter = await getUsers(token, '/search?isActive=');
-    const without = await getUsers(token, '/search');
+    const withFilter = await getUsers(token, '/search/cursor?isActive=');
+    const without = await getUsers(token, '/search/cursor');
 
     expect(withFilter.status).toBe(200);
     const filtered = (await withFilter.json()) as { data: unknown[] };
@@ -134,16 +134,16 @@ describe('User list/search filter-param validation parity with server', () => {
 
     const res = await getUsers(
       token,
-      `/search?q=${'x'.repeat(MAX_USER_FILTER_LENGTH)}`
+      `/search/cursor?q=${'x'.repeat(MAX_USER_FILTER_LENGTH)}`
     );
 
     expect(res.status).toBe(200);
   });
 
-  it('accepts scalar filters on GET /users/search', async () => {
+  it('accepts scalar filters on GET /users/search/cursor', async () => {
     const token = await loginAsAdmin();
 
-    const res = await getUsers(token, '/search?q=admin&role=admin');
+    const res = await getUsers(token, '/search/cursor?q=admin&role=admin');
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: { email: string }[] };

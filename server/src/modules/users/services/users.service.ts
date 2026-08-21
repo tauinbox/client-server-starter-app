@@ -16,11 +16,7 @@ import { issueEmailVerificationToken } from '../../../common/utils/issue-verific
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
-import { SearchUsersQueryDto } from '../dtos/search-users-query.dto';
-import {
-  PaginatedResponseDto,
-  CursorPaginatedResponseDto
-} from '../../../common/dtos';
+import { CursorPaginatedResponseDto } from '../../../common/dtos';
 import { escapeLikePattern } from '../../../common/utils/escape-like';
 import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
 import type { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto';
@@ -98,39 +94,6 @@ export class UsersService {
       },
       HttpStatus.CONFLICT
     );
-  }
-
-  async findPaginated(
-    query: SearchUsersQueryDto,
-    ability: AbilityOrSystem
-  ): Promise<PaginatedResponseDto<User>> {
-    const { page, limit, sortBy, sortOrder, includeDeleted, ...filters } =
-      query;
-
-    const qb = this.userRepository
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.roles', 'role');
-
-    if (includeDeleted) {
-      qb.withDeleted();
-    }
-
-    if (ability !== SYSTEM_ABILITY) {
-      applyAbilityToUserQuery(qb, ability, 'search');
-    }
-
-    this.applyUserFilters(qb, filters);
-
-    qb.orderBy(
-      USER_SORT_COLUMN_MAP[sortBy] ?? 'user.createdAt',
-      sortOrder.toUpperCase() as 'ASC' | 'DESC'
-    );
-    qb.skip((page - 1) * limit);
-    qb.take(limit);
-
-    const [data, total] = await qb.getManyAndCount();
-
-    return new PaginatedResponseDto(data, total, page, limit);
   }
 
   async findCursorPaginated(

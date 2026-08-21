@@ -2,8 +2,6 @@ import type { AdminUserResponse, SortOrder } from '@app/shared/types';
 import type { UserSortColumn } from '@app/shared/constants';
 
 export type {
-  PaginationMeta,
-  PaginatedResponse,
   CursorPaginationMeta,
   CursorPaginatedResponse,
   SortOrder
@@ -33,13 +31,6 @@ export type UpdateUser = Pick<
 > & {
   password?: string;
   unlockAccount?: boolean;
-};
-
-export type UserListParams = {
-  page: number;
-  limit: number;
-  sortBy: UserSortColumn;
-  sortOrder: SortOrder;
 };
 
 export type UserCursorListParams = {

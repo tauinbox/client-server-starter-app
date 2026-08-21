@@ -13,14 +13,10 @@ import {
   validateLocale,
   validateMaxLength
 } from '../utils/validation';
-import type { PaginationQuery } from '../helpers/pagination.helpers';
 import {
-  compareValues,
   cursorPaginate,
   cursorQueryErrors,
-  paginationQueryErrors,
-  parseCursorQuery,
-  parsePaginationQuery
+  parseCursorQuery
 } from '../helpers/pagination.helpers';
 import {
   findUserByEmail,
@@ -121,49 +117,13 @@ function findFilterValidationError(
  * filters. Filter messages come first so the existing envelope order is
  * unchanged for a request that only trips a filter rule.
  */
-function userQueryErrors(
-  query: Record<string, unknown>,
-  mode: 'offset' | 'cursor'
-): string[] {
+function userQueryErrors(query: Record<string, unknown>): string[] {
   const filterError = findFilterValidationError(query);
-  const options = {
+  const pagingErrors = cursorQueryErrors(query, {
     extraAllowed: USER_QUERY_KEYS,
     sortColumns: ALLOWED_USER_SORT_COLUMNS
-  };
-  const pagingErrors =
-    mode === 'cursor'
-      ? cursorQueryErrors(query, options)
-      : paginationQueryErrors(query, options);
-  return filterError ? [filterError, ...pagingErrors] : pagingErrors;
-}
-
-function paginateAndSort<T extends Record<string, unknown>>(
-  items: T[],
-  params: PaginationQuery
-): {
-  data: T[];
-  meta: { page: number; limit: number; total: number; totalPages: number };
-} {
-  const { page, limit, sortBy, sortOrder } = params;
-
-  const sorted = [...items].sort((a, b) => {
-    const aVal: unknown = a[sortBy];
-    const bVal: unknown = b[sortBy];
-
-    if (aVal == null && bVal == null) return 0;
-    if (aVal == null) return 1;
-    if (bVal == null) return -1;
-
-    const cmp = compareValues(aVal, bVal);
-    return sortOrder === 'asc' ? cmp : -cmp;
   });
-
-  const total = sorted.length;
-  const totalPages = Math.ceil(total / limit);
-  const start = (page - 1) * limit;
-  const data = sorted.slice(start, start + limit);
-
-  return { data, meta: { page, limit, total, totalPages } };
+  return filterError ? [filterError, ...pagingErrors] : pagingErrors;
 }
 
 const router = Router();
@@ -193,88 +153,9 @@ router.post('/', adminGuard, (req, res) => {
   res.status(201).json(toAdminUserResponse(user));
 });
 
-// GET /api/v1/users
-router.get('/', adminGuard, (req, res) => {
-  const queryErrors = userQueryErrors(
-    req.query as Record<string, unknown>,
-    'offset'
-  );
-  if (queryErrors.length > 0) {
-    res.status(400).json(validationError(queryErrors));
-    return;
-  }
-  const includeDeleted = String(req.query['includeDeleted']) === 'true';
-  let allUsers = Array.from(getState().users.values());
-  if (!includeDeleted) {
-    allUsers = allUsers.filter((u) => !u.deletedAt);
-  }
-  const users = allUsers.map(toAdminUserResponse);
-  const params = parsePaginationQuery(req.query as Record<string, unknown>);
-  const result = paginateAndSort(users, params);
-  res.json(result);
-});
-
-// GET /api/v1/users/search
-router.get('/search', adminGuard, (req, res) => {
-  const queryErrors = userQueryErrors(
-    req.query as Record<string, unknown>,
-    'offset'
-  );
-  if (queryErrors.length > 0) {
-    res.status(400).json(validationError(queryErrors));
-    return;
-  }
-  const { q, email, firstName, lastName, role, isActive } = req.query;
-  const includeDeleted = String(req.query['includeDeleted']) === 'true';
-  let users = Array.from(getState().users.values());
-
-  if (!includeDeleted) {
-    users = users.filter((u) => !u.deletedAt);
-  }
-
-  if (q) {
-    const qStr = String(q).toLowerCase();
-    users = users.filter(
-      (u) =>
-        u.email.toLowerCase().includes(qStr) ||
-        u.firstName.toLowerCase().includes(qStr) ||
-        u.lastName.toLowerCase().includes(qStr) ||
-        u.id.toLowerCase().includes(qStr)
-    );
-  }
-  if (email) {
-    const emailStr = String(email).toLowerCase();
-    users = users.filter((u) => u.email.toLowerCase().includes(emailStr));
-  }
-  if (firstName) {
-    const fnStr = String(firstName).toLowerCase();
-    users = users.filter((u) => u.firstName.toLowerCase().includes(fnStr));
-  }
-  if (lastName) {
-    const lnStr = String(lastName).toLowerCase();
-    users = users.filter((u) => u.lastName.toLowerCase().includes(lnStr));
-  }
-  if (role) {
-    const roleStr = String(role);
-    users = users.filter((u) => u.roles.includes(roleStr));
-  }
-  const activeBool = parseOptionalBoolean(isActive);
-  if (activeBool !== undefined) {
-    users = users.filter((u) => u.isActive === activeBool);
-  }
-
-  const userResponses = users.map(toAdminUserResponse);
-  const params = parsePaginationQuery(req.query as Record<string, unknown>);
-  const result = paginateAndSort(userResponses, params);
-  res.json(result);
-});
-
 // GET /api/v1/users/cursor
 router.get('/cursor', adminGuard, (req, res) => {
-  const queryErrors = userQueryErrors(
-    req.query as Record<string, unknown>,
-    'cursor'
-  );
+  const queryErrors = userQueryErrors(req.query as Record<string, unknown>);
   if (queryErrors.length > 0) {
     res.status(400).json(validationError(queryErrors));
     return;
@@ -292,10 +173,7 @@ router.get('/cursor', adminGuard, (req, res) => {
 
 // GET /api/v1/users/search/cursor
 router.get('/search/cursor', adminGuard, (req, res) => {
-  const queryErrors = userQueryErrors(
-    req.query as Record<string, unknown>,
-    'cursor'
-  );
+  const queryErrors = userQueryErrors(req.query as Record<string, unknown>);
   if (queryErrors.length > 0) {
     res.status(400).json(validationError(queryErrors));
     return;

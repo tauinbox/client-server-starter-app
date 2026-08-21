@@ -19,7 +19,6 @@ import { subject } from '@casl/ability';
 import { UsersService } from '../services/users.service';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
-import { SearchUsersQueryDto } from '../dtos/search-users-query.dto';
 import { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto';
 import { PermissionService } from '../../auth/services/permission.service';
 import { CaslAbilityFactory } from '../../auth/casl/casl-ability.factory';
@@ -120,38 +119,6 @@ export class UsersController {
       new UserCreatedEvent(createdUser.id)
     );
     return createdUser;
-  }
-
-  @Get()
-  @Authorize(['search', 'User'])
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get paginated list of users (admin only)' })
-  @ApiOkResponse({
-    description: 'Paginated list of users'
-  })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  findAll(
-    @Query() query: SearchUsersQueryDto,
-    @CurrentAbility() ability: AppAbility
-  ) {
-    return this.usersService.findPaginated(query, ability);
-  }
-
-  @Get('search')
-  @Authorize(['search', 'User'])
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Search users by criteria (admin only)' })
-  @ApiOkResponse({
-    description: 'Paginated list of filtered users'
-  })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  searchUsers(
-    @Query() query: SearchUsersQueryDto,
-    @CurrentAbility() ability: AppAbility
-  ) {
-    return this.usersService.findPaginated(query, ability);
   }
 
   @Get('cursor')
