@@ -485,7 +485,7 @@ describe('RoleService', () => {
 
     it('records the denying actor on the denial audit row', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
-      mockRoleRepo.manager.findOne.mockResolvedValue({ id: 'user-99' } as User);
+      mockRoleRepo.manager.findOne.mockResolvedValue({ id: 'user-99' });
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
 

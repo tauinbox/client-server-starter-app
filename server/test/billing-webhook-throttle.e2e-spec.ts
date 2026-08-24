@@ -58,7 +58,7 @@ function makeStubProvider(): PaymentProvider {
       };
       return Promise.resolve(parsed.event);
     }
-  } as PaymentProvider;
+  };
 }
 
 function makeWebhookEventRepo() {

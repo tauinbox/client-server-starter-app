@@ -380,7 +380,7 @@ describe('BillingEventReducer', () => {
         subscription: {
           ...usageSub(),
           billingMode: 'fixed'
-        } as Subscription
+        }
       });
 
       await reducer.reduce(

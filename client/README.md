@@ -363,16 +363,16 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 
 | Technology | Version |
 |------------|---------|
-| Angular | 21.2.19 |
+| Angular | 21.2.21 |
 | Angular Material | 21.2.14 |
 | TypeScript | 5.9.3 |
-| @ngrx/signals | 21.0.1 |
-| @jsverse/transloco | 7.5.0 |
+| @ngrx/signals | 21.1.1 |
+| @jsverse/transloco | 8.4.0 |
 | RxJS | 7.8.2 |
-| Vitest | 4.0.18 |
-| Playwright | 1.61.0 |
-| ESLint | 9.39.2 |
-| Prettier | 3.8.1 |
-| Stylelint | 17.1.1 |
-| commitlint | 20.4.1 |
-| commit-and-tag-version | 12.6.1 |
+| Vitest | 4.1.11 |
+| Playwright | 1.62.1 |
+| ESLint | 9.39.5 |
+| Prettier | 3.9.6 |
+| Stylelint | 17.14.1 |
+| commitlint | 20.5.3 |
+| commit-and-tag-version | 12.7.3 |

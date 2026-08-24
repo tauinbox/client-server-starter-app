@@ -990,18 +990,18 @@ This package's version is kept in sync with `client/` and `mock-server/` via `co
 
 | Technology | Version |
 |------------|---------|
-| NestJS | 11.1.17 |
-| TypeORM | 0.3.28 |
-| PostgreSQL | via `pg` 8.20.0 |
+| NestJS | 11.2.1 |
+| TypeORM | 0.3.31 |
+| PostgreSQL | via `pg` 8.23.0 |
 | Passport | 0.7.0 |
 | bcrypt | 6.0.0 |
 | class-validator | 0.14.4 |
-| @nestjs/swagger | 11.2.6 |
-| @nestjs/schedule | 6.1.1 |
+| @nestjs/swagger | 11.4.7 |
+| @nestjs/schedule | 6.1.3 |
 | cache-manager | 6.4.3 |
 | @keyv/redis | 5.1.6 |
-| ioredis | 5.10.1 |
+| ioredis | 5.11.1 |
 | TypeScript | 5.9.3 |
-| Jest | 30.2.0 |
-| ESLint | 9.39.4 |
-| Prettier | 3.8.1 |
+| Jest | 30.4.2 |
+| ESLint | 9.39.5 |
+| Prettier | 3.9.6 |

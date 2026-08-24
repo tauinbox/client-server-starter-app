@@ -47,8 +47,7 @@ export class ResourceSyncService implements OnApplicationBootstrap {
 
     for (const wrapper of controllers) {
       const metatype = wrapper.metatype as
-        | (new (...args: unknown[]) => unknown)
-        | undefined;
+        (new (...args: unknown[]) => unknown) | undefined;
       if (!metatype) continue;
 
       const meta = this.reflector.get<ResourceMetadata | undefined>(

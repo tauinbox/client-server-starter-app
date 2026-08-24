@@ -1,9 +1,5 @@
 export type FeatureFlagChangeType =
-  | 'created'
-  | 'updated'
-  | 'deleted'
-  | 'toggled'
-  | 'rules-replaced';
+  'created' | 'updated' | 'deleted' | 'toggled' | 'rules-replaced';
 
 export class FeatureFlagChangedEvent {
   constructor(

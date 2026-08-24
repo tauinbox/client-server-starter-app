@@ -136,7 +136,7 @@ describe('FeatureFlagService', () => {
     it('rejects duplicate key with 409', async () => {
       flagRepo.findOne.mockResolvedValueOnce(sampleFlag);
       await expect(
-        service.create({ key: sampleFlag.key } as { key: string }, 'actor-1')
+        service.create({ key: sampleFlag.key }, 'actor-1')
       ).rejects.toMatchObject({ status: 409 });
     });
 
@@ -147,10 +147,7 @@ describe('FeatureFlagService', () => {
       flagRepo.create.mockReturnValue({ ...sampleFlag, id: 'new-id' });
       flagRepo.save.mockResolvedValue({ ...sampleFlag, id: 'new-id' });
       const result = await service.create(
-        { key: 'beta-export', enabled: true } as {
-          key: string;
-          enabled: boolean;
-        },
+        { key: 'beta-export', enabled: true },
         'actor-1'
       );
       expect(result.id).toBe('new-id');
@@ -170,7 +167,7 @@ describe('FeatureFlagService', () => {
       flagRepo.save.mockRejectedValue({ code: '23505' });
 
       await expect(
-        service.create({ key: sampleFlag.key } as { key: string }, 'actor-1')
+        service.create({ key: sampleFlag.key }, 'actor-1')
       ).rejects.toMatchObject({
         status: 409,
         response: { errorKey: ErrorKeys.FEATURE_FLAGS.KEY_EXISTS }
@@ -183,7 +180,7 @@ describe('FeatureFlagService', () => {
       flagRepo.save.mockRejectedValue({ driverError: { code: '23505' } });
 
       await expect(
-        service.create({ key: sampleFlag.key } as { key: string }, 'actor-1')
+        service.create({ key: sampleFlag.key }, 'actor-1')
       ).rejects.toMatchObject({ status: 409 });
     });
 
@@ -193,7 +190,7 @@ describe('FeatureFlagService', () => {
       flagRepo.save.mockRejectedValue(new Error('connection reset'));
 
       await expect(
-        service.create({ key: sampleFlag.key } as { key: string }, 'actor-1')
+        service.create({ key: sampleFlag.key }, 'actor-1')
       ).rejects.toThrow('connection reset');
     });
   });

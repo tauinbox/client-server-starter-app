@@ -305,13 +305,7 @@ export function logAudit(
 }
 
 type Actions =
-  | 'manage'
-  | 'create'
-  | 'read'
-  | 'update'
-  | 'delete'
-  | 'search'
-  | 'assign';
+  'manage' | 'create' | 'read' | 'update' | 'delete' | 'search' | 'assign';
 type Subjects = 'User' | 'Role' | 'Permission' | 'Profile' | 'all';
 type MockAbility = MongoAbility<[Actions, Subjects]>;
 

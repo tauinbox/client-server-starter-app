@@ -9,7 +9,6 @@ import { Test } from '@nestjs/testing';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import type { INestApplication } from '@nestjs/common';
-import type { BillingProviderId } from '@app/shared/types';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
@@ -48,7 +47,7 @@ function makeSub(overrides: Partial<Subscription> = {}): Subscription {
     id: 'sub-1',
     customerId: 'cust-1',
     planKey: 'pro',
-    provider: 'yookassa' as BillingProviderId,
+    provider: 'yookassa',
     billingMode: 'fixed',
     status: 'active',
     lifecycleOwner: 'self',

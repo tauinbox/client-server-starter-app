@@ -101,11 +101,10 @@ function makeInsertStore(invoices: RepoMock) {
     update: jest.fn().mockResolvedValue({ affected: 1 }),
     // The proration refund reserves its leg on the source invoice under a row
     // lock, so that read goes through the transactional manager.
-    findOne: jest.fn(
-      (entity: unknown, options: unknown): Promise<unknown> =>
-        entity === Invoice
-          ? (invoices.findOne(options) as Promise<unknown>)
-          : Promise.resolve(null)
+    findOne: jest.fn((entity: unknown, options: unknown): Promise<unknown> =>
+      entity === Invoice
+        ? (invoices.findOne(options) as Promise<unknown>)
+        : Promise.resolve(null)
     ),
     createQueryBuilder: () => {
       const captured: { values?: InsertedInvoice } = {};
@@ -152,7 +151,7 @@ function makePlan(overrides: Partial<Plan> = {}): Plan {
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides
-  } as Plan;
+  };
 }
 
 function provider(
@@ -286,7 +285,7 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides
-  } as Product;
+  };
 }
 
 function makeDonation(overrides: Partial<Product> = {}): Product {

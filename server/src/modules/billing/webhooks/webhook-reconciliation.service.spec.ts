@@ -20,7 +20,7 @@ function row(overrides: Partial<WebhookEvent>): WebhookEvent {
     receivedAt: new Date('2026-06-16T00:00:00Z'),
     processedAt: null,
     ...overrides
-  } as WebhookEvent;
+  };
 }
 
 describe('WebhookReconciliationService', () => {

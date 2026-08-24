@@ -144,7 +144,7 @@ function makeManager(stores: Stores) {
           customerId,
           balanceUnits: Money.fromMinor(delta),
           updatedAt: new Date()
-        } as CreditBalance);
+        });
       }
       return Promise.resolve(undefined);
     },
@@ -259,7 +259,7 @@ function makeStubProvider(): PaymentProvider {
       };
       return Promise.resolve(parsed.event);
     }
-  } as PaymentProvider;
+  };
 }
 
 describe('Billing Paddle webhook (e2e)', () => {
@@ -941,7 +941,7 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
       customerId: 'cust-1',
       balanceUnits: Money.fromMinor(10),
       updatedAt: new Date()
-    } as CreditBalance);
+    });
 
     await postWebhook(renewalEvent);
     await settle();
@@ -974,7 +974,7 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
       customerId: 'cust-1',
       balanceUnits: Money.fromMinor(1000),
       updatedAt: new Date()
-    } as CreditBalance);
+    });
 
     await postWebhook(renewalEvent);
     await settle();

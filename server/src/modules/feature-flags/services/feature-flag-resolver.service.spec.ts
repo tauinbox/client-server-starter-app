@@ -225,7 +225,7 @@ describe('FeatureFlagResolverService', () => {
 
     // Advance time enough for the bumped version (Date.now()) to differ.
     const realNow = Date.now;
-    Date.now = (() => realNow() + 1000) as typeof Date.now;
+    Date.now = () => realNow() + 1000;
     await service.invalidateAll();
     Date.now = realNow;
 
@@ -242,7 +242,7 @@ describe('FeatureFlagResolverService', () => {
     seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
     const realNow = Date.now;
     const frozen = realNow();
-    Date.now = (() => frozen) as typeof Date.now;
+    Date.now = () => frozen;
     try {
       await service.evaluateForUser(
         { userId: 'u1', email: null, createdAt: null, roles: [] },

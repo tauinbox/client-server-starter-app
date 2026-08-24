@@ -79,7 +79,10 @@
   .detail-label {
     min-width: func.rem(150);
     font-weight: vars.$font-weight-medium;
-    opacity: 0.6;
+
+    // 0.6 lands the label on 4.39:1 against the card surface, just under the
+    // 4.5:1 WCAG AA floor; 0.7 clears it with margin in both themes.
+    opacity: 0.7;
   }
 
   .detail-value {

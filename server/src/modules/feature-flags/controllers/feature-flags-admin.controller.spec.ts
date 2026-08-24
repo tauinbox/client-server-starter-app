@@ -61,7 +61,7 @@ describe('FeatureFlagsAdminController', () => {
   });
 
   it('create emits a "created" change event', async () => {
-    await controller.create({ key: 'new-dashboard' } as never, req);
+    await controller.create({ key: 'new-dashboard' }, req);
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       FeatureFlagChangedEvent.name,
       expect.objectContaining({
@@ -73,18 +73,18 @@ describe('FeatureFlagsAdminController', () => {
 
   it('update requires If-Match header', async () => {
     await expect(
-      controller.update('flag-1', { enabled: true } as never, undefined, req)
+      controller.update('flag-1', { enabled: true }, undefined, req)
     ).rejects.toBeInstanceOf(HttpException);
   });
 
   it('update rejects non-integer If-Match', async () => {
     await expect(
-      controller.update('flag-1', { enabled: true } as never, 'abc', req)
+      controller.update('flag-1', { enabled: true }, 'abc', req)
     ).rejects.toBeInstanceOf(HttpException);
   });
 
   it('update strips quoted ETag and passes parsed version', async () => {
-    await controller.update('flag-1', { enabled: true } as never, '"5"', req);
+    await controller.update('flag-1', { enabled: true }, '"5"', req);
     expect(flagService.update).toHaveBeenCalledWith(
       'flag-1',
       { enabled: true },
@@ -102,7 +102,7 @@ describe('FeatureFlagsAdminController', () => {
   });
 
   it('replaceRules emits a "rules-replaced" change event', async () => {
-    await controller.replaceRules('flag-1', { rules: [] } as never, req);
+    await controller.replaceRules('flag-1', { rules: [] }, req);
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       FeatureFlagChangedEvent.name,
       expect.objectContaining({ changeType: 'rules-replaced' })

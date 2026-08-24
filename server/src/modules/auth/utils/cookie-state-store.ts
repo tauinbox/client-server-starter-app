@@ -68,8 +68,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
   store(
     req: Request,
     callbackOrMeta:
-      | OAuth2Strategy.StateStoreStoreCallback
-      | OAuth2Strategy.Metadata,
+      OAuth2Strategy.StateStoreStoreCallback | OAuth2Strategy.Metadata,
     maybeCallback?: OAuth2Strategy.StateStoreStoreCallback
   ): void {
     const callback =
@@ -114,8 +113,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
     req: Request,
     providedState: string,
     callbackOrMeta:
-      | OAuth2Strategy.StateStoreVerifyCallback
-      | OAuth2Strategy.Metadata,
+      OAuth2Strategy.StateStoreVerifyCallback | OAuth2Strategy.Metadata,
     maybeCallback?: OAuth2Strategy.StateStoreVerifyCallback
   ): void {
     const callback =

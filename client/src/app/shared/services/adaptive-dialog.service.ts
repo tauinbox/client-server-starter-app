@@ -30,20 +30,18 @@ export class AdaptiveDialogService {
   openConfirm(data: ConfirmDialogData): Observable<boolean | undefined> {
     if (this.#layout.isHandset()) {
       return this.#bottomSheet
-        .open<
+        .open<ConfirmBottomSheetComponent, ConfirmDialogData, boolean>(
           ConfirmBottomSheetComponent,
-          ConfirmDialogData,
-          boolean
-        >(ConfirmBottomSheetComponent, { data })
+          { data }
+        )
         .afterDismissed();
     }
 
     return this.#dialog
-      .open<
+      .open<ConfirmDialogComponent, ConfirmDialogData, boolean>(
         ConfirmDialogComponent,
-        ConfirmDialogData,
-        boolean
-      >(ConfirmDialogComponent, { ...dialogSizeConfig(DialogSize.Confirm), data })
+        { ...dialogSizeConfig(DialogSize.Confirm), data }
+      )
       .afterClosed();
   }
 }
