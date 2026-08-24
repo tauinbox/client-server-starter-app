@@ -6,7 +6,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { configValidationSchema } from './config-validation.schema';
 import { CacheModule } from '@nestjs/cache-manager';
 import { buildCacheOptions } from './redis-cache.store';
-import { RedisThrottlerStorage } from './redis-throttler.storage';
+import { buildThrottlerOptions } from './throttler-options';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { postgresConfig } from '../../postgres.config';
 import { UsersModule } from '../users/users.module';
@@ -15,10 +15,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { LoginThrottlerGuard } from './login-throttler.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import {
-  LOCKOUT_DURATION_MS,
-  MAX_FAILED_ATTEMPTS
-} from '@app/shared/constants';
 import { GlobalExceptionFilter } from './filters';
 import { MailModule } from '../mail/mail.module';
 import { HealthModule } from './health/health.module';
@@ -84,30 +80,8 @@ export class CoreModule implements NestModule {
         ScheduleModule.forRoot(),
         ThrottlerModule.forRootAsync({
           inject: [ConfigService],
-          useFactory: (config: ConfigService) => {
-            const redisUrl = config.get<string>('REDIS_URL');
-            const throttlers = [
-              // SPA-wide soft ceiling — admin pages, autocompletes, infinite
-              // scrolling and SSE reconnect all fan out into a handful of
-              // requests per interaction. Per-route `@Throttle()` overrides
-              // tighten this down to a few requests per minute on sensitive
-              // public endpoints (login/register/reset-password/etc.).
-              { ttl: 60000, limit: 120 },
-              {
-                // Applied globally but overridden on the login route to prevent a
-                // single IP from accumulating enough failed attempts to trigger
-                // account lockout (SEC-6). High global limit = effectively disabled
-                // on all other routes.
-                name: 'login-long-window',
-                ttl: LOCKOUT_DURATION_MS,
-                limit: MAX_FAILED_ATTEMPTS * 1000
-              }
-            ];
-            if (!redisUrl) {
-              return { throttlers };
-            }
-            return { throttlers, storage: new RedisThrottlerStorage(redisUrl) };
-          }
+          useFactory: (config: ConfigService) =>
+            buildThrottlerOptions(config.get<string>('REDIS_URL'))
         }),
         TypeOrmModule.forRootAsync({
           inject: [ConfigService],
