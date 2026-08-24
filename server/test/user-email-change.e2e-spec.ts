@@ -83,9 +83,8 @@ function makeUserRepoMock(store: UserStore) {
         return Promise.resolve(null);
       }
     ),
-    merge: jest.fn(
-      (target: User, partial: Partial<User>): User =>
-        Object.assign(target, partial)
+    merge: jest.fn((target: User, partial: Partial<User>): User =>
+      Object.assign(target, partial)
     ),
     save: jest.fn((entity: User): Promise<User> => {
       store.rows.set(entity.id, entity);

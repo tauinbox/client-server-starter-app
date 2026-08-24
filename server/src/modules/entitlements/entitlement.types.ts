@@ -8,10 +8,7 @@ import type { EntitlementLimits } from '@app/shared/types';
  * shared `EntitlementLimitKey` union.
  */
 export type EntitlementCapability =
-  | 'reports'
-  | 'api-access'
-  | 'data-export'
-  | 'priority-support';
+  'reports' | 'api-access' | 'data-export' | 'priority-support';
 
 /** Plan key of the default (no-subscription) tier. */
 export const FREE_PLAN_KEY = 'free';

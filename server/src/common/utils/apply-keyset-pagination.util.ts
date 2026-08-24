@@ -44,8 +44,7 @@ export async function applyKeysetPagination<T extends ObjectLiteral>(
   }
 
   const lastItem = results[results.length - 1] as
-    | (T & Record<string, unknown>)
-    | undefined;
+    (T & Record<string, unknown>) | undefined;
 
   const sortByField = sortBy;
   const nextCursor =

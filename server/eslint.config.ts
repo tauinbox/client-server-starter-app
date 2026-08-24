@@ -21,6 +21,15 @@ export default defineConfig(
     files: ['**/*.js', '**/*.mjs'],
     extends: [tseslint.configs.disableTypeChecked]
   },
+  {
+    files: ['**/*.spec.ts', 'test/**/*.ts'],
+    // The Express mock helpers return `Response & T`, so a mocked member carries
+    // both the jest.Mock property and the original method declaration, and
+    // `expect(res.cookie)` - the idiomatic Jest assertion - reads as an unbound
+    // method reference. Every hit in test code is that pattern or a metadata
+    // lookup off `Controller.prototype[name]`; neither ever calls the reference.
+    rules: { '@typescript-eslint/unbound-method': 'off' }
+  },
   globalIgnores(['dist/**', 'node_modules/**', 'coverage/**', 'public/**']),
   {
     files: ['**/*.ts'],

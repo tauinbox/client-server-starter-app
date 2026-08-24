@@ -199,7 +199,7 @@ describe('YooKassaProvider', () => {
 
       await provider.startCheckout(
         customer,
-        { ...paidPlan, trialDays: 14 } as Plan,
+        { ...paidPlan, trialDays: 14 },
         urls
       );
 
@@ -212,11 +212,7 @@ describe('YooKassaProvider', () => {
     it('throws when the plan has no YooKassa price', async () => {
       const { provider } = await build();
       await expect(
-        provider.startCheckout(
-          customer,
-          { ...paidPlan, prices: {} } as Plan,
-          urls
-        )
+        provider.startCheckout(customer, { ...paidPlan, prices: {} }, urls)
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
 
@@ -459,7 +455,7 @@ describe('YooKassaProvider', () => {
       // JPY has no minor unit: 1500 minor is 1500 yen. A hardcoded scale of 2
       // would send '15.00' and undercharge by two orders of magnitude.
       await provider.chargeOffSession(
-        { ...savedCustomer, currency: 'JPY' } as Customer,
+        { ...savedCustomer, currency: 'JPY' },
         1500,
         [{ description: 'Pro renewal', amountMinor: 1500, quantity: 1 }],
         'idem-jpy'

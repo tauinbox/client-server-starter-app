@@ -16,7 +16,7 @@ describe('AnonIdMiddleware', () => {
   });
 
   it('issues a new cookie when none is present', () => {
-    const req = createMockRequest({ cookies: {} as Record<string, string> });
+    const req = createMockRequest({ cookies: {} });
     const res = createMockResponse({ cookie: jest.fn() });
     const next = jest.fn();
     middleware.use(req, res, next);
@@ -37,7 +37,7 @@ describe('AnonIdMiddleware', () => {
   it('leaves an existing cookie untouched', () => {
     const existing = 'existing-uuid-value';
     const req = createMockRequest({
-      cookies: { [ANON_ID_COOKIE]: existing } as Record<string, string>
+      cookies: { [ANON_ID_COOKIE]: existing }
     });
     const res = createMockResponse({ cookie: jest.fn() });
     const next = jest.fn();
@@ -49,7 +49,7 @@ describe('AnonIdMiddleware', () => {
 
   it('sets Secure flag in production', () => {
     configService.get.mockReturnValue('production');
-    const req = createMockRequest({ cookies: {} as Record<string, string> });
+    const req = createMockRequest({ cookies: {} });
     const cookieSpy = jest.fn();
     const res = createMockResponse({ cookie: cookieSpy });
     middleware.use(req, res, jest.fn());

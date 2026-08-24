@@ -94,11 +94,7 @@ describe('Auth coverage — every protected route rejects unauthenticated access
     '%s returns 401 without token',
     async (_label, route) => {
       const method = route.method.toLowerCase() as
-        | 'get'
-        | 'post'
-        | 'patch'
-        | 'put'
-        | 'delete';
+        'get' | 'post' | 'patch' | 'put' | 'delete';
       const res = await request(server)[method](route.path);
       expect(res.status).toBe(401);
     }

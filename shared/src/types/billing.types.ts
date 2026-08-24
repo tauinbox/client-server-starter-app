@@ -5,11 +5,7 @@ export type PlanInterval = 'month' | 'year';
 export type BillingMode = 'fixed' | 'usage';
 
 export type SubscriptionStatus =
-  | 'incomplete'
-  | 'trialing'
-  | 'active'
-  | 'past_due'
-  | 'canceled';
+  'incomplete' | 'trialing' | 'active' | 'past_due' | 'canceled';
 
 export type InvoiceStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 

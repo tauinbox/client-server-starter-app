@@ -49,7 +49,7 @@ function makeSub(overrides: Partial<Subscription> = {}): Subscription {
     id: 'sub-1',
     customerId: 'cust-1',
     planKey: 'pro',
-    provider: 'yookassa' as BillingProviderId,
+    provider: 'yookassa',
     billingMode: 'fixed',
     status: 'active',
     lifecycleOwner: 'self',
@@ -72,7 +72,7 @@ function makeCustomer(): Customer {
   return Object.assign(new Customer(), {
     id: 'cust-1',
     userId: 'user-1',
-    provider: 'yookassa' as BillingProviderId,
+    provider: 'yookassa',
     providerOverride: null,
     providerCustomerId: null,
     country: 'RU',

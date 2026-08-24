@@ -240,7 +240,7 @@ describe('AuthController', () => {
       };
       const req = mockExpressRequest() as ExpressRequest;
 
-      const result = await controller.register(dto as never, req);
+      const result = await controller.register(dto, req);
 
       expect(authServiceMock.register).toHaveBeenCalledWith(
         dto,
@@ -448,7 +448,7 @@ describe('AuthController', () => {
       const res = mockResponse();
       const dto = { firstName: 'Updated' };
 
-      const result = await controller.updateProfile(req, dto as never, res);
+      const result = await controller.updateProfile(req, dto, res);
 
       expect(userServiceMock.update).toHaveBeenCalledWith(
         'user-1',
@@ -470,7 +470,7 @@ describe('AuthController', () => {
       const res = mockResponse();
       const dto = { password: 'NewPassword1', currentPassword: 'CurrentPass1' };
 
-      await controller.updateProfile(req, dto as never, res);
+      await controller.updateProfile(req, dto, res);
 
       expect(authServiceMock.verifyCurrentPassword).toHaveBeenCalledWith(
         'user-1',
@@ -497,7 +497,7 @@ describe('AuthController', () => {
       const res = mockResponse();
       const dto = { password: 'NewPassword1', currentPassword: 'CurrentPass1' };
 
-      await controller.updateProfile(req, dto as never, res);
+      await controller.updateProfile(req, dto, res);
 
       expect(userServiceMock.update).toHaveBeenCalledWith(
         'user-1',

@@ -7,9 +7,7 @@ import type { InvoiceResponse, _AssertNever } from '@app/shared/types';
  * charge was rated against — all @Exclude()-d from the wire.
  */
 type _ExcludedFields =
-  | 'providerEventId'
-  | 'refundedMinor'
-  | 'creditUnitsApplied';
+  'providerEventId' | 'refundedMinor' | 'creditUnitsApplied';
 
 type _EntityFieldCoverage = _AssertNever<
   Exclude<keyof Invoice, keyof InvoiceResponse | _ExcludedFields>

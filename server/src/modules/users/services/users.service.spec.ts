@@ -560,13 +560,12 @@ describe('UsersService', () => {
     });
 
     describe('email change', () => {
-      const buildVerifiedUser = (): User =>
-        ({
-          ...mockUser,
-          isEmailVerified: true,
-          emailVerificationToken: null,
-          emailVerificationExpiresAt: null
-        }) as User;
+      const buildVerifiedUser = (): User => ({
+        ...mockUser,
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpiresAt: null
+      });
 
       beforeEach(() => {
         mockRepository.merge.mockImplementation(
@@ -622,7 +621,7 @@ describe('UsersService', () => {
         const user = buildVerifiedUser();
         mockRepository.findOne
           .mockResolvedValueOnce(user)
-          .mockResolvedValueOnce({ ...user, id: 'other-user' } as User);
+          .mockResolvedValueOnce({ ...user, id: 'other-user' });
 
         await expect(
           service.update(
@@ -782,7 +781,7 @@ describe('UsersService', () => {
       ...mockUser,
       deletedAt: new Date('2025-06-01'),
       isActive: false
-    } as User;
+    };
 
     it('should lift the soft-delete without reactivating a deactivated user', async () => {
       const mockManager = {
