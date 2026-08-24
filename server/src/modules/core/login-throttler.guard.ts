@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import type { ThrottlerRequest } from '@nestjs/throttler';
 import type { Response } from 'express';
+import type { DecrementableThrottlerStorage } from './throttler-storage.interface';
 
 const LOGIN_LONG_WINDOW = 'login-long-window';
 
@@ -13,6 +14,10 @@ const LOGIN_LONG_WINDOW = 'login-long-window';
  */
 @Injectable()
 export class LoginThrottlerGuard extends ThrottlerGuard {
+  // Narrows the inherited storage to the contract the refund needs, so a
+  // storage without `decrement` fails to compile at the wiring site.
+  declare protected readonly storageService: DecrementableThrottlerStorage;
+
   protected override async handleRequest(
     requestProps: ThrottlerRequest
   ): Promise<boolean> {
@@ -36,10 +41,7 @@ export class LoginThrottlerGuard extends ThrottlerGuard {
 
     (res as Response).on('finish', () => {
       if ((res as Response).statusCode < 400) {
-        const storage = this.storageService as {
-          decrement?: (key: string) => Promise<void>;
-        };
-        void storage.decrement?.(key);
+        void this.storageService.decrement(key);
       }
     });
 

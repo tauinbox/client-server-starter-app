@@ -1,10 +1,10 @@
 import type { OnModuleDestroy } from '@nestjs/common';
-import type { ThrottlerStorage } from '@nestjs/throttler';
 import type { ThrottlerStorageRecord } from '@nestjs/throttler/dist/throttler-storage-record.interface';
+import type { DecrementableThrottlerStorage } from './throttler-storage.interface';
 import Redis from 'ioredis';
 
 export class RedisThrottlerStorage
-  implements ThrottlerStorage, OnModuleDestroy
+  implements DecrementableThrottlerStorage, OnModuleDestroy
 {
   private readonly redis: Redis;
 

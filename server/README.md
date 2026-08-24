@@ -420,9 +420,11 @@ Configured in `CoreModule` via `@nestjs/throttler`. Two throttlers run in parall
 | Throttler | Window | Limit | Notes |
 |-----------|--------|-------|-------|
 | `default` (unnamed) | 60 s | 120 req/IP | SPA-wide soft ceiling. Per-route `@Throttle({ default: { ttl, limit } })` decorators override this on sensitive endpoints. |
-| `login-long-window` | 15 min (`LOCKOUT_DURATION_MS`) | 4 999 (`MAX_FAILED_ATTEMPTS * 1000`) | Effectively disabled globally; tightened to `MAX_FAILED_ATTEMPTS - 1` on `/auth/login` so an IP cannot accumulate enough failed attempts to trip the account-lockout protection (SEC-6). |
+| `login-long-window` | 15 min (`LOCKOUT_DURATION_MS`) | 4 999 (`MAX_FAILED_ATTEMPTS * 1000`) | Effectively disabled globally; tightened to `MAX_FAILED_ATTEMPTS - 1` on `/auth/login` so an IP cannot accumulate enough failed attempts to trip the account-lockout protection (SEC-6). Counts **failed** logins only - `LoginThrottlerGuard` refunds the increment once the response finishes below 400, so a shared NAT egress cannot lock its own users out by logging in successfully. |
 
-When `REDIS_URL` is set the throttler uses `RedisThrottlerStorage` so counters are shared across all instances; otherwise it falls back to the in-process memory store (single-instance only).
+Both throttlers are built by `buildThrottlerOptions(REDIS_URL)` (`modules/core/throttler-options.ts`). When `REDIS_URL` is set the throttler uses `RedisThrottlerStorage` so counters are shared across all instances; otherwise it uses `MemoryThrottlerStorage` (single-instance only).
+
+`MemoryThrottlerStorage` exists because the refund above needs a `decrement`, which `@nestjs/throttler` does not put on its `ThrottlerStorage` contract: the library's own `ThrottlerStorageService` implements `increment` and nothing else. Both project storages implement `DecrementableThrottlerStorage`, and `LoginThrottlerGuard` is typed against it, so wiring a storage without a refund is a compile error instead of a silently skipped refund. `MemoryThrottlerStorage` also clamps the counter at zero on its way into `increment`: the base class schedules one expiry timer per hit that decrements the same counter, and a hit already refunded would otherwise drive it negative and hand out extra attempts in the next window.
 
 The billing webhook receivers (`POST /billing/webhooks/paddle`, `POST /billing/webhooks/yookassa`) carry `@SkipThrottle()`: payment providers deliver from a small set of egress IPs, so all of a provider's webhooks would share one per-IP bucket and a legitimate renewal batch could get 429'd. Authenticity is enforced by signature verification (Paddle) / API re-fetch (YooKassa) and ingestion is idempotent, so the throttle adds no protection on these routes. With the throttle skipped, unauthenticated traffic to these routes is bounded by the source-IP allowlist below.
 
@@ -956,8 +958,10 @@ set - point it at a local Mailpit (`SMTP_HOST=localhost`, `SMTP_PORT=1025`) in
 throttler to a per-application in-memory store (`test/private-throttler.ts`).
 Without Redis - how CI runs - every application already gets its own store; a
 Redis-backed local run shares one across all workers, where `/auth/login`'s 3
-per minute and 4 per 15 minutes per IP are spent by whichever suite gets there
-first. Suites that assert on rate limiting keep the real storage.
+per minute per IP is spent by whichever suite gets there first. The helper
+installs `MemoryThrottlerStorage`, not the library's own storage, so a pinned
+suite keeps the successful-login refund. Suites that assert on rate limiting
+keep the real storage.
 
 **Redis isolation.** When a Redis URL is configured (environment or `.env`), the
 run is pinned to a dedicated logical database (`E2E_REDIS_DB`, default `15`) and

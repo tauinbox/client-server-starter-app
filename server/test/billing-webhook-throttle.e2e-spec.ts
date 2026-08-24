@@ -11,11 +11,8 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { VersioningType, type INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import type { Server } from 'http';
-import {
-  LOCKOUT_DURATION_MS,
-  MAX_FAILED_ATTEMPTS
-} from '@app/shared/constants';
 import { LoginThrottlerGuard } from '../src/modules/core/login-throttler.guard';
+import { buildThrottlerOptions } from '../src/modules/core/throttler-options';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { BILLING_PROVIDERS } from '../src/modules/billing/providers/payment-provider.interface';
 import type {
@@ -26,8 +23,19 @@ import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-eve
 import { WebhookIngestionService } from '../src/modules/billing/webhooks/webhook-ingestion.service';
 import { BillingWebhooksController } from '../src/modules/billing/webhooks/billing-webhooks.controller';
 
-// Default global throttler from CoreModule: { ttl: 60000, limit: 120 }.
-const GLOBAL_LIMIT = 120;
+function readGlobalLimit(): number {
+  const globalThrottler = buildThrottlerOptions(undefined).throttlers.find(
+    (throttler) => throttler.name === undefined
+  );
+  if (typeof globalThrottler?.limit !== 'number') {
+    throw new Error(
+      'The unnamed global throttler must declare a numeric limit'
+    );
+  }
+  return globalThrottler.limit;
+}
+
+const GLOBAL_LIMIT = readGlobalLimit();
 
 function makeStubProvider(): PaymentProvider {
   return {
@@ -120,18 +128,7 @@ describe('Billing webhook throttle exemption (e2e)', () => {
 
   beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [
-        ThrottlerModule.forRoot({
-          throttlers: [
-            { ttl: 60000, limit: GLOBAL_LIMIT },
-            {
-              name: 'login-long-window',
-              ttl: LOCKOUT_DURATION_MS,
-              limit: MAX_FAILED_ATTEMPTS * 1000
-            }
-          ]
-        })
-      ],
+      imports: [ThrottlerModule.forRoot(buildThrottlerOptions(undefined))],
       controllers: [BillingWebhooksController],
       providers: [
         WebhookIngestionService,
