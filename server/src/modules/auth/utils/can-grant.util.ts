@@ -48,15 +48,75 @@ function deepEquals(a: unknown, b: unknown): boolean {
   return false;
 }
 
+type JsonScalar = string | number | boolean | null;
+
+function isJsonScalar(value: unknown): value is JsonScalar {
+  return (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  );
+}
+
 /**
- * True when every key of `callerQuery` appears in `grantQuery` with an equal
- * value. Extra keys in `grantQuery` are additional restrictions and are
- * allowed; a missing or differing key means the grant reaches rows the caller
- * cannot reach.
+ * The set of values a predicate admits, when that set is knowable: a bare
+ * scalar admits exactly itself, and a lone `$in` admits its elements. Any other
+ * shape (a range, a negation, a nested object, `$in` mixed with another
+ * operator) returns null, meaning "not expressible as a set" - the caller then
+ * falls back to strict equality rather than guessing.
+ */
+function admittedValues(predicate: unknown): JsonScalar[] | null {
+  if (isJsonScalar(predicate)) return [predicate];
+  if (
+    typeof predicate !== 'object' ||
+    predicate === null ||
+    Array.isArray(predicate)
+  ) {
+    return null;
+  }
+  const keys = Object.keys(predicate);
+  if (keys.length !== 1 || keys[0] !== '$in') return null;
+  const values = (predicate as { $in: unknown }).$in;
+  if (!Array.isArray(values) || !values.every(isJsonScalar)) return null;
+  return values;
+}
+
+/**
+ * True when the grant's predicate on one field restricts at least as much as
+ * the caller's own predicate on that field.
+ *
+ * Equality always qualifies. Beyond that, only the case both sides express as a
+ * value set is decided: the grant qualifies when its set is a subset of the
+ * caller's, which is what makes narrowing an existing predicate - `[true]` under
+ * a caller holding `[true, false]` - the legitimate delegation it reads as.
+ * Anything else falls back to equality.
+ */
+function predicateIsAtLeastAsNarrow(
+  callerPredicate: unknown,
+  grantPredicate: unknown
+): boolean {
+  if (deepEquals(callerPredicate, grantPredicate)) return true;
+
+  const callerValues = admittedValues(callerPredicate);
+  const grantValues = admittedValues(grantPredicate);
+  if (callerValues === null || grantValues === null) return false;
+
+  return grantValues.every((value) =>
+    callerValues.some((allowed) => deepEquals(allowed, value))
+  );
+}
+
+/**
+ * True when every key of `callerQuery` appears in `grantQuery` under a
+ * predicate that is at least as narrow. Extra keys in `grantQuery` are
+ * additional restrictions and are allowed; a missing key, or one whose
+ * predicate cannot be shown to be narrower, means the grant may reach rows the
+ * caller cannot.
  *
  * This is a deliberately conservative approximation - deciding whether one
- * arbitrary MongoQuery is narrower than another is not decidable in general,
- * so anything that is not a plain superset is rejected.
+ * arbitrary MongoQuery is narrower than another is not decidable in general, so
+ * whatever cannot be decided is rejected rather than assumed safe.
  */
 function grantIsContained(
   callerQuery: Record<string, unknown>,
@@ -65,7 +125,7 @@ function grantIsContained(
   return Object.keys(callerQuery).every(
     (key) =>
       Object.prototype.hasOwnProperty.call(grantQuery, key) &&
-      deepEquals(callerQuery[key], grantQuery[key])
+      predicateIsAtLeastAsNarrow(callerQuery[key], grantQuery[key])
   );
 }
 
