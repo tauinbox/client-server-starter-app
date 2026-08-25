@@ -3,7 +3,8 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
-  InternalServerErrorException
+  InternalServerErrorException,
+  Logger
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -37,6 +38,8 @@ import { RolePermissionsChangedEvent } from '../events/role-permissions-changed.
 
 @Injectable()
 export class RoleService {
+  private readonly logger = new Logger(RoleService.name);
+
   constructor(
     @InjectRepository(Role)
     private readonly roleRepository: Repository<Role>,
@@ -89,7 +92,10 @@ export class RoleService {
     const resolved = await this.resolveGrantItems(items);
     if (ability.can('manage', 'all')) return;
     try {
-      assertCanGrantPermissions(ability, resolved);
+      assertCanGrantPermissions(ability, resolved, {
+        actorId: context.actorId,
+        logger: this.logger
+      });
     } catch (err) {
       if (err instanceof HttpException && err.getStatus() === 403) {
         const body = err.getResponse();
