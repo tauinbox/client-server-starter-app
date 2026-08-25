@@ -88,6 +88,89 @@ describe('assertCanGrantPermissions', () => {
     return build();
   }
 
+  describe('narrowing an existing predicate rather than adding one', () => {
+    const CALLER_SET: PermissionCondition = {
+      fieldMatch: { isActive: [true, false] }
+    };
+
+    function abilityOverSet() {
+      return abilityFor([
+        { action: 'update', subject: 'User', conditions: CALLER_SET }
+      ]);
+    }
+
+    it('allows a grant whose value set is a subset of the caller set', () => {
+      expect(() =>
+        grant(abilityOverSet(), { fieldMatch: { isActive: [true] } })
+      ).not.toThrow();
+    });
+
+    it('allows a scalar grant admitted by the caller set', () => {
+      expect(() =>
+        grant(abilityOverSet(), { custom: '{"isActive":true}' })
+      ).not.toThrow();
+    });
+
+    it('rejects a grant whose value set escapes the caller set', () => {
+      const ability = abilityFor([
+        {
+          action: 'update',
+          subject: 'User',
+          conditions: { fieldMatch: { isActive: [true] } }
+        }
+      ]);
+
+      try {
+        grant(ability, { fieldMatch: { isActive: [true, false] } });
+        throw new Error('expected a 403');
+      } catch (err) {
+        expect((err as HttpException).getResponse()).toMatchObject({
+          errorKey: ErrorKeys.ROLES.CONDITION_BROADER_THAN_CALLER
+        });
+      }
+    });
+
+    it('rejects a grant that swaps the value for one the caller lacks', () => {
+      const ability = abilityFor([
+        {
+          action: 'update',
+          subject: 'User',
+          conditions: { fieldMatch: { isActive: [true] } }
+        }
+      ]);
+
+      try {
+        grant(ability, { fieldMatch: { isActive: [false] } });
+        throw new Error('expected a 403');
+      } catch (err) {
+        expect((err as HttpException).getResponse()).toMatchObject({
+          errorKey: ErrorKeys.ROLES.CONDITION_BROADER_THAN_CALLER
+        });
+      }
+    });
+
+    it('rejects a predicate shape it cannot decide, rather than assuming it is narrow', () => {
+      const ability = abilityFor([
+        {
+          action: 'update',
+          subject: 'User',
+          conditions: { custom: '{"loginCount":{"$gt":5}}' }
+        }
+      ]);
+
+      // `$gt: 10` really is narrower than `$gt: 5`, but ranges are not decided
+      // here - the check refuses what it cannot prove instead of guessing.
+      try {
+        grant(ability, { custom: '{"loginCount":{"$gt":10}}' });
+        throw new Error('expected a 403');
+      } catch (err) {
+        expect((err as HttpException).getResponse()).toMatchObject({
+          errorKey: ErrorKeys.ROLES.CONDITION_BROADER_THAN_CALLER
+        });
+      }
+    });
+  });
+
   describe('caller holds the permission only under a condition', () => {
     const OWNERSHIP: PermissionCondition = {
       ownership: { userField: 'id' }
