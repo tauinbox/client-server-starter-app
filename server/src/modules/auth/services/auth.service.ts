@@ -104,15 +104,25 @@ export class AuthService {
     const user = await this.usersService.findByEmail(email);
 
     // Check account lockout
-    if (user && user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
-      this.auditService.logFireAndForget({
-        action: AuditAction.USER_LOGIN_FAILURE,
-        actorEmail: email,
-        targetId: user.id,
-        targetType: 'User',
-        details: { reason: 'account_locked' }
-      });
-      throw this.lockedAccountException(user.lockedUntil);
+    if (user?.lockedUntil) {
+      if (user.lockedUntil.getTime() > Date.now()) {
+        this.auditService.logFireAndForget({
+          action: AuditAction.USER_LOGIN_FAILURE,
+          actorEmail: email,
+          targetId: user.id,
+          targetType: 'User',
+          details: { reason: 'account_locked' }
+        });
+        throw this.lockedAccountException(user.lockedUntil);
+      }
+
+      // The window elapsed. Restart the counter here: it is only ever cleared
+      // on a successful login, so leaving it at the threshold means the next
+      // wrong password re-locks the account on a single strike - one request
+      // per window keeps any known account locked indefinitely.
+      await this.usersService.resetLoginAttempts(user.id);
+      user.failedLoginAttempts = 0;
+      user.lockedUntil = null;
     }
 
     const hashToCompare =
@@ -415,6 +425,10 @@ export class AuthService {
         pendingEmail: null,
         pendingEmailToken: null,
         pendingEmailExpiresAt: null,
+        // Proving mailbox ownership outranks the failed-guess counter: without
+        // this the reset succeeds and the new password is still answered 423.
+        failedLoginAttempts: 0,
+        lockedUntil: null,
         tokenRevokedAt: new Date()
       });
       await manager.delete(RefreshToken, { userId: user.id });

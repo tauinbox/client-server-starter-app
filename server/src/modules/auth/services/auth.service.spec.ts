@@ -367,6 +367,64 @@ describe('AuthService', () => {
       }
     });
 
+    it('should not restart the counter while the lock window is open', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...mockUser,
+        failedLoginAttempts: 5,
+        lockedUntil: new Date(Date.now() + 600000)
+      });
+
+      await expect(
+        service.validateUser('test@example.com', 'password')
+      ).rejects.toThrow(HttpException);
+
+      expect(mockUsersService.resetLoginAttempts).not.toHaveBeenCalled();
+    });
+
+    // Regression: an elapsed lockout used to leave failedLoginAttempts at the
+    // threshold, so the next wrong password re-locked on a single strike
+    it('should restart the counter once the lock window has elapsed', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...mockUser,
+        failedLoginAttempts: 5,
+        lockedUntil: new Date(Date.now() - 1000)
+      });
+      mockUsersService.incrementFailedAttemptsAndLockIfNeeded.mockResolvedValue(
+        { failedLoginAttempts: 1, lockedUntil: null }
+      );
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+
+      try {
+        await service.validateUser('test@example.com', 'wrong-password');
+        fail('Expected HttpException');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpException);
+        expect((error as HttpException).getStatus()).toBe(
+          HttpStatus.UNAUTHORIZED
+        );
+      }
+
+      expect(mockUsersService.resetLoginAttempts).toHaveBeenCalledWith(
+        'user-1'
+      );
+    });
+
+    it('should accept a correct password once the lock window has elapsed', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...mockUser,
+        failedLoginAttempts: 5,
+        lockedUntil: new Date(Date.now() - 1000)
+      });
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      await expect(
+        service.validateUser('test@example.com', 'password')
+      ).resolves.toMatchObject({ id: 'user-1' });
+
+      // Once by the expiry branch; the success branch sees a cleared counter
+      expect(mockUsersService.resetLoginAttempts).toHaveBeenCalledTimes(1);
+    });
+
     it('should lock account after 5 failed attempts', async () => {
       const userNearLockout = { ...mockUser, failedLoginAttempts: 4 };
       mockUsersService.findByEmail.mockResolvedValue(userNearLockout);
@@ -777,6 +835,8 @@ describe('AuthService', () => {
           pendingEmail: null,
           pendingEmailToken: null,
           pendingEmailExpiresAt: null,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           tokenRevokedAt: expect.any(Date)
         })
@@ -787,6 +847,25 @@ describe('AuthService', () => {
         { userId: 'user-1' }
       );
       expect(result.message).toContain('reset successfully');
+    });
+
+    // Regression: the reset left the lockout standing, so the user was
+    // answered 423 with the password they had just set
+    it('should clear an active lockout for the account it resets', async () => {
+      mockUsersService.findByPasswordResetToken.mockResolvedValue({
+        ...mockUser,
+        failedLoginAttempts: 5,
+        lockedUntil: new Date(Date.now() + 900000),
+        passwordResetExpiresAt: new Date(Date.now() + 3600000)
+      });
+
+      await service.resetPassword('valid-token', 'NewPassword1');
+
+      expect(mockManager.update).toHaveBeenCalledWith(
+        expect.anything(),
+        'user-1',
+        expect.objectContaining({ failedLoginAttempts: 0, lockedUntil: null })
+      );
     });
 
     it('should throw 400 when token not found', async () => {
