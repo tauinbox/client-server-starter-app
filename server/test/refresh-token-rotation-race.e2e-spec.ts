@@ -10,11 +10,9 @@ import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 
-// Rotation revokes the presented token conditionally and reads `affected` to
-// tell the loser of a concurrent rotation apart from the winner. Only a real
-// Postgres running READ COMMITTED can produce that interleaving: the existing
-// refresh-token-reuse spec drives a synchronous in-memory repository where
-// nothing can interleave.
+// Only a real Postgres under READ COMMITTED produces the interleaving this
+// covers: the refresh-token-reuse spec drives a synchronous in-memory
+// repository where nothing can interleave.
 // Runs only when DB_HOST is set: CI provides Postgres, a bare local run skips.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
@@ -46,9 +44,8 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
     authService = app.get(AuthService);
     refreshTokenService = app.get(RefreshTokenService);
 
-    // Audit writes are suppressed rather than observed in the table: they are
-    // fire-and-forget, so asserting on their absence in the database would race
-    // the assertion itself.
+    // Suppressed rather than read back from the table: the writes are
+    // fire-and-forget, so asserting on their absence would race them.
     auditSpy = jest
       .spyOn(app.get(AuditService), 'logFireAndForget')
       .mockImplementation(() => undefined);
@@ -118,15 +115,14 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
     });
 
     const repository = dataSource.getRepository(RefreshToken);
-    // One live successor, and the loser's INSERT rolled back with its throw:
-    // the presented token plus a single replacement, nothing more.
+    // Two rows total means the loser's INSERT rolled back with its throw.
     expect(await repository.count({ where: { userId, revoked: false } })).toBe(
       1
     );
     expect(await repository.count({ where: { userId } })).toBe(2);
 
-    // The full reuse detector must NOT fire: neither racer presented a token
-    // that was already revoked when it was looked up.
+    // Neither racer presented an already-revoked token, so the full reuse
+    // detector must stay silent.
     const auditActions = auditSpy.mock.calls.map((call) => call[0].action);
     expect(auditActions).not.toContain(AuditAction.TOKEN_REUSE_DETECTED);
 

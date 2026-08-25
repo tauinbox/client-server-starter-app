@@ -539,13 +539,11 @@ export class AuthService {
     );
     const expiresAt = new Date(Date.now() + expiresIn * 1000);
 
-    // Revoke old token and create new one atomically to prevent
-    // concurrent requests from producing multiple valid sessions.
-    // The revoke is conditional on the row still being unrevoked: under READ
-    // COMMITTED both racers read the token as live, so `affected === 0` is the
-    // only thing that tells the loser apart from the winner. The throw has to
-    // stay inside the transaction so the loser's replacement token rolls back
-    // with it.
+    // Revoke old token and create new one atomically to prevent concurrent
+    // requests from producing multiple valid sessions: under READ COMMITTED
+    // both racers read the token as live, so only `affected === 0` separates
+    // the loser, whose throw stays inside the transaction so its replacement
+    // token rolls back with it.
     await withTransaction(this.dataSource, async (manager) => {
       const revoked = await manager.update(
         RefreshToken,
