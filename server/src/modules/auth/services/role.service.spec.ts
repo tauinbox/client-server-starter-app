@@ -952,6 +952,65 @@ describe('RoleService', () => {
       );
     });
 
+    it('rejects a condition broader than the one the caller holds', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockPermissionRepo.find.mockResolvedValue([permUpdateUser]);
+      const { ability } = abilityMock({
+        canMatrix: { 'update:*': true, 'update:User': true },
+        rulesMatrix: {
+          'update:User': [{ conditions: { id: 'actor-1' } }]
+        }
+      });
+
+      await expect(
+        service.assignPermissionsToRole(
+          'role-2',
+          ['perm-update-user'],
+          { fieldMatch: { isActive: [true] } },
+          ability,
+          'actor-1'
+        )
+      ).rejects.toMatchObject({
+        status: 403,
+        response: { errorKey: 'errors.roles.conditionBroaderThanCaller' }
+      });
+
+      expect(mockRolePermissionRepo.save).not.toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PERMISSION_GRANT_DENIED',
+          details: expect.objectContaining({
+            reason: 'condition-broader-than-caller'
+          }) as Record<string, unknown>
+        })
+      );
+    });
+
+    it('allows a grant that keeps the caller condition and adds a restriction', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRolePermissionRepo.save.mockResolvedValue([]);
+      mockPermissionRepo.find.mockResolvedValue([permUpdateUser]);
+      const { ability } = abilityMock({
+        canMatrix: { 'update:*': true, 'update:User': true },
+        rulesMatrix: {
+          'update:User': [{ conditions: { id: 'actor-1' } }]
+        }
+      });
+
+      await service.assignPermissionsToRole(
+        'role-2',
+        ['perm-update-user'],
+        {
+          ownership: { userField: 'id' },
+          fieldMatch: { isActive: [true] }
+        },
+        ability,
+        'actor-1'
+      );
+
+      expect(mockRolePermissionRepo.save).toHaveBeenCalled();
+    });
+
     it('allows grant when caller has matching unconditional rule', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.save.mockResolvedValue([]);

@@ -50,7 +50,9 @@ export const ErrorKeys = {
     CANNOT_DELETE_SYSTEM: 'errors.roles.cannotDeleteSystem',
     SUPER_FLAG_FORBIDDEN: 'errors.roles.superFlagForbidden',
     CANNOT_GRANT_PERMISSION: 'errors.roles.cannotGrantPermission',
-    CONDITION_NOT_APPLICABLE: 'errors.roles.conditionNotApplicable'
+    CONDITION_NOT_APPLICABLE: 'errors.roles.conditionNotApplicable',
+    CONDITION_BROADER_THAN_CALLER: 'errors.roles.conditionBroaderThanCaller',
+    CONDITION_UNRESOLVABLE: 'errors.roles.conditionUnresolvable'
   },
   ACTIONS: {
     NAME_RESERVED: 'errors.actions.nameReserved',

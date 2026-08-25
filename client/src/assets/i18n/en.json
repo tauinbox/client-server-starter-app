@@ -124,7 +124,9 @@
       "cannotDeleteSystem": "Cannot delete system roles",
       "superFlagForbidden": "isSuper flag cannot be set via API",
       "cannotGrantPermission": "You cannot grant a permission that you do not hold",
-      "conditionNotApplicable": "This condition cannot be used with a create permission: it matches the acting user's id, which a new record can never carry"
+      "conditionNotApplicable": "This condition cannot be used with a create permission: it matches the acting user's id, which a new record can never carry",
+      "conditionBroaderThanCaller": "You cannot grant a permission with a condition broader than the one you hold yourself",
+      "conditionUnresolvable": "This condition cannot be applied as written, so it would not restrict the permission"
     },
     "actions": {
       "nameReserved": "Action name is reserved and cannot be used",
