@@ -19,7 +19,7 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 
 ### Authentication
 - Email/password registration and login
-- **Account lockout** — 5 consecutive failed login attempts lock the account for 15 minutes (HTTP 423 with countdown); admin can unlock early via user-edit page
+- **Account lockout** — 5 consecutive failed login attempts lock the account for 15 minutes (HTTP 423 with countdown); the counter restarts once the window elapses, a completed password reset clears the lock, and an admin can unlock early via the user-edit page
 - **Email verification** — new registrations require email verification before login (HTTP 403); resend-verification endpoint; OAuth users marked verified only when the provider asserts `email_verified=true` for that same address (Google/Facebook), on account creation and on every later login alike; otherwise a verification email is sent and the flag stays false until the link is opened. Admin email changes via `PATCH /api/v1/users/:id` reset `isEmailVerified` to false, issue a new hashed verification token, and dispatch a fresh verification email; uniqueness is enforced server-side (HTTP 409 with `errorKey: errors.users.emailExists` and `field: 'email'`)
 - **Self-service email change** — users can change their own email from `/profile` via a two-step confirm-to-new flow: `POST /api/v1/auth/profile/email/initiate` (authenticated, throttled 3/hour, requires current password and rejects OAuth-only accounts) stores a hashed 1-hour token on the user row and sends a confirmation link to the new address + a no-link alert to the old address with the new address masked; `POST /api/v1/auth/profile/email/confirm` applies the change inside a transaction, re-checks uniqueness for the race window, revokes all refresh tokens, and notifies the old address. A partial unique index on `LOWER(pending_email)` and dual-email checks in `register` / `users.update` / `users.create` keep the `{email} ∪ {pendingEmail}` set globally unique. On the client one Save carries the whole form: a confirmed address change sends the initiate and the `PATCH /api/v1/auth/profile` for the name and password edits in sequence, initiate first, since a password update rehashes the credential the initiate verifies. The new endpoints are mirrored in `mock-server/` with the same response shapes and enumeration-safe behaviour.
 - **Password reset** — forgot-password sends a reset link (30-minute token expiry); reset invalidates all active sessions
@@ -961,11 +961,11 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1945 tests passing |
-| Server E2E tests | Jest | Separate config in `test/` | 332 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 331 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and skips 7 |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1949 tests passing |
+| Server E2E tests | Jest | Separate config in `test/` | 335 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 334 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and skips 7 |
 | Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1135 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 219 tests passing |
-| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 415 tests passing |
+| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 418 tests passing |
 
 ## CI/CD
 
@@ -988,7 +988,7 @@ The `audit (high)` step in all three jobs runs `npm run audit:ci`, which wraps `
 ## Security
 
 - Passwords hashed with **bcrypt** (cost factor = 12)
-- **Account lockout** after 5 failed login attempts (15-minute cooldown)
+- **Account lockout** after 5 failed login attempts (15-minute cooldown; cleared by a password reset or by the window elapsing)
 - **Email verification** required before first login
 - **Password reset tokens** are single-use with 30-minute expiry; reset revokes all sessions
 - **Admin password change** immediately revokes all sessions for the target user

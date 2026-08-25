@@ -437,6 +437,11 @@ router.post('/reset-password', (req, res) => {
   user.tokenRevokedAt = new Date().toISOString();
   user.updatedAt = new Date().toISOString();
 
+  // Proving mailbox ownership outranks the failed-guess counter: without this
+  // the reset succeeds and the new password is still answered 423.
+  user.failedLoginAttempts = 0;
+  user.lockedUntil = null;
+
   // Cancel any in-flight self-service email change — proof of email ownership
   // is invalidated when password ownership changes.
   if (user.pendingEmailToken) {
