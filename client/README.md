@@ -44,7 +44,7 @@ src/app/
 │   │   ├── casl/           # app-ability.ts — AppAbility, Actions, Subjects (auto-generated KnownSubjects + AnyObject), PermissionCheck (action, subject, instance?)
 │   │   ├── directives/     # RequirePermissionsDirective (*appRequirePermissions="check; else fallbackTpl" — optional else template renders a fallback view (e.g. disabled button + tooltip) when access is denied)
 │   │   ├── guards/         # authGuard, guestGuard, permissionGuard(action, subject), instancePermissionGuard(action, subject, instanceFactory) — all funnel through ensureAuthenticated(), which redirects straight to /login when no user was ever persisted instead of firing a refresh that can only 401. Every redirect is a returned UrlTree, never router.navigate() + false (Angular's documented CanActivate contract), so a guard stays a pure function of the store
-│   │   ├── utils/          # ensureAuthenticated (guard funnel), isSafeReturnUrl (post-login redirects must be app-internal paths), isSameOriginUrl, loginUrlTree (what guards return) + navigateToLogin (imperative, for the service-side logout paths), token-refresh predicates
+│   │   ├── utils/          # ensureAuthenticated (guard funnel), safeReturnUrl (post-login redirects must resolve to our own origin), isSameOriginUrl, loginUrlTree (what guards return) + navigateToLogin (imperative, for the service-side logout paths), token-refresh predicates
 │   │   ├── interceptors/   # jwtInterceptor
 │   │   ├── services/       # AuthService (HTTP, refresh scheduling, fetchPermissions: Promise<void>), rbac-metadata.service.ts
 │   │   └── store/          # AuthStore (NgRx Signal Store — state: accessToken (memory) + user (auth_user localStorage) + ability: AppAbility|null), RbacMetadataStore
