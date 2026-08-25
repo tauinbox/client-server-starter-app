@@ -91,16 +91,26 @@ function makeDataSourceMock(
   // The transactional manager mirrors the operations AuthService uses: update +
   // save against RefreshToken. Both delegate to the same in-memory store so a
   // committed transaction is observable to subsequent findByToken calls.
+  // The update honours the `revoked` condition in the criteria, because the
+  // rotation revokes conditionally and reads `affected` to detect the loser of
+  // a concurrent rotation.
   const manager = {
     update: jest.fn(
       (
         _entity: typeof RefreshToken,
-        id: string,
+        criteria: { id: string; revoked?: boolean },
         partial: Partial<RefreshToken>
       ) => {
-        const existing = store.tokens.get(id);
-        if (existing) Object.assign(existing, partial);
-        return Promise.resolve({ affected: existing ? 1 : 0 });
+        const existing = store.tokens.get(criteria.id);
+        if (!existing) return Promise.resolve({ affected: 0 });
+        if (
+          criteria.revoked !== undefined &&
+          existing.revoked !== criteria.revoked
+        ) {
+          return Promise.resolve({ affected: 0 });
+        }
+        Object.assign(existing, partial);
+        return Promise.resolve({ affected: 1 });
       }
     ),
     save: jest.fn((_entity: typeof RefreshToken, data: RefreshToken) =>
