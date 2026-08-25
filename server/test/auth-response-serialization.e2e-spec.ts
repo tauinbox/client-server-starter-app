@@ -168,7 +168,13 @@ describe('Auth response serialization (e2e)', () => {
           provide: DataSource,
           useValue: {
             transaction: (cb: (manager: unknown) => Promise<unknown>) =>
-              cb({ update: jest.fn(), save: jest.fn() })
+              cb({
+                // Rotation revokes conditionally and reads `affected` to detect
+                // the loser of a concurrent rotation, so the fake must report
+                // the row it matched.
+                update: jest.fn().mockResolvedValue({ affected: 1 }),
+                save: jest.fn()
+              })
           }
         },
         {

@@ -539,10 +539,35 @@ export class AuthService {
     );
     const expiresAt = new Date(Date.now() + expiresIn * 1000);
 
-    // Revoke old token and create new one atomically to prevent
-    // concurrent requests from producing multiple valid sessions
+    // Revoke old token and create new one atomically to prevent concurrent
+    // requests from producing multiple valid sessions: under READ COMMITTED
+    // both racers read the token as live, so only `affected === 0` separates
+    // the loser, whose throw stays inside the transaction so its replacement
+    // token rolls back with it.
     await withTransaction(this.dataSource, async (manager) => {
-      await manager.update(RefreshToken, tokenDoc.id, { revoked: true });
+      const revoked = await manager.update(
+        RefreshToken,
+        { id: tokenDoc.id, revoked: false },
+        { revoked: true }
+      );
+
+      if (revoked.affected === 0) {
+        this.auditService.logFireAndForget({
+          action: AuditAction.TOKEN_REFRESH_FAILURE,
+          actorId: user.id,
+          actorEmail: user.email,
+          details: { reason: 'concurrent_rotation' }
+        });
+        this.metricsService.recordAuthEvent('token_refresh_failure');
+        throw new HttpException(
+          {
+            message: 'Invalid refresh token',
+            errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+          },
+          HttpStatus.UNAUTHORIZED
+        );
+      }
+
       await manager.save(RefreshToken, {
         userId: user.id,
         token: hashToken(tokens.refresh_token),
