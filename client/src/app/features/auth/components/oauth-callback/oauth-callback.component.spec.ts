@@ -197,7 +197,7 @@ describe('OAuthCallbackComponent', () => {
     });
   });
 
-  it('should reject returnUrl with double slashes', async () => {
+  it('should reject a stored returnUrl that resolves off-origin', async () => {
     sessionStorageMock.getItem.mockReturnValue('//evil.com');
 
     fixture = TestBed.createComponent(OAuthCallbackComponent);
@@ -205,6 +205,30 @@ describe('OAuthCallbackComponent', () => {
     await fixture.whenStable();
 
     expect(router.navigateByUrl).toHaveBeenCalledWith('/profile', {
+      replaceUrl: true
+    });
+  });
+
+  it('should reject a stored returnUrl that forms an authority with a backslash', async () => {
+    sessionStorageMock.getItem.mockReturnValue('/\\evil.com');
+
+    fixture = TestBed.createComponent(OAuthCallbackComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/profile', {
+      replaceUrl: true
+    });
+  });
+
+  it('should follow a stored returnUrl that carries a double slash in the query', async () => {
+    sessionStorageMock.getItem.mockReturnValue('/admin/users?q=a//b');
+
+    fixture = TestBed.createComponent(OAuthCallbackComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/admin/users?q=a//b', {
       replaceUrl: true
     });
   });

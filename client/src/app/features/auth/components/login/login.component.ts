@@ -33,7 +33,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { take } from 'rxjs/operators';
 import { isOAuthProvider, OAUTH_URLS } from '../../constants/auth-api.const';
 import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
-import { isSafeReturnUrl } from '../../utils/is-safe-return-url';
+import { safeReturnUrl } from '../../utils/safe-return-url';
 import type { LockoutErrorData } from '../../models/auth.types';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
@@ -205,10 +205,10 @@ export class LoginComponent implements OnInit, OnDestroy {
       });
   }
 
-  /** Attacker-supplied `?returnUrl=` is only followed when app-internal. */
+  /** Attacker-supplied `?returnUrl=` is only followed when same-origin. */
   #returnUrl(): string {
     const returnUrl = this.#route.snapshot.queryParams['returnUrl'] as unknown;
-    return isSafeReturnUrl(returnUrl) ? returnUrl : '/';
+    return safeReturnUrl(returnUrl, this.#window?.location.origin) ?? '/';
   }
 
   #handleLoginError(err: HttpErrorResponse): void {

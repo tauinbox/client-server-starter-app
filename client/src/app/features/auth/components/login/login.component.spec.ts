@@ -229,7 +229,9 @@ describe('LoginComponent', () => {
       expect(router.navigateByUrl).toHaveBeenCalledWith('/');
     });
 
-    it('should navigate to custom returnUrl when present', async () => {
+    // A returnUrl only reaches the component through the route snapshot, which
+    // is read once in the constructor, so each case needs its own injector.
+    const submitWithReturnUrl = async (returnUrl: string): Promise<Router> => {
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
         imports: [LoginComponent, TranslocoTestingModuleWithLangs],
@@ -241,9 +243,7 @@ describe('LoginComponent', () => {
           { provide: AuthService, useValue: authServiceMock },
           {
             provide: ActivatedRoute,
-            useValue: {
-              snapshot: { queryParams: { returnUrl: '/dashboard' } }
-            }
+            useValue: { snapshot: { queryParams: { returnUrl } } }
           }
         ]
       });
@@ -262,43 +262,32 @@ describe('LoginComponent', () => {
       });
       await newFixture.whenStable();
       newComponent.onSubmit();
+
+      return newRouter;
+    };
+
+    it('should navigate to custom returnUrl when present', async () => {
+      const newRouter = await submitWithReturnUrl('/dashboard');
 
       expect(newRouter.navigateByUrl).toHaveBeenCalledWith('/dashboard');
     });
 
+    it('should follow an internal returnUrl that carries a double slash in the query', async () => {
+      const newRouter = await submitWithReturnUrl('/admin/users?q=a//b');
+
+      expect(newRouter.navigateByUrl).toHaveBeenCalledWith(
+        '/admin/users?q=a//b'
+      );
+    });
+
     it('should fall back to "/" when returnUrl points off-site', async () => {
-      TestBed.resetTestingModule();
-      TestBed.configureTestingModule({
-        imports: [LoginComponent, TranslocoTestingModuleWithLangs],
-        providers: [
-          provideRouter([]),
-          provideHttpClient(),
-          provideHttpClientTesting(),
-          provideNoopAnimations(),
-          { provide: AuthService, useValue: authServiceMock },
-          {
-            provide: ActivatedRoute,
-            useValue: {
-              snapshot: { queryParams: { returnUrl: '//evil.example' } }
-            }
-          }
-        ]
-      });
+      const newRouter = await submitWithReturnUrl('//evil.example');
 
-      const newFixture = TestBed.createComponent(LoginComponent);
-      const newComponent = newFixture.componentInstance;
-      const newRouter = TestBed.inject(Router);
-      vi.spyOn(newRouter, 'navigateByUrl');
-      newFixture.detectChanges();
+      expect(newRouter.navigateByUrl).toHaveBeenCalledWith('/');
+    });
 
-      authServiceMock.login.mockReturnValue(of(mockAuthResponse));
-
-      newComponent.loginModel.set({
-        email: 'test@example.com',
-        password: 'password123'
-      });
-      await newFixture.whenStable();
-      newComponent.onSubmit();
+    it('should fall back to "/" when returnUrl forms an authority with a backslash', async () => {
+      const newRouter = await submitWithReturnUrl('/\\evil.example');
 
       expect(newRouter.navigateByUrl).toHaveBeenCalledWith('/');
     });
