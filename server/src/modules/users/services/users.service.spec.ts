@@ -1077,17 +1077,6 @@ describe('UsersService', () => {
     });
   });
 
-  describe('clearPasswordResetToken', () => {
-    it('should clear reset token fields', async () => {
-      await service.clearPasswordResetToken('user-1');
-
-      expect(mockRepository.update).toHaveBeenCalledWith('user-1', {
-        passwordResetToken: null,
-        passwordResetExpiresAt: null
-      });
-    });
-  });
-
   // The authorization argument is required on every method that filters or
   // instance-checks, so a caller cannot get unfiltered data by omitting it.
   // ts-jest typechecks this file, so an accidental revert to an optional

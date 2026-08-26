@@ -412,13 +412,6 @@ export class UsersService {
     });
   }
 
-  async clearPasswordResetToken(userId: string): Promise<void> {
-    await this.userRepository.update(userId, {
-      passwordResetToken: null,
-      passwordResetExpiresAt: null
-    });
-  }
-
   async remove(
     id: string,
     ability: AbilityOrSystem,
