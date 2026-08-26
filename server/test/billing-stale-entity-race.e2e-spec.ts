@@ -29,6 +29,7 @@ import { BillingUserService } from '../src/modules/billing/services/billing-user
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
+import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import {
   InvoicePaidEvent,
   SubscriptionActivatedEvent
@@ -213,6 +214,10 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
     const module = await Test.createTestingModule({
       providers: [
         BillingEventReducer,
+        {
+          provide: MetricsService,
+          useValue: { recordUnmatchedOffSessionCharge: jest.fn() }
+        },
         {
           provide: getDataSourceToken(),
           useValue: {

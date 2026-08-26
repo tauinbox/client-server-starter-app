@@ -30,6 +30,7 @@ import {
   WEBHOOK_IGNORED
 } from '../src/modules/billing/providers/payment-provider.interface';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
+import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 
 const NOW = new Date('2026-06-08T00:00:00Z');
 
@@ -209,6 +210,10 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
       providers: [
         RenewalService,
         BillingEventReducer,
+        {
+          provide: MetricsService,
+          useValue: { recordUnmatchedOffSessionCharge: jest.fn() }
+        },
         YooKassaProvider,
         FixedRating,
         UsageRating,

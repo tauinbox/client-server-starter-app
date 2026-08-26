@@ -320,7 +320,10 @@ runWithInfra('billing write paths (e2e)', () => {
         { provide: BILLING_PROVIDERS, useValue: [provider] },
         {
           provide: MetricsService,
-          useValue: { recordUnratedUsage: jest.fn() }
+          useValue: {
+            recordUnratedUsage: jest.fn(),
+            recordUnmatchedOffSessionCharge: jest.fn()
+          }
         },
         {
           provide: EventEmitter2,

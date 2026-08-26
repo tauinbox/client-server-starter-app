@@ -323,6 +323,10 @@ describe('Billing Paddle webhook (e2e)', () => {
       providers: [
         WebhookIngestionService,
         BillingEventReducer,
+        {
+          provide: MetricsService,
+          useValue: { recordUnmatchedOffSessionCharge: jest.fn() }
+        },
         EntitlementService,
         CreditService,
         // The entitlements read is served by EntitlementService directly, so
@@ -798,6 +802,10 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
       providers: [
         WebhookIngestionService,
         BillingEventReducer,
+        {
+          provide: MetricsService,
+          useValue: { recordUnmatchedOffSessionCharge: jest.fn() }
+        },
         UsageInvoicingService,
         UsageRating,
         CreditService,

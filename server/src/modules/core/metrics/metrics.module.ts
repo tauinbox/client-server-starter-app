@@ -82,6 +82,13 @@ export const MAIL_QUEUE_REF = Symbol('MAIL_QUEUE_REF');
       help: 'Usage records stored under a meter the customer active plan does not price',
       labelNames: ['meter']
     }),
+    // The `provider` label is the closed set of registered billing providers;
+    // the customer is deliberately left out - it would be unbounded.
+    makeCounterProvider({
+      name: 'billing_off_session_charges_unmatched_total',
+      help: 'Off-session charges a provider confirmed against no pending invoice',
+      labelNames: ['provider']
+    }),
     {
       provide: SSE_CONNECTIONS_REF,
       useFactory: (): SseConnectionsRef => ({ getCount: () => 0 })

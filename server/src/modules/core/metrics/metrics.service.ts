@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectMetric } from '@willsoto/nestjs-prometheus';
 import type { Counter, Histogram } from 'prom-client';
+import type { BillingProviderId } from '@app/shared/types';
 
 export type AuthEvent =
   | 'login_success'
@@ -41,7 +42,9 @@ export class MetricsService {
     @InjectMetric('cache_requests_total')
     private readonly cacheRequestsCounter: Counter<string>,
     @InjectMetric('billing_usage_records_unrated_total')
-    private readonly unratedUsageCounter: Counter<string>
+    private readonly unratedUsageCounter: Counter<string>,
+    @InjectMetric('billing_off_session_charges_unmatched_total')
+    private readonly unmatchedChargeCounter: Counter<string>
   ) {}
 
   recordHttpRequest(
@@ -77,5 +80,9 @@ export class MetricsService {
 
   recordUnratedUsage(meter: string): void {
     this.unratedUsageCounter.inc({ meter });
+  }
+
+  recordUnmatchedOffSessionCharge(provider: BillingProviderId): void {
+    this.unmatchedChargeCounter.inc({ provider });
   }
 }

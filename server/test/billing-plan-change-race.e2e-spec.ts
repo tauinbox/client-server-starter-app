@@ -22,6 +22,7 @@ import { BillingService } from '../src/modules/billing/billing.service';
 import { ProrationCalculator } from '../src/modules/billing/rating/proration-calculator';
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
+import { ChargeDeclinedError } from '../src/modules/billing/providers/payment-provider.interface';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 
@@ -359,6 +360,63 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     expect(invoices[0].refundedMinor.toNumber()).toBe(0);
   }, 30000);
 
+  it('commits the charge invoice before the provider is asked for the money', async () => {
+    let recordedDuringCall: Invoice[] = [];
+    const { subscription, user } = await setup('yookassa', async (id) => {
+      recordedDuringCall = await ds
+        .getRepository(Invoice)
+        .find({ where: { subscriptionId: id } });
+    });
+
+    await service.changePlan(user, 'race-business');
+
+    // Read from a pooled connection while the charge is in flight: the plant
+    // is committed, so whatever ends the request from here on - the provider
+    // deadline, a pool timeout, a restart - the payment stays on the books.
+    expect(recordedDuringCall).toHaveLength(1);
+    expect(recordedDuringCall[0]).toMatchObject({
+      status: 'pending',
+      providerInvoiceRef: '',
+      paidAt: null,
+      providerEventId: `change-charge:${subscription.id}:race-business:${periodEnd.getTime()}`
+    });
+    expect(recordedDuringCall[0].amountMinor.toNumber()).toBeGreaterThan(0);
+
+    const settled = await ds
+      .getRepository(Invoice)
+      .findOneOrFail({ where: { id: recordedDuringCall[0].id } });
+    expect(settled).toMatchObject({
+      status: 'paid',
+      providerInvoiceRef: `pay_${subscription.id}`
+    });
+    expect(settled.paidAt).not.toBeNull();
+  }, 30000);
+
+  it('marks the planted charge failed when the provider declines the card', async () => {
+    const { subscription, user, provider } = await setup('yookassa', null);
+    provider.chargeOffSession.mockRejectedValue(
+      new ChargeDeclinedError('declined')
+    );
+
+    await expect(
+      service.changePlan(user, 'race-business')
+    ).rejects.toBeInstanceOf(ChargeDeclinedError);
+
+    // A decline is the one charge failure whose outcome is known: the row
+    // reads failed instead of lingering as a payment the customer owes.
+    const invoices = await ds
+      .getRepository(Invoice)
+      .find({ where: { subscriptionId: subscription.id } });
+    expect(invoices).toHaveLength(1);
+    expect(invoices[0]).toMatchObject({
+      status: 'failed',
+      providerInvoiceRef: ''
+    });
+    expect(await reload(subscription.id)).toMatchObject({
+      planKey: 'race-pro'
+    });
+  }, 30000);
+
   it('leaves dunning bookkeeping written during the window intact when the switch lands', async () => {
     const attemptAt = new Date('2026-06-20T00:00:00Z');
     const { subscription, user } = await setup('yookassa', (id) =>
@@ -395,8 +453,9 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     const { subscription, user, provider } = await setup(
       'yookassa',
       // An admin refund of the same source invoice, reserved the way
-      // BillingAdminService reserves it, lands mid-flight. The charge invoice
-      // does not exist yet, so this only touches the refund source.
+      // BillingAdminService reserves it, lands mid-flight. The switch's own
+      // charge leg is already recorded by now but is excluded from the source
+      // lookup by id, so the reservation still prices against the seeded one.
       (subscriptionId) =>
         ds
           .getRepository(Invoice)

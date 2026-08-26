@@ -8,7 +8,8 @@ import {
   ServiceUnavailableException
 } from '@nestjs/common';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { In } from 'typeorm';
+import { In, Not } from 'typeorm';
+import type { FindOperator } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import {
@@ -34,6 +35,8 @@ import { BillingService } from '../billing.service';
 
 import { ProrationCalculator } from '../rating/proration-calculator';
 import { UsageRating } from '../rating/usage-rating.strategy';
+import { ChargeDeclinedError } from '../providers/payment-provider.interface';
+import { ProviderTimeoutError } from '../providers/provider-deadline';
 import { BillingUserService } from './billing-user.service';
 import { CreditService } from './credit.service';
 
@@ -89,17 +92,71 @@ function cursorQuery(overrides: Partial<InvoiceCursorQueryDto> = {}) {
 
 type InsertedInvoice = Record<string, unknown> & {
   providerEventId?: string | null;
+  status?: string;
 };
 
-/** Transactional manager stub: records invoice inserts, dedups on event id. */
+type InvoiceCriteria = {
+  providerEventId?: string;
+  status?: string | FindOperator<string>;
+};
+
+/** Matches a stored row's status against a plain value or an `In([...])`. */
+function statusMatches(
+  row: InsertedInvoice,
+  expected: InvoiceCriteria['status']
+): boolean {
+  if (expected === undefined) return true;
+  if (typeof expected === 'string') return row.status === expected;
+  const allowed: string[] = Array.isArray(expected.value)
+    ? expected.value
+    : [expected.value];
+  return allowed.includes(row.status ?? '');
+}
+
+/**
+ * Transactional manager stub: records invoice inserts, dedups on event id, and
+ * applies invoice updates to the stored rows so a plant-then-settle sequence is
+ * observable as the row's final state (the charge leg is now recorded before
+ * the provider call and settled afterwards, not inserted once at the end).
+ */
 function makeInsertStore(invoices: RepoMock) {
   const inserted: InsertedInvoice[] = [];
   let seq = 0;
+  const applyInvoiceUpdate = (
+    criteria: InvoiceCriteria,
+    patch: Record<string, unknown>
+  ): { affected: number } => {
+    const matched = inserted.filter(
+      (row) =>
+        (criteria.providerEventId === undefined ||
+          row.providerEventId === criteria.providerEventId) &&
+        statusMatches(row, criteria.status)
+    );
+    for (const row of matched) {
+      Object.assign(row, patch);
+    }
+    return { affected: matched.length };
+  };
+  invoices.update = jest.fn(
+    (criteria: InvoiceCriteria, patch: Record<string, unknown>) =>
+      Promise.resolve(applyInvoiceUpdate(criteria, patch))
+  );
   const manager = {
     // changePlan applies the plan and bumps the refund source within the tx.
     save: (_target: unknown, entity: { id?: string }) =>
       Promise.resolve({ id: 'generated-id', ...entity }),
-    update: jest.fn().mockResolvedValue({ affected: 1 }),
+    update: jest.fn(
+      (
+        target: unknown,
+        criteria: InvoiceCriteria,
+        patch: Record<string, unknown>
+      ) =>
+        Promise.resolve(
+          target === Invoice
+            ? applyInvoiceUpdate(criteria, patch)
+            : { affected: 1 }
+        )
+    ),
     // The proration refund reserves its leg on the source invoice under a row
     // lock, so that read goes through the transactional manager.
     findOne: jest.fn((entity: unknown, options: unknown): Promise<unknown> =>
@@ -132,7 +189,16 @@ function makeInsertStore(invoices: RepoMock) {
       return builder;
     }
   };
-  return { inserted, manager };
+  /**
+   * A thrown callback rolls the transaction back, so the stub has to undo the
+   * rows it recorded inside it - without this a probe for "what survives a
+   * crash mid-transaction" would see writes a real database discards.
+   */
+  const snapshot = (): InsertedInvoice[] => inserted.map((row) => ({ ...row }));
+  const restore = (rows: InsertedInvoice[]): void => {
+    inserted.splice(0, inserted.length, ...rows);
+  };
+  return { inserted, manager, snapshot, restore };
 }
 
 function makePlan(overrides: Partial<Plan> = {}): Plan {
@@ -225,9 +291,15 @@ async function build() {
   const insertStore = makeInsertStore(invoices);
   const dataSource = {
     manager: insertStore.manager,
-    transaction: jest.fn((cb: (m: unknown) => unknown) =>
-      cb(insertStore.manager)
-    )
+    transaction: jest.fn(async (cb: (m: unknown) => unknown) => {
+      const before = insertStore.snapshot();
+      try {
+        return await cb(insertStore.manager);
+      } catch (error) {
+        insertStore.restore(before);
+        throw error;
+      }
+    })
   };
 
   const module = await Test.createTestingModule({
@@ -1392,35 +1464,148 @@ describe('BillingUserService', () => {
       expect(ctx.emit).not.toHaveBeenCalled();
     });
 
-    it('resolves the refund source before recording the new charge so it cannot refund itself', async () => {
+    it('excludes its own charge leg from the refund source so it cannot refund itself', async () => {
       const ctx = await build();
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
       const yoo = provider('yookassa', false);
       ctx.billing.getProviderById.mockReturnValue(yoo);
-      // Capture how many invoices have been recorded when the source is resolved.
-      let insertedWhenResolved = -1;
-      ctx.invoices.findOne.mockImplementation(() => {
-        insertedWhenResolved = ctx.insertedInvoices.length;
-        return Promise.resolve({
-          id: 'inv-period',
-          amountMinor: Money.fromMinor(99000),
-          providerInvoiceRef: 'pay_period',
-          status: 'paid',
-          billingMode: 'fixed',
-          refundedMinor: Money.fromMinor(0)
-        });
-      });
+      let sourceWhere: Record<string, unknown> | undefined;
+      ctx.invoices.findOne.mockImplementation(
+        (options: { where: Record<string, unknown> }) => {
+          sourceWhere = options.where;
+          return Promise.resolve({
+            id: 'inv-period',
+            amountMinor: Money.fromMinor(99000),
+            providerInvoiceRef: 'pay_period',
+            status: 'paid',
+            billingMode: 'fixed',
+            refundedMinor: Money.fromMinor(0)
+          });
+        }
+      );
 
       await ctx.service.changePlan('user-1', 'business');
 
-      expect(insertedWhenResolved).toBe(0);
+      // The charge leg is on the books before the source is picked, so the
+      // lookup must exclude it by id - a webhook settling it first would
+      // otherwise make this switch refund the payment it just took.
+      expect(ctx.insertedInvoices[0]['id']).toBe('inv-1');
+      expect(sourceWhere).toMatchObject({ id: Not('inv-1') });
       expect(yoo.refund).toHaveBeenCalledWith(
         'pay_period',
         39600,
         expect.any(String)
       );
+    });
+
+    it('records the charge before asking the provider for the money', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      ctx.invoices.findOne.mockResolvedValue(null);
+      const yoo = provider('yookassa', false);
+      let recordedWhenCharged: InsertedInvoice | undefined;
+      yoo.chargeOffSession.mockImplementation(() => {
+        recordedWhenCharged = { ...ctx.insertedInvoices[0] };
+        return Promise.resolve({
+          providerInvoiceRef: 'pay_change',
+          status: 'captured'
+        });
+      });
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await ctx.service.changePlan('user-1', 'business');
+
+      expect(recordedWhenCharged).toMatchObject({
+        providerEventId: `change-charge:sub-1:business:${periodEnd.getTime()}`,
+        amountMinor: Money.fromMinor(116000),
+        status: 'pending',
+        paidAt: null
+      });
+    });
+
+    it('leaves the captured charge on the books when the closing transaction dies', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      ctx.invoices.findOne.mockResolvedValue(null);
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+      const applyUpdate =
+        ctx.dataSource.manager.update.getMockImplementation() as (
+          target: unknown,
+          criteria: unknown,
+          patch: unknown
+        ) => Promise<{ affected: number }>;
+      // The request dies after the capture: a pool timeout, the provider
+      // deadline unwinding the handler, a restart.
+      ctx.dataSource.manager.update.mockImplementation(
+        (target: unknown, criteria: unknown, patch: unknown) =>
+          target === Subscription
+            ? Promise.reject(new Error('connection terminated'))
+            : applyUpdate(target, criteria, patch)
+      );
+
+      await expect(
+        ctx.service.changePlan('user-1', 'business')
+      ).rejects.toThrow('connection terminated');
+
+      // Without the pre-charge plant this leaves nothing at all: a real
+      // payment with no invoice, no ledger row and no log line.
+      expect(ctx.insertedInvoices).toHaveLength(1);
+      expect(ctx.insertedInvoices[0]).toMatchObject({
+        providerEventId: `change-charge:sub-1:business:${periodEnd.getTime()}`,
+        providerInvoiceRef: 'pay_change',
+        amountMinor: Money.fromMinor(116000)
+      });
+    });
+
+    it('marks the planted row failed when the provider declines the card', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      ctx.invoices.findOne.mockResolvedValue(null);
+      const yoo = provider('yookassa', false);
+      yoo.chargeOffSession.mockRejectedValue(
+        new ChargeDeclinedError('card declined')
+      );
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await expect(
+        ctx.service.changePlan('user-1', 'business')
+      ).rejects.toBeInstanceOf(ChargeDeclinedError);
+
+      // A decline is the one charge failure whose outcome is known, so the
+      // row reads failed rather than lingering as money the customer owes.
+      expect(ctx.insertedInvoices[0]).toMatchObject({ status: 'failed' });
+      expect(yoo.refund).not.toHaveBeenCalled();
+      expect(ctx.emit).not.toHaveBeenCalled();
+    });
+
+    it('leaves the planted row pending when the charge outcome is unknown', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      ctx.invoices.findOne.mockResolvedValue(null);
+      const yoo = provider('yookassa', false);
+      yoo.chargeOffSession.mockRejectedValue(
+        new ProviderTimeoutError('yookassa', 'chargeOffSession', 20000)
+      );
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await expect(
+        ctx.service.changePlan('user-1', 'business')
+      ).rejects.toBeInstanceOf(ProviderTimeoutError);
+
+      // The deadline bounds our call, not the provider's request: the payment
+      // may still capture, and the confirming webhook settles this row.
+      expect(ctx.insertedInvoices[0]).toMatchObject({ status: 'pending' });
     });
 
     it('applies the switch as a two-column guarded write, never as a whole-entity save', async () => {
@@ -1457,8 +1642,20 @@ describe('BillingUserService', () => {
       const yoo = provider('yookassa', false);
       ctx.billing.getProviderById.mockReturnValue(yoo);
       // A cancel (or any guarded column change) landed while the charge was in
-      // flight, so the apply finds no row matching the claim.
-      ctx.dataSource.manager.update.mockResolvedValue({ affected: 0 });
+      // flight, so the apply finds no row matching the claim. Only the
+      // subscription write misses - the invoice legs still settle.
+      const applyUpdate =
+        ctx.dataSource.manager.update.getMockImplementation() as (
+          target: unknown,
+          criteria: unknown,
+          patch: unknown
+        ) => Promise<{ affected: number }>;
+      ctx.dataSource.manager.update.mockImplementation(
+        (target: unknown, criteria: unknown, patch: unknown) =>
+          target === Subscription
+            ? Promise.resolve({ affected: 0 })
+            : applyUpdate(target, criteria, patch)
+      );
 
       await expect(
         ctx.service.changePlan('user-1', 'business')

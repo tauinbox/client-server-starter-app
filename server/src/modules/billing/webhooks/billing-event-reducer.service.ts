@@ -18,6 +18,8 @@ import { PaymentMethod } from '../entities/payment-method.entity';
 import { Plan } from '../entities/plan.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
+import { MetricsService } from '../../core/metrics/metrics.service';
+import { isPlantedBeforeCharge } from '../utils/charge-keys.util';
 import { CreditService } from '../services/credit.service';
 import {
   InvoicePaidEvent,
@@ -70,7 +72,8 @@ export class BillingEventReducer {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly credits: CreditService,
-    private readonly events: EventEmitter2
+    private readonly events: EventEmitter2,
+    private readonly metrics: MetricsService
   ) {}
 
   async reduce(event: NormalizedEvent): Promise<void> {
@@ -320,6 +323,34 @@ export class BillingEventReducer {
     );
   }
 
+  /**
+   * A settled off-session charge that matched no pending invoice. For a flow
+   * that plants its row before charging this is money the core cannot account
+   * for - either nothing was ever recorded under the key, or the row is not in
+   * a state this settle can close - so it is reported at `error` with a counter
+   * behind it. It stays a report, never a throw: throwing would leave the
+   * delivery `received` and the reconciliation sweep would replay it forever.
+   *
+   * The renewal and closing-cancel charges record after the provider answers,
+   * so a webhook winning that race matches nothing routinely; reporting those
+   * would emit a warning per off-session charge and train operators to ignore
+   * the signal.
+   */
+  private reportUnsettledCharge(
+    provider: BillingProviderId,
+    chargeKey: string,
+    payload: NormalizedInvoicePayload
+  ): void {
+    if (!isPlantedBeforeCharge(chargeKey)) {
+      return;
+    }
+    this.metrics.recordUnmatchedOffSessionCharge(provider);
+    this.logger.error(
+      `Off-session charge ${payload.providerInvoiceRef} (${chargeKey}) settled onto no pending invoice: ` +
+        `${payload.amountMinor} ${payload.currency} was captured with nothing to close`
+    );
+  }
+
   private async reduceInvoice(
     provider: BillingProviderId,
     providerEventId: string,
@@ -357,6 +388,7 @@ export class BillingEventReducer {
               { providerEventId: chargeKey },
               { providerInvoiceRef: payload.providerInvoiceRef }
             );
+            this.reportUnsettledCharge(provider, chargeKey, payload);
             return null;
           }
           const invoice = await manager.findOne(Invoice, {

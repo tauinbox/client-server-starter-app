@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import type {
   BillingProviderId,
   InvoiceKind,
@@ -203,6 +204,24 @@ export interface OneTimePaymentSession {
 export interface ChargeResult {
   providerInvoiceRef: string;
   status: 'captured' | 'pending';
+}
+
+/**
+ * A charge the provider refused outright - the card was declined and no money
+ * moved. It is the one charge failure whose outcome is *known*: every other
+ * rejection (a deadline, a dropped socket, a 5xx) leaves the payment's fate
+ * open, because the deadline bounds our call and not the provider's request.
+ * A caller that recorded the charge before making it flips its row to `failed`
+ * only on this error, and leaves it `pending` for the rest.
+ *
+ * Extends `ServiceUnavailableException` so the HTTP surface is unchanged: a
+ * declined self-service plan change still answers 503.
+ */
+export class ChargeDeclinedError extends ServiceUnavailableException {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ChargeDeclinedError';
+  }
 }
 
 /** Net immediate cost of a delegated plan change, from the provider's preview. */
