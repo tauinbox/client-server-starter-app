@@ -28,6 +28,7 @@ import type {
 import { PaymentMethod } from '../entities/payment-method.entity';
 import { CreditService } from '../services/credit.service';
 import { BillingEventReducer } from './billing-event-reducer.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 
 interface ManagerStubs {
   subscription: Subscription | null;
@@ -123,9 +124,12 @@ async function build(stubs: Partial<ManagerStubs> = {}) {
     spendOnUsage: jest.fn().mockResolvedValue(undefined)
   };
 
+  const metrics = { recordUnmatchedOffSessionCharge: jest.fn() };
+
   const module = await Test.createTestingModule({
     providers: [
       BillingEventReducer,
+      { provide: MetricsService, useValue: metrics },
       { provide: getDataSourceToken(), useValue: dataSource },
       { provide: CreditService, useValue: credits },
       { provide: EventEmitter2, useValue: { emit } }
@@ -138,7 +142,8 @@ async function build(stubs: Partial<ManagerStubs> = {}) {
     bareManager,
     dataSource,
     emit,
-    credits
+    credits,
+    metrics
   };
 }
 
@@ -755,6 +760,57 @@ describe('BillingEventReducer', () => {
       );
       expect(credits.spendOnUsage).not.toHaveBeenCalled();
       expect(emit).not.toHaveBeenCalled();
+    });
+
+    it('reports a plan-change charge that settled onto no pending invoice', async () => {
+      const { reducer, metrics } = await build({
+        updateAffected: 0,
+        invoice: null
+      });
+      const logged = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+
+      await reducer.reduce(
+        event(
+          'invoice.paid',
+          {
+            ...offSessionPayload,
+            offSessionChargeKey: 'change-charge:sub-1:business:123'
+          },
+          'yookassa'
+        )
+      );
+
+      // The plan change plants its invoice before charging, so a settle that
+      // matches nothing is money the core cannot account for.
+      expect(logged).toHaveBeenCalledWith(
+        expect.stringContaining('settled onto no pending invoice')
+      );
+      expect(metrics.recordUnmatchedOffSessionCharge).toHaveBeenCalledWith(
+        'yookassa'
+      );
+      logged.mockRestore();
+    });
+
+    it('stays silent when a renewal webhook wins the race against the local insert', async () => {
+      const { reducer, metrics } = await build({
+        updateAffected: 0,
+        invoice: null
+      });
+      const logged = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+
+      await reducer.reduce(
+        event('invoice.paid', offSessionPayload, 'yookassa')
+      );
+
+      // A renewal records after the provider answers, so losing that race is
+      // routine - reporting it would train operators to ignore the signal.
+      expect(logged).not.toHaveBeenCalled();
+      expect(metrics.recordUnmatchedOffSessionCharge).not.toHaveBeenCalled();
+      logged.mockRestore();
     });
 
     it('logs a mismatch between the charged and the recorded amount, and still settles', async () => {

@@ -30,6 +30,7 @@ import { FixedRating } from '../src/modules/billing/rating/fixed-rating.strategy
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
+import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import { WebhookIngestionService } from '../src/modules/billing/webhooks/webhook-ingestion.service';
 import { BillingWebhooksController } from '../src/modules/billing/webhooks/billing-webhooks.controller';
@@ -341,6 +342,10 @@ describe('Billing payment-method update flow (e2e)', () => {
       providers: [
         WebhookIngestionService,
         BillingEventReducer,
+        {
+          provide: MetricsService,
+          useValue: { recordUnmatchedOffSessionCharge: jest.fn() }
+        },
         RenewalService,
         FixedRating,
         UsageRating,

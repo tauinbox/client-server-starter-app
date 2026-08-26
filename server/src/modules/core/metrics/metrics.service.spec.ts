@@ -46,6 +46,10 @@ describe('MetricsService', () => {
         {
           provide: getToken('billing_usage_records_unrated_total'),
           useValue: mockCounter
+        },
+        {
+          provide: getToken('billing_off_session_charges_unmatched_total'),
+          useValue: mockCounter
         }
       ]
     }).compile();
@@ -135,6 +139,14 @@ describe('MetricsService', () => {
         cache: 'feature_flags',
         outcome: 'miss'
       });
+    });
+  });
+
+  describe('recordUnmatchedOffSessionCharge', () => {
+    it('increments the counter labelled by provider', () => {
+      service.recordUnmatchedOffSessionCharge('yookassa');
+
+      expect(mockCounter.inc).toHaveBeenCalledWith({ provider: 'yookassa' });
     });
   });
 

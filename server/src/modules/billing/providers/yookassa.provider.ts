@@ -22,7 +22,10 @@ import type { Customer } from '../entities/customer.entity';
 import { PaymentMethod } from '../entities/payment-method.entity';
 import type { Plan } from '../entities/plan.entity';
 import { YOOKASSA_CLIENT } from './yookassa.client';
-import { WEBHOOK_IGNORED } from './payment-provider.interface';
+import {
+  ChargeDeclinedError,
+  WEBHOOK_IGNORED
+} from './payment-provider.interface';
 import type {
   CancelMode,
   ChargeResult,
@@ -389,7 +392,7 @@ export class YooKassaProvider implements PaymentProvider {
     // payment-after-receipt fiscalization window) may still cancel at capture,
     // so it is reported as `pending`, never as captured funds.
     if (payment.status === 'canceled') {
-      throw new ServiceUnavailableException(
+      throw new ChargeDeclinedError(
         `YooKassa charge for customer "${customer.id}" was declined`
       );
     }

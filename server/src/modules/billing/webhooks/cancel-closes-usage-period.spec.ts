@@ -9,6 +9,7 @@ import { UsageRating } from '../rating/usage-rating.strategy';
 import { CreditService } from '../services/credit.service';
 import { UsageInvoicingService } from '../services/usage-invoicing.service';
 import { BillingEventReducer } from './billing-event-reducer.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import type { NormalizedEvent } from '../providers/payment-provider.interface';
 
 const PERIOD_START = new Date('2026-05-01T00:00:00Z');
@@ -67,6 +68,10 @@ async function build() {
     imports: [EventEmitterModule.forRoot()],
     providers: [
       BillingEventReducer,
+      {
+        provide: MetricsService,
+        useValue: { recordUnmatchedOffSessionCharge: jest.fn() }
+      },
       UsageInvoicingService,
       { provide: getDataSourceToken(), useValue: dataSource },
       {

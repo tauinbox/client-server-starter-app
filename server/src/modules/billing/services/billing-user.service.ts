@@ -9,7 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import {
@@ -38,14 +38,17 @@ import { Plan } from '../entities/plan.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { InvoicePaidEvent, PlanChangedEvent } from '../events/billing.events';
+import { ChargeDeclinedError } from '../providers/payment-provider.interface';
 import type {
   CancelMode,
+  ChargeResult,
   PaymentProvider
 } from '../providers/payment-provider.interface';
 import { ProrationCalculator } from '../rating/proration-calculator';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
 import { addInterval } from '../utils/period.util';
+import { changeChargeKey, changeRefundKey } from '../utils/charge-keys.util';
 import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
 import {
   lockInvoice,
@@ -593,35 +596,51 @@ export class BillingUserService {
     await this.claimChange(subscription);
 
     const periodEndMs = subscription.currentPeriodEnd.getTime();
-    const chargeKey = `change-charge:${subscription.id}:${toPlan.key}:${periodEndMs}`;
-    const refundKey = `change-refund:${subscription.id}:${toPlan.key}:${periodEndMs}`;
+    const chargeKey = changeChargeKey(subscription.id, toPlan.key, periodEndMs);
+    const refundKey = changeRefundKey(subscription.id, toPlan.key, periodEndMs);
 
     // External legs run outside the DB transaction — a provider HTTP call must
     // never be held inside an open transaction. Both keys are stable across
     // retries so a replay reconciles instead of charging/refunding twice.
+    const chargeAmount = quote?.chargeMinor ?? 0;
+    let chargeInvoiceId: string | null = null;
     let chargeRef: string | null = null;
     let chargeCaptured = true;
     if (quote && quote.chargeMinor > 0) {
-      const charge = await provider.chargeOffSession(
+      chargeInvoiceId = await this.plantChangeCharge({
+        subscription,
         customer,
-        quote.chargeMinor,
-        quote.chargeItems,
-        chargeKey
-      );
+        providerEventId: chargeKey,
+        amountMinor: chargeAmount,
+        billingMode: toPlan.billingMode
+      });
+      let charge: ChargeResult;
+      try {
+        charge = await provider.chargeOffSession(
+          customer,
+          quote.chargeMinor,
+          quote.chargeItems,
+          chargeKey
+        );
+      } catch (error) {
+        await this.failPlantedCharge(chargeKey, error);
+        throw error;
+      }
       chargeRef = charge.providerInvoiceRef;
-      // An accepted-but-uncaptured charge (payment-after-receipt) is recorded
-      // as a pending invoice; the confirming webhook settles it to paid (and
-      // emits InvoicePaidEvent) or fails it. The switch itself proceeds.
+      // Uncaptured (payment-after-receipt) stays pending for the webhook.
       chargeCaptured = charge.status === 'captured';
+      await this.recordChargeRef(chargeKey, chargeRef);
     }
 
-    // The reservation is taken here rather than up front: it must land after the
-    // charge (a charge failure aborts the switch and would strand it) and still
-    // before the new charge invoice is inserted below, so the invoice this path
-    // is about to record can never become its own refund source.
+    // Reserved after the charge, since a charge failure aborts the switch and
+    // would strand the reservation; the charge leg is excluded by id.
     const refund =
       quote && quote.refundMinor > 0
-        ? await this.reserveProrationRefund(subscription, quote.refundMinor)
+        ? await this.reserveProrationRefund(
+            subscription,
+            quote.refundMinor,
+            chargeInvoiceId
+          )
         : null;
 
     let refundIssued = false;
@@ -647,22 +666,13 @@ export class BillingUserService {
     // A guarded apply that loses to a concurrent writer still commits the legs:
     // the money already left, and the paid webhook only settles an invoice this
     // path planted — it never inserts one, so nothing else would record it.
-    const chargeAmount = quote?.chargeMinor ?? 0;
-    const { saved, chargeInvoiceId } = await withTransaction(
+    const { saved, chargeSettled } = await withTransaction(
       this.dataSource,
       async (manager) => {
-        let chargeInvoiceId: string | null = null;
-        if (chargeRef) {
-          chargeInvoiceId = await this.insertChangeInvoice(manager, {
-            subscription,
-            customer,
-            providerEventId: chargeKey,
-            providerInvoiceRef: chargeRef,
-            amountMinor: chargeAmount,
-            status: chargeCaptured ? 'paid' : 'pending',
-            billingMode: toPlan.billingMode
-          });
-        }
+        const chargeSettled =
+          chargeRef && chargeCaptured
+            ? await this.settleChangeCharge(manager, chargeKey, chargeRef)
+            : false;
         if (refundIssued && refund) {
           await this.insertChangeInvoice(manager, {
             subscription,
@@ -679,7 +689,7 @@ export class BillingUserService {
           subscription,
           toPlan
         );
-        return { saved, chargeInvoiceId };
+        return { saved, chargeSettled };
       }
     );
 
@@ -694,7 +704,9 @@ export class BillingUserService {
         )
       );
     }
-    if (chargeInvoiceId && chargeCaptured) {
+    // The webhook runs the same guarded flip, so gating on the win is what
+    // keeps exactly one side announcing the payment.
+    if (chargeInvoiceId && chargeSettled) {
       this.events.emit(
         InvoicePaidEvent.name,
         new InvoicePaidEvent(userId, chargeInvoiceId)
@@ -895,17 +907,24 @@ export class BillingUserService {
    * remainder and writing it back around an HTTP round-trip would instead
    * overwrite whatever committed in between, and the erased amount could then
    * be paid out a second time.
+   *
+   * `excludeInvoiceId` keeps the caller's own charge leg out of the candidates,
+   * so a switch can never refund the payment it just took. The id is matched
+   * rather than the charge key because `provider_event_id` is nullable and a
+   * `!=` on it would drop every row that has none.
    */
   private async reserveProrationRefund(
     subscription: Subscription,
-    refundMinor: number
+    refundMinor: number,
+    excludeInvoiceId: string | null = null
   ): Promise<{ source: Invoice; minor: number } | null> {
     return withTransaction(this.dataSource, async (manager) => {
       const source = await lockInvoice(manager, {
         where: {
           subscriptionId: subscription.id,
           status: 'paid',
-          billingMode: 'fixed'
+          billingMode: 'fixed',
+          ...(excludeInvoiceId ? { id: Not(excludeInvoiceId) } : {})
         },
         order: { createdAt: 'DESC' }
       });
@@ -968,6 +987,106 @@ export class BillingUserService {
       new PlanChangedEvent(customer.userId, saved.id, fromPlan.key, toPlan.key)
     );
     return saved;
+  }
+
+  /**
+   * Records the charge leg as a `pending` invoice BEFORE the provider is asked
+   * for the money, so a request that dies between the capture and the closing
+   * transaction - the provider deadline, a pool timeout, a restart - still
+   * leaves the payment on the books. A plan change is user-driven and runs
+   * once, so unlike a renewal there is no later scan to reconcile it, and an
+   * unrecorded charge is not even refundable through the admin console (that
+   * route is addressed by invoice id).
+   *
+   * Same construction as the usage close (`UsageInvoicingService`): the row
+   * carries no provider ref yet - `recordChargeRef` writes the real one the
+   * moment the provider answers - and a replayed change loses the `orIgnore`
+   * insert and reuses the row already under the key.
+   */
+  private async plantChangeCharge(args: {
+    subscription: Subscription;
+    customer: Customer;
+    providerEventId: string;
+    amountMinor: number;
+    billingMode: Plan['billingMode'];
+  }): Promise<string | null> {
+    const planted = await this.insertChangeInvoice(this.dataSource.manager, {
+      ...args,
+      providerInvoiceRef: '',
+      status: 'pending'
+    });
+    if (planted) {
+      return planted;
+    }
+    const existing = await this.invoices.findOne({
+      where: { providerEventId: args.providerEventId }
+    });
+    return existing?.id ?? null;
+  }
+
+  /**
+   * Attaches the provider's payment reference to the planted row as soon as the
+   * charge returns, in its own committed write. The status is left alone: the
+   * row stays `pending` until the closing transaction settles it, which is what
+   * keeps it out of the refund-source lookup that runs in between.
+   */
+  private async recordChargeRef(
+    chargeKey: string,
+    providerInvoiceRef: string
+  ): Promise<void> {
+    await this.invoices.update(
+      { providerEventId: chargeKey },
+      { providerInvoiceRef }
+    );
+  }
+
+  /**
+   * Marks the planted row failed, and only for a charge the provider refused
+   * outright. Every other rejection leaves the outcome open - the deadline
+   * bounds our call, not the provider's request - so the row stays `pending`
+   * and the confirming webhook settles it if the money did move; writing
+   * `failed` there would contradict a capture already in flight and block that
+   * settle. A failure to record this is logged, never raised: the charge error
+   * is what the caller must see.
+   */
+  private async failPlantedCharge(
+    chargeKey: string,
+    error: unknown
+  ): Promise<void> {
+    if (!(error instanceof ChargeDeclinedError)) {
+      return;
+    }
+    try {
+      await this.invoices.update(
+        { providerEventId: chargeKey, status: 'pending' },
+        { status: 'failed' }
+      );
+    } catch (updateError) {
+      this.logger.error(
+        `Failed to mark declined proration charge ${chargeKey} as failed: ${(updateError as Error).message}`
+      );
+    }
+  }
+
+  /**
+   * Settles the planted charge leg once the funds are captured, guarded on the
+   * status so the confirming webhook's identical flip and this one cannot both
+   * win. Returns whether this call is the winner - the caller announces the
+   * payment only then. A row left `failed` by a prior declined attempt settles
+   * too (this one went through outside the provider's idempotence window); a
+   * `paid` or `refunded` row is untouched.
+   */
+  private async settleChangeCharge(
+    manager: EntityManager,
+    chargeKey: string,
+    providerInvoiceRef: string
+  ): Promise<boolean> {
+    const flip = await manager.update(
+      Invoice,
+      { providerEventId: chargeKey, status: In(['pending', 'failed']) },
+      { status: 'paid', providerInvoiceRef, paidAt: new Date() }
+    );
+    return flip.affected === 1;
   }
 
   /**

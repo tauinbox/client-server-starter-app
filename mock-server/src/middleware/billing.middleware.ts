@@ -827,10 +827,9 @@ billingRouter.post(
       const quote = prorationQuote(fromPlan, toPlan, sub.provider, sub, now);
       const state = getState();
 
-      // Resolve the refund source BEFORE recording the new charge so the charge
-      // can't become its own refund source (mirrors the server's ordering). The
-      // refund is the latest paid fixed invoice that paid for the outgoing plan,
-      // capped by what is still unrefunded on it.
+      // Resolved before the new charge is recorded so the charge can't become
+      // its own refund source (the server has a provider call in between, so it
+      // excludes its charge row by id instead), and capped by the remainder.
       const source = [...state.billingInvoices.values()]
         .filter(
           (i) =>
