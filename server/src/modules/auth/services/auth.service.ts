@@ -429,6 +429,9 @@ export class AuthService {
         // this the reset succeeds and the new password is still answered 423.
         failedLoginAttempts: 0,
         lockedUntil: null,
+        // Redeeming the token is the same proof of mailbox control that the
+        // verification link carries: it is only ever mailed to user.email.
+        isEmailVerified: true,
         tokenRevokedAt: new Date()
       });
       await manager.delete(RefreshToken, { userId: user.id });
