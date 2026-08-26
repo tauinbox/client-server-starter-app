@@ -442,6 +442,10 @@ router.post('/reset-password', (req, res) => {
   user.failedLoginAttempts = 0;
   user.lockedUntil = null;
 
+  // Redeeming the token is the same proof of mailbox control that the
+  // verification link carries: it is only ever mailed to the address on the row.
+  user.isEmailVerified = true;
+
   // Cancel any in-flight self-service email change — proof of email ownership
   // is invalidated when password ownership changes.
   if (user.pendingEmailToken) {

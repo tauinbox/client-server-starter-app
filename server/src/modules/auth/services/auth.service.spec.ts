@@ -868,6 +868,25 @@ describe('AuthService', () => {
       );
     });
 
+    // Regression: redeeming the token proves mailbox control, but the flag
+    // stayed false, so an unverified account was answered 403 after recovery
+    it('should mark the email verified for the account it resets', async () => {
+      mockUsersService.findByPasswordResetToken.mockResolvedValue({
+        ...mockUser,
+        isEmailVerified: false,
+        password: null,
+        passwordResetExpiresAt: new Date(Date.now() + 3600000)
+      });
+
+      await service.resetPassword('valid-token', 'NewPassword1');
+
+      expect(mockManager.update).toHaveBeenCalledWith(
+        expect.anything(),
+        'user-1',
+        expect.objectContaining({ isEmailVerified: true })
+      );
+    });
+
     it('should throw 400 when token not found', async () => {
       mockUsersService.findByPasswordResetToken.mockResolvedValue(null);
 
