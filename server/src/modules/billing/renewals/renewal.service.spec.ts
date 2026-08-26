@@ -293,12 +293,14 @@ async function build(
   usageSum: jest.Mock = jest.fn().mockResolvedValue(null),
   availableCredits = 0,
   findOffSessionCharge: jest.Mock = jest.fn().mockResolvedValue(null),
-  deadlineMs = 0
+  deadlineMs = 0,
+  getOffSessionCharge: jest.Mock = jest.fn().mockResolvedValue(null)
 ): Promise<{
   service: RenewalService;
   emit: jest.Mock;
   charge: jest.Mock;
   findCharge: jest.Mock;
+  getCharge: jest.Mock;
   credits: { availableUnits: jest.Mock; spendOnUsage: jest.Mock };
 }> {
   const emit = jest.fn();
@@ -318,6 +320,7 @@ async function build(
     startCheckout: jest.fn(),
     chargeOffSession,
     findOffSessionCharge,
+    getOffSessionCharge,
     createOneTimePayment: jest.fn(),
     chargeUsage: jest.fn(),
     changePlan: jest.fn(),
@@ -388,6 +391,7 @@ async function build(
     emit,
     charge: chargeOffSession,
     findCharge: findOffSessionCharge,
+    getCharge: getOffSessionCharge,
     credits
   };
 }
@@ -1512,21 +1516,30 @@ describe('RenewalService', () => {
     it('settles the pending invoice and advances when the poll finds it captured', async () => {
       const sub = makeSub();
       const store = baseStore(sub);
-      const findCharge = jest.fn().mockResolvedValue({
+      const getCharge = jest.fn().mockResolvedValue({
         providerInvoiceRef: 'pay_pend',
         status: 'captured'
       });
+      const findCharge = jest.fn();
       const { service, emit, charge } = await build(
         store,
         pendingCharge(),
         undefined,
         0,
-        findCharge
+        findCharge,
+        0,
+        getCharge
       );
 
       await service.runDueRenewals(NOW);
       await service.runDueRenewals(NOW);
 
+      // The recorded reference answers the poll directly: no shop-wide scan.
+      expect(getCharge).toHaveBeenCalledWith(
+        'pay_pend',
+        'renewal:sub-1:' + new Date('2026-06-01T00:00:00Z').getTime()
+      );
+      expect(findCharge).not.toHaveBeenCalled();
       expect(charge).toHaveBeenCalledTimes(1);
       expect(store.invoices).toHaveLength(1);
       expect(store.invoices[0]).toMatchObject({
@@ -1547,7 +1560,7 @@ describe('RenewalService', () => {
     it('keeps waiting while the poll reports the charge still pending', async () => {
       const sub = makeSub();
       const store = baseStore(sub);
-      const findCharge = jest.fn().mockResolvedValue({
+      const getCharge = jest.fn().mockResolvedValue({
         providerInvoiceRef: 'pay_pend',
         status: 'pending'
       });
@@ -1556,7 +1569,9 @@ describe('RenewalService', () => {
         pendingCharge(),
         undefined,
         0,
-        findCharge
+        undefined,
+        0,
+        getCharge
       );
 
       await service.runDueRenewals(NOW);
@@ -1568,16 +1583,83 @@ describe('RenewalService', () => {
       expect(emit).not.toHaveBeenCalled();
     });
 
+    it('scans for the charge when the pending row carries no provider reference', async () => {
+      const sub = makeSub();
+      const store = baseStore(sub);
+      const anchorMs = new Date('2026-06-01T00:00:00Z').getTime();
+      // @ts-expect-error - partial Invoice fake for this scenario
+      const preInvoice: Invoice & { providerEventId: string | null } = {
+        id: 'inv-pre',
+        providerEventId: `renewal:sub-1:${anchorMs}`,
+        status: 'pending',
+        providerInvoiceRef: '',
+        creditUnitsApplied: 0
+      };
+      store.invoices.push(preInvoice);
+      const findCharge = jest.fn().mockResolvedValue({
+        providerInvoiceRef: 'pay_scan',
+        status: 'pending'
+      });
+      const getCharge = jest.fn();
+      const { service, charge } = await build(
+        store,
+        jest.fn(),
+        undefined,
+        0,
+        findCharge,
+        0,
+        getCharge
+      );
+
+      await service.runDueRenewals(NOW);
+
+      expect(getCharge).not.toHaveBeenCalled();
+      expect(findCharge).toHaveBeenCalledWith(
+        `renewal:sub-1:${anchorMs}`,
+        new Date('2026-06-01T00:00:00Z')
+      );
+      expect(charge).not.toHaveBeenCalled();
+    });
+
+    it('skips the cycle without failing the invoice when the poll itself errors', async () => {
+      const sub = makeSub();
+      const store = baseStore(sub);
+      const getCharge = jest
+        .fn()
+        .mockRejectedValue(new Error('payment lookup down'));
+      const { service, emit } = await build(
+        store,
+        pendingCharge(),
+        undefined,
+        0,
+        undefined,
+        0,
+        getCharge
+      );
+
+      await service.runDueRenewals(NOW);
+      await service.runDueRenewals(NOW);
+
+      // An unreadable payment is an unknown outcome, not a decline: the row
+      // stays pending and dunning is untouched so no second charge is posted.
+      expect(store.invoices[0]).toMatchObject({ status: 'pending' });
+      expect(sub.status).toBe('active');
+      expect(sub.dunningAttempts).toBe(0);
+      expect(emit).not.toHaveBeenCalled();
+    });
+
     it('fails the invoice and enters dunning when the pending charge cancels at capture', async () => {
       const sub = makeSub();
       const store = baseStore(sub);
-      const findCharge = jest.fn().mockResolvedValue(null);
+      const getCharge = jest.fn().mockResolvedValue(null);
       const { service, emit, credits } = await build(
         store,
         pendingCharge(),
         undefined,
         0,
-        findCharge
+        undefined,
+        0,
+        getCharge
       );
 
       await service.runDueRenewals(NOW);
@@ -1646,7 +1728,7 @@ describe('RenewalService', () => {
         })
       );
       const sum = jest.fn().mockResolvedValue(142);
-      const findCharge = jest.fn().mockResolvedValue({
+      const getCharge = jest.fn().mockResolvedValue({
         providerInvoiceRef: 'pay_pend',
         status: 'captured'
       });
@@ -1655,7 +1737,9 @@ describe('RenewalService', () => {
         pendingCharge(),
         sum,
         10,
-        findCharge
+        undefined,
+        0,
+        getCharge
       );
 
       await service.runDueRenewals(NOW);
@@ -1746,7 +1830,7 @@ describe('RenewalService', () => {
         providerInvoiceRef: 'pay_real',
         status: 'pending'
       });
-      const findCharge = jest.fn().mockResolvedValue({
+      const getCharge = jest.fn().mockResolvedValue({
         providerInvoiceRef: 'pay_real',
         status: 'pending'
       });
@@ -1755,7 +1839,9 @@ describe('RenewalService', () => {
         charge,
         usageSum(),
         10,
-        findCharge
+        undefined,
+        0,
+        getCharge
       );
 
       await service.runDueRenewals(NOW);
@@ -1771,7 +1857,7 @@ describe('RenewalService', () => {
       credits.availableUnits.mockResolvedValue(40);
       await service.runDueRenewals(NOW);
 
-      expect(findCharge).toHaveBeenCalledTimes(1);
+      expect(getCharge).toHaveBeenCalledTimes(1);
       expect(charge).toHaveBeenCalledTimes(1);
       expect(store.invoices).toHaveLength(1);
       expect(store.invoices[0]).toMatchObject({
@@ -1793,7 +1879,7 @@ describe('RenewalService', () => {
         providerInvoiceRef: 'pay_real',
         status: 'pending'
       });
-      const findCharge = jest.fn().mockResolvedValue({
+      const getCharge = jest.fn().mockResolvedValue({
         providerInvoiceRef: 'pay_real',
         status: 'captured'
       });
@@ -1802,7 +1888,9 @@ describe('RenewalService', () => {
         charge,
         usageSum(),
         10,
-        findCharge
+        undefined,
+        0,
+        getCharge
       );
 
       await service.runDueRenewals(NOW);
@@ -1890,7 +1978,7 @@ describe('RenewalService', () => {
         providerInvoiceRef: 'pay_fix',
         status: 'pending'
       });
-      const findCharge = jest.fn().mockResolvedValue({
+      const getCharge = jest.fn().mockResolvedValue({
         providerInvoiceRef: 'pay_fix',
         status: 'pending'
       });
@@ -1899,7 +1987,9 @@ describe('RenewalService', () => {
         charge,
         undefined,
         0,
-        findCharge
+        undefined,
+        0,
+        getCharge
       );
 
       await service.runDueRenewals(NOW);
@@ -1911,7 +2001,7 @@ describe('RenewalService', () => {
       store.plans[0].prices = { yookassa: { currency: 'RUB', amountMinor: 0 } };
       await service.runDueRenewals(NOW);
 
-      expect(findCharge).toHaveBeenCalledTimes(1);
+      expect(getCharge).toHaveBeenCalledTimes(1);
       expect(store.invoices).toHaveLength(1);
       expect(store.invoices[0]).toMatchObject({
         status: 'pending',

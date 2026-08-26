@@ -66,6 +66,16 @@ const ONE_TIME_PURPOSE = 'one_time';
 const OFF_SESSION_PURPOSE = 'off_session';
 
 /**
+ * Page cap on the shop-wide scan that locates a charge whose payment reference
+ * was never recorded, at 100 payments a page. It bounds a walk the provider
+ * cannot narrow — `getPaymentList` filters on `created_at`, `captured_at`,
+ * `payment_method` and `status` only, none of which select a customer or a
+ * metadata key — so the reachable window is the shop's whole payment volume
+ * since the period anchor.
+ */
+const OFF_SESSION_SCAN_MAX_PAGES = 20;
+
+/**
  * Minor units -> YooKassa decimal string, e.g. `99000` RUB -> `'990.00'`. The
  * decimal scale comes from the currency, not a fixed 2, so a zero- or
  * three-decimal currency is not shifted by two orders of magnitude.
@@ -403,23 +413,56 @@ export class YooKassaProvider implements PaymentProvider {
   }
 
   /**
+   * One request against the payment the core recorded, so a charge whose
+   * reference is known never pays for the shop-wide scan below. The verdict
+   * mirrors `findOffSessionCharge`, including `canceled` reading as `null`
+   * (a hard decline legitimately re-charges); a payment whose metadata carries
+   * a different `chargeKey` is a mismatched reference, which is inconclusive
+   * rather than an absent charge and so fails loudly.
+   */
+  async getOffSessionCharge(
+    providerInvoiceRef: string,
+    chargeKey: string
+  ): Promise<ChargeResult | null> {
+    const yoo = this.requireClient();
+    const payment = await yoo.getPayment(providerInvoiceRef);
+    if (offSessionChargeKeyFrom(payment.metadata) !== chargeKey) {
+      throw new ServiceUnavailableException(
+        `YooKassa payment "${providerInvoiceRef}" does not carry charge key "${chargeKey}"`
+      );
+    }
+    if (payment.status === 'canceled') {
+      return null;
+    }
+    return {
+      providerInvoiceRef: payment.id,
+      status: payment.status === 'succeeded' ? 'captured' : 'pending'
+    };
+  }
+
+  /**
    * YooKassa cannot look a payment up by its `Idempotence-Key` (the key store
-   * lives ~24h, far shorter than the 3-day dunning spacing), so the prior
-   * attempt is found by scanning the payment list for the `chargeKey` echoed
-   * through `metadata` by `chargeOffSession`. `canceled` payments are skipped —
-   * a hard decline legitimately re-charges. The scan is bounded: if the key is
-   * not settled within the page cap, the lookup fails loudly (the renewal
-   * scheduler skips the cycle and retries) rather than green-lighting a charge
-   * that may duplicate a captured payment.
+   * lives ~24h, far shorter than the 3-day dunning spacing), so a charge whose
+   * reference was never recorded — an attempt that threw before writing its
+   * invoice row — is found by scanning the payment list for the `chargeKey`
+   * echoed through `metadata` by `chargeOffSession`. `canceled` payments are
+   * skipped — a hard decline legitimately re-charges. Prefer
+   * `getOffSessionCharge` whenever the reference is known.
+   *
+   * The scan is bounded: if the key is not settled within the page cap, the
+   * lookup fails loudly (the renewal scheduler skips the cycle and retries)
+   * rather than green-lighting a charge that may duplicate a captured payment.
+   * The cap is a last-resort stop, not the operative bound — the whole call
+   * runs inside one provider deadline (`DeadlineBoundProvider`), so on a busy
+   * shop the deadline trips first and raising the cap alone changes nothing.
    */
   async findOffSessionCharge(
     chargeKey: string,
     createdAfter: Date
   ): Promise<ChargeResult | null> {
     const yoo = this.requireClient();
-    const maxPages = 20;
     let cursor: string | undefined;
-    for (let page = 0; page < maxPages; page++) {
+    for (let page = 0; page < OFF_SESSION_SCAN_MAX_PAGES; page++) {
       const list = await yoo.getPaymentList({
         created_at: { value: createdAfter.toISOString(), mode: 'gte' },
         limit: 100,
@@ -442,7 +485,7 @@ export class YooKassaProvider implements PaymentProvider {
       cursor = list.next_cursor;
     }
     throw new ServiceUnavailableException(
-      `YooKassa payment scan for charge key "${chargeKey}" exceeded ${maxPages} pages without a definitive answer`
+      `YooKassa payment scan for charge key "${chargeKey}" exceeded ${OFF_SESSION_SCAN_MAX_PAGES} pages without a definitive answer`
     );
   }
 

@@ -270,6 +270,22 @@ export interface PaymentProvider {
     createdAfter: Date
   ): Promise<ChargeResult | null>;
   /**
+   * Reads a single off-session charge the core already recorded the provider
+   * reference of, and answers the same captured/pending/`null` verdict as
+   * `findOffSessionCharge` — `null` only for a hard decline. Preferred over the
+   * scan wherever the reference is known: it is one request against one payment
+   * instead of a shop-wide list walk whose page cap a busy shop can exhaust.
+   * `chargeKey` is not a filter but an assertion — the reference must belong to
+   * the charge posted under that key, and a payment that carries a different
+   * one (or none) is inconclusive, not "no charge", so it fails loudly rather
+   * than green-lighting a second charge. Rejected by provider-managed (Paddle)
+   * lifecycles, which never charge off-session.
+   */
+  getOffSessionCharge(
+    providerInvoiceRef: string,
+    chargeKey: string
+  ): Promise<ChargeResult | null>;
+  /**
    * Starts a standalone one-time payment — no subscription, no
    * saved payment method. Paddle: `transactions.create` with the catalog
    * `paddlePriceId` or an inline price; YooKassa: `createPayment` with a 54-FZ

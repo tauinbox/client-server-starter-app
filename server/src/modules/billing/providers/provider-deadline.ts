@@ -107,6 +107,15 @@ export class DeadlineBoundProvider implements PaymentProvider {
     );
   }
 
+  getOffSessionCharge(
+    providerInvoiceRef: string,
+    chargeKey: string
+  ): Promise<ChargeResult | null> {
+    return this.bound('getOffSessionCharge', () =>
+      this.inner.getOffSessionCharge(providerInvoiceRef, chargeKey)
+    );
+  }
+
   createOneTimePayment(
     customer: Customer,
     params: OneTimePaymentParams

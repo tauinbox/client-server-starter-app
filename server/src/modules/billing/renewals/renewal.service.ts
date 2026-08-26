@@ -452,7 +452,15 @@ export class RenewalService {
     if (existing?.status === 'pending') {
       let found: ChargeResult | null;
       try {
-        found = await provider.findOffSessionCharge(idempotencyKey, anchor);
+        // Every writer of a pending row records the provider's payment
+        // reference, so the poll reads that one payment instead of walking the
+        // shop's list; the scan stays as the fallback for a row without one.
+        found = existing.providerInvoiceRef
+          ? await provider.getOffSessionCharge(
+              existing.providerInvoiceRef,
+              idempotencyKey
+            )
+          : await provider.findOffSessionCharge(idempotencyKey, anchor);
       } catch (error) {
         this.logger.error(
           `Pending-charge poll failed for subscription ${subscription.id}: ${(error as Error).message}`
