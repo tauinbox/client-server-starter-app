@@ -56,7 +56,6 @@ describe('AuthService', () => {
     markEmailVerified: jest.Mock;
     setPasswordResetToken: jest.Mock;
     findByPasswordResetToken: jest.Mock;
-    clearPasswordResetToken: jest.Mock;
     clearPendingEmailChange: jest.Mock;
     update: jest.Mock;
   };
@@ -176,7 +175,6 @@ describe('AuthService', () => {
       markEmailVerified: jest.fn().mockResolvedValue(undefined),
       setPasswordResetToken: jest.fn().mockResolvedValue(undefined),
       findByPasswordResetToken: jest.fn(),
-      clearPasswordResetToken: jest.fn().mockResolvedValue(undefined),
       clearPendingEmailChange: jest.fn().mockResolvedValue(undefined),
       update: jest.fn().mockResolvedValue(mockUser)
     };
