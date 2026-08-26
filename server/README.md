@@ -751,7 +751,7 @@ Base URL: `/api/v1`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/register` | None | Register user (sends verification email) |
+| POST | `/register` | None | Register user (sends verification email). A taken address answers 409 and writes a `USER_REGISTER_CONFLICT` audit row — account existence is deliberately discoverable here, so the mitigation is detection (see the "Account enumeration" row in the security section of the project spec) |
 | POST | `/login` | None | Login, returns JWT + refresh token |
 | POST | `/refresh-token` | None | Refresh access token |
 | POST | `/logout` | Bearer | Revoke all refresh tokens |

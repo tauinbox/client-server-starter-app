@@ -60,6 +60,17 @@ function emailExistsConflict(): HttpException {
   );
 }
 
+function isEmailExistsConflict(error: unknown): boolean {
+  if (!(error instanceof HttpException)) return false;
+  const response = error.getResponse();
+  return (
+    typeof response === 'object' &&
+    response !== null &&
+    'errorKey' in response &&
+    response.errorKey === ErrorKeys.USERS.EMAIL_EXISTS
+  );
+}
+
 const ENUMERATION_SAFE_INITIATE_RESPONSE = {
   message:
     'If the new email is available, a confirmation link has been sent to it.'
@@ -217,42 +228,58 @@ export class AuthService {
 
     // Create user and set verification token atomically so a partial failure
     // never leaves a user without a token (which would prevent email verification).
-    const user = await withTransaction(this.dataSource, async (manager) => {
-      // Also reject if another user holds this address as a pending email
-      // change — otherwise two accounts could claim the same address in flight.
-      const existing = await manager.findOne(User, {
-        where: [
-          { email: registerDto.email },
-          { pendingEmail: registerDto.email }
-        ]
-      });
-      if (existing) {
-        throw emailExistsConflict();
-      }
-
-      let newUser: User;
-      try {
-        newUser = await manager.save(User, {
-          ...registerDto,
-          password: hashedPassword,
-          emailVerificationToken: hashedToken,
-          emailVerificationExpiresAt: expiresAt
+    let user: User;
+    try {
+      user = await withTransaction(this.dataSource, async (manager) => {
+        // Also reject if another user holds this address as a pending email
+        // change — otherwise two accounts could claim the same address in flight.
+        const existing = await manager.findOne(User, {
+          where: [
+            { email: registerDto.email },
+            { pendingEmail: registerDto.email }
+          ]
         });
-      } catch (error: unknown) {
-        if (isUniqueViolation(error)) throw emailExistsConflict();
-        throw error;
+        if (existing) {
+          throw emailExistsConflict();
+        }
+
+        let newUser: User;
+        try {
+          newUser = await manager.save(User, {
+            ...registerDto,
+            password: hashedPassword,
+            emailVerificationToken: hashedToken,
+            emailVerificationExpiresAt: expiresAt
+          });
+        } catch (error: unknown) {
+          if (isUniqueViolation(error)) throw emailExistsConflict();
+          throw error;
+        }
+
+        // Assign default 'user' role
+        const userRole = await this.roleService.findRoleByName(
+          SYSTEM_ROLES.USER
+        );
+        await manager
+          .createQueryBuilder()
+          .relation(User, 'roles')
+          .of(newUser.id)
+          .add(userRole.id);
+
+        return newUser;
+      });
+    } catch (error: unknown) {
+      // Both conflict throw sites sit inside the callback, so catching around
+      // the call audits either of them in one place.
+      if (isEmailExistsConflict(error)) {
+        this.auditService.logFireAndForget({
+          action: AuditAction.USER_REGISTER_CONFLICT,
+          actorEmail: registerDto.email,
+          context: auditContext
+        });
       }
-
-      // Assign default 'user' role
-      const userRole = await this.roleService.findRoleByName(SYSTEM_ROLES.USER);
-      await manager
-        .createQueryBuilder()
-        .relation(User, 'roles')
-        .of(newUser.id)
-        .add(userRole.id);
-
-      return newUser;
-    });
+      throw error;
+    }
 
     await this.auditService.log({
       action: AuditAction.USER_REGISTER,
