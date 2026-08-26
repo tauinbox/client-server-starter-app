@@ -23,6 +23,7 @@ import { Subscription } from '../entities/subscription.entity';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import { EntitlementService } from '../../entitlements/entitlement.service';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
+import { RenewalService } from '../renewals/renewal.service';
 import { BillingService } from '../billing.service';
 
 import { BillingAdminService } from './billing-admin.service';
@@ -140,6 +141,7 @@ async function build() {
   const billing = {
     getProviderById: jest.fn()
   };
+  const renewals = { billClosingUsagePeriod: jest.fn() };
   const entitlements = {
     invalidateUser: jest.fn().mockResolvedValue(undefined)
   };
@@ -187,6 +189,7 @@ async function build() {
       { provide: getRepositoryToken(CustomerGrant), useValue: grants },
       { provide: getRepositoryToken(Product), useValue: products },
       { provide: BillingService, useValue: billing },
+      { provide: RenewalService, useValue: renewals },
       { provide: EntitlementService, useValue: entitlements },
       { provide: CreditService, useValue: credits },
       { provide: EventEmitter2, useValue: { emit } },
@@ -203,6 +206,7 @@ async function build() {
     grants,
     products,
     billing,
+    renewals,
     entitlements,
     credits,
     emit,
@@ -340,6 +344,29 @@ describe('BillingAdminService', () => {
         SubscriptionCanceledEvent.name,
         expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
       );
+    });
+
+    it('bills the closing metered period before an immediate cancel', async () => {
+      const ctx = await build();
+      const sub = makeSubscription({ providerSubscriptionId: null });
+      ctx.subscriptions.findOne.mockResolvedValue(sub);
+      ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
+
+      await ctx.service.cancelSubscription('sub-1', 'immediate');
+
+      expect(ctx.renewals.billClosingUsagePeriod).toHaveBeenCalledWith(sub);
+    });
+
+    it('leaves a period-end cancel to the renewal scan at the boundary', async () => {
+      const ctx = await build();
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSubscription({ providerSubscriptionId: null })
+      );
+      ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
+
+      await ctx.service.cancelSubscription('sub-1', 'period_end');
+
+      expect(ctx.renewals.billClosingUsagePeriod).not.toHaveBeenCalled();
     });
 
     it('does not call the provider for a self-managed sub without a provider ref', async () => {

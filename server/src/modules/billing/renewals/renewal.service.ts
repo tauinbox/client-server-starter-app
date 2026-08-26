@@ -1,7 +1,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { Brackets, DataSource, In, Repository } from 'typeorm';
+import {
+  Brackets,
+  DataSource,
+  EntityManager,
+  In,
+  Repository,
+  type UpdateResult
+} from 'typeorm';
 import type { SubscriptionStatus } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
@@ -96,6 +103,149 @@ export class RenewalService {
   }
 
   /**
+   * Rates and charges the metered period a self-managed subscription is closing
+   * mid-flight, for the immediate cancellations that end it outside the renewal
+   * scan. Postpaid units already consumed are owed whether or not the customer
+   * stays, but a decline must never trap them in a subscription they asked to
+   * leave: this never throws, and an uncollected period is booked as an unpaid
+   * invoice the customer and the admin list both still see.
+   *
+   * Provider-managed rows are skipped - Paddle's `subscription.canceled` webhook
+   * closes their period through `UsagePeriodClosedEvent` instead.
+   */
+  async billClosingUsagePeriod(
+    subscription: Subscription,
+    now: Date = new Date()
+  ): Promise<void> {
+    if (
+      subscription.billingMode !== 'usage' ||
+      subscription.lifecycleOwner !== 'self' ||
+      now.getTime() <= subscription.currentPeriodStart.getTime()
+    ) {
+      return;
+    }
+    try {
+      await this.chargeClosingUsagePeriod(subscription, now);
+    } catch (error) {
+      this.logger.error(
+        `Closing usage period of subscription ${subscription.id} could not be billed`,
+        error as Error
+      );
+    }
+  }
+
+  private async chargeClosingUsagePeriod(
+    subscription: Subscription,
+    now: Date
+  ): Promise<void> {
+    // The period this cancel closes is the one a due renewal would have rated,
+    // so a renewal invoice already recorded under that period's key - paid,
+    // pending or failed in dunning - is the same money and must not be re-rated.
+    const dueAnchor =
+      subscription.status === 'trialing' && subscription.trialEnd
+        ? subscription.trialEnd
+        : subscription.currentPeriodEnd;
+    const booked = await this.dataSource.manager.findOne(Invoice, {
+      where: {
+        providerEventId: `renewal:${subscription.id}:${dueAnchor.getTime()}`
+      }
+    });
+    if (booked) {
+      this.logger.log(
+        `Skipping closing charge for subscription ${subscription.id}: the period is already invoiced (${booked.status})`
+      );
+      return;
+    }
+
+    const customer = await this.customers.findOne({
+      where: { id: subscription.customerId }
+    });
+    const plan = await this.plans.findOne({
+      where: { key: subscription.planKey }
+    });
+    const provider = this.providers.find((p) => p.id === subscription.provider);
+    if (!customer || !plan || !provider) {
+      this.logger.warn(
+        `Skipping closing charge for subscription ${subscription.id}: missing customer, plan or provider`
+      );
+      return;
+    }
+
+    const rated = await this.usageRating.summarizeForPeriodWithCredits(
+      subscription,
+      plan,
+      { start: subscription.currentPeriodStart, end: now },
+      await this.credits.availableUnits(subscription.customerId)
+    );
+    // Stable per (subscription, period) so two racing cancels charge once.
+    const idempotencyKey = `cancel:${subscription.id}:${subscription.currentPeriodStart.getTime()}`;
+
+    let charge: ChargeResult;
+    if (rated.amountMinor === 0) {
+      charge = { providerInvoiceRef: idempotencyKey, status: 'captured' };
+    } else {
+      try {
+        charge = await provider.chargeOffSession(
+          customer,
+          rated.amountMinor,
+          rated.receiptItems,
+          idempotencyKey
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Closing charge failed for subscription ${subscription.id}: ${(error as Error).message}`
+        );
+        await this.recordUnpaidCharge(
+          subscription,
+          customer,
+          plan,
+          rated,
+          rated.creditUnitsApplied,
+          now,
+          idempotencyKey
+        );
+        return;
+      }
+    }
+
+    if (charge.status === 'pending') {
+      await this.recordPendingCharge(
+        subscription,
+        customer,
+        plan,
+        rated,
+        rated.creditUnitsApplied,
+        charge.providerInvoiceRef,
+        now,
+        idempotencyKey
+      );
+      return;
+    }
+
+    const paidInvoiceId = await withTransaction(this.dataSource, (manager) =>
+      this.settlePeriodInvoice(
+        manager,
+        subscription,
+        customer,
+        plan,
+        rated,
+        rated.creditUnitsApplied,
+        charge,
+        now,
+        idempotencyKey,
+        now,
+        false
+      )
+    );
+    if (paidInvoiceId) {
+      this.events.emit(
+        InvoicePaidEvent.name,
+        new InvoicePaidEvent(customer.userId, paidInvoiceId)
+      );
+    }
+  }
+
+  /**
    * Self-managed subscriptions past their due moment: a trial reaching
    * `trial_end`, an active period reaching `current_period_end`, or a `past_due`
    * one reaching its next dunning retry. Both rating modes are swept — fixed
@@ -160,8 +310,12 @@ export class RenewalService {
       return;
     }
 
-    // Cancel-at-period-end: stop at the boundary instead of charging again.
-    if (subscription.cancelAtPeriodEnd) {
+    // Cancel-at-period-end: stop at the boundary instead of opening another
+    // period. A fixed plan prepaid the period that is closing, so nothing is
+    // left to bill and the row closes straight away; a usage plan postpays it,
+    // so the units consumed inside it are rated and charged first.
+    const closing = subscription.cancelAtPeriodEnd;
+    if (closing && subscription.billingMode !== 'usage') {
       await this.cancelAtPeriodEnd(subscription, customer.userId);
       return;
     }
@@ -171,6 +325,10 @@ export class RenewalService {
       this.logger.error(
         `Subscription ${id} references unregistered provider ${subscription.provider}`
       );
+      // A misconfigured provider must not hold a cancellation hostage.
+      if (closing) {
+        await this.cancelAtPeriodEnd(subscription, customer.userId);
+      }
       return;
     }
 
@@ -214,9 +372,18 @@ export class RenewalService {
       creditUnitsApplied,
       anchor,
       idempotencyKey,
-      now
+      now,
+      closing
     );
-    if (!resolved) return;
+    if (!resolved) {
+      // The closing period is on the books (pending, or unpaid): a declined
+      // card must never trap the customer in a subscription they asked to
+      // leave, so the cancellation lands either way.
+      if (closing) {
+        await this.cancelAtPeriodEnd(subscription, customer.userId);
+      }
+      return;
+    }
 
     await this.handleSuccess(
       subscription,
@@ -228,7 +395,8 @@ export class RenewalService {
       anchor,
       idempotencyKey,
       now,
-      resolved.settleStored
+      resolved.settleStored,
+      closing
     );
   }
 
@@ -242,6 +410,11 @@ export class RenewalService {
    * `settleStored` marks a charge whose recorded invoice already carries the
    * amount/credit units the provider actually charged - the settle must keep
    * them instead of this scan's re-rated values.
+   *
+   * `closing` marks the last period of a subscription being cancelled at its
+   * boundary. Dunning is meaningless there - there is no next period to protect
+   * and no card to fix - so a decline records the period unpaid instead of
+   * opening a retry ladder, and the caller cancels regardless.
    *
    * A period that rates to zero is resolved here too, and only after that
    * inspection: deciding "nothing to charge" up front would settle an invoice
@@ -258,7 +431,8 @@ export class RenewalService {
     creditUnitsApplied: number,
     anchor: Date,
     idempotencyKey: string,
-    now: Date
+    now: Date,
+    closing = false
   ): Promise<{ charge: ChargeResult; settleStored: boolean } | null> {
     const existing = await this.dataSource.manager.findOne(Invoice, {
       where: { providerEventId: idempotencyKey }
@@ -299,7 +473,7 @@ export class RenewalService {
         { providerEventId: idempotencyKey, status: 'pending' },
         { status: 'failed' }
       );
-      if (flip.affected) {
+      if (flip.affected && !closing) {
         await this.handleFailure(subscription, customer.userId, now);
       }
       return null;
@@ -309,7 +483,9 @@ export class RenewalService {
       // The webhook recorded the capture-time decline before any scan did:
       // enter dunning without re-charging (the stable key would only replay
       // the declined payment inside the provider's idempotence window).
-      await this.handleFailure(subscription, customer.userId, now);
+      if (!closing) {
+        await this.handleFailure(subscription, customer.userId, now);
+      }
       return null;
     }
 
@@ -372,7 +548,19 @@ export class RenewalService {
       this.logger.warn(
         `Renewal charge failed for subscription ${subscription.id}: ${(error as Error).message}`
       );
-      await this.handleFailure(subscription, customer.userId, now);
+      if (closing) {
+        await this.recordUnpaidCharge(
+          subscription,
+          customer,
+          plan,
+          rated,
+          creditUnitsApplied,
+          anchor,
+          idempotencyKey
+        );
+      } else {
+        await this.handleFailure(subscription, customer.userId, now);
+      }
       return null;
     }
     if (result.status === 'pending') {
@@ -503,6 +691,49 @@ export class RenewalService {
     );
   }
 
+  /**
+   * Books the closing period of a cancelled subscription that could not be
+   * charged. The insert is `orIgnore` on the stable per-period key, so a row an
+   * earlier attempt already recorded keeps whatever status it holds. Credits are
+   * not spent: they settle with a paid invoice, never with an unpaid one.
+   */
+  private async recordUnpaidCharge(
+    subscription: Subscription,
+    customer: Customer,
+    plan: Plan,
+    rated: RatedAmount,
+    creditUnitsApplied: number,
+    anchor: Date,
+    idempotencyKey: string
+  ): Promise<void> {
+    const period = this.invoicePeriodFor(subscription, plan, anchor);
+    await this.dataSource.manager
+      .createQueryBuilder()
+      .insert()
+      .into(Invoice)
+      .values({
+        customerId: subscription.customerId,
+        subscriptionId: subscription.id,
+        provider: subscription.provider,
+        providerEventId: idempotencyKey,
+        providerInvoiceRef: '',
+        amountMinor: Money.fromMinor(rated.amountMinor),
+        currency: customer.currency,
+        status: 'failed',
+        billingMode: subscription.billingMode,
+        periodStart: period.start,
+        periodEnd: period.end,
+        paidAt: null,
+        receiptRef: null,
+        creditUnitsApplied
+      })
+      .orIgnore()
+      .execute();
+    this.logger.warn(
+      `Closing period of subscription ${subscription.id} recorded unpaid (${idempotencyKey}); cancelling anyway`
+    );
+  }
+
   private async handleSuccess(
     subscription: Subscription,
     customer: Customer,
@@ -513,114 +744,58 @@ export class RenewalService {
     anchor: Date,
     idempotencyKey: string,
     now: Date,
-    settleStored: boolean
+    settleStored: boolean,
+    closing = false
   ): Promise<void> {
-    const newPeriodStart = anchor;
     const billingAnchor = this.billingAnchor(subscription, anchor);
-    const newPeriodEnd = nextPeriodEnd(billingAnchor, anchor, plan.interval);
-    const invoicePeriod = this.invoicePeriodFor(subscription, plan, anchor);
 
     const result = await withTransaction(this.dataSource, async (manager) => {
-      const insert = await manager
-        .createQueryBuilder()
-        .insert()
-        .into(Invoice)
-        .values({
-          customerId: subscription.customerId,
-          subscriptionId: subscription.id,
-          provider: subscription.provider,
-          providerEventId: idempotencyKey,
-          providerInvoiceRef: charge.providerInvoiceRef,
-          amountMinor: Money.fromMinor(rated.amountMinor),
-          currency: customer.currency,
-          status: 'paid',
-          billingMode: subscription.billingMode,
-          periodStart: invoicePeriod.start,
-          periodEnd: invoicePeriod.end,
-          paidAt: now,
-          receiptRef: null,
-          creditUnitsApplied
-        })
-        .orIgnore()
-        .returning(['id'])
-        .execute();
-      const rows = insert.raw as Array<{ id: string }>;
-
-      let paidInvoiceId = rows[0]?.id ?? null;
-      let unitsToSpend = paidInvoiceId ? creditUnitsApplied : 0;
-      if (!paidInvoiceId) {
-        // The stable per-period key already has a row: settle it while still
-        // uncaptured. A settle of a recorded pending charge keeps the stored
-        // amount/credit units (what the provider actually charged); a fresh
-        // retry charge overwrites a failed row with its own values.
-        const existing = await manager.findOne(Invoice, {
-          where: { providerEventId: idempotencyKey }
-        });
-        if (
-          existing &&
-          (existing.status === 'pending' || existing.status === 'failed')
-        ) {
-          const flip = await manager.update(
-            Invoice,
-            { id: existing.id, status: existing.status },
-            {
-              status: 'paid',
-              paidAt: now,
-              providerInvoiceRef: charge.providerInvoiceRef,
-              ...(settleStored
-                ? {}
-                : {
-                    amountMinor: Money.fromMinor(rated.amountMinor),
-                    creditUnitsApplied
-                  })
-            }
-          );
-          if (flip.affected) {
-            paidInvoiceId = existing.id;
-            unitsToSpend = settleStored
-              ? existing.creditUnitsApplied
-              : creditUnitsApplied;
-          }
-        }
-      }
-
-      // Credits commit with the winning insert/flip, so a replayed scan (or
-      // the webhook reducer's own settle) spends nothing a second time.
-      if (paidInvoiceId && unitsToSpend > 0) {
-        await this.credits.spendOnUsage(
-          manager,
-          subscription.customerId,
-          paidInvoiceId,
-          unitsToSpend
-        );
-      }
+      const paidInvoiceId = await this.settlePeriodInvoice(
+        manager,
+        subscription,
+        customer,
+        plan,
+        rated,
+        creditUnitsApplied,
+        charge,
+        anchor,
+        idempotencyKey,
+        now,
+        settleStored
+      );
 
       // CAS on the period end and status read at scan start: a cancel landing
       // during the provider round-trip leaves `currentPeriodEnd` untouched and
       // must not be flipped back to `active`. `cancelAtPeriodEnd` is absent on
       // purpose — the period just paid for opens, the flag stops the next one.
-      const advance = await manager.update(
-        Subscription,
-        {
-          id: subscription.id,
-          currentPeriodEnd: subscription.currentPeriodEnd,
-          status: In([...ENTITLED_SUBSCRIPTION_STATUSES])
-        },
-        {
-          status: 'active',
-          currentPeriodStart: newPeriodStart,
-          currentPeriodEnd: newPeriodEnd,
-          billingAnchorAt: billingAnchor,
-          trialEnd: null,
-          dunningAttempts: 0,
-          nextRenewalAttemptAt: null
-        }
-      );
+      const transition = closing
+        ? await this.closeAtBoundary(manager, subscription)
+        : await manager.update(
+            Subscription,
+            {
+              id: subscription.id,
+              currentPeriodEnd: subscription.currentPeriodEnd,
+              status: In([...ENTITLED_SUBSCRIPTION_STATUSES])
+            },
+            {
+              status: 'active',
+              currentPeriodStart: anchor,
+              currentPeriodEnd: nextPeriodEnd(
+                billingAnchor,
+                anchor,
+                plan.interval
+              ),
+              billingAnchorAt: billingAnchor,
+              trialEnd: null,
+              dunningAttempts: 0,
+              nextRenewalAttemptAt: null
+            }
+          );
 
       // A concurrent scan winning the CAS is expected and silent; a charge
       // against a no-longer-chargeable row needs an operator.
       let blockedBy: SubscriptionStatus | null = null;
-      if (advance.affected !== 1) {
+      if (transition.affected !== 1) {
         const current = await manager.findOne(Subscription, {
           where: { id: subscription.id }
         });
@@ -632,12 +807,16 @@ export class RenewalService {
         }
       }
 
-      return { paidInvoiceId, advanced: advance.affected === 1, blockedBy };
+      return {
+        paidInvoiceId,
+        applied: transition.affected === 1,
+        blockedBy
+      };
     });
 
     if (result.blockedBy) {
       this.logger.warn(
-        `Renewal charge for subscription ${subscription.id} captured after it became ${result.blockedBy}; period not advanced, invoice ${result.paidInvoiceId ?? idempotencyKey} left recorded and refundable`
+        `Renewal charge for subscription ${subscription.id} captured after it became ${result.blockedBy}; ${closing ? 'cancellation already applied' : 'period not advanced'}, invoice ${result.paidInvoiceId ?? idempotencyKey} left recorded and refundable`
       );
     }
     if (result.paidInvoiceId) {
@@ -646,12 +825,112 @@ export class RenewalService {
         new InvoicePaidEvent(customer.userId, result.paidInvoiceId)
       );
     }
-    if (result.advanced) {
+    if (result.applied) {
       this.events.emit(
-        SubscriptionRenewedEvent.name,
-        new SubscriptionRenewedEvent(customer.userId, subscription.id)
+        closing
+          ? SubscriptionCanceledEvent.name
+          : SubscriptionRenewedEvent.name,
+        closing
+          ? new SubscriptionCanceledEvent(customer.userId, subscription.id)
+          : new SubscriptionRenewedEvent(customer.userId, subscription.id)
       );
     }
+  }
+
+  /**
+   * Records the period's charge as a paid invoice under the stable per-period
+   * key and commits the credits it consumed, inside the caller's transaction so
+   * the money and the subscription transition land together.
+   */
+  private async settlePeriodInvoice(
+    manager: EntityManager,
+    subscription: Subscription,
+    customer: Customer,
+    plan: Plan,
+    rated: RatedAmount,
+    creditUnitsApplied: number,
+    charge: ChargeResult,
+    anchor: Date,
+    idempotencyKey: string,
+    now: Date,
+    settleStored: boolean
+  ): Promise<string | null> {
+    const invoicePeriod = this.invoicePeriodFor(subscription, plan, anchor);
+    const insert = await manager
+      .createQueryBuilder()
+      .insert()
+      .into(Invoice)
+      .values({
+        customerId: subscription.customerId,
+        subscriptionId: subscription.id,
+        provider: subscription.provider,
+        providerEventId: idempotencyKey,
+        providerInvoiceRef: charge.providerInvoiceRef,
+        amountMinor: Money.fromMinor(rated.amountMinor),
+        currency: customer.currency,
+        status: 'paid',
+        billingMode: subscription.billingMode,
+        periodStart: invoicePeriod.start,
+        periodEnd: invoicePeriod.end,
+        paidAt: now,
+        receiptRef: null,
+        creditUnitsApplied
+      })
+      .orIgnore()
+      .returning(['id'])
+      .execute();
+    const rows = insert.raw as Array<{ id: string }>;
+
+    let paidInvoiceId = rows[0]?.id ?? null;
+    let unitsToSpend = paidInvoiceId ? creditUnitsApplied : 0;
+    if (!paidInvoiceId) {
+      // The stable per-period key already has a row: settle it while still
+      // uncaptured. A settle of a recorded pending charge keeps the stored
+      // amount/credit units (what the provider actually charged); a fresh
+      // retry charge overwrites a failed row with its own values.
+      const existing = await manager.findOne(Invoice, {
+        where: { providerEventId: idempotencyKey }
+      });
+      if (
+        existing &&
+        (existing.status === 'pending' || existing.status === 'failed')
+      ) {
+        const flip = await manager.update(
+          Invoice,
+          { id: existing.id, status: existing.status },
+          {
+            status: 'paid',
+            paidAt: now,
+            providerInvoiceRef: charge.providerInvoiceRef,
+            ...(settleStored
+              ? {}
+              : {
+                  amountMinor: Money.fromMinor(rated.amountMinor),
+                  creditUnitsApplied
+                })
+          }
+        );
+        if (flip.affected) {
+          paidInvoiceId = existing.id;
+          unitsToSpend = settleStored
+            ? existing.creditUnitsApplied
+            : creditUnitsApplied;
+        }
+      }
+    }
+
+    // Credits commit with the winning insert/flip, so a replayed scan (or
+    // the webhook reducer's own settle) spends nothing a second time.
+    if (paidInvoiceId && unitsToSpend > 0) {
+      await this.credits.spendOnUsage(
+        manager,
+        subscription.customerId,
+        paidInvoiceId,
+        unitsToSpend
+      );
+    }
+
+    return paidInvoiceId;
   }
 
   private async handleFailure(
@@ -706,21 +985,34 @@ export class RenewalService {
     }
   }
 
-  private async cancelAtPeriodEnd(
-    subscription: Subscription,
-    userId: string
-  ): Promise<void> {
-    // Guarded on the state that justified the cancel: saving the whole entity
-    // loaded at scan start would re-cancel an already-canceled row, emit a
-    // second event, and write back columns another writer moved in between,
-    // including the version token the self-service plan change swaps on.
-    const applied = await this.subscriptions.update(
+  /**
+   * Guarded on the state that justified the cancel: saving the whole entity
+   * loaded at scan start would re-cancel an already-canceled row, emit a second
+   * event, and write back columns another writer moved in between, including
+   * the version token the self-service plan change swaps on.
+   */
+  private closeAtBoundary(
+    manager: EntityManager,
+    subscription: Subscription
+  ): Promise<UpdateResult> {
+    return manager.update(
+      Subscription,
       {
         id: subscription.id,
         status: In([...ENTITLED_SUBSCRIPTION_STATUSES]),
         cancelAtPeriodEnd: true
       },
       { status: 'canceled', nextRenewalAttemptAt: null }
+    );
+  }
+
+  private async cancelAtPeriodEnd(
+    subscription: Subscription,
+    userId: string
+  ): Promise<void> {
+    const applied = await this.closeAtBoundary(
+      this.dataSource.manager,
+      subscription
     );
     if (applied.affected !== 1) return;
 

@@ -9,6 +9,7 @@ import type { BillingService } from '../billing.service';
 import type { Subscription } from '../entities/subscription.entity';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import type { CancelMode } from '../providers/payment-provider.interface';
+import type { RenewalService } from '../renewals/renewal.service';
 import { cancelFields } from './cancel-fields.util';
 
 export const ALREADY_CANCELED_MESSAGE =
@@ -18,6 +19,7 @@ export const ALREADY_CANCELED_MESSAGE =
 export interface CancelSubscriptionDeps {
   subscriptions: Repository<Subscription>;
   billing: BillingService;
+  renewals: RenewalService;
   events: EventEmitter2;
 }
 
@@ -53,6 +55,13 @@ export async function cancelOpenSubscription(
     if (provider) {
       await provider.cancel(subscription.providerSubscriptionId, mode);
     }
+  }
+
+  // Ending a metered period now means its postpaid units are owed now: they are
+  // rated and charged before the row closes. A period-end cancel leaves that to
+  // the renewal scan, which reaches the boundary with the period still open.
+  if (mode === 'immediate') {
+    await deps.renewals.billClosingUsagePeriod(subscription);
   }
 
   const fields = cancelFields(mode);

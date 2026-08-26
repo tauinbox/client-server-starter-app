@@ -58,6 +58,7 @@
     "cancel": "Cancel",
     "cancelTitle": "Cancel subscription?",
     "cancelMessage": "Your plan stays active until the end of the current billing period, then reverts to Free.",
+    "cancelMessageUsage": "Your plan stays active until the end of the current billing period, then reverts to Free. Metered usage recorded so far is charged when the period closes.",
     "cancelConfirm": "Cancel subscription",
     "cancelSuccess": "Subscription canceled — active until the period ends.",
     "noSubscription": "No subscription yet — explore plans.",
