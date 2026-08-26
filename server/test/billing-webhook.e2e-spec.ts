@@ -253,6 +253,7 @@ function makeStubProvider(): PaymentProvider {
     startCheckout: jest.fn(),
     chargeOffSession: jest.fn(),
     findOffSessionCharge: jest.fn(),
+    getOffSessionCharge: jest.fn(),
     createOneTimePayment: jest.fn(),
     chargeUsage: jest.fn(),
     changePlan: jest.fn(),

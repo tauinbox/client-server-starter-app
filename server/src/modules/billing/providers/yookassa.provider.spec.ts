@@ -686,6 +686,76 @@ describe('YooKassaProvider', () => {
     });
   });
 
+  describe('getOffSessionCharge', () => {
+    const CHARGE_KEY = 'renewal:sub-1:123';
+    const offSession = (
+      status: string,
+      chargeKey: string | null = CHARGE_KEY
+    ) => ({
+      id: 'pay-ref',
+      status,
+      metadata: chargeKey
+        ? { purpose: 'off_session', chargeKey }
+        : { customerId: 'cus-1' }
+    });
+
+    it('reads the recorded payment without scanning the shop', async () => {
+      const { provider, client } = await build();
+      client!.getPayment.mockResolvedValue(offSession('succeeded'));
+
+      await expect(
+        provider.getOffSessionCharge('pay-ref', CHARGE_KEY)
+      ).resolves.toEqual({ providerInvoiceRef: 'pay-ref', status: 'captured' });
+      expect(client!.getPayment).toHaveBeenCalledWith('pay-ref');
+      expect(client!.getPaymentList).not.toHaveBeenCalled();
+    });
+
+    it('reports a charge still settling as pending', async () => {
+      const { provider, client } = await build();
+      client!.getPayment.mockResolvedValue(offSession('waiting_for_capture'));
+
+      await expect(
+        provider.getOffSessionCharge('pay-ref', CHARGE_KEY)
+      ).resolves.toEqual({ providerInvoiceRef: 'pay-ref', status: 'pending' });
+    });
+
+    it('reports a canceled payment as no charge (a hard decline re-charges)', async () => {
+      const { provider, client } = await build();
+      client!.getPayment.mockResolvedValue(offSession('canceled'));
+
+      await expect(
+        provider.getOffSessionCharge('pay-ref', CHARGE_KEY)
+      ).resolves.toBeNull();
+    });
+
+    it('fails loudly when the payment carries a different charge key', async () => {
+      const { provider, client } = await build();
+      client!.getPayment.mockResolvedValue(
+        offSession('succeeded', 'renewal:sub-9:456')
+      );
+
+      await expect(
+        provider.getOffSessionCharge('pay-ref', CHARGE_KEY)
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+
+    it('fails loudly when the payment carries no off-session marker', async () => {
+      const { provider, client } = await build();
+      client!.getPayment.mockResolvedValue(offSession('succeeded', null));
+
+      await expect(
+        provider.getOffSessionCharge('pay-ref', CHARGE_KEY)
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+
+    it('throws when YooKassa is not configured', async () => {
+      const { provider } = await build({ client: null });
+      await expect(
+        provider.getOffSessionCharge('pay-ref', CHARGE_KEY)
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+  });
+
   describe('cancel', () => {
     it('is a no-op (self-managed lifecycle)', async () => {
       const { provider } = await build();

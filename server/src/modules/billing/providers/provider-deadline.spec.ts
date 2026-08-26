@@ -16,6 +16,7 @@ function providerStub() {
     startCheckout: jest.fn(),
     chargeOffSession: jest.fn(),
     findOffSessionCharge: jest.fn(),
+    getOffSessionCharge: jest.fn(),
     createOneTimePayment: jest.fn(),
     chargeUsage: jest.fn(),
     changePlan: jest.fn(),
@@ -69,6 +70,22 @@ describe('withProviderDeadline', () => {
       customer,
       1000,
       items,
+      'renewal:1'
+    );
+  });
+
+  it('bounds the single-payment charge lookup too', async () => {
+    const inner = providerStub();
+    inner.getOffSessionCharge.mockImplementation(hangs);
+    const provider = withProviderDeadline(inner, TIMEOUT_MS);
+
+    await expect(
+      provider.getOffSessionCharge('pay-1', 'renewal:1')
+    ).rejects.toThrow(
+      new ProviderTimeoutError('yookassa', 'getOffSessionCharge', TIMEOUT_MS)
+    );
+    expect(inner.getOffSessionCharge).toHaveBeenCalledWith(
+      'pay-1',
       'renewal:1'
     );
   });
