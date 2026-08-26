@@ -67,6 +67,15 @@ router.post('/register', (req, res) => {
 
   const validated = validateCreateUserBody(req.body);
   if (!validated.ok) {
+    // Registering against a taken address is the cheapest account-existence
+    // probe there is, so the conflict is audited even though the request fails.
+    // The admin create route shares this helper and is deliberately not logged.
+    if (validated.status === 409) {
+      logAudit('USER_REGISTER_CONFLICT', {
+        actorEmail: normalizeEmail(req.body?.email) ?? null,
+        ip: req.ip
+      });
+    }
     res.status(validated.status).json(validated.body);
     return;
   }

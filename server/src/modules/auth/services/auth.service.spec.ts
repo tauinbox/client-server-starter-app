@@ -702,6 +702,69 @@ describe('AuthService', () => {
         'connection lost'
       );
     });
+
+    it('audits the conflict raised by the pre-check', async () => {
+      mockManager.findOne.mockResolvedValue(mockUser);
+
+      await expect(
+        service.register(registerDto, { ip: '10.0.0.1', requestId: 'req-1' })
+      ).rejects.toThrow(HttpException);
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
+        action: AuditAction.USER_REGISTER_CONFLICT,
+        actorEmail: 'new@example.com',
+        context: { ip: '10.0.0.1', requestId: 'req-1' }
+      });
+      expect(mockAuditService.log).not.toHaveBeenCalled();
+    });
+
+    it('audits the conflict raised by the unique violation on the insert', async () => {
+      mockManager.findOne.mockResolvedValue(null);
+      mockManager.save.mockRejectedValue({ code: '23505' });
+
+      await expect(service.register(registerDto)).rejects.toThrow(
+        HttpException
+      );
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_REGISTER_CONFLICT,
+          actorEmail: 'new@example.com'
+        })
+      );
+      expect(mockAuditService.log).not.toHaveBeenCalled();
+    });
+
+    it('does not audit a conflict when the failure is unrelated', async () => {
+      mockManager.findOne.mockResolvedValue(null);
+      mockManager.save.mockRejectedValue(new Error('connection lost'));
+
+      await expect(service.register(registerDto)).rejects.toThrow(
+        'connection lost'
+      );
+
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_REGISTER_CONFLICT
+        })
+      );
+    });
+
+    it('audits the success path and never the conflict', async () => {
+      mockManager.findOne.mockResolvedValue(null);
+      mockManager.save.mockResolvedValue(savedUser);
+
+      await service.register(registerDto);
+
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: AuditAction.USER_REGISTER })
+      );
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_REGISTER_CONFLICT
+        })
+      );
+    });
   });
 
   describe('verifyEmail', () => {
