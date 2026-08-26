@@ -1068,12 +1068,21 @@ export class BillingUserService {
       );
     }
 
-    customer.providerOverride = newOverride;
-    await this.customers.save(customer);
+    // The override is the only column this call owns; saving the entity would
+    // write back everything read before the lookup above, and a payment-method
+    // webhook committing in that window would lose `defaultPaymentMethodId` -
+    // leaving the customer with no autopay token at all.
+    await this.customers.update(
+      { id: customer.id },
+      { providerOverride: newOverride }
+    );
+    const updated =
+      (await this.customers.findOne({ where: { id: customer.id } })) ??
+      Object.assign(customer, { providerOverride: newOverride });
     return {
-      region: regionForOverride(customer.providerOverride),
-      detectedProvider: this.billing.geoDefaultFor(customer.country),
-      effectiveProvider: this.billing.effectiveProviderId(customer)
+      region: regionForOverride(updated.providerOverride),
+      detectedProvider: this.billing.geoDefaultFor(updated.country),
+      effectiveProvider: this.billing.effectiveProviderId(updated)
     };
   }
 
