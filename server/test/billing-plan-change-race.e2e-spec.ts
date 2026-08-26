@@ -21,6 +21,7 @@ import { Subscription } from '../src/modules/billing/entities/subscription.entit
 import { BillingService } from '../src/modules/billing/billing.service';
 import { ProrationCalculator } from '../src/modules/billing/rating/proration-calculator';
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
+import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 
@@ -235,6 +236,10 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
           useValue: { getBalance: () => Promise.resolve(null) }
         },
         { provide: UsageRating, useValue: { summarizeForPeriod: jest.fn() } },
+        {
+          provide: RenewalService,
+          useValue: { billClosingUsagePeriod: jest.fn() }
+        },
         {
           provide: ConfigService,
           useValue: { get: () => 'http://localhost:4200' }

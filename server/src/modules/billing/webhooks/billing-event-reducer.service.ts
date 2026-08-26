@@ -211,6 +211,21 @@ export class BillingEventReducer {
           };
         }
 
+        // A cancellation closes the open metered period too, and its snapshot
+        // never satisfies the rollover predicate above. The stored boundary is
+        // what keys it: wall-clock now would let a replay charge twice.
+        if (
+          !closedPeriod &&
+          type === 'subscription.canceled' &&
+          subscription.billingMode === 'usage' &&
+          subscription.lifecycleOwner === 'provider'
+        ) {
+          closedPeriod = {
+            start: subscription.currentPeriodStart,
+            end: subscription.currentPeriodEnd
+          };
+        }
+
         subscription.status = payload.status;
         subscription.cancelAtPeriodEnd = payload.cancelAtPeriodEnd;
         if (payload.planKey) {

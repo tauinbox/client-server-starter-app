@@ -1138,6 +1138,210 @@ describe('RenewalService', () => {
         expect.objectContaining({ userId: 'user-1' })
       );
     });
+
+    describe('cancel_at_period_end reaching the boundary', () => {
+      const closingSub = () =>
+        makeSub({
+          planKey: 'usage',
+          billingMode: 'usage' as const,
+          cancelAtPeriodEnd: true
+        });
+
+      it('charges the closing period, then cancels without advancing', async () => {
+        const sub = closingSub();
+        const store = usageStore(sub);
+        const charge = jest.fn().mockResolvedValue({
+          providerInvoiceRef: 'pay_close',
+          status: 'captured'
+        });
+        const sum = jest.fn().mockResolvedValue(142);
+        const { service, emit } = await build(store, charge, sum);
+
+        await service.runDueRenewals(NOW);
+
+        expect(charge).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'cust-1' }),
+          8400,
+          expect.anything(),
+          'renewal:sub-1:' + new Date('2026-06-01T00:00:00Z').getTime()
+        );
+        expect(store.invoices[0]).toMatchObject({
+          amountMinor: Money.fromMinor(8400),
+          status: 'paid',
+          billingMode: 'usage',
+          periodStart: new Date('2026-05-01T00:00:00Z'),
+          periodEnd: new Date('2026-06-01T00:00:00Z')
+        });
+        expect(sub.status).toBe('canceled');
+        expect(sub.currentPeriodStart).toEqual(
+          new Date('2026-05-01T00:00:00Z')
+        );
+        expect(sub.currentPeriodEnd).toEqual(new Date('2026-06-01T00:00:00Z'));
+        expect(emit).toHaveBeenCalledWith(
+          SubscriptionCanceledEvent.name,
+          expect.objectContaining({ subscriptionId: 'sub-1' })
+        );
+        expect(
+          emit.mock.calls.filter(
+            (call: unknown[]) => call[0] === SubscriptionRenewedEvent.name
+          )
+        ).toHaveLength(0);
+      });
+
+      it('cancels anyway when the closing charge is declined, booking it unpaid', async () => {
+        const sub = closingSub();
+        const store = usageStore(sub);
+        const charge = jest.fn().mockRejectedValue(new Error('declined'));
+        const sum = jest.fn().mockResolvedValue(142);
+        const { service, emit } = await build(store, charge, sum);
+
+        await service.runDueRenewals(NOW);
+
+        expect(store.invoices).toHaveLength(1);
+        expect(store.invoices[0]).toMatchObject({
+          amountMinor: Money.fromMinor(8400),
+          status: 'failed',
+          periodStart: new Date('2026-05-01T00:00:00Z'),
+          periodEnd: new Date('2026-06-01T00:00:00Z')
+        });
+        // Dunning protects the next period; a cancellation has none.
+        expect(sub.status).toBe('canceled');
+        expect(sub.dunningAttempts).toBe(0);
+        expect(
+          emit.mock.calls.filter(
+            (call: unknown[]) => call[0] === PaymentFailedEvent.name
+          )
+        ).toHaveLength(0);
+      });
+
+      it('closes a zero-usage period with a zero invoice and cancels', async () => {
+        const sub = closingSub();
+        const store = usageStore(sub);
+        const charge = jest.fn();
+        const { service } = await build(store, charge);
+
+        await service.runDueRenewals(NOW);
+
+        expect(charge).not.toHaveBeenCalled();
+        expect(store.invoices[0]).toMatchObject({
+          amountMinor: Money.fromMinor(0),
+          status: 'paid'
+        });
+        expect(sub.status).toBe('canceled');
+      });
+
+      it('leaves a fixed subscription cancelling at the boundary uninvoiced', async () => {
+        const sub = makeSub({ cancelAtPeriodEnd: true });
+        const store = baseStore(sub);
+        const charge = jest.fn();
+        const { service } = await build(store, charge);
+
+        await service.runDueRenewals(NOW);
+
+        expect(charge).not.toHaveBeenCalled();
+        expect(store.invoices).toHaveLength(0);
+        expect(sub.status).toBe('canceled');
+      });
+    });
+
+    describe('billClosingUsagePeriod (immediate cancellation)', () => {
+      it('charges [currentPeriodStart, now) and records the invoice paid', async () => {
+        const sub = usageSub();
+        const store = usageStore(sub);
+        const charge = jest.fn().mockResolvedValue({
+          providerInvoiceRef: 'pay_now',
+          status: 'captured'
+        });
+        const sum = jest.fn().mockResolvedValue(142);
+        const { service, emit } = await build(store, charge, sum);
+
+        await service.billClosingUsagePeriod(sub, NOW);
+
+        expect(charge).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'cust-1' }),
+          8400,
+          expect.anything(),
+          'cancel:sub-1:' + new Date('2026-05-01T00:00:00Z').getTime()
+        );
+        expect(store.invoices[0]).toMatchObject({
+          status: 'paid',
+          billingMode: 'usage',
+          periodStart: new Date('2026-05-01T00:00:00Z'),
+          periodEnd: NOW
+        });
+        // The cancel columns belong to the caller; this only moves money.
+        expect(sub.status).toBe('active');
+        expect(emit).toHaveBeenCalledWith(
+          InvoicePaidEvent.name,
+          expect.objectContaining({ userId: 'user-1' })
+        );
+      });
+
+      it('books the period unpaid when the charge is declined, without throwing', async () => {
+        const sub = usageSub();
+        const store = usageStore(sub);
+        const charge = jest.fn().mockRejectedValue(new Error('declined'));
+        const sum = jest.fn().mockResolvedValue(142);
+        const { service } = await build(store, charge, sum);
+
+        await expect(
+          service.billClosingUsagePeriod(sub, NOW)
+        ).resolves.toBeUndefined();
+
+        expect(store.invoices[0]).toMatchObject({ status: 'failed' });
+        expect(sub.dunningAttempts).toBe(0);
+      });
+
+      it('skips a period a renewal invoice already covers', async () => {
+        const sub = usageSub();
+        const store = usageStore(sub);
+        const anchorMs = new Date('2026-06-01T00:00:00Z').getTime();
+        // @ts-expect-error - partial Invoice fake for this scenario
+        const booked: Invoice & { providerEventId: string | null } = {
+          id: 'inv-renewal',
+          providerEventId: `renewal:sub-1:${anchorMs}`,
+          status: 'failed',
+          providerInvoiceRef: '',
+          creditUnitsApplied: 0
+        };
+        store.invoices.push(booked);
+        const charge = jest.fn();
+        const { service } = await build(store, charge);
+
+        await service.billClosingUsagePeriod(sub, NOW);
+
+        expect(charge).not.toHaveBeenCalled();
+        expect(store.invoices).toHaveLength(1);
+      });
+
+      it('skips provider-managed rows, whose cancel webhook closes the period', async () => {
+        const sub = makeSub({
+          planKey: 'usage',
+          billingMode: 'usage' as const,
+          lifecycleOwner: 'provider'
+        });
+        const store = usageStore(sub);
+        const charge = jest.fn();
+        const { service } = await build(store, charge);
+
+        await service.billClosingUsagePeriod(sub, NOW);
+
+        expect(charge).not.toHaveBeenCalled();
+        expect(store.invoices).toHaveLength(0);
+      });
+
+      it('skips a fixed subscription entirely', async () => {
+        const sub = makeSub();
+        const store = baseStore(sub);
+        const charge = jest.fn();
+        const { service } = await build(store, charge);
+
+        await service.billClosingUsagePeriod(sub, NOW);
+
+        expect(charge).not.toHaveBeenCalled();
+        expect(store.invoices).toHaveLength(0);
+      });
+    });
   });
 
   it('renews a fixed $0 plan without a provider charge via a zero invoice', async () => {

@@ -54,6 +54,7 @@ import {
 } from '../utils/refund-reservation.util';
 import { INVOICE_SORT_COLUMN_MAP } from '../utils/list-order.util';
 import type { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
+import { RenewalService } from '../renewals/renewal.service';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
 
@@ -136,6 +137,7 @@ export class BillingUserService {
     private readonly users: Repository<User>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly billing: BillingService,
+    private readonly renewals: RenewalService,
     private readonly credits: CreditService,
     private readonly usageRating: UsageRating,
     private readonly proration: ProrationCalculator,
@@ -532,6 +534,7 @@ export class BillingUserService {
       {
         subscriptions: this.subscriptions,
         billing: this.billing,
+        renewals: this.renewals,
         events: this.events
       },
       subscription,

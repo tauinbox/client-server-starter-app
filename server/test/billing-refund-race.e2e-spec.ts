@@ -18,6 +18,7 @@ import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.enti
 import { BillingService } from '../src/modules/billing/billing.service';
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { BillingAdminService } from '../src/modules/billing/services/billing-admin.service';
+import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
@@ -162,6 +163,10 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
           useValue: { invalidateUser: jest.fn() }
         },
         { provide: CreditService, useValue: { clawbackPurchase: jest.fn() } },
+        {
+          provide: RenewalService,
+          useValue: { billClosingUsagePeriod: jest.fn() }
+        },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } }
       ]
     }).compile();

@@ -236,6 +236,17 @@ describe('BillingSettingsComponent', () => {
     fixture.componentInstance.onCancel();
     expect(dialogMock.openConfirm).toHaveBeenCalled();
     expect(storeMock.cancel).toHaveBeenCalledWith('period_end');
+    expect(dialogMock.openConfirm.mock.calls[0][0].message).not.toContain(
+      'Metered usage'
+    );
+  });
+
+  it('warns that the closing metered period will be charged', async () => {
+    await setup(true, undefined, { ...activeSub, billingMode: 'usage' });
+    fixture.componentInstance.onCancel();
+    expect(dialogMock.openConfirm.mock.calls[0][0].message).toContain(
+      'Metered usage recorded so far is charged when the period closes'
+    );
   });
 
   it('opens the change-plan dialog and applies the chosen plan', async () => {

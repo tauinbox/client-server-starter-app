@@ -179,10 +179,16 @@ export class BillingSettingsComponent implements OnInit {
   }
 
   onCancel(): void {
+    // A metered plan is postpaid: the units of the period being closed are
+    // charged at the boundary, which the generic copy does not say.
+    const messageKey =
+      this.store.subscription()?.billingMode === 'usage'
+        ? 'billing.settings.cancelMessageUsage'
+        : 'billing.settings.cancelMessage';
     this.#dialog
       .openConfirm({
         title: this.#transloco.translate('billing.settings.cancelTitle'),
-        message: this.#transloco.translate('billing.settings.cancelMessage'),
+        message: this.#transloco.translate(messageKey),
         confirmButton: this.#transloco.translate(
           'billing.settings.cancelConfirm'
         ),

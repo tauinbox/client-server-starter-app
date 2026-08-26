@@ -281,7 +281,7 @@ To apply multiple restrictions simultaneously, either use `$and` in a single `cu
 ### Billing (self-service)
 - **Pricing page** (`/billing`) — plan tiers as cards with the recommended tier visually lifted (raised + primary accent + "Most popular" chip); currency follows the resolved provider; publicly accessible (anonymous visitors are sent to login on "Choose")
 - **Checkout** — "Choose" starts a hosted-checkout session on the resolved provider and redirects; the return routes `/billing/success` (polls the subscription until active) and `/billing/cancel` confirm the outcome (the provider webhook is the source of truth)
-- **Billing settings** (`/billing/settings`) — current plan with a semantic status chip, change-plan dialog, cancel-at-period-end (confirm dialog), a prepaid-credits wallet card, saved payment method with an update action, and a cursor-paginated invoice history (table on desktop, stacked cards on handset, infinite scroll under both)
+- **Billing settings** (`/billing/settings`) — current plan with a semantic status chip, change-plan dialog, cancel-at-period-end (confirm dialog; on a metered plan it warns that the usage recorded so far is charged when the period closes), a prepaid-credits wallet card, saved payment method with an update action, and a cursor-paginated invoice history (table on desktop, stacked cards on handset, infinite scroll under both)
 - **Pay-as-you-go tier** — the metered `usage` plan is active in the catalog: the pricing page shows its per-unit teaser, and `GET /api/v1/billing/usage` returns the caller's current-period meter (total/included/billable units and the accrued amount)
 - **Usage meter** — billing settings shows a current-period usage card for usage-mode subscriptions: large unit readout, a quota gauge when the plan includes units (used quota in the primary tone, overage in the error tone), and a money mini-ledger (billable units × unit price) ending in the accrued amount; pure pay-as-you-go plans skip the gauge
 - **Plan change with proration** — the change-plan dialog in billing settings picks a billing mode (fixed / pay-as-you-go) and a target plan, then shows a live proration mini-ledger from `/change/preview` (YooKassa: credit − / charge + / bold "Due now"; Paddle: the net amount — the provider settles the split; a negative net reads "Refund due"). Confirming calls `POST /api/v1/billing/subscription/change`, which switches instantly: Paddle computes the proration itself (`subscriptions.update`, prorated immediately), YooKassa is settled server-side per the refund-and-recharge policy (charge the new plan's whole-day remainder first, then refund the old plan's unused remainder — two fiscal documents, both surfaced as receipt rows in the invoice history)
@@ -961,11 +961,11 @@ Husky, lint-staged, and commitlint are installed in the `client/` sub-package. R
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1953 tests passing |
-| Server E2E tests | Jest | Separate config in `test/` | 339 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 338 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and skips 7 |
-| Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1144 tests passing |
+| Server unit tests | Jest | `*.spec.ts` alongside source | 1970 tests passing |
+| Server E2E tests | Jest | Separate config in `test/` | 341 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 340 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and skips 7 |
+| Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1145 tests passing |
 | Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 219 tests passing |
-| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 424 tests passing |
+| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 429 tests passing |
 
 ## CI/CD
 

@@ -231,6 +231,27 @@ runWithInfra('billing write paths (e2e)', () => {
     subscriptionId = subscription.id;
   }
 
+  /** The stable per-period key a due renewal charges the closing period under. */
+  function renewalKey(subscription: Subscription): string {
+    return `renewal:${subscription.id}:${subscription.currentPeriodEnd.getTime()}`;
+  }
+
+  /** Meters `quantity` units inside the subscription's open period. */
+  async function seedUnits(
+    periodStart: Date,
+    quantity: number,
+    idempotencyKey: string
+  ): Promise<void> {
+    const usage = await build(UsageService);
+    await usage.record({
+      customerId,
+      meterKey: 'api_calls',
+      quantity,
+      occurredAt: new Date(periodStart.getTime() + 60_000),
+      idempotencyKey
+    });
+  }
+
   /** Puts the shared subscription back on a known plan and lifecycle state. */
   function resetSubscription(
     planKey: string,
@@ -261,6 +282,7 @@ runWithInfra('billing write paths (e2e)', () => {
         CreditService,
         FixedRating,
         UsageRating,
+        RenewalService,
         { provide: getDataSourceToken(), useValue: ds },
         {
           provide: getRepositoryToken(Customer),
@@ -383,6 +405,20 @@ runWithInfra('billing write paths (e2e)', () => {
       .getRepository(CreditBalance)
       .findOne({ where: { customerId } })
       .then((b) => b?.balanceUnits.toNumber() ?? 0);
+  }
+
+  /** Units of the subscription's own meter recorded inside a window. */
+  async function ratableUnits(start: Date, end: Date): Promise<number> {
+    const rows = await ds
+      .getRepository(UsageRecord)
+      .find({ where: { customerId, meterKey: 'api_calls' } });
+    return rows
+      .filter(
+        (r) =>
+          r.occurredAt.getTime() >= start.getTime() &&
+          r.occurredAt.getTime() < end.getTime()
+      )
+      .reduce((sum, r) => sum + r.quantity.toNumber(), 0);
   }
 
   describe('metering and credits', () => {
@@ -768,6 +804,75 @@ runWithInfra('billing write paths (e2e)', () => {
           (call: unknown[]) => call[0] === SubscriptionCanceledEvent.name
         )
       ).toHaveLength(1);
+    }, 60000);
+
+    it('invoices the metered period a boundary cancellation closes', async () => {
+      await resetSubscription(USAGE_PLAN, { cancelAtPeriodEnd: true });
+      const sub = await ds
+        .getRepository(Subscription)
+        .findOneOrFail({ where: { id: subscriptionId } });
+      // Seeded past the standing credit balance so the closing period leaves a
+      // real charge rather than being fully absorbed.
+      const credits = await creditUnits();
+      await seedUnits(sub.currentPeriodStart, credits + 7, 'wp-close-boundary');
+      const units = await ratableUnits(
+        sub.currentPeriodStart,
+        sub.currentPeriodEnd
+      );
+      const emit = jest.fn();
+      const renewals = await buildWithEmitter(emit);
+
+      await renewals.runDueRenewals(new Date());
+
+      const invoice = await ds.getRepository(Invoice).findOneOrFail({
+        where: { providerEventId: renewalKey(sub) }
+      });
+      expect(invoice.amountMinor.toNumber()).toBe(
+        (units - Math.max(0, credits)) * 200
+      );
+      expect(invoice.status).toBe('paid');
+      expect(invoice.periodStart.getTime()).toBe(
+        sub.currentPeriodStart.getTime()
+      );
+      expect(invoice.periodEnd.getTime()).toBe(sub.currentPeriodEnd.getTime());
+
+      const after = await ds
+        .getRepository(Subscription)
+        .findOneOrFail({ where: { id: subscriptionId } });
+      expect(after.status).toBe('canceled');
+      // The period the invoice covers must stay put, not roll forward.
+      expect(after.currentPeriodEnd.getTime()).toBe(
+        sub.currentPeriodEnd.getTime()
+      );
+    }, 60000);
+
+    it('invoices the open metered period an immediate cancellation closes', async () => {
+      await resetSubscription(USAGE_PLAN);
+      const sub = await ds
+        .getRepository(Subscription)
+        .findOneOrFail({ where: { id: subscriptionId } });
+      await seedUnits(sub.currentPeriodStart, 3, 'wp-close-immediate');
+      const now = new Date();
+      const units = await ratableUnits(sub.currentPeriodStart, now);
+      const credits = await creditUnits();
+      const renewals = await build(RenewalService);
+
+      await renewals.billClosingUsagePeriod(sub, now);
+
+      const invoice = await ds.getRepository(Invoice).findOneOrFail({
+        where: {
+          providerEventId: `cancel:${subscriptionId}:${sub.currentPeriodStart.getTime()}`
+        }
+      });
+      expect(invoice.status).toBe('paid');
+      expect(invoice.amountMinor.toNumber()).toBe(
+        Math.max(0, units - Math.max(0, credits)) * 200
+      );
+      expect(invoice.periodStart.getTime()).toBe(
+        sub.currentPeriodStart.getTime()
+      );
+      expect(invoice.periodEnd.getTime()).toBe(now.getTime());
+      expect(invoice.refundedMinor.toNumber()).toBe(0);
     }, 60000);
   });
 });
