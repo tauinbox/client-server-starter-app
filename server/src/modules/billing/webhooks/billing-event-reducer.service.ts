@@ -1,7 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, In, type EntityManager } from 'typeorm';
+import {
+  DataSource,
+  In,
+  type EntityManager,
+  type QueryDeepPartialEntity
+} from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
@@ -139,9 +144,8 @@ export class BillingEventReducer {
     const result = await withTransaction(this.dataSource, async (manager) => {
       const userId = await this.resolveUserId(manager, payload.ref);
       const now = new Date();
-      let closedPeriod: { start: Date; end: Date } | null = null;
 
-      let subscription = await manager.findOne(Subscription, {
+      const subscription = await manager.findOne(Subscription, {
         where: { providerSubscriptionId: payload.providerSubscriptionId }
       });
 
@@ -172,65 +176,67 @@ export class BillingEventReducer {
         });
         const lifecycleOwner = lifecycleOwnerFor(provider);
         const periodStart = parseDate(payload.currentPeriodStart, now);
-        subscription = manager.create(Subscription, {
-          customerId: payload.ref.customerId,
-          planKey: payload.planKey,
-          provider,
-          billingMode: plan?.billingMode ?? 'fixed',
-          status: payload.status,
-          lifecycleOwner,
-          currentPeriodStart: periodStart,
-          currentPeriodEnd: parseDate(payload.currentPeriodEnd, now),
-          // Only the self-managed scheduler derives boundaries; a provider-owned
-          // row takes each one from the provider's snapshot.
-          billingAnchorAt: lifecycleOwner === 'self' ? periodStart : null,
-          cancelAtPeriodEnd: payload.cancelAtPeriodEnd,
-          trialEnd: payload.trialEnd ? new Date(payload.trialEnd) : null,
-          providerSubscriptionId: payload.providerSubscriptionId,
-          paymentMethodId: null
-        });
-      } else {
-        // A provider-managed usage subscription whose incoming snapshot starts
-        // a new period at/after the stored boundary has just rolled over — the
-        // stored period is closed and must be invoiced postpaid. Detected
-        // before the snapshot is applied; a replayed snapshot no longer
-        // advances anything, so it never re-detects.
-        const incomingStart = payload.currentPeriodStart
-          ? new Date(payload.currentPeriodStart)
-          : null;
-        if (
-          subscription.billingMode === 'usage' &&
-          subscription.lifecycleOwner === 'provider' &&
-          incomingStart &&
-          !Number.isNaN(incomingStart.getTime()) &&
-          incomingStart.getTime() >= subscription.currentPeriodEnd.getTime()
-        ) {
-          closedPeriod = {
-            start: subscription.currentPeriodStart,
-            end: subscription.currentPeriodEnd
-          };
-        }
-
-        subscription.status = payload.status;
-        subscription.cancelAtPeriodEnd = payload.cancelAtPeriodEnd;
-        if (payload.planKey) {
-          subscription.planKey = payload.planKey;
-        }
-        if (payload.currentPeriodStart) {
-          subscription.currentPeriodStart = new Date(
-            payload.currentPeriodStart
-          );
-        }
-        if (payload.currentPeriodEnd) {
-          subscription.currentPeriodEnd = new Date(payload.currentPeriodEnd);
-        }
-        subscription.trialEnd = payload.trialEnd
-          ? new Date(payload.trialEnd)
-          : null;
+        const created = await manager.save(
+          manager.create(Subscription, {
+            customerId: payload.ref.customerId,
+            planKey: payload.planKey,
+            provider,
+            billingMode: plan?.billingMode ?? 'fixed',
+            status: payload.status,
+            lifecycleOwner,
+            currentPeriodStart: periodStart,
+            currentPeriodEnd: parseDate(payload.currentPeriodEnd, now),
+            // Only the self-managed scheduler derives boundaries; a
+            // provider-owned row takes each one from the provider's snapshot.
+            billingAnchorAt: lifecycleOwner === 'self' ? periodStart : null,
+            cancelAtPeriodEnd: payload.cancelAtPeriodEnd,
+            trialEnd: payload.trialEnd ? new Date(payload.trialEnd) : null,
+            providerSubscriptionId: payload.providerSubscriptionId,
+            paymentMethodId: null
+          })
+        );
+        return { subscriptionId: created.id, userId, closedPeriod: null };
       }
 
-      const saved = await manager.save(subscription);
-      return { subscriptionId: saved.id, userId, closedPeriod };
+      // A provider-managed usage subscription whose incoming snapshot starts
+      // a new period at/after the stored boundary has just rolled over — the
+      // stored period is closed and must be invoiced postpaid. Detected
+      // before the snapshot is applied; a replayed snapshot no longer
+      // advances anything, so it never re-detects.
+      const incomingStart = payload.currentPeriodStart
+        ? new Date(payload.currentPeriodStart)
+        : null;
+      const closedPeriod =
+        subscription.billingMode === 'usage' &&
+        subscription.lifecycleOwner === 'provider' &&
+        incomingStart &&
+        !Number.isNaN(incomingStart.getTime()) &&
+        incomingStart.getTime() >= subscription.currentPeriodEnd.getTime()
+          ? {
+              start: subscription.currentPeriodStart,
+              end: subscription.currentPeriodEnd
+            }
+          : null;
+
+      // By name, not by saving the entity: a whole-row diff would push the
+      // values read before the awaits above back over anything a concurrent
+      // writer committed meanwhile (dunning, `version`, the payment method).
+      const snapshot: QueryDeepPartialEntity<Subscription> = {
+        status: payload.status,
+        cancelAtPeriodEnd: payload.cancelAtPeriodEnd,
+        trialEnd: payload.trialEnd ? new Date(payload.trialEnd) : null
+      };
+      if (payload.planKey) {
+        snapshot.planKey = payload.planKey;
+      }
+      if (payload.currentPeriodStart) {
+        snapshot.currentPeriodStart = new Date(payload.currentPeriodStart);
+      }
+      if (payload.currentPeriodEnd) {
+        snapshot.currentPeriodEnd = new Date(payload.currentPeriodEnd);
+      }
+      await manager.update(Subscription, { id: subscription.id }, snapshot);
+      return { subscriptionId: subscription.id, userId, closedPeriod };
     });
 
     if (!result?.userId) {
@@ -562,13 +568,18 @@ export class BillingEventReducer {
    * as the customer's default `PaymentMethod`, point the subscription at it, and
    * flip it out of `incomplete` (to `trialing` while a trial is still running,
    * else `active`). Idempotency is guaranteed by the caller's invoice insert.
+   *
+   * Returns `null` when a cancellation landed while the card was being stored:
+   * the open-status predicate makes that cancel win, and no activation event
+   * may be emitted for a row this call did not activate.
    */
   private async activateSelfManaged(
     manager: EntityManager,
     subscription: Subscription,
     payload: NormalizedInvoicePayload,
     now: Date
-  ): Promise<string> {
+  ): Promise<string | null> {
+    let methodId: string | null = null;
     if (payload.savedPaymentMethod) {
       // Demote the current default before inserting the new one (mirrors
       // reducePaymentMethodUpdated) so defaults never accumulate.
@@ -587,7 +598,7 @@ export class BillingEventReducer {
           isDefault: true
         })
       );
-      subscription.paymentMethodId = method.id;
+      methodId = method.id;
       await manager.update(
         Customer,
         { id: subscription.customerId },
@@ -598,9 +609,18 @@ export class BillingEventReducer {
     const trialing =
       subscription.trialEnd != null &&
       subscription.trialEnd.getTime() > now.getTime();
-    subscription.status = trialing ? 'trialing' : 'active';
-    await manager.save(subscription);
-    return subscription.id;
+    const fields: QueryDeepPartialEntity<Subscription> = {
+      status: trialing ? 'trialing' : 'active'
+    };
+    if (methodId) {
+      fields.paymentMethodId = methodId;
+    }
+    const applied = await manager.update(
+      Subscription,
+      { id: subscription.id, status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
+      fields
+    );
+    return applied.affected ? subscription.id : null;
   }
 
   /**
@@ -653,8 +673,14 @@ export class BillingEventReducer {
         order: { createdAt: 'DESC' }
       });
       if (subscription) {
-        subscription.paymentMethodId = method.id;
-        await manager.save(subscription);
+        // Repeating the open-status predicate on the write is what keeps a
+        // cancel that commits during this reduce from being rolled back: only
+        // the pointer moves, and only while the subscription is still open.
+        await manager.update(
+          Subscription,
+          { id: subscription.id, status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
+          { paymentMethodId: method.id }
+        );
       }
     });
   }

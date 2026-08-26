@@ -2,7 +2,9 @@ import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken } from '@nestjs/typeorm';
+import { In } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
+import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { Plan } from '../entities/plan.entity';
@@ -253,8 +255,13 @@ describe('BillingEventReducer', () => {
       );
 
       expect(manager.create).not.toHaveBeenCalled();
-      expect(existing.currentPeriodEnd).toEqual(
-        new Date('2026-08-01T00:00:00Z')
+      expect(manager.save).not.toHaveBeenCalled();
+      expect(manager.update).toHaveBeenCalledWith(
+        Subscription,
+        { id: 'sub-1' },
+        expect.objectContaining({
+          currentPeriodEnd: new Date('2026-08-01T00:00:00Z')
+        })
       );
       expect(emit).toHaveBeenCalledWith(
         SubscriptionRenewedEvent.name,
@@ -533,7 +540,8 @@ describe('BillingEventReducer', () => {
           status: 'incomplete',
           trialEnd: null
         } as Subscription,
-        invoiceInsertRows: [{ id: 'inv-1' }]
+        invoiceInsertRows: [{ id: 'inv-1' }],
+        updateAffected: 1
       });
 
       await reducer.reduce(
@@ -558,8 +566,10 @@ describe('BillingEventReducer', () => {
         { id: 'cust-1' },
         { defaultPaymentMethodId: 'sub-new' }
       );
-      expect(manager.save).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'sub-1', status: 'active' })
+      expect(manager.update).toHaveBeenCalledWith(
+        Subscription,
+        { id: 'sub-1', status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
+        { status: 'active', paymentMethodId: 'sub-new' }
       );
       expect(emit).toHaveBeenCalledWith(
         InvoicePaidEvent.name,
@@ -989,8 +999,10 @@ describe('BillingEventReducer', () => {
         { id: 'cust-1' },
         { defaultPaymentMethodId: 'sub-new' }
       );
-      expect(manager.save).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'sub-1', paymentMethodId: 'sub-new' })
+      expect(manager.update).toHaveBeenCalledWith(
+        Subscription,
+        { id: 'sub-1', status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
+        { paymentMethodId: 'sub-new' }
       );
       // No money moved: no invoice insert, no status change, no domain event.
       expect(manager.execute).not.toHaveBeenCalled();

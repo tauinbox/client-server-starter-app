@@ -1809,20 +1809,24 @@ describe('BillingUserService', () => {
 
     it('persists the override when no conflicting subscription exists', async () => {
       const ctx = await build();
-      ctx.customers.findOne.mockResolvedValue({
+      const stored = {
         id: 'cust-1',
         userId: 'user-1',
         country: 'US',
         providerOverride: null
-      });
+      };
+      ctx.customers.findOne
+        .mockResolvedValueOnce(stored)
+        .mockResolvedValueOnce({ ...stored, providerOverride: 'yookassa' });
       ctx.subscriptions.findOne.mockResolvedValue(null);
-      ctx.customers.save.mockImplementation((c: object) => Promise.resolve(c));
 
       const region = await ctx.service.setRegion('user-1', 'ru');
 
-      expect(ctx.customers.save).toHaveBeenCalledWith(
-        expect.objectContaining({ providerOverride: 'yookassa' })
+      expect(ctx.customers.update).toHaveBeenCalledWith(
+        { id: 'cust-1' },
+        { providerOverride: 'yookassa' }
       );
+      expect(ctx.customers.save).not.toHaveBeenCalled();
       expect(region.region).toBe('ru');
       expect(region.effectiveProvider).toBe('yookassa');
     });
@@ -1843,6 +1847,7 @@ describe('BillingUserService', () => {
       await expect(ctx.service.setRegion('user-1', 'ru')).rejects.toThrow(
         ConflictException
       );
+      expect(ctx.customers.update).not.toHaveBeenCalled();
       expect(ctx.customers.save).not.toHaveBeenCalled();
     });
 
@@ -1859,7 +1864,8 @@ describe('BillingUserService', () => {
       // the concurrent winner.
       ctx.customers.findOne
         .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(winner);
+        .mockResolvedValueOnce(winner)
+        .mockResolvedValueOnce({ ...winner, providerOverride: 'yookassa' });
       ctx.users.findOne.mockResolvedValue({ id: 'user-1', locale: 'ru' });
       ctx.customers.save.mockRejectedValueOnce({ code: '23505' });
       ctx.subscriptions.findOne.mockResolvedValue(null);
@@ -1867,8 +1873,9 @@ describe('BillingUserService', () => {
       const region = await ctx.service.setRegion('user-1', 'ru');
 
       expect(region.region).toBe('ru');
-      expect(ctx.customers.save).toHaveBeenCalledWith(
-        expect.objectContaining({ providerOverride: 'yookassa' })
+      expect(ctx.customers.update).toHaveBeenCalledWith(
+        { id: 'cust-1' },
+        { providerOverride: 'yookassa' }
       );
     });
 

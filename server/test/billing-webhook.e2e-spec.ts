@@ -13,6 +13,7 @@ import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
 import { VersioningType, type INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
+import { FindOperator } from 'typeorm';
 import type { NextFunction, Request, Response } from 'express';
 import type { Server } from 'http';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
@@ -71,14 +72,18 @@ interface Stores {
   }>;
 }
 
+/** Matches a row against a `where`, resolving an `In([...])` to membership. */
+function matchesWhere<T extends object>(row: T, where: Partial<T>): boolean {
+  return Object.entries(where).every(([key, value]) => {
+    const actual = row[key as keyof T];
+    return value instanceof FindOperator
+      ? (value.value as unknown[]).includes(actual)
+      : actual === value;
+  });
+}
+
 function findWhere<T extends object>(rows: T[], where: Partial<T>): T | null {
-  return (
-    rows.find((row) =>
-      Object.entries(where).every(
-        ([key, value]) => row[key as keyof T] === value
-      )
-    ) ?? null
-  );
+  return rows.find((row) => matchesWhere(row, where)) ?? null;
 }
 
 function makeManager(stores: Stores) {
@@ -104,12 +109,14 @@ function makeManager(stores: Stores) {
       where: Record<string, unknown>,
       set: Record<string, unknown>
     ) => {
-      if (entity !== Invoice) return Promise.resolve({ affected: 0 });
-      const matches = stores.invoices.filter((row) =>
-        Object.entries(where).every(
-          ([key, value]) => row[key as keyof Invoice] === value
-        )
-      );
+      const rows: object[] | null =
+        entity === Invoice
+          ? stores.invoices
+          : entity === Subscription
+            ? stores.subscriptions
+            : null;
+      if (!rows) return Promise.resolve({ affected: 0 });
+      const matches = rows.filter((row) => matchesWhere(row, where));
       for (const row of matches) Object.assign(row, set);
       return Promise.resolve({ affected: matches.length });
     },
