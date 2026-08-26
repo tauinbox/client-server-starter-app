@@ -29,6 +29,7 @@ import {
   toUsageResponse
 } from '../state';
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
+import { billClosingUsagePeriod } from '../helpers/billing.helpers';
 import { pushToUser } from '../sse-hub';
 import {
   cursorPaginate,
@@ -956,6 +957,10 @@ billingRouter.post(
     }
 
     if (mode === 'immediate') {
+      // Ending a metered period now means its postpaid units are owed now. A
+      // provider-managed row is billed by its cancel webhook instead, and a
+      // period-end cancel by the renewal scan at the boundary.
+      if (sub.lifecycleOwner === 'self') billClosingUsagePeriod(sub);
       sub.status = 'canceled';
       sub.cancelAtPeriodEnd = false;
     } else {
@@ -1140,6 +1145,7 @@ billingAdminRouter.post(
     }
 
     if (mode === 'immediate') {
+      if (sub.lifecycleOwner === 'self') billClosingUsagePeriod(sub);
       sub.status = 'canceled';
       sub.cancelAtPeriodEnd = false;
     } else {

@@ -32,6 +32,7 @@ import {
 import { OAUTH_DATA_MAX_AGE_MS } from './constants';
 import { generateTokens } from './jwt.utils';
 import { pruneOldestUserTokens } from './helpers/auth.helpers';
+import { billClosingUsagePeriod } from './helpers/billing.helpers';
 import { resolveEntitlementLimit } from './middleware/billing.middleware';
 import type { BillingProviderId } from '@app/shared/types';
 import type { NotificationEvent } from '@app/shared/types';
@@ -744,8 +745,11 @@ router.post('/billing/advance-renewal', (req, res) => {
     return;
   }
 
-  // Cancel-at-period-end: the boundary cancels instead of charging.
+  // Cancel-at-period-end: the boundary closes the row instead of opening
+  // another period. A postpaid metered period is rated and invoiced first -
+  // its units were consumed and are owed.
   if (subscription.cancelAtPeriodEnd) {
+    billClosingUsagePeriod(subscription, now);
     subscription.status = 'canceled';
     subscription.updatedAt = nowIso;
     notifyEntitlementsChanged(subscription.customerId);

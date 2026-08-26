@@ -27,6 +27,7 @@ import { ProrationCalculator } from '../src/modules/billing/rating/proration-cal
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
+import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
 import {
   InvoicePaidEvent,
@@ -283,6 +284,10 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
         {
           provide: CreditService,
           useValue: { getBalance: () => Promise.resolve(null) }
+        },
+        {
+          provide: RenewalService,
+          useValue: { billClosingUsagePeriod: jest.fn() }
         },
         { provide: UsageRating, useValue: { summarizeForPeriod: jest.fn() } },
         {

@@ -29,6 +29,7 @@ import {
   PlanChangedEvent,
   SubscriptionCanceledEvent
 } from '../events/billing.events';
+import { RenewalService } from '../renewals/renewal.service';
 import { BillingService } from '../billing.service';
 
 import { ProrationCalculator } from '../rating/proration-calculator';
@@ -206,6 +207,7 @@ async function build() {
 
   const usageRating = { summarizeForPeriod: jest.fn() };
   const credits = { getBalance: jest.fn().mockResolvedValue(null) };
+  const renewals = { billClosingUsagePeriod: jest.fn() };
 
   const billing = {
     resolveProvider: jest.fn(),
@@ -241,6 +243,7 @@ async function build() {
       { provide: getRepositoryToken(User), useValue: users },
       { provide: getDataSourceToken(), useValue: dataSource },
       { provide: BillingService, useValue: billing },
+      { provide: RenewalService, useValue: renewals },
       { provide: CreditService, useValue: credits },
       { provide: UsageRating, useValue: usageRating },
       {
@@ -261,6 +264,7 @@ async function build() {
     products,
     users,
     billing,
+    renewals,
     credits,
     usageRating,
     emit,
@@ -828,6 +832,39 @@ describe('BillingUserService', () => {
         SubscriptionCanceledEvent.name,
         expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
       );
+    });
+
+    it('bills the closing metered period before an immediate cancel', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      const sub = {
+        id: 'sub-1',
+        provider: 'yookassa' as const,
+        providerSubscriptionId: null,
+        status: 'active',
+        cancelAtPeriodEnd: false
+      };
+      ctx.subscriptions.findOne.mockResolvedValue(sub);
+
+      await ctx.service.cancelSubscription('user-1', 'immediate');
+
+      expect(ctx.renewals.billClosingUsagePeriod).toHaveBeenCalledWith(sub);
+    });
+
+    it('leaves a period-end cancel to the renewal scan at the boundary', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        provider: 'yookassa' as const,
+        providerSubscriptionId: null,
+        status: 'active',
+        cancelAtPeriodEnd: false
+      });
+
+      await ctx.service.cancelSubscription('user-1');
+
+      expect(ctx.renewals.billClosingUsagePeriod).not.toHaveBeenCalled();
     });
 
     it('answers 409 and emits nothing when a concurrent writer cancelled first', async () => {

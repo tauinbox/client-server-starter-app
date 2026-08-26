@@ -405,6 +405,62 @@ describe('BillingEventReducer', () => {
         expect.anything()
       );
     });
+
+    it('emits UsagePeriodClosed for the stored period when the subscription is canceled', async () => {
+      const { reducer, emit } = await build({ subscription: usageSub() });
+
+      await reducer.reduce(
+        event(
+          'subscription.canceled',
+          subPayload({
+            status: 'canceled',
+            currentPeriodStart: null,
+            currentPeriodEnd: null
+          })
+        )
+      );
+
+      // The stored boundary, not the notification and not wall-clock now: a
+      // replayed delivery must key the same invoice instead of charging twice.
+      expect(emit).toHaveBeenCalledWith(
+        UsagePeriodClosedEvent.name,
+        expect.objectContaining({
+          subscriptionId: 'sub-1',
+          periodStart: new Date('2026-05-01T00:00:00Z'),
+          periodEnd: new Date('2026-06-01T00:00:00Z')
+        })
+      );
+    });
+
+    it('does not emit on cancel for a fixed-mode subscription', async () => {
+      const { reducer, emit } = await build({
+        subscription: { ...usageSub(), billingMode: 'fixed' }
+      });
+
+      await reducer.reduce(
+        event('subscription.canceled', subPayload({ status: 'canceled' }))
+      );
+
+      expect(emit).not.toHaveBeenCalledWith(
+        UsagePeriodClosedEvent.name,
+        expect.anything()
+      );
+    });
+
+    it('does not emit on cancel for a self-managed subscription', async () => {
+      const { reducer, emit } = await build({
+        subscription: { ...usageSub(), lifecycleOwner: 'self' }
+      });
+
+      await reducer.reduce(
+        event('subscription.canceled', subPayload({ status: 'canceled' }))
+      );
+
+      expect(emit).not.toHaveBeenCalledWith(
+        UsagePeriodClosedEvent.name,
+        expect.anything()
+      );
+    });
   });
 
   describe('invoice.paid — usage charge reconciliation', () => {

@@ -198,25 +198,27 @@ export class BillingEventReducer {
         return { subscriptionId: created.id, userId, closedPeriod: null };
       }
 
-      // A provider-managed usage subscription whose incoming snapshot starts
-      // a new period at/after the stored boundary has just rolled over — the
-      // stored period is closed and must be invoiced postpaid. Detected
-      // before the snapshot is applied; a replayed snapshot no longer
-      // advances anything, so it never re-detects.
       const incomingStart = payload.currentPeriodStart
         ? new Date(payload.currentPeriodStart)
         : null;
-      const closedPeriod =
+      // A provider-managed metered period closes either way: the snapshot
+      // starts a new one at/after the stored boundary, or it cancels the
+      // subscription - a case the rollover predicate never matches. Keyed on
+      // the stored boundary, so a replay neither re-detects nor charges twice.
+      const closesPeriod =
         subscription.billingMode === 'usage' &&
         subscription.lifecycleOwner === 'provider' &&
-        incomingStart &&
-        !Number.isNaN(incomingStart.getTime()) &&
-        incomingStart.getTime() >= subscription.currentPeriodEnd.getTime()
-          ? {
-              start: subscription.currentPeriodStart,
-              end: subscription.currentPeriodEnd
-            }
-          : null;
+        (type === 'subscription.canceled' ||
+          (incomingStart !== null &&
+            !Number.isNaN(incomingStart.getTime()) &&
+            incomingStart.getTime() >=
+              subscription.currentPeriodEnd.getTime()));
+      const closedPeriod = closesPeriod
+        ? {
+            start: subscription.currentPeriodStart,
+            end: subscription.currentPeriodEnd
+          }
+        : null;
 
       // By name, not by saving the entity: a whole-row diff would push the
       // values read before the awaits above back over anything a concurrent

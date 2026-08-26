@@ -35,6 +35,7 @@ import type {
   InvoiceCursorQueryDto,
   SubscriptionCursorQueryDto
 } from '../dtos/billing-cursor-query.dto';
+import { RenewalService } from '../renewals/renewal.service';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
 
@@ -61,6 +62,7 @@ export class BillingAdminService {
     @InjectRepository(WebhookEvent)
     private readonly webhookEvents: Repository<WebhookEvent>,
     private readonly billing: BillingService,
+    private readonly renewals: RenewalService,
     private readonly entitlements: EntitlementService,
     private readonly credits: CreditService,
     private readonly events: EventEmitter2,
@@ -150,6 +152,7 @@ export class BillingAdminService {
       {
         subscriptions: this.subscriptions,
         billing: this.billing,
+        renewals: this.renewals,
         events: this.events
       },
       subscription,
