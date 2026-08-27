@@ -29,7 +29,10 @@ import {
   toUsageResponse
 } from '../state';
 import { adminGuard, authGuard } from '../helpers/auth.helpers';
-import { billClosingUsagePeriod } from '../helpers/billing.helpers';
+import {
+  billClosingUsagePeriod,
+  sumPlanMeterUnits
+} from '../helpers/billing.helpers';
 import { pushToUser } from '../sse-hub';
 import {
   cursorPaginate,
@@ -364,19 +367,12 @@ billingRouter.get('/usage', authGuard, (req: Request, res: Response) => {
     return;
   }
 
-  // Only the plan's own meter is priced at its rate; a plan naming no meter
-  // charges for nothing.
-  const totalUnits = plan.meterKey
-    ? [...getState().billingUsageRecords.values()]
-        .filter(
-          (r) =>
-            r.subscriptionId === sub.id &&
-            r.meterKey === plan.meterKey &&
-            r.occurredAt >= sub.currentPeriodStart &&
-            r.occurredAt < sub.currentPeriodEnd
-        )
-        .reduce((sum, r) => sum + r.quantity, 0)
-    : 0;
+  const totalUnits = sumPlanMeterUnits(
+    plan,
+    sub.id,
+    sub.currentPeriodStart,
+    sub.currentPeriodEnd
+  );
 
   const includedUnits = price.includedUnits ?? 0;
   const unitPriceMinor = price.unitPriceMinor ?? 0;

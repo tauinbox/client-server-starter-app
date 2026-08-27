@@ -97,6 +97,49 @@ describe('POST /__control/billing/advance-renewal', () => {
     expect(usageInvoice!['periodEnd']).toBe(sub['currentPeriodStart']);
   });
 
+  it('rates the closing period on the plan meter only, ignoring a foreign meter', async () => {
+    const { token, id } = await login('user@example.com');
+    const { customerId } = await activate(id, 'usage');
+    await control('seed-usage', { customerId, quantity: 30 });
+    // A meter the plan does not name belongs to another product and is priced
+    // at that product's rate, never at this plan's.
+    await control('seed-usage', {
+      customerId,
+      meterKey: 'storage_gb',
+      quantity: 500
+    });
+
+    const before = await listInvoices(token);
+    const res = await control('advance-renewal', { userId: id });
+    expect(res.status).toBe(200);
+
+    const invoices = await listInvoices(token);
+    const added = invoices.filter(
+      (i) => !before.some((b) => b['id'] === i['id'])
+    );
+    expect(added).toHaveLength(1);
+    // 30 api_calls × $0.02. The 500 storage units add nothing.
+    expect(added[0]).toMatchObject({ amountMinor: 60, billingMode: 'usage' });
+  });
+
+  it('rates a usage plan that names no meter to zero', async () => {
+    const { token, id } = await login('user@example.com');
+    const { customerId } = await activate(id, 'usage');
+    const plan = [...getState().plans.values()].find((p) => p.key === 'usage')!;
+    plan.meterKey = null;
+    await control('seed-usage', { customerId, quantity: 30 });
+
+    const before = await listInvoices(token);
+    await control('advance-renewal', { userId: id });
+
+    const invoices = await listInvoices(token);
+    const added = invoices.filter(
+      (i) => !before.some((b) => b['id'] === i['id'])
+    );
+    expect(added).toHaveLength(1);
+    expect(added[0]).toMatchObject({ amountMinor: 0, billingMode: 'usage' });
+  });
+
   it('closes a zero-usage period with a zero invoice and still advances', async () => {
     const { token, id } = await login('user@example.com');
     await activate(id, 'usage');
