@@ -1,6 +1,7 @@
 # Server
 
-NestJS 11 REST API with JWT authentication, PostgreSQL via TypeORM, and Swagger documentation.
+A NestJS 11 REST API. It has JWT authentication, PostgreSQL through TypeORM, and Swagger
+documentation.
 
 ## Getting Started
 
@@ -14,14 +15,16 @@ npm run seed:run           # Optional: seed sample data
 npm run start:dev          # Dev server at http://localhost:3000
 ```
 
-`server/docker-compose.yml` is the local **dev** stack — Postgres (`:5432`),
-Redis (`:6379`), and Mailpit (SMTP `:1025`, UI `:8025`). It is separate from the
-repo-root `docker-compose.yml`, which is the **production** deployment file and
-should not be run locally. Redis and Mailpit are optional: set `REDIS_URL` to
-enable the queue/cache, and `SMTP_HOST`/`SMTP_PORT` to capture mail in Mailpit
-(see [Email](#email-mailmodule)).
+`server/docker-compose.yml` is the local **dev** stack. It holds Postgres on `:5432`, Redis on
+`:6379`, and Mailpit with SMTP on `:1025` and a UI on `:8025`.
 
-**Alternative for development**: Use the mock-server (no database required):
+That file is different from the `docker-compose.yml` file in the root of the repository. The root
+file is the **production** deployment, and you must not run it locally.
+
+Redis and Mailpit are optional. Set `REDIS_URL` to enable the queue and the cache. Set `SMTP_HOST`
+and `SMTP_PORT` to capture mail in Mailpit. Refer to [Email](#email-mailmodule).
+
+**An alternative for development.** Use the mock-server. It needs no database:
 
 ```bash
 cd mock-server
@@ -36,11 +39,11 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Dev server | `npm run start:dev` (port 3000, watch mode) |
 | Production start | `npm run start:prod` |
 | Build | `npm run build` |
-| Typecheck | `npm run typecheck` — `tsc --noEmit` over the full `tsconfig.json`, so it covers `test/`, `*.spec.ts`, `common/testing/` and `eslint.config.ts`, which `tsconfig.build.json` excludes from `npm run build` |
+| Typecheck | `npm run typecheck` runs `tsc --noEmit` over the full `tsconfig.json`. Thus it covers `test/`, `*.spec.ts`, `common/testing/` and `eslint.config.ts`. `tsconfig.build.json` excludes those files from `npm run build` |
 | Lint | `npm run lint` |
 | Lint fix | `npm run lint:fix` |
-| Format check | `npm run format:check` — covers `src/`, `test/`, `scripts/`, root configs, plus `shared/src/` and the root-level `*.mjs` configs |
-| Format | `npm run format` — same scope, writes fixes |
+| Format check | `npm run format:check` covers `src/`, `test/`, `scripts/` and the root configuration files. It also covers `shared/src/` and the root-level `*.mjs` configuration files |
+| Format | `npm run format` uses the same scope and writes the corrections |
 | Unit tests | `npm test` |
 | Single test | `npx jest --testPathPattern=<pattern>` |
 | Test watch | `npm run test:watch` |
@@ -50,76 +53,97 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Generate migration | `npm run migrations:gen -- ./src/migrations/<kebab-name>` (build first) |
 | Revert migration | `npm run migrations:revert` (build first) |
 | Run seeders | `npm run seed:run` (build first) |
-| Validate i18n keys | `npm run check:i18n` — verifies all `ErrorKeys` values exist in every client i18n JSON. Enforced in CI (`Server – Checks`), so a new error key without translations fails the build |
-| Generate CASL subjects | `npm run generate:subjects` — scans `@RegisterResource` decorators and writes `shared/src/generated/casl-subjects.ts`; run when adding a new resource |
-| Report grants against the grant-scope rule | `npm run check:grant-scope` - read-only. The grant-scope rule applies to writes only, so rows already in `role_permissions` are never re-validated (retro-validating live grants would silently strip permissions in production). This report closes that gap: it lists grants whose stored condition the resolver vetoes (inert today), and grants that the author recorded in the `PERMISSION_ASSIGN` audit trail could not re-authorize today, re-run through the real `assertCanGrantPermissions`. Attribution depends on the audit trail, which is pruned after `AUDIT_LOG_RETENTION_DAYS`, and abilities are evaluated as they are now - so a verdict is evidence to review, not proof. Exits 1 on findings. |
-| Audit role-permission conditions | `npm run check:role-conditions` — flags any `role_permissions.conditions.custom` rows that contain operators or fields the SQL translator (`apply-ability.util.ts`) cannot handle. Run against staging dumps before deploying changes to the translator. |
-| Audit dependencies | `npm run audit:ci` — runs `npm audit --audit-level=high --omit=dev` through `scripts/audit-ci.mjs`, the same gate CI enforces. Fails on high/critical advisories; moderate findings pass. Run before every push (advisories are tree-based, so this can fail with no source change). The wrapper retries up to 3 times, 15 s apart, **only** when the registry's advisory endpoint itself errors — a real finding still fails on the first attempt. |
+| Validate i18n keys | `npm run check:i18n` verifies that each `ErrorKeys` value exists in each client i18n JSON file. CI applies it in the `Server - Checks` job. Thus a new error key with no translation fails the build |
+| Generate CASL subjects | `npm run generate:subjects` scans the `@RegisterResource` decorators and writes `shared/src/generated/casl-subjects.ts`. Run it when you add a new resource |
+| Report grants against the grant-scope rule | `npm run check:grant-scope` is read-only. Refer to the description below the table |
+| Audit role-permission conditions | `npm run check:role-conditions` finds each `role_permissions.conditions.custom` row that holds an operator or a field that the SQL translator (`apply-ability.util.ts`) cannot handle. Run it against a staging dump before you deploy a change to the translator |
+| Audit dependencies | `npm run audit:ci` runs `npm audit --audit-level=high --omit=dev` through `scripts/audit-ci.mjs`. This is the same gate that CI applies. Refer to the description below the table |
+
+**`npm run check:grant-scope`.** The grant-scope rule applies to a write only. The server never
+validates a row that is already in `role_permissions` again, because a retro-validation of a live
+grant removes permissions in production silently.
+
+This report closes that gap. It lists two groups. The first group holds each grant whose stored
+condition the resolver vetoes, which is inert today. The second group holds each grant that its
+author, from the `PERMISSION_ASSIGN` audit trail, could not authorize today. The report runs those
+grants through the true `assertCanGrantPermissions` function.
+
+The attribution depends on the audit trail, which the system prunes after
+`AUDIT_LOG_RETENTION_DAYS`. The report also evaluates the abilities as they are now. Thus a verdict
+is evidence to review and not proof. The command exits with 1 when it finds something.
+
+**`npm run audit:ci`.** The command fails on a high or critical advisory. A moderate finding passes.
+
+Run it before each push. An advisory comes from the dependency tree, thus the command can fail with
+no change in the source.
+
+The wrapper retries a maximum of 3 times, 15 s apart. It retries **only** when the advisory endpoint
+of the registry gives an error. A true finding still fails on the first attempt.
 
 ## Environment Configuration
 
-Copy `.env.example` to `.env` and configure:
+Copy `.env.example` to `.env`, and then configure it:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APPLICATION_PORT` | `3000` | HTTP listen port |
-| `ENVIRONMENT` | `local` | Environment name (`local` enables auto-sync & permissive CORS) |
-| `SWAGGER_ENABLED` | - | Set to `true` to enable Swagger UI in staging/production (always on in `local`/`development`) |
+| `ENVIRONMENT` | `local` | Environment name. The value `local` enables the automatic schema sync and a permissive CORS policy |
+| `SWAGGER_ENABLED` | - | Set it to `true` to enable the Swagger UI in staging or in production. It is always on in `local` and `development` |
 | `DB_HOST` | `localhost` | PostgreSQL host |
 | `DB_PORT` | `5432` | PostgreSQL port |
 | `DB_NAME` | `my-db` | Database name |
 | `DB_USER` | `postgres` | Database user |
 | `DB_PASSWORD` | `password` | Database password |
 | `DB_SCHEMA` | `public` | Database schema |
-| `DB_LOGGING` | `["warn","error","slow"]` | TypeORM logging levels. `"slow"` logs queries exceeding `DB_SLOW_QUERY_THRESHOLD` |
+| `DB_LOGGING` | `["warn","error","slow"]` | TypeORM logging levels. The value `"slow"` logs a query that takes more than `DB_SLOW_QUERY_THRESHOLD` |
 | `DB_SLOW_QUERY_THRESHOLD` | `200` | Slow query threshold in milliseconds |
-| `DB_LOGGER` | - | TypeORM logger type (e.g. `advanced-console`, `file`); overrides the default logger when set |
-| `REQUEST_LOG_LEVEL` | `all` | Request logging verbosity: `all` (every request), `warn` (4xx+5xx only), `error` (5xx only) |
+| `DB_LOGGER` | - | TypeORM logger type, for example `advanced-console` or `file`. A value replaces the default logger |
+| `REQUEST_LOG_LEVEL` | `all` | Request logging level. `all` logs each request. `warn` logs a 4xx and a 5xx. `error` logs a 5xx |
 | `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
-| `JWT_SECRET` | - | Symmetric secret, min 16 chars (required when `JWT_ALGORITHM=HS256`) |
-| `JWT_PRIVATE_KEY` | - | Base64-encoded RSA private key PEM (required when `JWT_ALGORITHM=RS256`) |
-| `JWT_PUBLIC_KEY` | - | Base64-encoded RSA public key PEM (required when `JWT_ALGORITHM=RS256`) |
-| `JWT_MIN_IAT` | - | Unix timestamp; tokens issued before this value are rejected (used during key rotation) |
-| `JWT_EXPIRATION` | `3600` | Access token lifetime in seconds (1h). Minimum `120` - the client refreshes 60 s before expiry |
-| `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime in seconds (7d) |
+| `JWT_SECRET` | - | Symmetric secret, a minimum of 16 characters. It is necessary when `JWT_ALGORITHM=HS256` |
+| `JWT_PRIVATE_KEY` | - | RSA private key PEM in base64. It is necessary when `JWT_ALGORITHM=RS256` |
+| `JWT_PUBLIC_KEY` | - | RSA public key PEM in base64. It is necessary when `JWT_ALGORITHM=RS256` |
+| `JWT_MIN_IAT` | - | A Unix timestamp. The server rejects a token that it issued before this value. Use it during key rotation |
+| `JWT_EXPIRATION` | `3600` | Access token lifetime in seconds, that is 1 h. The minimum is `120`, because the client refreshes 60 s before the expiry |
+| `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime in seconds, that is 7 days |
 | `GOOGLE_CLIENT_ID` | - | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | - | Google OAuth client secret |
 | `FACEBOOK_CLIENT_ID` | - | Facebook OAuth client ID |
 | `FACEBOOK_CLIENT_SECRET` | - | Facebook OAuth client secret |
 | `VK_CLIENT_ID` | - | VK OAuth client ID |
 | `VK_CLIENT_SECRET` | - | VK OAuth client secret |
-| `CLIENT_URL` | `http://localhost:4200` | Client URL for OAuth callback redirects |
-| `ADMIN_EMAIL` | - | Email for the initial admin user (created on startup if not exists; skip if empty) |
-| `ADMIN_PASSWORD` | - | Password for the initial admin user |
-| `ADMIN_FIRST_NAME` | `Admin` | First name for the initial admin user |
-| `ADMIN_LAST_NAME` | `User` | Last name for the initial admin user |
-| `SMTP_HOST` | - | SMTP server host (if unset, emails logged to console) |
+| `CLIENT_URL` | `http://localhost:4200` | Client URL for the OAuth callback redirects |
+| `ADMIN_EMAIL` | - | Email address of the initial administrator. The server makes the account at startup when it does not exist. It skips this step when the value is empty |
+| `ADMIN_PASSWORD` | - | Password of the initial administrator |
+| `ADMIN_FIRST_NAME` | `Admin` | First name of the initial administrator |
+| `ADMIN_LAST_NAME` | `User` | Last name of the initial administrator |
+| `SMTP_HOST` | - | SMTP server host. When it is empty, the server writes each email to the console |
 | `SMTP_PORT` | `587` | SMTP server port |
-| `SMTP_SECURE` | - | `true` forces implicit TLS; unset = STARTTLS on 587, implicit TLS on 465 (TLS always required) |
+| `SMTP_SECURE` | - | The value `true` forces implicit TLS. When it is empty, the server uses STARTTLS on port 587 and implicit TLS on port 465. TLS is always necessary |
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
 | `SMTP_FROM` | `noreply@example.com` | Sender email address |
-| `REDIS_URL` | - | Redis connection URL (optional; enables distributed rate limiting and shared permission cache for multi-instance deployments) |
-| `E2E_REDIS_DB` | `15` | Test-only: logical Redis database `npm run test:e2e` is pinned to and wipes before each run. Must not be `0`. See [E2E Tests](#e2e-tests-jest) |
-| `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to retain audit log entries before nightly deletion |
-| `TURNSTILE_SITE_KEY` | - | Cloudflare Turnstile site key (public). Both Turnstile keys must be set to enable CAPTCHA; see [Enabling CAPTCHA in production](#enabling-captcha-in-production) |
-| `TURNSTILE_SECRET_KEY` | - | Cloudflare Turnstile secret key. CAPTCHA stays disabled while either key is empty |
-| `DB_POOL_MAX` | `10` | Maximum PostgreSQL connection pool size |
-| `DB_POOL_IDLE_TIMEOUT` | `30000` | Milliseconds before an idle connection is closed |
-| `DB_POOL_CONNECTION_TIMEOUT` | `5000` | Milliseconds to wait for a connection before erroring |
-| `CORS_ORIGINS` | - | Comma-separated allowed origins (e.g. `https://app.example.com,https://admin.example.com`); `*` is rejected in production |
-| `TRUSTED_PROXIES` | - (local), `loopback,uniquelocal` (docker-compose) | Express `trust proxy` setting. Required behind a reverse proxy so `req.ip` resolves to the real client (see [Deployment behind a reverse proxy](#deployment-behind-a-reverse-proxy)). Accepts `loopback` / `linklocal` / `uniquelocal`, a comma-separated IP/CIDR list, a hop count (e.g. `1`), or `true`. The application has no built-in default — leave the env var empty to disable. The repo's `docker-compose.yml` overrides this to `loopback,uniquelocal` for prod deployments behind a host-local reverse proxy or a docker-bridge sidecar; export `TRUSTED_PROXIES` in the shell to override. |
-| `PADDLE_API_KEY` | - | Paddle server API key. Paired with `PADDLE_WEBHOOK_SECRET`; both must be set for Paddle to count as configured |
-| `PADDLE_WEBHOOK_SECRET` | - | Paddle webhook HMAC secret for signature verification |
+| `REDIS_URL` | - | Redis connection URL. It is optional. It enables distributed rate limiting and a shared permission cache for a deployment with more than one instance |
+| `E2E_REDIS_DB` | `15` | For a test only. `npm run test:e2e` uses this logical Redis database, and it clears the database before each run. The value must not be `0`. Refer to [E2E Tests](#e2e-tests-jest) |
+| `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to keep an audit log entry before the nightly deletion |
+| `TURNSTILE_SITE_KEY` | - | Cloudflare Turnstile site key, which is public. The two Turnstile keys are necessary before the CAPTCHA operates. Refer to [Enabling CAPTCHA in production](#enabling-captcha-in-production) |
+| `TURNSTILE_SECRET_KEY` | - | Cloudflare Turnstile secret key. The CAPTCHA stays disabled while one of the two keys is empty |
+| `DB_POOL_MAX` | `10` | Maximum size of the PostgreSQL connection pool |
+| `DB_POOL_IDLE_TIMEOUT` | `30000` | Milliseconds before the pool closes an idle connection |
+| `DB_POOL_CONNECTION_TIMEOUT` | `5000` | Milliseconds to wait for a connection before an error |
+| `CORS_ORIGINS` | - | Permitted origins, separated by commas, for example `https://app.example.com,https://admin.example.com`. Production rejects the value `*` |
+| `TRUSTED_PROXIES` | - (local), `loopback,uniquelocal` (docker-compose) | The Express `trust proxy` setting. It is necessary behind a reverse proxy, thus `req.ip` gives the true client. Refer to [Deployment behind a reverse proxy](#deployment-behind-a-reverse-proxy). It accepts `loopback`, `linklocal`, `uniquelocal`, a list of IPs and CIDRs separated by commas, a hop count such as `1`, or `true`. The application has no built-in default, thus an empty value disables the setting. The `docker-compose.yml` file of the repository sets `loopback,uniquelocal` for a production deployment behind a host-local reverse proxy or a docker-bridge sidecar. To change it, export `TRUSTED_PROXIES` in the shell |
+| `PADDLE_API_KEY` | - | Paddle server API key. Use it with `PADDLE_WEBHOOK_SECRET`. The two values are necessary before Paddle counts as configured |
+| `PADDLE_WEBHOOK_SECRET` | - | Paddle webhook HMAC secret for the signature verification |
 | `PADDLE_ENVIRONMENT` | `sandbox` | Paddle API host: `sandbox` or `production` |
-| `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Paired with `YOOKASSA_SECRET_KEY`; both must be set for YooKassa to count as configured |
+| `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Use it with `YOOKASSA_SECRET_KEY`. The two values are necessary before YooKassa counts as configured |
 | `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
-| `YOOKASSA_VAT_CODE` | `1` | VAT code on every 54-FZ receipt line (1–6, tax-regime specific; `1` = "без НДС") |
-| `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency for new customers (`USD` or `RUB`). Billing UI stays hidden until at least one provider is configured |
-| `BILLING_PROVIDER_TIMEOUT_MS` | `20000` | Deadline for a single provider API call. Neither SDK sets a transport timeout, so without it a stalled socket blocks the sequential renewal scan and holds a webhook delivery open indefinitely. The deadline bounds our call, not the provider's request |
-| `BILLING_WEBHOOK_IP_ALLOWLIST` | - (local), provider egress ranges (docker-compose) | Comma-separated IPs/CIDRs allowed to call `/billing/webhooks/*`; other sources get `403` before any webhook processing. Empty disables the check; a malformed entry fails startup. Requires `TRUSTED_PROXIES` behind a reverse proxy. See [Billing webhook source-IP allowlist](#billing-webhook-source-ip-allowlist) |
-| `BILLING_WEBHOOK_RETENTION_DAYS` | `90` | Age (from `received_at`) at which the daily sweep deletes a settled webhook delivery from the idempotency ledger. `received` and `dead_letter` rows are never pruned. The sweep is a queue job, so it only runs with `REDIS_URL` set |
-| `BILLING_WEBHOOK_PAYLOAD_RETENTION_DAYS` | `7` | Age at which a settled delivery's stored event is nulled out, ahead of the row itself - a `processed` row is never replayed, so the payload is kept this long purely for triage. Set below `BILLING_WEBHOOK_RETENTION_DAYS`, otherwise the row is deleted before its payload would be dropped |
+| `YOOKASSA_VAT_CODE` | `1` | VAT code on each 54-FZ receipt line. The range is 1 to 6, and the value depends on the tax regime. The value `1` means "no VAT" |
+| `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency of a new customer: `USD` or `RUB`. The billing UI stays hidden until a person configures a minimum of one provider |
+| `BILLING_PROVIDER_TIMEOUT_MS` | `20000` | Deadline of one provider API call. Neither SDK sets a transport timeout. Without this deadline, a stalled socket blocks the sequential renewal scan and holds a webhook delivery open with no end. The deadline bounds our call and not the request of the provider |
+| `BILLING_WEBHOOK_IP_ALLOWLIST` | - (local), provider egress ranges (docker-compose) | IPs and CIDRs that can call `/billing/webhooks/*`, separated by commas. Each other source gets a `403` before any webhook processing. An empty value disables the check. A malformed entry stops the startup. Behind a reverse proxy the check needs `TRUSTED_PROXIES`. Refer to [Billing webhook source-IP allowlist](#billing-webhook-source-ip-allowlist) |
+| `BILLING_WEBHOOK_RETENTION_DAYS` | `90` | The age, from `received_at`, at which the daily sweep deletes a settled webhook delivery from the idempotency ledger. The sweep never deletes a `received` row or a `dead_letter` row. The sweep is a queue job, thus it runs only with `REDIS_URL` set |
+| `BILLING_WEBHOOK_PAYLOAD_RETENTION_DAYS` | `7` | The age at which the sweep clears the stored event of a settled delivery, before it deletes the row. The system never replays a `processed` row, thus it keeps the payload for this time for triage only. Set this value below `BILLING_WEBHOOK_RETENTION_DAYS`. If not, the sweep deletes the row before it clears the payload |
 
 ## Architecture
 
@@ -128,197 +152,1193 @@ Copy `.env.example` to `.env` and configure:
 ```
 src/
 ├── common/
-│   ├── dtos/               # PaginationQueryDto, PaginatedResponseDto<T>, CursorPaginationQueryDto, CursorPaginatedResponseDto<T>
-│   ├── utils/              # Shared utilities (escapeLikePattern, hashToken, withTransaction, extractAuditContext, cursor encode/decode, applyKeysetPagination)
-│   ├── validators/         # is-safe-mongo-query, permission-condition-shape; property-is-defined.ts - the @ValidateIf
-│   │                       #   condition that replaces @IsOptional() on any optional field whose consumer reads the
-│   │                       #   value rather than defaulting it (a NOT NULL column, a bounds check, a provider call),
-│   │                       #   so an explicit null is a 400 instead of being passed on (PartialType DTOs pass
-│   │                       #   { skipNullProperties: false } for the same reason)
-│   └── upload/             # createDiskStorageOptions() — reusable multer disk storage factory (destination, allowedExtensions, maxFileSizeBytes); validates both file extension and MIME type to block rename attacks
+│   ├── dtos/               # CursorPaginationQueryDto, CursorPaginatedResponseDto<T>,
+│   │                       #   EntityCursorQueryDto
+│   ├── utils/              # escapeLikePattern, hashToken, withTransaction,
+│   │                       #   extractAuditContext, cursor encode/decode,
+│   │                       #   applyKeysetPagination, cache-version-counter,
+│   │                       #   money-column.transformer
+│   ├── validators/         # is-safe-mongo-query, permission-condition-shape,
+│   │                       #   property-is-defined
+│   └── upload/             # createDiskStorageOptions()
 └── modules/
-├── core/                   # Dynamic root module
-│   ├── config/             # @nestjs/config, loads .env; config-validation.schema.ts - Joi bootstrap validation (coerced types + defaults; a malformed or missing required env var aborts startup)
-│   ├── cache/              # @nestjs/cache-manager; redis-cache.store.ts registers the @keyv/redis adapter under the
-│   │                       #   `stores` (plural) option — a singular `store` is silently ignored by the provider factory
-│   │                       #   and degrades to a per-process in-memory cache. Falls back to in-memory when REDIS_URL is unset;
-│   │                       #   a 1 s connection timeout keeps an unreachable Redis from hanging requests (serves uncached)
-│   ├── database/           # TypeORM + PostgreSQL config
-│   ├── filters/            # GlobalExceptionFilter (standardized error responses, DB error mapping)
-│   ├── health/             # HealthModule (GET /api/health/live, /api/health/ready — DB ping + Redis PING when REDIS_URL set or production;
-│   │                       #   dead Redis fails readiness (2 s timeout), missing REDIS_URL in production and SMTP failures degrade to a generic
-│   │                       #   warning — the raw SMTP error is logged server-side, never returned to the public endpoint;
-│   │                       #   the SMTP verify result is cached for 5 min behind an in-flight guard, so probing does not re-authenticate
-│   │                       #   against the provider on every request; every outcome is mirrored onto the dependency_up gauge,
-│   │                       #   which is what makes a degraded-but-"up" dependency alertable)
-│   ├── metrics/            # MetricsModule (@Global) — Prometheus metrics via @willsoto/nestjs-prometheus
-│   │                       #   GET /metrics (excluded from /api prefix, gated by InternalNetworkGuard — loopback/private/
-│   │                       #   unique-local req.ip only, 403 otherwise); http_requests_total,
-│   │                       #   http_request_duration_seconds, auth_events_total,
-│   │                       #   rbac_permission_denied_total{action,subject,level},
-│   │                       #   mail_queue_jobs{state}, mail_jobs_processed_total{outcome},
-│   │                       #   db_pool_connections{state}, cache_requests_total{cache,outcome},
-│   │                       #   billing_usage_records_unrated_total{meter}, dependency_up{dependency};
-│   │                       #   HttpMetricsInterceptor
-│   └── schedule/           # @nestjs/schedule for cron jobs
-├── auth/
-│   ├── controllers/        # AuthController (includes GET /permissions), OAuthController, RbacController
-│   ├── services/           # AuthService, OAuthService, TokenGeneratorService, RefreshTokenService, SessionIssuerService (issueSession(user) — the single place a sign-in becomes a session: generate tokens, persist the refresh token, then prune to the resolved allowance. AuthService.login and OAuthService.loginWithOAuth both delegate to it and hold no session logic of their own, so the two paths cannot drift; token rotation deliberately does NOT use it, because it replaces a session rather than adding one and runs no prune), SessionLimitService (maxSessionsFor(userId) = EntitlementService.limitFor(userId, 'sessions') ?? MAX_CONCURRENT_SESSIONS — the concurrent-session allowance is a plan dimension, so a paid allowance is not silently trimmed by whichever path the user signs in on. Fails open: a resolver rejection is caught and degrades to the constant, because a billing outage must never become a login outage), OAuthAccountService, TokenCleanupService, ResourceService, ActionService, ResourceSyncService
-│   ├── strategies/         # LocalStrategy, JwtStrategy (extracts roles), GoogleStrategy, FacebookStrategy, VkStrategy
-│   ├── guards/             # LocalAuthGuard, JwtAuthGuard, Google/Facebook/VkOAuthGuard (via createOAuthProviderGuard factory)
-│   ├── listeners/          # SessionRevocationListener (on UserSessionRevocationRequiredEvent: deletes refresh tokens + stamps tokenRevokedAt; registered with suppressErrors:false and emitted via emitAsync, so a failed revocation fails the caller's request), UserDeletedListener (pending email-change cleanup), UserRoleChangedListener (revocation + permission-cache invalidation on role change)
-│   ├── entities/           # RefreshToken, OAuthAccount, Resource, Action
-│   ├── enums/              # OAuthProvider
-│   └── dto/                # LoginDto, RegisterDto, UpdateProfileDto, VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto
-├── audit/
-│   ├── audit.service.ts         # AuditService — records 41 security-sensitive actions to audit_logs table
-│   ├── audit-cleanup.service.ts # AuditCleanupService — nightly cron deletes entries older than AUDIT_LOG_RETENTION_DAYS days
-│   ├── decorators/              # @LogAudit({action,targetType,targetIdParam?,targetIdFromResponse?,details?}) declarative audit logging
-│   ├── interceptors/            # AuditLogInterceptor — global APP_INTERCEPTOR reads @LogAudit metadata and fires logFireAndForget after success
-│   └── entities/                # AuditLog entity (action, actorId, actorEmail, targetId, ip, requestId, createdAt)
-├── mail/
-│   └── mail.service.ts     # Email sending (verification, password reset)
-├── roles/
-│   ├── controllers/        # RolesController (CRUD + permission + user assignment at /api/v1/roles)
-│   ├── services/           # RoleService, PermissionService, PolicyEvaluatorService
-│   ├── entities/           # Role, Permission, RolePermission
-│   ├── guards/             # PermissionsGuard (resolves + checks typed permissions; admin bypasses)
-│   ├── decorators/         # @RequirePermissions([Actions,Subjects]), @Authorize([action,subject]) composite, @RegisterResource
-│   └── casl/               # app-ability.ts (AppAbility, Actions, Subjects, PermissionCheck types,
-│                           #   SYSTEM_ABILITY sentinel + AbilityOrSystem union)
-│                           # CaslAbilityFactory (builds AppAbility, used by AuthController /permissions)
-│                           # constants.ts (reserved keywords: skipped for an allow, kept for a deny, at build time)
-├── notifications/
-│   ├── notifications.service.ts    # Manages Map<userId, Map<connectionId, Subject>> — push(userId), pushToAll()
-│   ├── notifications.listener.ts   # @OnEvent() handlers: UserDeleted/PasswordChanged/Created/Updated/Restored/RoleChanged/RolePermissionsChanged → push
-│   └── notifications.controller.ts # GET /stream — @Sse() returns Observable<MessageEvent> merged with 30s heartbeat
-├── feature-flags/
-│   ├── feature-flags.module.ts        # TypeOrmModule.forFeature([FeatureFlag, FeatureFlagRule]); registers AnonIdMiddleware globally via configure()
-│   ├── entities/                       # FeatureFlag + FeatureFlagRule (cascade) with entity-contract files
-│   ├── services/feature-flag.service.ts          # CRUD + optimistic-lock 409 on PATCH (If-Match); replaceRules in single tx
-│   ├── services/feature-flag-resolver.service.ts # Cached evaluation; per-user keys suffixed with the shared CacheVersionCounter (common/utils/cache-version-counter.ts) so flag changes orphan all per-user entries without Redis SCAN
-│   ├── services/attribute-registry.service.ts    # Extensibility seam — registerAttribute(key, resolver) from other modules' onModuleInit
-│   ├── controllers/feature-flags-admin.controller.ts # 7 admin endpoints under /admin/feature-flags; @Authorize(['manage','FeatureFlag']) + @LogAudit
-│   ├── controllers/feature-flags.controller.ts       # GET /feature-flags — @OptionalAuth(); authenticated → flags resolving true + public flags (disabled non-public omitted); anon → public flags only
-│   ├── constants/feature-flag-metadata.constants.ts  # FEATURE_FLAG_KEY — owned here, not by the decorator, so guard and decorator do not import each other (see the barrel/cycle rules in the root README)
-│   ├── decorators/require-feature.decorator.ts       # @RequireFeature('key') convenience — RBAC remains the real gate
-│   ├── guards/feature-flag.guard.ts                  # Returns 404 (anti-enumeration) when the named flag is disabled for the caller
-│   ├── middleware/anon-id.middleware.ts              # Issues nxs_anon_id cookie (SameSite=Lax, Secure in prod, 1yr, httpOnly=false) on first request
-│   ├── events/feature-flag-changed.event.ts          # { flagKey, changeType: 'created'|'updated'|'deleted'|'toggled'|'rules-replaced' }
-│   ├── listeners/feature-flag-changed.listener.ts    # Invalidates cache + bumps version + pushToAll SSE on FeatureFlagChangedEvent; per-user invalidation on UserRoleChangedEvent / UserDeletedEvent
-│   └── utils/validate-rule-payload.util.ts           # Discriminated payload validation per rule type; rejects custom attribute keys not in the registry
-├── billing/                # Subscriptions/billing foundation (BillingModule.forRoot() in CoreModule.forRoot())
-│   ├── billing.module.ts   # forRoot() dynamic module: FeatureFlagsModule + NotificationsModule (the entitlement-changed listener pushes to the affected client) + TypeOrmModule.forFeature([CreditBalance, CreditLedger, Customer, CustomerGrant, Plan, Product, Subscription, Invoice, PaymentMethod, UsageRecord, WebhookEvent, User (read-only, for YooKassa 54-FZ receipt email)]); BILLING_PROVIDERS + PADDLE_CLIENT + YOOKASSA_CLIENT factories; registers the billing-webhook BullMQ queue + processor + WebhookReconciliationService + WebhookRetentionService when REDIS_URL is set (the processor also self-schedules two repeatable sweeps on bootstrap - reconciliation and ledger retention - both skipped under test), and the self-managed renewal queue + processor when REDIS_URL is set and not under test (the renewal scan self-schedules on bootstrap); imports EntitlementsModule and re-exports it, so importers keep resolving EntitlementService/EntitlementGuard through BillingModule; exports BillingService + BillingConfigService + EntitlementsModule + UsageService + CreditService
-│   ├── billing.service.ts  # resolveProvider() geo-router: providerOverride ?? geoDefault(country); 503 when provider disabled/unconfigured; geoDefaultFor()/effectiveProviderId()/getProviderById() helpers
-│   ├── controllers/        # BillingPlansController — @Public() GET /api/v1/billing/plans (active plans, per-provider prices); BillingUserController — JWT, all scoped to req.user (IDOR-safe): GET subscription|invoices (cursor-paginated)|payment-method, GET usage (current-period metered-usage summary for the caller's usage-mode subscription, null otherwise), POST checkout (creates the local incomplete subscription for the self-managed provider, then redirects; a leftover unpaid row is reused through a conditional write that only matches while it is still `incomplete`, so a first-payment webhook activating it mid-checkout is answered 409 rather than resetting a paid subscription — the provider-managed stale-row release is guarded the same way), POST subscription/change (instant prorated plan/mode switch) + subscription/change/preview (cost without applying), POST subscription/cancel (period-end default), POST payment-method (provider-hosted card replacement: Paddle payment-method-change checkout / YooKassa zero-amount re-bind whose webhook swaps the default; past_due allowed — dunning recovery), GET/PUT region (auto/ru/world override + active-subscription guard, §19), GET products (one-time catalog: active products carrying a price entry for the effective provider — fixed-price sku/credits plus custom entries whose price holds the donation amount bounds; resolved without the availability assertion, so the catalog stays browsable), POST purchase (one-time purchase on the resolved provider: server price-authoritative for fixed-price products, custom amounts validated against the product's min/max bounds, buyer note sanitized into the receipt), GET credits (the caller's prepaid credit balance, null until a pack is bought), GET entitlements (the resolved access the caller's billing state grants — planKey + capabilities + limits — as its own read rather than a field on GET subscription, which answers null exactly in the Free-plus-grant case, or on /auth/me, which must keep working with the billing flag off; the plan catalog cannot substitute for it because it expresses neither one-time grants, nor their expiry, nor the Free fallback, nor the past_due grace window), GET premium-content (worked @RequireEntitlement('reports') example); BillingAdminController — CASL manage Billing (@RegisterResource Billing): GET subscriptions|invoices (both take a per-entity cursor DTO and return the shared cursor envelope through applyKeysetPagination — neither can return more than MAX_PAGE_SIZE rows), POST subscriptions/:id/cancel (409 once the subscription is no longer open — the route is addressed by id, so unlike the self-service cancel it can be handed a canceled row, and a repeat would otherwise re-ask the provider, re-emit the cancel event and write a second audit entry), POST invoices/:id/refund (refunds are tracked cumulatively in `refunded_minor` and cannot exceed `amount_minor`; once cumulative refunds reach the total the invoice flips to `refunded`, revokes a one-time sku's CustomerGrant + drops the buyer's cached entitlements, and claws a credit pack's units back — balance may go negative, blocking usage until topped up; a refund leaving a remaining balance keeps grant and credits), POST usage (internal metering ingest, idempotent on (customer_id, idempotency_key), meter validated against the plan catalog — no public meter endpoint)
-│   ├── services/           # PlanService — findActive(); BillingUserService — customer get-or-create (geo from registration locale), checkout, cancel, usage summary (UsageRating over the current period), region read/set with the no-cross-provider-migration guard, one-time catalog (listProducts) + purchase (resolveProvider → createOneTimePayment with the product id round-tripped through custom data; { provider, url|null, sessionRef } back to the client), payment-method update start (dispatched on the subscription's provider like cancel; returns the hosted session, return URL = billing settings), plan change + proration preview (serialized by an optimistic `version` compare-and-swap on the subscription before any money moves — a concurrent change loses the CAS and is rejected 409, so the provider is never asked for a second conflicting charge, and the CAS stays out of the DB transaction so no row lock is held across the provider HTTP call; Paddle delegates with the new plan key re-planted in custom data; YooKassa records the charge leg as a `pending` invoice BEFORE calling the provider — a plan change is user-driven and runs once, so unlike a renewal no later scan reconciles it and a capture the request then dies on would be recorded nowhere at all; the provider's real payment ref is written in its own committed write the moment the call returns — then charges the prorated new plan FIRST (a declined card aborts the switch and flips that row to `failed`, the one charge failure whose outcome is known; every other rejection leaves it `pending`, since the deadline bounds our call and not the provider's request), then refunds the outgoing plan's remainder against the invoice that paid for its current coverage — that leg is reserved on the source invoice under a FOR UPDATE lock BEFORE the provider refund call and AFTER the charge (so a declined card strands no reservation), and the switch's own charge leg is excluded from that source lookup BY INVOICE ID (`provider_event_id` is nullable, so a `!=` on the key would drop every row that has none) so a switch can never refund the payment it just took, with the unrefunded-remainder cap applied inside that reservation, so an admin refund of the same invoice landing mid-flight shrinks this leg instead of being overwritten by it; a failed provider refund releases the reservation; the closing transaction settles the charge leg to `paid` under a status guard — the confirming webhook runs the identical flip, so exactly one side emits InvoicePaidEvent — inserts the refund leg and applies the plan in ONE transaction [no charged-but-unapplied window], each leg keyed by a unique change-{charge,refund} event id; trial switches move no money; guarded to active/trialing, no scheduled cancel, same-provider price required); BillingAdminService — cross-customer read + cancel/refund (cancel differs from the self-service one only in how the row is found and how its owner is named — both run the same `cancelOpenSubscription` tail: refuse a row that is not open, ask the provider, write the cancel columns under a status predicate and answer 409 when it matches nothing, so a cancel landing during the provider round-trip loses instead of overwriting; refund runs as reserve → call → settle in two short transactions, so no row lock or pool connection is held across the provider HTTP call: the first commits the leg's amount onto `refunded_minor` under a FOR UPDATE lock, so a concurrent leg prices against the reservation and is refused 400 before any money moves; the provider is then called outside any transaction on the cumulative `refund-{id}-{cumulativeAfter}` idempotency key, and a failure releases the reservation in a compensating transaction — the retry recomputes the same key, which the providers' key scans collapse into the original money move; the settling transaction only performs the one-way paid → refunded flip, gated on the settling leg's OWN cumulative so a concurrent in-flight reservation cannot revoke grants for money that may never move, keeping grant revoke + credit clawback exactly-once; full credit-pack refund → CreditService clawback; a crash between a successful provider call and the settle leaves `status paid` with `refunded_minor` at the full amount — the signature to reconcile on; the reserve/release primitives themselves live in `utils/refund-reservation.util.ts` and are shared with the self-service proration leg — `lockInvoice` is the single site taking the FOR UPDATE lock on an invoice, `remainingRefundable` the single expression of the `0 <= refunded_minor <= amount_minor` upper bound, and `releaseRefund` the single compensating release with its clamp at zero, while the policy split stays at the call sites: proration caps silently, this route rejects with 400); UsageService — idempotent metering ingest (record() normalises `occurredAt` from an ISO string or Date, resolves the newest active subscription (same order as the entitlement resolver, so usage is billed against the subscription whose entitlements are in force), dedups on the per-customer unique (customer_id, idempotency_key) incl. a unique-violation race guard — a key reused by another customer is a distinct event, not a replay; a record is an observation, so the customer's current plan does not gate the write — only a meter no plan in the catalog declares is refused (400, a producer typo that can never become chargeable), while a meter some other plan prices is stored, counted on `billing_usage_records_unrated_total{meter}` and left for rating to ignore; the response carries `pricedByCurrentPlan` so the operator who mis-keys learns at the call site — it is a verdict about the plan in force, re-resolved on an idempotent replay rather than stored; 409 while the credit balance is negative); CreditService — single owner of the prepaid balance: atomic upsert (balance += delta, no read-modify-write) + append-only CreditLedger entry per change (purchase/usage/refund), mutators join the caller's invoice transaction so exactly-once rides on the winning provider_event_id insert; UsageInvoicingService — invoices a closed usage period of a provider-managed (Paddle) subscription postpaid: reads and rates the prepaid credit balance under a FOR UPDATE row lock so concurrent closes for the same customer serialize and never over-apply credits, plants a pending Invoice keyed by the unique usage:{subscriptionId}:{periodEnd} BEFORE posting the provider charge and spends the applied credits in the same transaction (a raced/replayed close loses the insert → never double-charges or double-spends; a zero net charge — no usage or credits cover it all — settles as a paid zero invoice without a provider call)
-│   ├── entities/           # 11 entities (Plan, Customer, CustomerGrant, CreditBalance, CreditLedger, PaymentMethod, Product, Subscription, Invoice, UsageRecord, WebhookEvent) + entity-contract + serialization specs
-│   ├── dtos/               # response DTOs (subscription/invoice/payment-method/checkout-session/region/usage/usage-summary/proration-preview/product/customer-grant/credit-balance/entitlements/purchase-session) with WireType/StructuralDiff contract checks + checkout/change/cancel/region/refund/record-usage/purchase request DTOs
-│   ├── events/             # billing.events.ts — SubscriptionActivated/Renewed/PastDue/Canceled, PlanChanged, InvoicePaid, PaymentFailed (each carries userId); UsagePeriodClosed (provider-managed usage rollover OR cancellation → usage-invoicing listener)
-│   ├── listeners/          # entitlement-changed.listener (on any entitlement-changing event: invalidate that user's cached entitlements, THEN push `entitlements_updated` to them — the order matters, a read issued against a still-cached value would re-cache the stale set) + billing-user-deleted.listener (on UserDeletedEvent: cancel provider-managed subscriptions at the provider, cancel self-managed ones locally + emit SubscriptionCanceledEvent; best-effort)
-│   ├── providers/          # PaymentProvider interface + NormalizedEvent behind the BILLING_PROVIDERS token; verifyAndParseWebhook has three outcomes — a NormalizedEvent to reduce, `WEBHOOK_IGNORED` for an authentic delivery carrying nothing to reduce (acked 200, no ledger row), and `null` only for a payload that cannot be verified (400); PaddleProvider (real: webhooks.unmarshal HMAC verify → NormalizedEvent incl. the usage charge key echoed via price custom data, startCheckout, chargeUsage = createOneTimeCharge at the cycle boundary, createOneTimePayment = transactions.create (catalog paddlePriceId or inline non-catalog price for custom amounts; one-time marker + productId in custom data; url optional — Paddle.js can complete by txn id), changePlan/previewChangePlan = subscriptions.update/previewUpdate with prorated_immediately, updatePaymentMethod = getPaymentMethodChangeTransaction hosted checkout [its zero-amount completed/failed webhooks are ignored by origin — acked, not rejected], cancel, refund [the Paddle API has no client idempotency keys, so the caller's refund key is embedded in the adjustment reason and a retry finds the existing adjustment via adjustments.list and no-ops — no double refund]) + YooKassaProvider (real, self-managed: startCheckout = createPayment save_payment_method + redirect [zero-amount binding for trials], chargeOffSession via the saved PaymentMethod token with 54-FZ receipt + Idempotence-Key (reports `captured` only for a `succeeded` payment; a payment-after-receipt `pending`/`waiting_for_capture` is reported uncaptured so the core records it pending rather than granting the period, `canceled` throws), findOffSessionCharge = metadata scan of getPaymentList reporting the same captured/pending status [the fallback path: getPaymentList cannot filter by customer or metadata, so the scan walks the whole shop and is page-bounded], getOffSessionCharge = direct getPayment by the recorded payment ref reporting the same statuses, used wherever the core already stored that ref [it asserts the payment carries the expected chargeKey and fails loudly on a mismatch rather than reporting no charge], createOneTimePayment = plain createPayment with receipt + redirect tagged purpose:one_time (card NOT saved), updatePaymentMethod = zero-amount re-bind tagged purpose:method_update [success webhook → payment_method.updated; abandoned re-bind ignored], refund with refund receipt + Idempotence-Key [the header only dedups inside YooKassa's ~24h key store, so the caller's refund key also rides in the refund description and a replay finds it by scanning getRefundList for a non-canceled match before creating — the scan is page-bounded and fails loudly when inconclusive, never re-refunding on a guess], verifyAndParseWebhook = GET-refetch by id → NormalizedEvent; cancel is a no-op); {paddle,yookassa}.client.ts build each SDK from env or null when unconfigured
-│   ├── rating/             # RatingStrategy interface + FixedRating (plan price) + UsageRating (sums UsageRecords carrying the plan's own meter_key with occurred_at in [period start, end) — a foreign meter belongs to another product and is never priced at this plan's rate, and a plan with no meter_key rates to zero — charges the overage beyond includedUnits at unitPriceMinor; summarizeForPeriod() backs GET /billing/usage, summarizeForPeriodWithCredits() backs both providers' usage invoicing — prepaid credits offset billable units one-for-one before pricing, the caller deducts the applied units) + ProrationCalculator (self-managed plan-change split: whole-day remainder, refund old / charge new, §17.4)
-│   ├── renewals/           # RenewalService — self-managed (YooKassa) renewal loop (design §8.2): sweeps due subscriptions of BOTH rating modes, skipping subscriptions whose owning user is soft-deleted (joins billing_customers -> users) (fixed prepays the next period; usage postpays the closed one — rated over [currentPeriodStart, anchor) with prepaid credits applied first, invoice covers that period, a zero net charge advances via a zero invoice without a provider call — decided only after the invoice already recorded for the period is inspected and any charge still open at the provider is polled, so a period that re-rates to zero mid-flight is settled from what was charged, never from the new rating; applied credits are spent inside the period-advance transaction), off-session charge under an Idempotence-Key stable per (subscription, period) — `renewal:{subId}:{anchorMs}`, also the renewal invoice's unique provider_event_id — so a dunning retry reconciles the prior attempt via findOffSessionCharge instead of charging twice; an accepted-but-uncaptured (`pending`) charge is recorded as a pending invoice with NO period advance and is resolved by the confirming webhook or the next scan's poll (captured → settle + advance; canceled at capture → failed + dunning) - the poll reads the single payment recorded on the pending invoice (getOffSessionCharge) and falls back to the shop-wide scan only for a row with no stored ref, with the advance a compare-and-swap on the period end AND the chargeable status (`trialing`/`active`/`past_due`) read at scan start, so it runs exactly once and a cancel landing during the provider round-trip is not flipped back to active (the paid invoice stays recorded and refundable, and the blocked advance is logged at warn); `cancel_at_period_end` is deliberately outside the predicate so the period just paid for still opens; a `cancel_at_period_end` **usage** subscription reaching its boundary rates and charges the metered period it closes first (same renewal key, invoice and cancel CAS in one transaction, period NOT advanced) and `billClosingUsagePeriod()` does the same for an immediate cancel over `[currentPeriodStart, now)` under `cancel:{subId}:{periodStartMs}` — neither walks dunning, so a decline books the period `failed` and the cancellation still lands; advances the period / converts trials — the new boundary is `nextPeriodEnd(billing_anchor_at, boundary, interval)`, which steps one interval and restores the anchor's day-of-month, so a short month clamps once instead of ratcheting the billing day backwards forever (the fixed-plan invoice period uses the same helper, and a trial re-anchors to `trial_end`) — and walks dunning (3 attempts over a ~7-day grace → past_due → canceled; entitlements kept through grace) — the dunning write is itself a compare-and-swap on the rung and chargeable status the scan claimed at its start, and the period-end cancel one on the status plus the cancel flag, each emitting only when it wins, so two overlapping scans reacting to one decline walk a single rung, cancel once, and notify the customer once; one scan takes at most `RENEWAL_SCAN_MAX_PER_RUN` (200) due rows, oldest boundary first, so a backlog drains over successive scans instead of one unbounded sequential pass (hitting the ceiling is logged at warn; a deferred row is safe by construction — the worker re-reads it, the charge key is per-period and the advance is a CAS); RenewalProcessor = BullMQ repeatable scan upserted on bootstrap (multi-instance safe)
-│   ├── webhooks/           # @Public() POST webhooks/{paddle,yookassa} (RawBodyRequest) → WebhookIngestionService: verify via provider seam (unverifiable → 400; authentic with nothing to reduce → 200 with no ledger row), idempotent insert on unique (provider, provider_event_id) persisting the verified NormalizedEvent on the row, enqueue reduction on BullMQ (inline without Redis); dedup is status-aware — a delivery is a permanent no-op only once it reaches `processed`, a row still `received` (a reduce that threw or a worker that died) is reprocessed on the next redelivery rather than dropped, and a periodic WebhookReconciliationService sweep replays rows stuck in `received` past a threshold from the persisted event (provider-independent recovery for the queued path); a daily WebhookRetentionService sweep bounds the ledger - a `processed` row loses its `payload` after `BILLING_WEBHOOK_PAYLOAD_RETENTION_DAYS` and the row itself after `BILLING_WEBHOOK_RETENTION_DAYS`, both measured from `received_at`, while `received` and `dead_letter` rows are never pruned (both are still replayable); the work is batched and capped per sweep so a ledger that has never been pruned is worked off over several days instead of one long transaction; BillingEventReducer applies the NormalizedEvent onto Subscription/Invoice in a transaction (idempotent), stamps the row with event.provider + the derived lifecycle owner (Paddle = provider, YooKassa = self), and emits the matching domain event. On the self-managed (YooKassa) first-payment path it also persists the saved card as the customer's default PaymentMethod, points the incomplete subscription (found by customer id) at it, and flips it to active/trialing. A payment_method.updated event (method-update re-bind) swaps the default card instead: the old method is demoted (kept for history), the customer's autopay pointer and the open subscription move to the new row — no invoice, no status change. For a provider-managed usage subscription it detects the period rollover (incoming snapshot starts at/after the stored boundary) and emits UsagePeriodClosed after commit; a `subscription.canceled` closes the open metered period the same way, with the boundary read from the STORED row rather than the notification or wall-clock now, so a replayed delivery keys the same invoice instead of charging twice and a genuine rollover for that boundary becomes a no-op; a paid/failed webhook carrying the usage charge key settles/fails the matching pending usage invoice instead of inserting a new row. A webhook carrying an off-session charge key never inserts (the core already recorded that invoice): a succeeded one settles a still-pending row (status-gated pending → paid + paid_at + ref, spending the credit units the charge was rated against) and emits InvoicePaid, or reconciles only the ref if already settled — and when the key matches no pending row at all it is reported at error on `billing_off_session_charges_unmatched_total{provider}`, but only for the flows that record before charging (`change-charge:`, per `utils/charge-keys.util.ts`), since `renewal:`/`cancel:` charges record after the provider answers and a webhook winning that race matches nothing routinely; the report is never a throw, which would leave the delivery `received` for the reconciliation sweep to replay forever; a canceled one (a pending charge declined at capture) flips the pending row to failed silently — the renewal scan observes it and owns the dunning ladder. A paid one-time purchase (kind one_time + productId echoed via custom data/metadata) reduces onto a kind 'one_time' invoice (subscription_id NULL, product_id) and applies the product's effect once per paid invoice — sku → CustomerGrant (expiry from grant.durationDays, else permanent), credits → prepaid balance top-up + ledger entry, custom → no grant; it never links/activates a subscription or saves a card, and a failed/canceled one-time payment is ignored at the seam (nothing pending locally, no dunning signal)
-│   ├── config/             # BillingConfigService — env-derived paddle/yookassa "configured" booleans
-│   └── registrars/         # BillingConfiguredAttributesRegistrar — registers paddleConfigured/yookassaConfigured + combined billingConfigured feature-flag attributes; public `billing` flag gates the UI on configuration, per-provider billing.provider.*.enabled admin kill-switches gate the geo-router
-├── entitlements/           # EntitlementsModule — a PEER of auth and billing, not a subdirectory of either, because both import it
-│   ├── entitlements.module.ts  # Imports only TypeOrmModule.forFeature([Customer, CustomerGrant, Plan, Subscription]) — no auth edge, so AuthModule -> EntitlementsModule and BillingModule -> EntitlementsModule are both one-way and the pre-existing BillingModule -> AuthModule edge stays acyclic (no forwardRef). BillingModule re-exports it, so consumers that import BillingModule keep resolving the service and guard unchanged. It reaches into billing/entities/ for the four rows it reads, which is a schema dependency, not a behavioural one
-│   ├── entitlement.service.ts  # capabilitiesFor(userId) (active/trialing/past_due-in-grace -> plan.entitlements, else Free, unioned with active CustomerGrants — non-revoked, non-expired — from paid one-time sku purchases), per-user cache keyed by the shared CacheVersionCounter (common/utils/cache-version-counter.ts — atomic Redis INCR, in-memory read-modify-write fallback); limitFor(userId, key) reads the already-resolved limits off that same cache (null = the plan carries no limit under that key and the caller applies its own default)
-│   ├── entitlement.guard.ts    # EntitlementGuard (403); @RequireEntitlement('<cap>') in require-entitlement.decorator.ts
-│   ├── entitlement.constants.ts # ENTITLEMENT_KEY — owned here, not by the decorator, so guard and decorator do not import each other (see the barrel/cycle rules in the root README)
-│   └── entitlement.types.ts    # EntitlementCapability union + ResolvedEntitlements (limits typed by the shared EntitlementLimits map)
-│                           # NOT here: EntitlementChangedListener stays in billing/listeners/ — it binds billing-owned events and pushes through NotificationsService
-└── users/
-    ├── controllers/        # UsersController (CRUD + search, all endpoints use @Authorize([action, 'User']))
-    ├── services/           # UsersService
-    ├── entities/           # User entity (ManyToMany to Role via user_roles)
-    └── dto/                # CreateUserDto, UpdateUserDto, UserResponseDto (public; roles: RoleResponse[])
-                            # AdminUserResponseDto extends UserResponseDto + lockedUntil + roles: RoleAdminResponseDto[]
+    ├── core/               # Dynamic root module: config, cache, database, filters,
+    │                       #   health, metrics, schedule
+    ├── auth/               # Authentication, OAuth, RBAC resource catalog
+    ├── audit/              # Audit log service, decorator, interceptor, entity
+    ├── mail/               # Email delivery
+    ├── roles/              # Roles, permissions, CASL ability factory, guards
+    ├── notifications/      # SSE push hub
+    ├── feature-flags/      # Flag entities, resolver, admin API, guard, middleware
+    ├── billing/            # Subscriptions, invoices, providers, rating, renewals,
+    │                       #   webhooks, credits, one-time purchases
+    ├── entitlements/       # EntitlementService and EntitlementGuard, a peer of auth
+    │                       #   and billing
+    └── users/              # User CRUD
 ```
+
+The subsections below give the detail of each directory.
+
+#### common
+
+`common/dtos/` holds the cursor pagination DTOs. Each list endpoint uses them.
+
+`common/utils/` holds the shared utilities. They are `escapeLikePattern`, `hashToken`,
+`withTransaction`, `extractAuditContext`, the cursor encoder and decoder, and
+`applyKeysetPagination`. It also holds `cache-version-counter.ts` and
+`money-column.transformer.ts`.
+
+`common/validators/` holds `is-safe-mongo-query` and `permission-condition-shape`. It also holds
+`property-is-defined.ts`.
+
+`property-is-defined.ts` supplies the `@ValidateIf` condition. That condition replaces
+`@IsOptional()` on an optional field whose consumer reads the value instead of a default. Three
+examples of such a consumer are a NOT NULL column, a bounds check and a provider call. Thus an
+explicit `null` is a 400 and the server does not pass it on. A DTO that `PartialType` builds passes
+`{ skipNullProperties: false }` for the same reason.
+
+`common/upload/` holds `createDiskStorageOptions()`. That is a reusable factory for a multer disk
+storage. It takes the destination, the permitted extensions and the maximum file size. It validates
+the file extension and the MIME type, thus a rename attack fails.
+
+#### core
+
+`config/` uses `@nestjs/config` and loads `.env`. `config-validation.schema.ts` holds the Joi
+validation for the bootstrap. It coerces the types and applies the defaults. A malformed variable, or
+a missing necessary variable, stops the startup.
+
+`cache/` uses `@nestjs/cache-manager`. `redis-cache.store.ts` registers the `@keyv/redis` adapter
+under the `stores` option, which is plural. The provider factory ignores a singular `store` option
+silently, and the cache then degrades to an in-memory cache in each process.
+
+The cache falls back to memory when `REDIS_URL` is empty. A connection timeout of 1 s stops an
+unreachable Redis from holding a request, and the server then serves the data with no cache.
+
+`database/` holds the TypeORM and PostgreSQL configuration.
+
+`filters/` holds `GlobalExceptionFilter`. It gives a standard error response and maps a DB error.
+
+`health/` holds `HealthModule`, with `GET /api/health/live` and `GET /api/health/ready`. The
+readiness check pings the database. It also sends a Redis PING when `REDIS_URL` has a value or the
+environment is production.
+
+A dead Redis fails the readiness check, with a timeout of 2 s. A missing `REDIS_URL` in production
+degrades to a generic warning, and an SMTP failure does the same. The server logs the raw SMTP error
+and never returns it from the public endpoint.
+
+The server keeps the SMTP verify result for 5 minutes behind an in-flight guard. Thus a probe does
+not authenticate against the provider again at each request.
+
+Each result also goes to the `dependency_up` gauge. That gauge is what makes a degraded dependency
+alertable while readiness reports it as up.
+
+`metrics/` holds `MetricsModule`, which is `@Global`. It supplies the Prometheus metrics through
+`@willsoto/nestjs-prometheus`.
+
+`GET /metrics` is outside the `/api` prefix. `InternalNetworkGuard` gates it: the server answers only
+a request whose `req.ip` is a loopback, private or unique-local address, and it answers 403 to each
+other source.
+
+The metrics are `http_requests_total`, `http_request_duration_seconds`, `auth_events_total`,
+`rbac_permission_denied_total{action,subject,level}`, `mail_queue_jobs{state}`,
+`mail_jobs_processed_total{outcome}`, `db_pool_connections{state}`,
+`cache_requests_total{cache,outcome}`, `billing_usage_records_unrated_total{meter}` and
+`dependency_up{dependency}`. The module also supplies `HttpMetricsInterceptor`.
+
+`schedule/` uses `@nestjs/schedule` for the cron jobs.
+
+#### auth
+
+`controllers/` holds `AuthController`, which includes `GET /permissions`. It also holds
+`OAuthController` and `RbacController`.
+
+`services/` holds `AuthService`, `OAuthService`, `TokenGeneratorService`, `RefreshTokenService`,
+`SessionIssuerService`, `SessionLimitService`, `OAuthAccountService`, `TokenCleanupService`,
+`ResourceService`, `ActionService` and `ResourceSyncService`.
+
+`SessionIssuerService.issueSession(user)` is the single place where a sign-in becomes a session. It
+generates the tokens, persists the refresh token, and then prunes the sessions to the resolved
+allowance. `AuthService.login` and `OAuthService.loginWithOAuth` both delegate to it and hold no
+session logic. Thus the two paths cannot diverge.
+
+Token rotation intentionally does NOT use that method. A rotation replaces a session instead of an
+addition of one, and it runs no prune.
+
+`SessionLimitService.maxSessionsFor(userId)` returns
+`EntitlementService.limitFor(userId, 'sessions') ?? MAX_CONCURRENT_SESSIONS`. The concurrent-session
+allowance is a plan dimension. Thus the sign-in path of the user cannot trim a paid allowance
+silently. The method fails open: it catches a rejection from the resolver and uses the constant,
+because a billing outage must never become a login outage.
+
+`strategies/` holds `LocalStrategy`, `JwtStrategy` (which extracts the roles), `GoogleStrategy`,
+`FacebookStrategy` and `VkStrategy`.
+
+`guards/` holds `LocalAuthGuard`, `JwtAuthGuard`, and the Google, Facebook and VK OAuth guards. The
+`createOAuthProviderGuard` factory makes the three OAuth guards.
+
+`listeners/` holds three listeners. `SessionRevocationListener` reacts to
+`UserSessionRevocationRequiredEvent`. It deletes the refresh tokens and stamps `tokenRevokedAt`. It
+registers with `suppressErrors:false`, and the caller emits it with `emitAsync`. Thus a failed
+revocation fails the request of the caller.
+
+`UserDeletedListener` cleans up a pending email change. `UserRoleChangedListener` does the revocation
+and the permission-cache invalidation after a role change.
+
+`entities/` holds `RefreshToken`, `OAuthAccount`, `Resource` and `Action`.
+
+`enums/` holds `OAuthProvider`.
+
+`dto/` holds `LoginDto`, `RegisterDto`, `UpdateProfileDto`, `VerifyEmailDto`, `ForgotPasswordDto` and
+`ResetPasswordDto`.
+
+#### audit
+
+`audit.service.ts` holds `AuditService`. It records 41 security-sensitive actions in the `audit_logs`
+table.
+
+`audit-cleanup.service.ts` holds `AuditCleanupService`. A nightly cron job deletes an entry that is
+older than `AUDIT_LOG_RETENTION_DAYS` days.
+
+`decorators/` holds
+`@LogAudit({action,targetType,targetIdParam?,targetIdFromResponse?,details?})` for declarative audit
+logging.
+
+`interceptors/` holds `AuditLogInterceptor`. It is a global `APP_INTERCEPTOR`. It reads the
+`@LogAudit` metadata and calls `logFireAndForget` after a success.
+
+`entities/` holds the `AuditLog` entity, with `action`, `actorId`, `actorEmail`, `targetId`, `ip`,
+`requestId` and `createdAt`.
+
+#### mail
+
+`mail.service.ts` sends the email messages for the verification and the password reset.
+
+#### roles
+
+`controllers/` holds `RolesController`. It has the CRUD operations, the permission operations and the
+user assignment at `/api/v1/roles`.
+
+`services/` holds `RoleService`, `PermissionService` and `PolicyEvaluatorService`.
+
+`entities/` holds `Role`, `Permission` and `RolePermission`.
+
+`guards/` holds `PermissionsGuard`. It resolves and checks the typed permissions, and an
+administrator with a super role bypasses it.
+
+`decorators/` holds `@RequirePermissions([Actions,Subjects])`, the composite
+`@Authorize([action,subject])`, and `@RegisterResource`.
+
+`casl/` holds three files. `app-ability.ts` holds `AppAbility`, `Actions`, `Subjects`, the
+`PermissionCheck` types, the `SYSTEM_ABILITY` sentinel and the `AbilityOrSystem` union.
+`CaslAbilityFactory` builds the `AppAbility` object, and `AuthController` uses it for
+`GET /permissions`. `constants.ts` holds the reserved keywords. The build skips such a keyword for an
+allow rule and keeps it for a deny rule.
+
+#### notifications
+
+`notifications.service.ts` manages a `Map<userId, Map<connectionId, Subject>>` structure. It supplies
+`push(userId)` and `pushToAll()`.
+
+`notifications.listener.ts` holds the `@OnEvent()` handlers. They react to `UserDeleted`,
+`UserPasswordChanged`, `UserCreated`, `UserUpdated`, `UserRestored`, `UserRoleChanged` and
+`UserRolePermissionsChanged`, and each one pushes a message.
+
+`notifications.controller.ts` holds `GET /stream`. The `@Sse()` decorator returns an
+`Observable<MessageEvent>` that merges with a heartbeat each 30 s.
+
+#### feature-flags
+
+`feature-flags.module.ts` registers `TypeOrmModule.forFeature([FeatureFlag, FeatureFlagRule])`. It
+also registers `AnonIdMiddleware` globally through `configure()`.
+
+`entities/` holds `FeatureFlag` and `FeatureFlagRule` with a cascade, plus their entity-contract
+files.
+
+`services/feature-flag.service.ts` holds the CRUD operations. A PATCH with `If-Match` gives a 409 on
+an optimistic-lock conflict. `replaceRules` runs in one transaction.
+
+`services/feature-flag-resolver.service.ts` does the cached evaluation. A per-user key ends with the
+shared `CacheVersionCounter` value (`common/utils/cache-version-counter.ts`). Thus a flag change
+orphans each per-user entry with no Redis `SCAN`.
+
+`services/attribute-registry.service.ts` is the extensibility seam. Another module calls
+`registerAttribute(key, resolver)` from its `onModuleInit` method.
+
+`controllers/feature-flags-admin.controller.ts` holds 7 administrator endpoints below
+`/admin/feature-flags`. Each one uses `@Authorize(['manage','FeatureFlag'])` and `@LogAudit`.
+
+`controllers/feature-flags.controller.ts` holds `GET /feature-flags` with `@OptionalAuth()`. An
+authenticated caller gets each flag that resolves true plus each public flag, and the server omits a
+disabled non-public flag. An anonymous caller gets the public flags only.
+
+`constants/feature-flag-metadata.constants.ts` holds `FEATURE_FLAG_KEY`. It lives here and not in the
+decorator, thus the guard and the decorator do not import each other. Refer to the barrel and cycle
+rules in the root README.
+
+`decorators/require-feature.decorator.ts` holds the `@RequireFeature('key')` convenience decorator.
+RBAC stays the true gate.
+
+`guards/feature-flag.guard.ts` returns 404 against enumeration when the named flag is disabled for
+the caller.
+
+`middleware/anon-id.middleware.ts` issues the `nxs_anon_id` cookie at the first request. The cookie
+uses `SameSite=Lax`, `Secure` in production, a life of 1 year and `httpOnly=false`.
+
+`events/feature-flag-changed.event.ts` holds
+`{ flagKey, changeType: 'created'|'updated'|'deleted'|'toggled'|'rules-replaced' }`.
+
+`listeners/feature-flag-changed.listener.ts` reacts to `FeatureFlagChangedEvent`. It invalidates the
+cache, increases the version, and calls `pushToAll` over SSE. It also does a per-user invalidation on
+`UserRoleChangedEvent` and on `UserDeletedEvent`.
+
+`utils/validate-rule-payload.util.ts` validates the payload of each rule type separately. It rejects
+a custom attribute key that the registry does not hold.
+
+#### billing
+
+The billing module is the foundation of the subscriptions. `CoreModule.forRoot()` starts it through
+`BillingModule.forRoot()`.
+
+**Module wiring (`billing.module.ts`).** The dynamic module imports `FeatureFlagsModule` and
+`NotificationsModule`. It needs the second module because the entitlement-changed listener pushes to
+the client of the affected user.
+
+It also imports `TypeOrmModule.forFeature([...])` with these entities: `CreditBalance`,
+`CreditLedger`, `Customer`, `CustomerGrant`, `Plan`, `Product`, `Subscription`, `Invoice`,
+`PaymentMethod`, `UsageRecord`, `WebhookEvent` and `User`. The `User` entity is read-only here, and
+the module needs it for the email address on a 54-FZ YooKassa receipt.
+
+The module supplies the `BILLING_PROVIDERS`, `PADDLE_CLIENT` and `YOOKASSA_CLIENT` factories.
+
+When `REDIS_URL` has a value, the module registers the billing-webhook BullMQ queue, its processor,
+`WebhookReconciliationService` and `WebhookRetentionService`. The processor also schedules two
+repeatable sweeps at bootstrap, that is the reconciliation sweep and the ledger retention sweep. It
+skips the two sweeps in a test.
+
+When `REDIS_URL` has a value and the process is not a test, the module also registers the
+self-managed renewal queue and its processor. The renewal scan schedules itself at bootstrap.
+
+The module imports `EntitlementsModule` and re-exports it. Thus an importer continues to resolve
+`EntitlementService` and `EntitlementGuard` through `BillingModule`. The module exports
+`BillingService`, `BillingConfigService`, `EntitlementsModule`, `UsageService` and `CreditService`.
+
+**Geo-router (`billing.service.ts`).** `resolveProvider()` computes
+`providerOverride ?? geoDefault(country)`. It answers 503 when the provider is disabled or not
+configured. The file also holds the `geoDefaultFor()`, `effectiveProviderId()` and
+`getProviderById()` helpers.
+
+**Controllers.** `BillingPlansController` holds the `@Public()` route `GET /api/v1/billing/plans`. It
+returns the active plans with the price of each provider.
+
+`BillingUserController` uses JWT. Each route is scoped to `req.user`, thus IDOR fails. The routes
+are:
+
+- `GET subscription`, `GET invoices` (cursor-paginated) and `GET payment-method`.
+- `GET usage` returns the metered-usage summary of the current period for a usage-mode subscription
+  of the caller. It returns null for each other condition.
+- `POST checkout` makes the local incomplete subscription for the self-managed provider, and then it
+  redirects. It reuses an unpaid row that stays from an earlier attempt, through a conditional write
+  that matches only while the row is `incomplete`. Thus a first-payment webhook that activates the
+  row during the checkout gets a 409, and it does not reset a paid subscription. The release of a
+  stale row on the provider-managed path uses the same guard.
+- `POST subscription/change` does an immediate prorated change of the plan or of the mode.
+  `POST subscription/change/preview` gives the cost and applies nothing.
+- `POST subscription/cancel` cancels at the end of the period by default.
+- `POST payment-method` starts the card replacement at the provider. Paddle gives its
+  payment-method-change checkout. YooKassa does a zero-amount re-bind, and its webhook changes the
+  default method. A `past_due` subscription can use this route, because it is how dunning recovers.
+- `GET region` and `PUT region` read and write the `auto`, `ru` or `world` override. The write has an
+  active-subscription guard, as in section 19 of the billing design.
+- `GET products` returns the one-time catalog. It holds each active product that carries a price for
+  the effective provider, that is a fixed-price `sku` or `credits` entry, and a `custom` entry whose
+  price holds the donation bounds. The route resolves the provider without the availability
+  assertion, thus the catalog stays readable.
+- `POST purchase` makes a one-time purchase on the resolved provider. The server is the authority on
+  the price of a fixed-price product. It validates a custom amount against the minimum and maximum of
+  the product. It sanitizes the note of the buyer into the receipt.
+- `GET credits` returns the prepaid credit balance of the caller. It returns null until the customer
+  buys a pack.
+- `GET entitlements` returns the access that the billing state of the caller gives, that is
+  `planKey`, `capabilities` and `limits`. It is a separate read and not a field on `GET subscription`,
+  which answers null in exactly the Free-plus-grant case. It is also not a field on `/auth/me`, which
+  must continue to operate while the billing flag is off. The plan catalog cannot substitute for it,
+  because the catalog expresses neither a one-time grant, nor the expiry of such a grant, nor the Free
+  fallback, nor the `past_due` grace window.
+- `GET premium-content` is the worked example of `@RequireEntitlement('reports')`.
+
+`BillingAdminController` uses the CASL subject `Billing` through `@RegisterResource Billing`. Its
+routes are:
+
+- `GET subscriptions` and `GET invoices`. Each one takes a cursor DTO for its entity and returns the
+  shared cursor envelope through `applyKeysetPagination`. Neither can return more than
+  `MAX_PAGE_SIZE` rows.
+- `POST subscriptions/:id/cancel` answers 409 when the subscription is no longer open. The route
+  takes an id, thus a person can address a canceled row here. The self-service cancel cannot get
+  such a row. Without the 409, a repeat asks the provider again, emits the cancel event again, and
+  writes a second audit entry.
+- `POST invoices/:id/refund`. The system tracks the refunds cumulatively in `refunded_minor`, and
+  the sum cannot be more than `amount_minor`. When the cumulative refunds reach the total, the
+  invoice becomes `refunded`. That flip revokes the `CustomerGrant` of a one-time sku, drops the
+  cached entitlements of the buyer, and takes the units of a credit pack back. The balance can become
+  negative, which blocks usage until the customer adds credits. A refund that leaves a remaining
+  balance keeps the grant and the credits.
+- `POST usage` is the internal metering ingest. It is idempotent on
+  `(customer_id, idempotency_key)`. The server validates the meter against the plan catalog. There is
+  no public meter endpoint.
+
+**Services.** `PlanService` supplies `findActive()`.
+
+`BillingUserService` does this work:
+
+- It gets or makes the customer. The geography comes from the registration locale.
+- It does the checkout and the cancel.
+- It makes the usage summary, with `UsageRating` over the current period.
+- It reads and sets the region, with the guard against a cross-provider migration.
+- It lists the one-time catalog (`listProducts`) and does a purchase. The purchase calls
+  `resolveProvider` and then `createOneTimePayment`. The product id travels through the custom data
+  of the provider. The service answers `{ provider, url|null, sessionRef }` to the client.
+- It starts a payment-method update. The dispatch uses the provider of the subscription, as the
+  cancel does. It returns the hosted session, and the return URL is the billing settings page.
+- It does the plan change and the proration preview. The next paragraphs describe that flow.
+
+**The plan change.** An optimistic `version` compare-and-swap on the subscription serializes the
+change before any money moves. A concurrent change loses the CAS and gets a 409. Thus the system
+never asks the provider for a second conflicting charge. The CAS stays outside the DB transaction,
+thus no row lock is held across the HTTP call to the provider.
+
+Paddle delegates the change. The new plan key goes into the custom data again.
+
+YooKassa records the charge leg as a `pending` invoice BEFORE the call to the provider. A plan change
+is user-driven and runs one time, thus no later scan reconciles it, unlike a renewal. Without the
+early record, a capture that the request then loses is recorded nowhere. The true payment reference
+of the provider goes into its own committed write the moment that the call returns.
+
+The service charges the prorated new plan FIRST. A declined card stops the change and flips that row
+to `failed`, which is the one charge failure with a known result. Each other rejection leaves the row
+`pending`, because the deadline bounds our call and not the request of the provider.
+
+Then the service refunds the remainder of the outgoing plan. The refund goes against the invoice that
+paid for the current coverage of that plan.
+
+The service reserves that leg on the source invoice under a `FOR UPDATE` lock. The reservation
+happens BEFORE the refund call to the provider and AFTER the charge, thus a declined card leaves no
+reservation.
+
+The lookup for the source invoice excludes the charge leg of the switch BY INVOICE ID.
+`provider_event_id` is nullable, thus a `!=` on that key drops each row that has none. Thus a switch
+can never refund the payment that it just took.
+
+The cap of the unrefunded remainder applies inside that reservation. Thus an administrator refund of
+the same invoice that lands during the flow makes this leg smaller, and this leg does not overwrite
+it. A failed refund at the provider releases the reservation.
+
+The closing transaction settles the charge leg to `paid` under a status guard. The confirming webhook
+runs the identical flip, thus exactly one of the two emits `InvoicePaidEvent`. The same transaction
+inserts the refund leg and applies the plan. Thus there is no window in which the customer is charged
+and the plan is not applied. Each leg has its own unique `change-charge` or `change-refund` event id.
+
+A switch during a trial moves no money. The route is guarded to the `active` and `trialing` statuses.
+It refuses a subscription with a scheduled cancel. It requires a price for the same provider.
+
+**`BillingAdminService`** does the cross-customer read, the cancel and the refund.
+
+The administrator cancel differs from the self-service cancel in two ways only: how it finds the row,
+and how it names the owner. The two run the same `cancelOpenSubscription` tail. That tail refuses a
+row that is not open, asks the provider, and writes the cancel columns under a status predicate. It
+answers 409 when the predicate matches nothing. Thus a cancel that lands during the provider round
+trip loses, and it does not overwrite the row.
+
+The refund runs as three steps in two short transactions: reserve, call, settle. Thus no row lock and
+no pool connection is held across the HTTP call to the provider.
+
+The first transaction commits the amount of the leg onto `refunded_minor` under a `FOR UPDATE` lock.
+Thus a concurrent leg prices against the reservation and gets a 400 before any money moves.
+
+Then the service calls the provider outside any transaction. The idempotency key is
+`refund-{id}-{cumulativeAfter}`, that is the cumulative total after the leg. A failure releases the
+reservation in a compensating transaction. The retry computes the same key, and the key scans of the
+providers collapse it into the original money move.
+
+The settling transaction does the one-way flip from paid to refunded only. It gates on the OWN
+cumulative value of the settling leg. Thus a concurrent in-flight reservation cannot revoke a grant
+for money that can still fail to move. This keeps the grant revocation and the credit clawback
+exactly-once.
+
+A full refund of a credit pack calls the `CreditService` clawback.
+
+A crash between a successful provider call and the settle leaves the status `paid` with
+`refunded_minor` at the full amount. That is the signature to reconcile on.
+
+The reserve and release primitives are in `utils/refund-reservation.util.ts`. The self-service
+proration leg shares them. `lockInvoice` is the single site that takes the `FOR UPDATE` lock on an
+invoice. `remainingRefundable` is the single expression of the bound
+`0 <= refunded_minor <= amount_minor`. `releaseRefund` is the single compensating release, with its
+clamp at zero. The policy stays at the call site: the proration caps silently, and this route rejects
+with a 400.
+
+**`UsageService`** does the idempotent metering ingest.
+
+`record()` normalizes `occurredAt` from an ISO string or a Date. It resolves the newest active
+subscription, in the same order as the entitlement resolver. Thus the system bills the usage against
+the subscription whose entitlements are in force.
+
+The method deduplicates on the per-customer unique pair `(customer_id, idempotency_key)`. It also has
+a guard for a unique-violation race. A key that another customer reuses is a distinct event and not a
+replay.
+
+A record is an observation, thus the current plan of the customer does not gate the write. The
+service refuses only a meter that no plan in the catalog declares, with a 400. Such a meter is a typo
+of the producer and can never become chargeable.
+
+The service stores a meter that another plan prices. It counts that record on
+`billing_usage_records_unrated_total{meter}` and leaves it for the rating step to ignore.
+
+The response carries `pricedByCurrentPlan`. Thus the operator who uses an incorrect key learns at the
+call site. That field is a verdict about the plan in force. The service resolves it again on an
+idempotent replay and does not store it.
+
+The method answers 409 while the credit balance is negative.
+
+**`CreditService`** is the single owner of the prepaid balance. Each change is an atomic upsert of
+`balance += delta`, and not a read, modify and write sequence. Each change also appends a
+`CreditLedger` entry with the reason `purchase`, `usage` or `refund`. Each mutator joins the invoice
+transaction of the caller. Thus the exactly-once property rides on the winning `provider_event_id`
+insert.
+
+**`UsageInvoicingService`** invoices a closed usage period of a provider-managed (Paddle)
+subscription. The billing is postpaid.
+
+The service reads and rates the prepaid credit balance under a `FOR UPDATE` row lock. Thus two
+concurrent closes for the same customer serialize, and they never apply the credits two times.
+
+It plants a pending Invoice, keyed by the unique value `usage:{subscriptionId}:{periodEnd}`, BEFORE
+it posts the charge to the provider. It spends the applied credits in the same transaction. Thus a
+close that races or replays loses the insert, and it never charges twice or spends twice.
+
+A net charge of zero settles as a paid zero invoice with no call to the provider. That occurs when
+there is no usage, or when the credits cover all of it.
+
+**Entities.** The module has 11 entities: `Plan`, `Customer`, `CustomerGrant`, `CreditBalance`,
+`CreditLedger`, `PaymentMethod`, `Product`, `Subscription`, `Invoice`, `UsageRecord` and
+`WebhookEvent`. Each one has an entity-contract file and serialization specs.
+
+**DTOs.** The response DTOs cover the subscription, the invoice, the payment method, the checkout
+session, the region, the usage, the usage summary, the proration preview, the product, the customer
+grant, the credit balance, the entitlements and the purchase session. Each one has the `WireType` and
+`StructuralDiff` contract checks.
+
+The request DTOs cover the checkout, the change, the cancel, the region, the refund, the usage record
+and the purchase.
+
+**Events (`events/billing.events.ts`).** The events are `SubscriptionActivated`,
+`SubscriptionRenewed`, `SubscriptionPastDue`, `SubscriptionCanceled`, `PlanChanged`, `InvoicePaid`
+and `PaymentFailed`. Each one carries a `userId`. `UsagePeriodClosed` comes from a provider-managed
+usage rollover or from a cancellation, and the usage-invoicing listener reads it.
+
+**Listeners.** `entitlement-changed.listener` reacts to each event that changes an entitlement. It
+invalidates the cached entitlements of that user, and THEN it pushes `entitlements_updated` to them.
+The order is important: a read against a value that is still cached re-caches the stale set.
+
+`billing-user-deleted.listener` reacts to `UserDeletedEvent`. It cancels a provider-managed
+subscription at the provider. It cancels a self-managed subscription locally and emits
+`SubscriptionCanceledEvent`. It is best-effort.
+
+**Providers.** The directory holds the `PaymentProvider` interface and the `NormalizedEvent` type
+behind the `BILLING_PROVIDERS` token.
+
+`verifyAndParseWebhook` has three results. A `NormalizedEvent` object is a delivery to reduce.
+`WEBHOOK_IGNORED` is an authentic delivery that carries nothing to reduce, and the server
+acknowledges it with a 200 and writes no ledger row. `null` is a payload that the server cannot
+verify, and the answer is a 400.
+
+`PaddleProvider` is the true Paddle client:
+
+- `verifyAndParseWebhook` uses `webhooks.unmarshal` for the HMAC verification, and it makes a
+  `NormalizedEvent` object. The event includes the usage charge key, which travels through the price
+  custom data.
+- `startCheckout` opens a hosted checkout.
+- `chargeUsage` calls `createOneTimeCharge` at the cycle boundary.
+- `createOneTimePayment` calls `transactions.create`. It uses the catalog `paddlePriceId`, or an
+  inline non-catalog price for a custom amount. The one-time marker and the `productId` go into the
+  custom data. The `url` value is optional, because Paddle.js can complete the payment with the
+  transaction id.
+- `changePlan` and `previewChangePlan` call `subscriptions.update` and `previewUpdate` with
+  `prorated_immediately`.
+- `updatePaymentMethod` calls `getPaymentMethodChangeTransaction` for the hosted checkout. The
+  provider ignores the zero-amount completed and failed webhooks of that flow by their origin. It
+  acknowledges them and does not reject them.
+- `cancel` cancels the subscription.
+- `refund` makes an adjustment. The Paddle API has no idempotency key from the client. Thus the
+  refund key of the caller goes into the reason of the adjustment. A retry finds the existing
+  adjustment through `adjustments.list` and does nothing. Thus there is no double refund.
+
+`YooKassaProvider` is the true YooKassa client, and it is self-managed:
+
+- `startCheckout` calls `createPayment` with `save_payment_method` and a redirect. A trial uses a
+  zero-amount binding.
+- `chargeOffSession` charges with the saved `PaymentMethod` token. It attaches the 54-FZ receipt and
+  an `Idempotence-Key`. It reports `captured` only for a `succeeded` payment. It reports a
+  payment-after-receipt in the `pending` or `waiting_for_capture` state as uncaptured, thus the core
+  records the invoice as pending and does not give the period. A `canceled` payment throws an error.
+- `findOffSessionCharge` scans the metadata of `getPaymentList`. It reports the same captured and
+  pending statuses. This is the fallback path: `getPaymentList` cannot filter by customer or by
+  metadata, thus the scan walks the whole shop. The scan is page-bounded.
+- `getOffSessionCharge` calls `getPayment` directly with the recorded payment reference. It reports
+  the same statuses. The core uses it wherever it already stored that reference. The method asserts
+  that the payment carries the expected `chargeKey`. It fails loudly on a mismatch, and it does not
+  report that there is no charge.
+- `createOneTimePayment` calls `createPayment` with a receipt and a redirect. The metadata carries
+  `purpose:one_time`. The provider does NOT save the card.
+- `updatePaymentMethod` does a zero-amount re-bind with `purpose:method_update`. The success webhook
+  becomes `payment_method.updated`. The provider ignores an abandoned re-bind.
+- `refund` sends a refund receipt and an `Idempotence-Key`. The header deduplicates only inside the
+  key store of YooKassa, which lives approximately 24 h. Thus the refund key of the caller also
+  travels in the refund description. A replay finds it: it scans `getRefundList` for a match that is
+  not canceled before it makes a refund. The scan is page-bounded and fails loudly when the result is
+  not conclusive. It never refunds again on a guess.
+- `verifyAndParseWebhook` reads the object again with a GET by id, and then makes a
+  `NormalizedEvent` object.
+- `cancel` does nothing.
+
+`paddle.client.ts` and `yookassa.client.ts` build each SDK from the environment. Each one returns
+null when the provider is not configured.
+
+**Rating.** The directory holds the `RatingStrategy` interface, `FixedRating`, `UsageRating` and
+`ProrationCalculator`.
+
+`FixedRating` uses the plan price.
+
+`UsageRating` sums the `UsageRecord` rows that carry the `meter_key` of the plan, with `occurred_at`
+inside the period. A foreign meter belongs to another product, thus the rating never prices it at the
+rate of this plan. A plan with no `meter_key` rates to zero. The strategy charges the overage above
+`includedUnits` at `unitPriceMinor`.
+
+`summarizeForPeriod()` supports `GET /billing/usage`. `summarizeForPeriodWithCredits()` supports the
+usage invoicing of the two providers. The prepaid credits offset the billable units one for one
+before the pricing step, and the caller deducts the applied units.
+
+`ProrationCalculator` computes the split of a self-managed plan change. It uses a whole-day
+remainder. It refunds the old plan and charges the new plan, as in section 17.4 of the billing
+design.
+
+**Renewals.** `RenewalService` is the renewal loop of the self-managed (YooKassa) provider. Section 8
+of the billing design describes it.
+
+The scan covers the subscriptions of the two rating modes. It skips a subscription whose owning user
+is soft-deleted, and it joins `billing_customers` to `users` for that check.
+
+A fixed plan prepays the next period. A usage plan postpays the period that closes. The rating covers
+`[currentPeriodStart, anchor)` and applies the prepaid credits first. The invoice covers that period.
+
+A net charge of zero advances the period with a zero invoice and no call to the provider. The service
+decides this only after two steps: it inspects the invoice that the period already recorded, and it
+polls any charge that is still open at the provider. Thus a period that rates to zero again during
+the flow settles from what the system charged, and never from the new rating. The service spends the
+applied credits inside the period-advance transaction.
+
+The off-session charge uses an `Idempotence-Key` that is stable for each pair of subscription and
+period. Its form is `renewal:{subId}:{anchorMs}`, and it is also the unique `provider_event_id` of
+the renewal invoice. Thus a dunning retry reconciles the previous attempt with `findOffSessionCharge`
+instead of a second charge.
+
+A charge that the provider accepts but does not capture (`pending`) becomes a pending invoice with NO
+period advance. The confirming webhook or the poll of the next scan resolves it. A captured payment
+settles the invoice and advances the period. A payment that cancels at capture becomes `failed`, and
+dunning starts.
+
+That poll reads the single payment that the pending invoice recorded, with `getOffSessionCharge`. It
+falls back to the shop-wide scan only for a row with no stored reference.
+
+The advance is a compare-and-swap on the period end AND on the chargeable status. The statuses are
+`trialing`, `active` and `past_due`, read at the start of the scan. Thus the advance runs exactly one
+time. Thus a cancel that lands during the provider round trip does not go back to active. The paid
+invoice stays recorded and refundable, and the service logs the blocked advance at warn level.
+
+`cancel_at_period_end` is intentionally outside the predicate, thus the period that the customer paid
+for still opens.
+
+A **usage** subscription with `cancel_at_period_end` that reaches its boundary rates and charges the
+metered period that it closes. It uses the same renewal key. The invoice and the cancel CAS commit in
+one transaction, and the period does NOT advance.
+
+`billClosingUsagePeriod()` does the same for an immediate cancel, over `[currentPeriodStart, now)`,
+under the key `cancel:{subId}:{periodStartMs}`. Neither path walks dunning. Thus a decline books the
+period as `failed` and the cancellation still completes.
+
+The service advances the period and converts a trial. The new boundary is
+`nextPeriodEnd(billing_anchor_at, boundary, interval)`. That helper steps one interval and restores
+the day of the month of the anchor. Thus a short month clamps one time, and the billing day does not
+move backwards permanently. The invoice period of a fixed plan uses the same helper, and a trial
+anchors again to `trial_end`.
+
+The service walks dunning: 3 attempts across a grace window of approximately 7 days, then `past_due`,
+then `canceled`. The customer keeps the entitlements through the grace window.
+
+The dunning write is itself a compare-and-swap. It compares the rung and the chargeable status that
+the scan claimed at its start. The period-end cancel compares the status and the cancel flag. Each
+one emits an event only when it wins. Thus two overlapping scans that react to one decline walk a
+single rung, cancel one time, and notify the customer one time.
+
+One scan takes a maximum of `RENEWAL_SCAN_MAX_PER_RUN` (200) due rows, with the oldest boundary
+first. Thus a backlog drains across successive scans, and not in one unbounded sequential pass. The
+service logs the ceiling at warn level. A deferred row is safe by construction: the worker reads it
+again, the charge key is per period, and the advance is a CAS.
+
+`RenewalProcessor` is the BullMQ repeatable scan. The module upserts it at bootstrap, thus it is safe
+with more than one instance.
+
+**Webhooks.** The `@Public()` routes are `POST webhooks/paddle` and `POST webhooks/yookassa`. They
+take a `RawBodyRequest` object.
+
+`WebhookIngestionService` verifies the delivery through the provider seam. A delivery that it cannot
+verify gets a 400. An authentic delivery with nothing to reduce gets a 200 and no ledger row.
+
+The service does an idempotent insert on the unique pair `(provider, provider_event_id)`. It persists
+the verified `NormalizedEvent` object on the row. Then it enqueues the reduction on BullMQ. Without
+Redis it reduces inline.
+
+The deduplication is status-aware. A delivery becomes a permanent no-op only when it reaches
+`processed`. A row that is still `received` comes from a reduce that threw an error, or from a worker
+that stopped. The service processes such a row again at the next redelivery, and it does not drop it.
+
+A periodic `WebhookReconciliationService` sweep replays each row that stays `received` past a
+threshold, from the persisted event. That recovery is provider-independent, thus it covers the queued
+path.
+
+A daily `WebhookRetentionService` sweep bounds the ledger. A `processed` row loses its `payload`
+after `BILLING_WEBHOOK_PAYLOAD_RETENTION_DAYS`, and the row goes after
+`BILLING_WEBHOOK_RETENTION_DAYS`. The sweep measures the two ages from `received_at`. It never prunes
+a `received` row or a `dead_letter` row, because a person can still replay the two. The work is
+batched and capped for each sweep. Thus a ledger that nobody pruned before is worked off across
+several days, and not in one long transaction.
+
+`BillingEventReducer` applies the `NormalizedEvent` object onto a `Subscription` or an `Invoice`
+inside a transaction, and it is idempotent. It stamps the row with `event.provider` and with the
+lifecycle owner that follows from it: Paddle is `provider`, and YooKassa is `self`. Then it emits the
+matching domain event.
+
+On the self-managed first-payment path it also persists the saved card as the default
+`PaymentMethod` of the customer. It points the incomplete subscription, found by customer id, at that
+method. Then it flips the subscription to `active` or `trialing`.
+
+A `payment_method.updated` event comes from a method-update re-bind. It changes the default card. The
+old method is demoted and kept for the history. The autopay pointer of the customer and the open
+subscription move to the new row. There is no invoice and no status change.
+
+For a provider-managed usage subscription, the reducer detects the period rollover. The incoming
+snapshot starts at or after the stored boundary. It emits `UsagePeriodClosed` after the commit.
+
+A `subscription.canceled` event closes the open metered period in the same way. The boundary comes
+from the STORED row, and not from the notification or from the wall clock. Thus a replayed delivery
+keys the same invoice instead of a second charge, and a true rollover for that boundary does nothing.
+
+A paid or failed webhook that carries the usage charge key settles or fails the matching pending
+usage invoice. It does not insert a new row.
+
+A webhook that carries an off-session charge key never inserts a row, because the core already
+recorded that invoice:
+
+- A succeeded event settles a row that is still pending. The flip from `pending` to `paid` is status
+  gated, and it writes `paid_at` and the reference. It spends the credit units that the rating used.
+  Then it emits `InvoicePaid`.
+- If the row is already settled, the event reconciles the reference only.
+- If the key matches no pending row, the reducer reports it at error level on
+  `billing_off_session_charges_unmatched_total{provider}`. It reports only the flows that record
+  before the charge, that is `change-charge:`, as `utils/charge-keys.util.ts` says. The `renewal:` and
+  `cancel:` charges record after the provider answers, thus a webhook that wins that race matches
+  nothing frequently. The report is never a throw. A throw leaves the delivery `received`, and the
+  reconciliation sweep then replays it forever.
+- A canceled event comes from a pending charge that the provider declined at capture. The reducer
+  flips the pending row to failed silently. The renewal scan sees that and owns the dunning ladder.
+
+A paid one-time purchase carries `kind one_time` and the `productId`, through the custom data or the
+metadata. The reducer applies it onto an invoice with `kind 'one_time'`, `subscription_id NULL` and
+the `product_id` value. It applies the effect of the product one time for each paid invoice. An `sku`
+makes a `CustomerGrant` row, with the expiry from `grant.durationDays`, or permanent with no such
+value. A `credits` product adds to the prepaid balance and writes a ledger entry. A `custom` product
+gives no grant.
+
+The reducer never links or activates a subscription for a one-time purchase, and it saves no card.
+The seam ignores a failed or canceled one-time payment, because nothing is pending locally and there
+is no dunning signal.
+
+**Configuration.** `BillingConfigService` supplies the `paddle` and `yookassa` configured booleans,
+which come from the environment.
+
+**Registrars.** `BillingConfiguredAttributesRegistrar` registers the `paddleConfigured`,
+`yookassaConfigured` and combined `billingConfigured` feature-flag attributes. The public `billing`
+flag gates the UI on the configuration. The per-provider `billing.provider.*.enabled` administrator
+kill switches gate the geo-router.
+
+#### entitlements
+
+`EntitlementsModule` is a PEER of auth and of billing. It is not a subdirectory of either one,
+because the two import it.
+
+`entitlements.module.ts` imports only
+`TypeOrmModule.forFeature([Customer, CustomerGrant, Plan, Subscription])`. It has no edge to auth.
+Thus `AuthModule -> EntitlementsModule` and `BillingModule -> EntitlementsModule` are both one-way,
+and the existing `BillingModule -> AuthModule` edge stays acyclic. There is no `forwardRef`.
+
+`BillingModule` re-exports the module. Thus a consumer that imports `BillingModule` continues to
+resolve the service and the guard with no change.
+
+The module reads four row types from `billing/entities/`. That is a schema dependency and not a
+behavioral one.
+
+`entitlement.service.ts` supplies `capabilitiesFor(userId)`. A subscription with the status active,
+trialing or past_due in the grace window gives `plan.entitlements`. Each other condition gives the
+Free entitlements. The result is the union with the active `CustomerGrant` rows, that is the grants
+that are not revoked and not expired, from a paid one-time sku purchase.
+
+The per-user cache is keyed by the shared `CacheVersionCounter` value
+(`common/utils/cache-version-counter.ts`). That counter uses an atomic Redis `INCR`. Without Redis it
+falls back to an in-memory read, modify and write sequence.
+
+`limitFor(userId, key)` reads the resolved limits from that same cache. A `null` result means that
+the plan carries no limit under that key, and the caller then applies its own default.
+
+`entitlement.guard.ts` holds `EntitlementGuard`, which answers 403.
+`require-entitlement.decorator.ts` holds `@RequireEntitlement('<cap>')`.
+
+`entitlement.constants.ts` holds `ENTITLEMENT_KEY`. It lives here and not in the decorator, thus the
+guard and the decorator do not import each other. Refer to the barrel and cycle rules in the root
+README.
+
+`entitlement.types.ts` holds the `EntitlementCapability` union and `ResolvedEntitlements`. The shared
+`EntitlementLimits` map types the limits.
+
+`EntitlementChangedListener` is NOT here. It stays in `billing/listeners/`, because it binds events
+that billing owns and pushes through `NotificationsService`.
+
+#### users
+
+`controllers/` holds `UsersController`. It has the CRUD operations and the search. Each endpoint uses
+`@Authorize([action, 'User'])`.
+
+`services/` holds `UsersService`.
+
+`entities/` holds the `User` entity, with a ManyToMany relation to `Role` through `user_roles`.
+
+`dto/` holds `CreateUserDto`, `UpdateUserDto` and `UserResponseDto`. `UserResponseDto` is the public
+form, and its `roles` field is a `RoleResponse[]` array. `AdminUserResponseDto` extends
+`UserResponseDto`. It adds `lockedUntil`, and its `roles` field is a `RoleAdminResponseDto[]` array.
 
 ### Request Pipeline
 
 ```
-Request → Global Middleware (Compression, CookieParser, CORS)
-        → Module Middleware
-        → Guards (JwtAuthGuard, RolesGuard)
-        → Interceptors (ClassSerializer with @SerializeOptions, custom)
-        → Pipes (ValidationPipe, custom)
-        → Controller Handler
-        → Interceptors (response phase)
-        → Response
-
-On exception: GlobalExceptionFilter catches all errors and returns
-standardized error responses with timestamp, path, and user-friendly messages.
-TypeORM errors are mapped by PG error code. Unknown errors return generic 500.
+Request -> Global Middleware (Compression, CookieParser, CORS)
+        -> Module Middleware
+        -> Guards (JwtAuthGuard, RolesGuard)
+        -> Interceptors (ClassSerializer with @SerializeOptions, custom)
+        -> Pipes (ValidationPipe, custom)
+        -> Controller Handler
+        -> Interceptors (response phase)
+        -> Response
 ```
+
+On an exception, `GlobalExceptionFilter` catches each error. It returns a standard error response
+with a timestamp, the path and a message for the user. It maps a TypeORM error by its PG error code.
+An unknown error becomes a generic 500.
 
 ### Authentication
 
-- **LocalStrategy** — validates email/password via bcrypt on login. `POST /auth/login` has no `@Body()` DTO (guards run before pipes, so a DTO would never execute), which makes the strategy the single place raw credentials are canonicalized: the address goes through the shared `normalizeEmail` (`shared/src/utils/email.ts`) and a non-string credential collapses to the empty string, so login answers 401 and never 400
-- **Email canonicalization** — trim + lowercase via `normalizeEmail`, applied by the DTO `@Transform`s, by `LocalStrategy`, by the three OAuth strategies and once more inside `loginWithOAuth` (the only writer of OAuth-created users). Backstopped in the schema by `UQ_users_email_lower`
-- **JwtStrategy** — verifies Bearer-token signature, pins issuer/audience and the signing algorithm, requires the `access` token purpose and a non-empty `sub`, enforces `JWT_MIN_IAT` and per-user `tokenRevokedAt` cutoffs, returns `PayloadFromJwt` (`{ userId, email, roles }`) — no `isAdmin` flag
-- **Token purpose** — every token the service signs (access, OAuth link, OAuth data) uses the same key, so each carries an explicit `purpose` claim and each consumer accepts only its own. Without it a token minted for one flow authenticates on another; an OAuth-data token in particular carries no `sub`, and an id-less user lookup resolves to an arbitrary row rather than failing. Issuer/audience are pinned on both signing and verification from a single factory (`jwt-module-options.factory.ts`) so the two cannot drift apart
-- **GoogleStrategy / FacebookStrategy / VkStrategy** — OAuth2 login (conditionally registered when env vars are set)
-- **Secure-by-default routing** — `JwtAuthGuard` is registered globally via `APP_GUARD` in `CoreModule`. Every endpoint requires a valid Bearer token unless explicitly opted out with `@Public()` (handler- or controller-level). Forgetting to mark a new endpoint protects it by default — the `check-auth-coverage` e2e suite iterates the per-feature route manifests under `contracts/routes/` to enforce this.
-- **@Public() decorator** — opt-out marker for endpoints intentionally reachable without authentication (login, register, password reset, OAuth init/callback, health, `/metrics`)
-- **@OptionalAuth() decorator** — variant of `@Public()` that still invokes `JwtStrategy.validate()` when a Bearer token is present so the handler receives a populated `req.user`, but never rejects on missing / invalid / expired / revoked tokens. Used by `GET /feature-flags` so the same endpoint can serve both anonymous browsers (public flags only) and authenticated users (full role / userId / email-attribute rule evaluation). `@OptionalAuth()` and `@Public()` must not be combined on the same handler; if both are set, `@Public()` wins (skips the strategy entirely)
-- **PermissionsGuard** — resolves user permissions (cached 5 min), checks required permissions from typed `@RequirePermissions([Actions, Subjects])`; roles with `isSuper` flag bypass all checks
-- **@Authorize([action, subject]) decorator** — composite: `JwtAuthGuard` + `PermissionsGuard` + typed `@RequirePermissions()`. Replaces `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` pattern. Both decorators take a non-empty tuple (`[PermissionCheck, ...PermissionCheck[]]`), so `@Authorize()` is a compile error: an empty check list makes `PermissionsGuard` return `true`, and because the guard reads metadata with `getAllAndOverride`, a handler-level empty call would also cancel a class-level `@Authorize(...)`. `@RequirePermissions` is marked `@internal` — on its own it attaches metadata without applying the guard, so it looks protective and enforces nothing
-- **CaslAbilityFactory** — builds `AppAbility` from user roles + permissions; used by `AuthController` to return CASL packed rules via `packRules()` from `GET /permissions`. Partitions rules allow-first / deny-last so permissions with `conditions.effect === 'deny'` register as CASL `cannot()` rules and reliably override prior allows for the same `(resource, action)` pair. Conditions are fail-closed: when `resolveConditions()` vetoes a permission (malformed branch shape per the shared `permission-condition-shape.ts` finders — non-array/empty-array `fieldMatch` values, non-string `userAttr` attributes, invalid `ownership.userField`, prototype-pollution keys; an unknown `userAttr` attribute; invalid/non-object `custom` JSON, a `custom` object carrying any `$`-key outside `ALLOWED_MONGO_OPERATORS`, or a `custom` `$in`/`$nin` whose value is not an array of JSON scalars — the runtime check runs the same `validateMongoQueryKeys()` allow-list the DTO applies on write, so a stored condition cannot be honoured by CASL yet dropped by the SQL list-filter translator; a `fieldMatch`/`userAttr`/`custom` key colliding with the protected `ownership.userField` key, which would replace the owner-scoping predicate with a broader one; or restriction branches that resolve to an empty query), an `allow` registers nothing and a `deny` registers as an unconditional `cannot()`; partial resolution is never registered — dropping just the malformed fragment would silently widen the authored restriction. Only a branch-less condition (bare `effect`) registers unconditionally. The same shape rules are enforced at input by `PermissionConditionDto` (custom validators in `common/validators/permission-condition-shape.validator.ts`), so a partially malformed condition is rejected with 400 at authoring time
-- **Instance-level enforcement** — every single-entity endpoint (`GET/PATCH/DELETE /users/:id`, `GET /users/:id/permissions`, `GET/PATCH/DELETE /roles/:id`, `GET /roles/:id/permissions`, `PATCH/POST(restore) /rbac/resources/:id`, `PATCH/DELETE /rbac/actions/:id`) loads the target record and runs `assertCan(ability, action, subject(<Subject>, entity))` BEFORE returning or mutating. `POST /users` runs the same check against the record being created - the subject is built from `CreateUserDto` (minus `password`, which no authorization condition can legitimately test), so a `create` grant conditioned on `fieldMatch`/`custom` is enforced instead of collapsing to the type-level check. This blocks the type-level `@Authorize` bypass that would otherwise let an admin-configured conditional grant become unconditional on a single-entity route. `UsersService.update/remove/restore`, `RoleService.assignRoleToUser/removeRoleFromUser` and the role permission-set mutations (`PUT/POST /roles/:id/permissions`, `DELETE /roles/:id/permissions/:permId` — checked in `RoleService` before the system-role lock and the grant check) apply the same check in the service layer; super-role assignment/removal is blocked for non-super actors. Each denial emits a `PERMISSION_CHECK_FAILURE` audit row (`details.instanceCheck === true`, `actorId` set to the refused caller - every service method taking an `ability` also takes the actor for this purpose) and increments `rbac_permission_denied_total{level="instance"}`.
-- **A delegated grant may narrow the caller's condition, never widen it** - `assertCanGrantPermissions` requires the caller to hold the granted `(action, subject)`, and when the caller's own matching allow rules are all conditional, the granted condition must **contain** one of them. A grant qualifies when it is equal, adds predicates on top, or narrows an existing predicate's value set (`[true]` under a caller holding `[true, false]`, or a scalar the caller's `$in` admits). Anything the check cannot *prove* narrower - a changed value, a dropped predicate, or a shape it does not decide such as a tightened `$gt` range - is 403 `errors.roles.conditionBroaderThanCaller`, omitting conditions is 403 `errors.roles.cannotGrantPermission`, and a condition the resolver vetoes is 403 `errors.roles.conditionUnresolvable` (it would restrict nothing at runtime). Both sides are compared as resolved MongoQueries - the request body is run through the same `resolveConditions` the ability factory uses, with the caller's id - so the comparison happens between two resolved queries rather than two authored shapes. Supers bypass it; `DELETE /roles/:id/permissions/:permId` has no grant check because removal is de-escalation; grants written before this rule are not retro-validated.
-- **Unsatisfiable grants are rejected on write** - `ownership` and `userAttr` resolve to the acting user's id, which a record that does not exist yet can never carry, so either branch on a `create` permission denies every create instead of restricting it. `RoleService.assertConditionsApplicable` rejects such a grant with 400 (`errors.roles.conditionNotApplicable`) on `PUT/POST /roles/:id/permissions` for every caller, supers included - the check is a validity rule, not an authorization one, and runs before the can-grant check that supers bypass. Only items carrying one of those branches are resolved, so the common case adds no query.
-- **JWT payload** — `CustomJwtPayload` carries `email` and optional `roles: string[]` on top of the standard `JwtPayload` claims; access decisions go through CASL/RBAC, not the payload
-- **Field-level response gating** — `class-transformer` decorators on entities determine wire shape: `@Exclude()` always hides (e.g. `User.password`, `User.failedLoginAttempts`), `@Expose({ groups: ['privileged'] })` hides by default and surfaces only on controllers with `@SerializeOptions({ groups: ['privileged'] })` (e.g. `User.lockedUntil`, `Role.isSystem`, `Role.isSuper`). Authorization (`@Authorize`) decides who can call the endpoint; serialization decides what fields the authorized caller sees. Self/auth endpoints (`AuthController`, `OAuthController`) carry no group → public form; admin endpoints (`UsersController`, `RolesController`) carry the `privileged` group → admin form. This only works on entity instances: a handler that spreads an entity into a plain object strips the metadata the interceptor keys on, so responses must return the entity itself (and payloads that leave the interceptor's reach — such as the signed `oauth_data` cookie — must be run through `instanceToPlain` at the point they are built)
-- **Refresh tokens** — opaque 80-char hex tokens stored in DB (SHA-256 hashed), delivered to the client as an `HttpOnly SameSite=Strict` cookie (`path=/api/v1/auth`), rotated on every use; never appear in response body. The rotation revokes the presented row **conditionally** (`WHERE id = :id AND revoked = false`) inside the same transaction that inserts the replacement, and treats `affected === 0` as the loser of a concurrent rotation: 401 `errors.auth.invalidRefreshToken`, a `TOKEN_REFRESH_FAILURE` audit row with `reason: 'concurrent_rotation'`, and the replacement rolled back with the throw. Without the condition both racers read the row as unrevoked under READ COMMITTED and each committed a live successor. The loser is answered a plain 401 rather than a session purge, because a benign double-refresh from two tabs must not log the user out everywhere. **Reuse detection** (OAuth 2.0 BCP / RFC 6819): if `refreshTokens()` sees a token where `revoked === true && !isExpired()`, every refresh token for the user is deleted and `User.tokenRevokedAt` is stamped — invalidating live access tokens too. A `TOKEN_REUSE_DETECTED` audit row is written and `auth_events_total{event="token_reuse_detected"}` increments. Revoked-and-expired tokens fall through to the standard 401 (natural cleanup window)
-- **OAuth accounts** — manage linked providers, safety check on unlink. The check and the delete run in one transaction holding a `FOR UPDATE` lock on the user row (`OAuthAccountService.unlinkProvider`), so two concurrent unlink requests cannot both observe "one other provider remains" and leave a password-less account with no way to authenticate; the loser is rejected with 400. Unlinking a provider that is not linked returns 404 (`errors.auth.oauthProviderNotLinked`) and writes no audit row. **Auto-link disabled**: if a local account already exists for the OAuth-asserted email, the callback throws `OAUTH_EMAIL_ALREADY_REGISTERED` (409) and redirects to `/login?oauth_error=email_already_registered`; users must log in with their password and link the provider explicitly via `POST /auth/oauth/link-init`. New users created via OAuth use the provider's `email_verified` flag (`profile.emails[0].verified` for Google, `profile._json.verified` for Facebook, always `false` for VK)
-- **OAuth callback failures redirect, they do not 401** — Passport rejects a callback inside the guard (denied consent screen, missing/expired state cookie, failed code exchange), so the handler that redirects back to the client is never reached. `createOAuthProviderGuard` overrides `handleRequest` to raise `OAuthAuthenticationFailedException` instead of `UnauthorizedException`, and the controller-scoped `OAuthAuthenticationExceptionFilter` answers it with `302 CLIENT_URL/login?oauth_error=auth_failed` — the browser is mid-navigation here, not calling an API. The guard picks both halves of that redirect from a fixed set, never from the request: `?error=access_denied` (how every provider reports a declined consent screen) becomes `oauth_error=oauth_cancelled`, and the presence of the `oauth_link` cookie makes the target `/profile` instead of `/login`, so a link attempt started on the profile page ends there — the filter also clears the cookie, since the attempt is over. An unconfigured provider still returns 404. The validated `CLIENT_URL` is a single provider (`auth/providers/client-url.provider.ts`) shared by the controller and the filter
-- **OAuth state is scoped per provider and per in-flight flow** — `CookieStateStore` writes `oauth_state_<provider>` (`httpOnly`, `sameSite: 'lax'`, path `/api/v1/auth/oauth`), whose value is a list of up to 5 `<state>-<expiresAt>` entries. Concurrent flows therefore coexist: two providers use different cookies, and two tabs of one provider each hold their own entry. A state is single-use (consumed on a successful verify), each entry expires 5 minutes after it was issued regardless of later flows refreshing the cookie's `maxAge`, and a callback whose state matches nothing leaves the remaining entries untouched so it cannot cancel a flow it does not own. Initiating a flow on a request with no response object fails there rather than producing a state that was never persisted
-- **Token cleanup** — daily cron removes expired tokens, weekly cron removes revoked+expired
-- **Account lockout** — 5 failed login attempts → 15 min lock (HTTP 423); cleared by a password reset, by the window elapsing, or by an admin unlock via user update
-- **Email verification** — required before login, 24-hour token expiry, resend capability. OAuth users created with `isEmailVerified=true` only when the provider asserts the email is verified; otherwise a verification email is sent at signup (same flow as local registration) and later OAuth logins do not flip the flag unless the provider vouches for that same address. Admin email changes via `PATCH /api/v1/users/:id` reset `isEmailVerified` to false, issue a new hashed token, dispatch a verification email, and revoke every session of the target (`UserSessionRevocationRequiredEvent`, awaited like the admin password change — an address is moved to recover an account, so the previous holder's access and refresh tokens must die with it; a resubmitted unchanged address revokes nothing); uniqueness is enforced server-side (HTTP 409 with `errorKey: errors.users.emailExists` and `field: 'email'`)
-- **Self-service email change** — two-step confirm-to-new flow: `POST /api/v1/auth/profile/email/initiate` stores a hashed token + new address on the user row (1-hour expiry) and sends a confirmation link to the new address plus a no-link masked alert to the old address; `POST /api/v1/auth/profile/email/confirm` applies the change inside a transaction, re-checks uniqueness for the race window, revokes all refresh tokens, and notifies the old address. OAuth-only accounts (no password) are rejected — they must set a password first. The endpoint is throttled (3/hour), enumeration-safe (same response shape on taken-address conflict), and clears the in-flight `pendingEmail*` fields on `resetPassword`, admin email change, soft-delete, and `UserDeletedEvent`. A partial unique index on `LOWER(pending_email)` and dual-email checks on `register`/`users.create`/`users.update` keep `{email} ∪ {pendingEmail}` globally unique even under concurrent writes
-- **Password reset** — forgot-password/reset-password flow, 30-minute token expiry, invalidates all sessions, clears the lockout, and sets `isEmailVerified = true` (the token is only ever mailed to `user.email`, and the same transaction clears `pendingEmail*` so a reset cannot confirm an in-flight change to another address)
-- **CAPTCHA soft-trigger** — `CaptchaRequiredGuard` gates `/register` and `/forgot-password` with a Cloudflare Turnstile challenge that activates only when `X-RateLimit-Remaining ≤ 1` for the caller's IP. **Disabled by default** (both env vars empty). Production activation requires a free Cloudflare account; full step-by-step in [Enabling CAPTCHA in production](#enabling-captcha-in-production). Test keys (`1x00000000000000000000AA` / `1x0000000000000000000000000000000AA`) work for local dev and CI but are **public — zero protection in production**.
+**LocalStrategy** validates the email address and the password with bcrypt at a login.
+
+`POST /auth/login` has no `@Body()` DTO. A guard runs before a pipe, thus a DTO never executes there.
+For that reason the strategy is the single place that canonicalizes the raw credentials. The address
+goes through the shared `normalizeEmail` function (`shared/src/utils/email.ts`). A credential that is
+not a string becomes an empty string. Thus a login answers 401 and never 400.
+
+**Email canonicalization.** `normalizeEmail` trims the address and makes it lowercase. The DTO
+`@Transform` decorators apply it. `LocalStrategy` applies it. The three OAuth strategies apply it. It
+also runs once more inside `loginWithOAuth`, which is the only writer of a user that OAuth makes. The
+`UQ_users_email_lower` index in the schema is the backstop.
+
+**JwtStrategy** verifies the signature of the Bearer token. It pins the issuer, the audience and the
+signing algorithm. It requires the `access` token purpose and a `sub` claim that is not empty. It
+applies the `JWT_MIN_IAT` cutoff and the per-user `tokenRevokedAt` cutoff. It returns
+`PayloadFromJwt`, that is `{ userId, email, roles }`. There is no `isAdmin` flag.
+
+**Token purpose.** The service signs three token types: access, OAuth link and OAuth data. The three
+use the same key. Thus each token carries an explicit `purpose` claim, and each consumer accepts only
+its own purpose.
+
+Without that claim, a token from one flow authenticates on another flow. An OAuth-data token carries
+no `sub` claim, and a user lookup with no id then resolves to an arbitrary row instead of a failure.
+
+One factory (`jwt-module-options.factory.ts`) pins the issuer and the audience for the signing and
+for the verification. Thus the two cannot diverge.
+
+**GoogleStrategy, FacebookStrategy and VkStrategy** do the OAuth2 login. The module registers each
+one only when its environment variables have a value.
+
+**Routing is secure by default.** `CoreModule` registers `JwtAuthGuard` globally through `APP_GUARD`.
+Each endpoint requires a valid Bearer token, and `@Public()` on a handler or on a controller is the
+only exception. Thus a new endpoint is protected when a person forgets to mark it. The
+`check-auth-coverage` e2e suite reads the per-feature route manifests in `contracts/routes/` and
+enforces this.
+
+**The `@Public()` decorator** marks an endpoint that a caller can reach with no authentication. The
+routes are the login, the register, the password reset, the OAuth init and callback, the health check
+and `/metrics`.
+
+**The `@OptionalAuth()` decorator** is a variant of `@Public()`. It still calls
+`JwtStrategy.validate()` when the request has a Bearer token, thus the handler gets a populated
+`req.user` object. It never rejects a request with a missing, invalid, expired or revoked token.
+
+`GET /feature-flags` uses it. Thus one endpoint serves an anonymous browser, with the public flags
+only, and an authenticated user, with the full evaluation of the role, userId and email attribute
+rules.
+
+Do not put `@OptionalAuth()` and `@Public()` on the same handler. If a person sets the two, `@Public()`
+wins and the strategy does not run.
+
+**PermissionsGuard** resolves the permissions of the user and caches them for 5 minutes. It checks
+the permissions that the typed `@RequirePermissions([Actions, Subjects])` decorator names. A role
+with the `isSuper` flag bypasses each check.
+
+**The `@Authorize([action, subject])` decorator** is a composite. It applies `JwtAuthGuard`,
+`PermissionsGuard` and the typed `@RequirePermissions()` decorator. It replaces the
+`@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` pattern.
+
+The two decorators take a tuple that is not empty
+(`[PermissionCheck, ...PermissionCheck[]]`). Thus `@Authorize()` is a compile error. An empty check
+list makes `PermissionsGuard` return `true`. Also, the guard reads the metadata with
+`getAllAndOverride`, thus an empty call on a handler cancels an `@Authorize(...)` call on the class.
+
+`@RequirePermissions` is marked `@internal`. On its own it attaches the metadata and does not apply
+the guard. Thus it looks protective and enforces nothing.
+
+**CaslAbilityFactory** builds an `AppAbility` object from the roles and the permissions of the user.
+`AuthController` uses it to return the packed CASL rules from `GET /permissions`, through
+`packRules()`.
+
+The factory puts the allow rules first and the deny rules last. Thus a permission with
+`conditions.effect === 'deny'` becomes a CASL `cannot()` rule. Such a rule reliably overrides an
+earlier allow for the same pair of resource and action.
+
+The conditions are fail-closed. When `resolveConditions()` vetoes a permission, an `allow` registers
+nothing and a `deny` registers as an unconditional `cannot()`.
+
+These inputs cause a veto:
+
+- A malformed branch shape, per the shared finders in `permission-condition-shape.ts`. That covers a
+  `fieldMatch` value that is not an array or that is an empty array, a `userAttr` attribute that is
+  not a string, an invalid `ownership.userField`, and a prototype-pollution key.
+- An unknown `userAttr` attribute.
+- Invalid or non-object `custom` JSON.
+- A `custom` object with a `$`-key outside `ALLOWED_MONGO_OPERATORS`.
+- A `custom` `$in` or `$nin` whose value is not an array of JSON scalars.
+- A `fieldMatch`, `userAttr` or `custom` key that collides with the protected `ownership.userField`
+  key. Such a key replaces the owner-scoping predicate with a broader one.
+- A restriction branch that resolves to an empty query.
+
+The runtime check runs the same `validateMongoQueryKeys()` allow-list that the DTO applies on a
+write. Thus CASL cannot honor a stored condition that the SQL list-filter translator drops.
+
+The factory never registers a partial resolution. A drop of the malformed fragment alone widens the
+authored restriction silently. Only a condition with no branch, that is a bare `effect`, registers
+unconditionally.
+
+`PermissionConditionDto` enforces the same shape rules at the input, through the custom validators in
+`common/validators/permission-condition-shape.validator.ts`. Thus the server rejects a partly
+malformed condition with a 400 at authoring time.
+
+**Instance-level enforcement.** Each single-entity endpoint loads the target record and runs
+`assertCan(ability, action, subject(<Subject>, entity))` BEFORE it returns or changes the record.
+Those endpoints are `GET/PATCH/DELETE /users/:id`, `GET /users/:id/permissions`,
+`GET/PATCH/DELETE /roles/:id`, `GET /roles/:id/permissions`, `PATCH /rbac/resources/:id`,
+`POST /rbac/resources/:id/restore`, and `PATCH/DELETE /rbac/actions/:id`.
+
+`POST /users` runs the same check against the record that it makes. The subject comes from
+`CreateUserDto`, minus `password`, which no authorization condition can legitimately test. Thus the
+server enforces a `create` grant with a `fieldMatch` or `custom` condition, and that grant does not
+collapse to the type-level check.
+
+This blocks the type-level `@Authorize` bypass. Without it, a conditional grant that an administrator
+configured becomes unconditional on a single-entity route.
+
+`UsersService.update`, `UsersService.remove`, `UsersService.restore`,
+`RoleService.assignRoleToUser`, `RoleService.removeRoleFromUser` and the mutations of the permission
+set of a role apply the same check in the service layer. The permission-set mutations are
+`PUT /roles/:id/permissions`, `POST /roles/:id/permissions` and
+`DELETE /roles/:id/permissions/:permId`. `RoleService` checks them before the system-role lock and
+before the grant check.
+
+The server blocks the assignment and the removal of a super role for an actor that is not a super.
+
+Each denial writes a `PERMISSION_CHECK_FAILURE` audit row. The row has `details.instanceCheck === true`
+and `actorId` set to the refused caller. Each service method that takes an `ability` parameter also
+takes the actor for this purpose. Each denial also increases
+`rbac_permission_denied_total{level="instance"}`.
+
+**A delegated grant can narrow the condition of the caller, and never widen it.**
+`assertCanGrantPermissions` requires the caller to hold the granted pair of action and subject. When
+each matching allow rule of the caller is conditional, the granted condition must **contain** one of
+them.
+
+A grant qualifies in three conditions. It is equal. It adds predicates. Or it narrows the value set
+of an existing predicate, for example `[true]` under a caller that holds `[true, false]`, or a scalar
+that the `$in` of the caller admits.
+
+Anything that the check cannot *prove* narrower gets a 403 with
+`errors.roles.conditionBroaderThanCaller`. That covers a changed value, a dropped predicate, and a
+shape that the check does not decide, such as a tighter `$gt` range.
+
+A request that omits the conditions gets a 403 with `errors.roles.cannotGrantPermission`. A condition
+that the resolver vetoes gets a 403 with `errors.roles.conditionUnresolvable`, because it restricts
+nothing at run time.
+
+The check compares the two sides as resolved MongoQuery objects. It runs the request body through the
+same `resolveConditions` function that the ability factory uses, with the id of the caller. Thus it
+compares two resolved queries and not two authored shapes.
+
+A super role bypasses the check. `DELETE /roles/:id/permissions/:permId` has no grant check, because
+a removal is a de-escalation. The server does not validate a grant that a person wrote before this
+rule again.
+
+**The server rejects an unsatisfiable grant on a write.** `ownership` and `userAttr` resolve to the
+id of the acting user. A record that does not exist yet can never carry that id. Thus either branch
+on a `create` permission denies each create instead of a restriction.
+
+`RoleService.assertConditionsApplicable` rejects such a grant with a 400
+(`errors.roles.conditionNotApplicable`) on `PUT /roles/:id/permissions` and
+`POST /roles/:id/permissions`, for each caller and for a super role. The check is a validity rule and
+not an authorization rule, thus it runs before the can-grant check that a super role bypasses.
+
+The method resolves only the items that carry one of those branches. Thus the common case adds no
+query.
+
+**JWT payload.** `CustomJwtPayload` carries `email` and an optional `roles: string[]` field, above
+the standard `JwtPayload` claims. An access decision goes through CASL and RBAC, and never through
+the payload.
+
+**Field-level response gating.** The `class-transformer` decorators on an entity control the wire
+shape.
+
+`@Exclude()` always hides a field, for example `User.password` and `User.failedLoginAttempts`.
+
+`@Expose({ groups: ['privileged'] })` hides a field by default. The field appears only on a
+controller with `@SerializeOptions({ groups: ['privileged'] })`. Examples are `User.lockedUntil`,
+`Role.isSystem` and `Role.isSuper`.
+
+`@Authorize` decides who can call the endpoint. The serialization decides which fields the authorized
+caller sees.
+
+The self and auth endpoints, that is `AuthController` and `OAuthController`, carry no group. Thus
+they give the public form. The administrator endpoints, that is `UsersController` and
+`RolesController`, carry the `privileged` group. Thus they give the administrator form.
+
+This works on an entity instance only. A handler that spreads an entity into a plain object removes
+the metadata that the interceptor reads. Thus a response must return the entity itself. A payload
+that leaves the reach of the interceptor, such as the signed `oauth_data` cookie, must go through
+`instanceToPlain` at the point where a person builds it.
+
+**Refresh tokens.** A refresh token is an opaque hex string of 80 characters. The database keeps it
+as a SHA-256 hash. The server delivers it as an `HttpOnly SameSite=Strict` cookie with the path
+`/api/v1/auth`. The server rotates it at each use. It never appears in a response body.
+
+The rotation revokes the presented row **conditionally**, with
+`WHERE id = :id AND revoked = false`. That happens in the same transaction that inserts the
+replacement.
+
+The service treats `affected === 0` as the loser of a concurrent rotation. It answers 401 with
+`errors.auth.invalidRefreshToken`. It writes a `TOKEN_REFRESH_FAILURE` audit row with
+`reason: 'concurrent_rotation'`. The throw rolls the replacement back.
+
+Without that condition, the two racers read the row as unrevoked under READ COMMITTED, and each one
+committed a live successor.
+
+The loser gets a plain 401 and not a session purge, because a benign double refresh from two tabs
+must not log the user out everywhere.
+
+**Reuse detection** follows the OAuth 2.0 BCP and RFC 6819. When `refreshTokens()` sees a token where
+`revoked === true && !isExpired()`, the server deletes each refresh token of the user and stamps
+`User.tokenRevokedAt`. That also invalidates the live access tokens. The server writes a
+`TOKEN_REUSE_DETECTED` audit row and increases
+`auth_events_total{event="token_reuse_detected"}`.
+
+A token that is revoked and expired falls through to the standard 401. That is the natural cleanup
+window.
+
+**OAuth accounts.** The user manages the linked providers. An unlink has a safety check.
+
+The check and the delete run in one transaction that holds a `FOR UPDATE` lock on the user row
+(`OAuthAccountService.unlinkProvider`). Thus two concurrent unlink requests cannot both see "one
+other provider remains". Without the lock, they leave an account with no password and no way to
+authenticate. The loser gets a 400.
+
+An unlink of a provider that is not linked returns 404 (`errors.auth.oauthProviderNotLinked`) and
+writes no audit row.
+
+**Automatic linking is disabled.** When a local account already exists for the email address that
+OAuth asserts, the callback throws `OAUTH_EMAIL_ALREADY_REGISTERED` (409). It redirects to
+`/login?oauth_error=email_already_registered`. The user must log in with their password and then link
+the provider with `POST /auth/oauth/link-init`.
+
+A new user that OAuth makes takes the `email_verified` flag of the provider. Google gives
+`profile.emails[0].verified`. Facebook gives `profile._json.verified`. VK always gives `false`.
+
+**An OAuth callback failure redirects, and does not answer 401.** Passport rejects a callback inside
+the guard. Three examples are a denied consent screen, a missing or expired state cookie, and a
+failed code exchange. Thus the handler that redirects back to the client never runs.
+
+`createOAuthProviderGuard` overrides `handleRequest`. It raises
+`OAuthAuthenticationFailedException` instead of `UnauthorizedException`. The controller-scoped
+`OAuthAuthenticationExceptionFilter` answers with `302 CLIENT_URL/login?oauth_error=auth_failed`. The
+browser is in the middle of a navigation here, and it is not calling an API.
+
+The guard selects the two halves of that redirect from a fixed set, and never from the request. The
+query `?error=access_denied`, which is how each provider reports a declined consent screen, becomes
+`oauth_error=oauth_cancelled`. The presence of the `oauth_link` cookie makes the target `/profile`
+instead of `/login`. Thus a link attempt that started on the profile page ends there. The filter also
+clears that cookie, because the attempt is over.
+
+A provider that nobody configured still returns 404. The validated `CLIENT_URL` value comes from one
+provider (`auth/providers/client-url.provider.ts`), which the controller and the filter share.
+
+**The OAuth state is scoped for each provider and for each flow in progress.** `CookieStateStore`
+writes an `oauth_state_<provider>` cookie. The cookie is `httpOnly`, uses `sameSite: 'lax'` and the
+path `/api/v1/auth/oauth`. Its value is a list of a maximum of 5 `<state>-<expiresAt>` entries.
+
+Thus two flows can run together. Two providers use two different cookies, and two tabs of one
+provider each hold their own entry.
+
+A state is single-use, and a successful verify consumes it. Each entry expires 5 minutes after the
+server issued it, and a later flow that refreshes the `maxAge` of the cookie does not change that.
+
+A callback whose state matches nothing leaves the other entries as they are. Thus it cannot cancel a
+flow that it does not own.
+
+A flow that starts on a request with no response object fails there. It does not make a state that
+nothing persisted.
+
+**Token cleanup.** A daily cron job removes the expired tokens. A weekly cron job removes the tokens
+that are revoked and expired.
+
+**Account lockout.** 5 failed logins lock the account for 15 minutes, and the answer is HTTP 423. A
+password reset clears the lock. The end of the window clears it. An administrator can also unlock the
+account with a user update.
+
+**Email verification.** It is necessary before a login. The token expires in 24 hours, and the user
+can request the email again.
+
+The server makes an OAuth user with `isEmailVerified=true` only when the provider asserts that the
+address is verified. If not, the server sends a verification email at the signup, which is the flow
+of a local registration. A later OAuth login does not change the flag, unless the provider vouches
+for that same address.
+
+An administrator email change through `PATCH /api/v1/users/:id` sets `isEmailVerified` to false. It
+issues a new hashed token and sends a verification email. It also revokes each session of the target,
+through `UserSessionRevocationRequiredEvent`, which the code awaits as it awaits an administrator
+password change. A person moves an address to recover an account, thus the access token and the
+refresh tokens of the previous holder must die with it. A resubmitted address that does not change
+revokes nothing.
+
+The server enforces the uniqueness of the address. A conflict answers HTTP 409 with
+`errorKey: errors.users.emailExists` and `field: 'email'`.
+
+**Self-service email change.** The flow has two steps and confirms at the new address.
+
+`POST /api/v1/auth/profile/email/initiate` stores a hashed token and the new address on the user row,
+with an expiry of 1 hour. It sends a confirmation link to the new address. It also sends a masked
+alert with no link to the old address.
+
+`POST /api/v1/auth/profile/email/confirm` applies the change inside a transaction. It checks the
+uniqueness again for the race window. It revokes each refresh token, and it notifies the old address.
+
+The server rejects an account with OAuth only, because it has no password. Such a user must set a
+password first.
+
+The endpoint has a throttle of 3 calls each hour. It is enumeration-safe, because a conflict on a
+taken address gives the same response shape.
+
+The server clears the `pendingEmail*` fields that are in progress on a `resetPassword` call, on an
+administrator email change, on a soft delete, and on `UserDeletedEvent`.
+
+A partial unique index on `LOWER(pending_email)`, plus the dual-email checks in `register`,
+`users.create` and `users.update`, keep the set of `{email}` and `{pendingEmail}` globally unique
+under a concurrent write.
+
+**Password reset.** The forgot-password and reset-password flow uses a token that expires in 30
+minutes. The reset invalidates each session, clears the lockout, and sets `isEmailVerified = true`.
+The server mails the token only to `user.email`. The same transaction clears the `pendingEmail*`
+fields, thus a reset cannot confirm a change to another address that is in progress.
+
+**CAPTCHA soft trigger.** `CaptchaRequiredGuard` gates `/register` and `/forgot-password` with a
+Cloudflare Turnstile challenge. The challenge activates only when `X-RateLimit-Remaining` is 1 or
+less for the IP of the caller.
+
+The CAPTCHA is **disabled by default**, because the two environment variables are empty. To activate
+it in production you need a free Cloudflare account. The full steps are in
+[Enabling CAPTCHA in production](#enabling-captcha-in-production).
+
+The test keys (`1x00000000000000000000AA` and `1x0000000000000000000000000000000AA`) operate for
+local development and for CI. They are **public and give no protection in production**.
 
 ### Email (MailModule)
 
-- Uses `nodemailer` for sending verification, password reset, and email-change messages
-- **SMTP transport** when `SMTP_HOST` env var is set — STARTTLS is enforced on port 587 **when credentials are configured** (`requireTLS`, so a downgrade aborts instead of leaking them); implicit TLS on 465 or when `SMTP_SECURE=true`; `minVersion: TLSv1.2` with certificate validation kept on. An unauthenticated local sink (e.g. Mailpit, which has no credentials and no STARTTLS) is exempt so plaintext dev delivery still works
-- **Console transport** when `SMTP_HOST` is not set — logs clickable URLs
-- Email links use `CLIENT_URL` env var: `${clientUrl}/verify-email?token=xxx`, `${clientUrl}/reset-password?token=xxx`
-- **Async delivery**: when `REDIS_URL` is set, messages are rendered then enqueued on a BullMQ queue (`mail`) and delivered by `MailProcessor` with retries (3 attempts, exponential backoff). Without `REDIS_URL`, `MailService` delivers inline in the request (no retries). The queue is transparent to callers — `MailService.sendXxx(...)` is unchanged. Mail is best-effort on both paths: an enqueue failure (e.g. Redis outage) or an inline delivery failure is logged and never propagates to the caller.
-- **Delivery test**: `test/email-delivery.e2e-spec.ts` boots the full app and verifies register → email → verify → login against a Mailpit sink (reads the message via Mailpit's REST API). CI runs a `mailpit` service with `SMTP_HOST`/`SMTP_PORT` set; the test is gated on `DB_HOST` **and** `SMTP_HOST` (environment or `.env`), so it skips while no sink is configured instead of waiting out the delivery timeout.
+- The module uses `nodemailer`. It sends the verification message, the password reset message and the
+  email-change messages.
+- The module uses an **SMTP transport** when the `SMTP_HOST` variable has a value.
+
+  It enforces STARTTLS on port 587 **when the credentials are configured**, through `requireTLS`.
+  Thus a downgrade stops the delivery and does not leak the credentials.
+
+  It uses implicit TLS on port 465, and also when `SMTP_SECURE=true`. It sets
+  `minVersion: TLSv1.2` and keeps the certificate validation on.
+
+  A local sink with no authentication is the exception. Mailpit is such a sink: it has no credentials
+  and no STARTTLS. Thus plaintext delivery in development still operates.
+- The module uses a **console transport** when `SMTP_HOST` has no value. It logs a URL that a person
+  can click.
+- An email link uses the `CLIENT_URL` variable. The two forms are
+  `${clientUrl}/verify-email?token=xxx` and `${clientUrl}/reset-password?token=xxx`.
+- **Delivery is asynchronous** when `REDIS_URL` has a value. The service renders the message and then
+  puts it on the BullMQ queue `mail`. `MailProcessor` delivers it with 3 attempts and an exponential
+  backoff.
+
+  Without `REDIS_URL`, `MailService` delivers the message inline in the request, with no retry.
+
+  The queue is transparent to a caller, because `MailService.sendXxx(...)` does not change.
+
+  Mail is best-effort on the two paths. A failed enqueue, for example during a Redis outage, and a
+  failed inline delivery are logged and never reach the caller.
+- **Delivery test.** `test/email-delivery.e2e-spec.ts` starts the full app. It verifies the sequence
+  of a register, an email, a verify and a login against a Mailpit sink. It reads the message through
+  the REST API of Mailpit.
+
+  CI runs a `mailpit` service with `SMTP_HOST` and `SMTP_PORT` set. The test is gated on `DB_HOST`
+  **and** `SMTP_HOST`, from the environment or from `.env`. Thus it skips while no sink is
+  configured, and it does not wait out the delivery timeout.
 
 #### Transport options
 
 | Mode | When | Config |
 |------|------|--------|
-| Console | `SMTP_HOST` empty | none — links logged to server console |
-| Local Mailpit | local testing of real send | `SMTP_HOST=localhost`, `SMTP_PORT=1025` (no user/pass) |
-| Gmail SMTP | production (free, ~500/day) | `smtp.gmail.com:587` + App Password |
+| Console | `SMTP_HOST` is empty | None. The server logs the links to its console |
+| Local Mailpit | To test a true send locally | `SMTP_HOST=localhost`, `SMTP_PORT=1025`, with no user and no password |
+| Gmail SMTP | Production. It is free, with a limit of approximately 500 messages each day | `smtp.gmail.com:587` with an App Password |
 
-**Local testing with Mailpit** — capture outgoing email in a local inbox without
-sending it externally:
+**Local testing with Mailpit.** Capture the outgoing email in a local inbox, and send nothing
+outside:
 
 ```sh
 cd server
 docker compose up -d mailpit   # or `docker compose up -d` for the whole dev stack
 ```
 
-Set `SMTP_HOST=localhost` and `SMTP_PORT=1025` in `server/.env` (leave
-`SMTP_USER`/`SMTP_PASS` empty), restart the dev server, then trigger a flow
-(register, forgot-password, email change) and read the message at
-http://localhost:8025.
+Set `SMTP_HOST=localhost` and `SMTP_PORT=1025` in `server/.env`. Leave `SMTP_USER` and `SMTP_PASS`
+empty. Restart the dev server. Then start a flow, that is a register, a forgot-password or an email
+change. Read the message at http://localhost:8025.
 
-**Production with Gmail SMTP** (no paid provider required):
+**Production with Gmail SMTP.** This needs no paid provider:
 
 1. Enable 2-Step Verification on the Google account.
-2. Create an **App Password** (Google Account → Security → App passwords) — this
-   is a 16-character token, distinct from the login password.
-3. In the deployment's `server/.env`:
+2. Make an **App Password**. Open the Google Account, then Security, then App passwords. The result
+   is a token of 16 characters, and it is not the login password.
+3. Put these values in the `server/.env` file of the deployment:
    ```
    SMTP_HOST=smtp.gmail.com
    SMTP_PORT=587
@@ -326,316 +1346,391 @@ http://localhost:8025.
    SMTP_PASS=<16-char app password>
    SMTP_FROM=your-account@gmail.com
    ```
-4. Restart the server container so it re-reads `server/.env`.
+4. Restart the server container, thus it reads `server/.env` again.
 
-> Gmail rewrites the `From` header to the authenticated account — `SMTP_FROM`
-> **must** equal `SMTP_USER`, otherwise messages appear spoofed and get
-> filtered. Gmail's free sending limit is ~500 recipients/day.
+> Gmail rewrites the `From` header to the authenticated account. Thus `SMTP_FROM` **must** be equal
+> to `SMTP_USER`. If not, a message looks spoofed and a filter removes it. The free sending limit of
+> Gmail is approximately 500 recipients each day.
 
-> **CI-deployed VPS:** SMTP creds (like all production secrets) are stored as GitHub repository
-> secrets and injected into the VPS `server/.env` by `scripts/sync-prod-env.sh` on every deploy —
-> hand-editing the secret-managed keys is overwritten on the next deploy. See the root README
-> ["Production credentials & secrets"](../README.md#production-credentials--secrets) for the full
-> inventory, the `DB_PASSWORD` caveat, and the from-scratch provisioning checklist.
+> **On a VPS that CI deploys:** the SMTP credentials are GitHub repository secrets, as each other
+> production secret. `scripts/sync-prod-env.sh` writes them into the VPS file `server/.env` at each
+> deploy. Thus the next deploy overwrites a manual edit of a secret-managed key. Refer to
+> ["Production credentials and secrets"](../README.md#production-credentials-and-secrets) in the root
+> README. That section has the full inventory, the caution about `DB_PASSWORD`, and the checklist to
+> provision a VPS from nothing.
 
 #### Localization
 
-All transactional emails are rendered from a shared, branded Handlebars layout
-(`mail/email.template.ts`) with locale-specific copy (`mail/mail-content.ts`).
-Each message is sent in the recipient's stored `users.locale` (EN/RU; defaults
-to `en`). The locale is captured at registration (optional `locale` field) and
-editable from the client profile.
+Each transactional email comes from a shared branded Handlebars layout
+(`mail/email.template.ts`). The copy for each locale is in `mail/mail-content.ts`.
+
+The server sends each message in the stored `users.locale` value of the recipient. The languages are
+EN and RU, and the default is `en`. The registration captures the locale through an optional `locale`
+field. A user can edit it from the client profile.
 
 ### Database
 
-Core tables managed via TypeORM migrations. Every timestamp column offered as a keyset `sortBy` is `timestamptz(3)`: the cursor encodes the sort value at millisecond precision, so a wider column names a point before the row it was taken from and silently drops or repeats rows across pages (`test/instants-timestamptz.e2e-spec.ts` enforces this).
+TypeORM migrations manage the core tables.
+
+Each timestamp column that a keyset `sortBy` value can name is a `timestamptz(3)` column. The cursor
+encodes the sort value with millisecond precision. Thus a column with more precision names a point
+before the row that gave it, and pages then drop or repeat rows silently.
+`test/instants-timestamptz.e2e-spec.ts` enforces this rule.
 
 | Table | Description |
 |-------|-------------|
-| `users` | UUID PK, email (unique, plus the `UQ_users_email_lower` functional unique index on `lower(email)` — two accounts may not differ only by case), name, bcrypt password (nullable for OAuth-only), isActive, isEmailVerified, `locale` (email language, default `en`), failedLoginAttempts, lockedUntil, verification/reset token fields, `deleted_at TIMESTAMPTZ NULL` (soft delete); ManyToMany to roles via user_roles |
-| `oauth_accounts` | UUID PK, provider + provider_id (unique), FK to users (CASCADE, indexed) |
-| `refresh_tokens` | UUID PK, token (SHA-256 hashed, unique, `@Exclude`-d from the wire), FK to users (CASCADE), expires_at, revoked |
-| `roles` | UUID PK, name (unique), description, isSystem flag, isSuper flag |
-| `resources` | UUID PK, name (unique), `subject` (unique — CASL cannot resolve an ambiguous subject; enforced in CI by `check:permissions`), displayName, description, isSystem flag, `is_orphaned` boolean (marked true when controller removed; its permissions can no longer grant, while deny rules keep applying until the resource is restored), `allowed_action_names text[]` |
-| `actions` | UUID PK, name (unique), displayName, description, isSystem flag, sortOrder |
-| `permissions` | UUID PK, resource_id + action_id (unique constraint, FKs to resources and actions) |
-| `role_permissions` | FK to roles + permissions, optional jsonb `conditions` |
-| `user_roles` | Join table: user_id + role_id (composite PK) |
-| `audit_logs` | UUID PK, action (enum), actorId (nullable), actorEmail (nullable), targetId (nullable), targetType (nullable), details (jsonb), ipAddress, requestId, createdAt |
+| `users` | UUID PK. `email` is unique. The functional unique index `UQ_users_email_lower` on `lower(email)` stops two accounts that differ only by case. The row holds the name and the bcrypt password, which is nullable for a user with OAuth only. It holds `isActive`, `isEmailVerified` and `locale`, the email language, with the default `en`. It holds `failedLoginAttempts` and `lockedUntil`. It holds the verification and reset token fields. `deleted_at TIMESTAMPTZ NULL` is the soft delete. The row has a ManyToMany relation to the roles through `user_roles` |
+| `oauth_accounts` | UUID PK. `provider` and `provider_id` are unique together. The FK to `users` uses CASCADE and has an index |
+| `refresh_tokens` | UUID PK. `token` is a unique SHA-256 hash, and `@Exclude` keeps it off the wire. The FK to `users` uses CASCADE. The row also holds `expires_at` and `revoked` |
+| `roles` | UUID PK, unique `name`, description, `isSystem` flag, `isSuper` flag |
+| `resources` | UUID PK, unique `name`, unique `subject`, `displayName`, description, `isSystem` flag. CASL cannot resolve an ambiguous subject, and `check:permissions` enforces the uniqueness in CI. The `is_orphaned` boolean becomes true when a person removes the controller. The permissions of such a resource then give nothing, and a deny rule continues to apply until a person restores it. `allowed_action_names text[]` holds the permitted actions |
+| `actions` | UUID PK, unique `name`, `displayName`, description, `isSystem` flag, `sortOrder` |
+| `permissions` | UUID PK. `resource_id` and `action_id` are unique together, and the two are FKs to `resources` and `actions` |
+| `role_permissions` | FK to `roles` and FK to `permissions`, plus an optional jsonb `conditions` column |
+| `user_roles` | Join table of `user_id` and `role_id`, with a composite PK |
+| `audit_logs` | UUID PK, `action` (enum), nullable `actorId`, nullable `actorEmail`, nullable `targetId`, nullable `targetType`, jsonb `details`, `ipAddress`, `requestId`, `createdAt` |
 
-Billing tables (subscriptions foundation; money is always stored in minor units). The overflow-prone money/quantity columns (`billing_invoices.amount_minor`/`refunded_minor`, `billing_credit_balances.balance_units`, `billing_credit_ledger.delta`, `billing_usage_records.quantity`) are `bigint`, decoded to a `Money` BigInt value object by `moneyColumnTransformer` (`common/utils/money-column.transformer.ts`) and serialized to the wire `number` via `@MoneyToNumber()`; pure counters stay `integer`. All billing arithmetic goes through `Money` — no floating-point. Conversions between minor units and a provider's decimal string take their scale from the currency (`minorUnitScale()` in `shared/src/utils/money.ts`), never a hardcoded 2, so zero- and three-decimal currencies are handled correctly:
+The billing tables are below. They are the foundation of the subscriptions, and the database always
+keeps money in minor units.
+
+The money and quantity columns that can overflow are `bigint` columns. They are
+`billing_invoices.amount_minor`, `billing_invoices.refunded_minor`,
+`billing_credit_balances.balance_units`, `billing_credit_ledger.delta` and
+`billing_usage_records.quantity`.
+
+`moneyColumnTransformer` (`common/utils/money-column.transformer.ts`) decodes such a column into a
+`Money` BigInt value object. `@MoneyToNumber()` serializes it to a `number` on the wire. A pure
+counter stays an `integer` column.
+
+Each billing calculation goes through `Money`. There is no floating-point arithmetic. A conversion
+between minor units and the decimal string of a provider takes its scale from the currency, through
+`minorUnitScale()` (`shared/src/utils/money.ts`). It never uses a hardcoded 2. Thus the code handles
+a currency with zero decimals and a currency with three decimals correctly.
 
 | Table | Description |
 |-------|-------------|
-| `plans` | UUID PK, key (unique), name, `billing_mode` (`fixed`/`usage`), `interval`, `meter_key` (usage), `entitlements text[]` (GIN-indexed), `limits jsonb` (typed as the closed `EntitlementLimits` map — keys come from the shared `EntitlementLimitKey` union, currently `sessions`; seeded Pro 10 / Business 25, null on Free and usage), `trial_days`, `active`, `prices jsonb` (per-provider `{ currency, amountMinor, unitPriceMinor?, includedUnits? }`) |
-| `billing_customers` | UUID PK, `user_id` (unique FK to users, CASCADE), `provider`, `provider_override` (manual region override), `provider_customer_id`, `country`, `currency`, `default_payment_method_id` (FK to billing_payment_methods, SET NULL) |
-| `billing_payment_methods` | UUID PK, `customer_id` (FK, CASCADE), `provider`, `provider_method_ref`, `brand`, `last4`, `is_default` (partial unique on `customer_id WHERE is_default` — at most one default per customer) |
-| `subscriptions` | UUID PK, `customer_id` (FK, CASCADE), `plan_key`, `provider`, `billing_mode`, `status`, `lifecycle_owner` (`provider`/`self`), current-period bounds, `billing_anchor_at` (nullable — the billing day every self-managed boundary is restored to, so a February clamp cannot ratchet a month-end customer backwards; NULL for provider-managed rows), `cancel_at_period_end`, `trial_end`, `provider_subscription_id`, `payment_method_id` (FK, SET NULL) |
-| `billing_invoices` | UUID PK, `customer_id` (FK, RESTRICT — financial records must survive customer deletion), `subscription_id` (FK, SET NULL), `provider`, `provider_event_id` (unique, webhook idempotency), `provider_invoice_ref`, `amount_minor`, `refunded_minor` (cumulative refunded units — full vs partial is `refunded_minor` vs `amount_minor`; @Exclude-d from the wire), `currency`, `status`, `billing_mode`, `kind` (`subscription`/`one_time`), `product_id` (FK to billing_products, SET NULL — one-time purchases), period bounds, `paid_at`, `receipt_ref` (54-FZ) |
-| `billing_products` | UUID PK, key (unique), name, description, `type` (`sku`/`credits`/`custom`), `prices jsonb` (per-provider `{ currency, amountMinor?, paddlePriceId? }` for fixed-price, `{ currency, minAmountMinor, maxAmountMinor }` for custom), `grant jsonb` (`{ credits }` or `{ entitlement, durationDays? }`, null for custom), `active` |
-| `billing_customer_grants` | UUID PK, `customer_id` (FK, CASCADE, indexed), `entitlement`, `source_invoice_id` (FK to billing_invoices, CASCADE — idempotency + refund revocation), `expires_at`, `revoked_at` |
-| `billing_credit_balances` | `customer_id` PK (FK, CASCADE), `balance_units` (may go negative after a refund clawback — blocks usage until topped up), `updated_at` |
-| `billing_credit_ledger` | UUID PK, `customer_id` (FK, RESTRICT — audit journal must survive customer deletion, indexed), `delta`, `reason` (`purchase`/`usage`/`refund`), `ref_invoice_id` (FK to billing_invoices, SET NULL) — append-only journal of every balance change |
-| `billing_usage_records` | UUID PK, `customer_id` (FK, CASCADE), `subscription_id` (FK, CASCADE, indexed), `meter_key`, `quantity`, `occurred_at`, `idempotency_key`, `recorded_at`; unique `(customer_id, idempotency_key)` — its index also serves the cascade lookup on `customer_id` |
-| `billing_webhook_events` | UUID PK, `provider`, `provider_event_id`, `type`, `payload` (jsonb, nullable — the verified NormalizedEvent, replayed by the reconciliation sweep; the raw delivery body is not retained in any form), `status` (`received`/`processed`/`dead_letter`, indexed with `received_at` for the reconciliation sweep), `attempts`, `last_error`, `received_at`, `processed_at`; unique `(provider, provider_event_id)` makes a `processed` replay a no-op while a stuck `received` row is reprocessed/swept. A delivery that fails the sweep `WEBHOOK_MAX_REPLAY_ATTEMPTS` times is quarantined as `dead_letter` (stops churning, alerts once) and stays replayable via `POST /admin/billing/webhook-events/:id/replay` or a provider redelivery. Settled rows are bounded by the daily retention sweep (payload dropped, then the row deleted); `received` and `dead_letter` rows are exempt |
+| `plans` | UUID PK, unique `key`, `name`, `billing_mode` (`fixed` or `usage`), `interval`, `meter_key` (for usage), `entitlements text[]` with a GIN index, `limits jsonb`, `trial_days`, `active`, `prices jsonb`. The `limits` column has the type of the closed `EntitlementLimits` map, and its keys come from the shared `EntitlementLimitKey` union, which currently holds `sessions`. The seeder writes Pro 10 and Business 25, and it leaves the value null on Free and on usage. The `prices` column holds `{ currency, amountMinor, unitPriceMinor?, includedUnits? }` for each provider |
+| `billing_customers` | UUID PK, `user_id` (unique FK to `users`, CASCADE), `provider`, `provider_override` (the manual region override), `provider_customer_id`, `country`, `currency`, `default_payment_method_id` (FK to `billing_payment_methods`, SET NULL) |
+| `billing_payment_methods` | UUID PK, `customer_id` (FK, CASCADE), `provider`, `provider_method_ref`, `brand`, `last4`, `is_default`. A partial unique index on `customer_id WHERE is_default` permits a maximum of one default for each customer |
+| `subscriptions` | UUID PK, `customer_id` (FK, CASCADE), `plan_key`, `provider`, `billing_mode`, `status`. Also `lifecycle_owner` (`provider` or `self`), the bounds of the current period, `billing_anchor_at`, `cancel_at_period_end`, `trial_end`, `provider_subscription_id` and `payment_method_id` (FK, SET NULL). `billing_anchor_at` is nullable. It is the billing day that each self-managed boundary returns to, thus a February clamp cannot move a month-end customer backwards. A provider-managed row keeps it NULL |
+| `billing_invoices` | UUID PK, `customer_id` (FK, RESTRICT), `subscription_id` (FK, SET NULL), `provider`. The FK to the customer uses RESTRICT, because a financial record must survive the deletion of a customer. Also `provider_event_id` (unique, for the webhook idempotency), `provider_invoice_ref`, `amount_minor`, `refunded_minor`, `currency`, `status` and `billing_mode`. Also `kind` (`subscription` or `one_time`) and `product_id` (FK to `billing_products`, SET NULL), which a one-time purchase uses. Also the period bounds, `paid_at` and `receipt_ref` (54-FZ). `refunded_minor` holds the cumulative refunded units. A refund is full when `refunded_minor` is equal to `amount_minor`, and partial when it is less. `@Exclude` keeps it off the wire |
+| `billing_products` | UUID PK, unique `key`, `name`, description, `type` (`sku`, `credits` or `custom`), `prices jsonb`, `grant jsonb`, `active`. A fixed price holds `{ currency, amountMinor?, paddlePriceId? }` for each provider. A custom price holds `{ currency, minAmountMinor, maxAmountMinor }`. The grant holds `{ credits }` or `{ entitlement, durationDays? }`, and it is null for a custom product |
+| `billing_customer_grants` | UUID PK, `customer_id` (FK, CASCADE, indexed), `entitlement`, `source_invoice_id` (FK to `billing_invoices`, CASCADE, for the idempotency and the refund revocation), `expires_at`, `revoked_at` |
+| `billing_credit_balances` | `customer_id` PK (FK, CASCADE), `balance_units`, `updated_at`. The balance can become negative after a refund clawback, which blocks usage until the customer adds credits |
+| `billing_credit_ledger` | UUID PK, `customer_id` (FK, RESTRICT, indexed), `delta`, `reason` (`purchase`, `usage` or `refund`), `ref_invoice_id` (FK to `billing_invoices`, SET NULL). The FK to the customer uses RESTRICT, because an audit journal must survive the deletion of a customer. The table is an append-only journal of each change of the balance |
+| `billing_usage_records` | UUID PK, `customer_id` (FK, CASCADE), `subscription_id` (FK, CASCADE, indexed), `meter_key`, `quantity`, `occurred_at`, `idempotency_key`, `recorded_at`. The pair `(customer_id, idempotency_key)` is unique, and its index also serves the cascade lookup on `customer_id` |
+| `billing_webhook_events` | UUID PK, `provider`, `provider_event_id`, `type`, nullable jsonb `payload`, `status` (`received`, `processed` or `dead_letter`, indexed with `received_at` for the reconciliation sweep), `attempts`, `last_error`, `received_at`, `processed_at`. The `payload` column holds the verified `NormalizedEvent` object, which the reconciliation sweep replays. The system keeps no form of the raw delivery body. The unique pair `(provider, provider_event_id)` makes a replay of a `processed` row a no-op, while the sweep reprocesses a stuck `received` row. A delivery that fails the sweep `WEBHOOK_MAX_REPLAY_ATTEMPTS` times becomes `dead_letter`. Such a row stops the churn and alerts one time. A person can still replay it with `POST /admin/billing/webhook-events/:id/replay`, or with a redelivery from the provider. The daily retention sweep bounds a settled row: it drops the payload, and then it deletes the row. A `received` row and a `dead_letter` row are exempt |
 
-Migration and seed commands operate on compiled JS in `dist/` — always run `npm run build` first.
+Each migration command and each seed command operates on the compiled JS in `dist/`. Always run
+`npm run build` first.
 
-All seeders in `src/seeders/` (RBAC, feature flags, billing plans and products) are idempotent: they look rows up by their natural key (`name` / `key`) and insert only what is missing, so `npm run seed:run` is safe to re-run against an already-seeded database. Rows an admin has since edited are left untouched, and feature-flag rules are seeded only alongside a newly created flag so a deleted rule is not resurrected.
+Each seeder in `src/seeders/` is idempotent. The seeders cover RBAC, the feature flags, and the
+billing plans and products. Each one finds a row by its natural key, that is `name` or `key`, and
+inserts only what is missing. Thus `npm run seed:run` is safe against a database that already has the
+data.
+
+A seeder does not touch a row that an administrator edited. A seeder writes the rules of a feature
+flag only beside a flag that it just made. Thus it does not restore a rule that a person deleted.
 
 ## Deployment behind a reverse proxy
 
-When the app runs behind nginx, Caddy, a Kubernetes ingress, or Cloudflare, the
-TCP peer for every request is the proxy — not the real client. Without any
-configuration, `req.ip` is the proxy's IP for every request, which silently
-breaks:
+The app can run behind nginx, Caddy, a Kubernetes ingress or Cloudflare. The TCP peer of each request
+is then the proxy, and not the true client.
 
-- `@nestjs/throttler` — all traffic is keyed under one IP, so either every
-  request counts toward the same quota (global lockout) or the quota is
-  effectively disabled
-- the `login-long-window` throttler that protects against brute-force account
-  lockout
-- `AuditService` IP recording — audit logs show the proxy's IP, not the real
-  client
+With no configuration, `req.ip` is the IP of the proxy for each request. That silently breaks three
+things:
 
-Set `TRUSTED_PROXIES` so Express trusts the `X-Forwarded-For` header from your
-proxy (and, importantly, _only_ from it). Examples:
+- `@nestjs/throttler`. Each request counts under one IP. Thus either each request uses the same
+  quota, which is a global lockout, or the quota does nothing.
+- The `login-long-window` throttler. That throttler protects against a brute-force account lockout.
+- The IP record of `AuditService`. An audit log then shows the IP of the proxy and not the IP of the
+  true client.
+
+Set `TRUSTED_PROXIES`. Then Express trusts the `X-Forwarded-For` header from your proxy, and only
+from your proxy. Examples:
 
 | Deployment | Recommended value |
 |------------|-------------------|
-| nginx / Caddy on the same host | `loopback` |
-| Sidecar proxy in Kubernetes | `loopback,uniquelocal` |
-| Two hops (e.g. CDN → nginx → app) | `2` |
-| Cloudflare with no private-range proxy in front | Cloudflare's published CIDR list, comma-separated |
+| nginx or Caddy on the same host | `loopback` |
+| A sidecar proxy in Kubernetes | `loopback,uniquelocal` |
+| Two hops, for example a CDN, then nginx, then the app | `2` |
+| Cloudflare with no private-range proxy in front of it | The published CIDR list of Cloudflare, separated by commas |
 
-Do **not** set `TRUSTED_PROXIES=true` unless you are certain nothing untrusted
-can reach the app directly — it causes Express to trust `X-Forwarded-For` from
-any source, which lets clients spoof their IP.
+Do **not** set `TRUSTED_PROXIES=true` unless you are sure that nothing untrusted can reach the app
+directly. That value makes Express trust `X-Forwarded-For` from each source. A client can then spoof
+its IP.
 
-See the Express [trust proxy docs](https://expressjs.com/en/guide/behind-proxies.html)
-for the full syntax.
+Refer to the Express [trust proxy docs](https://expressjs.com/en/guide/behind-proxies.html) for the
+full syntax.
 
 ## Rate limiting
 
-Configured in `CoreModule` via `@nestjs/throttler`. Two throttlers run in parallel:
+`CoreModule` configures the rate limiting through `@nestjs/throttler`. Two throttlers run in
+parallel:
 
 | Throttler | Window | Limit | Notes |
 |-----------|--------|-------|-------|
-| `default` (unnamed) | 60 s | 120 req/IP | SPA-wide soft ceiling. Per-route `@Throttle({ default: { ttl, limit } })` decorators override this on sensitive endpoints. |
-| `login-long-window` | 15 min (`LOCKOUT_DURATION_MS`) | 4 999 (`MAX_FAILED_ATTEMPTS * 1000`) | Effectively disabled globally; tightened to `MAX_FAILED_ATTEMPTS - 1` on `/auth/login` so an IP cannot accumulate enough failed attempts to trip the account-lockout protection (SEC-6). Counts **failed** logins only - `LoginThrottlerGuard` refunds the increment once the response finishes below 400, so a shared NAT egress cannot lock its own users out by logging in successfully. |
+| `default` (unnamed) | 60 s | 120 requests for each IP | A soft ceiling for the whole SPA. A `@Throttle({ default: { ttl, limit } })` decorator on a route replaces it on a sensitive endpoint |
+| `login-long-window` | 15 min (`LOCKOUT_DURATION_MS`) | 4 999 (`MAX_FAILED_ATTEMPTS * 1000`) | It does nothing at the global level. `/auth/login` tightens it to `MAX_FAILED_ATTEMPTS - 1`. Thus one IP cannot collect enough failed attempts to trip the account-lockout protection (SEC-6). It counts a **failed** login only: `LoginThrottlerGuard` refunds the increment when the response finishes below 400. Thus a shared NAT egress cannot lock out its own users with a successful login |
 
-Both throttlers are built by `buildThrottlerOptions(REDIS_URL)` (`modules/core/throttler-options.ts`). When `REDIS_URL` is set the throttler uses `RedisThrottlerStorage` so counters are shared across all instances; otherwise it uses `MemoryThrottlerStorage` (single-instance only).
+`buildThrottlerOptions(REDIS_URL)` (`modules/core/throttler-options.ts`) builds the two throttlers.
+With `REDIS_URL` set, the throttler uses `RedisThrottlerStorage`, thus each instance shares the
+counters. Without it, the throttler uses `MemoryThrottlerStorage`, which serves one instance only.
 
-`MemoryThrottlerStorage` exists because the refund above needs a `decrement`, which `@nestjs/throttler` does not put on its `ThrottlerStorage` contract: the library's own `ThrottlerStorageService` implements `increment` and nothing else. Both project storages implement `DecrementableThrottlerStorage`, and `LoginThrottlerGuard` is typed against it, so wiring a storage without a refund is a compile error instead of a silently skipped refund. `MemoryThrottlerStorage` also clamps the counter at zero on its way into `increment`: the base class schedules one expiry timer per hit that decrements the same counter, and a hit already refunded would otherwise drive it negative and hand out extra attempts in the next window.
+`MemoryThrottlerStorage` exists because the refund above needs a `decrement` method.
+`@nestjs/throttler` does not put that method on its `ThrottlerStorage` contract, and its own
+`ThrottlerStorageService` implements `increment` and nothing else.
 
-The billing webhook receivers (`POST /billing/webhooks/paddle`, `POST /billing/webhooks/yookassa`) carry `@SkipThrottle()`: payment providers deliver from a small set of egress IPs, so all of a provider's webhooks would share one per-IP bucket and a legitimate renewal batch could get 429'd. Authenticity is enforced by signature verification (Paddle) / API re-fetch (YooKassa) and ingestion is idempotent, so the throttle adds no protection on these routes. With the throttle skipped, unauthenticated traffic to these routes is bounded by the source-IP allowlist below.
+The two project storages implement `DecrementableThrottlerStorage`. `LoginThrottlerGuard` is typed
+against that interface. Thus a storage with no refund is a compile error, and not a refund that
+nobody applies.
+
+`MemoryThrottlerStorage` also clamps the counter at zero on its way into `increment`. The base class
+schedules one expiry timer for each hit, and that timer decreases the same counter. Thus a hit that
+the guard already refunded drives the counter negative and gives extra attempts in the next window.
+
+The billing webhook receivers, that is `POST /billing/webhooks/paddle` and
+`POST /billing/webhooks/yookassa`, carry `@SkipThrottle()`.
+
+A payment provider delivers from a small set of egress IPs. Thus each webhook of a provider shares one
+bucket for that IP, and a legitimate batch of renewals gets a 429.
+
+The signature verification of Paddle and the API re-fetch of YooKassa enforce the authenticity. The
+ingestion is idempotent. Thus the throttle adds no protection on these routes. With the throttle off,
+the source-IP allowlist below bounds the unauthenticated traffic to them.
 
 ### Billing webhook source-IP allowlist
 
-`WebhookIpAllowlistGuard` rejects requests to `/billing/webhooks/*` with `403` unless the client IP matches `BILLING_WEBHOOK_IP_ALLOWLIST` (comma-separated IPs/CIDRs, IPv6 supported). The check runs before any webhook processing - in particular before the outbound YooKassa payment re-fetch, which is what an arbitrary internet host could otherwise trigger at will (YooKassa notifications are unsigned by design; for HMAC-verified Paddle the allowlist is defense in depth).
+`WebhookIpAllowlistGuard` rejects a request to `/billing/webhooks/*` with a `403` unless the client IP
+matches `BILLING_WEBHOOK_IP_ALLOWLIST`. That variable holds IPs and CIDRs, separated by commas, and
+it supports IPv6.
 
-- Empty/unset disables the check - local dev and the e2e suites run open.
-- `docker-compose.yml` sets the production default to the provider egress ranges published at [Paddle: respond to webhooks](https://developer.paddle.com/webhooks/about/respond-to-webhooks/) (live + sandbox) and [YooKassa: webhooks](https://yookassa.ru/developers/using-api/webhooks), verified 2026-07-05. Both providers recommend allowlisting.
-- **Update procedure:** if a provider's webhooks start being rejected, the guard logs each rejection as a warning with the source IP - re-check the two pages above and update the default in `docker-compose.yml`. Export `BILLING_WEBHOOK_IP_ALLOWLIST` empty to disable the check temporarily without editing the file.
-- A malformed entry fails startup deliberately (a deploy that cannot enforce the list should fail loudly, not fall open or drop webhooks silently).
-- The guard reads `req.ip`, so behind a reverse proxy `TRUSTED_PROXIES` must be configured (see [Deployment behind a reverse proxy](#deployment-behind-a-reverse-proxy)); a spoofed `X-Forwarded-For` from an untrusted peer is ignored.
+The check runs before any webhook processing. In particular it runs before the outbound payment
+re-fetch of YooKassa. Without the check, an arbitrary host on the internet can start that re-fetch at
+will. A YooKassa notification has no signature by design. For Paddle, which has an HMAC, the
+allowlist is defense in depth.
 
-Per-route overrides currently in use:
+- An empty or unset value disables the check. Thus local development and the e2e suites run open.
+- `docker-compose.yml` sets the production default to the egress ranges of the providers. Those
+  ranges are at
+  [Paddle: respond to webhooks](https://developer.paddle.com/webhooks/about/respond-to-webhooks/) for
+  live and sandbox, and at [YooKassa: webhooks](https://yookassa.ru/developers/using-api/webhooks). A
+  person verified the two pages on 2026-07-05. The two providers recommend an allowlist.
+- **Update procedure.** If a provider starts to get a rejection, read the two pages again and update
+  the default in `docker-compose.yml`. The guard logs each rejection as a warning with the source IP.
+  To disable the check for a short time with no edit of the file, export
+  `BILLING_WEBHOOK_IP_ALLOWLIST` as empty.
+- A malformed entry stops the startup, and this is intentional. A deploy that cannot enforce the list
+  must fail loudly. It must not fall open or drop a webhook silently.
+- The guard reads `req.ip`. Thus behind a reverse proxy you must configure `TRUSTED_PROXIES`. Refer to
+  [Deployment behind a reverse proxy](#deployment-behind-a-reverse-proxy). The guard ignores a
+  spoofed `X-Forwarded-For` header from an untrusted peer.
+
+These routes currently replace the default limit:
 
 | Endpoint | Window | Limit | Why |
 |----------|--------|-------|-----|
-| `POST /auth/register` | 1 h | 5 | Account creation flood control. CAPTCHA soft-trigger kicks in near the limit. |
-| `POST /auth/login` | 1 min | 3 (default) + `login-long-window` | Brute-force credentials + lockout protection. |
-| `POST /auth/refresh-token` | 1 min | 5 | Bound to a real session — abuse would mean stolen cookies. |
-| `POST /auth/profile/email/initiate` | 1 h | 3 | Confirmation email cost + enumeration mitigation. |
-| `POST /auth/profile/email/confirm` | 1 min | 10 | Token brute-force defense in depth (token entropy already infeasible). |
-| `POST /auth/verify-email` | 1 min | 10 | Same. |
-| `POST /auth/resend-verification` | 1 min | 3 | Email cost. |
-| `POST /auth/forgot-password` | 5 min | 2 | Email cost + enumeration mitigation. CAPTCHA soft-trigger near the limit. |
-| `POST /auth/reset-password` | 1 min | 10 | Token brute-force defense in depth. |
-| `POST /auth/oauth/exchange` | 1 min | 10 | State-token-bound; tight enough to neutralise replay attempts. |
-| `GET /rbac/metadata` | 1 min | 30 | Bumped because every admin route guard reads it. |
+| `POST /auth/register` | 1 h | 5 | To control a flood of new accounts. The CAPTCHA soft trigger starts near the limit |
+| `POST /auth/login` | 1 min | 3 (default) plus `login-long-window` | To protect against a brute force of the credentials, and to protect the lockout |
+| `POST /auth/refresh-token` | 1 min | 5 | It is bound to a true session, thus abuse means a stolen cookie |
+| `POST /auth/profile/email/initiate` | 1 h | 3 | The cost of a confirmation email, and enumeration mitigation |
+| `POST /auth/profile/email/confirm` | 1 min | 10 | Defense in depth against a token brute force. The token entropy already makes that infeasible |
+| `POST /auth/verify-email` | 1 min | 10 | The same |
+| `POST /auth/resend-verification` | 1 min | 3 | The cost of an email |
+| `POST /auth/forgot-password` | 5 min | 2 | The cost of an email, and enumeration mitigation. The CAPTCHA soft trigger starts near the limit |
+| `POST /auth/reset-password` | 1 min | 10 | Defense in depth against a token brute force |
+| `POST /auth/oauth/exchange` | 1 min | 10 | It is bound to a state token. The limit is tight enough to stop a replay attempt |
+| `GET /rbac/metadata` | 1 min | 30 | The limit is higher, because each administrator route guard reads it |
 
-When a request is rejected the response is the standard `429` with `{ statusCode, message, error, timestamp, path }`.
+A rejected request gets the standard `429` answer with
+`{ statusCode, message, error, timestamp, path }`.
 
 ## Enabling CAPTCHA in production
 
-CAPTCHA on `/register` and `/forgot-password` is **disabled by default**. After
-deploy the endpoints are protected only by the rate-limiter (5 req/hour for
-register, 2 req/5min for forgot-password per IP). To enable a Cloudflare
-Turnstile soft-trigger challenge that activates when an IP nears the rate
-limit:
+The CAPTCHA on `/register` and `/forgot-password` is **disabled by default**. After a deploy, only
+the rate limiter protects the two endpoints. The limits are 5 requests each hour for the register
+route, and 2 requests each 5 minutes for the forgot-password route, for each IP.
 
-1. **Get keys from Cloudflare** (free, ~2 minutes):
-   - Sign in at https://dash.cloudflare.com (any plan, including Free)
-   - Open **Turnstile** → **Add site**
-   - Enter your production domain (only this domain will be allowed to use
-     the site key — protects against your key being embedded on other sites)
-   - Widget Mode: **Managed** (Cloudflare picks interactive vs invisible
-     based on risk score; recommended)
-   - Save and copy the generated **Site Key** and **Secret Key**
+Do these steps to enable a Cloudflare Turnstile soft-trigger challenge. The challenge then activates
+when an IP comes near the rate limit.
 
-2. **Set the keys** — pick one of:
+1. **Get the keys from Cloudflare.** This is free and takes approximately 2 minutes.
+   - Sign in at https://dash.cloudflare.com. Each plan works, and the Free plan is sufficient.
+   - Open **Turnstile**, then **Add site**.
+   - Enter your production domain. Only that domain can use the site key. Thus a person cannot embed
+     your key on another site.
+   - Set the Widget Mode to **Managed**. Cloudflare then selects an interactive challenge or an
+     invisible challenge from the risk score. This mode is the recommended one.
+   - Save the site, and copy the **Site Key** and the **Secret Key**.
 
-   **Recommended (rebuild-safe):** add the two values as GitHub repository
-   secrets — `TURNSTILE_SITE_KEY` (the public site key) and
-   `TURNSTILE_SECRET_KEY` (the sensitive secret key). On the next
-   `deploy.yml` / `rebuild.yml` run, `scripts/sync-prod-env.sh` writes both
-   into the VPS `server/.env` automatically (they join the same managed
-   list as `SMTP_*`, `JWT_*`, `DB_PASSWORD`, etc. — see the root
-   `README.md` §"Production credentials & secrets"). A from-scratch VPS
-   rebuild restores them along with every other managed secret.
+2. **Set the keys.** Select one of the two methods.
 
-   **Quick local edit (overwritten on next deploy if the GitHub secret
-   is set):**
+   **The recommended method, which survives a rebuild.** Add the two values as GitHub repository
+   secrets: `TURNSTILE_SITE_KEY` for the public site key, and `TURNSTILE_SECRET_KEY` for the
+   sensitive secret key.
+
+   At the next `deploy.yml` or `rebuild.yml` run, `scripts/sync-prod-env.sh` writes the two into the
+   VPS file `server/.env` automatically. They join the same managed list as `SMTP_*`, `JWT_*` and
+   `DB_PASSWORD`. Refer to the section "Production credentials and secrets" in the root `README.md`.
+   A rebuild of the VPS from nothing restores them with each other managed secret.
+
+   **A quick local edit.** The next deploy overwrites this when the GitHub secret has a value.
    ```bash
    ssh user@your-vps
    cd /path/to/project
    nano server/.env
    # Add or replace:
-   #   TURNSTILE_SITE_KEY=0x4AAAAAAA...   ← your real Site Key
-   #   TURNSTILE_SECRET_KEY=0x4AAAAAAA... ← your real Secret Key
+   #   TURNSTILE_SITE_KEY=0x4AAAAAAA...      your real Site Key
+   #   TURNSTILE_SECRET_KEY=0x4AAAAAAA...    your real Secret Key
    chmod 600 server/.env
    ```
 
-3. **Apply the change:**
-   - **GitHub-secrets path:** trigger a deploy (push to master, or run
-     `deploy.yml` via `workflow_dispatch`). The sync script writes the
-     keys, then `docker compose up -d` picks them up.
-   - **Local-edit path:** restart only the `server` service:
+3. **Apply the change.**
+   - **For the GitHub-secrets method:** start a deploy. Push to master, or run `deploy.yml` with
+     `workflow_dispatch`. The sync script writes the keys, and then `docker compose up -d` reads
+     them.
+   - **For the local-edit method:** restart the `server` service only:
      ```bash
      docker compose up -d server
      ```
-   In both cases the client does **not** need to be rebuilt — it fetches
-   the public Site Key at runtime from `GET /api/v1/auth/captcha-config`.
 
-4. **Verify**:
+   The client needs no new build in the two cases. It reads the public site key at run time from
+   `GET /api/v1/auth/captcha-config`.
+
+4. **Verify the result.**
    ```bash
    curl https://your-domain/api/v1/auth/captcha-config
-   # → {"enabled":true,"provider":"turnstile","siteKey":"0x4AAAAAAA..."}
+   # gives {"enabled":true,"provider":"turnstile","siteKey":"0x4AAAAAAA..."}
    ```
-   Open `/register` in a browser, submit the form 4 times in a row (use
-   different emails or expect 409 on existing). On the 4th attempt the
-   widget should appear; once solved, registration goes through.
+   Then open `/register` in a browser and submit the form 4 times in sequence. Use a different email
+   address each time, or expect a 409 for an address that exists. The widget must appear at the 4th
+   attempt. After you solve it, the registration completes.
 
-5. **Disable temporarily** (e.g. if Cloudflare has an outage and the
-   `Turnstile siteverify request failed` log starts spamming): clear
-   both `TURNSTILE_*` GitHub secrets (empty value) and trigger a deploy
-   — `sync-prod-env.sh` skips empty values, so this alone does **not**
-   clear `server/.env`; for an immediate fix, also comment the keys on
-   the VPS:
+5. **Disable the CAPTCHA for a short time.** Do this, for example, when Cloudflare has an outage and
+   the `Turnstile siteverify request failed` message fills the log.
+
+   Clear the two `TURNSTILE_*` GitHub secrets, that is set an empty value, and start a deploy. The
+   sync script skips an empty value. Thus this step alone does **not** clear `server/.env`. For an
+   immediate correction, also comment the keys out on the VPS:
    ```bash
    sed -i 's/^TURNSTILE_/# TURNSTILE_/' server/.env
    docker compose up -d server
    ```
-   Re-enable by restoring the secrets (and uncommenting the lines if you
-   used the manual path).
+   To enable the CAPTCHA again, restore the secrets. Also remove the comment characters if you used
+   the manual method.
 
 ### Content-Security-Policy requirements
 
-The Turnstile script and the challenge widget load from
-`https://challenges.cloudflare.com`. The client's CSP **must** allow it in
-both `script-src` (for `api.js?render=explicit`) and `frame-src` (for the
-embedded challenge iframe); otherwise the backend will keep returning
-`CAPTCHA_REQUIRED` while the browser silently blocks the widget, and users
-see only the "Please complete the CAPTCHA challenge to continue" error with
-no widget to solve.
+The Turnstile script and the challenge widget load from `https://challenges.cloudflare.com`.
 
-The shipped `client/nginx.conf` already includes both directives in every
-`add_header Content-Security-Policy` rule. If you front the client with a
-different reverse proxy / CDN (Caddy, Cloudflare, CloudFront, …) or
-customise the nginx config, ensure the served CSP contains:
+The CSP of the client **must** permit that host in `script-src`, for
+`api.js?render=explicit`, and in `frame-src`, for the embedded challenge iframe.
+
+Without the two directives, the backend continues to answer `CAPTCHA_REQUIRED` while the browser
+blocks the widget silently. The user then sees only the error "Please complete the CAPTCHA challenge
+to continue", and there is no widget to solve.
+
+The `client/nginx.conf` file of the project already has the two directives in each
+`add_header Content-Security-Policy` rule.
+
+You can put a different reverse proxy or CDN in front of the client, for example Caddy, Cloudflare or
+CloudFront. You can also customize the nginx configuration. In those conditions, make sure that the
+CSP that the server sends holds these two lines:
 
 ```
 script-src 'self' https://challenges.cloudflare.com
 frame-src https://challenges.cloudflare.com
 ```
 
-Quick check from any environment:
+To check this quickly from any environment:
 ```bash
 curl -sI https://your-domain/ | grep -i content-security-policy
 ```
 
-### Test keys vs production keys
+### Test keys against production keys
 
 | Key pair | Behaviour | Use case |
 |----------|-----------|----------|
-| `1x00000000000000000000AA` / `1x0000000000000000000000000000000AA` | Always pass — public, anyone can mint a token | Local dev, unit tests, CI — **never production** |
-| `2x00000000000000000000AB` / `2x0000000000000000000000000000000AA` | Always block — useful for testing the failure path | Negative-path tests |
-| Real Site Key + Secret Key from your dashboard | Real ML-driven challenge | Production |
+| `1x00000000000000000000AA` / `1x0000000000000000000000000000000AA` | It always passes. It is public, thus each person can make a token | Local development, unit tests and CI. **Never production** |
+| `2x00000000000000000000AB` / `2x0000000000000000000000000000000AA` | It always blocks. It is useful to test the failure path | A negative-path test |
+| A true Site Key and Secret Key from your dashboard | A true challenge that machine learning drives | Production |
 
-The test keys are **public** — bots can use them too. They provide zero
-abuse protection. A production deploy that leaves `TURNSTILE_*` set to test
-values is effectively the same as having CAPTCHA disabled (and worse,
-because users see a widget that does nothing useful).
+The test keys are **public**, thus a bot can also use them. They give no protection against abuse.
 
-### What if you don't want a Cloudflare dependency?
+A production deploy that keeps a test value in `TURNSTILE_*` is the same as a deploy with no CAPTCHA.
+It is worse in one way: the user sees a widget that does nothing useful.
 
-The throttler alone (5/h register, 2/5min forgot-password) gives reasonable
-protection against single-IP brute force. If you observe spam in
-`audit_logs` despite the throttler, options are:
+### An alternative to a dependency on Cloudflare
 
-- Switch the provider to hCaptcha — change the `siteverify` URL in
-  `CaptchaService` and the script URL in `CaptchaService.loadScript()`;
-  the protocol is identical (form-encoded `secret`/`response`,
-  JSON `{ success: boolean }` reply). hCaptcha also requires an account.
-- Self-host a CAPTCHA-free proof-of-work challenge (mCaptcha, Friendly
-  Captcha) — adds a container to `docker-compose.yml`, no external account.
-- Add a honeypot field + minimum form-fill time as a first line — works
-  out of the box, no third-party dependency, but bypassed by smarter bots.
+The throttler alone gives reasonable protection against a brute force from one IP. Its limits are 5
+requests each hour on the register route, and 2 requests each 5 minutes on the forgot-password route.
+
+If you see spam in `audit_logs` although the throttler runs, you have three options:
+
+- Change the provider to hCaptcha. Change the `siteverify` URL in `CaptchaService`, and the script
+  URL in `CaptchaService.loadScript()`. The protocol is identical: a form-encoded `secret` and
+  `response` request, and a JSON `{ success: boolean }` answer. hCaptcha also needs an account.
+- Host a proof-of-work challenge yourself, with no CAPTCHA. mCaptcha and Friendly Captcha are two
+  such tools. This adds a container to `docker-compose.yml`, and it needs no external account.
+- Add a honeypot field and a minimum form-fill time as a first line. This operates immediately and
+  needs no third party. A more capable bot gets past it.
 
 ## Observability
 
 ### Prometheus metrics
 
-The `MetricsModule` (`src/modules/core/metrics/metrics.module.ts`) exposes
-`GET /metrics` (excluded from the `/api` prefix). It carries no bearer token
-(`@Public()`), so access is instead gated by `InternalNetworkGuard`
-(`src/modules/core/metrics/internal-network.guard.ts`): only requests whose
-`req.ip` resolves to a loopback/private/unique-local address are served; every
-other source gets `403`. `req.ip` honors `trust proxy` (`TRUSTED_PROXIES`), so
-this cannot be bypassed via a spoofed `X-Forwarded-For` from an untrusted
-peer. Counters and histograms:
+`MetricsModule` (`src/modules/core/metrics/metrics.module.ts`) exposes `GET /metrics`. That route is
+outside the `/api` prefix.
+
+The route carries no bearer token, because it is `@Public()`. `InternalNetworkGuard`
+(`src/modules/core/metrics/internal-network.guard.ts`) gates it instead. The server answers only a
+request whose `req.ip` value is a loopback, private or unique-local address. Each other source gets a
+`403`.
+
+`req.ip` obeys the `trust proxy` setting (`TRUSTED_PROXIES`). Thus a spoofed `X-Forwarded-For` header
+from an untrusted peer cannot get past the guard.
+
+These are the counters and the histograms:
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `http_requests_total` | counter | `method`, `route`, `status_code` | Every HTTP request reaching the app |
-| `http_request_duration_seconds` | histogram | `method`, `route`, `status_code` | Per-route request latency (seconds) |
-| `auth_events_total` | counter | `event` ∈ `login_success`, `login_failure`, `token_refresh_success`, `token_refresh_failure`, `token_reuse_detected`, `logout`, `register` | Authentication events |
-| `rbac_permission_denied_total` | counter | `action`, `subject`, `level` ∈ `guard`, `instance` | RBAC/ABAC denials. `level=guard` is an `@Authorize` decorator rejection; `level=instance` is an `ability.can(action, entity)` rejection after the record was loaded |
-| `sse_connections_active` | gauge | — | Currently open SSE notification streams |
-| `mail_queue_jobs` | gauge | `state` ∈ `waiting`, `active`, `completed`, `failed`, `delayed` | BullMQ mail-queue depth by job state. No-ops (stays absent) when no queue is configured — i.e. `REDIS_URL` unset, so `MailService` sends in-process |
-| `mail_jobs_processed_total` | counter | `outcome` ∈ `completed`, `failed` | Mail jobs processed by the queue worker. `failed` counts each failed attempt, including retries |
-| `db_pool_connections` | gauge | `state` ∈ `total`, `idle`, `waiting` | PostgreSQL connection-pool size by state, read from the pg pool on the injected `DataSource`. A sustained `waiting` > 0 means the pool is exhausted and requests are queuing |
-| `cache_requests_total` | counter | `cache` ∈ `permissions`, `roles`, `resources`, `feature_flags`, `feature_flags_all`, `outcome` ∈ `hit`, `miss` | Redis-backed cache lookups by logical cache and outcome. Hit ratio = `hit / (hit + miss)` per `cache`; a persistently low ratio means the cache is invalidated faster than it serves hits |
-| `dependency_up` | gauge | `dependency` ∈ `smtp`, `redis` | Health of an external dependency as last observed by `/health/ready` (`1` healthy, `0` degraded or down). A series appears only once its indicator has run, so a deployment that does not configure SMTP never emits `dependency="smtp"`. This is the only machine-readable signal for the degradations readiness deliberately reports as `up` — see [Alerting](../README.md#alerting) |
-| `billing_usage_records_unrated_total` | counter | `meter` | Usage records stored under a meter the customer's current plan does not price. Expected to be non-zero while a customer meters a product they are not yet subscribed to; a sustained rise on one `meter` means a producer is keyed wrong and its units are silently not billing. Label cardinality is bounded by the plan catalog — ingest refuses a meter no plan declares |
+| `http_requests_total` | counter | `method`, `route`, `status_code` | Each HTTP request that reaches the app |
+| `http_request_duration_seconds` | histogram | `method`, `route`, `status_code` | The latency of each route, in seconds |
+| `auth_events_total` | counter | `event`, one of `login_success`, `login_failure`, `token_refresh_success`, `token_refresh_failure`, `token_reuse_detected`, `logout`, `register` | The authentication events |
+| `rbac_permission_denied_total` | counter | `action`, `subject`, `level`, one of `guard` or `instance` | The RBAC and ABAC denials. `level=guard` is a rejection from the `@Authorize` decorator. `level=instance` is an `ability.can(action, entity)` rejection after the server loaded the record |
+| `sse_connections_active` | gauge | - | The SSE notification streams that are open now |
+| `mail_queue_jobs` | gauge | `state`, one of `waiting`, `active`, `completed`, `failed`, `delayed` | The depth of the BullMQ mail queue, by job state. The metric stays absent when no queue is configured, that is when `REDIS_URL` is empty and `MailService` sends the mail in the process |
+| `mail_jobs_processed_total` | counter | `outcome`, one of `completed` or `failed` | The mail jobs that the queue worker processed. `failed` counts each failed attempt, and a retry is one attempt |
+| `db_pool_connections` | gauge | `state`, one of `total`, `idle`, `waiting` | The size of the PostgreSQL connection pool, by state. The metric reads the pg pool on the injected `DataSource` object. A `waiting` value above 0 for a long time means that the pool is exhausted and the requests are in a queue |
+| `cache_requests_total` | counter | `cache`, one of `permissions`, `roles`, `resources`, `feature_flags`, `feature_flags_all`; and `outcome`, one of `hit` or `miss` | The lookups in each Redis-backed cache, by logical cache and by outcome. The hit ratio of a cache is `hit / (hit + miss)`. A ratio that stays low means that the invalidation is faster than the hits |
+| `dependency_up` | gauge | `dependency`, one of `smtp` or `redis` | The health of an external dependency, as `/health/ready` last observed it. `1` is healthy, and `0` is degraded or down. A series appears only after its indicator runs. Thus a deployment with no SMTP configuration never emits `dependency="smtp"`. This is the only machine-readable signal for a degradation that readiness intentionally reports as up. Refer to [Alerting](../README.md#alerting) |
+| `billing_usage_records_unrated_total` | counter | `meter` | The usage records that the system stored under a meter that the current plan of the customer does not price. A value above zero is expected while a customer meters a product that they do not subscribe to. A rise that continues on one `meter` means that a producer uses an incorrect key, and its units silently do not bill. The plan catalog bounds the label cardinality, because the ingest refuses a meter that no plan declares |
 
-Plus the default Node.js process metrics (heap, GC, event-loop lag, file
-descriptors, ...) provided by `prom-client`.
+`prom-client` also supplies the default Node.js process metrics. Those cover the heap, the GC, the
+event-loop lag and the file descriptors.
 
 ### Scrape configuration
 
-The bundled `monitoring/prometheus.yml` already targets `server:3000 → /metrics`
-on a 15-second interval inside the Docker Compose network. Self-hosted
-Prometheus instances should add an equivalent scrape job.
+The `monitoring/prometheus.yml` file of the project already targets `server:3000` at the `/metrics`
+path. The interval is 15 seconds, inside the Docker Compose network. A self-hosted Prometheus
+instance must add an equivalent scrape job.
 
 ### Permission-denied alert recipes
 
-`rbac_permission_denied_total` is the single best signal for unexpected RBAC
-behaviour — misconfigured roles, brute-force probing of admin routes, a
-front-end bug that hits endpoints the user is not entitled to, or a
-regression that introduces a new check before the seed data was updated.
+`rbac_permission_denied_total` is the best single signal for unexpected RBAC behavior. It shows a
+misconfigured role, a brute-force probe of the administrator routes, a front-end defect that calls an
+endpoint that the user cannot use, and a regression that adds a new check before a person updates the
+seed data.
 
-Drop the following into a Prometheus rules file (e.g. `monitoring/rbac-rules.yml`,
-loaded via `rule_files:` in `prometheus.yml`). Thresholds are starting points
-— tune them to your baseline traffic before paging on them:
+Put the rules below in a Prometheus rules file, for example `monitoring/rbac-rules.yml`. Load that
+file with `rule_files:` in `prometheus.yml`. Each threshold is a starting point. Tune it against your
+own baseline traffic before you page a person on it.
 
 ```yaml
 groups:
   - name: rbac
     rules:
-      # 1. Burst: > 10 denials/min averaged over a 5-min window.
+      # 1. Burst: more than 10 denials/min averaged over a 5-min window.
       # Usually points at a deploy that broke a role, or a runaway script.
       - alert: RbacDenialBurst
         expr: sum(rate(rbac_permission_denied_total[5m])) * 60 > 10
@@ -643,12 +1738,12 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "RBAC denials averaging > 10/min over 5 min"
+          summary: "RBAC denials averaging above 10/min over 5 min"
           description: |
             Per-subject breakdown:
               sum by (subject, action) (rate(rbac_permission_denied_total[5m]))
 
-      # 2. Concentrated abuse: one subject takes > 70 % of denials.
+      # 2. Concentrated abuse: one subject takes more than 70 % of denials.
       # Typical when a single role / UI screen is denied repeatedly.
       - alert: RbacDenialHotSubject
         expr: |
@@ -663,188 +1758,236 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Single subject accounts for > 70 % of RBAC denials"
+          summary: "Single subject accounts for more than 70 % of RBAC denials"
 
-      # 3. Instance-level denial spike — usually an ownership-check bug or
+      # 3. Instance-level denial spike - usually an ownership-check bug or
       # a tampered client cache. Guards block typed access; instance checks
-      # block "you don't own this row", so a sudden rise often means the UI
-      # is showing rows that shouldn't be visible.
+      # block "you do not own this row", so a sudden rise often means the UI
+      # is showing rows that must not be visible.
       - alert: RbacInstanceDenialSpike
         expr: sum(rate(rbac_permission_denied_total{level="instance"}[5m])) * 60 > 5
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Instance-level RBAC denials > 5/min over 5 min"
+          summary: "Instance-level RBAC denials above 5/min over 5 min"
 
-      # 4. Sustained background noise — under steady load these counters
-      # should sit near zero for an authenticated user. Long-running
-      # drizzle is usually a broken UI that hides nothing client-side.
+      # 4. Sustained background noise - under steady load these counters
+      # must sit near zero for an authenticated user. A long-running
+      # trickle is usually a broken UI that hides nothing client-side.
       - alert: RbacDenialChronic
         expr: sum(rate(rbac_permission_denied_total[30m])) * 60 > 2
         for: 30m
         labels:
           severity: info
         annotations:
-          summary: "RBAC denials > 2/min for 30 min (likely a UI bug, not abuse)"
+          summary: "RBAC denials above 2/min for 30 min (likely a UI bug, not abuse)"
 ```
 
-For low-traffic deployments, replace `rate(...)` with
-`increase(rbac_permission_denied_total[1h]) > N` so the alert is not eaten
-by ratio-against-tiny-base noise.
+For a deployment with low traffic, replace `rate(...)` with
+`increase(rbac_permission_denied_total[1h]) > N`. Thus the noise of a ratio against a small base does
+not hide the alert.
 
 ### Grafana dashboard
 
-A starter dashboard focused on permission-denied breakdown lives at
-`doc/grafana/rbac.json` (the project's `doc/` folder is intentionally
-gitignored — copy or symlink it where you need it). Import via
-**Grafana → Dashboards → New → Import** and select the Prometheus
-datasource bundled with the Docker stack (UID `prometheus`).
+A starter dashboard is at `doc/grafana/rbac.json`. It shows the breakdown of the permission denials.
+The `doc/` folder of the project is intentionally in `.gitignore`. Thus you must copy the file or
+make a symbolic link to it where you need it.
 
-Panels:
+To import it, open **Grafana**, then **Dashboards**, then **New**, then **Import**. Select the
+Prometheus datasource of the Docker stack, which has the UID `prometheus`.
 
-- Denials/min (overall, 5-min window) — single stat
-- Denials/sec by level (`guard` vs `instance`) — time series
-- Top (subject, action) denials over 5 min — bar gauge
-- Distribution of denials by subject over 1 h — pie chart
-- Cumulative denials by (subject, action) over 24 h — table
+The panels are:
 
-The provisioned **App Metrics** dashboard
-(`monitoring/grafana/provisioning/dashboards/nexus.json`) covers the
-remaining metrics (HTTP traffic, auth events, latency p95s, SSE, Node.js
-runtime) plus an RBAC & Reliability section (permission denials by level
-and action/subject, process RSS memory, token-reuse-detected alarm,
-uptime, active handles/requests), a Mail Queue section (BullMQ depth by
-state, failed/completed job counts over 1 h), and a Database section (connection-pool
-size by state with a waiting-connections alarm). Use the dedicated RBAC dashboard
-(`doc/grafana/rbac.json`) alongside it for deeper security drill-downs.
+- Denials each minute, overall, over a 5-minute window. It is a single stat.
+- Denials each second by level, that is `guard` against `instance`. It is a time series.
+- The top pairs of subject and action over 5 minutes. It is a bar gauge.
+- The distribution of the denials by subject over 1 hour. It is a pie chart.
+- The cumulative denials by pair of subject and action over 24 hours. It is a table.
+
+The provisioned **App Metrics** dashboard is at
+`monitoring/grafana/provisioning/dashboards/nexus.json`. It covers the other metrics, that is the
+HTTP traffic, the authentication events, the p95 latencies, the SSE streams and the Node.js runtime.
+
+It also has an RBAC and Reliability section. That section shows the permission denials by level and
+by action and subject, the process RSS memory, the token-reuse-detected alarm, the uptime, and the
+active handles and requests.
+
+It has a Mail Queue section, with the BullMQ depth by state and the counts of the failed and
+completed jobs over 1 hour. It has a Database section, with the connection-pool size by state and an
+alarm for the waiting connections.
+
+Use the dedicated RBAC dashboard (`doc/grafana/rbac.json`) beside it for a deeper security
+investigation.
 
 ## Docker
 
-A multi-stage `Dockerfile` is provided for production builds.
+The `Dockerfile` has more than one stage, for a production build.
 
 **Build stages:**
-1. **deps** — installs production `node_modules` only (with `npm ci --omit=dev`)
-2. **builder** — installs all deps + compiles TypeScript (`nest build`) including `shared/`
-3. **runner** — copies `dist/` and production `node_modules`, runs `docker-entrypoint.sh`
+1. **deps** installs the production `node_modules` only, with `npm ci --omit=dev`.
+2. **builder** installs each dependency and compiles the TypeScript with `nest build`. The build
+   includes `shared/`.
+3. **runner** copies `dist/` and the production `node_modules`. It runs `docker-entrypoint.sh`.
 
-**`docker-entrypoint.sh`** (executed on container start):
+**`docker-entrypoint.sh`** runs at the start of the container:
 ```sh
 typeorm migration:run      # Apply pending migrations
 node dist/server/src/seed-admin.js   # Create admin user if ADMIN_EMAIL set
 exec node dist/server/src/main       # Start NestJS
 ```
 
-The admin seeder (`src/seed-admin.ts`) reads `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_FIRST_NAME`, `ADMIN_LAST_NAME` from the environment. It is idempotent — skips if the user already exists or if `ADMIN_EMAIL` is not set.
+The administrator seeder (`src/seed-admin.ts`) reads `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
+`ADMIN_FIRST_NAME` and `ADMIN_LAST_NAME` from the environment. It is idempotent: it skips the work
+when the user exists, and when `ADMIN_EMAIL` has no value.
 
-The repo-root `docker-compose.yml` is the **production** stack (db + redis + server + client + monitoring) deployed to the VPS — not for local use. For local development, run the API on the host (`npm run start:dev`) against the dev backing services in `server/docker-compose.yml`.
+The `docker-compose.yml` file in the root of the repository is the **production** stack. It holds the
+db, redis, server, client and monitoring services, and the deploy puts it on the VPS. Do not use it
+locally.
+
+For local development, run the API on the host with `npm run start:dev`. Run it against the dev
+backing services in `server/docker-compose.yml`.
 
 ---
 
 ## API
 
-Swagger docs: http://localhost:3000/swagger (enabled in `local` and `development` by default; set `SWAGGER_ENABLED=true` to enable in any environment)
+The Swagger documentation is at http://localhost:3000/swagger. It is on by default in `local` and in
+`development`. To enable it in another environment, set `SWAGGER_ENABLED=true`.
 
-Base URL: `/api/v1`
+The base URL is `/api/v1`.
 
 ### Auth (`/api/v1/auth`)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/register` | None | Register user (sends verification email). A taken address answers 409 and writes a `USER_REGISTER_CONFLICT` audit row — account existence is deliberately discoverable here, so the mitigation is detection (see the "Account enumeration" row in the security section of the project spec) |
-| POST | `/login` | None | Login, returns JWT + refresh token |
-| POST | `/refresh-token` | None | Refresh access token |
-| POST | `/logout` | Bearer | Revoke all refresh tokens |
-| GET | `/profile` | Bearer | Get current user |
-| PATCH | `/profile` | Bearer | Update own profile (name, password); `currentPassword` required when changing password (OAuth-only users may omit) |
-| POST | `/profile/email/initiate` | Bearer | Step 1 of self-service email change (3/hour). Requires `currentPassword`; rejects OAuth-only accounts; stores `pendingEmail`/`pendingEmailToken` (1h expiry); sends confirmation link to new address and a no-link masked alert to old address. Response is enumeration-safe |
-| POST | `/profile/email/confirm` | None | Step 2 — confirms the new email via the token, applies the change atomically, revokes all refresh tokens, notifies the old address |
-| GET | `/permissions` | Bearer | Get current user's resolved permissions |
-| POST | `/verify-email` | None | Verify email address using token |
-| POST | `/resend-verification` | None | Resend email verification (3/min) |
-| POST | `/forgot-password` | None | Request password reset email (2 per 5 min); CAPTCHA token required when near rate limit |
-| POST | `/reset-password` | None | Reset password using token |
-| GET | `/captcha-config` | None | Public CAPTCHA configuration (provider, site key, enabled flag) |
+| POST | `/register` | None | Register a user and send a verification email. A taken address answers 409 and writes a `USER_REGISTER_CONFLICT` audit row. The existence of an account is intentionally discoverable here, thus the mitigation is detection. Refer to the "Account enumeration" row in the security section of the project spec |
+| POST | `/login` | None | Log in. It returns a JWT and a refresh token |
+| POST | `/refresh-token` | None | Refresh the access token |
+| POST | `/logout` | Bearer | Revoke each refresh token |
+| GET | `/profile` | Bearer | Get the current user |
+| PATCH | `/profile` | Bearer | Update your own profile: the name and the password. `currentPassword` is necessary for a password change. A user with OAuth only can omit it |
+| POST | `/profile/email/initiate` | Bearer | Step 1 of the self-service email change, with a limit of 3 calls each hour. It requires `currentPassword` and rejects an account with OAuth only. It stores `pendingEmail` and `pendingEmailToken` with an expiry of 1 h. It sends a confirmation link to the new address, and a masked alert with no link to the old address. The response is enumeration-safe |
+| POST | `/profile/email/confirm` | None | Step 2. It confirms the new address with the token, applies the change atomically, revokes each refresh token, and notifies the old address |
+| GET | `/permissions` | Bearer | Get the resolved permissions of the current user |
+| POST | `/verify-email` | None | Verify an email address with a token |
+| POST | `/resend-verification` | None | Send the verification email again, with a limit of 3 calls each minute |
+| POST | `/forgot-password` | None | Request a password reset email, with a limit of 2 calls each 5 minutes. A CAPTCHA token is necessary near the rate limit |
+| POST | `/reset-password` | None | Reset the password with a token |
+| GET | `/captcha-config` | None | The public CAPTCHA configuration: the provider, the site key and the enabled flag |
 
 ### OAuth (`/api/v1/auth/oauth`)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/:provider` | None | Initiate OAuth login (google, facebook, vk) |
-| GET | `/:provider/callback` | None | OAuth provider callback → redirect to client |
-| GET | `/accounts` | Bearer | List linked OAuth accounts |
-| DELETE | `/accounts/:provider` | Bearer | Unlink OAuth provider |
+| GET | `/:provider` | None | Start an OAuth login. The providers are google, facebook and vk |
+| GET | `/:provider/callback` | None | The callback of the OAuth provider. It redirects to the client |
+| GET | `/accounts` | Bearer | List the linked OAuth accounts |
+| DELETE | `/accounts/:provider` | Bearer | Unlink an OAuth provider |
 
 ### Roles (`/api/v1/roles`)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/` | `roles:create` | Create role |
-| GET | `/` | `roles:read` | List all roles with permissions |
-| GET | `/:id` | `roles:read` | Get role by ID |
-| PATCH | `/:id` | `roles:update` | Update role |
-| DELETE | `/:id` | `roles:delete` | Delete role |
-| GET | `/permissions` | `roles:read` | List all available permissions |
-| GET | `/:id/permissions` | `roles:read` | Get permissions assigned to a specific role |
-| PUT | `/:id/permissions` | `roles:update` | Bulk-replace the full permission set for a role |
-| POST | `/:id/permissions` | `roles:update` | Assign permissions to role |
-| DELETE | `/:id/permissions/:permissionId` | `roles:update` | Remove permission from role |
-| POST | `/assign/:userId` | `roles:assign` | Assign role to user (404 when the user is unknown or soft-deleted) |
-| DELETE | `/assign/:userId/:roleId` | `roles:assign` | Remove role from user (404 when the user is unknown or soft-deleted) |
+| POST | `/` | `roles:create` | Create a role |
+| GET | `/` | `roles:read` | List each role with its permissions |
+| GET | `/:id` | `roles:read` | Get a role by ID |
+| PATCH | `/:id` | `roles:update` | Update a role |
+| DELETE | `/:id` | `roles:delete` | Delete a role |
+| GET | `/permissions` | `roles:read` | List each available permission |
+| GET | `/:id/permissions` | `roles:read` | Get the permissions of one role |
+| PUT | `/:id/permissions` | `roles:update` | Replace the full permission set of a role |
+| POST | `/:id/permissions` | `roles:update` | Assign permissions to a role |
+| DELETE | `/:id/permissions/:permissionId` | `roles:update` | Remove a permission from a role |
+| POST | `/assign/:userId` | `roles:assign` | Assign a role to a user. It answers 404 when the user is unknown or soft-deleted |
+| DELETE | `/assign/:userId/:roleId` | `roles:assign` | Remove a role from a user. It answers 404 when the user is unknown or soft-deleted |
 
 ### RBAC (`/api/v1/rbac`)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/metadata` | `permissions:read` | Get RBAC metadata (resources + actions); Redis-cached 60s |
-| GET | `/resources` | `permissions:read` | List all resources |
-| PATCH | `/resources/:id` | `permissions:update` | Update resource display info |
-| POST | `/resources/:id/restore` | `permissions:update` | Restore orphaned resource; 400 if `@RegisterResource` controller absent |
-| GET | `/actions` | `permissions:read` | List all actions |
-| POST | `/actions` | `permissions:create` | Create new action |
-| PATCH | `/actions/:id` | `permissions:update` | Update action |
-| DELETE | `/actions/:id` | `permissions:delete` | Delete custom action |
+| GET | `/metadata` | `permissions:read` | Get the RBAC metadata: the resources and the actions. Redis caches it for 60 s |
+| GET | `/resources` | `permissions:read` | List each resource |
+| PATCH | `/resources/:id` | `permissions:update` | Update the display data of a resource |
+| POST | `/resources/:id/restore` | `permissions:update` | Restore an orphaned resource. It answers 400 when no `@RegisterResource` controller exists |
+| GET | `/actions` | `permissions:read` | List each action |
+| POST | `/actions` | `permissions:create` | Create a new action |
+| PATCH | `/actions/:id` | `permissions:update` | Update an action |
+| DELETE | `/actions/:id` | `permissions:delete` | Delete a custom action |
 
 ### Notifications (`/api/v1/notifications`)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/stream` | Bearer | SSE stream — pushes `session_invalidated`, `permissions_updated`, `user_crud_events` (only to clients with `users:search`), and `feature_flags_updated` events |
+| GET | `/stream` | Bearer | The SSE stream. It pushes `session_invalidated`, `permissions_updated`, `user_crud_events` and `feature_flags_updated`. `user_crud_events` goes only to a client with `users:search` |
 
 ### Feature Flags (`/api/v1`)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/feature-flags` | Optional | Evaluated flags for the caller. Authenticated → each flag resolving `true` plus any `public` flag (disabled non-public flags omitted); anonymous → flags with `public: true`. Returns `{ flags: Record<string, boolean>, evaluatedAt: string }`. Sets `nxs_anon_id` cookie on first request |
-| GET | `/admin/feature-flags` | `manage:FeatureFlag` | List all flags with their rules |
+| GET | `/feature-flags` | Optional | The evaluated flags of the caller. An authenticated caller gets each flag that resolves `true` plus each `public` flag, and the server omits a disabled non-public flag. An anonymous caller gets the flags with `public: true`. It returns `{ flags: Record<string, boolean>, evaluatedAt: string }`. It sets the `nxs_anon_id` cookie at the first request |
+| GET | `/admin/feature-flags` | `manage:FeatureFlag` | List each flag with its rules |
 | GET | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Get a flag by ID |
-| POST | `/admin/feature-flags` | `manage:FeatureFlag` | Create a flag (audited as `FEATURE_FLAG_CREATE`) |
-| PATCH | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Update a flag. **Requires `If-Match: <version>` header**; HTTP 409 (`errorKey: errors.featureFlags.versionConflict`) on mismatch; HTTP 428 (`errors.featureFlags.ifMatchRequired`) when missing |
-| DELETE | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Cascade-delete a flag (audited as `FEATURE_FLAG_DELETE`) |
-| PUT | `/admin/feature-flags/:id/rules` | `manage:FeatureFlag` | Replace the full rule set in one transaction (audited as `FEATURE_FLAG_RULES_REPLACE`) |
-| POST | `/admin/feature-flags/:id/toggle` | `manage:FeatureFlag` | Flip `enabled` and increment version (audited as `FEATURE_FLAG_TOGGLE`) |
+| POST | `/admin/feature-flags` | `manage:FeatureFlag` | Create a flag. The audit action is `FEATURE_FLAG_CREATE` |
+| PATCH | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Update a flag. It **requires the `If-Match: <version>` header**. A mismatch gives HTTP 409 with `errorKey: errors.featureFlags.versionConflict`. A missing header gives HTTP 428 with `errors.featureFlags.ifMatchRequired` |
+| DELETE | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Delete a flag with a cascade. The audit action is `FEATURE_FLAG_DELETE` |
+| PUT | `/admin/feature-flags/:id/rules` | `manage:FeatureFlag` | Replace the full rule set in one transaction. The audit action is `FEATURE_FLAG_RULES_REPLACE` |
+| POST | `/admin/feature-flags/:id/toggle` | `manage:FeatureFlag` | Change `enabled` and increase the version. The audit action is `FEATURE_FLAG_TOGGLE` |
 
-**Caching:**
-- `featureflags:all` — full flag/rule set, TTL 300 s. Reloads are single-flight: concurrent cache misses share one DB load, and a load overlapped by an invalidation skips its cache write (generation guard) so pre-change rows are never re-cached
-- `featureflags:version` — monotonic counter, bumped on any change; appended to per-user keys so old entries orphan naturally
-- `featureflags:user:<userId>:v<version>` — evaluated map, TTL 60 s. Anonymous callers are not cached
+**Caching.** The system uses three keys:
 
-**Real-time updates:** `FeatureFlagChangedListener` broadcasts `{ type: 'feature_flags_updated' }` over SSE on flag change. The cache is invalidated per change, but the broadcast is coalesced (500 ms window) so a burst of changes — e.g. one dialog save emitting update + rules-replaced — triggers a single synchronized client refetch instead of one per change. `UserRoleChangedEvent` and `UserDeletedEvent` invalidate just the affected user's cache. Cross-module communication via `EventEmitter2`, not `forwardRef`.
+- `featureflags:all` holds the full set of flags and rules, with a TTL of 300 s. A reload is
+  single-flight: two concurrent misses share one load from the database. A load that an invalidation
+  overlaps skips its cache write, through a generation guard. Thus the cache never holds a row from
+  before the change.
+- `featureflags:version` is a monotonic counter. Each change increases it. The value goes at the end
+  of each per-user key, thus an old entry orphans itself.
+- `featureflags:user:<userId>:v<version>` holds the evaluated map, with a TTL of 60 s. The system
+  caches nothing for an anonymous caller.
 
-**Anonymous bucketing:** `AnonIdMiddleware` issues the `nxs_anon_id` cookie on first request to any route (`SameSite=Lax`, `Secure` in production, 1-year `maxAge`, `httpOnly: false`). The cookie value seeds the percentage-bucket hash so a 10 % rollout of a public flag converges on the same 10 % of anonymous browsers across reloads.
+**Real-time updates.** `FeatureFlagChangedListener` broadcasts `{ type: 'feature_flags_updated' }`
+over SSE at each change of a flag.
 
-> **Anonymous percentage rollouts are deterministic but client-controllable, not a security boundary.** Because the bucket key for an anonymous caller is the `nxs_anon_id` cookie (`httpOnly: false`, so readable/writable from JavaScript), a client can rotate the cookie until it lands in a targeted percentage bucket. This is acceptable by design — anonymous callers only ever see `public: true` flags, and any sensitive feature must require authentication (where bucketing keys on the immutable `userId`, which is not client-controllable). Never rely on an anonymous percentage rollout for access control or data isolation; treat it purely as a gradual-exposure mechanism. If a future flag needs anonymous rollouts to resist grinding, HMAC-sign the `nxs_anon_id` value with a server secret so a client cannot forge buckets.
+The system invalidates the cache at each change. It coalesces the broadcast in a window of 500 ms.
+Thus a burst of changes causes one synchronized refetch on the client, and not one refetch for each
+change. One save in a dialog is such a burst, because it emits an update and a rules-replaced event.
 
-**`@RequireFeature('key')` decorator** (convenience):
+`UserRoleChangedEvent` and `UserDeletedEvent` invalidate the cache of the affected user only. The
+cross-module communication uses `EventEmitter2` and never `forwardRef`.
+
+**Anonymous bucketing.** `AnonIdMiddleware` issues the `nxs_anon_id` cookie at the first request to
+any route. The cookie uses `SameSite=Lax`, `Secure` in production, a `maxAge` of 1 year, and
+`httpOnly: false`.
+
+The value of the cookie seeds the hash of the percentage bucket. Thus a 10 % rollout of a public flag
+converges on the same 10 % of anonymous browsers across reloads.
+
+> **An anonymous percentage rollout is deterministic but the client can control it. It is not a
+> security boundary.** The bucket key of an anonymous caller is the `nxs_anon_id` cookie, which is
+> `httpOnly: false`. Thus JavaScript can read it and write it, and a client can rotate the cookie
+> until it lands in a targeted bucket.
+>
+> This is acceptable by design. An anonymous caller sees only a flag with `public: true`. A sensitive
+> feature must require authentication. The bucketing then keys on the `userId` value, which is
+> immutable and which the client cannot control.
+>
+> Never use an anonymous percentage rollout for access control or for data isolation. Use it as a
+> mechanism for gradual exposure only. If a future flag needs an anonymous rollout that resists this
+> attack, sign the `nxs_anon_id` value with an HMAC and a server secret. A client can then not forge a
+> bucket.
+
+**The `@RequireFeature('key')` decorator** is a convenience:
 ```ts
 @Get('/beta')
 @RequireFeature('new-dashboard')
 @Authorize(['read', 'Dashboard'])  // RBAC remains the real gate
 getBetaDashboard() { ... }
 ```
-`FeatureFlagGuard` returns HTTP 404 (anti-enumeration) when the flag is disabled for the caller. **Never use as the sole authorization gate.**
+`FeatureFlagGuard` returns HTTP 404 against enumeration when the flag is disabled for the caller.
+**Never use it as the only authorization gate.**
 
-**Extending the attribute registry** for non-user-bound targeting (tenant, organization, region, subscription tier, ...):
+**To extend the attribute registry** for a target that is not bound to a user, such as a tenant, an
+organization, a region or a subscription tier:
 ```ts
 @Injectable()
 export class TenantModule implements OnModuleInit {
@@ -859,55 +2002,57 @@ export class TenantModule implements OnModuleInit {
   }
 }
 ```
-Admin UIs can then write rules referencing `{ field: 'custom', customKey: 'tenantId', op: 'in', value: ['acme', 'globex'] }`. The write-time validator rejects any `customKey` not registered.
+An administrator UI can then write a rule such as
+`{ field: 'custom', customKey: 'tenantId', op: 'in', value: ['acme', 'globex'] }`. The validator at
+write time rejects a `customKey` value that nobody registered.
 
-> **Request-stable contract.** A resolver MUST return a stable value for a given user across requests — it may use the `user` argument but MUST NOT branch on per-request data (IP, headers, query string, country, …). `evaluateForUser` caches the full evaluated set per user for 60s (`featureflags:user:<id>:v<version>`), so a request-derived attribute would freeze the first request's value for the whole TTL and make attribute rules non-deterministic per request. The resolver receives `req` only for stable, request-independent enrichment.
+> **The resolver contract is request-stable.** A resolver MUST return a stable value for a given user
+> across requests. It can use the `user` argument. It MUST NOT branch on per-request data, such as
+> the IP address, a header, the query string or the country.
+>
+> `evaluateForUser` caches the full evaluated set for each user for 60 s, under
+> `featureflags:user:<id>:v<version>`. Thus an attribute that comes from the request freezes the
+> value of the first request for the full TTL, and the attribute rules then give a different result
+> for each request.
+>
+> The resolver gets `req` for stable enrichment that does not depend on the request.
 
-**Audit trail.** Every mutating admin endpoint writes to `audit_logs` under one of the `FEATURE_FLAG_*` enum values (`FEATURE_FLAG_CREATE`, `_UPDATE`, `_DELETE`, `_TOGGLE`, `_RULES_REPLACE`). The `details` JSONB captures `key`, `changedFields`, `ruleCount`, or `enabled`, depending on the action — never the raw rule payload, so admin-only segmentation strategy never leaks into the audit log.
+**Audit trail.** Each mutating administrator endpoint writes to `audit_logs` under one of the
+`FEATURE_FLAG_*` enum values. Those are `FEATURE_FLAG_CREATE`, `FEATURE_FLAG_UPDATE`,
+`FEATURE_FLAG_DELETE`, `FEATURE_FLAG_TOGGLE` and `FEATURE_FLAG_RULES_REPLACE`.
 
-**Adding a new flag from a feature module.** No code is needed at the flag site beyond `@RequireFeature('key')` on the handler. Configuration is purely runtime: create the flag through the admin UI / API, attach rules if you want partial roll-out, and verify with `GET /api/v1/feature-flags` as the target caller. The flag's `key` is a free-form string (lowercase letters, digits, hyphens) — pick one with the same name as the gate so a future reader can grep from code to config.
+The `details` JSONB column holds `key`, `changedFields`, `ruleCount` or `enabled`, and the action
+decides which one. It never holds the raw rule payload. Thus the segmentation strategy, which is
+administrator-only data, never reaches the audit log.
+
+**To add a new flag from a feature module.** The flag site needs no code above
+`@RequireFeature('key')` on the handler. The configuration is entirely at run time. Make the flag
+through the administrator UI or API. Attach the rules if you want a partial rollout. Then verify the
+result with `GET /api/v1/feature-flags` as the target caller.
+
+The `key` of a flag is a free-form string of lowercase letters, digits and hyphens. Give it the same
+name as the gate. Thus a later reader can go from the code to the configuration with a grep.
 
 ### Users (`/api/v1/users`)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/` | `users:create` | Create user |
-| GET | `/` | `users:search` | List all users (paginated; `includeDeleted=true` to include soft-deleted) |
-| GET | `/search` | `users:search` | Search users (paginated + filters: `q` (unified substring across id/email/firstName/lastName), email, firstName, lastName, `role` (exact role name), isActive; `includeDeleted=true`). String filters cap at 255 chars; `isActive`/`includeDeleted` accept only `true`/`false` — anything else is a 400 |
-| GET | `/cursor` | `users:search` | List users with cursor-based (keyset) pagination |
-| GET | `/search/cursor` | `users:search` | Search users with cursor-based pagination + same filters as `/search` |
-| GET | `/:id` | `users:read` | Get user by ID |
-| GET | `/:id/permissions` | `users:read` | Get effective permissions for user (roles + resolved permissions + packed CASL rules) |
-| PATCH | `/:id` | `users:update` | Update user (email, name, password, `isActive` deactivate/reactivate, `unlockAccount`) |
-| DELETE | `/:id` | `users:delete` | Soft-delete user (sets `deleted_at`, revokes all active sessions) |
-| POST | `/:id/restore` | `users:delete` | Restore soft-deleted user (clears `deleted_at`, sets `isActive=true`) |
+| POST | `/` | `users:create` | Create a user |
+| GET | `/cursor` | `users:search` | List the users with cursor (keyset) pagination. `includeDeleted=true` adds the soft-deleted rows |
+| GET | `/search/cursor` | `users:search` | Search the users with cursor pagination. The filters are `q` (a substring across the id, email, firstName and lastName), `email`, `firstName`, `lastName`, `role` (an exact role name) and `isActive`. `includeDeleted=true` adds the soft-deleted rows. A string filter has a cap of 255 characters. `isActive` and `includeDeleted` accept `true` or `false` only, and each other value is a 400 |
+| GET | `/:id` | `users:read` | Get a user by ID |
+| GET | `/:id/permissions` | `users:read` | Get the effective permissions of a user: the roles, the resolved permissions and the packed CASL rules |
+| PATCH | `/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount` |
+| DELETE | `/:id` | `users:delete` | Soft-delete a user. It sets `deleted_at` and revokes each active session |
+| POST | `/:id/restore` | `users:delete` | Restore a soft-deleted user. It clears `deleted_at` and sets `isActive=true` |
 
-**Pagination query params:**
-- `page` (default 1)
-- `limit` (default 10, max 100)
-- `sortBy` (default createdAt)
-- `sortOrder` (default desc for list, asc for search)
+**Cursor pagination query parameters** for `/cursor` and `/search/cursor`:
+- `cursor` is the opaque token from the previous response. Omit it for the first page.
+- `limit` has the default 20 and the maximum 100.
+- `sortBy` has the default `createdAt`.
+- `sortOrder` has the default `desc`.
 
-**Response format for offset-paginated endpoints:**
-```json
-{
-  "data": [UserResponseDto, ...],
-  "meta": {
-    "page": 1,
-    "limit": 10,
-    "total": 70,
-    "totalPages": 7
-  }
-}
-```
-
-**Cursor-based pagination query params** (`/cursor`, `/search/cursor`):
-- `cursor` (opaque token from previous response; omit for first page)
-- `limit` (default 20, max 100)
-- `sortBy` (default createdAt)
-- `sortOrder` (default desc)
-
-**Response format for cursor-paginated endpoints:**
+**The response format of a cursor-paginated endpoint:**
 ```json
 {
   "data": [UserResponseDto, ...],
@@ -919,13 +2064,24 @@ Admin UIs can then write rules referencing `{ field: 'custom', customKey: 'tenan
 }
 ```
 
+Each list endpoint of this API uses cursor pagination. Offset pagination does not exist in this
+repository.
+
 ## Testing
 
 ### Unit Tests (Jest)
 
-- Test files: `*.spec.ts` alongside source files
-- Environment: Node
-- **Test mocks**: partial mocks are typed against the real type (`jest.Mocked<Pick<T, ...>>`) or, where the real type is impractically large (`ExecutionContext`, `EntityManager`, `DataSource`, `Repository<T>`), a scoped `// @ts-expect-error`. `as unknown as T` double casts are banned by a `no-restricted-syntax` ESLint rule. Reusable context/config/Express fakes live in `src/common/testing/` (excluded from the production build).
+- A test file is a `*.spec.ts` file beside its source file.
+- The environment is Node.
+- **Test mocks.** A partial mock uses the type of the real object, that is
+  `jest.Mocked<Pick<T, ...>>`. Where the real type is impractically large, the mock uses a scoped
+  `// @ts-expect-error` comment. Four such types are `ExecutionContext`, `EntityManager`,
+  `DataSource` and `Repository<T>`.
+
+  A `no-restricted-syntax` ESLint rule bans an `as unknown as T` double cast.
+
+  The reusable fakes for a context, a configuration and an Express object are in
+  `src/common/testing/`. The production build excludes that directory.
 
 ```bash
 npm test                   # Run all
@@ -936,57 +2092,98 @@ npx jest --testPathPattern=auth   # Run specific tests
 
 ### E2E Tests (Jest)
 
-- Separate config: `test/jest-e2e.json`
+The configuration is separate, in `test/jest-e2e.json`.
 
 ```bash
 npm run test:e2e
 ```
 
-**Database settings.** The run needs Postgres, and takes its `DB_*` values from
-the environment first and from `.env` for anything the environment leaves out -
-so `npm run test:e2e` works with no exports at all, and CI's explicit values
-still win. A partial export (`DB_HOST=localhost` alone) therefore no longer
-strands the credentials behind, which used to surface as `client password must
-be a string` from deep inside the driver. `global-setup.ts` opens one connection
-before the workers fork, so an unreachable or unmigrated database is reported
-once, by name, instead of once per suite.
+**Database settings.** The run needs Postgres. It takes each `DB_*` value from the environment first,
+and from `.env` for each value that the environment does not give.
 
-**Mail settings.** `SMTP_HOST`, `SMTP_PORT` and `MAILPIT_URL` are resolved the
-same way, and `test/email-delivery.e2e-spec.ts` runs only when `SMTP_HOST` is
-set - point it at a local Mailpit (`SMTP_HOST=localhost`, `SMTP_PORT=1025`) in
-`.env` to exercise the delivery path locally, or leave it empty to skip.
+Thus `npm run test:e2e` operates with no export at all, and the explicit values of CI still win.
 
-**Rate-limit counters.** Suites that log in more than a few times pin the
-throttler to a per-application in-memory store (`test/private-throttler.ts`).
-Without Redis - how CI runs - every application already gets its own store; a
-Redis-backed local run shares one across all workers, where `/auth/login`'s 3
-per minute per IP is spent by whichever suite gets there first. The helper
-installs `MemoryThrottlerStorage`, not the library's own storage, so a pinned
-suite keeps the successful-login refund. Suites that assert on rate limiting
-keep the real storage.
+For that reason a partial export, for example `DB_HOST=localhost` alone, no longer leaves the
+credentials behind. That condition used to appear as the message `client password must be a string`
+from deep inside the driver.
 
-**Redis isolation.** When a Redis URL is configured (environment or `.env`), the
-run is pinned to a dedicated logical database (`E2E_REDIS_DB`, default `15`) and
-that database is wiped before the first test and after the last one. Without it,
-throttler counters written by one run outlive it - the login throttler window is
-`LOCKOUT_DURATION_MS` - and a later run eventually gets a `429` where it expects
-a `401`. Database `0`, which holds the dev cache and queues, is rejected as a
-target. Run with `REDIS_URL=` empty to exercise the in-memory throttler instead,
-which is what CI does (no Redis service in the workflows).
+`global-setup.ts` opens one connection before the workers fork. Thus a database that is unreachable
+or unmigrated is reported one time, by name, and not one time for each suite.
+
+**Mail settings.** The run resolves `SMTP_HOST`, `SMTP_PORT` and `MAILPIT_URL` in the same way.
+`test/email-delivery.e2e-spec.ts` runs only when `SMTP_HOST` has a value.
+
+To exercise the delivery path locally, point that variable at a local Mailpit instance, that is
+`SMTP_HOST=localhost` and `SMTP_PORT=1025`, in `.env`. To skip the test, leave the variable empty.
+
+**Rate-limit counters.** A suite that logs in more than a few times pins the throttler to an
+in-memory store for each application (`test/private-throttler.ts`).
+
+Without Redis, which is how CI runs, each application already gets its own store. A local run with
+Redis shares one store across each worker. The `/auth/login` limit of 3 calls each minute for each IP
+is then spent by whichever suite arrives first.
+
+The helper installs `MemoryThrottlerStorage`, and not the storage of the library. Thus a pinned suite
+keeps the refund of a successful login. A suite that asserts on the rate limiting keeps the true
+storage.
+
+**Redis isolation.** When a Redis URL is configured, from the environment or from `.env`, the run
+uses a dedicated logical database. That is `E2E_REDIS_DB`, with the default `15`. The run clears that
+database before the first test and after the last test.
+
+Without that isolation, a throttler counter from one run outlives it, because the window of the login
+throttler is `LOCKOUT_DURATION_MS`. A later run then gets a `429` where it expects a `401`.
+
+The run rejects database `0` as a target, because that database holds the development cache and the
+queues.
+
+To exercise the in-memory throttler instead, run with `REDIS_URL=` empty. CI does this, because the
+workflows have no Redis service.
 
 ## Shared Module
 
-Server imports common types and constants from the root `shared/` directory via `@app/shared/*` path alias (maps to `../shared/src/*` in `tsconfig.json`). This includes:
+The server imports the common types and constants from the root `shared/` directory. It uses the
+`@app/shared/*` path alias, which maps to `../shared/src/*` in `tsconfig.json`.
 
-- **Types**: `UserResponse` (public), `AdminUserResponse` (admin-only superset with `lockedUntil` + `roles: RoleAdminResponse[]`), `OAuthAccountResponse`, `TokensResponse`, `AuthResponse`, `PaginationMeta`, `PaginatedResponse<T>`, `CursorPaginationMeta`, `CursorPaginatedResponse<T>`, `SortOrder`; `RoleResponse` (public, no `isSystem`/`isSuper`), `RoleAdminResponse` (admin-only superset), `PermissionResponse`, `RolePermissionResponse`, `RoleWithPermissionsResponse`, `PermissionCondition`, `PermissionEffect`, `ResolvedPermission`, `UserPermissionsResponse`, `UserEffectivePermissionsResponse`; `ResourceResponse`, `ActionResponse`, `RbacMetadataResponse`
-- **Constants**: `PASSWORD_REGEX`, `PASSWORD_ERROR`, `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, `MAX_CONCURRENT_SESSIONS`, pagination defaults, user sort columns; `SYSTEM_ROLES`, `SystemRole` (note: `PERMISSIONS` + `Permission` removed — typed `[Actions, Subjects]` tuples used instead)
-- **Utils**: `@app/shared/utils/time` (single import site re-exporting `Temporal` from the `temporal-polyfill` package, pinned exactly until native Temporal ships), `@app/shared/utils/money` (`Money`, a BigInt value object over integer minor units with an overflow-guarded `toNumber()` for the JSON wire — no floating-point math) and `@app/shared/utils/cursor` (`encodeCursor` / `parseCursor`, the keyset-pagination token codec shared with the mock server; `common/utils/cursor.util.ts` wraps `parseCursor` to raise `BadRequestException` on a malformed token)
+The import covers:
 
-NestJS build compiles shared files into `dist/shared/` alongside `dist/server/`. Migration and seed scripts use paths like `dist/server/src/...` to reflect the nested output structure.
+- **Types.** `UserResponse` is the public form. `AdminUserResponse` is the administrator superset,
+  with `lockedUntil` and `roles: RoleAdminResponse[]`. The other types are `OAuthAccountResponse`,
+  `TokensResponse`, `AuthResponse`, `CursorPaginationMeta`, `CursorPaginatedResponse<T>` and
+  `SortOrder`.
+
+  `RoleResponse` is the public form, with no `isSystem` and no `isSuper`. `RoleAdminResponse` is the
+  administrator superset. The other role types are `PermissionResponse`, `RolePermissionResponse`,
+  `RoleWithPermissionsResponse`, `PermissionCondition`, `PermissionEffect`, `ResolvedPermission`,
+  `UserPermissionsResponse` and `UserEffectivePermissionsResponse`.
+
+  The RBAC types are `ResourceResponse`, `ActionResponse` and `RbacMetadataResponse`.
+- **Constants.** They are `PASSWORD_REGEX`, `PASSWORD_ERROR`, `MAX_FAILED_ATTEMPTS`,
+  `LOCKOUT_DURATION_MS`, `MAX_CONCURRENT_SESSIONS`, `MAX_PAGE_SIZE`, `DEFAULT_CURSOR_PAGE_SIZE`, the
+  user sort columns, `SYSTEM_ROLES` and `SystemRole`.
+
+  Note that `PERMISSIONS` and `Permission` are gone. The code uses a typed `[Actions, Subjects]`
+  tuple instead.
+- **Utils.** `@app/shared/utils/time` is the single import site. It re-exports `Temporal` from the
+  `temporal-polyfill` package, which the project pins exactly until the native Temporal API ships.
+
+  `@app/shared/utils/money` holds `Money`. That is a BigInt value object over integer minor units.
+  Its `toNumber()` method has an overflow guard for the JSON wire. There is no floating-point
+  arithmetic.
+
+  `@app/shared/utils/cursor` holds `encodeCursor` and `parseCursor`. That is the token codec of the
+  keyset pagination, and the mock server shares it. `common/utils/cursor.util.ts` wraps `parseCursor`
+  and raises a `BadRequestException` on a malformed token.
+
+The NestJS build compiles the shared files into `dist/shared/`, beside `dist/server/`. Thus a
+migration script and a seed script use a path such as `dist/server/src/...`, which reflects the
+nested output structure.
 
 ## Versioning
 
-This package's version is kept in sync with `client/` and `mock-server/` via `commit-and-tag-version`. To cut a release, run `npm run release` from `client/` — it bumps `server/package.json` automatically.
+`commit-and-tag-version` keeps the version of this package equal to the version of `client/` and
+`mock-server/`. To make a release, run `npm run release` from `client/`. That command increases the
+version in `server/package.json` automatically.
 
 ## Tech Stack
 
@@ -994,7 +2191,7 @@ This package's version is kept in sync with `client/` and `mock-server/` via `co
 |------------|---------|
 | NestJS | 11.2.1 |
 | TypeORM | 0.3.31 |
-| PostgreSQL | via `pg` 8.23.0 |
+| PostgreSQL | through `pg` 8.23.0 |
 | Passport | 0.7.0 |
 | bcrypt | 6.0.0 |
 | class-validator | 0.14.4 |
