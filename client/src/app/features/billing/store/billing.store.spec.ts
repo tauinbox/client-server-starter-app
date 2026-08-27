@@ -199,6 +199,30 @@ describe('BillingStore', () => {
     expect(store.loading()).toBe(false);
   });
 
+  it.each([
+    ['trialing', true],
+    ['active', true],
+    ['past_due', true],
+    ['incomplete', false],
+    ['canceled', false]
+  ] as const)('hasActiveSubscription is %s -> %s', async (status, expected) => {
+    billingMock.getSubscription.mockReturnValue(
+      of({ ...activeSub, status } satisfies SubscriptionResponse)
+    );
+    const store = createStore();
+    await store.loadSettings();
+
+    expect(store.hasActiveSubscription()).toBe(expected);
+  });
+
+  it('hasActiveSubscription is false without a subscription', async () => {
+    billingMock.getSubscription.mockReturnValue(of(null));
+    const store = createStore();
+    await store.loadSettings();
+
+    expect(store.hasActiveSubscription()).toBe(false);
+  });
+
   it('loadSettings keeps the slices that loaded when one request fails', async () => {
     billingMock.getCredits.mockReturnValue(throwError(() => new Error('503')));
     const store = createStore();
