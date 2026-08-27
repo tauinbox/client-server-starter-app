@@ -1,4 +1,9 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import {
+  expect,
+  loginViaUi,
+  openedDialog,
+  test
+} from '../fixtures/base.fixture';
 import { mockId } from '../fixtures/ids';
 
 test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => {
@@ -73,10 +78,11 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
       .click({ timeout: 5_000 });
 
     // Composite outcome: NO "Feature flag updated" success snackbar, only the
-    // distinct rules-failure message with the flag key interpolated in.
+    // distinct rules-failure message carrying the flag key and the reason the
+    // server gave.
     await expect(
       page.getByText(
-        'Flag "beta-export" updated, but rules failed to save. Reopen to retry.'
+        'Flag "beta-export" updated, but the rules did not save. Reopen it to retry. Cause: Internal Server Error'
       )
     ).toBeVisible();
 
@@ -84,5 +90,71 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     await expect(
       page.getByRole('row', { name: /beta-export/ }).locator('.rules-warning')
     ).toBeVisible();
+  });
+
+  test('FF-UX-009: editing the value box of a boolean attribute rule leaves the flag on', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, {
+      id: mockId('user-102'),
+      email: 'flagvalueadmin@example.com',
+      roles: ['admin']
+    });
+
+    await page.goto('/admin/feature-flags');
+
+    await page
+      .getByRole('row', { name: /oauth-google/ })
+      .getByRole('button', { name: /Edit flag oauth-google/ })
+      .click();
+
+    const dialog = await openedDialog(page);
+    // The seeded rule is `custom oauthGoogleConfigured eq true`. The box is
+    // text, so a single keystroke used to store the string "true", which the
+    // evaluator compares with === and never matches again.
+    const valueInput = dialog.getByRole('textbox', { name: 'Value' });
+    await expect(valueInput).toHaveValue('true');
+    await valueInput.fill('true');
+
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(
+      page.getByText('Feature flag "oauth-google" updated')
+    ).toBeVisible();
+
+    const res = await fetch(`${_mockServer.url}/api/v1/feature-flags`);
+    const body = (await res.json()) as { flags: Record<string, boolean> };
+    expect(body.flags['oauth-google']).toBe(true);
+  });
+
+  test('FF-UX-010: a rule the server would reject blocks the save instead of half-applying it', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, {
+      id: mockId('user-103'),
+      email: 'flagpreflightadmin@example.com',
+      roles: ['admin']
+    });
+
+    await page.goto('/admin/feature-flags');
+
+    await page
+      .getByRole('row', { name: /beta-export/ })
+      .getByRole('button', { name: /Edit flag beta-export/ })
+      .click();
+
+    const dialog = await openedDialog(page);
+    const ruleRow = dialog.locator('nxs-feature-flag-rule-row').first();
+
+    await ruleRow.getByRole('combobox', { name: 'Type' }).click();
+    await page.getByRole('option', { name: 'Attribute', exact: true }).click();
+    await ruleRow.getByRole('combobox', { name: 'Operator' }).click();
+    await page.getByRole('option', { name: 'before', exact: true }).click();
+
+    // `before` with no date is a 400 on PUT /rules, which would land after the
+    // flag itself was already written.
+    await expect(ruleRow.getByText('Pick a date.')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Save' })).toBeDisabled();
   });
 });

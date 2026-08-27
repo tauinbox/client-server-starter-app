@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
+import type { HttpErrorResponse } from '@angular/common/http';
 import {
   MatCard,
   MatCardContent,
@@ -45,6 +46,7 @@ import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
+import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { FeatureFlagsAdminStore } from '../../../store/feature-flags-admin.store';
 import type {
   FeatureFlagFormDialogData,
@@ -318,9 +320,14 @@ export class FeatureFlagListComponent implements OnInit {
           this.#notify.success(successKey, { key: flag.key });
           this.#clearRulesFailed(flag.id);
         },
-        error: () => {
+        error: (err: HttpErrorResponse) => {
           this.#markRulesFailed(flag.id);
-          this.#notify.error(rulesErrorKey, { key: flag.key });
+          // The flag itself is already saved, so the snackbar has to name both
+          // the flag and the reason the rules were rejected.
+          this.#notify.error(rulesErrorKey, {
+            key: flag.key,
+            detail: parseHttpErrorMessage(err, this.#transloco)
+          });
         }
       });
   }

@@ -180,6 +180,11 @@
         }
       }
     </div>
+
+    @let ruleError = error();
+    @if (ruleError) {
+      <p class="rule-error" role="alert">{{ t(ruleError) }}</p>
+    }
   </div>
 
   <button

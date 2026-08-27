@@ -39,9 +39,8 @@
     "errorUpdateFailed": "Не удалось обновить фича-флаг.",
     "errorToggleFailed": "Не удалось переключить фича-флаг.",
     "errorDeleteFailed": "Не удалось удалить фича-флаг.",
-    "errorRulesFailed": "Не удалось сохранить правила.",
-    "errorRulesFailedCreate": "Флаг «{{ key }}» создан, но правила не сохранились. Откройте его снова, чтобы повторить.",
-    "errorRulesFailedUpdate": "Флаг «{{ key }}» обновлён, но правила не сохранились. Откройте его снова, чтобы повторить.",
+    "errorRulesFailedCreate": "Флаг «{{ key }}» создан, но правила не сохранились. Откройте его снова, чтобы повторить. Причина: {{ detail }}",
+    "errorRulesFailedUpdate": "Флаг «{{ key }}» обновлён, но правила не сохранились. Откройте его снова, чтобы повторить. Причина: {{ detail }}",
     "rulesFailedTooltip": "Не удалось сохранить правила — откройте флаг ещё раз, чтобы повторить."
   },
   "featureFlagForm": {
@@ -88,7 +87,7 @@
       "includedByRule": "Включён правилом",
       "noRulesDefaultOn": "Нет include-правил — по умолчанию включён"
     },
-    "errorPreviewFailed": "Не удалось выполнить предпросмотр."
+    "errorPreviewFailed": "Не удалось выполнить предпросмотр. Причина: {{ detail }}"
   },
   "featureFlagRule": {
     "remove": "Удалить правило",
@@ -121,7 +120,12 @@
     "op_after": "после",
     "valuePlaceholder": "Значение для сравнения",
     "valueListPlaceholder": "Добавьте значение, Enter",
-    "datePickerToggle": "Открыть календарь"
+    "datePickerToggle": "Открыть календарь",
+    "errorValueRequired": "Укажите значение.",
+    "errorValueInvalid": "Используйте текст, число или true/false, не длиннее 200 символов.",
+    "errorValueListRequired": "Добавьте хотя бы одно значение, не более 100.",
+    "errorValueDate": "Выберите дату.",
+    "errorCustomKeyRequired": "Укажите ключ своего атрибута."
   },
   "roles": {
     "title": "Управление ролями",

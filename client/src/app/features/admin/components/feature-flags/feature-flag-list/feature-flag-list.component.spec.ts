@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { LayoutService } from '@core/services/layout.service';
@@ -336,7 +337,7 @@ describe('FeatureFlagListComponent', () => {
       expect(notifySuccess).not.toHaveBeenCalled();
       expect(notifyError).toHaveBeenCalledWith(
         'admin.featureFlags.errorRulesFailedCreate',
-        { key: 'just-created' }
+        { key: 'just-created', detail: 'boom' }
       );
       expect(
         fixture.componentInstance.rulesFailedFlagIds().has('flag-new')
@@ -423,10 +424,42 @@ describe('FeatureFlagListComponent', () => {
       expect(notifySuccess).not.toHaveBeenCalled();
       expect(notifyError).toHaveBeenCalledWith(
         'admin.featureFlags.errorRulesFailedUpdate',
-        { key: 'new-dashboard' }
+        { key: 'new-dashboard', detail: 'boom' }
       );
       expect(fixture.componentInstance.rulesFailedFlagIds().has('flag-1')).toBe(
         true
+      );
+    });
+
+    it('puts the server rejection text in the error snackbar', async () => {
+      serviceMock.update.mockReturnValue(of(flag));
+      serviceMock.replaceRules.mockReturnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 400,
+              error: {
+                message:
+                  'attribute rule with op=before requires value: an ISO date string or an epoch-millisecond number'
+              }
+            })
+        )
+      );
+      stubDialogResult(dialogResult);
+
+      const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      fixture.componentInstance.openEditDialog(flag);
+
+      expect(notifyError).toHaveBeenCalledWith(
+        'admin.featureFlags.errorRulesFailedUpdate',
+        {
+          key: 'new-dashboard',
+          detail:
+            'attribute rule with op=before requires value: an ISO date string or an epoch-millisecond number'
+        }
       );
     });
 

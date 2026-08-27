@@ -64,6 +64,7 @@
             @for (rule of rules(); track rule.id ?? $index; let i = $index) {
               <nxs-feature-flag-rule-row
                 [rule]="rule"
+                [error]="ruleErrors()[i]"
                 (ruleChange)="updateRule(i, $event)"
                 (remove)="removeRule(i)"
               />
@@ -98,7 +99,7 @@
     <button
       matButton="filled"
       type="button"
-      [disabled]="flagForm().invalid()"
+      [disabled]="flagForm().invalid() || hasRuleErrors()"
       (click)="submit()"
     >
       {{ isEdit ? t('common.save') : t('admin.featureFlagForm.createButton') }}

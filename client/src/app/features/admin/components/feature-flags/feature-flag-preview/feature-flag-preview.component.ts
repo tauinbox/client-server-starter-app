@@ -8,6 +8,7 @@ import {
   signal
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import type { HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -23,6 +24,7 @@ import {
   type ChipOption
 } from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
 import { NotifyService } from '@core/services/notify.service';
+import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { RoleCatalogService } from '@core/services/role-catalog.service';
 import { UserService } from '../../../../users/services/user.service';
 import type { User } from '../../../../users/models/user.types';
@@ -167,9 +169,11 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
           this.result.set(res);
           this.loading.set(false);
         },
-        error: () => {
+        error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.#notify.error('admin.featureFlagPreview.errorPreviewFailed');
+          this.#notify.error('admin.featureFlagPreview.errorPreviewFailed', {
+            detail: parseHttpErrorMessage(err, this.#transloco)
+          });
         }
       });
   }
