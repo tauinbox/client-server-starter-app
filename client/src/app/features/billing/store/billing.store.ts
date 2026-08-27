@@ -22,6 +22,7 @@ import type {
   SubscriptionResponse,
   UsageSummaryResponse
 } from '@app/shared/types';
+import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { NotifyService } from '@core/services/notify.service';
 import { withCursorList } from '@shared/store/with-cursor-list';
 import {
@@ -54,14 +55,6 @@ const initialState: BillingState = {
   working: false
 };
 
-// Statuses that grant access — used to decide which plan is "current" and to
-// drive the active/empty UI states. Mirrors the server's open-subscription set.
-const ACTIVE_STATUSES: readonly SubscriptionResponse['status'][] = [
-  'trialing',
-  'active',
-  'past_due'
-];
-
 export const BillingStore = signalStore(
   withEntities<InvoiceResponse>(),
   withState(initialState),
@@ -73,9 +66,16 @@ export const BillingStore = signalStore(
       if (!sub) return null;
       return store.plans().find((p) => p.key === sub.planKey) ?? null;
     }),
+    /**
+     * True while the subscription is in `ENTITLED_SUBSCRIPTION_STATUSES` - the
+     * statuses that grant entitlements. It decides the "Current" plan badge and
+     * the active/empty billing states.
+     */
     hasActiveSubscription: computed(() => {
       const sub = store.subscription();
-      return sub !== null && ACTIVE_STATUSES.includes(sub.status);
+      return (
+        sub !== null && ENTITLED_SUBSCRIPTION_STATUSES.includes(sub.status)
+      );
     })
   })),
   withMethods((store) => {
