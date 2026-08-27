@@ -1,6 +1,31 @@
 import { randomUUID } from 'crypto';
 import { getState } from '../state';
-import type { MockInvoice, MockSubscription } from '../types';
+import type { MockInvoice, MockPlan, MockSubscription } from '../types';
+
+/**
+ * Sums the units the plan's own meter recorded inside `[startIso, endIso)`. A
+ * record under any other key belongs to a different product and must not be
+ * priced at this plan's rate; a plan naming no meter charges for nothing. This
+ * is the server's rule in `UsageRating.sumUnits`, and every mock site that
+ * rates a period reads it from here so the three cannot drift apart.
+ */
+export function sumPlanMeterUnits(
+  plan: MockPlan,
+  subscriptionId: string,
+  startIso: string,
+  endIso: string
+): number {
+  if (!plan.meterKey) return 0;
+  return [...getState().billingUsageRecords.values()]
+    .filter(
+      (r) =>
+        r.subscriptionId === subscriptionId &&
+        r.meterKey === plan.meterKey &&
+        r.occurredAt >= startIso &&
+        r.occurredAt < endIso
+    )
+    .reduce((sum, r) => sum + r.quantity, 0);
+}
 
 /**
  * Rates and invoices the open metered period a cancellation closes, mirroring
@@ -26,19 +51,12 @@ export function billClosingUsagePeriod(
   const closedStart = subscription.currentPeriodStart;
   if (nowIso <= closedStart) return null;
 
-  // Only the plan's own meter is priced at its rate; a plan naming no meter
-  // charges for nothing - the same rule the read endpoint and the server apply.
-  const totalUnits = plan.meterKey
-    ? [...state.billingUsageRecords.values()]
-        .filter(
-          (r) =>
-            r.subscriptionId === subscription.id &&
-            r.meterKey === plan.meterKey &&
-            r.occurredAt >= closedStart &&
-            r.occurredAt < nowIso
-        )
-        .reduce((sum, r) => sum + r.quantity, 0)
-    : 0;
+  const totalUnits = sumPlanMeterUnits(
+    plan,
+    subscription.id,
+    closedStart,
+    nowIso
+  );
   const billableUnits = Math.max(0, totalUnits - (price.includedUnits ?? 0));
   const balance = state.billingCreditBalances.get(subscription.customerId);
   const creditUnitsApplied = Math.min(

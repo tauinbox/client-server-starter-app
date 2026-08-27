@@ -32,7 +32,10 @@ import {
 import { OAUTH_DATA_MAX_AGE_MS } from './constants';
 import { generateTokens } from './jwt.utils';
 import { pruneOldestUserTokens } from './helpers/auth.helpers';
-import { billClosingUsagePeriod } from './helpers/billing.helpers';
+import {
+  billClosingUsagePeriod,
+  sumPlanMeterUnits
+} from './helpers/billing.helpers';
 import { resolveEntitlementLimit } from './middleware/billing.middleware';
 import type { BillingProviderId } from '@app/shared/types';
 import type { NotificationEvent } from '@app/shared/types';
@@ -775,14 +778,12 @@ router.post('/billing/advance-renewal', (req, res) => {
   let periodStart = nowIso;
   let periodEnd = newEnd.toISOString();
   if (subscription.billingMode === 'usage') {
-    const totalUnits = [...state.billingUsageRecords.values()]
-      .filter(
-        (r) =>
-          r.subscriptionId === subscription.id &&
-          r.occurredAt >= closedStart &&
-          r.occurredAt < nowIso
-      )
-      .reduce((sum, r) => sum + r.quantity, 0);
+    const totalUnits = sumPlanMeterUnits(
+      plan,
+      subscription.id,
+      closedStart,
+      nowIso
+    );
     const billableUnits = Math.max(0, totalUnits - (price.includedUnits ?? 0));
     // Prepaid credits offset billable units one-for-one before pricing,
     // mirroring the server's summarizeForPeriodWithCredits + spend commit: a
