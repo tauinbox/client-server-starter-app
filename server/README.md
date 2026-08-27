@@ -681,8 +681,9 @@ verify, and the answer is a 400.
   payment-after-receipt in the `pending` or `waiting_for_capture` state as uncaptured, thus the core
   records the invoice as pending and does not give the period. A `canceled` payment throws an error.
 - `findOffSessionCharge` scans the metadata of `getPaymentList`. It reports the same captured and
-  pending statuses. This is the fallback path: `getPaymentList` cannot filter by customer or by
-  metadata, thus the scan walks the whole shop. The scan is page-bounded.
+  pending statuses. This is the fallback path: `getPaymentList` cannot filter by customer, by payment
+  id or by metadata, thus the scan walks the whole shop. The scan is page-bounded. The core reaches
+  it only when a charge threw an error and no confirming webhook arrived after it.
 - `getOffSessionCharge` calls `getPayment` directly with the recorded payment reference. It reports
   the same statuses. The core uses it wherever it already stored that reference. The method asserts
   that the payment carries the expected `chargeKey`. It fails loudly on a mismatch, and it does not
@@ -738,8 +739,13 @@ applied credits inside the period-advance transaction.
 
 The off-session charge uses an `Idempotence-Key` that is stable for each pair of subscription and
 period. Its form is `renewal:{subId}:{anchorMs}`, and it is also the unique `provider_event_id` of
-the renewal invoice. Thus a dunning retry reconciles the previous attempt with `findOffSessionCharge`
-instead of a second charge.
+the renewal invoice. Thus a dunning retry reconciles the previous attempt instead of making a second
+charge.
+
+A charge that throws an error also records that invoice, as `failed` with an empty payment reference.
+The deadline rejects the call of the core and does not cancel the socket, thus the provider can hold
+a payment that the core never saw. The confirming webhook writes the payment reference onto that row,
+and the dunning retry then reads that one payment with `getOffSessionCharge`.
 
 A charge that the provider accepts but does not capture (`pending`) becomes a pending invoice with NO
 period advance. The confirming webhook or the poll of the next scan resolves it. A captured payment

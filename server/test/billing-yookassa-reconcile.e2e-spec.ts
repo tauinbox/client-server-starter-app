@@ -23,6 +23,7 @@ import { FixedRating } from '../src/modules/billing/rating/fixed-rating.strategy
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
+import { DUNNING_RETRY_DELAY_MS } from '../src/modules/billing/renewals/renewal-queue.constants';
 import { YooKassaProvider } from '../src/modules/billing/providers/yookassa.provider';
 import { YOOKASSA_CLIENT } from '../src/modules/billing/providers/yookassa.client';
 import {
@@ -132,6 +133,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
   let provider: YooKassaProvider;
   let emit: jest.Mock;
   let createPayment: jest.Mock;
+  let getPaymentList: jest.Mock;
   let capturedMetadata: Record<string, unknown> | undefined;
 
   beforeEach(async () => {
@@ -202,7 +204,20 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
         metadata: capturedMetadata
       })
     );
-    const yoo = { createPayment, getPayment };
+    getPaymentList = jest.fn(() =>
+      Promise.resolve({
+        items: [
+          {
+            id: 'pay-1',
+            status: 'succeeded',
+            amount: { value: '990.00', currency: 'RUB' },
+            metadata: capturedMetadata
+          }
+        ],
+        next_cursor: undefined
+      })
+    );
+    const yoo = { createPayment, getPayment, getPaymentList };
     emit = jest.fn();
     const manager = makeManager(store);
 
@@ -267,6 +282,10 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
         {
           provide: getRepositoryToken(Subscription),
           useValue: {
+            update: (
+              where: Record<string, unknown>,
+              set: Record<string, unknown>
+            ) => manager.update(Subscription, where, set),
             findOne: (opts: { where: { id: string } }) =>
               Promise.resolve(
                 store.subscriptions.find((s) => s.id === opts.where.id) ?? null
@@ -351,5 +370,56 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
     const events = emit.mock.calls.map((c: unknown[]) => c[0]);
     expect(events).toContain(InvoicePaidEvent.name);
     expect(events).not.toContain(SubscriptionActivatedEvent.name);
+  });
+
+  it('reconciles a charge the deadline hid, from the reference its webhook recorded', async () => {
+    // The provider created the payment and our call never saw the response:
+    // rejecting the wrapper does not cancel the socket. Booking the period
+    // unpaid is what gives the confirming webhook a row to write the reference
+    // onto, so the retry reads that one payment instead of walking the shop.
+    createPayment.mockImplementationOnce(
+      (payload: { metadata?: Record<string, unknown> }) => {
+        capturedMetadata = payload.metadata;
+        return Promise.reject(new Error('deadline exceeded'));
+      }
+    );
+
+    await renewals.runDueRenewals(NOW);
+
+    expect(store.subscriptions[0].status).toBe('past_due');
+    expect(store.subscriptions[0].dunningAttempts).toBe(1);
+    expect(store.invoices).toHaveLength(1);
+    expect(store.invoices[0]).toMatchObject({
+      status: 'failed',
+      providerInvoiceRef: ''
+    });
+
+    const event = await provider.verifyAndParseWebhook(
+      Buffer.from(
+        JSON.stringify({ event: 'payment.succeeded', object: { id: 'pay-1' } })
+      )
+    );
+    if (event === null || event === WEBHOOK_IGNORED) {
+      throw new Error(`Expected a reducible event, got ${String(event)}`);
+    }
+    await reducer.reduce(event);
+
+    expect(store.invoices).toHaveLength(1);
+    expect(store.invoices[0].providerInvoiceRef).toBe('pay-1');
+
+    getPaymentList.mockClear();
+    await renewals.runDueRenewals(
+      new Date(NOW.getTime() + DUNNING_RETRY_DELAY_MS)
+    );
+
+    expect(getPaymentList).not.toHaveBeenCalled();
+    expect(createPayment).toHaveBeenCalledTimes(1);
+    expect(store.invoices).toHaveLength(1);
+    expect(store.invoices[0]).toMatchObject({
+      status: 'paid',
+      providerInvoiceRef: 'pay-1'
+    });
+    expect(store.subscriptions[0].status).toBe('active');
+    expect(store.subscriptions[0].dunningAttempts).toBe(0);
   });
 });

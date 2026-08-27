@@ -29,9 +29,9 @@ export function changeRefundKey(
  * Whether the flow behind `chargeKey` records its invoice row BEFORE asking the
  * provider for the money. Only such a flow can read "the confirming webhook
  * matched no invoice" as an anomaly worth alerting on: the renewal and
- * closing-cancel charges (`renewal:`, `cancel:`) record after the provider
- * answers, so a webhook that wins that race routinely finds nothing and the
- * local path inserts moments later.
+ * closing-cancel charges (`renewal:`, `cancel:`) record once the provider has
+ * answered or thrown, so a webhook that wins that race routinely finds nothing
+ * and the local path inserts moments later.
  */
 export function isPlantedBeforeCharge(chargeKey: string): boolean {
   return chargeKey.startsWith(CHANGE_CHARGE_KEY_PREFIX);

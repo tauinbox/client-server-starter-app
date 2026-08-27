@@ -69,9 +69,12 @@ const OFF_SESSION_PURPOSE = 'off_session';
  * Page cap on the shop-wide scan that locates a charge whose payment reference
  * was never recorded, at 100 payments a page. It bounds a walk the provider
  * cannot narrow — `getPaymentList` filters on `created_at`, `captured_at`,
- * `payment_method` and `status` only, none of which select a customer or a
- * metadata key — so the reachable window is the shop's whole payment volume
- * since the period anchor.
+ * `payment_method` and `status` only, none of which select a customer, a
+ * payment id or a metadata key — so the reachable window is the shop's whole
+ * payment volume since the period anchor. A two-sided `created_at` range is
+ * available but unusable here: the deadline rejects our call without cancelling
+ * the socket, so the payment can be created after we recorded the failure, and
+ * a window that ends there would miss it and charge twice.
  */
 const OFF_SESSION_SCAN_MAX_PAGES = 20;
 
@@ -443,8 +446,8 @@ export class YooKassaProvider implements PaymentProvider {
   /**
    * YooKassa cannot look a payment up by its `Idempotence-Key` (the key store
    * lives ~24h, far shorter than the 3-day dunning spacing), so a charge whose
-   * reference was never recorded — an attempt that threw before writing its
-   * invoice row — is found by scanning the payment list for the `chargeKey`
+   * reference was never recorded — an attempt that threw and whose payment then
+   * produced no webhook — is found by scanning the payment list for the `chargeKey`
    * echoed through `metadata` by `chargeOffSession`. `canceled` payments are
    * skipped — a hard decline legitimately re-charges. Prefer
    * `getOffSessionCharge` whenever the reference is known.
