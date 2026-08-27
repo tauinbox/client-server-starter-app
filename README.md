@@ -1,6 +1,8 @@
 # Fullstack Starter App
 
-Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** server, using PostgreSQL via TypeORM. Provides a production-ready foundation with authentication, user management, and theming.
+A full-stack TypeScript monorepo. It has an **Angular 21** client and a **NestJS 11** server, and it
+uses PostgreSQL through TypeORM. It gives a production-ready foundation with authentication, user
+management and theming.
 
 ## Tech Stack
 
@@ -18,57 +20,303 @@ Full-stack TypeScript monorepo with **Angular 21** client and **NestJS 11** serv
 ## Features
 
 ### Authentication
-- Email/password registration and login
-- **Account lockout** — 5 consecutive failed login attempts lock the account for 15 minutes (HTTP 423 with countdown); the counter restarts once the window elapses, a completed password reset clears the lock, and an admin can unlock early via the user-edit page
-- **Email verification** — new registrations require email verification before login (HTTP 403); resend-verification endpoint; OAuth users marked verified only when the provider asserts `email_verified=true` for that same address (Google/Facebook), on account creation and on every later login alike; otherwise a verification email is sent and the flag stays false until the link is opened. Admin email changes via `PATCH /api/v1/users/:id` reset `isEmailVerified` to false, issue a new hashed verification token, and dispatch a fresh verification email; uniqueness is enforced server-side (HTTP 409 with `errorKey: errors.users.emailExists` and `field: 'email'`)
-- **Self-service email change** — users can change their own email from `/profile` via a two-step confirm-to-new flow: `POST /api/v1/auth/profile/email/initiate` (authenticated, throttled 3/hour, requires current password and rejects OAuth-only accounts) stores a hashed 1-hour token on the user row and sends a confirmation link to the new address + a no-link alert to the old address with the new address masked; `POST /api/v1/auth/profile/email/confirm` applies the change inside a transaction, re-checks uniqueness for the race window, revokes all refresh tokens, and notifies the old address. A partial unique index on `LOWER(pending_email)` and dual-email checks in `register` / `users.update` / `users.create` keep the `{email} ∪ {pendingEmail}` set globally unique. On the client one Save carries the whole form: a confirmed address change sends the initiate and the `PATCH /api/v1/auth/profile` for the name and password edits in sequence, initiate first, since a password update rehashes the credential the initiate verifies. The new endpoints are mirrored in `mock-server/` with the same response shapes and enumeration-safe behaviour.
-- **Password reset** — forgot-password sends a reset link (30-minute token expiry); reset invalidates all active sessions, clears any active lockout, and marks the address verified (redeeming a token mailed only to that address proves mailbox control, so an OAuth-created account recovers in one step instead of being answered 403)
-- **CAPTCHA soft-trigger on register / forgot-password** — Cloudflare Turnstile challenge activated server-side only when `X-RateLimit-Remaining ≤ 1` for the caller's IP, so legitimate users normally do not see it. **Disabled by default** — production activation requires a free Cloudflare account (the included test keys provide zero abuse protection in prod and are intended for local dev / CI only). Step-by-step deploy flow in [`server/README.md` → "Enabling CAPTCHA in production"](server/README.md#enabling-captcha-in-production). Client fetches the public site key from `GET /api/v1/auth/captcha-config` and lazy-loads the Turnstile script only when needed
-- **OAuth2 login via Google, Facebook, VK** — never auto-links to a pre-existing local account (account-takeover prevention); users must log in with their password and link the provider explicitly from their profile. Creates OAuth-only users for emails not yet registered. Any failed callback — an expired state cookie, a failed code exchange — returns the browser to `/login?oauth_error=auth_failed` instead of leaving it on an API error page. A declined consent screen is told apart from a genuine failure (`oauth_error=oauth_cancelled`, its own message), and a cancelled or failed **link** attempt returns to `/profile`, where it started, instead of dropping an already logged-in user on the login page
-- **Provider buttons are auto-gated by configuration** — each provider is exposed as a public feature flag (`oauth-google` / `oauth-facebook` / `oauth-vk`) carrying an attribute rule on a server-registered, env-derived signal (`oauth<Provider>Configured`, true when `*_CLIENT_ID` is set). A button shows only when the provider is configured **and** its flag is enabled (the manual override); the login page hides the whole OAuth block when none qualify, and the profile "connected accounts" card hides providers that are neither configured nor already linked. Admins toggle the flags from `/admin/feature-flags`
-- JWT access tokens (1h, stored in-memory only) + opaque refresh tokens (7d, stored as HttpOnly `SameSite=Strict` cookie — never readable by JavaScript)
-- Session restored on page reload via cookie-refresh in `provideAppInitializer` before route guards run
-- Automatic token refresh 60 seconds before expiry; a response that lands after the session was torn down is discarded instead of restoring it. The refresh window lives in `shared/` and the server floors `JWT_EXPIRATION` at twice it, so a token lifetime the client cannot schedule against is rejected at boot rather than turning every open tab into a refresh loop
-- 401 handling with request retry in JWT interceptor
-- **Reactive permission refresh on 403** — `errorInterceptor` detects mid-session 403s, silently re-fetches `/api/v1/auth/permissions`, updates `AuthStore.ability`, and retries the request; `RequirePermissionsDirective` reacts via Angular `effect()` without a page reload
-- **Real-time notifications via SSE** — `GET /api/v1/notifications/stream` (JWT-protected) pushes three event types: `session_invalidated` (force-logout on admin password change or user delete), `permissions_updated` (silent permissions re-fetch when a user's roles change or when a role they hold has its permission set changed — fanned out to every connected holder of that role), `user_crud_events` (admin user list auto-refresh on create/update/delete/restore — delivered only to connected clients whose current abilities allow `users:search`, so ordinary users never see them). Client uses `HttpClient` with `observe: 'events'` so the existing JWT interceptor attaches the Bearer token; `NotificationsService` connects on login and disconnects on logout with exponential-backoff reconnect, and recycles the connection every 4–8 h (jittered) so the transport buffers Angular retains for the life of a request cannot grow unbounded on long-lived tabs
-- **Role-Based Access Control (RBAC)** — dynamic resources and actions with `@RegisterResource` auto-discovery; `isSuper` flag on roles replaces hardcoded admin bypass; `@Authorize(['action', 'Subject'])` typed tuples on server; `permissionGuard(action, subject)` + `instancePermissionGuard(action, subject, instanceFactory)` + `*appRequirePermissions="{ action, subject, instance? }"` directive on client; `/api/v1/rbac/` endpoints for managing resources and actions. `PermissionsGuard` attaches the built `AppAbility` to the request for downstream instance-level checks via `@CurrentAbility()`. Valid CASL subject names are auto-generated from `@RegisterResource` decorators into `shared/src/generated/casl-subjects.ts`
-- `GET /api/v1/auth/permissions` returns CASL packed rules; client hydrates into `AppAbility` at bootstrap before route activation
-- OAuth account management (link/unlink providers in profile)
-- Server-side token cleanup via cron jobs
-- **Audit logging** — security-sensitive operations recorded to `audit_logs` table (login, registration, password changes, user/role management, OAuth events); nightly cleanup removes entries older than `AUDIT_LOG_RETENTION_DAYS` days (default 90)
-- **Feature flags** — dedicated subsystem for hiding in-development functionality and progressively rolling it out (specific users, roles, percentages, attributes, environments). `GET /api/v1/feature-flags` evaluates the flag set for the caller (authenticated → each flag they resolve true plus any `public` flag, with disabled non-public flags omitted; anonymous → only `public: true` flags). Admin CRUD at `/api/v1/admin/feature-flags` with optimistic locking via the `If-Match` header. Anonymous-user bucketing via the `nxs_anon_id` cookie (set automatically by `AnonIdMiddleware`) so a 10 % rollout of a public flag converges on the same 10 % of anonymous browsers across reloads. `FeatureFlagChangedListener` invalidates the cache on every change and coalesces the SSE broadcast of `{ type: 'feature_flags_updated' }` (a burst of changes triggers one synchronized client refetch, and the flag-list reload behind those refetches is single-flight); the per-user cache is keyed by a global version counter so changes orphan all per-user entries without needing Redis `SCAN MATCH` (Redis-backed deployments bump it with an atomic `INCR`, so simultaneous invalidations across instances cannot collapse into one version). A flag's `environments` are restricted to the names the server can actually run as and normalized on write, and an `attribute` rule's `value` must match a shape its operator can compare; both would otherwise store a rule that reads as active but can never match. The `AttributeRegistryService` is the extensibility seam — other modules call `registerAttribute('tenantId', resolver)` from `onModuleInit` to expose tenant / org / region / subscription-tier attributes to the evaluator. `@RequireFeature('key')` + `FeatureFlagGuard` is a convenience decorator for hiding routes entirely (returns HTTP 404 for anti-enumeration); RBAC remains the actual authorization gate. The Angular client mirrors the surface with `FeatureFlagsStore` (NgRx Signals, loaded at bootstrap on both authenticated and rehydration paths, plus a non-blocking load for anonymous visitors so public flags can gate landing-page previews), `featureFlagGuard(key, redirectTo?)` for route-level gating, `*nxsHasFeature="'key'"` structural directive with an optional `nxsHasFeatureElse` template, and `{{ 'key' | featureEnabled }}` pipe for attribute bindings; SSE-driven `reload()` propagates admin toggles to connected clients without a refresh, and `permissionsUpdated$` also triggers `reload()` so role-bound flags stay in sync after a role change
+
+- Registration and login with an email address and a password.
+- **Account lockout.** 5 sequential failed logins lock the account for 15 minutes. The answer is HTTP
+  423 with a countdown. The counter starts again when the window ends. A completed password reset
+  clears the lock. An administrator can also unlock the account from the user-edit page.
+- **Email verification.** A new registration requires email verification before the first login, and
+  a login before that answers HTTP 403. A resend-verification endpoint is available.
+
+  An OAuth user becomes verified only when the provider asserts `email_verified=true` for that same
+  address. Google and Facebook do this. The rule applies at the creation of the account and at each
+  later login. If the provider does not assert it, the server sends a verification email. The flag
+  then stays false until the user opens the link.
+
+  An administrator email change through `PATCH /api/v1/users/:id` sets `isEmailVerified` to false. It
+  makes a new hashed verification token and sends a new verification email. The server enforces the
+  uniqueness of the address. A conflict answers HTTP 409 with
+  `errorKey: errors.users.emailExists` and `field: 'email'`.
+- **Self-service email change.** A user can change their own email address from `/profile`. The flow
+  has two steps and confirms at the new address.
+
+  `POST /api/v1/auth/profile/email/initiate` needs authentication. It has a throttle of 3 calls each
+  hour. It requires the current password and rejects an account that has OAuth only. It stores a
+  hashed token on the user row for 1 hour. Then it sends a confirmation link to the new address. It
+  also sends an alert with no link to the old address, and it masks the new address there.
+
+  `POST /api/v1/auth/profile/email/confirm` applies the change inside a transaction. It checks the
+  uniqueness again for the race window. It revokes each refresh token, and it notifies the old
+  address.
+
+  A partial unique index on `LOWER(pending_email)` keeps the set of `{email}` and `{pendingEmail}`
+  globally unique. The dual-email checks in `register`, `users.update` and `users.create` do the
+  same.
+
+  On the client, one Save action carries the whole form. If the user confirms an address change, the
+  client sends the initiate request and the `PATCH /api/v1/auth/profile` request in sequence. The
+  initiate request goes first, because a password update makes a new hash of the credential that the
+  initiate request verifies.
+
+  `mock-server/` mirrors the new endpoints. It uses the same response shapes and the same
+  enumeration-safe behavior.
+- **Password reset.** The forgot-password flow sends a reset link, and the token expires in 30
+  minutes. The reset invalidates each active session, clears an active lockout, and marks the address
+  verified. The system mails the token only to that address, thus the redemption of the token proves
+  control of the mailbox. Thus an account that OAuth created recovers in one step, and the server does
+  not answer 403.
+- **A CAPTCHA soft trigger on register and forgot-password.** The server activates the Cloudflare
+  Turnstile challenge only when `X-RateLimit-Remaining` is 1 or less for the IP of the caller. Thus a
+  legitimate user usually does not see it.
+
+  The CAPTCHA is **disabled by default**. To activate it in production you need a free Cloudflare
+  account. The included test keys give no protection against abuse in production. Use them for local
+  development and for CI only. The deploy steps are in
+  [`server/README.md`, "Enabling CAPTCHA in production"](server/README.md#enabling-captcha-in-production).
+
+  The client reads the public site key from `GET /api/v1/auth/captcha-config`. It loads the Turnstile
+  script only when the script is necessary.
+- **OAuth2 login with Google, Facebook and VK.** The server never links a provider to an existing
+  local account automatically, because that prevents an account takeover. The user must log in with
+  their password and then link the provider from their profile.
+
+  For an email address with no account, the server makes an OAuth-only user.
+
+  A failed callback returns the browser to `/login?oauth_error=auth_failed`. It does not leave the
+  browser on an API error page. An expired state cookie and a failed code exchange are two such
+  failures.
+
+  The server separates a declined consent screen from a true failure. A declined screen gives
+  `oauth_error=oauth_cancelled` and its own message.
+
+  A canceled **link** attempt and a failed link attempt return to `/profile`, which is where the
+  attempt started. They do not leave an authenticated user on the login page.
+- **The configuration gates the provider buttons automatically.** Each provider is a public feature
+  flag: `oauth-google`, `oauth-facebook` or `oauth-vk`. Each flag has an attribute rule on a signal
+  that the server registers from the environment. The signal is `oauth<Provider>Configured`, and it is
+  true when `*_CLIENT_ID` has a value.
+
+  A button appears only when the provider is configured **and** its flag is enabled. The flag is the
+  manual override. The login page hides the full OAuth block when no provider qualifies. The
+  "connected accounts" card in the profile hides a provider that is neither configured nor already
+  linked. An administrator changes the flags at `/admin/feature-flags`.
+- A JWT access token lives 1 h and stays in memory only. An opaque refresh token lives 7 days. The
+  browser keeps it as an HttpOnly cookie with `SameSite=Strict`, thus JavaScript can never read it.
+- The app restores the session after a page reload. `provideAppInitializer` does a cookie refresh
+  before the route guards run.
+- The client refreshes the token automatically 60 seconds before the expiry. It discards a response
+  that arrives after the teardown of the session, and it does not restore the session.
+
+  The refresh window lives in `shared/`. The server sets the floor of `JWT_EXPIRATION` at two times
+  that window. Thus the server rejects a token lifetime that the client cannot schedule against, and
+  it does this at boot instead of turning each open tab into a refresh loop.
+- The JWT interceptor handles a 401 and retries the request.
+- **A reactive permission refresh on a 403.** `errorInterceptor` finds a 403 in the middle of a
+  session. It reads `/api/v1/auth/permissions` again silently, updates `AuthStore.ability`, and
+  retries the request. `RequirePermissionsDirective` reacts through an Angular `effect()` and needs no
+  page reload.
+- **Real-time notifications through SSE.** `GET /api/v1/notifications/stream` is JWT-protected. It
+  pushes three event types:
+  - `session_invalidated` forces a logout after an administrator changes a password or deletes a
+    user.
+  - `permissions_updated` starts a silent permissions read. The server sends it when the roles of a
+    user change, and when the permission set of a role that they hold changes. It goes to each
+    connected holder of that role.
+  - `user_crud_events` refreshes the administrator user list after a create, update, delete or
+    restore. The server sends it only to a connected client whose current abilities permit
+    `users:search`. Thus an ordinary user never sees these events.
+
+  The client uses `HttpClient` with `observe: 'events'`, thus the existing JWT interceptor attaches
+  the Bearer token. `NotificationsService` connects at login and disconnects at logout, and it
+  reconnects with exponential backoff. It also recycles the connection each 4 h to 8 h, with jitter.
+  Angular keeps the transport buffers for the life of a request, thus the recycle stops unbounded
+  growth on a tab that stays open.
+- **Role-Based Access Control (RBAC).** The resources and the actions are dynamic, and
+  `@RegisterResource` discovers them automatically. The `isSuper` flag on a role replaces a hardcoded
+  administrator bypass.
+
+  On the server, `@Authorize(['action', 'Subject'])` takes a typed tuple. On the client there are
+  `permissionGuard(action, subject)`, `instancePermissionGuard(action, subject, instanceFactory)` and
+  the `*appRequirePermissions="{ action, subject, instance? }"` directive. The `/api/v1/rbac/`
+  endpoints manage the resources and the actions.
+
+  `PermissionsGuard` attaches the `AppAbility` object to the request. A downstream instance-level
+  check reads it with `@CurrentAbility()`. A script generates the valid CASL subject names from the
+  `@RegisterResource` decorators into `shared/src/generated/casl-subjects.ts`.
+- `GET /api/v1/auth/permissions` returns the packed CASL rules. The client hydrates them into
+  `AppAbility` at bootstrap, before the route activation.
+- The profile page manages the OAuth accounts. A user can link a provider and unlink a provider.
+- Cron jobs on the server clean up the tokens.
+- **Audit logging.** The server records a security-sensitive operation in the `audit_logs` table.
+  Examples are a login, a registration, a password change, user and role management, and an OAuth
+  event. A nightly cleanup removes an entry that is older than `AUDIT_LOG_RETENTION_DAYS` days. The
+  default is 90.
+- **Feature flags.** This subsystem hides functionality that is in development. It also rolls
+  functionality out progressively to a specific user, a role, a percentage, an attribute or an
+  environment.
+
+  `GET /api/v1/feature-flags` evaluates the flag set for the caller. An authenticated caller gets each
+  flag that resolves true, plus each `public` flag. The server omits a disabled non-public flag. An
+  anonymous caller gets the `public: true` flags only.
+
+  The administrator CRUD is at `/api/v1/admin/feature-flags`. It uses optimistic locking through the
+  `If-Match` header.
+
+  An anonymous user goes into a bucket by the `nxs_anon_id` cookie, which `AnonIdMiddleware` sets
+  automatically. Thus a 10 % rollout of a public flag converges on the same 10 % of anonymous
+  browsers across reloads.
+
+  `FeatureFlagChangedListener` invalidates the cache on each change. It also coalesces the SSE
+  broadcast of `{ type: 'feature_flags_updated' }`, thus a burst of changes causes one synchronized
+  client refetch. The flag-list reload behind those refetches is single-flight.
+
+  The per-user cache is keyed by a global version counter. Thus a change orphans each per-user entry
+  and needs no Redis `SCAN MATCH`. A deployment with Redis increases the counter with an atomic
+  `INCR`, thus simultaneous invalidations across instances cannot collapse into one version.
+
+  The `environments` of a flag are restricted to the names that the server can run as, and the server
+  normalizes them on a write. The `value` of an `attribute` rule must have a shape that its operator
+  can compare. Without these two rules, the system stores a rule that looks active but can never
+  match.
+
+  `AttributeRegistryService` is the extensibility seam. Another module calls
+  `registerAttribute('tenantId', resolver)` from `onModuleInit`. Thus it gives a tenant, an
+  organization, a region or a subscription-tier attribute to the evaluator.
+
+  `@RequireFeature('key')` with `FeatureFlagGuard` is a convenience decorator that hides a route
+  completely. It returns HTTP 404 against enumeration. RBAC stays the true authorization gate.
+
+  The Angular client mirrors the surface. `FeatureFlagsStore` uses NgRx Signals. It loads at bootstrap
+  on the authenticated path and on the rehydration path. It also does a non-blocking load for an
+  anonymous visitor, thus a public flag can gate a preview on the landing page. The other pieces are
+  `featureFlagGuard(key, redirectTo?)` for a route gate, the `*nxsHasFeature="'key'"` structural
+  directive with an optional `nxsHasFeatureElse` template, and the `{{ 'key' | featureEnabled }}` pipe
+  for an attribute binding.
+
+  An SSE event starts `reload()`, thus an administrator toggle reaches a connected client with no
+  refresh. `permissionsUpdated$` also starts `reload()`, thus a role-bound flag stays correct after a
+  role change.
 
 ### Admin Panel
-- **Role management** — tabbed `/admin` shell (`AdminPanelComponent`) with "Users", "Roles", and "Resources" tabs. Role list with create/edit/delete dialogs; `RolePermissionsDialogComponent` assigns permissions to roles with optional CASL conditions (ownership, fieldMatch, userAttr, custom)
-- **Resource/Action management** — "Manage Resources" tab at `/admin/resources` (requires `read:Permission`). Resources table allows editing display name, description, and allowed actions per resource (`allowedActionNames`); Actions table supports create, edit, and delete of non-default actions. Each mutation refreshes `RbacMetadataStore` automatically
-- **Billing console** — "Billing" tab at `/admin/billing` (requires `manage:Billing`, hidden behind the public `billing` flag). Read-only tables of every customer's subscriptions and invoices (desktop table / handset cards) with the two M1 mutations: cancel a subscription (end-of-period or immediate, via a confirm dialog; a subscription that is no longer open is refused with a conflict instead of being cancelled twice) and refund a paid invoice. Both lists are cursor-paginated behind an infinite scroll, each backed by its own store, so the page never reads a whole table. Fully internationalized (EN / RU)
-- **CASL condition editors** — all four condition types supported in the permissions dialog: `ownership` checkbox, `fieldMatch` / `userAttr` JSON editors, and a `custom` visual condition builder with field/operator/value form, nested `$or`/`$and` groups, JSON preview, and raw JSON fallback toggle. The `ownership` / `fieldMatch` / `userAttr` editors validate the condition shape inline (shared `permission-condition-shape.ts` finders — the same rules the server DTO enforces), so a malformed condition (e.g. a `fieldMatch` value that is not a non-empty array) blocks save with a translated error instead of a 400 round-trip
-- **Operator-safe `custom` conditions** — the `custom` branch runs `validateMongoQueryKeys()` on parsed user-supplied JSON before any merge, the same allow-list `PermissionConditionDto` applies on write: a `__proto__`/`constructor`/`prototype` key, any `$`-operator outside `ALLOWED_MONGO_OPERATORS` (`$where`, `$regex`, `$exists`, a typo), or a `$in`/`$nin` whose value is not an array of JSON scalars, vetoes the entire permission. Screening the runtime layer with the write layer's allow-list keeps a stored row from meaning one thing to CASL and another to the SQL list-filter translator, which cannot reproduce those operators — nor bind anything but a scalar into `IN (:...p)`, which is why the element rule `fieldMatch` has always enforced now applies to raw `custom` JSON too
-- **Condition translation** — each branch of `PermissionCondition` (ownership, fieldMatch, userAttr, custom) is translated to a MongoQuery by `resolveConditions()` in `server/src/modules/auth/casl/resolve-conditions.ts`, merged in that fixed order (later writes win, except the protected `ownership.userField` key — a collision on it vetoes the permission). To add a new condition type, add a branch to `resolveConditions()` and extend `PermissionCondition` in `shared/src/types/role.types.ts`
-- **Fail-closed condition resolution** — a condition that cannot be honored as authored vetoes the whole permission instead of degrading into a wider grant: a malformed branch shape (non-array / empty-array `fieldMatch` values, non-string `userAttr` attributes, empty or non-string `ownership.userField`, prototype-pollution keys, `$`-prefixed keys and attribute names), an unknown `userAttr` attribute, invalid/non-object `custom` JSON, a `custom` operator outside `ALLOWED_MONGO_OPERATORS`, or restriction branches that resolve to an empty query. Partial resolution is never registered — dropping just the malformed part would silently widen the intended restriction. A vetoed `deny` registers as an unconditional `cannot()` so a broken deny rule never silently disappears; only a branch-less condition object (bare `effect`) registers unconditionally
-- **A delegated grant cannot widen the caller's own condition** - an admin who holds a permission only under a condition (say `update:User` restricted to themselves) may hand that permission to a role under an equal or stricter condition, but not a broader one. The server compares the two as resolved queries and rejects anything that is not provably narrower with 403 (`errors.roles.conditionBroaderThanCaller`), closing the path where a delegated admin mints a role with a wider condition and assigns it to themselves. Supers are unaffected
-- **Identity-bound conditions are rejected on a `create` grant** - `ownership` and `userAttr` both resolve to the acting user's id, which a record that does not exist yet can never carry, so attaching either to a `create` permission denies every create instead of restricting it. `RoleService` rejects such a grant with 400 (`errors.roles.conditionNotApplicable`) on both permission-write routes (`PUT/POST /roles/:id/permissions`), for every caller including supers, and the mock server mirrors it. `fieldMatch` and `custom` stay usable on `create` - they are evaluated against the submitted payload by the instance-level check on `POST /users`
-- **Condition shape validation at input** — `PermissionConditionDto` enforces the inner shape of `ownership` / `fieldMatch` / `userAttr` (shared finders in `shared/src/utils/permission-condition-shape.ts`, also used by the client editors and the mock server), so a partially malformed condition (e.g. `{"status": ["active"], "dept": "sales"}` — forgotten array brackets) is rejected with 400 at authoring time instead of silently registering a wider rule. A key starting with `$` is rejected the same way in all three branches: it would land in field position of the resolved MongoQuery and be read as an operator, making an allow grant nothing and a deny stop denying
+
+- **Role management.** `/admin` is a tabbed shell (`AdminPanelComponent`) with the tabs "Users",
+  "Roles" and "Resources". The role list has create, edit and delete dialogs.
+  `RolePermissionsDialogComponent` assigns the permissions to a role with optional CASL conditions:
+  ownership, fieldMatch, userAttr and custom.
+- **Resource and action management.** The "Manage Resources" tab is at `/admin/resources` and needs
+  `read:Permission`. The Resources table edits the display name, the description and the allowed
+  actions of each resource (`allowedActionNames`). The Actions table creates, edits and deletes a
+  non-default action. Each mutation refreshes `RbacMetadataStore` automatically.
+- **Billing console.** The "Billing" tab is at `/admin/billing`. It needs `manage:Billing`, and the
+  public `billing` flag hides it. It shows read-only tables of the subscriptions and the invoices of
+  each customer, as a table on a desktop and as cards on a handset.
+
+  It has the two M1 mutations. The first cancels a subscription, at the end of the period or
+  immediately, through a confirmation dialog. If the subscription is no longer open, the server
+  answers with a conflict and does not cancel it a second time. The second refunds a paid invoice.
+
+  Each list is cursor-paginated behind an infinite scroll, and each has its own store. Thus the page
+  never reads a whole table. The console has full EN and RU translations.
+- **CASL condition editors.** The permissions dialog supports the four condition types. `ownership`
+  is a checkbox. `fieldMatch` and `userAttr` are JSON editors. `custom` is a visual condition builder
+  with a field, operator and value form, nested `$or` and `$and` groups, a JSON preview, and a toggle
+  to raw JSON.
+
+  The `ownership`, `fieldMatch` and `userAttr` editors validate the shape of the condition inline. They
+  use the shared finders of `permission-condition-shape.ts`, which are the rules that the server DTO
+  applies. Thus a malformed condition blocks the save with a translated error and needs no 400 round
+  trip. An example of a malformed condition is a `fieldMatch` value that is not a non-empty array.
+- **Operator-safe `custom` conditions.** The `custom` branch runs `validateMongoQueryKeys()` on the
+  parsed JSON from the user before any merge. That is the same allow-list that
+  `PermissionConditionDto` applies on a write.
+
+  Three inputs veto the whole permission: a `__proto__`, `constructor` or `prototype` key; a
+  `$`-operator outside `ALLOWED_MONGO_OPERATORS`, such as `$where`, `$regex`, `$exists` or a typo; and
+  a `$in` or `$nin` whose value is not an array of JSON scalars.
+
+  The runtime layer uses the allow-list of the write layer. Thus a stored row cannot mean one thing to
+  CASL and a different thing to the SQL list-filter translator. That translator cannot reproduce those
+  operators. It also cannot bind anything except a scalar into `IN (:...p)`. For that reason the
+  element rule of `fieldMatch` now also applies to raw `custom` JSON.
+- **Condition translation.** `resolveConditions()` in
+  `server/src/modules/auth/casl/resolve-conditions.ts` translates each branch of `PermissionCondition`
+  to a MongoQuery. The branches are ownership, fieldMatch, userAttr and custom. The function merges
+  them in that fixed order, and a later branch wins. The `ownership.userField` key is protected: a
+  collision on it vetoes the permission. To add a new condition type, add a branch to
+  `resolveConditions()` and extend `PermissionCondition` in `shared/src/types/role.types.ts`.
+- **Fail-closed condition resolution.** A condition that the system cannot honor as it is authored
+  vetoes the whole permission. It never degrades into a wider grant.
+
+  These inputs veto the permission: a malformed branch shape, an unknown `userAttr` attribute, invalid
+  or non-object `custom` JSON, a `custom` operator outside `ALLOWED_MONGO_OPERATORS`, and a
+  restriction branch that resolves to an empty query. A malformed branch shape is a `fieldMatch` value
+  that is not an array or that is an empty array, a `userAttr` attribute that is not a string, an
+  `ownership.userField` that is empty or not a string, a prototype-pollution key, or a `$`-prefixed
+  key or attribute name.
+
+  The system never registers a partial resolution. A drop of the malformed part alone widens the
+  intended restriction silently.
+
+  A vetoed `deny` registers as an unconditional `cannot()`. Thus a broken deny rule never disappears
+  silently. Only a condition object with no branch (a bare `effect`) registers unconditionally.
+- **A delegated grant cannot widen the condition of the caller.** An administrator can hold a
+  permission under a condition, for example `update:User` restricted to themselves. That administrator
+  can give the permission to a role under an equal condition or a stricter condition. They cannot give
+  it under a broader condition.
+
+  The server compares the two as resolved queries. It rejects anything that is not provably narrower
+  with a 403 and `errors.roles.conditionBroaderThanCaller`. Thus a delegated administrator cannot make
+  a role with a wider condition and give that role to themselves. A super role is not affected.
+- **The server rejects an identity-bound condition on a `create` grant.** `ownership` and `userAttr`
+  both resolve to the id of the acting user. A record that does not exist yet can never carry that id.
+  Thus one of these conditions on a `create` permission denies each create instead of restricting it.
+
+  `RoleService` rejects such a grant with a 400 and `errors.roles.conditionNotApplicable`. It does this
+  on the two permission-write routes, `PUT /roles/:id/permissions` and `POST /roles/:id/permissions`,
+  for each caller and for a super role. The mock server mirrors the rule.
+
+  `fieldMatch` and `custom` stay usable on `create`. The instance-level check on `POST /users`
+  evaluates them against the submitted payload.
+- **Condition shape validation at the input.** `PermissionConditionDto` enforces the inner shape of
+  `ownership`, `fieldMatch` and `userAttr`. It uses the shared finders in
+  `shared/src/utils/permission-condition-shape.ts`, which the client editors and the mock server also
+  use.
+
+  Thus the server rejects a partly malformed condition with a 400 at authoring time. It does not
+  register a wider rule silently. An example is `{"status": ["active"], "dept": "sales"}`, where the
+  author forgot the array brackets.
+
+  A key that starts with `$` is rejected in the same way in the three branches. Such a key lands in
+  the field position of the resolved MongoQuery, and the engine reads it as an operator. An allow
+  grant then gives nothing, and a deny rule then stops denying.
 
 ### CASL Permission Conditions
 
-The project uses [CASL](https://casl.js.org) (`@casl/ability` v6) with `MongoAbility` — a variant that evaluates conditions using **MongoDB query syntax** (operators like `$in`, `$lt`, `$or`, etc.). This is a pure in-memory evaluation engine (via `@ucast/mongo2js`, bundled inside CASL v6) — **no actual MongoDB database is involved**.
+The project uses [CASL](https://casl.js.org) (`@casl/ability` v6) with `MongoAbility`. That variant
+evaluates a condition with the **MongoDB query syntax**, which has operators such as `$in`, `$lt` and
+`$or`. This is a pure in-memory evaluation engine, through `@ucast/mongo2js` inside CASL v6. **No
+MongoDB database is involved.**
 
-#### How Conditions Work
+#### How conditions work
 
-Each permission assigned to a role can optionally have a `conditions` object (stored as JSONB in `role_permissions.conditions`). When the server builds the CASL ability for a user, conditions are translated into MongoDB-style queries that CASL evaluates at runtime against entity instances.
+Each permission on a role can have an optional `conditions` object. The database keeps it as JSONB in
+`role_permissions.conditions`.
+
+When the server builds the CASL ability of a user, it translates each condition into a MongoDB-style
+query. CASL then evaluates that query against an entity instance at run time.
 
 ```
-Without conditions:     can('update', 'User')                         → allows updating ANY user
-With conditions:        can('update', 'User', { id: currentUserId })  → allows updating ONLY own record
+Without conditions:     can('update', 'User')                         -> allows updating ANY user
+With conditions:        can('update', 'User', { id: currentUserId })  -> allows updating ONLY own record
 ```
 
-The client receives packed CASL rules via `GET /api/v1/auth/permissions`, unpacks them into `AppAbility`, and evaluates the same conditions locally — so UI elements (Edit/Delete buttons) hide/show consistently with what the server enforces.
+The client reads the packed CASL rules from `GET /api/v1/auth/permissions`. It unpacks them into
+`AppAbility` and evaluates the same conditions locally. Thus a UI element, such as an Edit button or a
+Delete button, appears exactly when the server permits the operation.
 
-#### Condition Types
+#### Condition types
 
-Type definition (`shared/src/types/role.types.ts`):
+The type definition is in `shared/src/types/role.types.ts`:
 
 ```typescript
 type PermissionCondition = {
@@ -80,31 +328,33 @@ type PermissionCondition = {
 };
 ```
 
-All four condition types can be combined on a single permission — they are merged into one query with implicit AND logic. The separate `effect` flag controls whether the resulting rule is a CASL `can()` (allow) or `cannot()` (deny) — see "Deny Rules" below.
+You can combine the four condition types on one permission. The system merges them into one query
+with an implicit AND. The separate `effect` flag says whether the rule becomes a CASL `can()` (allow)
+or a CASL `cannot()` (deny). Refer to "Deny rules" below.
 
 ---
 
-**Type 1: `ownership`** — restrict access to records owned by the current user
+**Type 1: `ownership`.** It restricts access to the records that the current user owns.
 
-Sets `query[userField] = userId` where `userId` is the authenticated user's ID.
+It sets `query[userField] = userId`, where `userId` is the id of the authenticated user.
 
 | Admin UI | JSON stored |  Generated CASL rule |
 |----------|-------------|---------------------|
-| Checkbox + field name input (default: `"id"`) | `{ "ownership": { "userField": "id" } }` | `can('update', 'User', { id: '<userId>' })` |
+| Checkbox with a field-name input (default: `"id"`) | `{ "ownership": { "userField": "id" } }` | `can('update', 'User', { id: '<userId>' })` |
 
 Examples:
 
 | Scenario | userField | Effect |
 |----------|-----------|--------|
-| User can edit own profile | `"id"` | `User.id` must match current user's ID |
-| Author can edit own posts | `"authorId"` | `Post.authorId` must match |
-| Manager sees own team | `"managerId"` | `Team.managerId` must match |
+| A user edits their own profile | `"id"` | `User.id` must be equal to the id of the current user |
+| An author edits their own posts | `"authorId"` | `Post.authorId` must be equal |
+| A manager sees their own team | `"managerId"` | `Team.managerId` must be equal |
 
 ---
 
-**Type 2: `fieldMatch`** — restrict access based on specific field values (allowlist)
+**Type 2: `fieldMatch`.** It restricts access by the values of a field. It is an allowlist.
 
-Each field is translated to a `$in` operator: `query[field] = { $in: values }`.
+The system translates each field to a `$in` operator: `query[field] = { $in: values }`.
 
 | Admin UI | JSON stored | Generated CASL rule |
 |----------|-------------|---------------------|
@@ -114,35 +364,42 @@ Examples:
 
 | Scenario | Configuration | Effect |
 |----------|--------------|--------|
-| Support sees only active users | `{ "isActive": [true] }` | Can only read users where `isActive === true` |
-| Editor manages draft/review posts | `{ "status": ["draft", "review"] }` | Cannot touch published posts |
-| Regional manager | `{ "region": ["EU", "NA"] }` | Access limited to EU and NA records |
+| Support sees the active users only | `{ "isActive": [true] }` | Can read a user only when `isActive === true` |
+| An editor manages draft and review posts | `{ "status": ["draft", "review"] }` | Cannot touch a published post |
+| A regional manager | `{ "region": ["EU", "NA"] }` | Access is limited to the EU and NA records |
 
 ---
 
-**Type 3: `userAttr`** — map a record field to a user attribute
+**Type 3: `userAttr`.** It maps a field of a record to an attribute of the user.
 
-Resolves the attribute name from a user context object: `query[field] = userContext[attrName]`.
+It resolves the attribute name from a user context object: `query[field] = userContext[attrName]`.
 
 | Admin UI | JSON stored | Generated CASL rule |
 |----------|-------------|---------------------|
 | JSON textarea | `{ "userAttr": { "createdBy": "id" } }` | `can('update', 'User', { createdBy: '<userId>' })` |
 
-Currently available user context attributes: `{ id: userId }`. To add more (e.g., `departmentId`, `tenantId`), extend the `userContext` object in `CaslAbilityFactory.createForUser()`.
+The user context currently has one attribute: `{ id: userId }`. To add more, for example
+`departmentId` or `tenantId`, extend the `userContext` object in
+`CaslAbilityFactory.createForUser()`.
 
-Difference from `ownership`: `ownership` always maps to `userId`. `userAttr` maps to any user attribute — once more attributes are added to userContext, this becomes the most flexible built-in type.
+The difference from `ownership`: `ownership` always maps to `userId`. `userAttr` maps to any attribute
+of the user. When the user context has more attributes, this becomes the most flexible built-in type.
 
 ---
 
-**Type 4: `custom`** — raw MongoDB query for complex conditions
+**Type 4: `custom`.** It is a raw MongoDB query for a complex condition.
 
-The value is a **JSON string** (stringified MongoDB query). It is parsed and merged key-by-key into the condition query.
+The value is a **JSON string**, that is a MongoDB query in string form. The system parses it and
+merges it into the condition query key by key.
 
 | Admin UI | JSON stored | Generated CASL rule |
 |----------|-------------|---------------------|
 | JSON textarea with validation | `{ "custom": "{\"price\":{\"$lt\":100}}" }` | `can('update', 'Product', { price: { $lt: 100 } })` |
 
-**Supported MongoDB operators** — the only operators accepted in `custom` conditions. The set is deliberately limited to operators the server-side SQL list-filter can reproduce faithfully (see the note below), so a condition behaves the same whether it is checked against a single record or used to filter a list:
+**Supported MongoDB operators.** These are the only operators that a `custom` condition accepts. The
+set is intentionally small. It holds only the operators that the SQL list-filter on the server can
+reproduce exactly. Refer to the note below. Thus a condition behaves the same against one record and
+as a filter on a list.
 
 | Operator | Meaning | Example |
 |----------|---------|---------|
@@ -155,7 +412,7 @@ The value is a **JSON string** (stringified MongoDB query). It is parsed and mer
 | `$in` | In array | `{ "status": { "$in": ["active", "pending"] } }` |
 | `$nin` | Not in array | `{ "role": { "$nin": ["admin", "super"] } }` |
 
-**Logical operators** (combine multiple conditions):
+**Logical operators.** They combine two or more conditions:
 
 | Operator | Meaning | Example |
 |----------|---------|---------|
@@ -164,15 +421,37 @@ The value is a **JSON string** (stringified MongoDB query). It is parsed and mer
 | `$nor` | None must match | `{ "$nor": [{ "status": "archived" }, { "status": "deleted" }] }` |
 | `$not` | Negation | `{ "price": { "$not": { "$gt": 1000 } } }` |
 
-Security: prototype pollution keys (`__proto__`, `constructor`, `prototype`) are silently skipped during parsing.
+Security: the parser skips a prototype-pollution key silently. Those keys are `__proto__`,
+`constructor` and `prototype`.
 
-> **Server-side SQL translation (`apply-ability.util.ts`)** — when CASL conditions are translated into SQL `WHERE` fragments for the user listing, the translator supports exactly the operators above (`$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$and`, `$or`, `$nor`, `$not`) against the user fields `id`, `email`, `firstName`, `lastName`, `isActive`. Input validation rejects any other operator up front, so the accepted set and the translatable set are identical (a drift-guard test enforces this). Operands must be scalars on both sides: a comparison value and every element of a `$in`/`$nin` array are checked, since only a scalar can be bound into `IN (:...p)`. As defense-in-depth for pre-existing data, any rule using an unsupported operator or field, or a list holding a non-scalar element, is still **dropped entirely** (fail-closed) and a warning is logged. Run `npm run check:role-conditions` (in `server/`) against a staging dump to surface any existing rows that would be affected.
+> **SQL translation on the server (`apply-ability.util.ts`).** The translator makes an SQL `WHERE`
+> fragment from the CASL conditions for the user listing. It supports exactly the operators above,
+> that is `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$and`, `$or`, `$nor` and `$not`.
+> It supports them against the user fields `id`, `email`, `firstName`, `lastName` and `isActive`.
 >
-> `deny` rules are translated too: allow and deny groups are built separately and combined as `allow AND NOT deny`, so a deny narrows the listing exactly as it narrows a single-record check. An unconditional deny reduces the listing to no rows. The fail-closed rule is asymmetric — dropping an untranslatable allow only narrows the result, but dropping a deny would widen it, so an untranslatable deny reduces the whole query to no rows instead of being skipped.
+> The input validation rejects each other operator at the start. Thus the accepted set and the
+> translatable set are identical, and a drift-guard test enforces this.
+>
+> An operand must be a scalar on the two sides. The translator checks a comparison value and each
+> element of a `$in` or `$nin` array, because only a scalar can go into `IN (:...p)`.
+>
+> As defense in depth for data that already exists, the translator **drops** a rule that uses an
+> operator or a field that it does not support, and a rule with a list that holds a non-scalar
+> element. This is fail-closed, and the server logs a warning. Run
+> `npm run check:role-conditions` in `server/` against a staging dump. It shows each existing row that
+> this rule affects.
+>
+> The translator also translates a `deny` rule. It builds the allow group and the deny group
+> separately and combines them as `allow AND NOT deny`. Thus a deny narrows the listing exactly as it
+> narrows a check on one record. An unconditional deny reduces the listing to no rows.
+>
+> The fail-closed rule is asymmetric. A drop of an untranslatable allow only narrows the result. A
+> drop of a deny widens it. Thus an untranslatable deny reduces the whole query to no rows, and the
+> translator does not skip it.
 
-#### Combining Multiple Condition Types
+#### Combining more than one condition type
 
-Multiple types on the same permission are merged into one query (AND):
+The system merges the types on one permission into one query with an AND:
 
 ```json
 {
@@ -182,7 +461,7 @@ Multiple types on the same permission are merged into one query (AND):
 }
 ```
 
-Produces:
+This gives:
 ```
 can('update', 'User', {
   id: '<userId>',                              // from ownership
@@ -191,27 +470,42 @@ can('update', 'User', {
 })
 ```
 
-Meaning: user can update only their own record, only if it's active, and only if the email matches the company domain.
+The meaning: the user can update only their own record, only while that record is active, and only
+when the email address is in the company domain.
 
-**Conflict resolution:** if the same field key appears in multiple condition types, later types overwrite earlier ones. Processing order: ownership → fieldMatch → userAttr → custom. Exception: the `ownership.userField` key is protected — a `fieldMatch`, `userAttr`, or `custom` entry on that key would replace the owner-scoping predicate with a broader one, so the whole permission is vetoed (fail closed) instead.
+**Conflict resolution.** If the same field key is in more than one condition type, a later type
+overwrites an earlier type. The processing order is ownership, then fieldMatch, then userAttr, then
+custom.
 
-#### Practical Examples
+There is one exception. The `ownership.userField` key is protected. A `fieldMatch`, `userAttr` or
+`custom` entry on that key replaces the owner-scoping predicate with a broader predicate. Thus the
+system vetoes the whole permission and fails closed.
+
+#### Practical examples
 
 | # | Scenario | Resource | Action | Condition | Result |
 |---|----------|----------|--------|-----------|--------|
-| 1 | User edits own profile | User | update | `{ "ownership": { "userField": "id" } }` | Edit button on own record only (default seed config) |
-| 2 | Moderator deletes inactive users | User | delete | `{ "fieldMatch": { "isActive": [false] } }` | Delete button on inactive records only |
-| 3 | Editor updates cheap products | Product | update | `{ "custom": "{\"price\":{\"$lt\":100}}" }` | Edit allowed only when `price < 100` |
-| 4 | Support sees active EU/NA users | User | read | `{ "fieldMatch": { "isActive": [true] }, "custom": "{\"$or\":[{\"region\":\"EU\"},{\"region\":\"NA\"}]}" }` | Filtered to active users in EU or NA |
-| 5 | Manager manages users they created | User | update | `{ "userAttr": { "createdBy": "id" } }` | Only records where `createdBy === managerId` |
+| 1 | A user edits their own profile | User | update | `{ "ownership": { "userField": "id" } }` | The Edit button appears on their own record only. This is the default seed configuration |
+| 2 | A moderator deletes inactive users | User | delete | `{ "fieldMatch": { "isActive": [false] } }` | The Delete button appears on an inactive record only |
+| 3 | An editor updates inexpensive products | Product | update | `{ "custom": "{\"price\":{\"$lt\":100}}" }` | The edit is permitted only while `price < 100` |
+| 4 | Support sees active EU and NA users | User | read | `{ "fieldMatch": { "isActive": [true] }, "custom": "{\"$or\":[{\"region\":\"EU\"},{\"region\":\"NA\"}]}" }` | The list holds the active users in the EU or in NA |
+| 5 | A manager manages the users that they made | User | update | `{ "userAttr": { "createdBy": "id" } }` | Only a record where `createdBy === managerId` |
 
-#### Instance-Level Checks
+#### Instance-level checks
 
-**Server-side:** controllers inject `@CurrentAbility()` and pass it to the service, which loads the entity and calls `ability.can(action, entity)`. Returns 403 if denied. On `UsersService` the ability parameter is **required** (typed `AbilityOrSystem`), so a new caller cannot skip filtering or the instance check by omitting it — a caller that genuinely acts without a requesting principal (e.g. the self-service `PATCH /auth/profile`, whose target is pinned to the authenticated user) passes the explicit `SYSTEM_ABILITY` sentinel.
+**On the server,** a controller injects `@CurrentAbility()` and gives it to the service. The service
+loads the entity and calls `ability.can(action, entity)`. It returns a 403 on a denial.
 
-**Client-side** — three mechanisms:
+On `UsersService` the ability parameter is **necessary**, and its type is `AbilityOrSystem`. Thus a
+new caller cannot omit it and skip the filter or the instance check. A caller that truly acts with no
+requesting principal gives the explicit `SYSTEM_ABILITY` sentinel. The self-service
+`PATCH /auth/profile` route is such a caller, because its target is the authenticated user.
 
-1. **`*appRequirePermissions` directive** (templates) — evaluates per-row, supports an optional `else` template for rendering a fallback when access is denied (e.g. disabled button + tooltip instead of hiding it entirely):
+**On the client** there are three mechanisms.
+
+1. The **`*appRequirePermissions` directive** works in a template. It evaluates for each row. It
+   supports an optional `else` template, which shows a fallback when access is denied. An example is a
+   disabled button with a tooltip instead of no button at all:
    ```html
    <button
      *appRequirePermissions="
@@ -227,12 +521,12 @@ Meaning: user can update only their own record, only if it's active, and only if
    </ng-template>
    ```
 
-2. **`instancePermissionGuard`** (routes) — checks before route activation:
+2. **`instancePermissionGuard`** works on a route. It runs before the route activation:
    ```typescript
    canActivate: [instancePermissionGuard('update', 'User', (route) => ({ id: route.params['id'] }))]
    ```
 
-3. **Computed properties** (components with complex logic):
+3. A **computed property** works in a component with complex logic:
    ```typescript
    canManageUser = computed(() => {
      const u = this.user();
@@ -243,80 +537,286 @@ Meaning: user can update only their own record, only if it's active, and only if
    });
    ```
 
-#### Super Roles
+#### Super roles
 
-Roles with `isSuper: true` receive `can('manage', 'all')` — a CASL wildcard that bypasses all condition checks. All buttons visible, all routes accessible, all API calls allowed.
+A role with `isSuper: true` gets `can('manage', 'all')`. That is a CASL wildcard, and it bypasses each
+condition check. Each button is visible, each route is available, and each API call is permitted.
 
-This is the only path to a wildcard rule. `manage` and `all` are rejected as action names and `all` as a resource subject when they are written, and rejected again when rules are built: a stored permission carrying either keyword is skipped (and logged at `error`) if it is an allow, and kept if it is a deny, since inverting a wildcard only ever restricts. The mock server's rule packer applies the same guard.
+This is the only path to a wildcard rule. The system rejects `manage` and `all` as an action name, and
+`all` as a resource subject, when a person writes them. It rejects them again when it builds the
+rules. A stored permission that carries one of the two keywords is skipped when it is an allow, and
+the server logs this at `error` level. Such a permission is kept when it is a deny, because an
+inverted wildcard can only restrict. The rule packer of the mock server applies the same guard.
 
-#### Deny Rules (`effect: 'deny'`)
+#### Deny rules (`effect: 'deny'`)
 
-Any permission on a role can set `effect: 'deny'` in its `conditions` to register a CASL `cannot()` rule instead of a `can()` rule. The factory partitions rules allow-first, deny-last; CASL's last-matching-rule semantics mean a deny always overrides a prior allow for the same `(resource, action)` pair. Deny rules may carry the same MongoQuery conditions as allow rules (ownership / fieldMatch / userAttr / custom), so you can express patterns like:
+Any permission on a role can set `effect: 'deny'` in its `conditions`. The factory then registers a
+CASL `cannot()` rule instead of a `can()` rule.
 
-- Blanket deny after allow: Role A has `update:User` (allow, no conditions); Role B has `update:User` with `{ effect: 'deny' }` → net: cannot update any user.
-- Conditional deny: Role A has `update:User` with `{ ownership: { userField: 'createdBy' } }` (allow-own); Role B has `update:User` with `{ effect: 'deny', fieldMatch: { status: ['locked'] } }` → net: can update own records except when `status === 'locked'`.
+The factory puts the allow rules first and the deny rules last. CASL uses the last matching rule.
+Thus a deny always overrides an earlier allow for the same pair of resource and action.
 
-Expose the flag in the admin UI via the "Deny" toggle at the top of each permission's condition block in `RolePermissionsDialogComponent`.
+A deny rule can carry the same MongoQuery conditions as an allow rule, that is ownership, fieldMatch,
+userAttr and custom. Thus you can express these patterns:
 
-#### Multiple Roles and Condition Precedence
+- A blanket deny after an allow. Role A has `update:User` as an allow with no conditions. Role B has
+  `update:User` with `{ effect: 'deny' }`. The net result: the user cannot update any user.
+- A conditional deny. Role A has `update:User` with `{ ownership: { userField: 'createdBy' } }`, which
+  is an allow for their own records. Role B has `update:User` with
+  `{ effect: 'deny', fieldMatch: { status: ['locked'] } }`. The net result: the user can update their
+  own records, except when `status === 'locked'`.
 
-When a user has multiple roles, permissions are deduplicated by `effect:resource:action` key — so allow and deny rules for the same `(resource, action)` coming from different roles are preserved as separate entries. Within the same effect bucket, later roles override earlier ones; conditions are **not merged** across roles.
+The administrator UI shows the flag as the "Deny" toggle. The toggle is at the top of the condition
+block of each permission in `RolePermissionsDialogComponent`.
 
-Example: if Role A grants `update:User` with `{ ownership: { userField: "id" } }` and Role B grants `update:User` with no conditions — the user gets **unrestricted** `update:User` (Role B overrides Role A on the allow side).
+#### More than one role, and condition precedence
 
-To apply multiple restrictions simultaneously, either use `$and` in a single `custom` condition on one role, or move the extra restrictions to a separate role with `effect: 'deny'`.
+When a user has more than one role, the system deduplicates the permissions by the key
+`effect:resource:action`. Thus an allow rule and a deny rule for the same pair of resource and action,
+from two different roles, stay two separate entries.
+
+Inside the same effect bucket, a later role overrides an earlier role. The system does **not** merge
+the conditions across two roles.
+
+Example: Role A grants `update:User` with `{ ownership: { userField: "id" } }`. Role B grants
+`update:User` with no conditions. The user then gets **unrestricted** `update:User`, because Role B
+overrides Role A on the allow side.
+
+To apply more than one restriction at the same time, use one of two methods. Use `$and` in one
+`custom` condition on one role. Or move the additional restrictions to a separate role with
+`effect: 'deny'`.
 
 ### User Management (Admin)
-- **Unified Manage Users page** — inline filter form (single unified search field, role select, status) on the same page as the user list; empty filters load all users, filled filters trigger a search via `GET /users/search/cursor`. The `q` search is OR-matched across id/email/firstName/lastName; the `role` filter narrows to users having a role with that exact name
-- **Infinite scroll** with column sorting — loads 20 users at a time through the cursor endpoints; the shared `nxsInfiniteScroll` sentinel requests the next page as the user scrolls, and keeps filling until the viewport is covered or the server stops handing out cursors
-- User detail, edit, and **soft delete** — records are preserved with a `deleted_at` timestamp; all active sessions are revoked on delete; count decremented inline (no reload)
-- **Restore** soft-deleted users via `POST /users/:id/restore` — clears `deleted_at` only. An account deactivated before deletion comes back deactivated; reactivation stays a `PATCH /users/:id { "isActive": true }` operation, so holding `users:delete` alone cannot re-enable a disabled account through a delete/restore round trip
-- **"Include deleted users"** checkbox in the list filter form (`includeDeleted=true` on list and search). A deleted row shows a "Deleted" status chip and offers restore as its only action — the detail and edit endpoints exclude soft-deleted rows. Deleting a user while the filter is on flips the row in place instead of removing it
-- Role assignment in user edit form — multi-select field (visible to users with `assign:Role` permission); diffs initial vs selected roles and issues `POST /roles/assign/:userId` / `DELETE /roles/assign/:userId/:roleId` calls on save
-- **Effective permissions preview** — read-only `/admin/users/:id/permissions` page (linked from user detail) showing assigned roles, allow/deny/conditional summary chips, and a resource-grouped `mat-accordion` list of resolved permissions with per-rule action + effect chip and expandable CASL condition JSON; super-role users see a single "full access" note
-- **Cursor pagination is the standard for every list.** Each list endpoint takes `cursor`, `limit` (capped at 100), `sortBy` (whitelisted per entity in `shared/src/constants/sort-columns.constants.ts`) and `sortOrder`, and answers `{ data, meta: { nextCursor, hasMore, limit } }`. Server: `applyKeysetPagination` over a `(sortColumn, id)` tuple; client: `withCursorList` + the `nxsInfiniteScroll` sentinel, one store per list. A sortable column must be NOT NULL and must hold no precision the cursor cannot carry — timestamp sort keys are therefore `timestamptz(3)`, since the cursor encodes the value at millisecond precision. Covers users, the three billing lists and the roles / resources / actions / feature-flag catalogs. The offset envelope `{ data, meta: { page, limit, total, totalPages } }` is legacy and only still serves `GET /users` and `GET /users/search`. **Pickers are the deliberate exception:** a select, autocomplete or checkbox list that offers a whole catalog reads the unpaginated sibling endpoint (`GET /rbac/actions`, `GET /roles`, `GET /admin/feature-flags`) — feeding one from a page of the cursor list silently drops everything past the first page
-- **Cursor-based (keyset) pagination** — alternative to offset-based, available via `/cursor` and `/search/cursor` endpoints with response `{ data: User[], meta: { nextCursor, hasMore, limit } }`
-- **Sticky header** — toolbar remains fixed at the top while scrolling through long lists
+
+- **One Manage Users page.** An inline filter form is on the same page as the user list. It has one
+  unified search field, a role select and a status select. Empty filters load all users. Filled
+  filters start a search through `GET /users/search/cursor`. The `q` value matches with an OR across
+  the id, the email, the first name and the last name. The `role` filter narrows the list to the users
+  that have a role with that exact name.
+- **Infinite scroll** with column sorting. The page loads 20 users at a time through the cursor
+  endpoints. The shared `nxsInfiniteScroll` sentinel requests the next page while the user scrolls. It
+  continues until the page fills the viewport or the server gives no more cursors.
+- A user detail page, a user edit page, and a **soft delete**. A soft delete keeps the record and sets
+  a `deleted_at` timestamp. It revokes each active session. The count decreases in place and needs no
+  reload.
+- **Restore** a soft-deleted user with `POST /users/:id/restore`. The restore clears `deleted_at`
+  only. An account that a person deactivated before the delete comes back deactivated. Reactivation
+  stays a `PATCH /users/:id { "isActive": true }` operation. Thus `users:delete` alone cannot enable a
+  disabled account through a delete and restore sequence.
+- An **"Include deleted users"** checkbox is in the filter form of the list. It sends
+  `includeDeleted=true` on the list and on the search. A deleted row shows a "Deleted" status chip and
+  offers restore as its only action, because the detail endpoint and the edit endpoint exclude a
+  soft-deleted row. A delete while the filter is on changes the row in place and does not remove it.
+- Role assignment is in the user edit form. It is a multi-select field, and it is visible to a user
+  with the `assign:Role` permission. On a save it compares the initial roles with the selected roles.
+  Then it sends `POST /roles/assign/:userId` and `DELETE /roles/assign/:userId/:roleId` calls.
+- **Effective permissions preview.** The read-only page is at `/admin/users/:id/permissions`, and the
+  user detail page links to it. It shows the assigned roles and the allow, deny and conditional
+  summary chips. It also shows a `mat-accordion` list of the resolved permissions, grouped by
+  resource. Each rule has an action chip and an effect chip, and its CASL condition JSON expands. A
+  user with a super role sees one "full access" note.
+- **Cursor pagination is the standard for each list.** Each list endpoint takes `cursor`, `limit`
+  (with a cap of 100), `sortBy` and `sortOrder`. `sortBy` has a whitelist for each entity in
+  `shared/src/constants/sort-columns.constants.ts`. Each endpoint answers
+  `{ data, meta: { nextCursor, hasMore, limit } }`.
+
+  On the server, `applyKeysetPagination` works on a tuple of `(sortColumn, id)`. On the client,
+  `withCursorList` works with the `nxsInfiniteScroll` sentinel, and each list has one store.
+
+  A sortable column must be NOT NULL. It must also hold no precision that the cursor cannot carry.
+  Thus a timestamp sort key is a `timestamptz(3)` column, because the cursor encodes the value with
+  millisecond precision.
+
+  This standard covers the users, the three billing lists, and the catalogs of the roles, the
+  resources, the actions and the feature flags. **Offset pagination does not exist in this
+  repository.** No list endpoint reports a `total`, because a keyset query cannot produce one without
+  a second COUNT over the whole table.
+
+  **A picker is the intentional exception.** A select, an autocomplete or a checkbox list that offers
+  a whole catalog reads the unpaginated sibling endpoint: `GET /rbac/actions`, `GET /roles` or
+  `GET /admin/feature-flags`. If you feed a picker from a page of the cursor list, the picker drops
+  each item after the first page silently.
+- **Sticky header.** The toolbar stays at the top while the user scrolls through a long list.
 
 ### Billing (self-service)
-- **Pricing page** (`/billing`) — plan tiers as cards with the recommended tier visually lifted (raised + primary accent + "Most popular" chip); currency follows the resolved provider; publicly accessible (anonymous visitors are sent to login on "Choose")
-- **Checkout** — "Choose" starts a hosted-checkout session on the resolved provider and redirects; the return routes `/billing/success` (polls the subscription until active) and `/billing/cancel` confirm the outcome (the provider webhook is the source of truth)
-- **Billing settings** (`/billing/settings`) — current plan with a semantic status chip, change-plan dialog, cancel-at-period-end (confirm dialog; on a metered plan it warns that the usage recorded so far is charged when the period closes), a prepaid-credits wallet card, saved payment method with an update action, and a cursor-paginated invoice history (table on desktop, stacked cards on handset, infinite scroll under both)
-- **Pay-as-you-go tier** — the metered `usage` plan is active in the catalog: the pricing page shows its per-unit teaser, and `GET /api/v1/billing/usage` returns the caller's current-period meter (total/included/billable units and the accrued amount)
-- **Usage meter** — billing settings shows a current-period usage card for usage-mode subscriptions: large unit readout, a quota gauge when the plan includes units (used quota in the primary tone, overage in the error tone), and a money mini-ledger (billable units × unit price) ending in the accrued amount; pure pay-as-you-go plans skip the gauge
-- **Plan change with proration** — the change-plan dialog in billing settings picks a billing mode (fixed / pay-as-you-go) and a target plan, then shows a live proration mini-ledger from `/change/preview` (YooKassa: credit − / charge + / bold "Due now"; Paddle: the net amount — the provider settles the split; a negative net reads "Refund due"). Confirming calls `POST /api/v1/billing/subscription/change`, which switches instantly: Paddle computes the proration itself (`subscriptions.update`, prorated immediately), YooKassa is settled server-side per the refund-and-recharge policy (charge the new plan's whole-day remainder first, then refund the old plan's unused remainder — two fiscal documents, both surfaced as receipt rows in the invoice history)
-- **Payment-method update** — the "Update" button on the settings payment-method card calls `POST /api/v1/billing/payment-method` and redirects to the provider-hosted card replacement: Paddle returns its zero-amount payment-method-change checkout, YooKassa re-binds the card via a zero-amount payment whose success webhook swaps the default saved method (the old card is demoted, not deleted; the next renewal charges the new token); `past_due` subscriptions are allowed — fixing the card is how dunning recovers
-- **Stable billing day** — a self-managed subscription keeps the day of the month it was opened on. Each boundary is derived from the recorded billing anchor rather than from the previous boundary, so a short month clamps once and the original day returns as soon as the next month is long enough (Jan 31 → Feb 28 → Mar 31 → Apr 30). A trial re-anchors to its conversion date; provider-managed subscriptions take every boundary from the provider
-- **Billing region** — Auto / Russia / International control on the pricing page (authenticated only) that sets the provider used for the next checkout
-- **One-time purchases** — a section below the plan grid (authenticated only) renders the `GET /api/v1/billing/products` catalog: fixed-price products as horizontal ticket cards (tonal icon, unlocked-entitlement meta, price + "Buy" split off by a dashed rule) and custom-amount products as a donation card (quick preset amounts derived from the catalog minimum, a bounded custom amount with client-side validation, an optional receipt note, and a pay button that always shows the live amount). The purchase session reference is parked in `sessionStorage` before the provider redirect; `/billing/success` detects it and polls the invoice list for the paid `one_time` invoice (keyed by the provider payment reference) instead of the subscription, ending in a thank-you card with the product and amount
-- **Prepaid credit packs** — `credits` products in the one-time catalog (seeded 500/1000/5000-unit packs) render as the same ticket cards; a paid pack tops up the customer's prepaid credit balance (`GET /api/v1/billing/credits`), which metered usage spends before money is charged — a usage period fully covered by credits settles as a paid zero invoice with no provider charge. Refunding a credit-pack invoice up to its full amount (in one leg or several partial ones — refunds accumulate) claws the units back; if they were already spent the balance goes negative and new usage recording is blocked (409) until topped up
-- **Credits wallet** — billing settings shows the balance as a wallet card sharing the catalog's ticket vocabulary (tonal toll icon, dashed punch line): a confident zero state ("0 credits — top up"), an overdrawn state in the error palette explaining that usage is paused, and a top-up/buy action leading to the credit packs on the pricing page
-- **Entitlements as a first-class access axis** — `GET /api/v1/billing/entitlements` reports what a caller's billing state actually grants (plan in force, capabilities, numeric limits), and the client mirrors it in an `EntitlementsStore` behind a `*nxsHasEntitlement` structural directive with an optional else-template for an upgrade prompt. The mirror is advisory — the server's entitlement guard stays the boundary — and the plan catalog is deliberately not used as a substitute: it expresses neither one-time purchase grants, nor their expiry, nor the Free fallback, nor the full entitlements retained through the `past_due` grace window. Any billing change pushes an `entitlements_updated` SSE event to that one user, so the mirror refreshes instead of waiting out the cache TTL
-- **Plan-driven concurrent sessions** — the numeric half of an entitlement is enforced, not decorative: how many refresh tokens a user may hold at once comes from the plan (`limits.sessions`, seeded Pro 10 / Business 25) and falls back to the built-in `MAX_CONCURRENT_SESSIONS` of 5 when the plan sets none. Resolved on **both** sign-in paths, password and OAuth, so a paid allowance is not silently trimmed by whichever one the user takes. The semantics are eviction rather than rejection — login always succeeds and the oldest device is dropped, which is why the UI reads "Devices at once: N" — and resolution **fails open** to the constant, so a billing outage can never become a login outage. A downgrade revokes nothing at plan-change time; the trim happens at that user's own next sign-in, so a catalog edit cannot log a whole tier out at once. The limit key space is a closed union (`EntitlementLimitKey`), so an invented or misspelled key is a compile error rather than a value nothing reads
-- **Availability gating** — the billing nav entry and routes are hidden behind the public `billing` feature flag, which the server keeps off until at least one payment provider is configured
-- Fully internationalized (EN / RU) via a lazy-loaded `billing` Transloco scope
 
-### UI/UX
-- Angular Material M3 component library — `mat.theme()` API with Azure/Violet palette, M3 design tokens (`--mat-sys-*`), pill-shaped navigation active indicators
-- Light/dark theme with system preference detection; dark mode contrast ratios verified (7.9–14.4:1)
-- **WCAG 2.1 AA** — skip link, `aria-label` / `aria-current` / `aria-expanded` on sidenav, `aria-hidden` on decorative icons, transloco-bound `aria-label` on toolbar controls
-- **Runtime multilingual support (EN / RU)** — `@jsverse/transloco` with lazy-loaded per-feature scopes; language switcher in toolbar (flag icons); persisted to `localStorage`; server error keys translated client-side via shared `ErrorKeys` const
-- **Interface density preference** — Profile → Preferences exposes an "Interface density" slider (Material density levels 0–5) applied at runtime via `data-ui-density` on `<html>` and persisted per-device in `localStorage`; overall size is intentionally left to the browser's own zoom
-- **Keyboard shortcuts** — `Ctrl+S` / `Cmd+S` saves the active form; `?` or `Ctrl+/` opens a contextual shortcuts reference dialog; stack-based registration so dialog overlays handle shortcut scoping automatically
-- Responsive SCSS architecture
-- Snackbar error notifications
-- Form validation with error messages; reusable password strength indicator (`<app-password-strength>`, 4-bar visual meter, aria-live label) shown in register, profile, and reset-password forms
-- 404 and 403 pages
-- Version display in toolbar (version + git hash via `MatTooltip`)
-- **Collapsible side navigation** — persistent left panel (narrow 64px / wide 220px) with per-user localStorage persistence; auto-collapses to overlay mode on mobile (≤599px) via `BreakpointObserver`; hamburger button in toolbar opens the drawer. Links rendered from a permission-filtered `NavLink` registry on `SidenavStateService`; the root route auto-lands on the first accessible nav link (or `/profile` fallback) via `defaultRoute()`
-- **Standardized dialog system** — `DialogSize` enum (`Confirm` / `Form` / `Wide`) with `dialogSizeConfig()` helper; all dialogs use Material Design 3 responsive `{ width: '90vw', maxWidth }` pattern; global `_dialogs.scss` handles title padding, Angular Material bug #26352 fix (floating label clipping), and `::before` spacer reset. **Adaptive confirm dialogs** — `AdaptiveDialogService.openConfirm()` opens confirm dialogs as bottom sheets on handset viewports and as standard dialogs on larger screens
+- **Pricing page** (`/billing`). The plan tiers are cards, and the recommended tier is lifted with a
+  raised elevation, a primary accent and a "Most popular" chip. The currency follows the resolved
+  provider. The page is public, and "Choose" sends an anonymous visitor to the login page.
+- **Checkout.** "Choose" starts a hosted-checkout session on the resolved provider and redirects the
+  browser. The return route `/billing/success` polls the subscription until it is active. The return
+  route `/billing/cancel` shows the other outcome. The provider webhook is the source of truth.
+- **Billing settings** (`/billing/settings`). The page shows the current plan with a semantic status
+  chip, the change-plan dialog, and the cancel action. The cancel action opens a confirmation dialog.
+  On a metered plan that dialog says that the system charges the usage of the period at the close of
+  the period.
+
+  The page also shows a prepaid-credits wallet card, the saved payment method with an update action,
+  and the invoice history. The invoice history is cursor-paginated. It is a table on a desktop and
+  stacked cards on a handset, and the two layouts have an infinite scroll.
+- **Pay-as-you-go tier.** The metered `usage` plan is active in the catalog. The pricing page shows
+  its price for each unit. `GET /api/v1/billing/usage` returns the meter of the current period for the
+  caller. It gives the total units, the included units, the billable units and the accrued amount.
+- **Usage meter.** The billing settings page shows a usage card for the current period of a usage-mode
+  subscription. It has a large unit readout. It has a quota gauge when the plan includes units, where
+  the used quota is in the primary tone and the overage is in the error tone. It ends with a money
+  mini-ledger, which multiplies the billable units by the unit price and shows the accrued amount. A
+  pure pay-as-you-go plan has no gauge.
+- **Plan change with proration.** The change-plan dialog in the billing settings selects a billing
+  mode (fixed or pay as you go) and a target plan. Then it shows a live proration mini-ledger from
+  `/change/preview`. For YooKassa the ledger shows a credit line, a charge line and a bold "Due now"
+  line. For Paddle it shows the net amount, because the provider settles the two parts. A negative net
+  amount reads "Refund due".
+
+  The Confirm button calls `POST /api/v1/billing/subscription/change`, which switches the plan
+  immediately. Paddle computes the proration itself, through `subscriptions.update` with immediate
+  proration. The server settles YooKassa with the refund-and-recharge policy: it charges the whole-day
+  remainder of the new plan first, and then it refunds the unused remainder of the old plan. That
+  makes two fiscal documents, and the invoice history shows the two as receipt rows.
+- **Payment-method update.** The "Update" button on the payment-method card in the settings calls
+  `POST /api/v1/billing/payment-method`. Then it redirects to the card replacement page of the
+  provider.
+
+  Paddle returns its zero-amount payment-method-change checkout. YooKassa binds the card again with a
+  zero-amount payment, and its success webhook changes the default saved method. The old card is
+  demoted and not deleted, and the next renewal charges the new token.
+
+  A `past_due` subscription can use this route, because a correction of the card is how dunning
+  recovers.
+- **A stable billing day.** A self-managed subscription keeps the day of the month on which a person
+  opened it. Each boundary comes from the recorded billing anchor and not from the previous boundary.
+  Thus a short month clamps one time, and the original day returns as soon as the next month is long
+  enough. For example, January 31 gives February 28, then March 31, then April 30. A trial anchors
+  again to its conversion date. A provider-managed subscription takes each boundary from the provider.
+- **Billing region.** The pricing page shows an Auto, Russia and International control to an
+  authenticated user. The control sets the provider of the next checkout.
+- **One-time purchases.** A section below the plan grid renders the `GET /api/v1/billing/products`
+  catalog for an authenticated user.
+
+  A fixed-price product is a horizontal ticket card. It has a tonal icon, the unlocked entitlement in
+  the meta line, and a dashed rule between the price and the "Buy" button.
+
+  A custom-amount product is a donation card. It has quick preset amounts that come from the catalog
+  minimum. It has a bounded custom amount with validation on the client. It has an optional receipt
+  note. Its pay button always shows the live amount.
+
+  The client parks the purchase session reference in `sessionStorage` before the redirect to the
+  provider. `/billing/success` finds the reference and polls the invoice list for the paid `one_time`
+  invoice, keyed by the payment reference of the provider. It does not poll the subscription. It ends
+  with a thank-you card that shows the product and the amount.
+- **Prepaid credit packs.** The one-time catalog holds `credits` products. The seeder ships packs of
+  500, 1000 and 5000 units. They render as the same ticket cards.
+
+  A paid pack adds units to the prepaid credit balance of the customer, which
+  `GET /api/v1/billing/credits` reports. Metered usage spends the credits before the system charges
+  money. A usage period that the credits fully cover settles as a paid invoice of zero, with no charge
+  at the provider.
+
+  A refund of a credit-pack invoice up to its full amount takes the units back. The refund can be one
+  leg or several partial legs, because the refunds accumulate. If the customer already spent the
+  units, the balance becomes negative. The system then blocks a new usage record with a 409 until the
+  customer adds credits.
+- **Credits wallet.** The billing settings page shows the balance as a wallet card. The card shares
+  the ticket vocabulary of the catalog, that is a tonal toll icon and a dashed punch line. It has a
+  confident zero state that reads "0 credits - top up". It has an overdrawn state in the error
+  palette, which says that usage is paused. It has a top-up action that goes to the credit packs on
+  the pricing page.
+- **Entitlements are a first-class access axis.** `GET /api/v1/billing/entitlements` reports what the
+  billing state of a caller truly gives: the plan in force, the capabilities and the numeric limits.
+
+  The client mirrors it in an `EntitlementsStore` behind a `*nxsHasEntitlement` structural directive.
+  The directive takes an optional else-template for an upgrade prompt. The mirror is advisory, and the
+  entitlement guard on the server stays the boundary.
+
+  The plan catalog is intentionally not a substitute. The catalog expresses neither a one-time
+  purchase grant, nor the expiry of such a grant, nor the Free fallback, nor the full entitlements
+  that the customer keeps through the `past_due` grace window.
+
+  Each billing change pushes an `entitlements_updated` SSE event to that one user. Thus the mirror
+  refreshes and does not wait for the cache TTL.
+- **Plan-driven concurrent sessions.** The system enforces the numeric half of an entitlement, and it
+  is not decorative. The number of refresh tokens that a user can hold at one time comes from the plan
+  (`limits.sessions`, seeded as Pro 10 and Business 25). If the plan sets none, the value falls back
+  to the built-in `MAX_CONCURRENT_SESSIONS` of 5.
+
+  The system resolves the value on **both** sign-in paths, that is the password path and the OAuth
+  path. Thus the path that the user takes cannot trim a paid allowance silently.
+
+  The semantics are eviction and not rejection. A login always succeeds, and the system drops the
+  oldest device. For that reason the UI reads "Devices at once: N".
+
+  The resolution **fails open** to the constant. Thus a billing outage can never become a login
+  outage.
+
+  A downgrade revokes nothing at the time of the plan change. The trim occurs at the next sign-in of
+  that user. Thus a catalog edit cannot log out a whole tier at one time.
+
+  The key space of the limits is a closed union (`EntitlementLimitKey`). Thus an invented key or an
+  incorrect key is a compile error and not a value that nothing reads.
+- **Availability gating.** The public `billing` feature flag hides the billing navigation entry and
+  the billing routes. The server keeps the flag off until a person configures at least one payment
+  provider.
+- The billing feature has full EN and RU translations, through a `billing` Transloco scope that loads
+  on demand.
+
+### UI and UX
+
+- The Angular Material M3 component library. The project uses the `mat.theme()` API with the Azure and
+  Violet palette, the M3 design tokens (`--mat-sys-*`), and pill-shaped active indicators in the
+  navigation.
+- A light theme and a dark theme, with detection of the system preference. A person verified the
+  contrast ratios of the dark mode, which are 7.9:1 to 14.4:1.
+- **WCAG 2.1 AA.** The app has a skip link. The sidenav has `aria-label`, `aria-current` and
+  `aria-expanded`. A decorative icon has `aria-hidden`. Each `aria-label` of a toolbar control binds
+  to a Transloco string.
+- **Multilingual support at run time (EN and RU).** The app uses `@jsverse/transloco` with a scope for
+  each feature that loads on demand. A language switcher with flag icons is in the toolbar, and the
+  app keeps the selection in `localStorage`. The client translates a server error key through the
+  shared `ErrorKeys` constant.
+- **Interface density preference.** The Preferences section of the Profile page has an "Interface
+  density" slider with the Material density levels 0 to 5. The app applies the level at run time
+  through `data-ui-density` on `<html>` and keeps it in `localStorage` for each device. The browser
+  zoom controls the full size, which is intentional.
+- **Keyboard shortcuts.** `Ctrl+S` and `Cmd+S` save the active form. `?` and `Ctrl+/` open a
+  contextual reference dialog of the shortcuts. The registration is a stack, thus a dialog overlay
+  scopes the shortcuts automatically.
+- A responsive SCSS architecture.
+- Snackbar error notifications.
+- Form validation with error messages. A reusable password strength indicator
+  (`<app-password-strength>`) has a visual meter of 4 bars and an aria-live label. The register page,
+  the profile page and the reset-password page show it.
+- A 404 page and a 403 page.
+- The toolbar shows the version and the git hash through a `MatTooltip`.
+- **Collapsible side navigation.** The left panel is persistent, and it is 64 px narrow or 220 px
+  wide. The app keeps the state in `localStorage` for each user. Below 599 px the panel becomes an
+  overlay automatically, through `BreakpointObserver`. The hamburger button in the toolbar opens the
+  drawer.
+
+  The links come from a `NavLink` registry on `SidenavStateService`, which the app filters by
+  permission. The root route goes to the first available navigation link, or to `/profile` as the
+  fallback, through `defaultRoute()`.
+- **A standard dialog system.** The `DialogSize` enum has the values `Confirm`, `Form` and `Wide`, and
+  the `dialogSizeConfig()` helper applies them. Each dialog uses the responsive Material Design 3
+  pattern `{ width: '90vw', maxWidth }`. The global `_dialogs.scss` file owns the title padding, the
+  correction for Angular Material bug #26352 (a clipped floating label), and the `::before` spacer
+  reset.
+
+  **Adaptive confirm dialogs.** `AdaptiveDialogService.openConfirm()` opens a confirm dialog as a
+  bottom sheet on a handset viewport, and as a standard dialog on a larger screen.
 
 ### Versioning
-- All three workspaces share a single version (see `package.json`)
-- `client/scripts/version.mjs` auto-generates `src/environments/version.ts` before every build/start/test
-- `npm run release` (from `client/`) bumps all `package.json` files, generates `CHANGELOG.md`, and creates a git tag
-- Conventional Commits enforced via commitlint + husky `commit-msg` hook
-- A `@name` written bare in a commit subject becomes a GitHub user mention in `CHANGELOG.md` and on the release page, crediting an unrelated account. Write code identifiers in backticks (`` `@Authorize` ``); commitlint rejects the bare form, and `client/scripts/at-mentions.mjs` escapes any that still get through — on changelog generation (`postchangelog`) and again before the release body is published
+
+- The three workspaces share one version. Refer to `package.json`.
+- `client/scripts/version.mjs` makes `src/environments/version.ts` automatically before each build,
+  start and test.
+- `npm run release`, from `client/`, increases the version in each `package.json` file. It makes
+  `CHANGELOG.md` and a git tag.
+- commitlint and the husky `commit-msg` hook enforce Conventional Commits.
+- A bare `@name` in a commit subject becomes a GitHub user mention in `CHANGELOG.md` and on the
+  release page. It gives credit to an unrelated account. Write a code identifier in backticks, for
+  example `` `@Authorize` ``. commitlint rejects the bare form.
+  `client/scripts/at-mentions.mjs` escapes a name that gets past the hook. It does this at the
+  changelog generation (`postchangelog`) and again before the release body is published.
 
 ## Project Structure
 
@@ -330,7 +830,7 @@ fullstack-starter-app/
 │       ├── types/          # UserResponse, AdminUserResponse, AuthResponse, CursorPaginatedResponse<T>,
 │       │                   # RoleResponse (public) / RoleAdminResponse (with isSystem/isSuper),
 │       │                   # PermissionResponse, UserPermissionsResponse, etc.
-│       ├── constants/      # PASSWORD_REGEX, pagination defaults, SYSTEM_ROLES, MAX_CONCURRENT_SESSIONS,
+│       ├── constants/      # PASSWORD_REGEX, cursor page size, SYSTEM_ROLES, MAX_CONCURRENT_SESSIONS,
 │       │                   # ENTITLED/OPEN/CHANGEABLE_SUBSCRIPTION_STATUSES (one definition each), etc.
 │       └── utils/          # feature-flag-evaluator, mongo-query-safety, time (Temporal barrel), money (BigInt value object)
 ├── client/                 # Angular 21 SPA
@@ -352,9 +852,9 @@ fullstack-starter-app/
 │   │   ├── notifications/  # SSE push: NotificationsService, NotificationsListener, NotificationsController
 │   │   └── roles/          # RBAC: Role/Permission/RolePermission entities, RolesController, PermissionsGuard
 │   ├── src/common/
-│   │   ├── dtos/           # PaginationQueryDto, PaginatedResponseDto<T>, CursorPaginationQueryDto, CursorPaginatedResponseDto<T>
+│   │   ├── dtos/           # CursorPaginationQueryDto, CursorPaginatedResponseDto<T>, EntityCursorQueryDto
 │   │   ├── utils/          # escapeLikePattern, hashToken, withTransaction, extractAuditContext, cursor encode/decode, applyKeysetPagination
-│   │   └── upload/         # createDiskStorageOptions() — reusable multer disk storage factory; validates extension + MIME type
+│   │   └── upload/         # createDiskStorageOptions() - reusable multer disk storage factory; validates extension + MIME type
 │   ├── src/migrations/     # TypeORM migrations
 │   └── src/seeders/        # Database seeders
 └── mock-server/            # In-memory Express server for dev/testing
@@ -372,35 +872,45 @@ fullstack-starter-app/
         └── control.routes.ts  # Test control API (reset, seed, notify, invalidate-access-tokens, revoke-user-sessions)
 ```
 
-Seed entities carry UUID ids, minted from a readable slug by `mockId()` (`utils/mock-id.ts`), because the
-server guards every id path parameter with `ParseUUIDPipe`. `requireUuid()` mirrors that guard on the mock
-routes, so a malformed id is a 400 in both, ahead of any lookup. Specs and E2E fixtures address seed rows
-through `mockId('user-1')`, `mockId('role-editor')` and friends rather than through literal ids.
+Each seed entity has a UUID id. `mockId()` (`utils/mock-id.ts`) makes the id from a readable slug,
+because the server guards each id path parameter with `ParseUUIDPipe`. `requireUuid()` mirrors that
+guard on the mock routes. Thus a malformed id is a 400 in the two servers, before any lookup.
 
-Request bodies follow the same rule: the server's global `ValidationPipe` runs before the handler, so a body
-that fails its DTO is a 400 whether or not the addressed row exists. Mock handlers therefore run their
-DTO-shape checks (type, length, enum, range) ahead of the entity lookup, and keep checks that need the
-looked-up row - uniqueness, state transitions, remaining-total comparisons - below the 404.
+A spec and an E2E fixture address a seed row through `mockId('user-1')`, `mockId('role-editor')` and
+similar calls. They do not use a literal id.
 
-The pipe also runs with `whitelist` + `forbidNonWhitelisted`, so a property no DTO declares is a 400 by
-itself. `utils/validation.ts` mirrors the individual class-validator constraints (`unknownPropertyErrors`,
-`trimmedStringErrors`, `intErrors`, `uuidErrors`, `iso8601Errors`, `oneOfErrors`) with the real validator's
-message text and ordering - unknown properties first, then each property as declared - so a handler composes
-its DTO from them and answers with the same envelope the server would. Note that `@IsUUID()` on a body field
-is stricter than `ParseUUIDPipe` on a route param: it constrains the version and variant nibbles, so an id
-can be a valid path parameter and an invalid body field.
+A request body obeys the same rule. The global `ValidationPipe` of the server runs before the handler.
+Thus a body that fails its DTO is a 400, and the existence of the addressed row does not change this.
 
-All three workspaces import from `@app/shared/*` path alias (maps to `../shared/src/*` in each workspace's `tsconfig.json`).
+For that reason a mock handler runs its DTO-shape checks first. Those checks cover the type, the
+length, the enum and the range. A check that needs the row stays below the 404. Such a check covers
+the uniqueness, a state transition or a comparison with a remaining total.
+
+The pipe also runs with `whitelist` and `forbidNonWhitelisted`. Thus a property that no DTO declares
+is a 400 by itself.
+
+`utils/validation.ts` mirrors the individual class-validator constraints. The mirrors are
+`unknownPropertyErrors`, `trimmedStringErrors`, `intErrors`, `uuidErrors`, `iso8601Errors` and
+`oneOfErrors`. They use the message text and the order of the true validator. That order puts the
+unknown properties first, and then each property as the DTO declares it. Thus a handler composes its
+DTO from them and answers with the envelope of the server.
+
+Note that `@IsUUID()` on a body field is stricter than `ParseUUIDPipe` on a route parameter. It
+constrains the version nibble and the variant nibble. Thus an id can be a valid path parameter and an
+invalid body field.
+
+The three workspaces import from the `@app/shared/*` path alias. Each workspace maps it to
+`../shared/src/*` in its `tsconfig.json`.
 
 ## Prerequisites
 
-- **Node.js 24** (pinned via `.nvmrc`)
-- **PostgreSQL** running locally or remotely
+- **Node.js 24**, which `.nvmrc` pins
+- **PostgreSQL**, local or remote
 - **npm**
 
 ## Getting Started
 
-### 1. Clone and install dependencies
+### 1. Clone the repository and install the dependencies
 
 ```bash
 git clone <repository-url>
@@ -418,7 +928,7 @@ cd server
 cp .env.example .env
 ```
 
-Edit `.env` with your database credentials and settings:
+Then edit `.env`. Put your database credentials and your settings there.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -430,48 +940,48 @@ Edit `.env` with your database credentials and settings:
 | `DB_USER` | `postgres` | Database user |
 | `DB_PASSWORD` | `password` | Database password |
 | `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
-| `JWT_SECRET` | - | HS256 secret (min 16 chars; required when `JWT_ALGORITHM=HS256`) |
-| `JWT_PRIVATE_KEY` | - | Base64-encoded RSA private key PEM (required when `JWT_ALGORITHM=RS256`) |
-| `JWT_PUBLIC_KEY` | - | Base64-encoded RSA public key PEM (required when `JWT_ALGORITHM=RS256`) |
-| `JWT_MIN_IAT` | - | Unix timestamp; tokens issued before this value are rejected (key rotation) |
-| `JWT_EXPIRATION` | `3600` | Access token lifetime (seconds); minimum `120` |
-| `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime (seconds) |
+| `JWT_SECRET` | - | HS256 secret, a minimum of 16 characters. It is necessary when `JWT_ALGORITHM=HS256` |
+| `JWT_PRIVATE_KEY` | - | RSA private key PEM in base64. It is necessary when `JWT_ALGORITHM=RS256` |
+| `JWT_PUBLIC_KEY` | - | RSA public key PEM in base64. It is necessary when `JWT_ALGORITHM=RS256` |
+| `JWT_MIN_IAT` | - | A Unix timestamp. The server rejects a token that it issued before this value. Use it for key rotation |
+| `JWT_EXPIRATION` | `3600` | Access token lifetime in seconds. The minimum is `120` |
+| `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime in seconds |
 | `GOOGLE_CLIENT_ID` | - | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | - | Google OAuth client secret |
 | `FACEBOOK_CLIENT_ID` | - | Facebook OAuth client ID |
 | `FACEBOOK_CLIENT_SECRET` | - | Facebook OAuth client secret |
 | `VK_CLIENT_ID` | - | VK OAuth client ID |
 | `VK_CLIENT_SECRET` | - | VK OAuth client secret |
-| `CLIENT_URL` | `http://localhost:4200` | Client URL for OAuth redirects |
-| `SMTP_HOST` | - | SMTP server host (enables email delivery) |
+| `CLIENT_URL` | `http://localhost:4200` | Client URL for the OAuth redirects |
+| `SMTP_HOST` | - | SMTP server host. A value enables the email delivery |
 | `SMTP_PORT` | `587` | SMTP server port |
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
-| `REDIS_URL` | - | Redis connection URL (optional; enables distributed rate limiting and shared permission cache for multi-instance deployments) |
-| `TRUSTED_PROXIES` | - (local), `loopback,uniquelocal` (docker-compose) | Express `trust proxy` setting — required when running behind nginx / Caddy / K8s ingress / Cloudflare so `req.ip` resolves to the real client IP (used by throttlers and audit-log IP recording). Accepts `loopback` / `linklocal` / `uniquelocal`, an IP-CIDR list, a hop count, or `true`. The application has no built-in default; `docker-compose.yml` provides `loopback,uniquelocal` for prod deployments. See `server/README.md` "Deployment behind a reverse proxy" |
-| `SWAGGER_ENABLED` | - | Set to `true` to enable Swagger UI in staging/production (always on in `local`/`development`) |
-| `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to retain audit log entries |
-| `DB_POOL_MAX` | `10` | Maximum PostgreSQL connection pool size |
-| `DB_POOL_IDLE_TIMEOUT` | `30000` | Milliseconds before an idle connection is closed |
-| `DB_POOL_CONNECTION_TIMEOUT` | `5000` | Milliseconds to wait for a connection before erroring |
-| `SMTP_FROM` | `noreply@example.com` | Default "from" address for emails |
-| `ADMIN_EMAIL` | - | Email for the initial admin user (seeded on startup; skip if empty) |
-| `ADMIN_PASSWORD` | - | Password for the initial admin user |
-| `ADMIN_FIRST_NAME` | `Admin` | First name for the initial admin user |
-| `ADMIN_LAST_NAME` | `User` | Last name for the initial admin user |
-| `TURNSTILE_SITE_KEY` | - | Cloudflare Turnstile public site key. CAPTCHA on `/register` and `/forgot-password` is disabled while either key is empty. Get a real pair from `dash.cloudflare.com → Turnstile → Add site` (free). Test keys (`1x00000000000000000000AA` / `1x0000000000000000000000000000000AA`) work for local dev and CI but are public — provide zero protection in production. See [`server/README.md` → "Enabling CAPTCHA in production"](server/README.md#enabling-captcha-in-production) |
-| `TURNSTILE_SECRET_KEY` | - | Cloudflare Turnstile secret key for server-side `siteverify` calls. Paired with `TURNSTILE_SITE_KEY` |
-| `PADDLE_API_KEY` | - | Paddle server API key. Paired with `PADDLE_WEBHOOK_SECRET`; both must be set for Paddle to count as configured |
-| `PADDLE_WEBHOOK_SECRET` | - | Paddle webhook HMAC secret for signature verification |
+| `REDIS_URL` | - | Redis connection URL. It is optional. It enables distributed rate limiting and a shared permission cache for a deployment with more than one instance |
+| `TRUSTED_PROXIES` | - (local), `loopback,uniquelocal` (docker-compose) | The Express `trust proxy` setting. It is necessary behind nginx, Caddy, a K8s ingress or Cloudflare, thus `req.ip` gives the true client IP. The throttlers and the audit-log IP record use that value. It accepts `loopback`, `linklocal`, `uniquelocal`, an IP-CIDR list, a hop count, or `true`. The application has no built-in default. `docker-compose.yml` gives `loopback,uniquelocal` for a production deployment. Refer to "Deployment behind a reverse proxy" in `server/README.md` |
+| `SWAGGER_ENABLED` | - | Set it to `true` to enable the Swagger UI in staging or in production. It is always on in `local` and `development` |
+| `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to keep an audit log entry |
+| `DB_POOL_MAX` | `10` | Maximum size of the PostgreSQL connection pool |
+| `DB_POOL_IDLE_TIMEOUT` | `30000` | Milliseconds before the pool closes an idle connection |
+| `DB_POOL_CONNECTION_TIMEOUT` | `5000` | Milliseconds to wait for a connection before an error |
+| `SMTP_FROM` | `noreply@example.com` | Default "from" address of an email |
+| `ADMIN_EMAIL` | - | Email address of the initial administrator. The server seeds the account at startup, and it skips this step when the value is empty |
+| `ADMIN_PASSWORD` | - | Password of the initial administrator |
+| `ADMIN_FIRST_NAME` | `Admin` | First name of the initial administrator |
+| `ADMIN_LAST_NAME` | `User` | Last name of the initial administrator |
+| `TURNSTILE_SITE_KEY` | - | Public site key of Cloudflare Turnstile. The CAPTCHA on `/register` and `/forgot-password` stays disabled while one of the two keys is empty. Get a true pair at `dash.cloudflare.com`, then Turnstile, then Add site. It is free. The test keys (`1x00000000000000000000AA` and `1x0000000000000000000000000000000AA`) operate for local development and for CI. They are public and give no protection in production. Refer to [`server/README.md`, "Enabling CAPTCHA in production"](server/README.md#enabling-captcha-in-production) |
+| `TURNSTILE_SECRET_KEY` | - | Secret key of Cloudflare Turnstile for the `siteverify` calls on the server. Use it with `TURNSTILE_SITE_KEY` |
+| `PADDLE_API_KEY` | - | Paddle server API key. Use it with `PADDLE_WEBHOOK_SECRET`. The two values are necessary before Paddle counts as configured |
+| `PADDLE_WEBHOOK_SECRET` | - | Paddle webhook HMAC secret for the signature verification |
 | `PADDLE_ENVIRONMENT` | `sandbox` | Paddle API host: `sandbox` or `production` |
-| `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Paired with `YOOKASSA_SECRET_KEY`; both must be set for YooKassa to count as configured |
+| `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Use it with `YOOKASSA_SECRET_KEY`. The two values are necessary before YooKassa counts as configured |
 | `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
-| `YOOKASSA_VAT_CODE` | `1` | VAT code on every 54-FZ receipt line (1–6, tax-regime specific; `1` = "без НДС") |
-| `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency for new customers (`USD` or `RUB`) |
-| `BILLING_PROVIDER_TIMEOUT_MS` | `20000` | Deadline for a single provider API call, in milliseconds. Neither provider SDK sets a transport timeout, so without it a stalled socket blocks the sequential renewal scan |
-| `BILLING_WEBHOOK_IP_ALLOWLIST` | - (local), provider egress ranges (docker-compose) | Comma-separated IPs/CIDRs allowed to call the billing webhook receivers (`/api/v1/billing/webhooks/*`); other sources get `403` before any webhook processing. Empty disables the check; a malformed entry fails startup. `docker-compose.yml` defaults it to the published Paddle + YooKassa egress ranges. See ["Billing webhook source-IP allowlist" in `server/README.md`](server/README.md#billing-webhook-source-ip-allowlist) |
-| `BILLING_WEBHOOK_RETENTION_DAYS` | `90` | Age at which a settled webhook delivery is deleted from the idempotency ledger by the daily retention sweep. Unfinished and dead-lettered deliveries are never pruned |
-| `BILLING_WEBHOOK_PAYLOAD_RETENTION_DAYS` | `7` | Age at which a settled delivery's stored event is nulled out, ahead of the row itself. Keep below `BILLING_WEBHOOK_RETENTION_DAYS` |
+| `YOOKASSA_VAT_CODE` | `1` | VAT code on each 54-FZ receipt line. The range is 1 to 6, and the value depends on the tax regime. The value `1` means "no VAT" |
+| `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency of a new customer: `USD` or `RUB` |
+| `BILLING_PROVIDER_TIMEOUT_MS` | `20000` | Deadline of one provider API call, in milliseconds. Neither provider SDK sets a transport timeout. Without this deadline, a stalled socket blocks the sequential renewal scan |
+| `BILLING_WEBHOOK_IP_ALLOWLIST` | - (local), provider egress ranges (docker-compose) | IPs and CIDRs that can call the billing webhook receivers (`/api/v1/billing/webhooks/*`), separated by commas. Each other source gets a `403` before any webhook processing. An empty value disables the check. A malformed entry stops the startup. `docker-compose.yml` defaults it to the published egress ranges of Paddle and YooKassa. Refer to ["Billing webhook source-IP allowlist" in `server/README.md`](server/README.md#billing-webhook-source-ip-allowlist) |
+| `BILLING_WEBHOOK_RETENTION_DAYS` | `90` | The age at which the daily retention sweep deletes a settled webhook delivery from the idempotency ledger. The sweep never deletes an unfinished delivery or a dead-lettered delivery |
+| `BILLING_WEBHOOK_PAYLOAD_RETENTION_DAYS` | `7` | The age at which the sweep clears the stored event of a settled delivery, before it deletes the row. Keep this value below `BILLING_WEBHOOK_RETENTION_DAYS` |
 
 ### 3. Set up the database
 
@@ -482,43 +992,45 @@ npm run migrations:run
 npm run seed:run            # Optional: seed initial admin and RBAC data
 ```
 
-`seed:run` is idempotent — every seeder inserts only the rows it is missing, so re-running it against an already-seeded database is a no-op rather than a unique-constraint error.
+`seed:run` is idempotent. Each seeder inserts only the rows that are missing. Thus a second run
+against a database that already has the data does nothing. It does not give a unique-constraint
+error.
 
-### 4. Start development servers
+### 4. Start the development servers
 
-**Option 1: Full stack (NestJS server with PostgreSQL)**
+**Option 1: the full stack, that is the NestJS server with PostgreSQL.**
 
 ```bash
-# Terminal 1 — Backend (port 3000)
+# Terminal 1 - Backend (port 3000)
 cd server
 npm run start:dev
 
-# Terminal 2 — Frontend (port 4200, proxies /api to backend)
+# Terminal 2 - Frontend (port 4200, proxies /api to backend)
 cd client
 npm start
 ```
 
-**Option 2: Mock server (no database required, great for frontend development)**
+**Option 2: the mock server. It needs no database, and it is good for frontend development.**
 
 ```bash
-# Terminal 1 — Mock backend (port 3000, in-memory data, watch mode)
+# Terminal 1 - Mock backend (port 3000, in-memory data, watch mode)
 cd mock-server
 npm run start:dev
 
-# Terminal 2 — Frontend (port 4200, proxies /api to mock server)
+# Terminal 2 - Frontend (port 4200, proxies /api to mock server)
 cd client
 npm start
 ```
 
-Open http://localhost:4200 in your browser.
+Then open http://localhost:4200 in your browser.
 
 **Mock server credentials:**
-- Admin: `admin@example.com` / `Password1`
+- Administrator: `admin@example.com` / `Password1`
 - User: `user@example.com` / `Password1`
 
 ## Docker Deployment
 
-The project ships with Dockerfiles and a Compose file for production deployment.
+The project has a Dockerfile for each image and a Compose file for a production deployment.
 
 ### Build and run
 
@@ -531,78 +1043,122 @@ docker-compose up -d
 ```
 
 Services:
-- **redis** — redis:7.4-alpine, used for distributed rate limiting and shared permission cache
-- **db** — postgres:18-alpine, persistent named volume
-- **server** — NestJS API on port 3000; entrypoint runs migrations, optional admin seed, then starts the server; exposes `GET /metrics` for Prometheus scraping; joins both `default` and the external `shared` network so a host Caddy can reach it as `server:3000`
-- **client** — Angular SPA served by nginx on port 8080; host binding `127.0.0.1:4200:8080` (localhost-only; Caddy accesses internally via `client:8080`); built with `--base-href /nexus/` (overridable via `docker build --build-arg BASE_HREF=/`); joins both `default` and the external `shared` network. Declaring `shared` in compose (not attaching it manually) keeps the proxy reachable across container recreates
-- **prometheus** — prom/prometheus:v3.12.0, internal network only (no ports exposed); scrapes `/metrics` every 15s, 30d retention; config at `monitoring/prometheus.yml`
-- **grafana** — grafana/grafana:13.0.1, accessible at port 3001; provisioned datasource (Prometheus) and the **App Metrics** dashboard (HTTP traffic, per-route p95 latency, auth events, SSE connections, Node.js runtime, an RBAC & Reliability section: permission denials, process RSS, token-reuse alarm, uptime, queue/handle health, and a Mail Queue section: BullMQ depth by state and failed/completed job counts, a Database section: connection-pool depth by state, and a Cache section: per-cache hit ratio for the Redis-backed RBAC/feature-flag caches). See [`server/README.md` → "Observability"](server/README.md#observability) for the full metric list, Prometheus alert recipes for `rbac_permission_denied_total`, and an RBAC drill-down dashboard (`doc/grafana/rbac.json`). Grafana-managed alerting is provisioned from `monitoring/grafana/provisioning/alerting/` — see [Alerting](#alerting) below
+
+- **redis** is redis:7.4-alpine. It supplies the distributed rate limiting and the shared permission
+  cache.
+- **db** is postgres:18-alpine with a persistent named volume.
+- **server** is the NestJS API on port 3000. Its entrypoint runs the migrations, does the optional
+  administrator seed, and then starts the server. It exposes `GET /metrics` for Prometheus. It joins
+  the `default` network and the external `shared` network, thus a Caddy instance on the host reaches
+  it as `server:3000`.
+- **client** is the Angular SPA. nginx serves it on port 8080. The host binding is
+  `127.0.0.1:4200:8080`, thus only the localhost reaches it, and Caddy uses `client:8080` internally.
+  The build uses `--base-href /nexus/`, and `docker build --build-arg BASE_HREF=/` changes it. The
+  service joins the `default` network and the external `shared` network. The compose file declares
+  `shared`, and no person attaches it manually. Thus the proxy stays reachable after a recreate of a
+  container.
+- **prometheus** is prom/prometheus:v3.12.0. It is on the internal network only and exposes no port.
+  It scrapes `/metrics` each 15 s and keeps the data 30 days. Its configuration is
+  `monitoring/prometheus.yml`.
+- **grafana** is grafana/grafana:13.0.1 on port 3001. The stack provisions the Prometheus datasource
+  and the **App Metrics** dashboard.
+
+  That dashboard shows the HTTP traffic, the p95 latency of each route, the authentication events, the
+  SSE connections and the Node.js runtime. It has an RBAC and Reliability section, with the permission
+  denials, the process RSS, the token-reuse alarm, the uptime, and the queue and handle health. It has
+  a Mail Queue section, with the BullMQ depth by state and the counts of the failed and completed
+  jobs. It has a Database section, with the depth of the connection pool by state. It has a Cache
+  section, with the hit ratio of each Redis-backed RBAC cache and feature-flag cache.
+
+  Refer to [`server/README.md`, "Observability"](server/README.md#observability). That section has the
+  full metric list, the Prometheus alert recipes for `rbac_permission_denied_total`, and an RBAC
+  drill-down dashboard (`doc/grafana/rbac.json`).
+
+  Grafana-managed alerting comes from the files in `monitoring/grafana/provisioning/alerting/`. Refer
+  to [Alerting](#alerting) below.
 
 ### Alerting
 
-`/health/ready` deliberately stays `ok` when a non-fatal dependency degrades (a failed SMTP verify, a
-production instance running without `REDIS_URL`), so neither the container healthcheck nor the deploy
-gate notices. The `dependency_up` gauge is the signal that does: the readiness indicators mirror their
-outcome onto it (`1` healthy, `0` degraded or down), one series per dependency.
+`/health/ready` intentionally stays `ok` when a non-fatal dependency degrades. Two examples are a
+failed SMTP verify and a production instance with no `REDIS_URL`. Thus neither the container
+healthcheck nor the deploy gate sees the condition.
 
-Two Grafana-managed rules watch it, provisioned as files (read-only in the UI, `provenance: file`):
+The `dependency_up` gauge is the signal that does see it. Each readiness indicator writes its result
+onto the gauge: `1` is healthy, and `0` is degraded or down. There is one series for each dependency.
+
+Two Grafana-managed rules watch the gauge. They come from files, thus the UI shows them as read-only
+with `provenance: file`:
 
 | Rule | Expression | `for` | No-data behaviour |
 |---|---|---|---|
-| Dependency degraded | `dependency_up < 1` | 10m | `OK` — a missing series means the server is down, which the rule below owns |
+| Dependency degraded | `dependency_up < 1` | 10m | `OK`. A missing series means that the server is down, and the rule below owns that condition |
 | Server unreachable | `up{job="nestjs-server"} < 1` | 5m | `Alerting` |
 
-The 10-minute window is deliberate: `SmtpHealthIndicator` memoizes its verify for 5 minutes, so a
-sample can be one TTL stale and a shorter window would alert on an already-recovered dependency.
-Worst-case detection latency is therefore ~15 minutes, against the five and a half weeks a dead SMTP
-went unnoticed before this existed.
+The window of 10 minutes is intentional. `SmtpHealthIndicator` keeps its verify result for 5 minutes.
+Thus a sample can be one TTL old, and a shorter window alerts on a dependency that already recovered.
+The worst-case detection latency is therefore approximately 15 minutes. Before this rule existed, a
+dead SMTP server stayed unknown for five and a half weeks.
 
-Delivery goes to a single webhook contact point (`ops-webhook`), read from `$ALERT_WEBHOOK_URL`. The
-root notification policy is provisioned too, and is not optional: without it Grafana keeps routing to
-its built-in email contact point, which would try to deliver "mail is down" by mail.
+The delivery goes to one webhook contact point, `ops-webhook`. It reads `$ALERT_WEBHOOK_URL`.
 
-**Setting up the receiver:** create a webhook endpoint that accepts `POST` with a JSON body (an n8n
-*Webhook* node with method `POST` and "Respond immediately" is enough), then store its URL as the
-`ALERT_WEBHOOK_URL` repository secret. Both deploy workflows abort while the secret is empty, because
-Grafana refuses to start with an empty webhook URL and would take the monitoring stack down with it.
-The payload is Alertmanager-shaped: `status`, `alerts[].labels.{alertname,dependency,severity}`,
-`alerts[].annotations.{summary,description}`. Routing on `severity` (`warning` vs `critical`) or on
-`dependency` is done in the receiver, not in Grafana.
+The root notification policy also comes from a file, and it is not optional. Without it, Grafana
+continues to route to its built-in email contact point. Grafana would then try to deliver the message
+"mail is down" by mail.
+
+**To set up the receiver:** make a webhook endpoint that accepts a `POST` with a JSON body. An n8n
+*Webhook* node with the method `POST` and "Respond immediately" is sufficient. Then store its URL as
+the `ALERT_WEBHOOK_URL` repository secret.
+
+The two deploy workflows stop while that secret is empty. Grafana refuses to start with an empty
+webhook URL, and it would stop the monitoring stack.
+
+The payload has the Alertmanager shape. It holds `status`,
+`alerts[].labels.{alertname,dependency,severity}` and
+`alerts[].annotations.{summary,description}`. Do the routing on `severity` (`warning` or `critical`)
+or on `dependency` in the receiver, and not in Grafana.
 
 ### Resource limits
 
-Each service declares a conservative `mem_limit` as defense-in-depth: a single leaking or runaway
-container can't starve the others of memory. Caps are derived from each service's own memory profile —
-they sit above the container's measured peak working set (startup/migration spikes included), not
-steady-state — so they hold regardless of the host the stack runs on:
+Each service declares a conservative `mem_limit` as defense in depth. Thus one container with a leak
+or a runaway process cannot take the memory of the others.
+
+Each cap comes from the memory profile of its own service. Each cap is above the measured peak working
+set of the container, and the startup spike and the migration spike are included. The caps are not
+the steady-state value. Thus they hold on each host that runs the stack.
 
 | Service | `mem_limit` | `mem_reservation` |
 |---|---|---|
 | server | 384m | 128m |
 | db | 256m | 96m |
 | grafana | 384m | 192m |
-| prometheus | 192m | — |
-| redis | 96m | — |
-| client | 64m | — |
+| prometheus | 192m | - |
+| redis | 96m | - |
+| client | 64m | - |
 
-Limits are ceilings, not reservations, so their sum can exceed available RAM. Container swap is left at
-the default (no `memswap_limit`), giving a spill-to-swap safety valve before the kernel OOM-kills a process.
+A limit is a ceiling and not a reservation. Thus the sum of the limits can be more than the available
+RAM. The container swap stays at the default, because the compose file sets no `memswap_limit`. Thus a
+container can spill to swap before the kernel stops a process with an OOM kill.
 
 ### Container hardening
 
-Every service runs with `security_opt: no-new-privileges:true` and `cap_drop: ALL`. The two images whose
-official entrypoints start as root and drop privileges via `gosu` re-add only the minimal capabilities
-that drop needs: `redis` keeps `SETUID`/`SETGID`; `db` keeps `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID`,
-`SETUID` (initdb + chown + the privilege drop). `server`, `client`, `prometheus`, and `grafana` already
-run as non-root users on high ports and need no capabilities.
+Each service runs with `security_opt: no-new-privileges:true` and `cap_drop: ALL`.
 
-Every service also declares a `healthcheck`, so `restart: unless-stopped` recovers a hung-but-running
-container, not just a crashed one — `prometheus` (`/-/healthy`) and `grafana` (`/api/health`) join the
-existing checks on db/redis/server/client.
+The official entrypoints of two images start as root and drop the privileges with `gosu`. Those two
+images keep only the minimal capabilities for that drop. `redis` keeps `SETUID` and `SETGID`. `db`
+keeps `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID` and `SETUID`, for initdb, for chown and for the
+privilege drop.
+
+`server`, `client`, `prometheus` and `grafana` already run as a non-root user on a high port. They
+need no capability.
+
+Each service also declares a `healthcheck`. Thus `restart: unless-stopped` recovers a container that
+runs but does not answer, and not only a container that stopped. `prometheus` uses `/-/healthy` and
+`grafana` uses `/api/health`. They join the existing checks on db, redis, server and client.
 
 ### Docker environment variables
 
-In addition to the standard server env vars, set these in `server/.env` to provision an initial admin account on first startup:
+Set these variables in `server/.env`, beside the standard server variables. They make an initial
+administrator account at the first startup:
 
 ```
 ADMIN_EMAIL=admin@yourdomain.com
@@ -611,180 +1167,277 @@ ADMIN_FIRST_NAME=Admin
 ADMIN_LAST_NAME=User
 ```
 
-The admin seeder is idempotent — it skips creation if the user already exists and does nothing if `ADMIN_EMAIL` is empty.
+The administrator seeder is idempotent. It skips the creation when the user already exists. It does
+nothing when `ADMIN_EMAIL` is empty.
 
-Set `GRAFANA_ADMIN_PASSWORD` as a shell environment variable before running `docker-compose up` to control the Grafana admin password (defaults to `admin` for local use only). Grafana is available at http://your-host:3001. In production this default never applies: the `deploy.yml` / `rebuild.yml` workflows abort before touching any container if the `GRAFANA_ADMIN_PASSWORD` secret is empty, so a cleared secret fails the deploy loudly instead of silently shipping `admin`/`admin`.
+Set `GRAFANA_ADMIN_PASSWORD` as a shell environment variable before you run `docker-compose up`. It
+controls the Grafana administrator password. The default is `admin`, and it is for local use only.
+Grafana is at http://your-host:3001.
+
+In production that default never applies. The `deploy.yml` and `rebuild.yml` workflows stop before
+they touch a container when the `GRAFANA_ADMIN_PASSWORD` secret is empty. Thus a cleared secret fails
+the deploy loudly, and it does not ship `admin`/`admin` silently.
 
 ### Deploy pipeline
 
-`.github/workflows/deploy.yml` — triggered manually (`workflow_dispatch`) or on push to `master`. Builds Docker images locally, scans with Trivy (HIGH/CRITICAL), pushes to GHCR only after both scans pass, and deploys to VPS with health checks and automatic rollback.
+`.github/workflows/deploy.yml` starts manually (`workflow_dispatch`) or on a push to `master`. It
+builds the Docker images locally and scans them with Trivy for HIGH and CRITICAL findings. It pushes
+to GHCR only after the two scans pass. Then it deploys to the VPS with health checks and an automatic
+rollback.
 
-`.github/workflows/rebuild.yml` — weekly scheduled rebuild (Sundays 03:00 UTC) to pick up OS security patches. Rebuilds images with `no-cache`, scans, and deploys. Snapshots current images as `:pre-rebuild` for safe rollback. On a HIGH/CRITICAL finding it hands off to `scripts/auto-patch-cves.sh`, which upgrades the vulnerable Alpine packages (stable repositories first, edge as fallback) via a `CVE_PATCHES` block in the Dockerfile, re-scans, and opens a patch PR. If a CVE cannot be resolved (e.g. the fix conflicts with pinned sibling packages), it opens a tracking issue (label `auto-patch-blocked`) with the `apk` resolver conflict. The deploy stays blocked until a human acts.
+`.github/workflows/rebuild.yml` is a weekly rebuild on Sunday at 03:00 UTC. It collects the OS
+security patches. It rebuilds the images with `no-cache`, scans them and deploys them. It also
+snapshots the current images as `:pre-rebuild` for a safe rollback.
 
-`.github/workflows/edge-patch-cleanup.yml` — quarterly check that creates a PR to remove the Dockerfile `CVE_PATCHES` blocks once the fixes are present in the base image.
+On a HIGH or CRITICAL finding, the rebuild workflow calls `scripts/auto-patch-cves.sh`. That script
+upgrades the vulnerable Alpine packages, with the stable repositories first and edge as the fallback.
+It does this through a `CVE_PATCHES` block in the Dockerfile. Then it scans again and opens a patch
+PR.
 
-Both of those paths open their pull request with `GITHUB_TOKEN`, and GitHub does not start workflow runs for events raised by that token, so those PRs arrive with no CI behind them. Each PR body therefore opens with a required first action: close the pull request and reopen it, which is a human-initiated event and does start the full suite. Do not merge either one until those checks are green: both change the Dockerfiles that build the production images.
+If the script cannot resolve a CVE, it opens a tracking issue with the label
+`auto-patch-blocked`. The issue holds the `apk` resolver conflict. One example of such a condition is
+a fix that conflicts with a pinned sibling package. The deploy stays blocked until a person acts.
 
-`.github/actions/preseed-ssh-client` — local composite action that installs the `drone-ssh` client used by `appleboy/ssh-action` before that action runs. The action downloads its worker binary from a GitHub release on every invocation and aborts the job when that URL is unavailable, which is how a deploy failed on six consecutive 503s. The composite action restores the binary from the Actions cache, checks it against a pinned sha256 and installs it where the action looks for it, so the action skips its own download. Two properties follow: in the steady state a deploy contacts no third-party release URL at all, and the executable that runs with the VPS SSH key is pinned by digest instead of being trusted on arrival. The pinned version and checksum live in that one file — bump them together, taking the value from the release's `checksums.txt`. Wired into every workflow that opens an SSH session to the VPS: `deploy.yml`, `rollback.yml`, `rebuild.yml` and `rotate-keys.yml`.
+`.github/workflows/edge-patch-cleanup.yml` is a quarterly check. It makes a PR that removes the
+`CVE_PATCHES` blocks from the Dockerfiles when the base image already has the fixes.
 
-The same action also derives the SHA256 fingerprint of the `VPS_HOST_KEY` secret and exposes it as an output, which each of those four workflows passes to the SSH action's `fingerprint` input. That is what makes the client verify *which* host it is authenticating to: with no fingerprint the client accepts whatever key answers, and because a runner starts every run with an empty `known_hosts` the first-use trust gap would otherwise be re-opened on every deploy — with the deploy key and 21 further secrets on the other side of it. Keeping the derivation in the composite action puts it in one place instead of four, and an empty secret fails the step rather than quietly restoring the unverified behaviour. `rollback.yml`'s `resolve` job does not check the repository out, so it seeds `~/.ssh/known_hosts` from the same secret itself and connects with `StrictHostKeyChecking=yes`.
+The two paths above open their pull request with `GITHUB_TOKEN`. GitHub does not start a workflow run
+for an event that this token raises. Thus those PRs arrive with no CI behind them.
 
-`.github/dependabot.yml` — keeps the `@sha256` base-image digests pinned in `server/Dockerfile` and `client/Dockerfile` current (docker ecosystem, weekly; major `node`/`nginx` bumps ignored), so builds are reproducible while still receiving reviewed upstream base updates.
+For that reason the body of each PR starts with a necessary first action: close the pull request and
+open it again. That is an event from a person, and it starts the full suite. Do not merge one of those
+PRs until the checks are green, because the two change the Dockerfiles that build the production
+images.
 
-Both deploy paths refresh the host checkout with `git pull --ff-only` and then check `docker-compose.yml` out at the commit whose images they are deploying, so a merge that lands while a deploy is in flight cannot pair a newer compose file with older images. `rollback.yml` does the same for its own target SHA. The next run restores the file before pulling.
+`.github/actions/preseed-ssh-client` is a local composite action. It installs the `drone-ssh` client
+that `appleboy/ssh-action` uses, before that action runs.
 
-All VPS-facing workflows share a `deploy-production` concurrency group to prevent race conditions. `rollback.yml` is the one member that sets `cancel-in-progress: true`, so an emergency rollback preempts whatever holds the group instead of queueing behind it — otherwise a wedged deploy blocks the rollback that exists to undo it. Every job that opens an SSH session also carries `timeout-minutes`, because the SSH action's own connect and command timeouts have been observed not to end a session against an unresponsive host.
+`appleboy/ssh-action` downloads its worker binary from a GitHub release at each invocation. It stops
+the job when that URL is not available. That is how a deploy failed after six sequential 503 answers.
 
-### Production credentials & secrets
+The composite action restores the binary from the Actions cache, compares it with a pinned sha256, and
+installs it where the action looks for it. Thus the action skips its own download.
 
-**Model:** all production secrets live in **GitHub repository secrets** and are the single source of
-truth. On every `deploy.yml` / `rebuild.yml` run (after `git pull`), `scripts/sync-prod-env.sh` writes
-them into the VPS `server/.env` (and root `.env` for `DB_PASSWORD`), so the on-disk env files are a
-**derived artifact** — a from-scratch VPS rebuild restores credentials instead of silently dropping
-email / auth / DB access. Each key is written **only when its secret is non-empty**; an unset secret
-leaves the existing on-disk value untouched (safe to add a key before its secret is populated). Keys
-not in the script (e.g. `JWT_MIN_IAT`, `JWT_ALGORITHM`, and non-secret config) are never touched.
+Two properties follow. In the steady state a deploy contacts no third-party release URL. Also, a
+digest pins the executable that runs with the SSH key of the VPS, and the workflow does not trust the
+file on arrival.
 
-**How `scripts/sync-prod-env.sh` works:** the deploy workflow exports the managed keys as environment
-variables (from `${{ secrets.* }}`) and runs the script from the checkout root on the VPS. For each
-managed key it calls an `upsert KEY VALUE FILE` helper that:
-1. **skips empty values** — if the secret is unset/empty, the key is left exactly as it is on disk (no
-   clobber), which is why adding a new managed key before its secret exists is a safe no-op;
-2. **replaces or appends** — strips any existing `KEY=` line and writes the fresh `KEY=value`, so there
-   are never duplicate lines and the value is updated in place;
-3. **writes atomically** — builds a temp file and `mv`s it over the target, so a crash mid-write can't
-   leave a half-written env file.
+The pinned version and the checksum are in that one file. Change the two together, and take the value
+from the `checksums.txt` file of the release.
 
-It targets `server/.env` for every managed key and additionally mirrors `DB_PASSWORD` into the root
-`.env` (consumed by the `db`/postgres service), then `chmod 600`s both files. It only ever touches the
-keys in its own list — any other line in `server/.env` (non-secret config, `JWT_MIN_IAT`, comments) is
-preserved byte-for-byte. The script's header comment is the authoritative reference for the key list.
+Each workflow that opens an SSH session to the VPS uses the composite action. Those workflows are
+`deploy.yml`, `rollback.yml`, `rebuild.yml` and `rotate-keys.yml`.
+
+The same action also computes the SHA256 fingerprint of the `VPS_HOST_KEY` secret and gives it as an
+output. Each of the four workflows passes that output to the `fingerprint` input of the SSH action.
+
+That fingerprint is what makes the client verify *which* host it authenticates to. With no fingerprint
+the client accepts the key of whichever host answers. A runner starts each run with an empty
+`known_hosts` file. Thus the first-use trust gap opens again at each deploy, with the deploy key and
+21 other secrets on the other side of it.
+
+The derivation lives in the composite action, thus it is in one place and not in four. An empty secret
+fails the step, and it does not restore the unverified behavior silently.
+
+The `resolve` job of `rollback.yml` does not check out the repository. Thus it writes
+`~/.ssh/known_hosts` from the same secret itself, and it connects with `StrictHostKeyChecking=yes`.
+
+`.github/dependabot.yml` keeps the `@sha256` base-image digests in `server/Dockerfile` and
+`client/Dockerfile` current. It uses the docker ecosystem each week, and it ignores a major bump of
+`node` and of `nginx`. Thus a build is reproducible and still gets reviewed upstream base updates.
+
+The two deploy paths refresh the checkout on the host with `git pull --ff-only`. Then they check out
+`docker-compose.yml` at the commit of the images that they deploy. Thus a merge that lands during a
+deploy cannot pair a newer compose file with older images. `rollback.yml` does the same for its own
+target SHA. The next run restores the file before it pulls.
+
+Each workflow that touches the VPS shares the `deploy-production` concurrency group, thus there is no
+race condition. `rollback.yml` is the one member with `cancel-in-progress: true`. Thus an emergency
+rollback stops whichever run holds the group, and it does not wait behind it. Without that setting, a
+wedged deploy blocks the rollback that must undo it.
+
+Each job that opens an SSH session also has a `timeout-minutes` value. A person observed that the
+connect timeout and the command timeout of the SSH action do not always end a session against a host
+that does not answer.
+
+### Production credentials and secrets
+
+**Model.** Each production secret is a **GitHub repository secret**, and that is the single source of
+truth.
+
+On each `deploy.yml` and `rebuild.yml` run, after the `git pull`, `scripts/sync-prod-env.sh` writes
+the secrets into the VPS file `server/.env`. It also writes `DB_PASSWORD` into the root `.env` file.
+Thus the env files on disk are a **derived artifact**. A rebuild of the VPS from nothing restores the
+credentials, and it does not drop the email, authentication or DB access silently.
+
+The script writes a key **only when its secret is not empty**. An unset secret leaves the value on
+disk unchanged. Thus it is safe to add a key before a person fills its secret. The script never
+touches a key that is not in its list, for example `JWT_MIN_IAT`, `JWT_ALGORITHM` and the non-secret
+configuration.
+
+**How `scripts/sync-prod-env.sh` operates.** The deploy workflow exports the managed keys as
+environment variables, from `${{ secrets.* }}`. Then it runs the script from the checkout root on the
+VPS. For each managed key the script calls an `upsert KEY VALUE FILE` helper. That helper does three
+things:
+
+1. **It skips an empty value.** If the secret is unset or empty, the key on disk stays exactly as it
+   is. For that reason it is safe to add a new managed key before its secret exists.
+2. **It replaces the line or appends it.** It removes an existing `KEY=` line and writes a new
+   `KEY=value` line. Thus there is never a duplicate line, and the value updates in place.
+3. **It writes atomically.** It builds a temporary file and moves it over the target. Thus a crash in
+   the middle of a write cannot leave a half-written env file.
+
+The script targets `server/.env` for each managed key. It also mirrors `DB_PASSWORD` into the root
+`.env` file, which the `db` postgres service reads. Then it sets the mode of the two files to `600`.
+
+The script touches only the keys in its own list. It keeps each other line of `server/.env` byte for
+byte, including the non-secret configuration, `JWT_MIN_IAT` and each comment. The header comment of
+the script is the authoritative reference for the key list.
 
 **Secret inventory:**
 
 | GitHub secret | Used by | Injected into | Notes |
 |---|---|---|---|
-| `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` | all VPS workflows | — (SSH auth) | how Actions reaches the VPS |
-| `VPS_HOST_KEY` | all VPS workflows | — (SSH host verification) | The VPS host's public key, one line in `ssh-keyscan` output format. Every SSH job verifies the far side against it before authenticating, so a redirected connection cannot collect the deploy key and the secrets forwarded with it. **An empty value fails the job by design** — the SSH client silently skips verification when it has no key to check against. **It must be the host's ECDSA key**: the host answers with whichever of its three host keys the client asks for, and the Go client inside `drone-ssh` prefers `ecdsa-sha2-nistp256`, so an `ssh-ed25519` value fails every job with `host key fingerprint mismatch` — while local OpenSSH, which prefers ed25519, verifies against it happily and makes the wrong key look correct. Re-take it (`ssh-keyscan -t ecdsa <host>`, checked against `/etc/ssh/ssh_host_ecdsa_key.pub` read on the host itself) if the host is ever reinstalled; a reboot or a resize keeps the same key. |
-| `GITHUB_TOKEN` | all | — (GHCR login) | auto-provided by Actions |
-| `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_ROOT_URL` | deploy, rebuild | `docker-compose.yml` `${}` | Grafana container env. An empty `GRAFANA_ADMIN_PASSWORD` aborts the deploy (no silent `admin` default in prod). |
-| `ALERT_WEBHOOK_URL` | deploy, rebuild | root `.env` → `docker-compose.yml` `${}` | Where Grafana POSTs firing alerts. An empty value aborts the deploy: Grafana exits at startup when a provisioned webhook has no URL. Treat as a capability — anyone who can POST to it can inject fake alerts. |
-| `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` | deploy, rebuild, rotate-keys | `server/.env` | RS256 keypair (base64 PEM) |
-| `DB_PASSWORD` | deploy, rebuild | `server/.env` + root `.env` | must equal the postgres volume's password — see caveat below |
-| `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_SECRET`, `VK_CLIENT_SECRET` | deploy, rebuild | `server/.env` | OAuth client secrets |
-| `ADMIN_PASSWORD` | deploy, rebuild | `server/.env` | initial-admin bootstrap password |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | deploy, rebuild | `server/.env` | outgoing email |
-| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | deploy, rebuild | `server/.env` | Cloudflare Turnstile CAPTCHA on `/register` and `/forgot-password`. Site key is public but injected the same way for rebuild-safety; CAPTCHA stays disabled while either is empty — see [Enabling CAPTCHA in production](server/README.md#enabling-captcha-in-production) |
-| `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` | deploy, rebuild | `server/.env` | Billing provider credentials. Billing stays hidden until a provider's full pair is set; left empty until a provider is connected |
-| `CI_JWT_SECRET` | ci.yml | — (CI tests only) | not used in prod |
+| `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` | all VPS workflows | - (SSH auth) | How Actions reaches the VPS |
+| `VPS_HOST_KEY` | all VPS workflows | - (SSH host verification) | The public key of the VPS host, as one line in the `ssh-keyscan` output format. Each SSH job verifies the far side against it before it authenticates. Thus a redirected connection cannot collect the deploy key and the secrets with it. **An empty value fails the job by design**, because the SSH client skips the verification silently when it has no key to compare against. **The value must be the ECDSA key of the host.** The host answers with the host key that the client asks for. The Go client inside `drone-ssh` prefers `ecdsa-sha2-nistp256`. Thus an `ssh-ed25519` value fails each job with `host key fingerprint mismatch`. Local OpenSSH prefers ed25519 and verifies against such a value without an error, thus the incorrect key looks correct. Take the key again if a person reinstalls the host: run `ssh-keyscan -t ecdsa <host>` and compare it with `/etc/ssh/ssh_host_ecdsa_key.pub`, read on the host itself. A reboot or a resize keeps the same key. |
+| `GITHUB_TOKEN` | all | - (GHCR login) | Actions supplies it automatically |
+| `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_ROOT_URL` | deploy, rebuild | `docker-compose.yml` `${}` | Environment of the Grafana container. An empty `GRAFANA_ADMIN_PASSWORD` stops the deploy, thus production gets no silent `admin` default. |
+| `ALERT_WEBHOOK_URL` | deploy, rebuild | root `.env`, then `docker-compose.yml` `${}` | The address to which Grafana POSTs a firing alert. An empty value stops the deploy, because Grafana exits at startup when a provisioned webhook has no URL. Treat the URL as a capability: a person who can POST to it can inject false alerts. |
+| `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` | deploy, rebuild, rotate-keys | `server/.env` | The RS256 keypair, as base64 PEM |
+| `DB_PASSWORD` | deploy, rebuild | `server/.env` and root `.env` | It must be equal to the password of the postgres volume. Refer to the caution below |
+| `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_SECRET`, `VK_CLIENT_SECRET` | deploy, rebuild | `server/.env` | The OAuth client secrets |
+| `ADMIN_PASSWORD` | deploy, rebuild | `server/.env` | The password of the initial administrator |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | deploy, rebuild | `server/.env` | Outgoing email |
+| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | deploy, rebuild | `server/.env` | The Cloudflare Turnstile CAPTCHA on `/register` and `/forgot-password`. The site key is public, but the workflow injects it in the same way for safety during a rebuild. The CAPTCHA stays disabled while one of the two is empty. Refer to [Enabling CAPTCHA in production](server/README.md#enabling-captcha-in-production) |
+| `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` | deploy, rebuild | `server/.env` | The credentials of the billing providers. Billing stays hidden until the full pair of a provider has a value. Keep them empty until a person connects a provider |
+| `CI_JWT_SECRET` | ci.yml | - (CI tests only) | Production does not use it |
 
-> **`DB_PASSWORD` caveat:** postgres bakes the password into its data volume on first init. Changing
-> the `DB_PASSWORD` secret does **not** re-key an existing volume — the app would then fail to connect.
-> Keep the secret equal to the live password; to truly rotate it, change it inside postgres too.
+> **Caution about `DB_PASSWORD`.** Postgres writes the password into its data volume at the first
+> initialization. A change of the `DB_PASSWORD` secret does **not** change the key of an existing
+> volume, and the application then cannot connect. Keep the secret equal to the live password. To
+> rotate it truly, change it inside postgres too.
 
-**Hand-maintained (not secrets, set directly in the VPS `server/.env`):** non-secret config —
-`CLIENT_URL`, `CORS_ORIGINS`, `TRUSTED_PROXIES`, OAuth client **IDs** (`GOOGLE_CLIENT_ID`, …),
-`ADMIN_EMAIL`, `JWT_ALGORITHM`, `JWT_MIN_IAT` (set by `rotate-keys.yml`), `BILLING_DEFAULT_CURRENCY`,
-DB pool / logging settings.
+**Hand-maintained values, which are not secrets.** Set these directly in the VPS file `server/.env`.
+They are the non-secret configuration: `CLIENT_URL`, `CORS_ORIGINS`, `TRUSTED_PROXIES`, the OAuth
+client **IDs** such as `GOOGLE_CLIENT_ID`, `ADMIN_EMAIL`, `JWT_ALGORITHM`, `JWT_MIN_IAT` (which
+`rotate-keys.yml` sets), `BILLING_DEFAULT_CURRENCY`, and the DB pool and logging settings.
 
-**From-scratch VPS provisioning checklist:**
-1. Install Docker + Compose; create the `deploy` user and `/home/deploy/nexus`; clone the repo there.
-2. Ensure the `shared-network` Docker network exists and Caddy routes `/api`→`server`, `/nexus`→`client`.
-3. Populate the GitHub secrets in the inventory above (all of them).
-4. Create `server/.env` from `server/.env.example` and fill the **hand-maintained** (non-secret) keys;
-   leave the secret-managed keys empty — the deploy will inject them.
-5. Create root `.env` from `.env.example` (`DB_NAME`, `DB_USER`, image names); leave `DB_PASSWORD`
-   empty (injected).
-6. Trigger `deploy.yml` (`workflow_dispatch`). The sync script fills the secret-managed keys, the stack
-   comes up, and `/api/health/ready` should report `database/redis/smtp: up`.
+**Checklist to provision a VPS from nothing:**
+
+1. Install Docker and Compose. Make the `deploy` user and the directory `/home/deploy/nexus`. Clone
+   the repository there.
+2. Make sure that the `shared-network` Docker network exists. Make sure that Caddy routes `/api` to
+   `server` and `/nexus` to `client`.
+3. Fill each GitHub secret in the inventory above.
+4. Make `server/.env` from `server/.env.example`. Fill the **hand-maintained** non-secret keys. Leave
+   the secret-managed keys empty, because the deploy injects them.
+5. Make the root `.env` from `.env.example`, with `DB_NAME`, `DB_USER` and the image names. Leave
+   `DB_PASSWORD` empty, because the deploy injects it.
+6. Start `deploy.yml` with `workflow_dispatch`. The sync script fills the secret-managed keys. The
+   stack starts, and `/api/health/ready` reports `database/redis/smtp: up`.
 
 ---
 
 ## API Documentation
 
-Swagger docs are available at http://localhost:3000/swagger when the server is running in `local` or `development` environments. Can be enabled in any environment via `SWAGGER_ENABLED=true`.
+The Swagger documentation is at http://localhost:3000/swagger. It is available while the server runs
+in the `local` or `development` environment. To enable it in another environment, set
+`SWAGGER_ENABLED=true`.
 
-API base URL: `/api/v1`
+The base URL of the API is `/api/v1`.
 
 ### Endpoints
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/auth/register` | None | Register a new user |
-| POST | `/auth/login` | None | Login — sets `refresh_token` HttpOnly cookie, returns access token |
-| POST | `/auth/refresh-token` | None | Refresh access token (reads `refresh_token` cookie, rotates cookie) |
-| POST | `/auth/logout` | Bearer | Logout, revokes refresh tokens |
-| GET | `/auth/profile` | Bearer | Get current user profile |
-| PATCH | `/auth/profile` | Bearer | Update own profile (name, password); `currentPassword` required when changing password (OAuth-only users may omit) |
-| POST | `/auth/profile/email/initiate` | Bearer | Start self-service email change (throttled 3/h; requires current password; rejects OAuth-only accounts) |
-| POST | `/auth/profile/email/confirm` | None | Confirm email change with the token sent to the new address (applies change in a transaction, revokes all sessions) |
-| GET | `/auth/oauth/:provider` | None | Initiate OAuth login (google, facebook, vk) |
-| GET | `/auth/oauth/:provider/callback` | None | OAuth provider callback |
-| POST | `/auth/verify-email` | None | Verify email with token |
-| POST | `/auth/resend-verification` | None | Resend verification email |
-| POST | `/auth/forgot-password` | None | Request password reset email; CAPTCHA token required when near rate limit |
-| GET | `/auth/captcha-config` | None | Public CAPTCHA configuration (site key, enabled flag) |
-| POST | `/auth/reset-password` | None | Reset password with token |
-| POST | `/auth/oauth/link-init` | Bearer | Initiate OAuth account linking — sets a short-lived link cookie so the next OAuth flow attaches the provider to the current user |
-| POST | `/auth/oauth/exchange` | None | Exchange the post-callback OAuth-data cookie for the auth response (access token + refresh cookie) |
-| GET | `/auth/oauth/accounts` | Bearer | List linked OAuth accounts |
-| DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink OAuth provider |
-| GET | `/auth/permissions` | Bearer | Get current user's resolved permissions |
-| GET | `/users` | `users:search` | List all users (paginated; `includeDeleted=true` to include soft-deleted) |
-| GET | `/users/search` | `users:search` | Search users (paginated + filters: `q` (unified substring across id/email/firstName/lastName), email, firstName, lastName, `role` (exact role name), isActive; `includeDeleted=true`). String filters are capped at 255 chars and the boolean filters accept only `true`/`false` — anything else is a 400 |
-| GET | `/users/cursor` | `users:search` | List users with cursor-based (keyset) pagination |
-| GET | `/users/search/cursor` | `users:search` | Search users with cursor-based pagination + same filters as `/users/search` |
-| GET | `/users/:id` | `users:read` | Get user by ID |
-| GET | `/users/:id/permissions` | `users:read` | Get effective permissions (roles + resolved permissions + packed CASL rules) |
-| POST | `/users` | `users:create` | Create user |
-| PATCH | `/users/:id` | `users:update` | Update user (email, name, password, `isActive` deactivate/reactivate, `unlockAccount`); a password or email change revokes the target's sessions |
-| DELETE | `/users/:id` | `users:delete` | Soft-delete user (sets `deleted_at`, revokes sessions) |
-| POST | `/users/:id/restore` | `users:delete` | Restore soft-deleted user (clears `deleted_at`; leaves `isActive` untouched) |
-| POST | `/roles` | `roles:create` | Create role |
-| GET | `/roles` | `roles:read` | List roles with permissions |
-| GET | `/roles/:id` | `roles:read` | Get role by ID |
-| PATCH | `/roles/:id` | `roles:update` | Update role |
-| DELETE | `/roles/:id` | `roles:delete` | Delete role |
-| GET | `/roles/permissions` | `roles:read` | List all available permissions |
-| GET | `/roles/:id/permissions` | `roles:read` | Get permissions assigned to a specific role |
-| PUT | `/roles/:id/permissions` | `roles:update` | Bulk-replace the full permission set for a role |
-| POST | `/roles/:id/permissions` | `roles:update` | Assign permissions to role |
-| DELETE | `/roles/:id/permissions/:permId` | `roles:update` | Remove permission from role |
-| POST | `/roles/assign/:userId` | `roles:assign` | Assign role to user (404 when the user is unknown or soft-deleted) |
-| DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove role from user (404 when the user is unknown or soft-deleted) |
-| GET | `/notifications/stream` | Bearer | SSE stream — pushes `session_invalidated`, `permissions_updated`, `user_crud_events` (only to clients with `users:search`) |
-| GET | `/rbac/metadata` | `permissions:read` | Get RBAC metadata (resources + actions); Redis-cached 60s |
-| GET | `/rbac/resources` | `permissions:read` | List all resources |
-| PATCH | `/rbac/resources/:id` | `permissions:update` | Update resource display info |
-| POST | `/rbac/resources/:id/restore` | `permissions:update` | Restore an orphaned resource; 400 if controller not registered |
-| GET | `/rbac/actions` | `permissions:read` | List all actions |
+| POST | `/auth/login` | None | Log in. Sets the `refresh_token` HttpOnly cookie and returns an access token |
+| POST | `/auth/refresh-token` | None | Refresh the access token. Reads the `refresh_token` cookie and rotates it |
+| POST | `/auth/logout` | Bearer | Log out. Revokes the refresh tokens |
+| GET | `/auth/profile` | Bearer | Get the profile of the current user |
+| PATCH | `/auth/profile` | Bearer | Update your own profile: the name and the password. `currentPassword` is necessary for a password change. A user with OAuth only can omit it |
+| POST | `/auth/profile/email/initiate` | Bearer | Start a self-service email change. Throttled to 3 calls each hour. Requires the current password. Rejects an account with OAuth only |
+| POST | `/auth/profile/email/confirm` | None | Confirm an email change with the token from the new address. Applies the change in a transaction and revokes each session |
+| GET | `/auth/oauth/:provider` | None | Start an OAuth login. The providers are google, facebook and vk |
+| GET | `/auth/oauth/:provider/callback` | None | Callback of the OAuth provider |
+| POST | `/auth/verify-email` | None | Verify an email address with a token |
+| POST | `/auth/resend-verification` | None | Send the verification email again |
+| POST | `/auth/forgot-password` | None | Request a password reset email. A CAPTCHA token is necessary near the rate limit |
+| GET | `/auth/captcha-config` | None | Public CAPTCHA configuration: the site key and the enabled flag |
+| POST | `/auth/reset-password` | None | Reset the password with a token |
+| POST | `/auth/oauth/link-init` | Bearer | Start an OAuth account link. Sets a cookie with a short life, thus the next OAuth flow attaches the provider to the current user |
+| POST | `/auth/oauth/exchange` | None | Exchange the OAuth-data cookie from the callback for the auth response: an access token and a refresh cookie |
+| GET | `/auth/oauth/accounts` | Bearer | List the linked OAuth accounts |
+| DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink an OAuth provider |
+| GET | `/auth/permissions` | Bearer | Get the resolved permissions of the current user |
+| GET | `/users/cursor` | `users:search` | List the users with cursor (keyset) pagination. `includeDeleted=true` adds the soft-deleted rows |
+| GET | `/users/search/cursor` | `users:search` | Search the users with cursor pagination. The filters are `q` (a substring across the id, email, firstName and lastName), `email`, `firstName`, `lastName`, `role` (an exact role name) and `isActive`. `includeDeleted=true` adds the soft-deleted rows. A string filter has a cap of 255 characters. A boolean filter accepts `true` or `false` only, and each other value is a 400 |
+| GET | `/users/:id` | `users:read` | Get a user by ID |
+| GET | `/users/:id/permissions` | `users:read` | Get the effective permissions: the roles, the resolved permissions and the packed CASL rules |
+| POST | `/users` | `users:create` | Create a user |
+| PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change or an email change revokes the sessions of the target |
+| DELETE | `/users/:id` | `users:delete` | Soft-delete a user. Sets `deleted_at` and revokes the sessions |
+| POST | `/users/:id/restore` | `users:delete` | Restore a soft-deleted user. Clears `deleted_at` and does not change `isActive` |
+| POST | `/roles` | `roles:create` | Create a role |
+| GET | `/roles` | `roles:read` | List the roles with their permissions |
+| GET | `/roles/:id` | `roles:read` | Get a role by ID |
+| PATCH | `/roles/:id` | `roles:update` | Update a role |
+| DELETE | `/roles/:id` | `roles:delete` | Delete a role |
+| GET | `/roles/permissions` | `roles:read` | List each available permission |
+| GET | `/roles/:id/permissions` | `roles:read` | Get the permissions of one role |
+| PUT | `/roles/:id/permissions` | `roles:update` | Replace the full permission set of a role |
+| POST | `/roles/:id/permissions` | `roles:update` | Assign permissions to a role |
+| DELETE | `/roles/:id/permissions/:permId` | `roles:update` | Remove a permission from a role |
+| POST | `/roles/assign/:userId` | `roles:assign` | Assign a role to a user. Answers 404 when the user is unknown or soft-deleted |
+| DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove a role from a user. Answers 404 when the user is unknown or soft-deleted |
+| GET | `/notifications/stream` | Bearer | The SSE stream. It pushes `session_invalidated`, `permissions_updated` and `user_crud_events`. The last one goes only to a client with `users:search` |
+| GET | `/rbac/metadata` | `permissions:read` | Get the RBAC metadata: the resources and the actions. Redis caches it for 60 s |
+| GET | `/rbac/resources` | `permissions:read` | List each resource |
+| PATCH | `/rbac/resources/:id` | `permissions:update` | Update the display data of a resource |
+| POST | `/rbac/resources/:id/restore` | `permissions:update` | Restore an orphaned resource. Answers 400 when no controller registers it |
+| GET | `/rbac/actions` | `permissions:read` | List each action |
 | POST | `/rbac/actions` | `permissions:create` | Create a new action |
-| PATCH | `/rbac/actions/:id` | `permissions:update` | Update action |
-| DELETE | `/rbac/actions/:id` | `permissions:delete` | Delete custom action |
-| GET | `/feature-flags` | None (optional) | Evaluate the flag set for the caller (authenticated → flags they resolve true + `public` flags; anonymous → `public: true` only) |
-| GET | `/admin/feature-flags` | `feature-flags:manage` | List all feature flags (admin) |
+| PATCH | `/rbac/actions/:id` | `permissions:update` | Update an action |
+| DELETE | `/rbac/actions/:id` | `permissions:delete` | Delete a custom action |
+| GET | `/feature-flags` | None (optional) | Evaluate the flag set for the caller. An authenticated caller gets the flags that resolve true plus the `public` flags. An anonymous caller gets the `public: true` flags only |
+| GET | `/admin/feature-flags` | `feature-flags:manage` | List each feature flag |
 | GET | `/admin/feature-flags/:id` | `feature-flags:manage` | Get a feature flag by ID |
 | POST | `/admin/feature-flags` | `feature-flags:manage` | Create a feature flag |
-| PATCH | `/admin/feature-flags/:id` | `feature-flags:manage` | Update a feature flag (optimistic locking via `If-Match`) |
+| PATCH | `/admin/feature-flags/:id` | `feature-flags:manage` | Update a feature flag. Uses optimistic locking through `If-Match` |
 | DELETE | `/admin/feature-flags/:id` | `feature-flags:manage` | Delete a feature flag |
-| PUT | `/admin/feature-flags/:id/rules` | `feature-flags:manage` | Bulk-replace a flag's targeting rules |
-| POST | `/admin/feature-flags/:id/preview` | `feature-flags:manage` | Preview how a flag evaluates for given attributes without saving |
-| POST | `/admin/feature-flags/:id/toggle` | `feature-flags:manage` | Enable/disable a flag |
+| PUT | `/admin/feature-flags/:id/rules` | `feature-flags:manage` | Replace the targeting rules of a flag |
+| POST | `/admin/feature-flags/:id/preview` | `feature-flags:manage` | Show how a flag evaluates for given attributes, and save nothing |
+| POST | `/admin/feature-flags/:id/toggle` | `feature-flags:manage` | Enable or disable a flag |
 
 ## Available Commands
 
-> `format` / `format:check` cover every TypeScript and ESM file the workspace owns, not just `src/` — root-level configs (`eslint.config.*`, `playwright.config.ts`, `proxy.conf.mjs`, …) and `scripts/` are included. The `shared/` module and root-level `*.mjs` configs are formatted from `server/`, since they belong to no single workspace.
+> `format` and `format:check` cover each TypeScript file and each ESM file that the workspace owns.
+> They do not cover `src/` only. They include the root-level configuration files, such as
+> `eslint.config.*`, `playwright.config.ts` and `proxy.conf.mjs`, and they include `scripts/`. The
+> `shared/` module and the root-level `*.mjs` configuration files are formatted from `server/`,
+> because they belong to no single workspace.
 
-> `typecheck` exists in all three workspaces and is not redundant with `build`: `build` only typechecks what it compiles. `server/`'s `tsconfig.build.json` excludes `test/`, `*.spec.ts` and `common/testing/`; the client's `ng build` covers the `app` project only, and Playwright transpiles without typechecking, so `e2e/` is checked by nothing else. Each script runs the real project configs, never the base `tsconfig.json` — the client's base config is not a compilable program on its own (`e2e/` needs `types: ["node"]` and ESNext modules, specs need `lib: esnext.disposable`, the app project needs `types: []`). Run it in every affected workspace before pushing.
+> `typecheck` exists in the three workspaces, and it is not redundant with `build`. `build` typechecks
+> only the files that it compiles. The `tsconfig.build.json` file of `server/` excludes `test/`,
+> `*.spec.ts` and `common/testing/`. The `ng build` command of the client covers the `app` project
+> only, and Playwright transpiles the tests without a typecheck. Thus no other gate examines `e2e/`.
+>
+> Each script runs the true project configurations, and never the base `tsconfig.json`. The base
+> configuration of the client is not a compilable program by itself: `e2e/` needs `types: ["node"]`
+> and ESNext modules, the specs need `lib: esnext.disposable`, and the app project needs `types: []`.
+> Run the script in each affected workspace before you push.
 
-> The client splits the gate in two: `typecheck` (app + spec projects) and `typecheck:e2e` (e2e project + `playwright.config.ts`). They are separate because `e2e/` fixtures import mock-server sources, so the e2e project only typechecks where that workspace is installed — locally, and in the `Client E2E` CI job. Run both before pushing a client change.
+> The client splits the gate in two: `typecheck` for the app and spec projects, and `typecheck:e2e`
+> for the e2e project and `playwright.config.ts`. They are separate because the `e2e/` fixtures import
+> mock-server sources. Thus the e2e project typechecks only where that workspace is installed, that is
+> on a local machine and in the `Client E2E` CI job. Run the two before you push a client change.
 
 ### Mock Server (`cd mock-server`)
 
 ```bash
 npm start                  # Start mock server (port 3000)
 npm run start:dev          # Start with watch mode (ts-node-dev)
-npm run typecheck          # tsc --noEmit (no build script — this is the type gate)
+npm run typecheck          # tsc --noEmit (no build script - this is the type gate)
 npm run lint               # Lint check
 npm run format:check       # Prettier check
 npm run check:imports      # Repo-wide cycle + barrel check (same script in all workspaces)
@@ -829,40 +1482,77 @@ npm run release            # Bump versions, generate CHANGELOG.md, create git ta
 
 ### Client
 
-- **Standalone components** (no NgModules), all using `OnPush` change detection
-- **Lazy loading** via `loadComponent` on all routes
-- **NgRx Signal Store** for state management (`AuthStore` global, `UsersStore` route-level)
-- **HTTP interceptors**: JWT (auto-attach token, handle 401 refresh) and error (snackbar notifications)
-- **Guards**: `authGuard` (checks authentication + token refresh), `permissionGuard(action, subject)` (typed CASL check for route-level access), `adminPanelGuard` (OR check: search/User OR read/Role OR read/Permission), `guestGuard` (redirects authenticated users); `PermissionsGuard` checks RBAC permissions on server
-- **Path aliases**: `@core/*`, `@features/*`, `@shared/*`
+- **Standalone components.** No component uses an NgModule, and each component uses `OnPush` change
+  detection.
+- **Loading on demand.** Each route uses `loadComponent`.
+- **NgRx Signal Store** manages the state. `AuthStore` is global, and `UsersStore` is at route level.
+- **HTTP interceptors.** The JWT interceptor attaches the token and handles a 401 refresh. The error
+  interceptor shows the snackbar notifications.
+- **Guards.** `authGuard` checks the authentication and refreshes the token. `permissionGuard(action,
+  subject)` does a typed CASL check for a route. `adminPanelGuard` does an OR check on search/User,
+  read/Role and read/Permission. `guestGuard` sends an authenticated user away. On the server,
+  `PermissionsGuard` checks the RBAC permissions.
+- **Path aliases.** They are `@core/*`, `@features/*` and `@shared/*`.
 
 ### Server
 
-- **Modular NestJS architecture** with dynamic root `CoreModule`
-- **Passport strategies**: `LocalStrategy` (email/password), `JwtStrategy` (Bearer token; verifies signature and `tokenRevokedAt`, extracts `{ userId, email, roles }`), `GoogleStrategy`, `FacebookStrategy`, `VkStrategy` (OAuth, conditionally registered)
-- **Secure-by-default routing**: `JwtAuthGuard` is registered globally via `APP_GUARD`; every endpoint requires a valid Bearer token unless explicitly opted out with `@Public()`. The `check-auth-coverage` e2e suite iterates the per-feature route manifests under `contracts/routes/` to enforce that no protected endpoint accidentally goes unauthenticated.
-- **RBAC**: `RolesModule` provides `PermissionsGuard`, `PolicyEvaluatorService`, `PermissionService`, `CaslAbilityFactory`. `@Authorize(['action', 'Subject'])` typed tuples replace `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` on all protected endpoints
-- **Request pipeline**: Global middleware -> Module middleware -> Guards -> Interceptors -> Pipes -> Controller
-- **Pagination**: Offset-based (`PaginationQueryDto` / `PaginatedResponseDto<T>`) and cursor-based (`CursorPaginationQueryDto` / `CursorPaginatedResponseDto<T>`) — both available, reusable across endpoints
-- **Cron jobs**: Daily expired token cleanup, weekly revoked token cleanup
-- **Swagger** auto-generated API documentation
+- A **modular NestJS architecture** with a dynamic root `CoreModule`.
+- **Passport strategies.** `LocalStrategy` uses the email and the password. `JwtStrategy` uses the
+  Bearer token. It verifies the signature and `tokenRevokedAt`, and it extracts
+  `{ userId, email, roles }`. `GoogleStrategy`, `FacebookStrategy` and `VkStrategy` do the OAuth
+  logins, and the module registers them conditionally.
+- **Routing is secure by default.** `APP_GUARD` registers `JwtAuthGuard` globally. Each endpoint
+  requires a valid Bearer token, and `@Public()` is the only exception. The `check-auth-coverage` e2e
+  suite reads the per-feature route manifests in `contracts/routes/`. Thus no protected endpoint can
+  become unauthenticated by accident.
+- **RBAC.** `RolesModule` supplies `PermissionsGuard`, `PolicyEvaluatorService`, `PermissionService`
+  and `CaslAbilityFactory`. The typed tuple `@Authorize(['action', 'Subject'])` replaces
+  `@UseGuards(JwtAuthGuard, RolesGuard) @Roles()` on each protected endpoint.
+- **Request pipeline.** The order is: global middleware, module middleware, guards, interceptors,
+  pipes, controller.
+- **Pagination.** Each list endpoint is cursor-paginated, through `CursorPaginationQueryDto` and
+  `CursorPaginatedResponseDto<T>`. Offset pagination does not exist in this repository.
+- **Cron jobs.** One job cleans up the expired tokens each day. One job cleans up the revoked tokens
+  each week.
+- **Swagger** makes the API documentation automatically.
 
 ### Database
 
-Nine tables managed via TypeORM migrations:
+TypeORM migrations manage 24 tables. The core tables are below. The billing tables are in
+[`doc/billing-design.md`](doc/billing-design.md), section 3.
 
-- **users** — UUID primary key, email (unique), name, bcrypt password hash (nullable for OAuth-only users), role/active flags, email verification (isEmailVerified, token, expiresAt), preferred `locale` (email language, default `en`), account lockout (failedLoginAttempts, lockedUntil), password reset (token, expiresAt), soft delete (`deleted_at TIMESTAMPTZ NULL`); ManyToMany to roles via user_roles
-- **oauth_accounts** — Linked to users (CASCADE delete), provider + provider_id (unique), timestamps
-- **refresh_tokens** — Linked to users (CASCADE delete), token string (SHA-256 hashed), expiry, revoked flag
-- **roles** — UUID PK, name (unique), description, isSystem flag, isSuper flag; ManyToMany with users
-- **resources** — UUID PK, name (unique), displayName, description, isSystem flag, `is_orphaned` boolean (true when controller was removed; its permissions stop granting, while deny rules keep applying until restored), `allowed_action_names text[]` (null = use all default actions)
-- **actions** — UUID PK, name (unique), displayName, description, isSystem flag, sortOrder
-- **permissions** — UUID PK, resource_id + action_id (unique constraint, FKs to resources and actions)
-- **role_permissions** — FK to roles + permissions, optional jsonb `conditions` column
-- **user_roles** — Join table (user_id, role_id), composite PK
-- **feature_flags** — UUID PK, key (unique), description, enabled, environments `text[]` (GIN-indexed), public, version int, updated_by_user_id, timestamps
-- **feature_flag_rules** — UUID PK, flag_id (FK CASCADE, btree-indexed), priority, type, effect, payload `jsonb`, timestamps
-- **feature** — Auto-increment ID, name, timestamps
+- **users** has a UUID primary key, a unique email address, a name, and a bcrypt password hash. The
+  hash is nullable for a user with OAuth only. The row also holds the role and active flags, the email
+  verification data (`isEmailVerified`, the token and `expiresAt`), the preferred `locale` for the
+  email language with the default `en`, the account lockout data (`failedLoginAttempts` and
+  `lockedUntil`), the password reset data (the token and `expiresAt`), and the soft delete column
+  (`deleted_at TIMESTAMPTZ NULL`). It has a ManyToMany relation to the roles through `user_roles`.
+- **oauth_accounts** links to a user with a CASCADE delete. It holds the provider, the unique
+  provider_id and the timestamps.
+- **refresh_tokens** links to a user with a CASCADE delete. It holds the token string as a SHA-256
+  hash, the expiry and the revoked flag.
+- **roles** has a UUID primary key, a unique name, a description, an `isSystem` flag and an `isSuper`
+  flag. It has a ManyToMany relation to the users.
+- **resources** has a UUID primary key, a unique name, a `displayName`, a description and an
+  `isSystem` flag. The `is_orphaned` boolean is true when a person removed the controller. The
+  permissions of an orphaned resource then give nothing, and a deny rule continues to apply until a
+  person restores it. `allowed_action_names text[]` holds the permitted actions, and `null` means the
+  full set of default actions.
+- **actions** has a UUID primary key, a unique name, a `displayName`, a description, an `isSystem`
+  flag and a `sortOrder`.
+- **permissions** has a UUID primary key, a `resource_id` and an `action_id`. The pair is unique, and
+  the two columns are foreign keys to the resources and the actions.
+- **role_permissions** has a foreign key to the roles and a foreign key to the permissions. It has an
+  optional jsonb `conditions` column.
+- **user_roles** is a join table of `user_id` and `role_id`, with a composite primary key.
+- **audit_logs** holds the security-sensitive operations. Each row has the actor, the target, the IP
+  address and the request id.
+- **feature_flags** has a UUID primary key, a unique key, a description, the `enabled` flag, the
+  `environments text[]` column with a GIN index, the `public` flag, an integer `version`, an
+  `updated_by_user_id` and the timestamps.
+- **feature_flag_rules** has a UUID primary key, a `flag_id` foreign key with CASCADE and a btree
+  index, a priority, a type, an effect, a `jsonb` payload and the timestamps.
+- **feature** has an auto-increment ID, a name and the timestamps.
 
 ## Code Quality
 
@@ -871,75 +1561,77 @@ Nine tables managed via TypeORM migrations:
 | ESLint | Client (angular-eslint, unused-imports, import cycles) | `eslint.config.mjs` |
 | ESLint | Server (@typescript-eslint + prettier, import cycles) | `eslint.config.ts` |
 | ESLint | Mock server (@typescript-eslint + prettier, import cycles) | `eslint.config.ts` |
-| — | All three need `settings['import/parsers']` mapping `.ts` to `@typescript-eslint/parser`, or `import/no-cycle` silently passes on everything | — |
-| ESLint | Shared rules for both workspaces (incl. a `no-restricted-syntax` ban on `as unknown as T` double casts); the client config adds selectors banning the `'admin'` role literal and the rendering of a server `errorKey` outside `parseHttpErrorMessage` | `eslint.base.config.mjs`, `client/eslint.config.mjs` |
-| Prettier | Both (single quotes, no trailing commas) | `.prettierrc` |
-| Stylelint | Client SCSS (recess property order, no `px` units outside breakpoints) | `.stylelintrc.json` |
-| Husky + lint-staged | Pre-commit hook (auto-fix staged files) | `.lintstagedrc.mjs` |
+| - | The three configurations need `settings['import/parsers']` to map `.ts` to `@typescript-eslint/parser`. Without that map, `import/no-cycle` passes on everything silently | - |
+| ESLint | Shared rules for the workspaces. They include a `no-restricted-syntax` ban on an `as unknown as T` double cast. The client configuration adds two selectors: one bans the `'admin'` role literal, and one bans the rendering of a server `errorKey` outside `parseHttpErrorMessage` | `eslint.base.config.mjs`, `client/eslint.config.mjs` |
+| Prettier | All workspaces (single quotes, no trailing commas) | `.prettierrc` |
+| Stylelint | Client SCSS (recess property order, no `px` unit outside a breakpoint) | `.stylelintrc.json` |
+| Husky + lint-staged | Pre-commit hook (auto-fix the staged files) | `.lintstagedrc.mjs` |
 | Commitlint | Conventional Commits enforcement | `client/commitlint.config.mjs` |
-| commit-and-tag-version | Automated versioning + CHANGELOG | `client/.versionrc.json` |
-| check-imports | Repo-wide cycles, barrel rules (all four source roots) | `scripts/check-imports.mjs` |
+| commit-and-tag-version | Automated versioning and CHANGELOG | `client/.versionrc.json` |
+| check-imports | Repo-wide cycles and barrel rules (all four source roots) | `scripts/check-imports.mjs` |
 
 ### Import hygiene and barrels
 
-`npm run check:imports` (available from any of the three workspaces; it walks the
-whole repository, so one run covers everything) enforces four rules:
+`npm run check:imports` is available from each of the three workspaces. It walks the whole repository,
+thus one run covers everything. It enforces four rules:
 
-1. **Dependency cycles are an error.** TypeORM entity files are exempt — a
-   bidirectional relation needs the related class as a value inside a lazily
-   evaluated arrow, so `import type` is not available and the cycle is inherent
-   to the ORM. Cycles whose every edge is `import type` are also skipped, since
-   they are erased at compile time.
-2. **A file must not import through a barrel that lives in its own directory.**
-   Import the sibling module directly. This single pattern is what turns a
-   barrel from a facade into a cycle.
-3. **New barrels are an error.** Four are grandfathered in `ALLOWED_BARRELS`:
-   `shared/src/types`, `shared/src/constants` (the cross-workspace public API of
-   a package all three workspaces consume) plus `server/src/common/dtos` and
+1. **A dependency cycle is an error.** A TypeORM entity file is exempt. A bidirectional relation needs
+   the related class as a value inside an arrow function that runs later. Thus `import type` is not
+   available, and the cycle belongs to the ORM. A cycle in which each edge is an `import type` is also
+   exempt, because the compiler erases those edges.
+2. **A file must not import through a barrel in its own directory.** Import the sibling module
+   directly. This one pattern is what changes a barrel from a facade into a cycle.
+3. **A new barrel is an error.** Four barrels are grandfathered in `ALLOWED_BARRELS`:
+   `shared/src/types` and `shared/src/constants`, which are the cross-workspace public API of a
+   package that the three workspaces consume, plus `server/src/common/dtos` and
    `server/src/modules/core/filters`.
-4. **A directory that has a barrel is entered through it.** No deep path from
-   outside: `from '@app/shared/types'`, never
-   `from '@app/shared/types/role.types'`. Rules 2 and 4 are one principle read
-   from either side — the barrel is a directory's outside face and never its
-   inside face. **Files inside `shared/src/` are exempt and must keep using deep
-   paths**, because routing them through the barrels would close a cycle:
-   `types/index.ts` re-exports `feature-flag.types`, which imports
-   `../constants/feature-flag.constants`, while `constants/index.ts` re-exports
-   `billing-flags.constants`, which imports `../types/billing.types`. That
-   carve-out is `PACKAGE_API_ROOTS` in the script.
+4. **A directory that has a barrel is entered through it.** Use no deep path from outside. Write
+   `from '@app/shared/types'`, and never `from '@app/shared/types/role.types'`.
 
-**Importing from `shared/`:** always through the barrel — `from
-'@app/shared/constants'`, never `from '@app/shared/constants/auth.constants'`.
-Both styles used to be in use; the barrel won because it makes `constants`
-consistent with `types` and because the counter-argument turned out to be
-empty — the client bundle measures 846.90 kB raw with deep imports and 846.83 kB
-with the barrel, so nothing is lost to tree-shaking. A symbol you can only reach
-by deep path is a barrel that needs the export added, not a deep import to
-write. This was convention only until rule 4 was added, and 25 sites had drifted
-off it by then. `shared/src/utils/` and `shared/src/enums/` have no barrel and
-are still imported by full path — rule 4 says nothing about directories without
-one.
+   Rule 2 and rule 4 are one principle from two sides. A barrel is the outside face of a directory,
+   and never its inside face.
 
-The check is written in dependency-free Node rather than as an ESLint rule
-because ESLint cannot lint files outside the directory containing its config, so
-**`shared/` is linted by no workspace** — and that is exactly where the two
-largest barrels live. It carries a `--self-test` that builds synthetic fixtures
-and fails if any detector stops firing; CI runs that before the check itself.
+   **A file inside `shared/src/` is exempt and must keep its deep paths.** A path through the barrels
+   closes a cycle: `types/index.ts` re-exports `feature-flag.types`, which imports
+   `../constants/feature-flag.constants`. At the same time, `constants/index.ts` re-exports
+   `billing-flags.constants`, which imports `../types/billing.types`. `PACKAGE_API_ROOTS` in the script
+   holds that exemption.
 
-`import/no-cycle` additionally runs in all three workspaces so a cycle surfaces
-in the editor while you are writing it, rather than in CI. That rule is the fast
-feedback loop; `check-imports.mjs` is the enforcement, and it is the only one of
-the two that sees `shared/`. `server/` and `mock-server/` exempt `**/*.entity.ts`
-for the TypeORM reason above, matching the script.
+**To import from `shared/`, always use the barrel.** Write `from '@app/shared/constants'`, and never
+`from '@app/shared/constants/auth.constants'`.
 
-> **Changing either cycle rule?** Prove it still detects. Write a throwaway
-> two-file cycle in that workspace's `src/`, confirm ESLint reports it, delete
-> it. A green lint run is not evidence: this rule's failure mode is silence, and
-> it sat dead in the client for exactly that reason.
+The two styles were both in use. The barrel won for two reasons. It makes `constants` consistent with
+`types`. Also, the counter-argument was empty: the client bundle measures 846.90 kB raw with the deep
+imports and 846.83 kB with the barrel, thus tree-shaking loses nothing.
+
+A symbol that you can reach only by a deep path is a barrel that needs the export. It is not a deep
+import to write.
+
+This was a convention only, until rule 4 was added. By that time, 25 sites had moved away from it.
+`shared/src/utils/` and `shared/src/enums/` have no barrel, and a full path still imports from them.
+Rule 4 says nothing about a directory with no barrel.
+
+The check is written in Node with no dependency, and it is not an ESLint rule. ESLint cannot lint a
+file outside the directory that holds its configuration. Thus **no workspace lints `shared/`**, and
+that is exactly where the two largest barrels are.
+
+The script carries a `--self-test` option. That option builds synthetic fixtures and fails if a
+detector stops working. CI runs the self-test before the check itself.
+
+`import/no-cycle` also runs in the three workspaces. Thus a cycle appears in the editor while a person
+writes it, and not later in CI. That rule is the fast feedback loop. `check-imports.mjs` is the
+enforcement, and it is the only one of the two that sees `shared/`. `server/` and `mock-server/`
+exempt `**/*.entity.ts` for the TypeORM reason above, thus they agree with the script.
+
+> **Do you change one of the two cycle rules?** Prove that it still detects a cycle. Write a
+> throwaway two-file cycle in the `src/` directory of that workspace. Confirm that ESLint reports it.
+> Then delete the two files. A green lint run is not evidence. The failure mode of this rule is
+> silence, and for that reason the rule was inactive in the client for a long time.
 
 ### Git Hooks
 
-A pre-commit hook (via [husky](https://typicode.github.io/husky/)) runs **lint-staged** on every commit. It applies auto-fix linting to staged files only:
+A pre-commit hook, through [husky](https://typicode.github.io/husky/), runs **lint-staged** at each
+commit. It applies auto-fix linting to the staged files only:
 
 | Glob | Linter |
 |------|--------|
@@ -953,57 +1645,152 @@ A pre-commit hook (via [husky](https://typicode.github.io/husky/)) runs **lint-s
 | `shared/src/**/*.ts` | Prettier |
 | `{.lintstagedrc.mjs,eslint.base.config.mjs}` | Prettier |
 
-A commit-msg hook (`client/.husky/commit-msg`) additionally runs **commitlint** to enforce [Conventional Commits](https://www.conventionalcommits.org/) format and to reject bare `@name` mentions in the subject or body (see [Versioning](#versioning)).
+A commit-msg hook (`client/.husky/commit-msg`) also runs **commitlint**. It enforces the
+[Conventional Commits](https://www.conventionalcommits.org/) format. It also rejects a bare `@name`
+mention in the subject or in the body. Refer to [Versioning](#versioning).
 
-Husky, lint-staged, and commitlint are installed in the `client/` sub-package. Running `npm install` inside `client/` activates the git hooks via the `prepare` script.
+husky, lint-staged and commitlint are in the `client/` sub-package. An `npm install` inside `client/`
+activates the git hooks through the `prepare` script.
 
 ## Testing
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | `*.spec.ts` alongside source | 1987 tests passing |
-| Server E2E tests | Jest | Separate config in `test/` | 347 tests; database and mail settings come from the environment first and `.env` for the rest, so a local `npm run test:e2e` reports 346 passing and 1 skipped (the mail suite, until `SMTP_HOST` points at a sink). CI runs without Redis and skips 7 |
-| Client unit tests | Vitest | `*.spec.ts` alongside source, runner options in `client/vitest-base.config.mjs` | 1145 tests passing |
-| Client E2E tests | Playwright | `e2e/` directory, uses mock-server (4 parallel workers) | 219 tests passing |
-| Mock server | Express | `mock-server/` directory, provides full API simulation with RBAC support; parity specs in `src/__tests__/` assert its responses match the server's | 429 tests passing |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 1987 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 347 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 346 passed and 1 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1145 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 219 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 429 tests pass |
 
 ## CI/CD
 
-GitHub Actions runs on every push and pull request to `master` with 5 jobs:
+GitHub Actions runs on each push to `master` and on each pull request into `master`. It has 5 jobs:
 
 | Job | Depends on | Steps | Artifacts |
 |-----|-----------|-------|-----------|
-| **Server – Checks** | — | audit (high), lint, format:check, typecheck, check:routes, check:enums, check:permissions, check:i18n (validates all `ErrorKeys` values exist in every client i18n JSON), check:imports (repo-wide, preceded by its own `--self-test`) | — |
-| **Server – Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
-| **Mock Server** | — | audit (high), lint, format:check, typecheck, test | — |
-| **Client** | — | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |
-| **Client E2E** | mock-server | typecheck:e2e (after installing mock-server), ng build → serve (static), Playwright Chromium | HTML report, test results |
+| **Server - Checks** | - | audit (high), lint, format:check, typecheck, check:routes, check:enums, check:permissions, check:i18n, check:imports | - |
+| **Server - Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
+| **Mock Server** | - | audit (high), lint, format:check, typecheck, test | - |
+| **Client** | - | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |
+| **Client E2E** | mock-server | typecheck:e2e (after the mock-server install), ng build, then serve the static output, then Playwright Chromium | HTML report, test results |
 
-Concurrency groups cancel stale runs on rapid pushes. No database or `.env` file required — all tests run against mocks.
+In the `Server - Checks` job, `check:i18n` validates that each `ErrorKeys` value exists in each client
+i18n JSON file. `check:imports` runs repo-wide, after its own `--self-test`.
 
-Every job sets an explicit `timeout-minutes` (10 for the two check jobs, 15 for `Client`, 20 for `Server – Tests & Build` and `Client E2E`). Without one a job inherits the six-hour default, so a hung step burns six hours of runner time before it fails. The bounds are several times each job's normal duration, so only a hang reaches them. Two steps in `Client E2E` carry their own smaller bounds, since a job-level bound turns a stalled step into a 20-minute red check with no test signal: the Playwright browser install (5 min) and `playwright install-deps` (4 min, plus `continue-on-error` - it only adds font packages whose absence changes no assertion, and its runtime depends on the Ubuntu mirror rather than on this repository).
+Concurrency groups cancel a stale run when the pushes are rapid. The tests need no database and no
+`.env` file, because each test runs against a mock.
 
-The `audit (high)` step in all three jobs runs `npm run audit:ci`, which wraps `npm audit --audit-level=high --omit=dev` in `scripts/audit-ci.mjs`. The wrapper exists because `npm audit` POSTs to the registry's advisory endpoint and the underlying fetch layer never retries POST requests, so a single 5xx from the registry reds the job with no source change. It retries up to 3 times, 15 s apart, **only** when the output carries `audit endpoint returned an error`; a genuine high-severity finding still fails on the first attempt.
+Each job sets an explicit `timeout-minutes` value. The two check jobs use 10. `Client` uses 15.
+`Server - Tests & Build` and `Client E2E` use 20.
+
+Without such a value a job takes the default of six hours. A hung step then uses six hours of runner
+time before it fails. Each bound is several times the normal duration of its job, thus only a hang
+reaches it.
+
+Two steps in `Client E2E` carry their own smaller bounds. A job-level bound turns a stalled step into
+a red check after 20 minutes with no test signal. The two steps are the Playwright browser install (5
+minutes) and `playwright install-deps` (4 minutes). The second step also uses `continue-on-error`. It
+adds font packages only, and their absence changes no assertion. Its duration depends on the Ubuntu
+mirror and not on this repository.
+
+The `audit (high)` step in the three jobs runs `npm run audit:ci`. That script wraps
+`npm audit --audit-level=high --omit=dev` in `scripts/audit-ci.mjs`.
+
+The wrapper exists because `npm audit` sends a POST to the advisory endpoint of the registry, and the
+fetch layer below it never retries a POST. Thus one 5xx answer from the registry makes the job red
+with no source change.
+
+The wrapper retries a maximum of 3 times, 15 s apart. It retries **only** when the output holds
+`audit endpoint returned an error`. A true high-severity finding still fails on the first attempt.
 
 ## Security
 
-- Passwords hashed with **bcrypt** (cost factor = 12)
-- **Account lockout** after 5 failed login attempts (15-minute cooldown; cleared by a password reset or by the window elapsing)
-- **Email verification** required before first login
-- **Password reset tokens** are single-use with 30-minute expiry; reset revokes all sessions
-- **Admin password change** immediately revokes all sessions for the target user
-- **Admin email change** does the same — the endpoint exists to recover an account whose address is attacker-controlled, so the previous holder must not keep authenticating with the tokens issued before the move. A resubmitted, unchanged address revokes nothing
-- **Self-service password change** (`PATCH /auth/profile`) requires `currentPassword` to mitigate token theft → permanent account takeover; OAuth-only accounts (no password set) may omit the field when establishing their first password
-- **HttpOnly refresh token cookie** (`SameSite=Strict`, `path=/api/v1/auth`, 7d expiry) — JavaScript cannot read or steal the token (XSS-proof); rotated on every use, and the rotation revokes the presented row conditionally so that two requests racing with the same token produce exactly one live successor - the loser gets a plain 401 rather than a session purge, because a benign double-refresh from two tabs must not log the user out everywhere. **Reuse detection** (OAuth 2.0 BCP / RFC 6819): a revoked refresh token presented before its natural expiry triggers a full session purge for the user, a `TOKEN_REUSE_DETECTED` audit row, and `auth_events_total{event="token_reuse_detected"}` metric increment
-- JWT access tokens (1h) stored in Angular signals only — never written to `localStorage`; user info persisted to `localStorage` (`auth_user` key) only to detect prior sessions on page reload, and validated by a type guard on read — Web Storage is user-writable and survives a deploy, so a value of the wrong shape is discarded instead of trusted. Removing that key doubles as the cross-tab logout signal: the other tabs of the session tear down on the `storage` event instead of staying usable until their in-memory access token expires
-- `@Exclude()` decorator hides password in API responses
-- **RBAC** — dynamic resources and actions with `@RegisterResource` auto-discovery; typed CASL permission checks via `PermissionsGuard` + `@Authorize(['action', 'Subject'])`; instance-level ownership enforcement on user mutations (`update`, `delete`, `restore`), role assignment (super-role escalation prevention) and role permission-set mutations; CASL ability hydrated at bootstrap before route activation; permissions cached per user (5 min); `isSuper` flag on roles bypasses all checks; `*appRequirePermissions="{ action, subject }"` directive for template-level visibility
-- **Audit logging** — 41 security-sensitive actions (login, register, password change/reset, user/role/permission CRUD, OAuth link/unlink, logout, token refresh failures, feature-flag changes, and every admin billing mutation — subscription cancel, invoice refund, webhook-event replay, usage ingest) written to a dedicated `audit_logs` table with actor, target, IP, and request ID
-- **`X-Request-Id` shape validation** — incoming `x-request-id` headers must match `^[A-Za-z0-9_-]{1,64}$`; non-conforming values are replaced with a fresh UUID before reaching audit rows, log lines, or Prometheus labels (prevents log injection and high-cardinality label abuse)
-- `class-validator` on server DTOs with `whitelist: true` and `forbidNonWhitelisted: true` — unknown properties are stripped and requests with undeclared fields are rejected (prevents mass-assignment attacks); Angular `Validators` on client forms
-- **An explicit `null` is not "absent"** — `@IsOptional()` skips every other validator for `null` as well as `undefined`, so an optional field would accept `null` and pass it on unvalidated. An optional field therefore keeps `@IsOptional()` only when its consumer defaults a `null` exactly as it defaults an omitted property (`value ?? fallback`, a truthiness check, or a genuinely nullable column); every other one uses `@ValidateIf(propertyIsDefined)` (`server/src/common/validators/property-is-defined.ts`), and DTOs built with `PartialType` pass the equivalent `{ skipNullProperties: false }`. Two failure shapes have been observed: `PATCH /auth/profile` with `{"password": null}` set the column to NULL and answered 200, leaving the account unable to log in, while the other identity fields turned a 400 into a NOT NULL violation reported as 500; and on the money path `POST /billing/purchase` with `{"amountMinor": null}` slipped past the "amount omitted" guard (`=== undefined`) and then compared as `0` against the product bounds, so a custom-amount product configured with a zero lower bound sent `null` to the payment provider as both the charge and the receipt line. `POST /billing/subscription/cancel` had the same shape one layer down — a `null` `mode` passed straight through the handler's default parameter, which only fills in for an omitted property. `PartialType`'s option does not cover a property the parent class already marks `@IsOptional()` — those are converted in the parent
-- LIKE query pattern escaping to prevent SQL injection via wildcards
-- File upload security: auth required, 5 MB limit, type whitelist, filename sanitization
-- Configurable CORS (permissive only in `local` environment)
-- Angular template escaping for XSS prevention
+- bcrypt hashes each password, with a cost factor of 12.
+- **Account lockout** starts after 5 failed logins. The cooldown is 15 minutes. A password reset
+  clears it, and the end of the window also clears it.
+- **Email verification** is necessary before the first login.
+- A **password reset token** is single-use and expires in 30 minutes. The reset revokes each session.
+- An **administrator password change** immediately revokes each session of the target user.
+- An **administrator email change** does the same. The endpoint exists to recover an account whose
+  address an attacker controls. Thus the previous holder must not continue to authenticate with the
+  tokens from before the change. A resubmitted address that does not change revokes nothing.
+- A **self-service password change** (`PATCH /auth/profile`) requires `currentPassword`. Thus a stolen
+  token cannot become a permanent account takeover. An account with OAuth only has no password, and
+  it can omit the field when it sets its first password.
+- The **refresh token cookie is HttpOnly**, with `SameSite=Strict`, the path `/api/v1/auth` and an
+  expiry of 7 days. JavaScript can neither read nor steal the token, thus XSS cannot take it.
 
+  The server rotates the token at each use. The rotation revokes the presented row conditionally.
+  Thus two requests that race with the same token make exactly one live successor. The loser gets a
+  plain 401 and not a session purge, because a benign double refresh from two tabs must not log the
+  user out everywhere.
+
+  **Reuse detection** follows the OAuth 2.0 BCP and RFC 6819. If a person presents a revoked refresh
+  token before its natural expiry, the server purges the full session of the user. It writes a
+  `TOKEN_REUSE_DETECTED` audit row and increases the
+  `auth_events_total{event="token_reuse_detected"}` metric.
+- A JWT access token lives 1 h and stays in an Angular signal. The app never writes it to
+  `localStorage`.
+
+  The app keeps the user data in `localStorage` under the `auth_user` key, and only to detect a
+  previous session after a page reload. A type guard validates the value on a read. Web Storage is
+  writable by the user and survives a deploy, thus the app discards a value with an incorrect shape
+  instead of trusting it.
+
+  The removal of that key is also the cross-tab logout signal. The other tabs of the session tear down
+  on the `storage` event. Without it they stay usable until their in-memory access token expires.
+- The `@Exclude()` decorator hides the password in an API response.
+- **RBAC.** The resources and the actions are dynamic, and `@RegisterResource` discovers them
+  automatically. `PermissionsGuard` and `@Authorize(['action', 'Subject'])` do the typed CASL
+  permission checks.
+
+  The server enforces instance-level ownership on a user mutation (`update`, `delete` and `restore`),
+  on a role assignment (which prevents an escalation to a super role), and on a mutation of the
+  permission set of a role.
+
+  The app hydrates the CASL ability at bootstrap, before the route activation. It caches the
+  permissions for each user for 5 minutes. The `isSuper` flag on a role bypasses each check. The
+  `*appRequirePermissions="{ action, subject }"` directive controls the visibility in a template.
+- **Audit logging** records 41 security-sensitive actions in the `audit_logs` table. Each row holds
+  the actor, the target, the IP address and the request id. The actions include a login, a
+  registration, a password change, a password reset, the CRUD of a user, a role and a permission, an
+  OAuth link and unlink, a logout, a failed token refresh, a feature-flag change, and each
+  administrator billing mutation. The billing mutations are a subscription cancel, an invoice refund,
+  a webhook-event replay and a usage ingest.
+- **`X-Request-Id` shape validation.** An incoming `x-request-id` header must match
+  `^[A-Za-z0-9_-]{1,64}$`. The server replaces a value that does not match with a new UUID before the
+  value reaches an audit row, a log line or a Prometheus label. Thus a person cannot inject data into
+  a log or make a label with high cardinality.
+- `class-validator` runs on the server DTOs with `whitelist: true` and `forbidNonWhitelisted: true`.
+  The pipe removes an unknown property and rejects a request with an undeclared field. Thus a
+  mass-assignment attack fails. On the client, the Angular `Validators` do the same work.
+- **An explicit `null` is not "absent".** `@IsOptional()` skips each other validator for `null` and
+  for `undefined`. Thus an optional field accepts `null` and passes it on with no validation.
+
+  For that reason an optional field keeps `@IsOptional()` only when its consumer treats a `null`
+  exactly as an omitted property. Three examples are a `value ?? fallback` expression, a truthiness
+  check, and a column that is truly nullable.
+
+  Each other optional field uses `@ValidateIf(propertyIsDefined)`
+  (`server/src/common/validators/property-is-defined.ts`). A DTO that `PartialType` builds passes the
+  equivalent option `{ skipNullProperties: false }`.
+
+  A person observed two failure shapes. First, `PATCH /auth/profile` with `{"password": null}` set the
+  column to NULL and answered 200. The account could then not log in. The other identity fields
+  changed a 400 into a NOT NULL violation, which the server reported as a 500.
+
+  Second, on the money path, `POST /billing/purchase` with `{"amountMinor": null}` got past the guard
+  for an omitted amount, which compared with `=== undefined`. The value then compared as `0` against
+  the product bounds. Thus a custom-amount product with a lower bound of zero sent `null` to the
+  payment provider as the charge and as the receipt line.
+
+  `POST /billing/subscription/cancel` had the same shape one layer lower. A `null` `mode` passed
+  through the default parameter of the handler, which fills in only for an omitted property.
+
+  The option of `PartialType` does not cover a property that the parent class already marks with
+  `@IsOptional()`. Convert such a property in the parent class.
+- The server escapes the pattern of a LIKE query. Thus a wildcard cannot do an SQL injection.
+- File upload security: the route needs authentication. The limit is 5 MB. The server uses a type
+  allowlist and sanitizes the file name.
+- CORS is configurable, and it is permissive only in the `local` environment.
+- Angular escapes a template value. Thus XSS fails.
