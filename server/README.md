@@ -392,7 +392,11 @@ cache, increases the version, and calls `pushToAll` over SSE. It also does a per
 `UserRoleChangedEvent` and on `UserDeletedEvent`.
 
 `utils/validate-rule-payload.util.ts` validates the payload of each rule type separately. It rejects
-a custom attribute key that the registry does not hold.
+a custom attribute key that the registry does not hold. The value check itself is the shared
+`attributeValueError`, which the mock server and the admin rule editor also call, thus the client
+blocks a save that this file would reject. That shared function reads `toTimestamp` from
+`shared/src/utils/feature-flag-timestamp.ts` and not from the evaluator, because the evaluator opens
+with `node:crypto` and the client bundles the validator.
 
 #### billing
 
