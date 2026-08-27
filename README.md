@@ -832,7 +832,10 @@ fullstack-starter-app/
 │       │                   # PermissionResponse, UserPermissionsResponse, etc.
 │       ├── constants/      # PASSWORD_REGEX, cursor page size, SYSTEM_ROLES, MAX_CONCURRENT_SESSIONS,
 │       │                   # ENTITLED/OPEN/CHANGEABLE_SUBSCRIPTION_STATUSES (one definition each), etc.
-│       └── utils/          # feature-flag-evaluator, mongo-query-safety, time (Temporal barrel), money (BigInt value object)
+│       └── utils/          # feature-flag-evaluator (needs node:crypto, server + mock only),
+│                           # feature-flag-attribute-value + feature-flag-timestamp (also imported by
+│                           # the client, thus free of node built-ins), mongo-query-safety,
+│                           # time (Temporal barrel), money (BigInt value object)
 ├── client/                 # Angular 21 SPA
 │   ├── src/app/
 │   │   ├── core/           # Header, theme, storage, error interceptor, 404

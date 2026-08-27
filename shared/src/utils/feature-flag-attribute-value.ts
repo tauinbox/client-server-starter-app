@@ -1,5 +1,5 @@
 import type { FeatureFlagAttributeOp } from '../constants/feature-flag.constants';
-import { toTimestamp } from './feature-flag-evaluator';
+import { toTimestamp } from './feature-flag-timestamp';
 
 export const ATTRIBUTE_VALUE_MAX_LENGTH = 200;
 export const ATTRIBUTE_VALUE_MAX_ITEMS = 100;

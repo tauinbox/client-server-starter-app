@@ -5,6 +5,7 @@ import {
   computed,
   DestroyRef,
   inject,
+  input,
   model,
   output,
   signal
@@ -69,6 +70,28 @@ type AttributePayload = Extract<FeatureFlagRulePayload, { type: 'attribute' }>;
 
 const PERCENT_STEP = 5;
 
+type AttributeScalar = string | number | boolean | null;
+
+function isAttributeScalar(value: unknown): value is AttributeScalar {
+  return (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  );
+}
+
+// The evaluator compares with `===`, so a text box that writes back "true"
+// permanently stops a rule seeded with `true` from matching. A number is taken
+// only when the text round-trips exactly, keeping "007" and "1.50" strings.
+function parseAttributeScalar(raw: string): AttributeScalar {
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  const num = Number(raw);
+  if (Number.isFinite(num) && String(num) === raw) return num;
+  return raw;
+}
+
 function userMatchesTerm(user: User, lowered: string): boolean {
   return (
     user.email.toLowerCase().includes(lowered) ||
@@ -104,6 +127,8 @@ function userMatchesTerm(user: User, lowered: string): boolean {
 })
 export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   readonly rule = model.required<FeatureFlagRuleDraft>();
+  // Translation key for the reason the server would reject this draft, or null.
+  readonly error = input<string | null>(null);
   readonly remove = output<void>();
 
   protected readonly layout = inject(LayoutService);
@@ -149,8 +174,10 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
     const v = payload.value;
     const arr = Array.isArray(v) ? v : [];
     return arr
-      .filter((x): x is string => typeof x === 'string' && x.length > 0)
-      .map((s) => ({ value: s, label: s }));
+      .filter(isAttributeScalar)
+      .map((x) => String(x))
+      .filter((text) => text.length > 0)
+      .map((text) => ({ value: text, label: text }));
   });
 
   readonly #userSearch$ = new Subject<string>();
@@ -379,14 +406,15 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
       // Switching INTO `in`: preserve any existing scalar as the first chip.
       const existing = current.value;
       if (Array.isArray(existing)) nextValue = existing;
-      else if (typeof existing === 'string' && existing.trim().length > 0)
-        nextValue = [existing.trim()];
+      else if (typeof existing === 'string')
+        nextValue = existing.trim().length > 0 ? [existing.trim()] : [];
+      else if (isAttributeScalar(existing)) nextValue = [existing];
       else nextValue = [];
     } else if (current.op === 'in') {
       // Switching OUT of `in`: collapse first chip to a scalar so the new
       // single-input field has a sensible starting value.
       const arr = Array.isArray(current.value) ? current.value : [];
-      nextValue = arr.length > 0 ? String(arr[0]) : '';
+      nextValue = arr.length > 0 && isAttributeScalar(arr[0]) ? arr[0] : '';
     } else {
       nextValue = current.value;
     }
@@ -394,7 +422,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   }
 
   onAttributeValueChange(raw: string): void {
-    this.#patchAttributePayload({ value: raw });
+    this.#patchAttributePayload({ value: parseAttributeScalar(raw) });
   }
 
   onAttributeDateChange(date: Date | null): void {
@@ -411,7 +439,20 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   onAttributeChipsChange(chips: ChipOption[]): void {
     const current = this.rule().payload;
     if (current.type !== 'attribute' || current.op !== 'in') return;
-    this.#patchAttributePayload({ value: chips.map((c) => c.value) });
+    // Map a chip back to the primitive it was rendered from, so an untouched
+    // entry keeps its type and only a newly typed chip reaches the parser.
+    const stored = new Map<string, AttributeScalar>();
+    const arr = Array.isArray(current.value) ? current.value : [];
+    for (const entry of arr) {
+      if (!isAttributeScalar(entry)) continue;
+      const text = String(entry);
+      if (!stored.has(text)) stored.set(text, entry);
+    }
+    this.#patchAttributePayload({
+      value: chips.map(
+        (c) => stored.get(c.value) ?? parseAttributeScalar(c.value)
+      )
+    });
   }
 
   onAttributeCustomKeyChange(customKey: string): void {

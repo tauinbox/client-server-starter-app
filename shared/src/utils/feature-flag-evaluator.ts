@@ -8,6 +8,7 @@ import type {
   FeatureFlagPreviewResult,
   FeatureFlagRulePayload
 } from '../types/feature-flag.types';
+import { toTimestamp } from './feature-flag-timestamp';
 
 export type FeatureFlagEvaluationContext = {
   userId: string | null;
@@ -116,16 +117,6 @@ function matchesAttributeOp(
  * Canonical parser for the `before` / `after` operands. Exported so payload
  * validation accepts exactly the shapes evaluation can compare.
  */
-export function toTimestamp(value: unknown): number | null {
-  if (value instanceof Date) return value.getTime();
-  if (typeof value === 'string') {
-    const parsed = Date.parse(value);
-    return Number.isNaN(parsed) ? null : parsed;
-  }
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  return null;
-}
-
 export function percentageBucket(id: string, flagKey: string): number {
   // `% 100` skews buckets 0..95 by ~2e-8 (2^32 leaves a remainder of 96).
   // Correcting it would re-bucket every existing user for no measurable gain.

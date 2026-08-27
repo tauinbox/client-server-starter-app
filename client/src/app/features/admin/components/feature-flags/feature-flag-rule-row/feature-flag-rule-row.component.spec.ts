@@ -1,4 +1,5 @@
 import { Component, signal } from '@angular/core';
+import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -14,6 +15,7 @@ import { FeatureFlagRuleRowComponent } from './feature-flag-rule-row.component';
   imports: [FeatureFlagRuleRowComponent],
   template: `<nxs-feature-flag-rule-row
     [(rule)]="rule"
+    [error]="error()"
     (remove)="onRemove()"
   />`
 })
@@ -23,6 +25,7 @@ class HostComponent {
     type: 'percentage',
     payload: { type: 'percentage', percent: 25 }
   });
+  readonly error = signal<string | null>(null);
   removed = 0;
   onRemove(): void {
     this.removed++;
@@ -752,5 +755,138 @@ describe('FeatureFlagRuleRowComponent', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  describe('non-string attribute values survive the editor', () => {
+    function mountAttributeRule(
+      payload: FeatureFlagRuleDraft['payload']
+    ): [ComponentFixture<HostComponent>, FeatureFlagRuleRowComponent] {
+      const fixture = TestBed.createComponent(HostComponent);
+      fixture.componentInstance.rule.set({
+        effect: 'include',
+        type: 'attribute',
+        payload
+      });
+      fixture.detectChanges();
+      const cmp = fixture.debugElement.children[0]
+        .componentInstance as FeatureFlagRuleRowComponent;
+      return [fixture, cmp];
+    }
+
+    const booleanRule = {
+      type: 'attribute',
+      field: 'custom',
+      op: 'eq',
+      value: true,
+      customKey: 'oauthGoogleConfigured'
+    } as const;
+
+    it('keeps a boolean value a boolean when the value box is edited', () => {
+      const [fixture, cmp] = mountAttributeRule({ ...booleanRule });
+
+      cmp.onAttributeValueChange('true');
+
+      expect(fixture.componentInstance.rule().payload).toEqual(booleanRule);
+    });
+
+    it('writes a number when the typed text round-trips as one', () => {
+      const [fixture, cmp] = mountAttributeRule({
+        type: 'attribute',
+        field: 'custom',
+        op: 'eq',
+        value: 5,
+        customKey: 'seatCount'
+      });
+
+      cmp.onAttributeValueChange('42');
+
+      expect(fixture.componentInstance.rule().payload).toMatchObject({
+        value: 42
+      });
+    });
+
+    it('keeps text that only looks numeric as a string', () => {
+      const [fixture, cmp] = mountAttributeRule({
+        type: 'attribute',
+        field: 'email',
+        op: 'eq',
+        value: ''
+      });
+
+      cmp.onAttributeValueChange('007');
+
+      expect(fixture.componentInstance.rule().payload).toMatchObject({
+        value: '007'
+      });
+    });
+
+    it('renders a chip for every scalar of an `in` list', () => {
+      const [fixture] = mountAttributeRule({
+        type: 'attribute',
+        field: 'custom',
+        op: 'in',
+        value: [1, 2, true],
+        customKey: 'seatCount'
+      });
+
+      const chips = (fixture.nativeElement as HTMLElement).querySelectorAll(
+        'mat-chip-row'
+      );
+      expect(chips.length).toBe(3);
+    });
+
+    it('keeps the stored primitives when a chip is added to an `in` list', () => {
+      const [fixture, cmp] = mountAttributeRule({
+        type: 'attribute',
+        field: 'custom',
+        op: 'in',
+        value: [1, 2],
+        customKey: 'seatCount'
+      });
+
+      cmp.onAttributeChipsChange([
+        { value: '1', label: '1' },
+        { value: '2', label: '2' },
+        { value: 'gold', label: 'gold' }
+      ]);
+
+      expect(fixture.componentInstance.rule().payload).toMatchObject({
+        value: [1, 2, 'gold']
+      });
+    });
+
+    it('carries a boolean through an eq -> in -> eq operator round trip', () => {
+      const [fixture, cmp] = mountAttributeRule({ ...booleanRule });
+
+      cmp.onAttributeOpChange('in');
+      expect(fixture.componentInstance.rule().payload).toMatchObject({
+        value: [true]
+      });
+
+      cmp.onAttributeOpChange('eq');
+      expect(fixture.componentInstance.rule().payload).toEqual(booleanRule);
+    });
+  });
+
+  describe('rule error', () => {
+    it('renders the translated error text when one is supplied', () => {
+      const fixture = TestBed.createComponent(HostComponent);
+      fixture.detectChanges();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('.rule-error')
+      ).toBeNull();
+
+      fixture.componentInstance.error.set(
+        'admin.featureFlagRule.errorValueDate'
+      );
+      fixture.detectChanges();
+
+      const el = (fixture.nativeElement as HTMLElement).querySelector(
+        '.rule-error'
+      );
+      expect(el).not.toBeNull();
+      expect(el!.textContent?.trim()).toBe('Pick a date.');
+    });
   });
 });

@@ -2,6 +2,7 @@ import type { OnDestroy, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   ElementRef,
   inject,
@@ -36,6 +37,7 @@ import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.serv
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { deepEqual } from '@shared/utils/deep-equal.utils';
+import { featureFlagRuleError } from '../../../utils/feature-flag-rule-validation';
 import {
   NxsChipsAutocompleteComponent,
   type ChipOption
@@ -123,6 +125,16 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
     }))
   );
 
+  // A rules rejection arrives after the flag itself is already written, so the
+  // incomplete drafts the editor can produce are blocked before either request.
+  readonly ruleErrors = computed<(string | null)[]>(() =>
+    this.rules().map((r) => featureFlagRuleError(r.payload))
+  );
+
+  readonly hasRuleErrors = computed(() =>
+    this.ruleErrors().some((e) => e !== null)
+  );
+
   readonly flagForm = form(this.model, (path) => {
     required(path.key);
     minLength(path.key, 2);
@@ -178,7 +190,7 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   }
 
   submit(): void {
-    if (this.flagForm().invalid()) return;
+    if (this.flagForm().invalid() || this.hasRuleErrors()) return;
     // An enabled flag with no include rules evaluates "on" for every
     // authenticated user, so confirm that intent before saving. Disabled
     // flags and flags that target a subset via include rules save directly.

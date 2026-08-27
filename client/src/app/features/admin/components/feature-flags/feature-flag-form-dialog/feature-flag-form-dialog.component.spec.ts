@@ -281,6 +281,76 @@ describe('FeatureFlagFormDialogComponent', () => {
     expect(result.rulesChanged).toBe(true);
   });
 
+  it('submit() is a no-op while a rule the server would reject is present', async () => {
+    const fixture = await setup(flagWithAttributeRule());
+    const cmp = fixture.componentInstance;
+    cmp.updateRule(0, {
+      id: 'rule-1',
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'createdAt',
+        op: 'before',
+        value: ''
+      }
+    });
+
+    expect(cmp.hasRuleErrors()).toBe(true);
+    expect(cmp.ruleErrors()).toEqual(['admin.featureFlagRule.errorValueDate']);
+    cmp.submit();
+
+    expect(closeSpy).not.toHaveBeenCalled();
+  });
+
+  it('marks the offending row and disables the save button', async () => {
+    const fixture = await setup(flagWithAttributeRule());
+    const cmp = fixture.componentInstance;
+    cmp.updateRule(0, {
+      id: 'rule-1',
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'custom',
+        op: 'eq',
+        value: 'gold',
+        customKey: ''
+      }
+    });
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('.rule-error')?.textContent?.trim()).toBe(
+      'Enter the custom attribute key.'
+    );
+    const save = host.querySelector<HTMLButtonElement>(
+      'mat-dialog-actions button[matButton="filled"]'
+    );
+    expect(save?.disabled).toBe(true);
+  });
+
+  it('submit() proceeds once the rule is completed', async () => {
+    const fixture = await setup(flagWithAttributeRule());
+    const cmp = fixture.componentInstance;
+    cmp.updateRule(0, {
+      id: 'rule-1',
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'createdAt',
+        op: 'before',
+        value: '2026-01-15T00:00:00.000Z'
+      }
+    });
+
+    expect(cmp.hasRuleErrors()).toBe(false);
+    cmp.submit();
+
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('submit() skips the confirmation when the flag is disabled', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;

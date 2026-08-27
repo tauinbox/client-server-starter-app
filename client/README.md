@@ -157,7 +157,12 @@ src/app/
 │       │                                     # uses a discrete slider with a 5% step and a static
 │       │                                     # value label. An attribute rule has field, op,
 │       │                                     # value and customKey. It shows chips for op=in and
-│       │                                     # a mat-datepicker for op=before and op=after.
+│       │                                     # a mat-datepicker for op=before and op=after. The
+│       │                                     # value box keeps the primitive type of the stored
+│       │                                     # value: true, false and an exact number stay
+│       │                                     # scalars, because the evaluator compares with ===.
+│       │                                     # The dialog passes the reason the server would
+│       │                                     # reject the row, and the row shows it in .rule-error.
 │       │                                     # The [data-effect] attribute shows the include or
 │       │                                     # exclude effect with a colored left border. An
 │       │                                     # exclude rule also gets a tinted background. A
@@ -925,8 +930,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 219 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1151 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 221 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1170 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. The unit tests also cover session restore, cross-tab logout, lockout, email
 verification, and password reset with a password confirmation. They cover the users list, detail, edit

@@ -49,6 +49,13 @@
   display: block;
 }
 
+.rule-error {
+  grid-column: 1 / -1;
+  margin: func.rem(4) 0 0;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-error);
+}
+
 .rule-payload-input {
   width: 100%;
 }

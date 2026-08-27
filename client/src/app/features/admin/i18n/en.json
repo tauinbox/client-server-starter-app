@@ -39,9 +39,8 @@
     "errorUpdateFailed": "Failed to update feature flag.",
     "errorToggleFailed": "Failed to toggle feature flag.",
     "errorDeleteFailed": "Failed to delete feature flag.",
-    "errorRulesFailed": "Failed to save rules.",
-    "errorRulesFailedCreate": "Flag \"{{ key }}\" created, but rules failed to save. Reopen to retry.",
-    "errorRulesFailedUpdate": "Flag \"{{ key }}\" updated, but rules failed to save. Reopen to retry.",
+    "errorRulesFailedCreate": "Flag \"{{ key }}\" created, but the rules did not save. Reopen it to retry. Cause: {{ detail }}",
+    "errorRulesFailedUpdate": "Flag \"{{ key }}\" updated, but the rules did not save. Reopen it to retry. Cause: {{ detail }}",
     "rulesFailedTooltip": "Rules failed to save — reopen the flag to retry."
   },
   "featureFlagForm": {
@@ -88,7 +87,7 @@
       "includedByRule": "Included by rule",
       "noRulesDefaultOn": "No include rules — defaults to on"
     },
-    "errorPreviewFailed": "Preview request failed."
+    "errorPreviewFailed": "Preview request failed. Cause: {{ detail }}"
   },
   "featureFlagRule": {
     "remove": "Remove rule",
@@ -121,7 +120,12 @@
     "op_after": "after",
     "valuePlaceholder": "Value to compare against",
     "valueListPlaceholder": "Add value, press Enter",
-    "datePickerToggle": "Open date picker"
+    "datePickerToggle": "Open date picker",
+    "errorValueRequired": "Enter a value.",
+    "errorValueInvalid": "Use text, a number or true/false, up to 200 characters.",
+    "errorValueListRequired": "Add at least one value, up to 100.",
+    "errorValueDate": "Pick a date.",
+    "errorCustomKeyRequired": "Enter the custom attribute key."
   },
   "roles": {
     "title": "Roles management",

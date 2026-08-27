@@ -1,6 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import type { FeatureFlagPreviewResult } from '@app/shared/types';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
@@ -214,9 +215,30 @@ describe('FeatureFlagPreviewComponent', () => {
     previewSpy.mockReturnValue(throwError(() => new Error('boom')));
     fixture.componentInstance.run();
     expect(notifyError).toHaveBeenCalledWith(
-      'admin.featureFlagPreview.errorPreviewFailed'
+      'admin.featureFlagPreview.errorPreviewFailed',
+      { detail: 'boom' }
     );
     expect(fixture.componentInstance['loading']()).toBe(false);
+  });
+
+  it('puts the server rejection text in the error toast', async () => {
+    const fixture = await setup();
+    previewSpy.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 400,
+            error: { message: 'userId must be a UUID' }
+          })
+      )
+    );
+
+    fixture.componentInstance.run();
+
+    expect(notifyError).toHaveBeenCalledWith(
+      'admin.featureFlagPreview.errorPreviewFailed',
+      { detail: 'userId must be a UUID' }
+    );
   });
 
   it('maps each preview reason to a stable i18n key', async () => {
