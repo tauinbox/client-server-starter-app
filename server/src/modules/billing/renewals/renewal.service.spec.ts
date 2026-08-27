@@ -468,10 +468,16 @@ describe('RenewalService', () => {
     expect(charge).toHaveBeenCalledTimes(2);
     expect(next.status).toBe('active');
     expect(next.currentPeriodEnd).toEqual(new Date('2026-07-01T00:00:00Z'));
-    expect(store.invoices).toHaveLength(1);
-    expect(store.invoices[0]).toMatchObject({ providerInvoiceRef: 'pay_2' });
+    expect(store.invoices).toHaveLength(2);
+    expect(store.invoices[1]).toMatchObject({ providerInvoiceRef: 'pay_2' });
     // The timed-out charge takes the ordinary decline path: one dunning rung,
-    // and the next scan reconciles it against `findOffSessionCharge`.
+    // and its period is booked unpaid, so a payment the deadline hid from us
+    // has a row for its confirming webhook to write the reference onto.
+    expect(store.invoices[0]).toMatchObject({
+      subscriptionId: 'sub-1',
+      status: 'failed',
+      providerInvoiceRef: ''
+    });
     expect(stalled.status).toBe('past_due');
     expect(stalled.dunningAttempts).toBe(1);
   });
@@ -826,7 +832,12 @@ describe('RenewalService', () => {
     expect(sub.nextRenewalAttemptAt).toEqual(
       new Date(NOW.getTime() + DUNNING_RETRY_DELAY_MS)
     );
-    expect(store.invoices).toHaveLength(0);
+    expect(store.invoices).toHaveLength(1);
+    expect(store.invoices[0]).toMatchObject({
+      providerEventId: `renewal:sub-1:${new Date('2026-06-01T00:00:00Z').getTime()}`,
+      status: 'failed',
+      providerInvoiceRef: ''
+    });
     expect(emit).toHaveBeenCalledWith(
       PaymentFailedEvent.name,
       expect.objectContaining({ userId: 'user-1' })
@@ -1112,7 +1123,7 @@ describe('RenewalService', () => {
       );
     });
 
-    it('spends no credits when the charge fails (no invoice, no deduction)', async () => {
+    it('books the failed period unpaid and spends no credits', async () => {
       const sub = usageSub();
       const store = usageStore(sub);
       const charge = jest.fn().mockRejectedValue(new Error('declined'));
@@ -1121,8 +1132,15 @@ describe('RenewalService', () => {
 
       await service.runDueRenewals(NOW);
 
+      // The row carries the units this attempt rated against, but they settle
+      // with a paid invoice only - an unpaid period deducts nothing.
       expect(credits.spendOnUsage).not.toHaveBeenCalled();
-      expect(store.invoices).toHaveLength(0);
+      expect(store.invoices).toHaveLength(1);
+      expect(store.invoices[0]).toMatchObject({
+        status: 'failed',
+        providerInvoiceRef: '',
+        creditUnitsApplied: 10
+      });
     });
 
     it('walks the dunning ladder when the usage charge fails', async () => {
@@ -1136,7 +1154,11 @@ describe('RenewalService', () => {
 
       expect(sub.status).toBe('past_due');
       expect(sub.dunningAttempts).toBe(1);
-      expect(store.invoices).toHaveLength(0);
+      expect(store.invoices).toHaveLength(1);
+      expect(store.invoices[0]).toMatchObject({
+        status: 'failed',
+        providerInvoiceRef: ''
+      });
       expect(emit).toHaveBeenCalledWith(
         PaymentFailedEvent.name,
         expect.objectContaining({ userId: 'user-1' })
@@ -1938,7 +1960,8 @@ describe('RenewalService', () => {
       };
       store.invoices.push(failedInvoice);
       const charge = jest.fn();
-      const findCharge = jest.fn().mockResolvedValue({
+      const findCharge = jest.fn().mockResolvedValue(null);
+      const getCharge = jest.fn().mockResolvedValue({
         providerInvoiceRef: 'pay_prior',
         status: 'captured'
       });
@@ -1948,12 +1971,20 @@ describe('RenewalService', () => {
         charge,
         usageSum(),
         40,
-        findCharge
+        findCharge,
+        0,
+        getCharge
       );
 
       await service.runDueRenewals(NOW);
 
-      expect(findCharge).toHaveBeenCalledTimes(1);
+      // The recorded row carries the prior attempt's payment reference, so the
+      // reconcile reads that one payment instead of walking the shop's list.
+      expect(getCharge).toHaveBeenCalledWith(
+        'pay_prior',
+        `renewal:sub-1:${anchorMs}`
+      );
+      expect(findCharge).not.toHaveBeenCalled();
       expect(charge).not.toHaveBeenCalled();
       expect(store.invoices).toHaveLength(1);
       expect(store.invoices[0]).toMatchObject({

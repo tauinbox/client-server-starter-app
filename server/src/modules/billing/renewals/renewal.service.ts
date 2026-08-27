@@ -502,7 +502,12 @@ export class RenewalService {
     let prior: ChargeResult | null = null;
     if (subscription.dunningAttempts > 0) {
       try {
-        prior = await provider.findOffSessionCharge(idempotencyKey, anchor);
+        prior = existing?.providerInvoiceRef
+          ? await provider.getOffSessionCharge(
+              existing.providerInvoiceRef,
+              idempotencyKey
+            )
+          : await provider.findOffSessionCharge(idempotencyKey, anchor);
       } catch (error) {
         // Prior outcome unknown — skip the cycle (dunning state untouched,
         // the next scan retries) rather than risk a duplicate charge.
@@ -556,17 +561,20 @@ export class RenewalService {
       this.logger.warn(
         `Renewal charge failed for subscription ${subscription.id}: ${(error as Error).message}`
       );
-      if (closing) {
-        await this.recordUnpaidCharge(
-          subscription,
-          customer,
-          plan,
-          rated,
-          creditUnitsApplied,
-          anchor,
-          idempotencyKey
-        );
-      } else {
+      // A throw does not mean no payment: the deadline rejects our call without
+      // cancelling the socket. The confirming webhook can only hand the
+      // reference back onto a row that already exists, so record it here too.
+      await this.recordUnpaidCharge(
+        subscription,
+        customer,
+        plan,
+        rated,
+        creditUnitsApplied,
+        anchor,
+        idempotencyKey,
+        closing
+      );
+      if (!closing) {
         await this.handleFailure(subscription, customer.userId, now);
       }
       return null;
@@ -700,10 +708,11 @@ export class RenewalService {
   }
 
   /**
-   * Books the closing period of a cancelled subscription that could not be
-   * charged. The insert is `orIgnore` on the stable per-period key, so a row an
-   * earlier attempt already recorded keeps whatever status it holds. Credits are
-   * not spent: they settle with a paid invoice, never with an unpaid one.
+   * Books a period whose charge could not be collected - the closing period of
+   * a cancelled subscription, or a renewal period entering dunning. The insert
+   * is `orIgnore` on the stable per-period key, so a row an earlier attempt
+   * already recorded keeps whatever status it holds. Credits are not spent:
+   * they settle with a paid invoice, never with an unpaid one.
    */
   private async recordUnpaidCharge(
     subscription: Subscription,
@@ -712,7 +721,8 @@ export class RenewalService {
     rated: RatedAmount,
     creditUnitsApplied: number,
     anchor: Date,
-    idempotencyKey: string
+    idempotencyKey: string,
+    closing = true
   ): Promise<void> {
     const period = this.invoicePeriodFor(subscription, plan, anchor);
     await this.dataSource.manager
@@ -738,7 +748,9 @@ export class RenewalService {
       .orIgnore()
       .execute();
     this.logger.warn(
-      `Closing period of subscription ${subscription.id} recorded unpaid (${idempotencyKey}); cancelling anyway`
+      closing
+        ? `Closing period of subscription ${subscription.id} recorded unpaid (${idempotencyKey}); cancelling anyway`
+        : `Renewal period of subscription ${subscription.id} recorded unpaid (${idempotencyKey}); entering dunning`
     );
   }
 
