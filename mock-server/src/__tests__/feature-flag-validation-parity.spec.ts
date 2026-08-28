@@ -342,6 +342,191 @@ describe('feature-flag validation parity with server', () => {
     });
   });
 
+  // Every message below was measured by running the body through
+  // `PreviewFlagContextDto` with the `main.ts` ValidationPipe options. The mock
+  // used to coerce these values instead, so a context that worked here returned
+  // 400 against the real server.
+  describe('preview context validation', () => {
+    let flagId: string;
+
+    async function preview(body: unknown): Promise<Response> {
+      const token = await loginAsAdmin();
+      return fetch(`${baseUrl}/api/v1/admin/feature-flags/${flagId}/preview`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(body)
+      });
+    }
+
+    async function errorsOf(body: unknown): Promise<string[]> {
+      const res = await preview(body);
+      expect(res.status).toBe(400);
+      return ((await res.json()) as { errors: string[] }).errors;
+    }
+
+    beforeEach(async () => {
+      const created = await createFlag({
+        key: 'preview-context',
+        enabled: true
+      });
+      expect(created.status).toBe(201);
+      flagId = ((await created.json()) as { id: string }).id;
+    });
+
+    it('reports the unknown property and both field failures together', async () => {
+      await expect(
+        errorsOf({ userId: 'not-a-uuid', bogusProp: 1, roles: 'admin' })
+      ).resolves.toEqual([
+        'property bogusProp should not exist',
+        'userId must be a UUID',
+        'roles must contain no more than 32 elements',
+        'roles must be an array'
+      ]);
+    });
+
+    it('rejects a userId that is not a UUID', async () => {
+      await expect(errorsOf({ userId: 'not-a-uuid' })).resolves.toEqual([
+        'userId must be a UUID'
+      ]);
+    });
+
+    // `@IsUUID()` constrains the version and variant nibbles; the pattern
+    // ParseUUIDPipe applies to the `:id` route param does not.
+    it('rejects a body userId the route param pattern would accept', async () => {
+      await expect(
+        errorsOf({ userId: '11111111-1111-1111-1111-111111111111' })
+      ).resolves.toEqual(['userId must be a UUID']);
+    });
+
+    it('rejects a non-array roles', async () => {
+      await expect(errorsOf({ roles: 5 })).resolves.toEqual([
+        'each value in roles must be shorter than or equal to 64 characters',
+        'each value in roles must be a string',
+        'roles must contain no more than 32 elements',
+        'roles must be an array'
+      ]);
+    });
+
+    it('rejects more than 32 roles', async () => {
+      const roles = Array.from({ length: 33 }, () => 'beta');
+      await expect(errorsOf({ roles })).resolves.toEqual([
+        'roles must contain no more than 32 elements'
+      ]);
+    });
+
+    it('rejects a role name over 64 characters', async () => {
+      await expect(errorsOf({ roles: ['r'.repeat(65)] })).resolves.toEqual([
+        'each value in roles must be shorter than or equal to 64 characters'
+      ]);
+    });
+
+    it('rejects a non-object attributes', async () => {
+      await expect(errorsOf({ attributes: 'nope' })).resolves.toEqual([
+        'attributes must be an object'
+      ]);
+      await expect(errorsOf({ attributes: [1, 2] })).resolves.toEqual([
+        'attributes must be an object'
+      ]);
+    });
+
+    it('rejects an env over 32 characters', async () => {
+      await expect(errorsOf({ env: 'e'.repeat(33) })).resolves.toEqual([
+        'env must be shorter than or equal to 32 characters'
+      ]);
+    });
+
+    it('rejects a non-string env', async () => {
+      await expect(errorsOf({ env: 7 })).resolves.toEqual([
+        'env must be shorter than or equal to 32 characters',
+        'env must be a string'
+      ]);
+    });
+
+    it('rejects an anonId over 128 characters', async () => {
+      await expect(errorsOf({ anonId: 'a'.repeat(129) })).resolves.toEqual([
+        'anonId must be shorter than or equal to 128 characters'
+      ]);
+    });
+
+    it('rejects an unknown property on its own', async () => {
+      await expect(errorsOf({ bogusProp: 1 })).resolves.toEqual([
+        'property bogusProp should not exist'
+      ]);
+    });
+
+    it('reports the context fields before the draft fields', async () => {
+      await expect(
+        errorsOf({ enabled: 'yes', userId: 'not-a-uuid' })
+      ).resolves.toEqual([
+        'userId must be a UUID',
+        'enabled must be a boolean value'
+      ]);
+    });
+
+    // `@IsOptional()` skips the remaining validators for an explicit null.
+    it('accepts an explicit null for every optional context field', async () => {
+      const res = await preview({
+        userId: null,
+        roles: null,
+        attributes: null,
+        env: null,
+        anonId: null
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('accepts a well-formed context', async () => {
+      const res = await preview({
+        userId: '123e4567-e89b-12d3-a456-426614174000',
+        roles: ['beta'],
+        attributes: { email: 'tester@example.com' },
+        env: 'staging',
+        anonId: 'anon-42'
+      });
+      expect(res.status).toBe(200);
+    });
+
+    // sanitizeAttributes drops an over-long key instead of rejecting it.
+    it('drops an over-long attribute key without rejecting the request', async () => {
+      const res = await preview({
+        attributes: { ['k'.repeat(65)]: 1, email: 'tester@example.com' }
+      });
+      expect(res.status).toBe(200);
+    });
+
+    // The server slices the first 32 entries and only then drops the bad keys,
+    // so a dropped key still consumes one of the 32 slots.
+    it('counts a dropped attribute key against the 32-entry cap', async () => {
+      const stored = await replaceRules(flagId, [
+        {
+          type: 'attribute',
+          effect: 'include',
+          payload: {
+            type: 'attribute',
+            field: 'email',
+            op: 'eq',
+            value: 'tester@example.com'
+          }
+        }
+      ]);
+      expect(stored.status).toBe(200);
+
+      const attributes: Record<string, unknown> = { ['k'.repeat(65)]: 1 };
+      for (let i = 0; i < 31; i++) attributes[`k${i}`] = i;
+      attributes['email'] = 'tester@example.com';
+
+      const res = await preview({ attributes });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        result: false,
+        matchedRule: null
+      });
+    });
+  });
+
   // The server runs the global ValidationPipe before the handler body, so a DTO
   // failure precedes the If-Match parse and both precede the service lookup.
   // The rule-payload validator is the exception: it runs inside replaceRules,

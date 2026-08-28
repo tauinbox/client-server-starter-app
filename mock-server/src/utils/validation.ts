@@ -92,7 +92,7 @@ function isSkipped(
   return value === undefined || (optional === 'nullable' && value === null);
 }
 
-interface TrimmedStringRules {
+interface StringRules {
   /** Omitted for a field carrying no `@MinLength`. */
   min?: number;
   max: number;
@@ -100,27 +100,98 @@ interface TrimmedStringRules {
 }
 
 /**
- * Mirrors `@Transform(trim) @IsString() @MinLength(min) @MaxLength(max)`.
- * Decorators apply bottom-up, so a value failing several of them is reported
- * MaxLength, MinLength, IsString - and the trim runs before the caps.
+ * Mirrors `@IsString() @MinLength(min) @MaxLength(max)`. Decorators apply
+ * bottom-up, so a value failing several of them is reported MaxLength,
+ * MinLength, IsString.
  */
-export function trimmedStringErrors(
+export function stringErrors(
   field: string,
   value: unknown,
-  rules: TrimmedStringRules
+  rules: StringRules
 ): string[] {
   if (isSkipped(value, rules.optional)) return [];
 
-  const trimmed = typeof value === 'string' ? value.trim() : value;
   const errors: string[] = [];
-  const tooLong = validateMaxLength(trimmed, rules.max, field);
+  const tooLong = validateMaxLength(value, rules.max, field);
   if (tooLong) errors.push(tooLong);
   if (rules.min !== undefined) {
-    const tooShort = validateMinLength(trimmed, rules.min, field);
+    const tooShort = validateMinLength(value, rules.min, field);
     if (tooShort) errors.push(tooShort);
   }
   if (typeof value !== 'string') errors.push(`${field} must be a string`);
   return errors;
+}
+
+/**
+ * Mirrors `@Transform(trim) @IsString() @MinLength(min) @MaxLength(max)`. The
+ * trim runs before the caps. A field with no `@Transform(trim)` takes
+ * `stringErrors` instead, because trimming there would accept a value the
+ * server rejects on length.
+ */
+export function trimmedStringErrors(
+  field: string,
+  value: unknown,
+  rules: StringRules
+): string[] {
+  if (isSkipped(value, rules.optional)) return [];
+
+  const trimmed = typeof value === 'string' ? value.trim() : value;
+  return stringErrors(field, trimmed, { min: rules.min, max: rules.max });
+}
+
+interface StringArrayRules {
+  maxItems: number;
+  maxItemLength: number;
+  optional?: OptionalMode;
+}
+
+/**
+ * Mirrors `@IsArray() @ArrayMaxSize(maxItems) @IsString({ each: true })
+ * @MaxLength(maxItemLength, { each: true })`, reported in that reverse order.
+ *
+ * class-validator iterates an `each` constraint over an array, a Set or a Map
+ * only. Any other value is validated as if it were the single element, so
+ * `'admin'` passes both `each` constraints and fails only the two array ones.
+ */
+export function stringArrayErrors(
+  field: string,
+  value: unknown,
+  rules: StringArrayRules
+): string[] {
+  if (isSkipped(value, rules.optional)) return [];
+
+  const isArray = Array.isArray(value);
+  const items = isArray ? value : [value];
+  const errors: string[] = [];
+  if (
+    items.some((item) => validateMaxLength(item, rules.maxItemLength, field))
+  ) {
+    errors.push(
+      `each value in ${field} must be shorter than or equal to ${rules.maxItemLength} characters`
+    );
+  }
+  if (items.some((item) => typeof item !== 'string')) {
+    errors.push(`each value in ${field} must be a string`);
+  }
+  if (!isArray || value.length > rules.maxItems) {
+    errors.push(
+      `${field} must contain no more than ${rules.maxItems} elements`
+    );
+  }
+  if (!isArray) errors.push(`${field} must be an array`);
+  return errors;
+}
+
+/** Mirrors `@IsObject()`, which rejects an array and a null. */
+export function objectErrors(
+  field: string,
+  value: unknown,
+  optional?: OptionalMode
+): string[] {
+  if (isSkipped(value, optional)) return [];
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? []
+    : [`${field} must be an object`];
 }
 
 interface IntRules {
@@ -163,7 +234,12 @@ const BODY_UUID_PATTERN =
   /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/i;
 
 /** Mirrors `@IsUUID()` with no version, i.e. validator.js `all`. */
-export function uuidErrors(field: string, value: unknown): string[] {
+export function uuidErrors(
+  field: string,
+  value: unknown,
+  optional?: OptionalMode
+): string[] {
+  if (isSkipped(value, optional)) return [];
   return typeof value === 'string' && BODY_UUID_PATTERN.test(value)
     ? []
     : [`${field} must be a UUID`];
