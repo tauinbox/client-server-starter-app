@@ -101,6 +101,12 @@ interface ReplaceRulesBody {
   rules?: unknown;
 }
 
+// Mirrors the @Transform on CreateFeatureFlagDto.key: class-transformer trims
+// the value before the length and pattern validators see it.
+function trimKey(value: unknown): unknown {
+  return typeof value === 'string' ? value.trim() : value;
+}
+
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((v) => typeof v === 'string');
 }
@@ -138,7 +144,7 @@ type CreateData = {
 function validateCreate(
   body: CreateFlagBody
 ): { ok: true; data: CreateData } | { ok: false; message: string } {
-  const key = body.key;
+  const key = trimKey(body.key);
   if (
     typeof key !== 'string' ||
     key.length < 2 ||
@@ -189,18 +195,19 @@ function validateUpdate(
 ): { ok: true; patch: UpdatePatch } | { ok: false; message: string } {
   const patch: UpdatePatch = {};
   if (body.key !== undefined) {
+    const key = trimKey(body.key);
     if (
-      typeof body.key !== 'string' ||
-      body.key.length < 2 ||
-      body.key.length > 100 ||
-      !KEY_PATTERN.test(body.key)
+      typeof key !== 'string' ||
+      key.length < 2 ||
+      key.length > 100 ||
+      !KEY_PATTERN.test(key)
     ) {
       return {
         ok: false,
         message: 'key must match ^[a-z0-9][a-z0-9-]*[a-z0-9]$ (2-100 chars)'
       };
     }
-    patch.key = body.key;
+    patch.key = key;
   }
   if (body.description !== undefined) {
     if (
