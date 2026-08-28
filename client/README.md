@@ -738,6 +738,14 @@ The `public` field has helper text. The text says that the field controls **anon
 only. A save of an enabled flag with no include rules asks for the same "enable for everyone"
 confirmation as the toggle in the list.
 
+**`FeatureFlagPreviewComponent`** is the expandable panel at the bottom of the dialog. It builds a
+synthetic context, from structured fields or from raw JSON, and posts it to
+`POST /admin/feature-flags/:id/preview`. The dialog also gives it a `draft` input, which holds the
+rule drafts, the enabled switch and the environment chips that are on screen. The panel merges that
+draft into the request in both modes, thus the server evaluates the unsaved editor state and not the
+stored flag. The server validates a supplied rule set with the validator of the save path, so an
+incomplete rule gets the same 400 that a save would give.
+
 **`FeatureFlagRuleRowComponent`** edits one rule. Each type has its own payload editor. A `user` rule
 and a `role` rule use comma-separated IDs. A `percentage` rule uses a `mat-slider` with a numeric
 input. An `attribute` rule uses a field, an op and a value, plus a conditional `customKey`.
@@ -930,8 +938,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 221 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1170 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 222 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1173 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. The unit tests also cover session restore, cross-tab logout, lockout, email
 verification, and password reset with a password confirmation. They cover the users list, detail, edit

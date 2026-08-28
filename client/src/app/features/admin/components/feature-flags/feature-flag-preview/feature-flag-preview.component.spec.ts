@@ -118,6 +118,59 @@ describe('FeatureFlagPreviewComponent', () => {
     });
   });
 
+  it('sends the unsaved draft alongside the context', async () => {
+    const fixture = await setup('flag-42');
+    previewSpy.mockReturnValue(
+      of({
+        result: true,
+        reason: 'included-by-rule',
+        matchedRule: { index: 0, type: 'role', effect: 'include' }
+      } satisfies FeatureFlagPreviewResult)
+    );
+    const draft = {
+      rules: [
+        {
+          type: 'role' as const,
+          effect: 'include' as const,
+          payload: { type: 'role' as const, roleNames: ['gamma'] }
+        }
+      ],
+      enabled: true,
+      environments: ['staging']
+    };
+    fixture.componentRef.setInput('draft', draft);
+    fixture.detectChanges();
+    const cmp = fixture.componentInstance;
+    cmp['selectedRoles'].set([{ value: 'gamma', label: 'gamma' }]);
+    cmp.run();
+    expect(previewSpy).toHaveBeenCalledWith('flag-42', {
+      roles: ['gamma'],
+      ...draft
+    });
+  });
+
+  it('sends the draft in raw-JSON mode too', async () => {
+    const fixture = await setup('flag-42');
+    previewSpy.mockReturnValue(
+      of({
+        result: false,
+        reason: 'disabled',
+        matchedRule: null
+      } satisfies FeatureFlagPreviewResult)
+    );
+    fixture.componentRef.setInput('draft', { rules: [], enabled: false });
+    fixture.detectChanges();
+    const cmp = fixture.componentInstance;
+    cmp.toggleRawJson(true);
+    cmp['rawJson'].set('{"roles":["beta"]}');
+    cmp.run();
+    expect(previewSpy).toHaveBeenCalledWith('flag-42', {
+      roles: ['beta'],
+      rules: [],
+      enabled: false
+    });
+  });
+
   it('debounces user search and queries UserService.searchCursor with q', async () => {
     vi.useFakeTimers();
     try {

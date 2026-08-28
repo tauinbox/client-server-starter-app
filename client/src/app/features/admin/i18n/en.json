@@ -61,7 +61,7 @@
   },
   "featureFlagPreview": {
     "title": "Preview",
-    "description": "Run a dry evaluation against a synthetic context to verify rules before flipping the flag.",
+    "description": "Run a dry evaluation against a synthetic context. It uses the rules and switches in this editor, including the changes you did not save yet.",
     "userLabel": "User",
     "userPlaceholder": "Search by name, email or ID — leave empty for guest",
     "rolesLabel": "Roles",

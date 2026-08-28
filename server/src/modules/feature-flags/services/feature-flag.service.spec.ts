@@ -465,6 +465,93 @@ describe('FeatureFlagService', () => {
       });
       expect(result.result).toBe(true);
     });
+
+    it('evaluates a supplied rule set instead of the persisted one', async () => {
+      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
+      ruleRepo.find.mockResolvedValueOnce([previewRule]);
+      const result = await service.preview('flag-1', {
+        roles: ['beta'],
+        rules: [
+          {
+            type: 'role',
+            effect: 'include',
+            payload: { type: 'role', roleNames: ['gamma'] }
+          }
+        ]
+      });
+      expect(result.result).toBe(false);
+      expect(result.matchedRule).toBeNull();
+    });
+
+    it('matches a supplied rule the persisted set does not contain', async () => {
+      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
+      ruleRepo.find.mockResolvedValueOnce([]);
+      const result = await service.preview('flag-1', {
+        roles: ['gamma'],
+        rules: [
+          {
+            type: 'role',
+            effect: 'include',
+            payload: { type: 'role', roleNames: ['gamma'] }
+          }
+        ]
+      });
+      expect(result.result).toBe(true);
+      expect(result.reason).toBe('included-by-rule');
+      expect(result.matchedRule).toEqual({
+        index: 0,
+        type: 'role',
+        effect: 'include'
+      });
+    });
+
+    it('rejects a supplied rule payload the save path also rejects', async () => {
+      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
+      ruleRepo.find.mockResolvedValueOnce([previewRule]);
+      await expect(
+        service.preview('flag-1', {
+          rules: [
+            {
+              type: 'user',
+              effect: 'include',
+              // @ts-expect-error probing the runtime validator with a bad payload
+              payload: { type: 'user', userIds: 'not-an-array' }
+            }
+          ]
+        })
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { message: 'user rule requires userIds: string[]' }
+      });
+    });
+
+    it('evaluates a supplied enabled flag state instead of the stored one', async () => {
+      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
+      ruleRepo.find.mockResolvedValueOnce([previewRule]);
+      const result = await service.preview('flag-1', {
+        roles: ['beta'],
+        enabled: false
+      });
+      expect(result).toEqual({
+        result: false,
+        reason: 'disabled',
+        matchedRule: null
+      });
+    });
+
+    it('evaluates a supplied environment list instead of the stored one', async () => {
+      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
+      ruleRepo.find.mockResolvedValueOnce([previewRule]);
+      const result = await service.preview('flag-1', {
+        roles: ['beta'],
+        environments: ['staging']
+      });
+      expect(result).toEqual({
+        result: false,
+        reason: 'env-mismatch',
+        matchedRule: null
+      });
+    });
   });
 
   describe('delete', () => {
