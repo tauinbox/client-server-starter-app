@@ -35,7 +35,11 @@ import {
   searchUsersPage,
   userToChip
 } from '../../../utils/user-chip-search';
-import type { PreviewFlagContext } from '../../../services/feature-flags-admin.service';
+import type {
+  PreviewFlagContext,
+  PreviewFlagDraft,
+  PreviewFlagRequest
+} from '../../../services/feature-flags-admin.service';
 import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.service';
 
 @Component({
@@ -64,6 +68,12 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
   readonly #destroyRef = inject(DestroyRef);
 
   readonly flagId = input.required<string>();
+
+  /**
+   * Unsaved flag state from the surrounding editor. The server evaluates it
+   * instead of the persisted flag, so the panel answers for what is on screen.
+   */
+  readonly draft = input<PreviewFlagDraft | null>(null);
 
   protected readonly selectedUser = signal<ChipOption[]>([]);
   protected readonly userOptions = signal<ChipOption[]>([]);
@@ -159,10 +169,11 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
       ? this.#parseRawJson()
       : this.#buildStructuredContext();
     if (ctx === null) return;
+    const request: PreviewFlagRequest = { ...ctx, ...(this.draft() ?? {}) };
     this.loading.set(true);
     this.contextError.set(null);
     this.#adminService
-      .preview(this.flagId(), ctx)
+      .preview(this.flagId(), request)
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: (res) => {

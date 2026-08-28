@@ -213,7 +213,9 @@ export class FeatureFlagsAdminController {
   @ApiBearerAuth()
   @ApiOperation({
     summary:
-      'Dry-run a feature flag against a synthetic context — non-mutating, no audit log'
+      'Dry-run a feature flag against a synthetic context — non-mutating, no audit log',
+    description:
+      'Evaluates the stored flag by default. A request that carries `rules`, `enabled` or `environments` evaluates those unsaved values instead, so an editor can verify a draft before it saves.'
   })
   @ApiParam({ name: 'id' })
   @ApiBody({ type: PreviewFlagContextDto })

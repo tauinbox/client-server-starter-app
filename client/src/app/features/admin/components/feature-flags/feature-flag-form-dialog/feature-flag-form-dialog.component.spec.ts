@@ -351,6 +351,39 @@ describe('FeatureFlagFormDialogComponent', () => {
     expect(closeSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('previewDraft() reports the unsaved editor state, not the stored flag', async () => {
+    const fixture = await setup(flagWithAttributeRule());
+    const cmp = fixture.componentInstance;
+    expect(cmp.previewDraft()).toEqual({
+      rules: [
+        {
+          effect: 'include',
+          type: 'attribute',
+          payload: attributeRulePayload
+        }
+      ],
+      enabled: true,
+      environments: ['production']
+    });
+
+    cmp.removeRule(0);
+    cmp.addRule();
+    cmp.onEnabledChange(false);
+    cmp.onEnvironmentsChange([{ value: 'staging', label: 'staging' }]);
+
+    expect(cmp.previewDraft()).toEqual({
+      rules: [
+        {
+          effect: 'include',
+          type: 'percentage',
+          payload: { type: 'percentage', percent: 0 }
+        }
+      ],
+      enabled: false,
+      environments: ['staging']
+    });
+  });
+
   it('submit() skips the confirmation when the flag is disabled', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;

@@ -1,13 +1,24 @@
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
+  IsIn,
   IsObject,
   IsOptional,
   IsString,
   IsUUID,
-  MaxLength
+  MaxLength,
+  ValidateIf,
+  ValidateNested
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform, Type } from 'class-transformer';
+import {
+  APP_ENVIRONMENTS,
+  normalizeEnvironmentList
+} from '@app/shared/constants';
+import { propertyIsDefined } from '../../../common/validators/property-is-defined';
+import { FeatureFlagRuleDto } from './feature-flag-rule.dto';
 
 const MAX_ATTRIBUTE_KEYS = 32;
 const MAX_ATTRIBUTE_KEY_LENGTH = 64;
@@ -63,6 +74,41 @@ export class PreviewFlagContextDto {
   @IsString()
   @MaxLength(128)
   anonId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Unsaved rule set to evaluate instead of the persisted rules. Validated with the same rules as PUT /:id/rules.',
+    type: [FeatureFlagRuleDto]
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(64)
+  @ValidateNested({ each: true })
+  @Type(() => FeatureFlagRuleDto)
+  rules?: FeatureFlagRuleDto[];
+
+  @ApiPropertyOptional({
+    description: 'Unsaved enabled state to evaluate instead of the stored one.'
+  })
+  @ValidateIf(propertyIsDefined)
+  @IsBoolean()
+  enabled?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Unsaved environment list to evaluate instead of the stored one.',
+    enum: APP_ENVIRONMENTS,
+    isArray: true
+  })
+  @Transform(({ value }: { value: unknown }) =>
+    Array.isArray(value) ? normalizeEnvironmentList(value) : value
+  )
+  @ValidateIf(propertyIsDefined)
+  @IsArray()
+  @ArrayMaxSize(APP_ENVIRONMENTS.length)
+  @IsString({ each: true })
+  @IsIn(APP_ENVIRONMENTS, { each: true })
+  environments?: string[];
 }
 
 export function sanitizeAttributes(

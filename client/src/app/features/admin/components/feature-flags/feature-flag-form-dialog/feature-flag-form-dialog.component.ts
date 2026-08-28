@@ -29,7 +29,8 @@ import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type {
   CreateFeatureFlag,
-  FeatureFlagRuleInput
+  FeatureFlagRuleInput,
+  PreviewFlagDraft
 } from '../../../services/feature-flags-admin.service';
 import type { FeatureFlagResponse } from '@app/shared/types';
 import { APP_ENVIRONMENTS } from '@app/shared/constants';
@@ -134,6 +135,18 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   readonly hasRuleErrors = computed(() =>
     this.ruleErrors().some((e) => e !== null)
   );
+
+  // The preview panel evaluates this instead of the persisted flag, so it
+  // answers for the rules and toggles currently on screen.
+  readonly previewDraft = computed<PreviewFlagDraft>(() => ({
+    rules: this.rules().map((r) => ({
+      effect: r.effect,
+      type: r.type,
+      payload: r.payload
+    })),
+    enabled: this.enabled(),
+    environments: this.environments().map((c) => c.value)
+  }));
 
   readonly flagForm = form(this.model, (path) => {
     required(path.key);

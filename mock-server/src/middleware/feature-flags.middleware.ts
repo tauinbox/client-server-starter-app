@@ -750,6 +750,42 @@ adminRouter.put('/:id/rules', requireUuid('id'), (req, res) => {
 });
 
 adminRouter.post('/:id/preview', requireUuid('id'), (req, res) => {
+  const body = (req.body ?? {}) as {
+    userId?: unknown;
+    roles?: unknown;
+    attributes?: unknown;
+    env?: unknown;
+    anonId?: unknown;
+    rules?: unknown;
+    enabled?: unknown;
+    environments?: unknown;
+  };
+  // The server resolves the body through the ValidationPipe before the handler
+  // runs, so every DTO-level rejection precedes the 404. Only the rule-payload
+  // validator lives in the service, below the lookup.
+  const rulesValidation =
+    body.rules === undefined ? null : validateRules(body.rules);
+  if (
+    rulesValidation &&
+    !rulesValidation.ok &&
+    rulesValidation.source === 'dto'
+  ) {
+    res.status(400).json(validationError(rulesValidation.message));
+    return;
+  }
+  if (body.enabled !== undefined && typeof body.enabled !== 'boolean') {
+    res.status(400).json(validationError('enabled must be a boolean value'));
+    return;
+  }
+  let draftEnvironments: string[] | undefined;
+  if (body.environments !== undefined) {
+    const validated = validateEnvironments(body.environments);
+    if (!validated.ok) {
+      res.status(400).json(validationError(validated.message));
+      return;
+    }
+    draftEnvironments = validated.environments;
+  }
   const flag = getState().featureFlags.get((req.params['id'] as string) ?? '');
   if (!flag) {
     sendError(
@@ -760,13 +796,10 @@ adminRouter.post('/:id/preview', requireUuid('id'), (req, res) => {
     );
     return;
   }
-  const body = (req.body ?? {}) as {
-    userId?: unknown;
-    roles?: unknown;
-    attributes?: unknown;
-    env?: unknown;
-    anonId?: unknown;
-  };
+  if (rulesValidation && !rulesValidation.ok) {
+    sendError(res, 400, rulesValidation.message);
+    return;
+  }
   const userId =
     typeof body.userId === 'string' && body.userId.length <= 128
       ? body.userId
@@ -796,11 +829,20 @@ adminRouter.post('/:id/preview', requireUuid('id'), (req, res) => {
     typeof body.anonId === 'string' && body.anonId.length <= 128
       ? body.anonId
       : null;
-  const rules: EvaluatorRule[] = getState()
-    .featureFlagRules.filter((r) => r.flagId === flag.id)
-    .map((r) => ({ effect: r.effect, payload: r.payload }));
+  const rules: EvaluatorRule[] = rulesValidation?.ok
+    ? rulesValidation.rules.map((r) => ({
+        effect: r.effect,
+        payload: r.payload
+      }))
+    : getState()
+        .featureFlagRules.filter((r) => r.flagId === flag.id)
+        .map((r) => ({ effect: r.effect, payload: r.payload }));
   const result = previewFeatureFlag(
-    { key: flag.key, enabled: flag.enabled, environments: flag.environments },
+    {
+      key: flag.key,
+      enabled: (body.enabled as boolean | undefined) ?? flag.enabled,
+      environments: draftEnvironments ?? flag.environments
+    },
     rules,
     { userId, anonId, roles, attributes, env }
   );

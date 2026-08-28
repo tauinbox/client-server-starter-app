@@ -43,6 +43,18 @@ export type PreviewFlagContext = {
   anonId?: string;
 };
 
+/**
+ * Unsaved flag state the preview evaluates instead of the stored one. Omitted
+ * fields fall back to what the server has persisted.
+ */
+export type PreviewFlagDraft = {
+  rules?: FeatureFlagRuleInput[];
+  enabled?: boolean;
+  environments?: string[];
+};
+
+export type PreviewFlagRequest = PreviewFlagContext & PreviewFlagDraft;
+
 @Injectable({ providedIn: 'root' })
 export class FeatureFlagsAdminService {
   readonly #http = inject(HttpClient);
@@ -105,11 +117,11 @@ export class FeatureFlagsAdminService {
 
   preview(
     id: string,
-    context: PreviewFlagContext
+    request: PreviewFlagRequest
   ): Observable<FeatureFlagPreviewResult> {
     return this.#http.post<FeatureFlagPreviewResult>(
       `${ADMIN_API_V1}/${id}/preview`,
-      context
+      request
     );
   }
 }

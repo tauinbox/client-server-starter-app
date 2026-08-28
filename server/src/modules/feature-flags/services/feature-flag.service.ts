@@ -252,13 +252,21 @@ export class FeatureFlagService {
     const flag = await this.findOne(id);
     const evalFlag: EvaluatorFlag = {
       key: flag.key,
-      enabled: flag.enabled,
-      environments: flag.environments
+      enabled: dto.enabled ?? flag.enabled,
+      environments: dto.environments ?? flag.environments
     };
-    const evalRules: EvaluatorRule[] = flag.rules.map((r) => ({
-      effect: r.effect,
-      payload: r.payload
-    }));
+    // A supplied rule set goes through the same validator the save path uses,
+    // so preview never accepts a payload `PUT /:id/rules` would reject.
+    const customKeys = this.attributeRegistry.getKnownCustomKeys();
+    const evalRules: EvaluatorRule[] = dto.rules
+      ? dto.rules.map((r) => ({
+          effect: r.effect,
+          payload: validateRulePayload(r.type, r.payload, customKeys)
+        }))
+      : flag.rules.map((r) => ({
+          effect: r.effect,
+          payload: r.payload
+        }));
     const env =
       dto.env ?? this.configService.get<string>('ENVIRONMENT') ?? 'production';
     const ctx: FeatureFlagEvaluationContext = {

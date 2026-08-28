@@ -738,6 +738,14 @@ The `public` field has helper text. The text says that the field controls **anon
 only. A save of an enabled flag with no include rules asks for the same "enable for everyone"
 confirmation as the toggle in the list.
 
+**`FeatureFlagPreviewComponent`** is the expandable panel at the bottom of the dialog. It builds a
+synthetic context, from structured fields or from raw JSON, and posts it to
+`POST /admin/feature-flags/:id/preview`. The dialog also gives it a `draft` input, which holds the
+rule drafts, the enabled switch and the environment chips that are on screen. The panel merges that
+draft into the request in both modes, thus the server evaluates the unsaved editor state and not the
+stored flag. The server validates a supplied rule set with the validator of the save path, so an
+incomplete rule gets the same 400 that a save would give.
+
 **`FeatureFlagRuleRowComponent`** edits one rule. Each type has its own payload editor. A `user` rule
 and a `role` rule use comma-separated IDs. A `percentage` rule uses a `mat-slider` with a numeric
 input. An `attribute` rule uses a field, an op and a value, plus a conditional `customKey`.

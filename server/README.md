@@ -364,8 +364,10 @@ orphans each per-user entry with no Redis `SCAN`.
 `services/attribute-registry.service.ts` is the extensibility seam. Another module calls
 `registerAttribute(key, resolver)` from its `onModuleInit` method.
 
-`controllers/feature-flags-admin.controller.ts` holds 7 administrator endpoints below
-`/admin/feature-flags`. Each one uses `@Authorize(['manage','FeatureFlag'])` and `@LogAudit`.
+`controllers/feature-flags-admin.controller.ts` holds 9 administrator endpoints below
+`/admin/feature-flags`. Each one uses `@Authorize(['manage','FeatureFlag'])`. The 5 mutating
+endpoints also use `@LogAudit`. The 3 read endpoints and `POST :id/preview` write nothing, thus they
+make no audit entry.
 
 `controllers/feature-flags.controller.ts` holds `GET /feature-flags` with `@OptionalAuth()`. An
 authenticated caller gets each flag that resolves true plus each public flag, and the server omits a
@@ -1943,6 +1945,7 @@ The base URL is `/api/v1`.
 | DELETE | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Delete a flag with a cascade. The audit action is `FEATURE_FLAG_DELETE` |
 | PUT | `/admin/feature-flags/:id/rules` | `manage:FeatureFlag` | Replace the full rule set in one transaction. The audit action is `FEATURE_FLAG_RULES_REPLACE` |
 | POST | `/admin/feature-flags/:id/toggle` | `manage:FeatureFlag` | Change `enabled` and increase the version. The audit action is `FEATURE_FLAG_TOGGLE` |
+| POST | `/admin/feature-flags/:id/preview` | `manage:FeatureFlag` | Evaluate the flag against a synthetic context and write nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag. A supplied rule set goes through the validator of `PUT /:id/rules`, thus it gets the same 400 |
 
 **Caching.** The system uses three keys:
 
