@@ -8,6 +8,7 @@ import {
   type FeatureFlagEvaluationContext
 } from '@app/shared/utils/feature-flag-evaluator';
 import type {
+  FeatureFlagAttributeKeysResponse,
   FeatureFlagResponse,
   FeatureFlagRulePayload
 } from '@app/shared/types';
@@ -550,6 +551,15 @@ adminRouter.get('/cursor', (req, res) => {
     parseCursorQuery(query)
   );
   res.json({ data: page.data.map(toFeatureFlagResponse), meta: page.meta });
+});
+
+// Mirrors GET /admin/feature-flags/attribute-keys. Declared above the /:id
+// handler so the literal segment wins, as /cursor is.
+adminRouter.get('/attribute-keys', (_req, res) => {
+  const body: FeatureFlagAttributeKeysResponse = {
+    customKeys: Array.from(KNOWN_CUSTOM_KEYS).sort()
+  };
+  res.json(body);
 });
 
 adminRouter.get('/', (_req, res) => {

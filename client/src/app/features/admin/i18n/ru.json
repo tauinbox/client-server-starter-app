@@ -110,6 +110,7 @@
     "attributeOp": "Оператор",
     "attributeValue": "Значение",
     "customKey": "Свой ключ",
+    "customKeyPlaceholder": "Выберите зарегистрированный ключ",
     "field_email": "Email",
     "field_emailDomain": "Домен email",
     "field_createdAt": "Дата регистрации",
@@ -126,7 +127,8 @@
     "errorValueInvalid": "Используйте текст, число или true/false, не длиннее 200 символов.",
     "errorValueListRequired": "Добавьте хотя бы одно значение, не более 100.",
     "errorValueDate": "Выберите дату.",
-    "errorCustomKeyRequired": "Укажите ключ своего атрибута."
+    "errorCustomKeyRequired": "Укажите ключ своего атрибута.",
+    "errorCustomKeyUnknown": "Этот ключ не зарегистрирован на сервере. Выберите ключ из списка."
   },
   "roles": {
     "title": "Управление ролями",

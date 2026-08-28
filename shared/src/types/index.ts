@@ -47,7 +47,8 @@ export type {
   FeatureFlagResponse,
   EvaluatedFeatureFlagsResponse,
   FeatureFlagPreviewMatchedRule,
-  FeatureFlagPreviewResult
+  FeatureFlagPreviewResult,
+  FeatureFlagAttributeKeysResponse
 } from './feature-flag.types';
 
 export type {

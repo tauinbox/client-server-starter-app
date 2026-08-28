@@ -110,6 +110,7 @@
     "attributeOp": "Operator",
     "attributeValue": "Value",
     "customKey": "Custom key",
+    "customKeyPlaceholder": "Select a registered key",
     "field_email": "Email",
     "field_emailDomain": "Email domain",
     "field_createdAt": "Created at",
@@ -126,7 +127,8 @@
     "errorValueInvalid": "Use text, a number or true/false, up to 200 characters.",
     "errorValueListRequired": "Add at least one value, up to 100.",
     "errorValueDate": "Pick a date.",
-    "errorCustomKeyRequired": "Enter the custom attribute key."
+    "errorCustomKeyRequired": "Enter the custom attribute key.",
+    "errorCustomKeyUnknown": "This key is not registered on the server. Select one from the list."
   },
   "roles": {
     "title": "Roles management",

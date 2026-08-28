@@ -2,8 +2,9 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { of, throwError, type Observable } from 'rxjs';
 import type {
+  FeatureFlagAttributeKeysResponse,
   FeatureFlagRulePayload,
   FeatureFlagRuleResponse
 } from '@app/shared/types';
@@ -13,6 +14,7 @@ import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.serv
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { RoleCatalogService } from '@core/services/role-catalog.service';
 import { UserService } from '../../../../users/services/user.service';
+import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.service';
 import type { FeatureFlagFormDialogResult } from './feature-flag-form-dialog.component';
 import { FeatureFlagFormDialogComponent } from './feature-flag-form-dialog.component';
 
@@ -21,7 +23,10 @@ describe('FeatureFlagFormDialogComponent', () => {
   let confirmSpy: ReturnType<typeof vi.fn>;
 
   const setup = async (
-    data: Record<string, unknown> = {}
+    data: Record<string, unknown> = {},
+    attributeKeys$: Observable<FeatureFlagAttributeKeysResponse> = of({
+      customKeys: ['billingConfigured', 'oauthGoogleConfigured']
+    })
   ): Promise<ComponentFixture<FeatureFlagFormDialogComponent>> => {
     closeSpy = vi.fn();
     confirmSpy = vi.fn(() => of(true));
@@ -48,6 +53,10 @@ describe('FeatureFlagFormDialogComponent', () => {
         {
           provide: RoleCatalogService,
           useValue: { getAll: vi.fn(() => of([])) }
+        },
+        {
+          provide: FeatureFlagsAdminService,
+          useValue: { getAttributeKeys: vi.fn(() => attributeKeys$) }
         },
         {
           provide: UserService,
@@ -349,6 +358,81 @@ describe('FeatureFlagFormDialogComponent', () => {
     cmp.submit();
 
     expect(closeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks a custom key the server has not registered', async () => {
+    const fixture = await setup(flagWithAttributeRule());
+    const cmp = fixture.componentInstance;
+    cmp.updateRule(0, {
+      id: 'rule-1',
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'custom',
+        op: 'eq',
+        value: 'gold',
+        customKey: 'plan'
+      }
+    });
+    fixture.detectChanges();
+
+    expect(cmp.ruleErrors()).toEqual([
+      'admin.featureFlagRule.errorCustomKeyUnknown'
+    ]);
+    cmp.submit();
+    expect(closeSpy).not.toHaveBeenCalled();
+  });
+
+  it('accepts a custom key the server reports', async () => {
+    const fixture = await setup(flagWithAttributeRule());
+    const cmp = fixture.componentInstance;
+    cmp.updateRule(0, {
+      id: 'rule-1',
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'custom',
+        op: 'eq',
+        value: 'gold',
+        customKey: 'billingConfigured'
+      }
+    });
+
+    expect(cmp.hasRuleErrors()).toBe(false);
+  });
+
+  // A catalog the admin cannot read must not block a save the server accepts.
+  it('keeps the membership check off when the catalog request fails', async () => {
+    const fixture = await setup(
+      flagWithAttributeRule(),
+      throwError(() => new Error('offline'))
+    );
+    const cmp = fixture.componentInstance;
+    cmp.updateRule(0, {
+      id: 'rule-1',
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'custom',
+        op: 'eq',
+        value: 'gold',
+        customKey: 'plan'
+      }
+    });
+
+    expect(cmp.hasRuleErrors()).toBe(false);
+    expect(cmp['customKeyOptions']()).toEqual([]);
+  });
+
+  it('offers the reported keys to the rule rows', async () => {
+    const fixture = await setup(flagWithAttributeRule());
+    expect(fixture.componentInstance['customKeyOptions']()).toEqual([
+      'billingConfigured',
+      'oauthGoogleConfigured'
+    ]);
   });
 
   it('previewDraft() reports the unsaved editor state, not the stored flag', async () => {

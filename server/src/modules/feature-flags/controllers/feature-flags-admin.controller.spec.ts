@@ -19,6 +19,7 @@ describe('FeatureFlagsAdminController', () => {
     toggle: jest.Mock;
     delete: jest.Mock;
     replaceRules: jest.Mock;
+    getAttributeCustomKeys: jest.Mock;
   };
   let eventEmitter: { emit: jest.Mock };
   let auditService: { log: jest.Mock; logFireAndForget: jest.Mock };
@@ -47,7 +48,10 @@ describe('FeatureFlagsAdminController', () => {
         .fn()
         .mockResolvedValue({ ...sampleFlag, enabled: true, version: 2 }),
       delete: jest.fn().mockResolvedValue(undefined),
-      replaceRules: jest.fn().mockResolvedValue(sampleFlag)
+      replaceRules: jest.fn().mockResolvedValue(sampleFlag),
+      getAttributeCustomKeys: jest
+        .fn()
+        .mockReturnValue({ customKeys: ['billingConfigured'] })
     };
     eventEmitter = { emit: jest.fn() };
     auditService = {
@@ -68,6 +72,13 @@ describe('FeatureFlagsAdminController', () => {
       .compile();
 
     controller = module.get(FeatureFlagsAdminController);
+  });
+
+  it('getAttributeKeys returns the registered custom keys', () => {
+    expect(controller.getAttributeKeys()).toEqual({
+      customKeys: ['billingConfigured']
+    });
+    expect(flagService.getAttributeCustomKeys).toHaveBeenCalled();
   });
 
   it('create emits a "created" change event', async () => {

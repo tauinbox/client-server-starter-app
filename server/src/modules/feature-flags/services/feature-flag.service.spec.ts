@@ -92,6 +92,21 @@ describe('FeatureFlagService', () => {
     service = module.get(FeatureFlagService);
   });
 
+  describe('getAttributeCustomKeys', () => {
+    it('reports the registered custom keys, sorted, without the built-ins', () => {
+      attributeRegistry.registerAttribute('tier', () => 'pro');
+      attributeRegistry.registerAttribute('billingConfigured', () => true);
+
+      expect(service.getAttributeCustomKeys()).toEqual({
+        customKeys: ['billingConfigured', 'tier']
+      });
+    });
+
+    it('reports an empty list when no module registered an attribute', () => {
+      expect(service.getAttributeCustomKeys()).toEqual({ customKeys: [] });
+    });
+  });
+
   describe('findByKey', () => {
     it('returns the flag for a known key without loading rules', async () => {
       flagRepo.findOne.mockResolvedValue(sampleFlag);
