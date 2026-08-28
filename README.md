@@ -642,8 +642,8 @@ To apply more than one restriction at the same time, use one of two methods. Use
 
   **A picker is the intentional exception.** A select, an autocomplete or a checkbox list that offers
   a whole catalog reads the unpaginated sibling endpoint: `GET /rbac/actions`, `GET /roles`,
-  `GET /admin/feature-flags` or `GET /admin/feature-flags/attribute-keys`. If you feed a picker from a page of the cursor list, the picker drops
-  each item after the first page silently.
+  `GET /admin/feature-flags` or `GET /admin/feature-flags/attribute-keys`. If you feed a picker from
+  a page of the cursor list, the picker drops each item after the first page silently.
 - **Sticky header.** The toolbar stays at the top while the user scrolls through a long list.
 
 ### Billing (self-service)
