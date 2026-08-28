@@ -306,11 +306,30 @@ describe('FeatureFlagPreviewComponent', () => {
       [
         'no-rules-default-on',
         'admin.featureFlagPreview.reason.noRulesDefaultOn'
-      ]
+      ],
+      ['not-included', 'admin.featureFlagPreview.reason.notIncluded']
     ];
     for (const [reason, expected] of cases) {
       expect(cmp['reasonKey'](reason)).toBe(expected);
     }
+  });
+
+  it('does not claim an exclusion when no include rule matched', async () => {
+    const fixture = await setup();
+    previewSpy.mockReturnValue(
+      of({
+        result: false,
+        reason: 'not-included',
+        matchedRule: null
+      } satisfies FeatureFlagPreviewResult)
+    );
+    fixture.componentInstance.run();
+    fixture.detectChanges();
+    const panel = fixture.nativeElement.querySelector(
+      '.preview-result'
+    ) as HTMLElement;
+    expect(panel.textContent).toContain('No rule included this context');
+    expect(panel.textContent).not.toContain('Excluded by rule');
   });
 
   it('projects the idle play icon into the button leading-icon slot', async () => {

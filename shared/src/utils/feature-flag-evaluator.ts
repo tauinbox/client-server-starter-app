@@ -165,5 +165,5 @@ export function previewFeatureFlag(
     }
   }
 
-  return { result: false, reason: 'excluded', matchedRule: null };
+  return { result: false, reason: 'not-included', matchedRule: null };
 }

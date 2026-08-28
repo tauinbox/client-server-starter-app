@@ -85,7 +85,8 @@
       "envMismatch": "Environment does not match",
       "excluded": "Excluded by rule",
       "includedByRule": "Included by rule",
-      "noRulesDefaultOn": "No include rules — defaults to on"
+      "noRulesDefaultOn": "No include rules — defaults to on",
+      "notIncluded": "No rule included this context"
     },
     "errorPreviewFailed": "Preview request failed. Cause: {{ detail }}"
   },

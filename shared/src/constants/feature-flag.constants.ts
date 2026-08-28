@@ -32,14 +32,17 @@ export const FEATURE_FLAG_ATTRIBUTE_OPS = [
 ] as const;
 
 // Why a preview returned the result it did, in the order the evaluator checks
-// them: the kill-switch, the environment gate, deny-overrides, the includes,
-// then the no-rules default.
+// them: the kill-switch, the environment gate, deny-overrides, the no-rules
+// default, the includes, then the fall-through when no include matched.
+// `excluded` means a rule denied the caller; `not-included` means no rule
+// admitted it. Both give result false, and only `excluded` has a matched rule.
 export const FEATURE_FLAG_PREVIEW_REASONS = [
   'disabled',
   'env-mismatch',
   'excluded',
   'included-by-rule',
-  'no-rules-default-on'
+  'no-rules-default-on',
+  'not-included'
 ] as const;
 
 export type FeatureFlagRuleType = (typeof FEATURE_FLAG_RULE_TYPES)[number];

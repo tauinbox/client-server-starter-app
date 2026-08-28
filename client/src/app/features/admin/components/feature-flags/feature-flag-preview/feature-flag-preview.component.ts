@@ -97,7 +97,8 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
       'env-mismatch': 'admin.featureFlagPreview.reason.envMismatch',
       excluded: 'admin.featureFlagPreview.reason.excluded',
       'included-by-rule': 'admin.featureFlagPreview.reason.includedByRule',
-      'no-rules-default-on': 'admin.featureFlagPreview.reason.noRulesDefaultOn'
+      'no-rules-default-on': 'admin.featureFlagPreview.reason.noRulesDefaultOn',
+      'not-included': 'admin.featureFlagPreview.reason.notIncluded'
     };
     return map[reason];
   }

@@ -515,7 +515,7 @@ describe('previewFeatureFlag — reasons', () => {
     });
   });
 
-  it('reason "excluded" with null matchedRule when includes exist but none match', () => {
+  it('reason "not-included" with null matchedRule when includes exist but none match', () => {
     const rules = [rule('include', { type: 'user', userIds: ['alice'] })];
     const result = previewFeatureFlag(
       baseFlag(),
@@ -524,7 +524,24 @@ describe('previewFeatureFlag — reasons', () => {
     );
     expect(result).toEqual({
       result: false,
-      reason: 'excluded',
+      reason: 'not-included',
+      matchedRule: null
+    });
+  });
+
+  it('reason "not-included" when an include rule exists and no exclude rule matched', () => {
+    const rules = [
+      rule('include', { type: 'role', roleNames: ['beta'] }),
+      rule('exclude', { type: 'role', roleNames: ['banned'] })
+    ];
+    const result = previewFeatureFlag(
+      baseFlag(),
+      rules,
+      baseCtx({ roles: ['plain'] })
+    );
+    expect(result).toEqual({
+      result: false,
+      reason: 'not-included',
       matchedRule: null
     });
   });
