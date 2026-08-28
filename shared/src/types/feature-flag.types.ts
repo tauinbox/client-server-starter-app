@@ -57,3 +57,12 @@ export type FeatureFlagPreviewResult = {
   reason: FeatureFlagPreviewReason;
   matchedRule: FeatureFlagPreviewMatchedRule | null;
 };
+
+/**
+ * The `custom` attribute keys the server accepts in a rule payload. The set is
+ * filled at boot by module registrars, so it is a deployment fact and the
+ * client must read it from the API instead of holding a constant.
+ */
+export type FeatureFlagAttributeKeysResponse = {
+  customKeys: string[];
+};

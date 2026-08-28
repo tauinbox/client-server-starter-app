@@ -48,6 +48,7 @@ import { FeatureFlagResponseDto } from '../dtos/feature-flag-response.dto';
 import { PreviewFlagContextDto } from '../dtos/preview-flag-context.dto';
 import { PreviewFlagResponseDto } from '../dtos/preview-flag-response.dto';
 import { FeatureFlagChangedEvent } from '../events/feature-flag-changed.event';
+import type { FeatureFlagAttributeKeysResponse } from '@app/shared/types';
 
 @ApiTags('Feature Flags Admin API')
 @Controller({
@@ -75,6 +76,18 @@ export class FeatureFlagsAdminController {
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   findAllCursor(@Query() query: FeatureFlagCursorQueryDto) {
     return this.flagService.findCursorPaginated(query);
+  }
+
+  @Get('attribute-keys')
+  @Authorize(['manage', 'FeatureFlag'])
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Custom attribute keys accepted in a rule payload'
+  })
+  @ApiOkResponse({ description: 'Registered custom attribute keys' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  getAttributeKeys(): FeatureFlagAttributeKeysResponse {
+    return this.flagService.getAttributeCustomKeys();
   }
 
   @Get()

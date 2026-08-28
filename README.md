@@ -162,6 +162,12 @@ management and theming.
   The administrator CRUD is at `/api/v1/admin/feature-flags`. It uses optimistic locking through the
   `If-Match` header.
 
+  An attribute rule can reference a `custom` key. The set of valid keys is not a constant: a module
+  registers its keys in `onModuleInit`, thus the set is a property of the deployment.
+  `GET /api/v1/admin/feature-flags/attribute-keys` reports it, and the rule editor offers it as an
+  autocomplete. The editor also blocks a save that names an unregistered key, thus the administrator
+  does not learn the valid set from a 400 after the flag itself was written.
+
   An anonymous user goes into a bucket by the `nxs_anon_id` cookie, which `AnonIdMiddleware` sets
   automatically. Thus a 10 % rollout of a public flag converges on the same 10 % of anonymous
   browsers across reloads.
@@ -181,7 +187,9 @@ management and theming.
 
   `AttributeRegistryService` is the extensibility seam. Another module calls
   `registerAttribute('tenantId', resolver)` from `onModuleInit`. Thus it gives a tenant, an
-  organization, a region or a subscription-tier attribute to the evaluator.
+  organization, a region or a subscription-tier attribute to the evaluator. The registered set
+  reaches the administrator through `GET /api/v1/admin/feature-flags/attribute-keys`, thus a newly
+  registered key shows in the rule editor with no client change.
 
   `@RequireFeature('key')` with `FeatureFlagGuard` is a convenience decorator that hides a route
   completely. It returns HTTP 404 against enumeration. RBAC stays the true authorization gate.
@@ -633,8 +641,8 @@ To apply more than one restriction at the same time, use one of two methods. Use
   a second COUNT over the whole table.
 
   **A picker is the intentional exception.** A select, an autocomplete or a checkbox list that offers
-  a whole catalog reads the unpaginated sibling endpoint: `GET /rbac/actions`, `GET /roles` or
-  `GET /admin/feature-flags`. If you feed a picker from a page of the cursor list, the picker drops
+  a whole catalog reads the unpaginated sibling endpoint: `GET /rbac/actions`, `GET /roles`,
+  `GET /admin/feature-flags` or `GET /admin/feature-flags/attribute-keys`. If you feed a picker from a page of the cursor list, the picker drops
   each item after the first page silently.
 - **Sticky header.** The toolbar stays at the top while the user scrolls through a long list.
 
@@ -1418,6 +1426,7 @@ The base URL of the API is `/api/v1`.
 | GET | `/feature-flags` | None (optional) | Evaluate the flag set for the caller. An authenticated caller gets the flags that resolve true plus the `public` flags. An anonymous caller gets the `public: true` flags only |
 | GET | `/admin/feature-flags` | `feature-flags:manage` | List each feature flag |
 | GET | `/admin/feature-flags/:id` | `feature-flags:manage` | Get a feature flag by ID |
+| GET | `/admin/feature-flags/attribute-keys` | `feature-flags:manage` | List the `custom` attribute keys that a rule payload can reference. A reference load, not a list |
 | POST | `/admin/feature-flags` | `feature-flags:manage` | Create a feature flag |
 | PATCH | `/admin/feature-flags/:id` | `feature-flags:manage` | Update a feature flag. Uses optimistic locking through `If-Match` |
 | DELETE | `/admin/feature-flags/:id` | `feature-flags:manage` | Delete a feature flag |
@@ -1672,11 +1681,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2003 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 349 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 348 passed and 1 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1174 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 222 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 483 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2006 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 350 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 349 passed and 1 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1186 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 223 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 489 tests pass |
 
 ## CI/CD
 

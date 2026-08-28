@@ -156,7 +156,10 @@ src/app/
 │       │                                     # RoleCatalogService.getAll(). A percentage rule
 │       │                                     # uses a discrete slider with a 5% step and a static
 │       │                                     # value label. An attribute rule has field, op,
-│       │                                     # value and customKey. It shows chips for op=in and
+│       │                                     # value and customKey. The customKey box is an
+│       │                                     # autocomplete over the keys that
+│       │                                     # GET /admin/feature-flags/attribute-keys reports.
+│       │                                     # It shows chips for op=in and
 │       │                                     # a mat-datepicker for op=before and op=after. The
 │       │                                     # value box keeps the primitive type of the stored
 │       │                                     # value: true, false and an exact number stay
@@ -752,7 +755,12 @@ rule. The second one says that include rules exist and that no rule matched the 
 
 **`FeatureFlagRuleRowComponent`** edits one rule. Each type has its own payload editor. A `user` rule
 and a `role` rule use comma-separated IDs. A `percentage` rule uses a `mat-slider` with a numeric
-input. An `attribute` rule uses a field, an op and a value, plus a conditional `customKey`.
+input. An `attribute` rule uses a field, an op and a value, plus a conditional `customKey`. That box is an
+autocomplete. The dialog reads the registered keys once through
+`FeatureFlagsAdminService.getAttributeKeys()` and passes them to every row, thus a flag with three
+rules makes one request. The dialog also blocks a save that names a key outside that set, because the
+set is a runtime fact of the server and a wrong key is a 400 that lands after the flag itself was
+written.
 
 The state and the HTTP calls are in `features/admin/{store,services}`:
 

@@ -27,6 +27,8 @@ import { MatExpansionModule } from '@angular/material/expansion';
 import { MatIcon } from '@angular/material/icon';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { catchError, of } from 'rxjs';
+import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.service';
 import type {
   CreateFeatureFlag,
   FeatureFlagRuleInput,
@@ -94,6 +96,7 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
   readonly #transloco = inject(TranslocoService);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #flagsAdmin = inject(FeatureFlagsAdminService);
   protected readonly data = inject<FeatureFlagFormDialogData>(MAT_DIALOG_DATA);
 
   #cleanupSave: (() => void) | null = null;
@@ -126,10 +129,19 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
     }))
   );
 
+  // The registered custom attribute keys, or null while the request is in
+  // flight or after it failed. Null keeps the membership check off, so a
+  // catalog the admin cannot see never blocks a save the server would accept.
+  readonly #customKeys = signal<ReadonlySet<string> | null>(null);
+
+  protected readonly customKeyOptions = computed<string[]>(() => [
+    ...(this.#customKeys() ?? [])
+  ]);
+
   // A rules rejection arrives after the flag itself is already written, so the
   // incomplete drafts the editor can produce are blocked before either request.
   readonly ruleErrors = computed<(string | null)[]>(() =>
-    this.rules().map((r) => featureFlagRuleError(r.payload))
+    this.rules().map((r) => featureFlagRuleError(r.payload, this.#customKeys()))
   );
 
   readonly hasRuleErrors = computed(() =>
@@ -157,6 +169,17 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    this.#flagsAdmin
+      .getAttributeKeys()
+      .pipe(
+        catchError(() => of(null)),
+        takeUntilDestroyed(this.#destroyRef)
+      )
+      .subscribe((response) => {
+        if (response === null) return;
+        this.#customKeys.set(new Set(response.customKeys));
+      });
+
     this.#cleanupSave = this.#shortcuts.registerSave(
       'shortcuts.labelSave',
       'shortcuts.groupForms',

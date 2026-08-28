@@ -157,4 +157,47 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     await expect(ruleRow.getByText('Pick a date.')).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Save' })).toBeDisabled();
   });
+
+  test('FF-UX-011: the custom attribute key is picked from the registered set', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, {
+      id: mockId('user-104'),
+      email: 'flagkeyadmin@example.com',
+      roles: ['admin']
+    });
+
+    await page.goto('/admin/feature-flags');
+
+    await page
+      .getByRole('row', { name: /oauth-google/ })
+      .getByRole('button', { name: /Edit flag oauth-google/ })
+      .click();
+
+    const dialog = await openedDialog(page);
+    const ruleRow = dialog.locator('nxs-feature-flag-rule-row').first();
+    const keyInput = ruleRow.getByRole('combobox', { name: 'Custom key' });
+
+    await expect(keyInput).toHaveValue('oauthGoogleConfigured');
+
+    // An unregistered key is a 400 on PUT /rules, which would land after the
+    // flag itself was already written.
+    await keyInput.fill('plan');
+    await expect(
+      ruleRow.getByText(
+        'This key is not registered on the server. Select one from the list.'
+      )
+    ).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    await keyInput.fill('');
+    await keyInput.click();
+    await page
+      .getByRole('option', { name: 'oauthGoogleConfigured', exact: true })
+      .click();
+
+    await expect(keyInput).toHaveValue('oauthGoogleConfigured');
+    await expect(dialog.getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
 });

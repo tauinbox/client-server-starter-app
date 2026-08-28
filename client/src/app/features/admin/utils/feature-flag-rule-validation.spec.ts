@@ -66,6 +66,78 @@ describe('featureFlagRuleError', () => {
     }
   });
 
+  it('reports a custom key the server has not registered', () => {
+    expect(
+      featureFlagRuleError(
+        {
+          type: 'attribute',
+          field: 'custom',
+          op: 'eq',
+          value: 'gold',
+          customKey: 'plan'
+        },
+        new Set(['billingConfigured'])
+      )
+    ).toBe('admin.featureFlagRule.errorCustomKeyUnknown');
+  });
+
+  it('accepts a registered custom key', () => {
+    expect(
+      featureFlagRuleError(
+        {
+          type: 'attribute',
+          field: 'custom',
+          op: 'eq',
+          value: 'gold',
+          customKey: 'billingConfigured'
+        },
+        new Set(['billingConfigured'])
+      )
+    ).toBeNull();
+  });
+
+  it('matches the key verbatim, as the server does', () => {
+    expect(
+      featureFlagRuleError(
+        {
+          type: 'attribute',
+          field: 'custom',
+          op: 'eq',
+          value: 'gold',
+          customKey: ' billingConfigured '
+        },
+        new Set(['billingConfigured'])
+      )
+    ).toBe('admin.featureFlagRule.errorCustomKeyUnknown');
+  });
+
+  it('skips the membership check when the catalog is unknown', () => {
+    expect(
+      featureFlagRuleError({
+        type: 'attribute',
+        field: 'custom',
+        op: 'eq',
+        value: 'gold',
+        customKey: 'plan'
+      })
+    ).toBeNull();
+  });
+
+  it('reports an empty key before the membership check', () => {
+    expect(
+      featureFlagRuleError(
+        {
+          type: 'attribute',
+          field: 'custom',
+          op: 'eq',
+          value: 'gold',
+          customKey: ''
+        },
+        new Set(['billingConfigured'])
+      )
+    ).toBe('admin.featureFlagRule.errorCustomKeyRequired');
+  });
+
   it('accepts a filled date operator', () => {
     expect(
       featureFlagRuleError({

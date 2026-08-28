@@ -16,6 +16,7 @@ import { FeatureFlagRuleRowComponent } from './feature-flag-rule-row.component';
   template: `<nxs-feature-flag-rule-row
     [(rule)]="rule"
     [error]="error()"
+    [customKeyOptions]="customKeyOptions()"
     (remove)="onRemove()"
   />`
 })
@@ -26,6 +27,7 @@ class HostComponent {
     payload: { type: 'percentage', percent: 25 }
   });
   readonly error = signal<string | null>(null);
+  readonly customKeyOptions = signal<readonly string[]>([]);
   removed = 0;
   onRemove(): void {
     this.removed++;
@@ -562,6 +564,75 @@ describe('FeatureFlagRuleRowComponent', () => {
       op: 'endsWith',
       value: 'pro',
       customKey: 'plan'
+    });
+  });
+
+  const customRuleFixture = (
+    customKey: string,
+    options: readonly string[]
+  ): ComponentFixture<HostComponent> => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.customKeyOptions.set(options);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'custom',
+        op: 'eq',
+        value: 'pro',
+        customKey
+      }
+    });
+    fixture.detectChanges();
+    return fixture;
+  };
+
+  const openCustomKeyPanel = (
+    fixture: ComponentFixture<HostComponent>
+  ): string[] => {
+    const input = (
+      fixture.nativeElement as HTMLElement
+    ).querySelector<HTMLInputElement>('input[aria-autocomplete="list"]');
+    expect(input).not.toBeNull();
+    input?.dispatchEvent(new Event('focusin'));
+    fixture.detectChanges();
+    return Array.from(document.querySelectorAll('mat-option')).map((option) =>
+      (option.textContent ?? '').trim()
+    );
+  };
+
+  it('offers every registered key when the input is empty', () => {
+    const fixture = customRuleFixture('', [
+      'billingConfigured',
+      'oauthGoogleConfigured'
+    ]);
+    expect(openCustomKeyPanel(fixture)).toEqual([
+      'billingConfigured',
+      'oauthGoogleConfigured'
+    ]);
+  });
+
+  it('filters the offered keys by what the admin typed', () => {
+    const fixture = customRuleFixture('GOOGLE', [
+      'billingConfigured',
+      'oauthGoogleConfigured'
+    ]);
+    expect(openCustomKeyPanel(fixture)).toEqual(['oauthGoogleConfigured']);
+  });
+
+  it('writes the picked key into the payload', () => {
+    const fixture = customRuleFixture('', ['billingConfigured']);
+    openCustomKeyPanel(fixture);
+    document.querySelector<HTMLElement>('mat-option')?.click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'attribute',
+      field: 'custom',
+      op: 'eq',
+      value: 'pro',
+      customKey: 'billingConfigured'
     });
   });
 

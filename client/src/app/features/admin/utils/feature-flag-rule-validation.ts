@@ -15,16 +15,29 @@ const VALUE_ERROR_KEYS: Record<FeatureFlagAttributeOp, string> = {
  * reject this draft, or null when the server accepts it. The value check is
  * delegated to the shared `attributeValueError`, so the two cannot drift.
  *
- * Two server checks are deliberately absent. An empty user or role list is a
- * valid rule that matches nobody, and the registered-custom-key set is filled
- * at boot from the environment, so only the server can test membership.
+ * `knownCustomKeys` is the set `GET /admin/feature-flags/attribute-keys`
+ * reports. It is filled at boot from the environment, so it cannot be a client
+ * constant; pass null while the request is in flight or after it failed, and
+ * the membership check is skipped rather than guessed. The key is matched
+ * verbatim, as the server matches it - a padded key is a key the server
+ * rejects.
+ *
+ * One server check stays deliberately absent: an empty user or role list is a
+ * valid rule that matches nobody.
  */
 export function featureFlagRuleError(
-  payload: FeatureFlagRulePayload
+  payload: FeatureFlagRulePayload,
+  knownCustomKeys: ReadonlySet<string> | null = null
 ): string | null {
   if (payload.type !== 'attribute') return null;
-  if (payload.field === 'custom' && (payload.customKey ?? '').trim() === '') {
-    return 'admin.featureFlagRule.errorCustomKeyRequired';
+  if (payload.field === 'custom') {
+    const customKey = payload.customKey ?? '';
+    if (customKey.trim() === '') {
+      return 'admin.featureFlagRule.errorCustomKeyRequired';
+    }
+    if (knownCustomKeys !== null && !knownCustomKeys.has(customKey)) {
+      return 'admin.featureFlagRule.errorCustomKeyUnknown';
+    }
   }
   if (attributeValueError(payload.op, payload.value) === null) return null;
   return VALUE_ERROR_KEYS[payload.op];

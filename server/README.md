@@ -2023,6 +2023,9 @@ export class TenantModule implements OnModuleInit {
 An administrator UI can then write a rule such as
 `{ field: 'custom', customKey: 'tenantId', op: 'in', value: ['acme', 'globex'] }`. The validator at
 write time rejects a `customKey` value that nobody registered.
+`GET /admin/feature-flags/attribute-keys` reports the registered set, thus the new key appears in the
+rule editor of the client with no change there. That route reports the keys only. It never reports a
+resolved value, because a resolver can carry personal data.
 
 > **The resolver contract is request-stable.** A resolver MUST return a stable value for a given user
 > across requests. It can use the `user` argument. It MUST NOT branch on per-request data, such as

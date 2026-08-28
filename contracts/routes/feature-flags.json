@@ -49,6 +49,11 @@
       "method": "GET",
       "path": "/api/v1/admin/feature-flags/cursor",
       "expectedStatus": 401
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/feature-flags/attribute-keys",
+      "expectedStatus": 401
     }
   ]
 }

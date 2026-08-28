@@ -11,6 +11,7 @@ import {
   signal
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatIconButton } from '@angular/material/button';
 import {
   MatDatepicker,
@@ -104,6 +105,7 @@ function userMatchesTerm(user: User, lowered: string): boolean {
 @Component({
   selector: 'nxs-feature-flag-rule-row',
   imports: [
+    MatAutocompleteModule,
     MatIconButton,
     MatDatepicker,
     MatDatepickerInput,
@@ -129,6 +131,9 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   readonly rule = model.required<FeatureFlagRuleDraft>();
   // Translation key for the reason the server would reject this draft, or null.
   readonly error = input<string | null>(null);
+  // The custom attribute keys the server has registered. Empty while the
+  // catalog request is in flight, or after it failed.
+  readonly customKeyOptions = input<readonly string[]>([]);
   readonly remove = output<void>();
 
   protected readonly layout = inject(LayoutService);
@@ -220,6 +225,13 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
     const d = new Date(p.value);
     return Number.isNaN(d.getTime()) ? null : d;
   }
+
+  protected readonly filteredCustomKeys = computed<string[]>(() => {
+    const term = this.attributeCustomKey.trim().toLowerCase();
+    const options = this.customKeyOptions();
+    if (term === '') return [...options];
+    return options.filter((key) => key.toLowerCase().includes(term));
+  });
 
   protected readonly isDateOp = computed(() => {
     const p = this.rule().payload;

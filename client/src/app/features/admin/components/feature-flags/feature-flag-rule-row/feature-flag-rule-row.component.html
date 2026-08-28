@@ -127,8 +127,22 @@
                   #customKeyInput
                   matInput
                   [value]="attributeCustomKey"
+                  [matAutocomplete]="customKeyAuto"
+                  [placeholder]="
+                    t('admin.featureFlagRule.customKeyPlaceholder')
+                  "
                   (input)="onAttributeCustomKeyChange(customKeyInput.value)"
                 />
+                <mat-autocomplete
+                  #customKeyAuto="matAutocomplete"
+                  (optionSelected)="
+                    onAttributeCustomKeyChange($event.option.value)
+                  "
+                >
+                  @for (key of filteredCustomKeys(); track key) {
+                    <mat-option [value]="key">{{ key }}</mat-option>
+                  }
+                </mat-autocomplete>
               </mat-form-field>
             }
             @if (attributeOp === 'in') {

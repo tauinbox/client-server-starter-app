@@ -8,7 +8,10 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository, UpdateResult } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
-import type { FeatureFlagPreviewResult } from '@app/shared/types';
+import type {
+  FeatureFlagAttributeKeysResponse,
+  FeatureFlagPreviewResult
+} from '@app/shared/types';
 import {
   previewFeatureFlag,
   type EvaluatorFlag,
@@ -57,6 +60,18 @@ export class FeatureFlagService {
     private readonly attributeRegistry: AttributeRegistryService,
     private readonly configService: ConfigService
   ) {}
+
+  /**
+   * The `custom` attribute keys a rule payload may reference. The registry is
+   * filled from `onModuleInit` registrars, so this reports a runtime fact that
+   * no shared constant could hold. Keys only: `resolveAll` evaluates the same
+   * registry against a user, and those values carry personal data.
+   */
+  getAttributeCustomKeys(): FeatureFlagAttributeKeysResponse {
+    return {
+      customKeys: [...this.attributeRegistry.getKnownCustomKeys()].sort()
+    };
+  }
 
   async findAll(): Promise<FeatureFlag[]> {
     const flags = await this.flagRepo.find({ order: { key: 'ASC' } });

@@ -6,6 +6,7 @@ import type {
   FeatureFlagRuleType
 } from '@app/shared/constants';
 import type {
+  FeatureFlagAttributeKeysResponse,
   FeatureFlagPreviewResult,
   FeatureFlagResponse,
   FeatureFlagRulePayload
@@ -66,6 +67,17 @@ export class FeatureFlagsAdminService {
     return this.#http.get<CursorPaginatedResponse<FeatureFlagResponse>>(
       `${ADMIN_API_V1}/cursor`,
       { params: cursorParams(request) }
+    );
+  }
+
+  /**
+   * The custom attribute keys a rule payload may reference. A reference load,
+   * like the role catalog: the picker needs the whole set in one response, and
+   * the set is a server-runtime fact, so no client constant can replace it.
+   */
+  getAttributeKeys(): Observable<FeatureFlagAttributeKeysResponse> {
+    return this.#http.get<FeatureFlagAttributeKeysResponse>(
+      `${ADMIN_API_V1}/attribute-keys`
     );
   }
 

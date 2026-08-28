@@ -65,6 +65,7 @@
               <nxs-feature-flag-rule-row
                 [rule]="rule"
                 [error]="ruleErrors()[i]"
+                [customKeyOptions]="customKeyOptions()"
                 (ruleChange)="updateRule(i, $event)"
                 (remove)="removeRule(i)"
               />
