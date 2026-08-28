@@ -78,6 +78,56 @@ async function patchFlag(
 // cannot run as, and an attribute value the evaluator cannot compare, are both
 // rejected instead of being stored as a permanently inert rule.
 describe('feature-flag validation parity with server', () => {
+  describe('key', () => {
+    it('trims surrounding whitespace before validating', async () => {
+      const res = await createFlag({ key: '  probe-trim  ' });
+      expect(res.status).toBe(201);
+      const flag = (await res.json()) as { key: string };
+      expect(flag.key).toBe('probe-trim');
+    });
+
+    it('compares the trimmed key against the existing flags', async () => {
+      const created = await createFlag({ key: 'dup-trim' });
+      expect(created.status).toBe(201);
+
+      const res = await createFlag({ key: ' dup-trim ' });
+      expect(res.status).toBe(409);
+    });
+
+    it('applies the same trim on PATCH', async () => {
+      const created = await createFlag({ key: 'patch-trim' });
+      expect(created.status).toBe(201);
+      const flag = (await created.json()) as { id: string; version: number };
+
+      const res = await patchFlag(
+        flag.id,
+        { key: '  patch-trimmed  ' },
+        String(flag.version)
+      );
+      expect(res.status).toBe(200);
+      const patched = (await res.json()) as { key: string };
+      expect(patched.key).toBe('patch-trimmed');
+    });
+
+    it('rejects a key that is only whitespace', async () => {
+      const res = await createFlag({ key: '   ' });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects a whitespace-only key on PATCH', async () => {
+      const created = await createFlag({ key: 'patch-blank' });
+      expect(created.status).toBe(201);
+      const flag = (await created.json()) as { id: string; version: number };
+
+      const res = await patchFlag(
+        flag.id,
+        { key: '   ' },
+        String(flag.version)
+      );
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe('environments', () => {
     it('trims, lowercases and de-duplicates', async () => {
       const res = await createFlag({
