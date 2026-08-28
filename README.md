@@ -889,6 +889,14 @@ For that reason a mock handler runs its DTO-shape checks first. Those checks cov
 length, the enum and the range. A check that needs the row stays below the 404. Such a check covers
 the uniqueness, a state transition or a comparison with a remaining total.
 
+A header is not a body. Thus the handler parses `If-Match` after the DTO-shape checks and above the
+404. This gives a 428 for a valid body with no header, and a 400 for a bad body.
+
+One helper can hold checks of the two classes. The rule-payload validator of a feature flag is an
+example. Its `source` field tells which server layer rejects the same input. A `dto` failure is a 400
+above the 404. A `service` failure is a 400 below the 404, because the server runs that validator
+inside `replaceRules`, after the lookup.
+
 The pipe also runs with `whitelist` and `forbidNonWhitelisted`. Thus a property that no DTO declares
 is a 400 by itself.
 
@@ -1663,7 +1671,7 @@ activates the git hooks through the `prepare` script.
 | Server E2E tests | Jest | A separate configuration in `test/` | 348 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 347 passed and 1 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1173 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 222 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 441 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 448 tests pass |
 
 ## CI/CD
 

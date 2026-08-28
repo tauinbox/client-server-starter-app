@@ -601,6 +601,18 @@ adminRouter.post('/', (req, res) => {
 });
 
 adminRouter.patch('/:id', requireUuid('id'), (req, res) => {
+  // Order mirrors the server: the global ValidationPipe rejects the body
+  // before the handler reads If-Match, and both precede the service lookup.
+  const validation = validateUpdate(req.body as UpdateFlagBody);
+  if (!validation.ok) {
+    res.status(400).json(validationError(validation.message));
+    return;
+  }
+  const ifMatch = parseIfMatch(req.header('if-match') ?? undefined);
+  if (!ifMatch.ok) {
+    sendError(res, ifMatch.status, ifMatch.message, ifMatch.errorKey);
+    return;
+  }
   const flag = getState().featureFlags.get((req.params['id'] as string) ?? '');
   if (!flag) {
     sendError(
@@ -609,25 +621,6 @@ adminRouter.patch('/:id', requireUuid('id'), (req, res) => {
       'Feature flag not found',
       ErrorKeys.FEATURE_FLAGS.NOT_FOUND
     );
-    return;
-  }
-  const ifMatch = parseIfMatch(req.header('if-match') ?? undefined);
-  if (!ifMatch.ok) {
-    sendError(res, ifMatch.status, ifMatch.message, ifMatch.errorKey);
-    return;
-  }
-  if (flag.version !== ifMatch.version) {
-    sendError(
-      res,
-      409,
-      'Feature flag was modified by another request — reload and retry',
-      ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
-    );
-    return;
-  }
-  const validation = validateUpdate(req.body as UpdateFlagBody);
-  if (!validation.ok) {
-    res.status(400).json(validationError(validation.message));
     return;
   }
   if (validation.patch.key !== undefined) {
@@ -641,6 +634,19 @@ adminRouter.patch('/:id', requireUuid('id'), (req, res) => {
       );
       return;
     }
+  }
+  // The server compares the version inside the UPDATE ... WHERE clause, so the
+  // key conflict above wins when a request is both stale and duplicate-keyed.
+  if (flag.version !== ifMatch.version) {
+    sendError(
+      res,
+      409,
+      'Feature flag was modified by another request — reload and retry',
+      ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
+    );
+    return;
+  }
+  if (validation.patch.key !== undefined) {
     flag.key = validation.patch.key;
   }
   if (validation.patch.description !== undefined) {
@@ -694,6 +700,15 @@ adminRouter.delete('/:id', requireUuid('id'), (req, res) => {
 });
 
 adminRouter.put('/:id/rules', requireUuid('id'), (req, res) => {
+  const body = req.body as ReplaceRulesBody;
+  const validation = validateRules(body.rules);
+  // The two failure sources sit on opposite sides of the lookup on the server:
+  // the ValidationPipe rejects a 'dto' failure before replaceRules runs, while
+  // the rule-payload validator runs after findOne has already thrown the 404.
+  if (!validation.ok && validation.source === 'dto') {
+    res.status(400).json(validationError(validation.message));
+    return;
+  }
   const flag = getState().featureFlags.get((req.params['id'] as string) ?? '');
   if (!flag) {
     sendError(
@@ -704,14 +719,8 @@ adminRouter.put('/:id/rules', requireUuid('id'), (req, res) => {
     );
     return;
   }
-  const body = req.body as ReplaceRulesBody;
-  const validation = validateRules(body.rules);
   if (!validation.ok) {
-    if (validation.source === 'dto') {
-      res.status(400).json(validationError(validation.message));
-    } else {
-      sendError(res, 400, validation.message);
-    }
+    sendError(res, 400, validation.message);
     return;
   }
   const state = getState();
