@@ -107,7 +107,11 @@ describe('validation-error envelope parity with server', () => {
       );
 
       expect(status).toBe(400);
-      expect(body.errors).toEqual(['name is required']);
+      expect(body.errors).toEqual([
+        'name must be shorter than or equal to 50 characters',
+        'name must be a string',
+        'name should not be empty'
+      ]);
     });
 
     it('billing: an unsupported region', async () => {

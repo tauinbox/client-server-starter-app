@@ -903,7 +903,10 @@ is a 400 by itself.
 `utils/validation.ts` mirrors the individual class-validator constraints. The mirrors are
 `unknownPropertyErrors`, `stringErrors`, `trimmedStringErrors`, `stringArrayErrors`, `objectErrors`,
 `intErrors`, `uuidErrors`, `iso8601Errors` and `oneOfErrors`. Take `stringErrors` for a field with no
-`@Transform(trim)`, because a trim here accepts a value that the server rejects on length. They use
+`@Transform(trim)`, because a trim here accepts a value that the server rejects on length. Set the
+`notEmpty` rule for a field with `@IsNotEmpty()`. That constraint counts only `''`, null and
+undefined as empty. Thus a number fails `@IsString()` alone, and a whitespace-only value fails only
+after a `@Transform(trim)` makes it empty. They use
 the message text and the order of the true validator. That order puts the
 unknown properties first, and then each property as the DTO declares it. Thus a handler composes its
 DTO from them and answers with the envelope of the server.
@@ -1673,7 +1676,7 @@ activates the git hooks through the `prepare` script.
 | Server E2E tests | Jest | A separate configuration in `test/` | 348 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 347 passed and 1 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1173 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 222 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 464 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 475 tests pass |
 
 ## CI/CD
 
