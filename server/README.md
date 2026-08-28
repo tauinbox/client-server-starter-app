@@ -355,7 +355,11 @@ also registers `AnonIdMiddleware` globally through `configure()`.
 files.
 
 `services/feature-flag.service.ts` holds the CRUD operations. A PATCH with `If-Match` gives a 409 on
-an optimistic-lock conflict. `replaceRules` runs in one transaction.
+an optimistic-lock conflict. The key check sits above the version comparison, because the version
+goes into the `UPDATE ... WHERE` clause. Thus a request that is stale and duplicate-keyed gives
+`errors.featureFlags.keyExists`. `replaceRules` runs in one transaction, and it validates each rule
+payload after the 404 of `findOne`. The shape of a rule is validated above that point, by the
+`ValidationPipe` on `ReplaceRulesDto`.
 
 `services/feature-flag-resolver.service.ts` does the cached evaluation. A per-user key ends with the
 shared `CacheVersionCounter` value (`common/utils/cache-version-counter.ts`). Thus a flag change

@@ -1,5 +1,5 @@
 import type { Server } from 'http';
-import { APP_ENVIRONMENTS } from '@app/shared/constants';
+import { APP_ENVIRONMENTS, ErrorKeys } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
@@ -54,6 +54,23 @@ async function replaceRules(flagId: string, rules: unknown): Promise<Response> {
       authorization: `Bearer ${token}`
     },
     body: JSON.stringify({ rules })
+  });
+}
+
+async function patchFlag(
+  flagId: string,
+  body: unknown,
+  ifMatch?: string
+): Promise<Response> {
+  const token = await loginAsAdmin();
+  return fetch(`${baseUrl}/api/v1/admin/feature-flags/${flagId}`, {
+    method: 'PATCH',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${token}`,
+      ...(ifMatch === undefined ? {} : { 'if-match': ifMatch })
+    },
+    body: JSON.stringify(body)
   });
 }
 
@@ -322,6 +339,74 @@ describe('feature-flag validation parity with server', () => {
       expect(stored).toHaveLength(1);
       expect(stored[0].payload).toEqual({ type: 'role', roleNames: ['beta'] });
       expect(getState().featureFlags.get(flagId)?.enabled).toBe(true);
+    });
+  });
+
+  // The server runs the global ValidationPipe before the handler body, so a DTO
+  // failure precedes the If-Match parse and both precede the service lookup.
+  // The rule-payload validator is the exception: it runs inside replaceRules,
+  // after findOne has already thrown the 404.
+  describe('rejection order', () => {
+    const ABSENT_ID = '11111111-1111-4111-8111-111111111111';
+
+    it('rejects a bad PATCH body on an absent flag with 400, not 404', async () => {
+      const res = await patchFlag(ABSENT_ID, { enabled: 'yes' });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { errors: string[] };
+      expect(body.errors[0]).toContain('enabled');
+    });
+
+    it('rejects a bad PATCH body with 400 before the missing If-Match', async () => {
+      const created = await createFlag({ key: 'order-patch-body' });
+      const flag = (await created.json()) as { id: string };
+      const res = await patchFlag(flag.id, { enabled: 'yes' });
+      expect(res.status).toBe(400);
+    });
+
+    it('still answers 428 for a valid PATCH body with no If-Match on an absent flag', async () => {
+      const res = await patchFlag(ABSENT_ID, { enabled: true });
+      expect(res.status).toBe(428);
+      const body = (await res.json()) as { errorKey: string };
+      expect(body.errorKey).toBe(ErrorKeys.FEATURE_FLAGS.IF_MATCH_REQUIRED);
+    });
+
+    it('reports the key conflict, not the version conflict, when a PATCH is both', async () => {
+      const first = await createFlag({ key: 'order-taken-key' });
+      const second = await createFlag({ key: 'order-stale-flag' });
+      expect(first.status).toBe(201);
+      const target = (await second.json()) as { id: string; version: number };
+
+      const res = await patchFlag(
+        target.id,
+        { key: 'order-taken-key' },
+        String(target.version + 5)
+      );
+      expect(res.status).toBe(409);
+      const body = (await res.json()) as { errorKey: string };
+      expect(body.errorKey).toBe(ErrorKeys.FEATURE_FLAGS.KEY_EXISTS);
+    });
+
+    it('rejects a non-array rule set on an absent flag with 400, not 404', async () => {
+      const res = await replaceRules(ABSENT_ID, 'nope');
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { errors: string[] };
+      expect(body.errors).toContain('rules must be an array');
+    });
+
+    it('rejects a non-object rule payload on an absent flag with 400, not 404', async () => {
+      const res = await replaceRules(ABSENT_ID, [
+        { type: 'user', effect: 'include', payload: 'nope' }
+      ]);
+      expect(res.status).toBe(400);
+    });
+
+    it('answers 404 for a payload the rule validator rejects on an absent flag', async () => {
+      const res = await replaceRules(ABSENT_ID, [
+        { type: 'user', effect: 'include', payload: { type: 'user' } }
+      ]);
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { errorKey: string };
+      expect(body.errorKey).toBe(ErrorKeys.FEATURE_FLAGS.NOT_FOUND);
     });
   });
 });
