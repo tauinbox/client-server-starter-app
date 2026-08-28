@@ -85,7 +85,8 @@
       "envMismatch": "Окружение не совпадает",
       "excluded": "Исключён правилом",
       "includedByRule": "Включён правилом",
-      "noRulesDefaultOn": "Нет include-правил — по умолчанию включён"
+      "noRulesDefaultOn": "Нет include-правил — по умолчанию включён",
+      "notIncluded": "Ни одно include-правило не сработало"
     },
     "errorPreviewFailed": "Не удалось выполнить предпросмотр. Причина: {{ detail }}"
   },

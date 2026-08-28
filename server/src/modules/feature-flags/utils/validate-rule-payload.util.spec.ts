@@ -55,7 +55,8 @@ describe('feature-flag rule vocabulary', () => {
       'env-mismatch',
       'excluded',
       'included-by-rule',
-      'no-rules-default-on'
+      'no-rules-default-on',
+      'not-included'
     ]);
   });
 });

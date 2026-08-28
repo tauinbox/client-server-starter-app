@@ -591,6 +591,33 @@ describe('Feature flags end-to-end', () => {
     });
   });
 
+  it('preview() reports not-included when no include rule matched', async () => {
+    const flag = await flagService.create(
+      { key: 'unmatched-preview', enabled: true },
+      'actor-1'
+    );
+    await flagService.replaceRules(
+      flag.id,
+      [
+        {
+          type: 'role',
+          effect: 'include',
+          payload: { type: 'role', roleNames: ['beta'] }
+        }
+      ],
+      'actor-1'
+    );
+
+    const result = await flagService.preview(flag.id, {
+      roles: ['plain']
+    });
+    expect(result).toEqual({
+      result: false,
+      reason: 'not-included',
+      matchedRule: null
+    });
+  });
+
   it('preview() reports disabled when the flag itself is off', async () => {
     const flag = await flagService.create(
       { key: 'off-preview', enabled: false },
