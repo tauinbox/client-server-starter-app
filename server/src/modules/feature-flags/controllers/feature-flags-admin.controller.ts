@@ -37,6 +37,8 @@ import { FeatureFlagCursorQueryDto } from '../../../common/dtos';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
 import { RegisterResource } from '../../auth/decorators/register-resource.decorator';
 import { LogAudit } from '../../audit/decorators/log-audit.decorator';
+import { AuditService } from '../../audit/audit.service';
+import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { JwtAuthRequest } from '../../auth/types/auth.request';
 import { FeatureFlagService } from '../services/feature-flag.service';
 import { CreateFeatureFlagDto } from '../dtos/create-feature-flag.dto';
@@ -61,7 +63,8 @@ import { FeatureFlagChangedEvent } from '../events/feature-flag-changed.event';
 export class FeatureFlagsAdminController {
   constructor(
     private readonly flagService: FeatureFlagService,
-    private readonly eventEmitter: EventEmitter2
+    private readonly eventEmitter: EventEmitter2,
+    private readonly auditService: AuditService
   ) {}
 
   @Get('cursor')
@@ -158,22 +161,32 @@ export class FeatureFlagsAdminController {
 
   @Delete(':id')
   @Authorize(['manage', 'FeatureFlag'])
-  @LogAudit({
-    action: AuditAction.FEATURE_FLAG_DELETE,
-    targetType: 'FeatureFlag'
-  })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a feature flag' })
   @ApiParam({ name: 'id' })
   @ApiOkResponse({ description: 'Deleted' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id', ParseUUIDPipe) id: string) {
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: JwtAuthRequest
+  ) {
     const flag = await this.flagService.findOne(id);
     await this.flagService.delete(id);
     this.eventEmitter.emit(
       FeatureFlagChangedEvent.name,
       new FeatureFlagChangedEvent(flag.key, 'deleted')
     );
+    // The row is gone after the delete, so the key is recorded here: a bare
+    // targetId resolves to nothing once the flag no longer exists.
+    await this.auditService.log({
+      action: AuditAction.FEATURE_FLAG_DELETE,
+      actorId: req.user?.userId ?? null,
+      actorEmail: req.user?.email ?? null,
+      targetId: id,
+      targetType: 'FeatureFlag',
+      details: { key: flag.key },
+      context: extractAuditContext(req)
+    });
   }
 
   @Put(':id/rules')

@@ -410,6 +410,7 @@ router.delete('/actions/:id', adminGuard, requireUuid('id'), (req, res) => {
     actorEmail: actor.email,
     targetId: id,
     targetType: 'Action',
+    details: { name: action.name },
     ip: req.ip
   });
 

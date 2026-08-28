@@ -44,6 +44,7 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { LogAudit } from '../../audit/decorators/log-audit.decorator';
 import { AuditService } from '../../audit/audit.service';
 import { assertCan } from '../../../common/utils/assert-can.util';
+import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserRoleChangedEvent } from '../events/user-role-changed.event';
@@ -198,10 +199,6 @@ export class RolesController {
 
   @Delete(':id')
   @Authorize(['delete', 'Role'])
-  @LogAudit({
-    action: AuditAction.ROLE_DELETE,
-    targetType: 'Role'
-  })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a role' })
   @ApiParam({ name: 'id', description: 'The role ID' })
@@ -221,7 +218,18 @@ export class RolesController {
       { actorId: req.user?.userId, targetId: id, targetType: 'Role' },
       this.metricsService
     );
-    return this.roleService.delete(id);
+    await this.roleService.delete(id);
+    // The row is gone after the delete, so the name is recorded here: a bare
+    // targetId resolves to nothing once the role no longer exists.
+    await this.auditService.log({
+      action: AuditAction.ROLE_DELETE,
+      actorId: req.user?.userId ?? null,
+      actorEmail: req.user?.email ?? null,
+      targetId: id,
+      targetType: 'Role',
+      details: { name: role.name },
+      context: extractAuditContext(req)
+    });
   }
 
   @Put(':id/permissions')
