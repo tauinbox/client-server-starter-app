@@ -39,6 +39,13 @@ import {
   requireUuid,
   validationError
 } from '../helpers/validation-error.helpers';
+import {
+  objectErrors,
+  stringArrayErrors,
+  stringErrors,
+  unknownPropertyErrors,
+  uuidErrors
+} from '../utils/validation';
 import { pushToAll } from '../sse-hub';
 import { getState, logAudit, toFeatureFlagResponse } from '../state';
 import type { MockFeatureFlag, MockFeatureFlagRule } from '../types';
@@ -758,42 +765,99 @@ adminRouter.put('/:id/rules', requireUuid('id'), (req, res) => {
   res.json(toFeatureFlagResponse(flag));
 });
 
+const MAX_ATTRIBUTE_KEYS = 32;
+const MAX_ATTRIBUTE_KEY_LENGTH = 64;
+
+const PREVIEW_BODY_KEYS = [
+  'userId',
+  'roles',
+  'attributes',
+  'env',
+  'anonId',
+  'rules',
+  'enabled',
+  'environments'
+];
+
+/**
+ * Mirrors the server's `sanitizeAttributes`: it takes the first 32 entries and
+ * only then drops the keys that are empty or over-long, so a rejected key still
+ * consumes one of the 32 slots. Counting the accepted keys instead would let
+ * the mock evaluate an attribute the server never sees.
+ */
+function sanitizeAttributes(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null) return {};
+  const out: Record<string, unknown> = {};
+  const entries = Object.entries(value as Record<string, unknown>).slice(
+    0,
+    MAX_ATTRIBUTE_KEYS
+  );
+  for (const [key, entry] of entries) {
+    if (key.length === 0 || key.length > MAX_ATTRIBUTE_KEY_LENGTH) continue;
+    out[key] = entry;
+  }
+  return out;
+}
+
+/**
+ * Mirrors the context half of `PreviewFlagContextDto` under the global
+ * ValidationPipe. class-validator whitelists before it validates and reports
+ * the properties in declaration order, so the unknown-property errors lead and
+ * the context fields follow in the order the DTO declares them. Every field is
+ * `@IsOptional()`, which skips an explicit `null` as well as an omitted key.
+ *
+ * `userId` takes the body UUID pattern, not the looser one `ParseUUIDPipe`
+ * applies to the `:id` route param.
+ */
+function previewContextErrors(body: Record<string, unknown>): string[] {
+  return [
+    ...unknownPropertyErrors(body, PREVIEW_BODY_KEYS),
+    ...uuidErrors('userId', body['userId'], 'nullable'),
+    ...stringArrayErrors('roles', body['roles'], {
+      maxItems: 32,
+      maxItemLength: 64,
+      optional: 'nullable'
+    }),
+    ...objectErrors('attributes', body['attributes'], 'nullable'),
+    ...stringErrors('env', body['env'], { max: 32, optional: 'nullable' }),
+    ...stringErrors('anonId', body['anonId'], {
+      max: 128,
+      optional: 'nullable'
+    })
+  ];
+}
+
 adminRouter.post('/:id/preview', requireUuid('id'), (req, res) => {
-  const body = (req.body ?? {}) as {
-    userId?: unknown;
-    roles?: unknown;
-    attributes?: unknown;
-    env?: unknown;
-    anonId?: unknown;
-    rules?: unknown;
-    enabled?: unknown;
-    environments?: unknown;
-  };
+  const body = (req.body ?? {}) as Record<string, unknown>;
   // The server resolves the body through the ValidationPipe before the handler
-  // runs, so every DTO-level rejection precedes the 404. Only the rule-payload
-  // validator lives in the service, below the lookup.
+  // runs, so every DTO-level rejection precedes the 404, and the pipe reports
+  // all of them together. Only the rule-payload validator lives in the service,
+  // below the lookup.
+  const errors = previewContextErrors(body);
   const rulesValidation =
-    body.rules === undefined ? null : validateRules(body.rules);
+    body['rules'] === undefined ? null : validateRules(body['rules']);
   if (
     rulesValidation &&
     !rulesValidation.ok &&
     rulesValidation.source === 'dto'
   ) {
-    res.status(400).json(validationError(rulesValidation.message));
-    return;
+    errors.push(rulesValidation.message);
   }
-  if (body.enabled !== undefined && typeof body.enabled !== 'boolean') {
-    res.status(400).json(validationError('enabled must be a boolean value'));
-    return;
+  if (body['enabled'] !== undefined && typeof body['enabled'] !== 'boolean') {
+    errors.push('enabled must be a boolean value');
   }
   let draftEnvironments: string[] | undefined;
-  if (body.environments !== undefined) {
-    const validated = validateEnvironments(body.environments);
-    if (!validated.ok) {
-      res.status(400).json(validationError(validated.message));
-      return;
+  if (body['environments'] !== undefined) {
+    const validated = validateEnvironments(body['environments']);
+    if (validated.ok) {
+      draftEnvironments = validated.environments;
+    } else {
+      errors.push(validated.message);
     }
-    draftEnvironments = validated.environments;
+  }
+  if (errors.length > 0) {
+    res.status(400).json(validationError(errors));
+    return;
   }
   const flag = getState().featureFlags.get((req.params['id'] as string) ?? '');
   if (!flag) {
@@ -809,35 +873,16 @@ adminRouter.post('/:id/preview', requireUuid('id'), (req, res) => {
     sendError(res, 400, rulesValidation.message);
     return;
   }
-  const userId =
-    typeof body.userId === 'string' && body.userId.length <= 128
-      ? body.userId
-      : null;
-  const roles = isStringArray(body.roles)
-    ? body.roles.slice(0, 32).filter((r) => r.length <= 64)
-    : [];
-  const attributes: Record<string, unknown> = {};
-  if (body.attributes !== null && typeof body.attributes === 'object') {
-    let count = 0;
-    for (const [key, value] of Object.entries(
-      body.attributes as Record<string, unknown>
-    )) {
-      if (count >= 32) break;
-      if (typeof key !== 'string' || key.length === 0 || key.length > 64) {
-        continue;
-      }
-      attributes[key] = value;
-      count++;
-    }
-  }
+  // Every field passed the checks above, so the reads below only pick the
+  // default for an omitted or explicitly null value.
+  const userId = typeof body['userId'] === 'string' ? body['userId'] : null;
+  const roles = isStringArray(body['roles']) ? body['roles'] : [];
+  const attributes = sanitizeAttributes(body['attributes']);
   const env =
-    typeof body.env === 'string' && body.env.length <= 32
-      ? body.env
+    typeof body['env'] === 'string'
+      ? body['env']
       : (process.env['ENVIRONMENT'] ?? 'production');
-  const anonId =
-    typeof body.anonId === 'string' && body.anonId.length <= 128
-      ? body.anonId
-      : null;
+  const anonId = typeof body['anonId'] === 'string' ? body['anonId'] : null;
   const rules: EvaluatorRule[] = rulesValidation?.ok
     ? rulesValidation.rules.map((r) => ({
         effect: r.effect,
@@ -849,7 +894,7 @@ adminRouter.post('/:id/preview', requireUuid('id'), (req, res) => {
   const result = previewFeatureFlag(
     {
       key: flag.key,
-      enabled: (body.enabled as boolean | undefined) ?? flag.enabled,
+      enabled: (body['enabled'] as boolean | undefined) ?? flag.enabled,
       environments: draftEnvironments ?? flag.environments
     },
     rules,
