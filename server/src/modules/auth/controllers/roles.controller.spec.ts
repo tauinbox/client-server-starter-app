@@ -42,7 +42,9 @@ const denyAbility: AppAbility = { can: jest.fn().mockReturnValue(false) };
 
 const mockReq: import('../types/auth.request').JwtAuthRequest = {
   // @ts-expect-error partial user — handlers only read req.user.userId
-  user: { userId: 'actor-1', email: 'a@example.com' }
+  user: { userId: 'actor-1', email: 'a@example.com' },
+  ip: '127.0.0.1',
+  headers: {}
 };
 
 describe('RolesController', () => {
@@ -262,6 +264,41 @@ describe('RolesController', () => {
       expect(result).toBeUndefined();
     });
 
+    it('should record the deleted role name in the ROLE_DELETE audit details', async () => {
+      roleServiceMock.findOne.mockResolvedValue({
+        id: 'role-1',
+        name: 'editor'
+      });
+
+      await controller.remove('role-1', mockReq, mockAbility);
+
+      expect(auditServiceMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.ROLE_DELETE,
+          actorId: 'actor-1',
+          actorEmail: 'a@example.com',
+          targetId: 'role-1',
+          targetType: 'Role',
+          details: { name: 'editor' }
+        })
+      );
+    });
+
+    it('should not write a ROLE_DELETE audit entry when the ability denies', async () => {
+      roleServiceMock.findOne.mockResolvedValue({
+        id: 'role-1',
+        name: 'editor'
+      });
+
+      await expect(
+        controller.remove('role-1', mockReq, denyAbility)
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(auditServiceMock.log).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: AuditAction.ROLE_DELETE })
+      );
+    });
+
     it('should throw ForbiddenException and skip delete when ability denies the loaded role', async () => {
       const role = { id: 'role-1', name: 'editor' };
       roleServiceMock.findOne.mockResolvedValue(role);
@@ -390,12 +427,8 @@ describe('RolesController', () => {
       ).toEqual({ changedFields: ['name', 'description'] });
     });
 
-    it('remove: ROLE_DELETE with no details', () => {
-      const opts = getAuditOptions('remove');
-      expect(opts?.action).toBe(AuditAction.ROLE_DELETE);
-      expect(opts?.targetType).toBe('Role');
-      expect(opts?.details).toBeUndefined();
-      expect(opts?.targetIdParam).toBeUndefined();
+    it('remove: no @LogAudit metadata - the handler logs ROLE_DELETE itself', () => {
+      expect(getAuditOptions('remove')).toBeUndefined();
     });
 
     it('setPermissions: PERMISSION_ASSIGN with permissionIds from items', () => {

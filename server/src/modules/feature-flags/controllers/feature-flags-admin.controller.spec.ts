@@ -5,6 +5,8 @@ import { FeatureFlagsAdminController } from './feature-flags-admin.controller';
 import { FeatureFlagService } from '../services/feature-flag.service';
 import { FeatureFlagChangedEvent } from '../events/feature-flag-changed.event';
 import { PermissionsGuard } from '../../auth/guards/permissions.guard';
+import { AuditService } from '../../audit/audit.service';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import type { JwtAuthRequest } from '../../auth/types/auth.request';
 
 describe('FeatureFlagsAdminController', () => {
@@ -19,9 +21,12 @@ describe('FeatureFlagsAdminController', () => {
     replaceRules: jest.Mock;
   };
   let eventEmitter: { emit: jest.Mock };
+  let auditService: { log: jest.Mock; logFireAndForget: jest.Mock };
 
   const req = {
-    user: { userId: 'actor-1', email: 'a@b.com' }
+    user: { userId: 'actor-1', email: 'a@b.com' },
+    ip: '127.0.0.1',
+    headers: {}
   } as JwtAuthRequest;
   const sampleFlag = {
     id: 'flag-1',
@@ -45,12 +50,17 @@ describe('FeatureFlagsAdminController', () => {
       replaceRules: jest.fn().mockResolvedValue(sampleFlag)
     };
     eventEmitter = { emit: jest.fn() };
+    auditService = {
+      log: jest.fn().mockResolvedValue(undefined),
+      logFireAndForget: jest.fn()
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [FeatureFlagsAdminController],
       providers: [
         { provide: FeatureFlagService, useValue: flagService },
-        { provide: EventEmitter2, useValue: eventEmitter }
+        { provide: EventEmitter2, useValue: eventEmitter },
+        { provide: AuditService, useValue: auditService }
       ]
     })
       .overrideGuard(PermissionsGuard)
@@ -110,13 +120,27 @@ describe('FeatureFlagsAdminController', () => {
   });
 
   it('delete emits a "deleted" change event with the flag key', async () => {
-    await controller.remove('flag-1');
+    await controller.remove('flag-1', req);
     expect(flagService.delete).toHaveBeenCalledWith('flag-1');
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       FeatureFlagChangedEvent.name,
       expect.objectContaining({
         flagKey: 'new-dashboard',
         changeType: 'deleted'
+      })
+    );
+  });
+
+  it('delete records the flag key in the audit details', async () => {
+    await controller.remove('flag-1', req);
+    expect(auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.FEATURE_FLAG_DELETE,
+        actorId: 'actor-1',
+        actorEmail: 'a@b.com',
+        targetId: 'flag-1',
+        targetType: 'FeatureFlag',
+        details: { key: 'new-dashboard' }
       })
     );
   });

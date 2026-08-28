@@ -326,6 +326,7 @@ export class RbacController {
       actorEmail: req.user.email,
       targetId: id,
       targetType: 'Action',
+      details: { name: action.name },
       context: extractAuditContext(req)
     });
   }

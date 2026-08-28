@@ -485,12 +485,15 @@ describe('RbacController', () => {
       expect(cacheManagerMock.del).toHaveBeenCalledWith('rbac:metadata');
     });
 
-    it('should log ACTION_DELETE audit event', async () => {
+    it('should log ACTION_DELETE audit event with the deleted action name', async () => {
       const req = mockJwtRequest(
         'user-3',
         'deleter@example.com'
       ) as JwtAuthRequest;
-      actionServiceMock.findOne.mockResolvedValue({ id: 'act-1' });
+      actionServiceMock.findOne.mockResolvedValue({
+        id: 'act-1',
+        name: 'approve'
+      });
 
       await controller.deleteAction('act-1', req, mockAbility);
 
@@ -500,7 +503,8 @@ describe('RbacController', () => {
           actorId: 'user-3',
           actorEmail: 'deleter@example.com',
           targetId: 'act-1',
-          targetType: 'Action'
+          targetType: 'Action',
+          details: { name: 'approve' }
         })
       );
     });

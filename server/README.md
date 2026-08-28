@@ -370,8 +370,9 @@ orphans each per-user entry with no Redis `SCAN`.
 
 `controllers/feature-flags-admin.controller.ts` holds 9 administrator endpoints below
 `/admin/feature-flags`. Each one uses `@Authorize(['manage','FeatureFlag'])`. The 5 mutating
-endpoints also use `@LogAudit`. The 3 read endpoints and `POST :id/preview` write nothing, thus they
-make no audit entry.
+endpoints each write an audit entry. Four of them use `@LogAudit`. The delete calls
+`AuditService.log` itself, to record `details: { key }` of the flag that it removed. The 3 read
+endpoints and `POST :id/preview` write nothing, thus they make no audit entry.
 
 `controllers/feature-flags.controller.ts` holds `GET /feature-flags` with `@OptionalAuth()`. An
 authenticated caller gets each flag that resolves true plus each public flag, and the server omits a
