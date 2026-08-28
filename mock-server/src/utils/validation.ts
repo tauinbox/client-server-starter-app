@@ -96,13 +96,19 @@ interface StringRules {
   /** Omitted for a field carrying no `@MinLength`. */
   min?: number;
   max: number;
+  /**
+   * The field carries `@IsNotEmpty()`. class-validator treats only `''`, null
+   * and undefined as empty, so a number passes it and fails `@IsString()`
+   * alone. It sits at the top of the decorator list, so it is reported last.
+   */
+  notEmpty?: boolean;
   optional?: OptionalMode;
 }
 
 /**
- * Mirrors `@IsString() @MinLength(min) @MaxLength(max)`. Decorators apply
- * bottom-up, so a value failing several of them is reported MaxLength,
- * MinLength, IsString.
+ * Mirrors `@IsNotEmpty() @IsString() @MinLength(min) @MaxLength(max)`.
+ * Decorators apply bottom-up, so a value failing several of them is reported
+ * MaxLength, MinLength, IsString, IsNotEmpty.
  */
 export function stringErrors(
   field: string,
@@ -119,12 +125,19 @@ export function stringErrors(
     if (tooShort) errors.push(tooShort);
   }
   if (typeof value !== 'string') errors.push(`${field} must be a string`);
+  if (
+    rules.notEmpty &&
+    (value === '' || value === null || value === undefined)
+  ) {
+    errors.push(`${field} should not be empty`);
+  }
   return errors;
 }
 
 /**
- * Mirrors `@Transform(trim) @IsString() @MinLength(min) @MaxLength(max)`. The
- * trim runs before the caps. A field with no `@Transform(trim)` takes
+ * Mirrors `@Transform(trim) @IsNotEmpty() @IsString() @MinLength(min)
+ * @MaxLength(max)`. The trim runs before the caps, so a whitespace-only value
+ * reaches `@IsNotEmpty()` as an empty string. A field with no `@Transform(trim)` takes
  * `stringErrors` instead, because trimming there would accept a value the
  * server rejects on length.
  */
@@ -136,7 +149,11 @@ export function trimmedStringErrors(
   if (isSkipped(value, rules.optional)) return [];
 
   const trimmed = typeof value === 'string' ? value.trim() : value;
-  return stringErrors(field, trimmed, { min: rules.min, max: rules.max });
+  return stringErrors(field, trimmed, {
+    min: rules.min,
+    max: rules.max,
+    notEmpty: rules.notEmpty
+  });
 }
 
 interface StringArrayRules {

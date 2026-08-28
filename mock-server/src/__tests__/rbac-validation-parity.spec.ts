@@ -86,7 +86,64 @@ describe('rbac validation parity with server', () => {
 
       expect(res.status).toBe(400);
       const body = (await res.json()) as { errors?: string[] };
-      expect(body.errors).toEqual(['description must be a string']);
+      expect(body.errors).toEqual([
+        'description must be shorter than or equal to 500 characters',
+        'description must be a string'
+      ]);
+    });
+
+    it('rejects an unknown property before it validates a field', async () => {
+      const res = await send('POST', '/rbac/actions', {
+        name: '  ',
+        displayName: '',
+        description: 5,
+        bogus: true
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { errors?: string[] };
+      expect(body.errors).toEqual([
+        'property bogus should not exist',
+        'name should not be empty',
+        'displayName should not be empty',
+        'description must be shorter than or equal to 500 characters',
+        'description must be a string'
+      ]);
+    });
+
+    it('reports a whitespace-only name as empty, not as missing', async () => {
+      const res = await send('POST', '/rbac/actions', {
+        name: '   ',
+        displayName: 'Publish'
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { errors?: string[] };
+      expect(body.errors).toEqual(['name should not be empty']);
+    });
+
+    it('reports an over-long name and displayName together', async () => {
+      const res = await send('POST', '/rbac/actions', {
+        name: 'a'.repeat(51),
+        displayName: 'd'.repeat(101)
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { errors?: string[] };
+      expect(body.errors).toEqual([
+        'name must be shorter than or equal to 50 characters',
+        'displayName must be shorter than or equal to 100 characters'
+      ]);
+    });
+
+    it('accepts a null description the way `@IsOptional()` does', async () => {
+      const res = await send('POST', '/rbac/actions', {
+        name: 'publish',
+        displayName: 'Publish',
+        description: null
+      });
+
+      expect(res.status).toBe(201);
     });
 
     it('still rejects a reserved name with the service envelope', async () => {
@@ -120,7 +177,38 @@ describe('rbac validation parity with server', () => {
 
       expect(res.status).toBe(400);
       const body = (await res.json()) as { errors?: string[] };
-      expect(body.errors).toEqual(['displayName must be a string']);
+      expect(body.errors).toEqual([
+        'displayName must be shorter than or equal to 100 characters',
+        'displayName must be a string'
+      ]);
+    });
+
+    it('rejects an unknown property', async () => {
+      const res = await send('PATCH', `/rbac/actions/${mockId('act-assign')}`, {
+        bogus: 1
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { errors?: string[] };
+      expect(body.errors).toEqual(['property bogus should not exist']);
+    });
+
+    it('reports every fault of a body at once, in DTO order', async () => {
+      const res = await send('PATCH', `/rbac/actions/${mockId('act-assign')}`, {
+        bogus: 1,
+        displayName: null,
+        description: null
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { errors?: string[] };
+      expect(body.errors).toEqual([
+        'property bogus should not exist',
+        'displayName must be shorter than or equal to 100 characters',
+        'displayName must be a string',
+        'description must be shorter than or equal to 500 characters',
+        'description must be a string'
+      ]);
     });
 
     it('rejects a non-string description without mutating the action', async () => {
@@ -167,7 +255,10 @@ describe('rbac validation parity with server', () => {
 
       expect(res.status).toBe(400);
       const body = (await res.json()) as { errors?: string[] };
-      expect(body.errors).toEqual(['displayName must be a string']);
+      expect(body.errors).toEqual([
+        'displayName must be shorter than or equal to 100 characters',
+        'displayName must be a string'
+      ]);
     });
 
     it('rejects an over-long description without mutating the resource', async () => {
@@ -183,7 +274,7 @@ describe('rbac validation parity with server', () => {
       expect(res.status).toBe(400);
       const body = (await res.json()) as { errors?: string[] };
       expect(body.errors).toEqual([
-        'description must not exceed 500 characters'
+        'description must be shorter than or equal to 500 characters'
       ]);
 
       const after = await send(
@@ -193,6 +284,88 @@ describe('rbac validation parity with server', () => {
       );
       const resource = (await after.json()) as { displayName: string };
       expect(resource.displayName).not.toBe('Renamed');
+    });
+
+    it('rejects an unknown property', async () => {
+      const res = await send(
+        'PATCH',
+        `/rbac/resources/${mockId('res-users')}`,
+        { bogus: 1, other: 2, displayName: 'ok' }
+      );
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { errors?: string[] };
+      expect(body.errors).toEqual([
+        'property bogus should not exist',
+        'property other should not exist'
+      ]);
+    });
+
+    it('reports every fault of a body at once, in DTO order', async () => {
+      const res = await send(
+        'PATCH',
+        `/rbac/resources/${mockId('res-users')}`,
+        {
+          bogus: 1,
+          displayName: 'd'.repeat(101),
+          description: 501,
+          allowedActionNames: 5
+        }
+      );
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { errors?: string[] };
+      expect(body.errors).toEqual([
+        'property bogus should not exist',
+        'displayName must be shorter than or equal to 100 characters',
+        'description must be shorter than or equal to 500 characters',
+        'description must be a string',
+        'each value in allowedActionNames must be shorter than or equal to 50 characters',
+        'each value in allowedActionNames must be a string',
+        'allowedActionNames must contain no more than 100 elements',
+        'allowedActionNames must be an array'
+      ]);
+    });
+
+    it('reports the four allowedActionNames constraints bottom-up', async () => {
+      const res = await send(
+        'PATCH',
+        `/rbac/resources/${mockId('res-users')}`,
+        { allowedActionNames: [1, 'x'.repeat(51)] }
+      );
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { errors?: string[] };
+      expect(body.errors).toEqual([
+        'each value in allowedActionNames must be shorter than or equal to 50 characters',
+        'each value in allowedActionNames must be a string'
+      ]);
+    });
+
+    it('reports displayName ahead of allowedActionNames', async () => {
+      const res = await send(
+        'PATCH',
+        `/rbac/resources/${mockId('res-users')}`,
+        { allowedActionNames: ['read', 'x'.repeat(51)], displayName: 5 }
+      );
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { errors?: string[] };
+      expect(body.errors).toEqual([
+        'displayName must be shorter than or equal to 100 characters',
+        'displayName must be a string',
+        'each value in allowedActionNames must be shorter than or equal to 50 characters'
+      ]);
+    });
+
+    it('accepts a null allowedActionNames', async () => {
+      const res = await send(
+        'PATCH',
+        `/rbac/resources/${mockId('res-users')}`,
+        { allowedActionNames: null }
+      );
+
+      expect(res.status).toBe(200);
     });
 
     it('accepts a null description', async () => {

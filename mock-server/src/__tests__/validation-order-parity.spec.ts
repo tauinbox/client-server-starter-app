@@ -183,7 +183,8 @@ describe('body validation precedes the entity lookup', () => {
       method: 'PATCH',
       path: `/api/v1/rbac/resources/${UNKNOWN}`,
       malformed: { displayName: 42 },
-      malformedMessage: 'displayName must be a string',
+      malformedMessage:
+        'displayName must be shorter than or equal to 100 characters. displayName must be a string',
       wellFormed: { displayName: 'Valid' },
       notFoundKey: ErrorKeys.RESOURCES.NOT_FOUND
     },
@@ -192,7 +193,8 @@ describe('body validation precedes the entity lookup', () => {
       method: 'PATCH',
       path: `/api/v1/rbac/actions/${UNKNOWN}`,
       malformed: { description: 'x'.repeat(501) },
-      malformedMessage: 'description must not exceed 500 characters',
+      malformedMessage:
+        'description must be shorter than or equal to 500 characters',
       wellFormed: { description: 'Valid' },
       notFoundKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
     },
