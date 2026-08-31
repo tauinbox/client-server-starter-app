@@ -1212,6 +1212,15 @@ query `?error=access_denied`, which is how each provider reports a declined cons
 instead of `/login`. Thus a link attempt that started on the profile page ends there. The filter also
 clears that cookie, because the attempt is over.
 
+**The link intent ends with the session.** `POST /auth/logout` clears the `oauth_link` cookie, and so
+does a self-service password change, which revokes the sessions for the same reason. The
+refresh-token clear cannot do it, because a cookie has a path and the two cookies sit on different
+paths: `/api/v1/auth` and `/api/v1/auth/oauth`. `linkOAuthToUser` also refuses a link token whose
+`iat` is earlier than `User.tokenRevokedAt`, which is the comparison the JWT strategy makes. The
+second leg holds when the cookie reaches the callback from a different tab or a different device. A
+link token with no `iat` links nothing. Without both legs, an abandoned link attempt attaches the
+next provider identity in that browser to the account that started it.
+
 A provider that nobody configured still returns 404. The validated `CLIENT_URL` value comes from one
 provider (`auth/providers/client-url.provider.ts`), which the controller and the filter share.
 

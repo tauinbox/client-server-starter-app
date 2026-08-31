@@ -14,6 +14,11 @@ import { OAuthUserProfile } from '../types/oauth-profile';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys, TOKEN_PURPOSE } from '@app/shared/constants';
 
+// Seconds, as a JWT `iat` is.
+const LINK_TOKEN_IAT = Math.floor(
+  new Date('2026-01-01T00:00:00Z').getTime() / 1000
+);
+
 function mockJwtRequest(userId: string): {
   user: JwtAuthRequest['user'];
   headers: Record<string, string>;
@@ -75,9 +80,11 @@ describe('OAuthController', () => {
 
     jwtServiceMock = {
       sign: jest.fn().mockReturnValue('signed-link-token'),
-      verify: jest
-        .fn()
-        .mockReturnValue({ sub: 'user-1', purpose: TOKEN_PURPOSE.OAUTH_LINK })
+      verify: jest.fn().mockReturnValue({
+        sub: 'user-1',
+        purpose: TOKEN_PURPOSE.OAUTH_LINK,
+        iat: LINK_TOKEN_IAT
+      })
     };
 
     oauthServiceMock = {
@@ -373,6 +380,7 @@ describe('OAuthController', () => {
         'user-1',
         OAuthProvider.GOOGLE,
         '456',
+        LINK_TOKEN_IAT,
         expect.objectContaining({ ip: '127.0.0.1' })
       );
       expect(res.clearCookie).toHaveBeenCalledWith('oauth_link', {
@@ -380,6 +388,35 @@ describe('OAuthController', () => {
       });
       expect(res.redirect).toHaveBeenCalledWith(
         'http://localhost:4200/profile?oauth_linked=google'
+      );
+    });
+
+    // The service compares the issue time against the last session revocation,
+    // so a token that carries none must be refused, never linked on trust.
+    it('should not link the account when the token carries no issue time', async () => {
+      jwtServiceMock.verify.mockReturnValue({
+        sub: 'user-1',
+        purpose: TOKEN_PURPOSE.OAUTH_LINK
+      });
+
+      const res = mockResponse();
+      const profile: OAuthUserProfile = {
+        provider: OAuthProvider.GOOGLE,
+        providerId: '456',
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        emailVerified: true
+      };
+
+      await controller.googleCallback(
+        mockExpressRequest(profile, { oauth_link: 'link-token-without-iat' }),
+        res
+      );
+
+      expect(oauthServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://localhost:4200/profile?oauth_error=link_failed'
       );
     });
 

@@ -408,6 +408,23 @@ describe('AuthController', () => {
       expect(result).toEqual({ message: 'Successfully logged out' });
     });
 
+    // Regression: the link cookie sits on a deeper path, so the refresh clear
+    // cannot remove it. Left behind, it makes the next provider sign-in in this
+    // browser link that identity to the account that just signed out.
+    it('should clear the OAuth link cookie on its own path', async () => {
+      const req = mockJwtRequest(
+        'user-1',
+        'user@example.com'
+      ) as JwtAuthRequest;
+      const res = mockResponse();
+
+      await controller.logout(req, res);
+
+      expect(res.clearCookie).toHaveBeenCalledWith('oauth_link', {
+        path: '/api/v1/auth/oauth'
+      });
+    });
+
     it('should log USER_LOGOUT audit event', async () => {
       const req = mockJwtRequest(
         'user-99',
@@ -479,6 +496,11 @@ describe('AuthController', () => {
       expect(authServiceMock.logout).toHaveBeenCalledWith('user-1');
       expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
         path: '/api/v1/auth'
+      });
+      // A password change revokes the sessions, thus it also cancels a link
+      // attempt that the previous session started.
+      expect(res.clearCookie).toHaveBeenCalledWith('oauth_link', {
+        path: '/api/v1/auth/oauth'
       });
       expect(auditServiceMock.log).toHaveBeenCalledWith(
         expect.objectContaining({
