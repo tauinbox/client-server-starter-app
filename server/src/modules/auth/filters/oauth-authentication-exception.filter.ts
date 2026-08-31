@@ -5,7 +5,7 @@ import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import {
   OAUTH_LINK_COOKIE,
-  OAUTH_LINK_COOKIE_PATH
+  OAUTH_INTENT_COOKIE_PATH
 } from '../constants/oauth.constants';
 
 @Injectable()
@@ -30,7 +30,7 @@ export class OAuthAuthenticationExceptionFilter implements ExceptionFilter {
     // in-handler failure paths clear it in OAuthController the same way.
     if (exception.redirectPath === '/profile') {
       response.clearCookie(OAUTH_LINK_COOKIE, {
-        path: OAUTH_LINK_COOKIE_PATH
+        path: OAUTH_INTENT_COOKIE_PATH
       });
     }
 

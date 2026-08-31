@@ -1,7 +1,14 @@
-import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  MaxLength,
+  ValidateIf
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { normalizeEmail } from '@app/shared/utils/email';
+import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 
 export class InitiateEmailChangeDto {
   @ApiProperty({
@@ -13,12 +20,16 @@ export class InitiateEmailChangeDto {
   @MaxLength(255)
   newEmail: string;
 
-  @ApiProperty({
-    description: 'Current password — required to authorize the change',
+  @ApiPropertyOptional({
+    description:
+      'Current password. An account that holds one must supply it. An account ' +
+      'created through a provider holds none and authorizes the change with a ' +
+      're-authentication proof instead.',
     example: 'CurrentPassword123'
   })
+  @ValidateIf(propertyIsDefined)
   @IsString()
   @IsNotEmpty()
   @MaxLength(128)
-  currentPassword: string;
+  currentPassword?: string;
 }

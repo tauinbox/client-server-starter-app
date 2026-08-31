@@ -1401,6 +1401,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/forgot-password` | None | Request a password reset email. A CAPTCHA token is necessary near the rate limit |
 | GET | `/auth/captcha-config` | None | Public CAPTCHA configuration: the site key and the enabled flag |
 | POST | `/auth/reset-password` | None | Reset the password with a token |
+| POST | `/auth/oauth/reauth-init` | Bearer | Start a step-up re-authentication for an account that holds no password. Sets a short-lived cookie tied to the authorization flow that starts next. The callback mints a `reauth_proof` cookie, and only when the provider identity already belongs to the caller |
 | POST | `/auth/oauth/link-init` | Bearer | Start an OAuth account link. Sets a cookie with a short life, thus the OAuth flow that starts next attaches the provider to the current user. The flow that starts next claims it, and no other flow can use it. A logout cancels it |
 | POST | `/auth/oauth/exchange` | None | Exchange the OAuth-data cookie from the callback for the auth response: an access token and a refresh cookie |
 | GET | `/auth/oauth/accounts` | Bearer | List the linked OAuth accounts |
@@ -1693,11 +1694,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2028 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2050 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 350 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 349 passed and 1 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1186 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 223 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 489 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 226 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 490 tests pass |
 
 ## CI/CD
 
@@ -1754,6 +1755,13 @@ The wrapper retries a maximum of 3 times, 15 s apart. It retries **only** when t
 - A **self-service password change** (`PATCH /auth/profile`) requires `currentPassword`. Thus a stolen
   token cannot become a permanent account takeover. An account with OAuth only has no password, and
   it can omit the field when it sets its first password.
+- A **self-service email change** (`POST /auth/profile/email/initiate`) requires a fresh proof of
+  identity, with the factor the account actually holds. An account with a password supplies it. An
+  account with OAuth only completes a round trip at its provider through
+  `POST /auth/oauth/reauth-init`, and the callback mints a `reauth_proof` cookie the change consumes.
+  The proof lasts 300 seconds, is HttpOnly, and dies with a session revocation. It is not single use.
+  The callback mints nothing unless the provider identity that just authenticated already belongs to
+  the caller, so a second account at the same provider proves nothing.
 - The **refresh token cookie is HttpOnly**, with `SameSite=Strict`, the path `/api/v1/auth` and an
   expiry of 7 days. JavaScript can neither read nor steal the token, thus XSS cannot take it.
 

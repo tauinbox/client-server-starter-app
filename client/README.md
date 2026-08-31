@@ -950,10 +950,14 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 223 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1174 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 226 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1186 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
-and the password edit. The unit tests also cover session restore, cross-tab logout, lockout, email
+and the password edit. An account created through a provider holds no password, so the profile page
+shows a notice naming that provider in place of the current-password field, and the email change
+leaves for the provider and resumes when the callback returns with `?reauth=ok`. Three Playwright
+tests cover that path, with the proof seeded through `POST /__control/reauth-proof`, because both
+provider halves of the mock stay 501 stubs. The unit tests also cover session restore, cross-tab logout, lockout, email
 verification, and password reset with a password confirmation. They cover the users list, detail, edit
 and search. This includes the email-change confirmation dialog of the administrator and the
 soft-delete and restore flow. They also cover the administration of roles, resources and feature

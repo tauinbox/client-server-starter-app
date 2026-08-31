@@ -11,6 +11,7 @@ export {
   TOKEN_PURPOSE,
   TOKEN_REFRESH_WINDOW_SECONDS,
   MIN_JWT_EXPIRATION_SECONDS,
+  REAUTH_PROOF_MAX_AGE_SECONDS,
   type TokenPurpose
 } from './auth.constants';
 

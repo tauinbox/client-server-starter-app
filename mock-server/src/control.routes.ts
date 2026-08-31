@@ -29,7 +29,7 @@ import {
   ENTITLED_SUBSCRIPTION_STATUSES,
   MAX_CONCURRENT_SESSIONS
 } from '@app/shared/constants';
-import { OAUTH_DATA_MAX_AGE_MS } from './constants';
+import { OAUTH_DATA_MAX_AGE_MS, REAUTH_PROOF_MAX_AGE_MS } from './constants';
 import { generateTokens } from './jwt.utils';
 import { pruneOldestUserTokens } from './helpers/auth.helpers';
 import {
@@ -53,6 +53,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
     users: Array.from(state.users.values()).map(toUserResponse),
     oauthAccounts: Object.fromEntries(state.oauthAccounts),
     oauthDataTokens: state.oauthDataTokens.size,
+    reauthProofs: state.reauthProofs.size,
     refreshTokens: state.refreshTokens.size,
     revokedRefreshTokens: state.revokedRefreshTokens.size,
     emailVerificationTokens: state.emailVerificationTokens.size,
@@ -162,6 +163,29 @@ router.post('/oauth-data', (req, res) => {
     userId: user.id,
     tokens,
     expiresAt: Date.now() + OAUTH_DATA_MAX_AGE_MS
+  });
+
+  res.json({ token });
+});
+
+// POST /__control/reauth-proof — mint a step-up proof for a user
+// The real server mints this at the end of a provider round trip. Both
+// provider halves answer 501 here, so E2E seeds the proof directly and sets
+// the cookie the value belongs to.
+router.post('/reauth-proof', (req, res) => {
+  const { userId }: { userId: string } = req.body;
+  const user = userId ? findUserById(userId) : undefined;
+
+  if (!user) {
+    res.status(400).json({ message: 'Body must have a known userId' });
+    return;
+  }
+
+  const token = randomUUID();
+  getState().reauthProofs.set(token, {
+    userId: user.id,
+    issuedAt: Math.floor(Date.now() / 1000),
+    expiresAt: Date.now() + REAUTH_PROOF_MAX_AGE_MS
   });
 
   res.json({ token });

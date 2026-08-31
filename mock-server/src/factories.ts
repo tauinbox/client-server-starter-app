@@ -22,7 +22,9 @@ export function createMockUser(options: MockUserOptions = {}): MockUser {
         .toLowerCase(),
     firstName,
     lastName,
-    password: options.password ?? 'Password1',
+    // `??` would turn an explicit null into the default, and null is exactly
+    // what an account created through a provider holds.
+    password: 'password' in options ? (options.password ?? null) : 'Password1',
     isActive: options.isActive ?? faker.datatype.boolean({ probability: 0.8 }),
     roles: options.roles ?? ['user'],
     isEmailVerified: options.isEmailVerified ?? true,

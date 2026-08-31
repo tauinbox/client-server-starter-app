@@ -59,8 +59,11 @@ import { Request as ExpressRequest } from 'express';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { CaptchaRequiredGuard } from '../captcha/captcha-required.guard';
 import {
+  OAUTH_INTENT_COOKIE_PATH,
   OAUTH_LINK_COOKIE,
-  OAUTH_LINK_COOKIE_PATH
+  OAUTH_REAUTH_COOKIE,
+  REAUTH_PROOF_COOKIE,
+  REAUTH_PROOF_COOKIE_PATH
 } from '../constants/oauth.constants';
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
@@ -110,7 +113,9 @@ export class AuthController {
   // touches this one. An abandoned link attempt must not outlive the session
   // that started it: the callback links whatever identity signs in next.
   private clearOAuthLinkCookie(res: Response): void {
-    res.clearCookie(OAUTH_LINK_COOKIE, { path: OAUTH_LINK_COOKIE_PATH });
+    res.clearCookie(OAUTH_LINK_COOKIE, { path: OAUTH_INTENT_COOKIE_PATH });
+    res.clearCookie(OAUTH_REAUTH_COOKIE, { path: OAUTH_INTENT_COOKIE_PATH });
+    res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
   }
 
   @Public()
@@ -286,15 +291,27 @@ export class AuthController {
     description:
       'If the new email is available, a confirmation link has been sent to it'
   })
-  initiateEmailChange(
+  async initiateEmailChange(
     @Request() req: JwtAuthRequest,
-    @Body() dto: InitiateEmailChangeDto
+    @Body() dto: InitiateEmailChangeDto,
+    @Res({ passthrough: true }) res: Response
   ) {
-    return this.authService.initiateEmailChange(
+    const proof = (req.cookies as Record<string, string> | undefined)?.[
+      REAUTH_PROOF_COOKIE
+    ];
+
+    const result = await this.authService.initiateEmailChange(
       req.user.userId,
       dto,
+      proof,
       extractAuditContext(req)
     );
+
+    // Cleared only after the change is accepted, so a rejected attempt leaves
+    // the user their remaining proof window instead of a second round trip.
+    res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
+
+    return result;
   }
 
   @Public()

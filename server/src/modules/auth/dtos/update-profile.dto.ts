@@ -48,11 +48,12 @@ export class UpdateProfileDto {
 
   @ApiPropertyOptional({
     description:
-      'Current password — required when changing the password. ' +
-      'OAuth-only users (no password set) may omit this field when setting their first password.',
+      'Current password. An account that holds one must supply it to change ' +
+      'the password; the service rejects a missing value. An account created ' +
+      'through a provider holds none and omits this field.',
     example: 'CurrentPassword123'
   })
-  @ValidateIf((o: UpdateProfileDto) => o.password !== undefined)
+  @ValidateIf(propertyIsDefined)
   @IsString()
   @IsNotEmpty()
   @MaxLength(128)

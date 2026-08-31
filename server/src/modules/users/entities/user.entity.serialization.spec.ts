@@ -71,6 +71,15 @@ describe('User entity serialization', () => {
       expect(plain).not.toHaveProperty('tokenRevokedAt');
     });
 
+    it('exposes hasPassword and derives it from the hidden password', () => {
+      expect(instanceToPlain(createUser())).toMatchObject({
+        hasPassword: true
+      });
+      expect(instanceToPlain(createUser({ password: null }))).toMatchObject({
+        hasPassword: false
+      });
+    });
+
     it('hides Role.isSystem and Role.isSuper on nested roles', () => {
       const plain = instanceToPlain(createUser()) as { roles: object[] };
       expect(plain.roles).toHaveLength(1);

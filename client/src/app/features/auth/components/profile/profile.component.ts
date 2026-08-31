@@ -41,7 +41,10 @@ import {
   OAUTH_URLS,
   type OAuthProvider
 } from '../../constants/auth-api.const';
-import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
+import {
+  OAUTH_ERROR_CANCELLED,
+  OAUTH_ERROR_REAUTH_FAILED
+} from '../../constants/oauth-error.const';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
@@ -81,6 +84,12 @@ type OAuthAccountInfo = {
   provider: string;
   createdAt: string;
 };
+
+/**
+ * A step-up re-authentication leaves the app for the provider and comes back
+ * as a full page load, so the address the user asked for has to survive it.
+ */
+const PENDING_EMAIL_KEY = 'pending_email_change';
 
 /** Keyed by OAuthProvider so a new entry in OAUTH_URLS fails the build until it gets a label. */
 const PROVIDER_KEYS: Record<OAuthProvider, string> = {
@@ -197,6 +206,9 @@ export class ProfileComponent implements OnInit {
       message: 'auth.profile.passwordMinLength'
     });
     validate(path.currentPassword, ({ value, valueOf }) => {
+      // An account created through a provider holds no password, so demanding
+      // one here is the defect this field used to carry.
+      if (!this.accountHasPassword()) return null;
       const password = valueOf(path.password);
       const emailValue = canonicalEmail(valueOf(path.email));
       const loaded = canonicalEmail(this.user()?.email);
@@ -224,16 +236,38 @@ export class ProfileComponent implements OnInit {
     });
   });
 
-  protected readonly hasPassword = computed(
+  protected readonly passwordTyped = computed(
     () => !!this.profileModel().password
   );
 
   /**
-   * The currentPassword field appears whenever a sensitive change is queued —
-   * either a password update OR an email change. Both require fresh proof of
-   * password ownership.
+   * False only for an account created through a provider. The profile may not
+   * be loaded yet, and the safe default there is the password-bearing shape,
+   * because that one asks for a factor rather than skipping it.
+   */
+  protected readonly accountHasPassword = computed(
+    () => this.user()?.hasPassword !== false
+  );
+
+  /** The provider a step-up round trip can run against. */
+  protected readonly reauthProvider = computed(() => {
+    const linked = this.oauthAccounts().map((a) => a.provider);
+    return linked.find(isOAuthProvider) ?? null;
+  });
+
+  protected readonly reauthProviderLabel = computed(() => {
+    const provider = this.reauthProvider();
+    return provider ? this.#providerLabel(provider) : '';
+  });
+
+  /**
+   * The currentPassword field appears whenever a sensitive change is queued -
+   * either a password update OR an email change. An account that holds no
+   * password proves itself through its provider instead, so the field never
+   * applies to it.
    */
   protected readonly requiresCurrentPassword = computed(() => {
+    if (!this.accountHasPassword()) return false;
     const data = this.profileModel();
     if (data.password) return true;
     const loaded = canonicalEmail(this.user()?.email);
@@ -241,10 +275,60 @@ export class ProfileComponent implements OnInit {
     return canonicalEmail(data.email) !== loaded;
   });
 
+  /** True when this submit will leave the app for the provider. */
+  protected readonly emailChangeNeedsReauth = computed(() => {
+    if (this.accountHasPassword()) return false;
+    const loaded = canonicalEmail(this.user()?.email);
+    if (!loaded) return false;
+    return canonicalEmail(this.profileModel().email) !== loaded;
+  });
+
   ngOnInit() {
     this.loadProfile();
     this.loadOAuthAccounts();
     this.#checkOAuthLinkedParam();
+    this.#resumeEmailChangeAfterReauth();
+  }
+
+  /**
+   * Runs on the page load that follows a provider round trip. The proof lives
+   * in an httpOnly cookie the server set, so all this needs is the address the
+   * user asked for before leaving.
+   */
+  #resumeEmailChangeAfterReauth(): void {
+    const reauth = this.#route.snapshot.queryParamMap.get('reauth');
+    const pending = this.#sessionStorage.getItem<string>(PENDING_EMAIL_KEY);
+    this.#sessionStorage.removeItem(PENDING_EMAIL_KEY);
+
+    if (reauth !== 'ok') return;
+
+    void this.#router.navigate([], {
+      queryParams: { reauth: null },
+      queryParamsHandling: 'merge'
+    });
+
+    if (!pending) return;
+
+    this.saving.set(true);
+    this.#authService
+      .initiateEmailChange(pending)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.saving.set(false);
+          this.#notify.success('auth.profile.emailChangeInitiated');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.saving.set(false);
+          this.error.set(
+            parseHttpErrorMessage(
+              err,
+              this.#transloco,
+              'auth.profile.errorEmailChangeFailed'
+            )
+          );
+        }
+      });
   }
 
   #checkOAuthLinkedParam(): void {
@@ -265,6 +349,8 @@ export class ProfileComponent implements OnInit {
     } else if (error) {
       if (error === OAUTH_ERROR_CANCELLED) {
         this.#notify.info('auth.profile.linkCancelled');
+      } else if (error === OAUTH_ERROR_REAUTH_FAILED) {
+        this.#notify.error('auth.profile.errorReauthFailed');
       } else {
         this.#notify.error('auth.profile.errorLinkFailed');
       }
@@ -453,6 +539,11 @@ export class ProfileComponent implements OnInit {
     const values = this.profileModel();
     const updateData = this.#buildProfileUpdate(values, newEmail !== null);
 
+    if (newEmail !== null && !this.accountHasPassword()) {
+      this.#startReauthForEmailChange(newEmail, updateData);
+      return;
+    }
+
     this.saving.set(true);
     this.error.set(null);
 
@@ -505,6 +596,75 @@ export class ProfileComponent implements OnInit {
               newEmail !== null && !emailInitiated
                 ? 'auth.profile.errorEmailChangeFailed'
                 : 'auth.profile.errorUpdateFailed'
+            )
+          );
+        }
+      });
+  }
+
+  /**
+   * An account created through a provider proves itself by completing a round
+   * trip at that provider, which is a full page load. Anything else the user
+   * typed is therefore saved BEFORE leaving, so the redirect never discards it.
+   *
+   * A first password in the same submit is refused rather than handled: saving
+   * it ends the session, which would leave the round trip authenticating a
+   * session that no longer exists. Saving it alone also makes the account one
+   * that holds a password, so the ordinary path serves the next attempt.
+   */
+  #startReauthForEmailChange(
+    newEmail: string,
+    updateData: UpdateProfile | null
+  ): void {
+    if (this.profileModel().password.trim()) {
+      this.error.set(
+        this.#transloco.translate('auth.profile.errorPasswordBeforeEmail')
+      );
+      return;
+    }
+
+    const provider = this.reauthProvider();
+    if (!provider) {
+      this.error.set(
+        this.#transloco.translate('auth.profile.errorReauthNoProvider')
+      );
+      return;
+    }
+
+    this.saving.set(true);
+    this.error.set(null);
+
+    const ops: Observable<unknown>[] = [];
+    if (updateData) {
+      ops.push(
+        this.#authService.updateProfile(updateData).pipe(
+          tap((user) => {
+            this.user.set(user);
+          })
+        )
+      );
+    }
+    ops.push(defer(() => this.#authService.initOAuthReauth()));
+
+    concat(...ops)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        complete: () => {
+          this.#sessionStorage.setItem(PENDING_EMAIL_KEY, newEmail);
+          this.#notify.info('auth.profile.reauthRedirecting', {
+            provider: this.reauthProviderLabel()
+          });
+          if (this.#window) {
+            this.#window.location.href = OAUTH_URLS[provider];
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.saving.set(false);
+          this.error.set(
+            parseHttpErrorMessage(
+              err,
+              this.#transloco,
+              'auth.profile.errorEmailChangeFailed'
             )
           );
         }

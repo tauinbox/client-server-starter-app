@@ -39,14 +39,21 @@ import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
-import { ErrorKeys, TOKEN_PURPOSE } from '@app/shared/constants';
+import {
+  ErrorKeys,
+  REAUTH_PROOF_MAX_AGE_SECONDS,
+  TOKEN_PURPOSE
+} from '@app/shared/constants';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authentication-exception.filter';
 import {
+  OAUTH_INTENT_COOKIE_PATH,
   OAUTH_LINK_COOKIE,
-  OAUTH_LINK_COOKIE_PATH
+  OAUTH_REAUTH_COOKIE,
+  REAUTH_PROOF_COOKIE,
+  REAUTH_PROOF_COOKIE_PATH
 } from '../constants/oauth.constants';
-import { readLinkIntentForFlow } from '../utils/oauth-link-intent';
+import { readIntentForFlow } from '../utils/oauth-flow-intent';
 
 @ApiTags('OAuth API')
 @Controller({
@@ -89,11 +96,43 @@ export class OAuthController {
       httpOnly: true,
       sameSite: 'lax',
       secure: this.configService.get('ENVIRONMENT') === 'production',
-      path: OAUTH_LINK_COOKIE_PATH,
+      path: OAUTH_INTENT_COOKIE_PATH,
       maxAge: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS * 1000
     });
 
     return { message: 'Link initiated' };
+  }
+
+  // --- Step-up re-authentication initiation ---
+
+  /**
+   * Starts a step-up re-authentication for an account that holds no password.
+   * The provider round trip that follows proves the caller still controls the
+   * identity the account is linked to, and the callback mints the proof.
+   */
+  @Post('reauth-init')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Initiate a step-up re-authentication through a linked provider'
+  })
+  initOAuthReauth(
+    @Request() req: JwtAuthRequest,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    const reauthToken = this.jwtService.sign(
+      { sub: req.user.userId, purpose: TOKEN_PURPOSE.OAUTH_REAUTH },
+      { expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS }
+    );
+
+    res.cookie(OAUTH_REAUTH_COOKIE, reauthToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: this.configService.get('ENVIRONMENT') === 'production',
+      path: OAUTH_INTENT_COOKIE_PATH,
+      maxAge: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS * 1000
+    });
+
+    return { message: 'Re-authentication initiated' };
   }
 
   // --- Google ---
@@ -290,15 +329,26 @@ export class OAuthController {
     res: Response
   ): Promise<void> {
     try {
-      const linkIntent = (req.cookies as Record<string, string> | undefined)?.[
-        OAUTH_LINK_COOKIE
-      ];
-      // The cookie says which user to link. Only the state says which flow may
-      // do it, so an intent that belongs to another flow - or to no flow at all
-      // - leaves this callback a plain sign-in. It is not cleared here: it is
-      // now consumable by its own flow alone, and that flow may still finish.
+      const cookies = req.cookies as Record<string, string> | undefined;
+      const flowState = req.query?.['state'];
+
+      // A cookie says which user this round trip is for; only the state says
+      // which flow may act on it, so an intent belonging to another flow leaves
+      // this callback a plain sign-in. Neither is cleared here: each stays
+      // consumable by its own flow, which may still finish. Re-authentication
+      // wins a tie because it links nothing.
+      const reauthIntent = cookies?.[OAUTH_REAUTH_COOKIE];
+      const reauthToken = reauthIntent
+        ? readIntentForFlow(reauthIntent, flowState)
+        : null;
+
+      if (reauthToken) {
+        return this.handleOAuthReauth(reauthToken, profile, res);
+      }
+
+      const linkIntent = cookies?.[OAUTH_LINK_COOKIE];
       const linkToken = linkIntent
-        ? readLinkIntentForFlow(linkIntent, req.query?.['state'])
+        ? readIntentForFlow(linkIntent, flowState)
         : null;
 
       if (linkToken) {
@@ -350,6 +400,63 @@ export class OAuthController {
     }
   }
 
+  /**
+   * Turns one completed provider round trip into a short-lived proof that the
+   * caller re-authenticated. It mints no session and links nothing, so the
+   * worst a stolen intent can produce is a proof for an account whose provider
+   * identity the attacker already controls.
+   */
+  private async handleOAuthReauth(
+    reauthToken: string,
+    profile: OAuthUserProfile,
+    res: Response
+  ): Promise<void> {
+    res.clearCookie(OAUTH_REAUTH_COOKIE, {
+      path: OAUTH_INTENT_COOKIE_PATH
+    });
+
+    try {
+      const payload = this.jwtService.verify<{
+        sub: string;
+        purpose?: string;
+        iat?: number;
+      }>(reauthToken);
+      if (payload.purpose !== TOKEN_PURPOSE.OAUTH_REAUTH) {
+        throw new Error('Unexpected token purpose');
+      }
+      // The service compares this against the last session revocation, so a
+      // token without one is refused rather than trusted.
+      if (typeof payload.iat !== 'number') {
+        throw new Error('Re-authentication token carries no issue time');
+      }
+
+      await this.oauthService.assertReauthenticated(
+        payload.sub,
+        profile.provider,
+        profile.providerId,
+        payload.iat
+      );
+
+      const proof = this.jwtService.sign(
+        { sub: payload.sub, purpose: TOKEN_PURPOSE.REAUTH_PROOF },
+        { expiresIn: REAUTH_PROOF_MAX_AGE_SECONDS }
+      );
+
+      res.cookie(REAUTH_PROOF_COOKIE, proof, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: this.configService.get('ENVIRONMENT') === 'production',
+        path: REAUTH_PROOF_COOKIE_PATH,
+        maxAge: REAUTH_PROOF_MAX_AGE_SECONDS * 1000
+      });
+
+      res.redirect(`${this.clientUrl}/profile?reauth=ok`);
+    } catch (error) {
+      this.logger.error('OAuth re-authentication error', error);
+      res.redirect(`${this.clientUrl}/profile?oauth_error=reauth_failed`);
+    }
+  }
+
   private async handleOAuthLink(
     linkToken: string,
     profile: OAuthUserProfile,
@@ -357,7 +464,7 @@ export class OAuthController {
     res: Response
   ): Promise<void> {
     res.clearCookie(OAUTH_LINK_COOKIE, {
-      path: OAUTH_LINK_COOKIE_PATH
+      path: OAUTH_INTENT_COOKIE_PATH
     });
 
     try {

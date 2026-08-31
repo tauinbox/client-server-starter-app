@@ -29,6 +29,12 @@ export class UserResponseDto {
   @ApiProperty({ example: true })
   isEmailVerified: boolean;
 
+  @ApiProperty({
+    example: true,
+    description: 'False for an account that signs in through a provider only'
+  })
+  hasPassword: boolean;
+
   @ApiProperty({ example: 'en' })
   locale: string;
 

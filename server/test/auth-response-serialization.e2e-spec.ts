@@ -44,6 +44,7 @@ const PUBLIC_USER_FIELDS = [
   'isActive',
   'roles',
   'isEmailVerified',
+  'hasPassword',
   'locale',
   'createdAt',
   'updatedAt',

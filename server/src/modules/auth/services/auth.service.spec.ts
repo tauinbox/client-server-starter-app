@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { instanceToPlain } from 'class-transformer';
@@ -13,7 +14,8 @@ import { TokenGeneratorService } from './token-generator.service';
 import {
   BCRYPT_SALT_ROUNDS,
   ErrorKeys,
-  MAX_CONCURRENT_SESSIONS
+  MAX_CONCURRENT_SESSIONS,
+  TOKEN_PURPOSE
 } from '@app/shared/constants';
 import { MailService } from '../../mail/mail.service';
 import { AuditService } from '../../audit/audit.service';
@@ -93,6 +95,10 @@ describe('AuthService', () => {
   let mockEntitlementService: {
     limitFor: jest.Mock;
   };
+  let mockJwtService: {
+    sign: jest.Mock;
+    verify: jest.Mock;
+  };
 
   const mockUserRole = {
     id: 'role-uuid-user',
@@ -112,6 +118,7 @@ describe('AuthService', () => {
     firstName: 'John',
     lastName: 'Doe',
     password: '$2b$10$hashedpassword',
+    hasPassword: true,
     isActive: true,
     isEmailVerified: true,
     locale: 'en',
@@ -247,6 +254,11 @@ describe('AuthService', () => {
       limitFor: jest.fn().mockResolvedValue(null)
     };
 
+    mockJwtService = {
+      sign: jest.fn(),
+      verify: jest.fn()
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -261,7 +273,8 @@ describe('AuthService', () => {
         { provide: TokenGeneratorService, useValue: mockTokenGenerator },
         { provide: MailService, useValue: mockMailService },
         { provide: AuditService, useValue: mockAuditService },
-        { provide: MetricsService, useValue: mockMetricsService }
+        { provide: MetricsService, useValue: mockMetricsService },
+        { provide: JwtService, useValue: mockJwtService }
       ]
     }).compile();
 
@@ -1059,7 +1072,10 @@ describe('AuthService', () => {
     });
 
     it('should return the User entity instance so @Exclude() fields can be stripped downstream', async () => {
-      const entity = Object.assign(new User(), mockUser, {
+      // hasPassword is a get-only accessor on User, so it must not travel in
+      // the source of an Object.assign onto a real instance.
+      const { hasPassword: _derived, ...columns } = mockUser;
+      const entity = Object.assign(new User(), columns, {
         passwordResetToken: 'hashed-reset-token'
       });
       mockRefreshTokenService.findByToken.mockResolvedValue(mockTokenDoc);
@@ -1398,6 +1414,133 @@ describe('AuthService', () => {
         expect(err).toBeInstanceOf(HttpException);
         expect((err as HttpException).getStatus()).toBe(HttpStatus.BAD_REQUEST);
       }
+      expect(mockManager.update).not.toHaveBeenCalled();
+    });
+
+    describe('an account that holds no password', () => {
+      const oauthOnlyUser = () => ({
+        ...mockUser,
+        password: null,
+        hasPassword: false
+      });
+
+      const validProof = () => ({
+        sub: 'user-1',
+        purpose: TOKEN_PURPOSE.REAUTH_PROOF,
+        iat: Math.floor(Date.now() / 1000)
+      });
+
+      beforeEach(() => {
+        mockUsersService.findOne.mockResolvedValue(oauthOnlyUser());
+      });
+
+      it('proceeds on a valid re-authentication proof and never checks a password', async () => {
+        // Earlier cases in this file leave calls on the shared bcrypt spy.
+        const compare = jest.spyOn(bcrypt, 'compare').mockClear();
+        mockJwtService.verify.mockReturnValue(validProof());
+
+        const result = await service.initiateEmailChange(
+          'user-1',
+          { newEmail: 'new@example.com' },
+          'proof-token'
+        );
+
+        expect(result.message).toBeDefined();
+        expect(compare).not.toHaveBeenCalled();
+        expect(mockManager.update).toHaveBeenCalled();
+      });
+
+      it('refuses when no proof is presented', async () => {
+        await expect(
+          service.initiateEmailChange('user-1', { newEmail: 'new@example.com' })
+        ).rejects.toMatchObject({
+          response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
+        });
+        expect(mockManager.update).not.toHaveBeenCalled();
+      });
+
+      it('refuses a proof minted for another account', async () => {
+        mockJwtService.verify.mockReturnValue({
+          ...validProof(),
+          sub: 'someone-else'
+        });
+
+        await expect(
+          service.initiateEmailChange(
+            'user-1',
+            { newEmail: 'new@example.com' },
+            'proof-token'
+          )
+        ).rejects.toMatchObject({
+          response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
+        });
+        expect(mockManager.update).not.toHaveBeenCalled();
+      });
+
+      it('refuses a token minted for a different purpose', async () => {
+        mockJwtService.verify.mockReturnValue({
+          ...validProof(),
+          purpose: TOKEN_PURPOSE.ACCESS
+        });
+
+        await expect(
+          service.initiateEmailChange(
+            'user-1',
+            { newEmail: 'new@example.com' },
+            'access-token'
+          )
+        ).rejects.toMatchObject({
+          response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
+        });
+      });
+
+      it('refuses a proof older than the last session revocation', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        mockUsersService.findOne.mockResolvedValue({
+          ...oauthOnlyUser(),
+          tokenRevokedAt: new Date(now * 1000)
+        });
+        mockJwtService.verify.mockReturnValue({
+          ...validProof(),
+          iat: now - 60
+        });
+
+        await expect(
+          service.initiateEmailChange(
+            'user-1',
+            { newEmail: 'new@example.com' },
+            'stale-proof'
+          )
+        ).rejects.toMatchObject({
+          response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
+        });
+      });
+
+      it('refuses a proof that does not verify at all', async () => {
+        mockJwtService.verify.mockImplementation(() => {
+          throw new Error('bad signature');
+        });
+
+        await expect(
+          service.initiateEmailChange(
+            'user-1',
+            { newEmail: 'new@example.com' },
+            'forged'
+          )
+        ).rejects.toMatchObject({
+          response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
+        });
+      });
+    });
+
+    it('rejects an account that holds a password and supplies none', async () => {
+      mockUsersService.findOne.mockResolvedValue({ ...mockUser });
+
+      await expect(
+        service.initiateEmailChange('user-1', { newEmail: 'new@example.com' })
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD }
+      });
       expect(mockManager.update).not.toHaveBeenCalled();
     });
 
