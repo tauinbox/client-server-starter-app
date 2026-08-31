@@ -46,6 +46,7 @@ import {
   OAUTH_LINK_COOKIE,
   OAUTH_LINK_COOKIE_PATH
 } from '../constants/oauth.constants';
+import { readLinkIntentForFlow } from '../utils/oauth-link-intent';
 
 @ApiTags('OAuth API')
 @Controller({
@@ -289,9 +290,16 @@ export class OAuthController {
     res: Response
   ): Promise<void> {
     try {
-      const linkToken = (req.cookies as Record<string, string> | undefined)?.[
+      const linkIntent = (req.cookies as Record<string, string> | undefined)?.[
         OAUTH_LINK_COOKIE
       ];
+      // The cookie says which user to link. Only the state says which flow may
+      // do it, so an intent that belongs to another flow - or to no flow at all
+      // - leaves this callback a plain sign-in. It is not cleared here: it is
+      // now consumable by its own flow alone, and that flow may still finish.
+      const linkToken = linkIntent
+        ? readLinkIntentForFlow(linkIntent, req.query?.['state'])
+        : null;
 
       if (linkToken) {
         return this.handleOAuthLink(linkToken, profile, req, res);
