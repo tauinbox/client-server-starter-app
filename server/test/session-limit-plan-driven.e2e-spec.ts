@@ -5,6 +5,7 @@
 
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { DataSource, Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -199,6 +200,10 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
           useValue: { findOne: jest.fn().mockResolvedValue(userRecord) }
         },
         { provide: RoleService, useValue: {} },
+        {
+          provide: JwtService,
+          useValue: { sign: jest.fn(), verify: jest.fn() }
+        },
         {
           provide: TokenGeneratorService,
           useValue: {

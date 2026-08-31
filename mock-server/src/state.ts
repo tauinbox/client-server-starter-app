@@ -82,6 +82,7 @@ export function resetState(): void {
       ])
     ),
     oauthDataTokens: new Map(),
+    reauthProofs: new Map(),
     refreshTokens: new Map(),
     revokedRefreshTokens: new Map(),
     emailVerificationTokens: new Map(),
@@ -248,7 +249,7 @@ export function toUserResponse(user: MockUser): UserResponse {
     const role = Array.from(state.roles.values()).find((r) => r.name === name);
     return role ? [toRolePublicResponse(role)] : [];
   });
-  return { ...rest, roles };
+  return { ...rest, roles, hasPassword: user.password !== null };
 }
 
 export function toAdminUserResponse(user: MockUser): AdminUserResponse {
@@ -266,7 +267,7 @@ export function toAdminUserResponse(user: MockUser): AdminUserResponse {
     const role = Array.from(state.roles.values()).find((r) => r.name === name);
     return role ? [toRoleAdminResponse(role)] : [];
   });
-  return { ...rest, roles };
+  return { ...rest, roles, hasPassword: user.password !== null };
 }
 
 export function addOAuthAccounts(

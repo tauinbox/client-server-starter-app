@@ -8,6 +8,12 @@ export type UserResponse = {
   isActive: boolean;
   roles: RoleResponse[];
   isEmailVerified: boolean;
+  /**
+   * True when the account holds a password. An account created through an OAuth
+   * provider holds none, so the client asks that account for its provider
+   * instead of a current password.
+   */
+  hasPassword: boolean;
   locale: string;
   createdAt: string;
   updatedAt: string;

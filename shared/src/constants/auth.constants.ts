@@ -21,7 +21,9 @@ export const JWT_AUDIENCE = 'nexus-client';
 export const TOKEN_PURPOSE = {
   ACCESS: 'access',
   OAUTH_LINK: 'oauth_link',
-  OAUTH_DATA: 'oauth_data'
+  OAUTH_DATA: 'oauth_data',
+  OAUTH_REAUTH: 'oauth_reauth',
+  REAUTH_PROOF: 'reauth_proof'
 } as const;
 
 export type TokenPurpose = (typeof TOKEN_PURPOSE)[keyof typeof TOKEN_PURPOSE];
@@ -40,3 +42,9 @@ export const TOKEN_REFRESH_WINDOW_SECONDS = 60;
  * against.
  */
 export const MIN_JWT_EXPIRATION_SECONDS = 2 * TOKEN_REFRESH_WINDOW_SECONDS;
+
+/**
+ * How long a step-up re-authentication proof stays usable. A sensitive change
+ * must follow the proof closely, so this is much shorter than a session.
+ */
+export const REAUTH_PROOF_MAX_AGE_SECONDS = 300;

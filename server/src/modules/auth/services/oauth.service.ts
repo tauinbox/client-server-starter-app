@@ -206,6 +206,60 @@ export class OAuthService {
    * `linkTokenIssuedAt` is the `iat` of the link token, in seconds. It is
    * required, not optional: the caller must state when the intent was proved.
    */
+  /**
+   * Confirms that a completed provider round trip re-authenticated the account
+   * the intent names. Two things have to hold, and neither is implied by the
+   * other: the account must still be usable, and the identity the provider just
+   * vouched for must already belong to it. Without the second check any second
+   * account at the same provider would satisfy the gate.
+   */
+  async assertReauthenticated(
+    userId: string,
+    provider: string,
+    providerId: string,
+    reauthTokenIssuedAt: number
+  ): Promise<void> {
+    const user = await this.usersService.findOne(userId);
+    if (!user || !user.isActive) {
+      throw new HttpException(
+        {
+          message: 'User account not found or deactivated',
+          errorKey: ErrorKeys.AUTH.USER_NOT_FOUND_OR_DEACTIVATED
+        },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+
+    // Same comparison shape as the link path and the JWT strategy, so a proof
+    // minted before a session revocation is refused everywhere alike.
+    if (
+      user.tokenRevokedAt &&
+      reauthTokenIssuedAt < user.tokenRevokedAt.getTime() / 1000
+    ) {
+      throw new HttpException(
+        {
+          message: 'Token has been revoked',
+          errorKey: ErrorKeys.AUTH.TOKEN_REVOKED
+        },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+
+    const account = await this.oauthAccountService.findByProviderAndProviderId(
+      provider,
+      providerId
+    );
+    if (!account || account.userId !== userId) {
+      throw new HttpException(
+        {
+          message: 'The provider identity does not belong to this account',
+          errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
+        },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+  }
+
   async linkOAuthToUser(
     userId: string,
     provider: string,

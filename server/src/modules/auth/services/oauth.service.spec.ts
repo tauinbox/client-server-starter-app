@@ -771,4 +771,90 @@ describe('OAuthService', () => {
       ).rejects.toThrow('Connection lost');
     });
   });
+
+  describe('assertReauthenticated', () => {
+    const IAT = Math.floor(Date.now() / 1000);
+
+    it('accepts an identity that already belongs to the account', async () => {
+      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        userId: mockUser.id,
+        provider: 'google',
+        providerId: 'google-123'
+      });
+
+      await expect(
+        service.assertReauthenticated(mockUser.id, 'google', 'google-123', IAT)
+      ).resolves.toBeUndefined();
+    });
+
+    it('refuses an identity linked to a different account', async () => {
+      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        userId: 'somebody-else',
+        provider: 'google',
+        providerId: 'google-999'
+      });
+
+      await expect(
+        service.assertReauthenticated(mockUser.id, 'google', 'google-999', IAT)
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
+      });
+    });
+
+    it('refuses an identity that is linked to nobody', async () => {
+      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
+        null
+      );
+
+      await expect(
+        service.assertReauthenticated(
+          mockUser.id,
+          'google',
+          'google-unknown',
+          IAT
+        )
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
+      });
+    });
+
+    it('refuses an intent minted before the last session revocation', async () => {
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        tokenRevokedAt: new Date(IAT * 1000)
+      });
+
+      await expect(
+        service.assertReauthenticated(
+          mockUser.id,
+          'google',
+          'google-123',
+          IAT - 60
+        )
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.TOKEN_REVOKED }
+      });
+      expect(
+        mockOAuthAccountService.findByProviderAndProviderId
+      ).not.toHaveBeenCalled();
+    });
+
+    it('refuses a deactivated account', async () => {
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        isActive: false
+      });
+
+      await expect(
+        service.assertReauthenticated(mockUser.id, 'google', 'google-123', IAT)
+      ).rejects.toMatchObject({
+        response: {
+          errorKey: ErrorKeys.AUTH.USER_NOT_FOUND_OR_DEACTIVATED
+        }
+      });
+    });
+  });
 });

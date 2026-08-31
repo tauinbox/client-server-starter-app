@@ -37,7 +37,7 @@ export const ErrorKeys = {
     CAPTCHA_GATE_FAILURE: 'errors.auth.captchaGateFailure',
     SAME_EMAIL: 'errors.auth.sameEmail',
     PENDING_EMAIL_TOKEN_EXPIRED: 'errors.auth.pendingEmailTokenExpired',
-    OAUTH_ONLY_SET_PASSWORD_FIRST: 'errors.auth.oauthOnlySetPasswordFirst'
+    REAUTH_REQUIRED: 'errors.auth.reauthRequired'
   },
   USERS: {
     NOT_FOUND: 'errors.users.notFound',

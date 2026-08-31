@@ -6,6 +6,7 @@
 
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -210,6 +211,10 @@ describe('Refresh token reuse detection (e2e)', () => {
           useValue: { findOne: jest.fn().mockResolvedValue(userRecord) }
         },
         { provide: RoleService, useValue: {} },
+        {
+          provide: JwtService,
+          useValue: { sign: jest.fn(), verify: jest.fn() }
+        },
         {
           provide: TokenGeneratorService,
           useValue: {

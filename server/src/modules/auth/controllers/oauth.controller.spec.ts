@@ -13,7 +13,7 @@ import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys, TOKEN_PURPOSE } from '@app/shared/constants';
-import { bindLinkIntent } from '../utils/oauth-link-intent';
+import { bindIntent } from '../utils/oauth-flow-intent';
 
 // Seconds, as a JWT `iat` is.
 const LINK_TOKEN_IAT = Math.floor(
@@ -68,7 +68,7 @@ function mockExpressRequest(
 
 /** Builds the cookie the store writes once a flow claims the intent. */
 function linkCookie(token: string, state: string = FLOW_STATE) {
-  return { oauth_link: bindLinkIntent(token, state) };
+  return { oauth_link: bindIntent(token, state) };
 }
 
 describe('OAuthController', () => {

@@ -135,7 +135,13 @@
     "confirmEmailChangeButton": "Send link",
     "emailChangeInitiated": "Confirmation link sent. Check your new email inbox to complete the change.",
     "emailChangeInitiatedWithProfile": "Profile updated. Confirmation link sent - check your new email inbox to complete the address change.",
-    "errorEmailChangeFailed": "Failed to initiate email change. Please try again."
+    "errorEmailChangeFailed": "Failed to initiate email change. Please try again.",
+    "reauthNotice": "Your account signs in with {{ provider }}. We will ask {{ provider }} to confirm it is you before we change your email.",
+    "reauthRedirecting": "Sending you to {{ provider }} to confirm it is you...",
+    "reauthConfirmButton": "Continue to {{ provider }}",
+    "errorReauthFailed": "We could not confirm it is you. Nothing was changed. Please try again.",
+    "errorReauthNoProvider": "No sign-in provider is connected, so we cannot confirm it is you. Connect one first.",
+    "errorPasswordBeforeEmail": "Save your new password first, then change your email."
   },
   "confirmEmailChange": {
     "title": "Confirm Email Change",

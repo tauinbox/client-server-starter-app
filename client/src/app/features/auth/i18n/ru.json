@@ -135,7 +135,13 @@
     "confirmEmailChangeButton": "Отправить ссылку",
     "emailChangeInitiated": "Ссылка для подтверждения отправлена. Проверьте новый почтовый ящик, чтобы завершить смену email.",
     "emailChangeInitiatedWithProfile": "Профиль обновлён. Ссылка для подтверждения отправлена - проверьте новый почтовый ящик, чтобы завершить смену адреса.",
-    "errorEmailChangeFailed": "Не удалось начать смену email. Попробуйте снова."
+    "errorEmailChangeFailed": "Не удалось начать смену email. Попробуйте снова.",
+    "reauthNotice": "Вход в ваш аккаунт выполняется через {{ provider }}. Перед сменой email мы попросим {{ provider }} подтвердить, что это вы.",
+    "reauthRedirecting": "Переходим к {{ provider }}, чтобы подтвердить, что это вы...",
+    "reauthConfirmButton": "Перейти к {{ provider }}",
+    "errorReauthFailed": "Не удалось подтвердить, что это вы. Ничего не изменено. Попробуйте ещё раз.",
+    "errorReauthNoProvider": "Не подключён ни один провайдер входа, поэтому подтвердить личность нельзя. Сначала подключите провайдера.",
+    "errorPasswordBeforeEmail": "Сначала сохраните новый пароль, затем меняйте email."
   },
   "confirmEmailChange": {
     "title": "Подтверждение смены email",

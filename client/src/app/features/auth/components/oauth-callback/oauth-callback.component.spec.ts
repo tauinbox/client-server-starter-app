@@ -53,6 +53,7 @@ const mockAuthResponse: AuthResponse = {
     isActive: true,
     roles: [mockUserRole],
     isEmailVerified: true,
+    hasPassword: true,
     locale: 'en',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

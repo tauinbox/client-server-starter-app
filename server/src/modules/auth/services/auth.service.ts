@@ -1,5 +1,6 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { DataSource } from 'typeorm';
@@ -25,7 +26,8 @@ import {
   ErrorKeys,
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
-  SYSTEM_ROLES
+  SYSTEM_ROLES,
+  TOKEN_PURPOSE
 } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
@@ -100,7 +102,8 @@ export class AuthService {
     private mailService: MailService,
     private auditService: AuditService,
     private metricsService: MetricsService,
-    private sessionIssuer: SessionIssuerService
+    private sessionIssuer: SessionIssuerService,
+    private jwtService: JwtService
   ) {}
 
   // Dummy hash for constant-time rejection (prevents timing attacks).
@@ -641,30 +644,12 @@ export class AuthService {
   async initiateEmailChange(
     userId: string,
     dto: InitiateEmailChangeDto,
+    reauthProof?: string,
     auditContext?: AuditContext
   ): Promise<{ message: string }> {
     const user = await this.usersService.findOne(userId);
 
-    if (user.password === null) {
-      throw new HttpException(
-        {
-          message: 'Please set a password before changing your email',
-          errorKey: ErrorKeys.AUTH.OAUTH_ONLY_SET_PASSWORD_FIRST
-        },
-        HttpStatus.BAD_REQUEST
-      );
-    }
-
-    const isMatch = await bcrypt.compare(dto.currentPassword, user.password);
-    if (!isMatch) {
-      throw new HttpException(
-        {
-          message: 'Current password is incorrect',
-          errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
-        },
-        HttpStatus.BAD_REQUEST
-      );
-    }
+    await this.assertStepUp(user, dto.currentPassword, reauthProof);
 
     if (dto.newEmail === user.email) {
       throw new HttpException(
@@ -869,6 +854,82 @@ export class AuthService {
       message:
         'Email has been updated. Please sign in again with your new email.'
     };
+  }
+
+  /**
+   * Demands a fresh proof of identity before a sensitive change, using whatever
+   * factor the account actually holds. An account with a password proves it
+   * with that password. An account created through a provider holds none, so it
+   * proves itself by completing a provider round trip, which mints the
+   * `reauth_proof` token this reads.
+   *
+   * The proof is bounded by its own 300 second expiry and by the last session
+   * revocation. It is NOT single use: the cookie is cleared after a successful
+   * change, but nothing on the server records that it was spent.
+   */
+  private async assertStepUp(
+    user: User,
+    currentPassword: string | undefined,
+    reauthProof: string | undefined
+  ): Promise<void> {
+    if (user.password === null) {
+      this.assertReauthProof(user, reauthProof);
+      return;
+    }
+
+    const invalidCurrentPasswordError = new HttpException(
+      {
+        message: 'Current password is incorrect',
+        errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
+      },
+      HttpStatus.BAD_REQUEST
+    );
+
+    if (!currentPassword) {
+      throw invalidCurrentPasswordError;
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      throw invalidCurrentPasswordError;
+    }
+  }
+
+  private assertReauthProof(user: User, proof: string | undefined): void {
+    const reauthRequiredError = new HttpException(
+      {
+        message: 'Confirm it is you with your sign-in provider, then try again',
+        errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
+      },
+      HttpStatus.BAD_REQUEST
+    );
+
+    if (!proof) {
+      throw reauthRequiredError;
+    }
+
+    try {
+      const payload = this.jwtService.verify<{
+        sub: string;
+        purpose?: string;
+        iat?: number;
+      }>(proof);
+
+      const revokedAtSeconds = user.tokenRevokedAt
+        ? user.tokenRevokedAt.getTime() / 1000
+        : null;
+
+      if (
+        payload.purpose !== TOKEN_PURPOSE.REAUTH_PROOF ||
+        payload.sub !== user.id ||
+        typeof payload.iat !== 'number' ||
+        (revokedAtSeconds !== null && payload.iat < revokedAtSeconds)
+      ) {
+        throw reauthRequiredError;
+      }
+    } catch {
+      throw reauthRequiredError;
+    }
   }
 
   async verifyCurrentPassword(

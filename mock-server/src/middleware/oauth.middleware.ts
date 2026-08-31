@@ -55,7 +55,7 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
   if (!user.password && otherOAuth === 0) {
     res.status(400).json({
       message:
-        'Cannot unlink the last OAuth provider without a password set. Please set a password first.',
+        'This is the only way you can sign in. Link another provider first, or set a password through the forgot-password link.',
       statusCode: 400,
       errorKey: ErrorKeys.AUTH.UNLINK_LAST_PROVIDER
     });
@@ -138,6 +138,14 @@ router.post('/exchange', (req, res) => {
 // POST /api/v1/auth/oauth/link-init (stub)
 router.post('/link-init', authGuard, (_req, res) => {
   res.json({ message: 'Link initiated' });
+});
+
+// POST /api/v1/auth/oauth/reauth-init (stub)
+// The real server sets an intent cookie that its provider callback consumes.
+// Both provider halves are 501 here, so the proof the callback would mint is
+// seeded by POST /__control/reauth-proof instead.
+router.post('/reauth-init', authGuard, (_req, res) => {
+  res.json({ message: 'Re-authentication initiated' });
 });
 
 export default router;

@@ -1,6 +1,6 @@
 import { CookieStateStore } from './cookie-state-store';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
-import { bindLinkIntent, readLinkIntentForFlow } from './oauth-link-intent';
+import { bindIntent, readIntentForFlow } from './oauth-flow-intent';
 import type { Request, Response } from 'express';
 
 /**
@@ -154,7 +154,7 @@ describe('CookieStateStore', () => {
 
       store.store(req, (err, state) => {
         expect(err).toBeNull();
-        expect(readLinkIntentForFlow(cookies['oauth_link'], state)).toBe(
+        expect(readIntentForFlow(cookies['oauth_link'], state)).toBe(
           LINK_TOKEN
         );
         done();
@@ -164,18 +164,18 @@ describe('CookieStateStore', () => {
     it('should leave an intent that an earlier flow already claimed', (done) => {
       const store = new CookieStateStore(OAuthProvider.GOOGLE, false);
       const abandonedState = 'a'.repeat(64);
-      const claimed = bindLinkIntent(LINK_TOKEN, abandonedState);
+      const claimed = bindIntent(LINK_TOKEN, abandonedState);
       const { req, cookies } = mockReqRes({ oauth_link: claimed });
 
       store.store(req, (err, state) => {
         expect(err).toBeNull();
         expect(cookies['oauth_link']).toBe(claimed);
         // The second flow gets nothing, which is the takeover closing.
-        expect(readLinkIntentForFlow(cookies['oauth_link'], state)).toBeNull();
+        expect(readIntentForFlow(cookies['oauth_link'], state)).toBeNull();
         // The first flow still owns it.
-        expect(
-          readLinkIntentForFlow(cookies['oauth_link'], abandonedState)
-        ).toBe(LINK_TOKEN);
+        expect(readIntentForFlow(cookies['oauth_link'], abandonedState)).toBe(
+          LINK_TOKEN
+        );
         done();
       });
     });

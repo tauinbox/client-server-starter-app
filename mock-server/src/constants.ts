@@ -29,3 +29,8 @@ export const OAUTH_DATA_COOKIE_OPTIONS: CookieOptions = {
   path: OAUTH_DATA_COOKIE_PATH,
   maxAge: OAUTH_DATA_MAX_AGE_MS
 };
+
+/** Mirrors the server: the step-up proof is scoped to the auth routes. */
+export const REAUTH_PROOF_COOKIE = 'reauth_proof';
+export const REAUTH_PROOF_COOKIE_PATH = '/api/v1/auth';
+export const REAUTH_PROOF_MAX_AGE_MS = 300 * 1000;

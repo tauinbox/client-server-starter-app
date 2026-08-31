@@ -49,6 +49,11 @@
       "method": "POST",
       "path": "/api/v1/auth/oauth/link-init",
       "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/oauth/reauth-init",
+      "expectedStatus": 401
     }
   ]
 }

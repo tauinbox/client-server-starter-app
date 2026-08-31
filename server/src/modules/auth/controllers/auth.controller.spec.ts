@@ -61,6 +61,7 @@ function mockLocalAuthRequest(
     isActive: true,
     roles: [mockAdminRole],
     isEmailVerified: true,
+    hasPassword: true,
     locale: 'en',
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),

@@ -37,6 +37,7 @@ describe('SessionIssuerService', () => {
     firstName: 'John',
     lastName: 'Doe',
     password: '$2b$10$hashedpassword',
+    hasPassword: true,
     isActive: true,
     isEmailVerified: true,
     locale: 'en',

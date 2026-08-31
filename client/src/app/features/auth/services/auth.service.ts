@@ -287,6 +287,18 @@ export class AuthService {
     return this.#http.post<{ message: string }>(AuthApiEnum.OAuthLinkInit, {});
   }
 
+  /**
+   * Starts a step-up re-authentication for an account that holds no password.
+   * The provider round trip that follows mints the proof the email change
+   * needs, so the caller must send the browser to the provider afterwards.
+   */
+  initOAuthReauth(): Observable<{ message: string }> {
+    return this.#http.post<{ message: string }>(
+      AuthApiEnum.OAuthReauthInit,
+      {}
+    );
+  }
+
   unlinkOAuthAccount(provider: string): Observable<{ message: string }> {
     return this.#http.delete<{ message: string }>(
       `${AuthApiEnum.OAuthAccounts}/${encodeURIComponent(provider)}`
@@ -331,13 +343,18 @@ export class AuthService {
     );
   }
 
+  /**
+   * An account created through a provider holds no password and authorizes the
+   * change with the `reauth_proof` cookie instead, so the field is omitted
+   * rather than sent empty - an empty string fails DTO validation.
+   */
   initiateEmailChange(
     newEmail: string,
-    currentPassword: string
+    currentPassword?: string
   ): Observable<{ message: string }> {
     return this.#http.post<{ message: string }>(
       AuthApiEnum.InitiateEmailChange,
-      { newEmail, currentPassword },
+      currentPassword ? { newEmail, currentPassword } : { newEmail },
       { context: silentContext() }
     );
   }

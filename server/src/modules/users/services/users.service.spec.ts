@@ -48,6 +48,7 @@ describe('UsersService', () => {
     firstName: 'John',
     lastName: 'Doe',
     password: '$2b$10$hashedpassword',
+    hasPassword: true,
     isActive: true,
     locale: 'en',
     createdAt: new Date('2025-01-01'),
@@ -560,8 +561,11 @@ describe('UsersService', () => {
     });
 
     describe('email change', () => {
+      // A class accessor is not carried by an object spread, so every literal
+      // that rebuilds a User from mockUser has to restate it.
       const buildVerifiedUser = (): User => ({
         ...mockUser,
+        hasPassword: mockUser.hasPassword,
         isEmailVerified: true,
         emailVerificationToken: null,
         emailVerificationExpiresAt: null
@@ -779,6 +783,7 @@ describe('UsersService', () => {
   describe('restore', () => {
     const deletedUser: User = {
       ...mockUser,
+      hasPassword: mockUser.hasPassword,
       deletedAt: new Date('2025-06-01'),
       isActive: false
     };

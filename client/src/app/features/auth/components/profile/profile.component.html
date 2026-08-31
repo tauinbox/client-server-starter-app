@@ -82,6 +82,16 @@
 
               <nxs-password-strength [password]="profileModel().password" />
 
+              @if (emailChangeNeedsReauth()) {
+                <div class="reauth-notice" role="note">
+                  {{
+                    t('auth.profile.reauthNotice', {
+                      provider: reauthProviderLabel()
+                    })
+                  }}
+                </div>
+              }
+
               @if (requiresCurrentPassword()) {
                 <nxs-form-field
                   [field]="profileForm.currentPassword"
@@ -94,7 +104,7 @@
                 </nxs-form-field>
               }
 
-              @if (hasPassword()) {
+              @if (passwordTyped()) {
                 <nxs-form-field
                   [field]="profileForm.confirmPassword"
                   label="auth.profile.confirmPassword"

@@ -38,7 +38,13 @@ import {
 } from '../helpers/captcha.helpers';
 import type { AuthenticatedRequest } from '../types';
 import { validationError } from '../helpers/validation-error.helpers';
-import { REFRESH_COOKIE_OPTIONS, REFRESH_TOKEN_COOKIE } from '../constants';
+import {
+  REAUTH_PROOF_COOKIE,
+  REAUTH_PROOF_COOKIE_PATH,
+  REFRESH_COOKIE_OPTIONS,
+  REFRESH_TOKEN_COOKIE
+} from '../constants';
+import { isValidReauthProof } from '../helpers/reauth.helpers';
 
 const router = Router();
 
@@ -145,10 +151,11 @@ router.post('/login', (req, res) => {
   }
 
   // Plaintext comparison — mock only. Real server uses bcrypt.compare().
-  if (!user || !user.isActive || user.password !== password) {
+  if (!user || !user.isActive || !user.password || user.password !== password) {
     let attemptsAfterIncrement: number | null = null;
-    // Handle failed login attempt tracking
-    if (user && user.isActive) {
+    // An account that holds no password cannot fail a password check, so it
+    // must not accrue lockout either. Same condition as the server.
+    if (user && user.isActive && user.password) {
       user.failedLoginAttempts++;
       attemptsAfterIncrement = user.failedLoginAttempts;
 
@@ -741,26 +748,32 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
     res.status(400).json(validationError(emailMaxErr));
     return;
   }
+  // Supplied values are still checked; an absent one reaches the step-up gate,
+  // which is the only place that knows which factor this account holds.
   if (
-    typeof currentPassword !== 'string' ||
-    currentPassword.length === 0 ||
-    currentPassword.length > 128
+    currentPassword !== undefined &&
+    (typeof currentPassword !== 'string' ||
+      currentPassword.length === 0 ||
+      currentPassword.length > 128)
   ) {
     res.status(400).json(validationError('currentPassword is required'));
     return;
   }
 
   if (user.password === null) {
-    res.status(400).json({
-      message: 'Please set a password before changing your email',
-      statusCode: 400,
-      errorKey: ErrorKeys.AUTH.OAUTH_ONLY_SET_PASSWORD_FIRST
-    });
-    return;
-  }
-
-  // Plaintext comparison — mock only. Real server uses bcrypt.compare().
-  if (user.password !== currentPassword) {
+    const proof = (req.cookies as Record<string, string> | undefined)?.[
+      REAUTH_PROOF_COOKIE
+    ];
+    if (!isValidReauthProof(proof, user)) {
+      res.status(400).json({
+        message: 'Confirm it is you with your sign-in provider, then try again',
+        statusCode: 400,
+        errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
+      });
+      return;
+    }
+  } else if (user.password !== currentPassword) {
+    // Plaintext comparison — mock only. Real server uses bcrypt.compare().
     res.status(400).json({
       message: 'Current password is incorrect',
       statusCode: 400,
@@ -779,6 +792,10 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
   }
 
   const state = getState();
+
+  // The server clears the proof once the change is accepted, so a rejected
+  // attempt keeps its remaining window. Everything above this line rejects.
+  res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
 
   // Uniqueness check: primary email OR pending email on any OTHER user.
   let conflict = false;

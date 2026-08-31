@@ -79,7 +79,7 @@ export class OAuthAccountService {
         throw new HttpException(
           {
             message:
-              'Cannot unlink the last OAuth provider without a password set. Please set a password first.',
+              'This is the only way you can sign in. Link another provider first, or set a password through the forgot-password link.',
             errorKey: ErrorKeys.AUTH.UNLINK_LAST_PROVIDER
           },
           HttpStatus.BAD_REQUEST

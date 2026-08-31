@@ -3,10 +3,11 @@ import type { CookieOptions, Request, Response } from 'express';
 import type OAuth2Strategy from 'passport-oauth2';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import {
+  OAUTH_INTENT_COOKIE_PATH,
   OAUTH_LINK_COOKIE,
-  OAUTH_LINK_COOKIE_PATH
+  OAUTH_REAUTH_COOKIE
 } from '../constants/oauth.constants';
-import { bindLinkIntent, isLinkIntentBound } from './oauth-link-intent';
+import { bindIntent, isIntentBound } from './oauth-flow-intent';
 import { timingSafeStringEqual } from './timing-safe-equal';
 
 const COOKIE_NAME_PREFIX = 'oauth_state_';
@@ -86,7 +87,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
     ].slice(-MAX_PENDING_STATES);
 
     res.cookie(this.cookieName, serialize(pending), this.cookieOptions());
-    this.bindPendingLinkIntent(req, res, state);
+    this.bindPendingIntents(req, res, state);
 
     callback(null, state);
   }
@@ -140,35 +141,38 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
   }
 
   /**
-   * The link intent is a browser-wide cookie, so every callback that finds it
-   * takes the link branch, whatever request started that callback. Tying it to
-   * the state this flow just minted makes it apply to this flow alone.
+   * An intent is a browser-wide cookie, so every callback that finds one takes
+   * that branch, whatever request started the callback. Tying an intent to the
+   * state this flow just minted makes it apply to this flow alone.
+   *
+   * Both intents get the same treatment. The link intent attaches a provider
+   * identity to an account; the re-authentication intent mints a step-up proof
+   * for one. An abandoned intent of either kind must not be picked up by the
+   * next flow at that browser.
    *
    * An intent that an earlier flow already claimed is left untouched: handing it
    * to the flow that runs now is the defect itself in a new place. The rewrite
    * refreshes the cookie's own maxAge, which extends nothing in practice - the
-   * link token inside it carries its own expiry, and the callback still verifies
+   * token inside it carries its own expiry, and the callback still verifies
    * that.
    */
-  private bindPendingLinkIntent(
-    req: Request,
-    res: Response,
-    state: string
-  ): void {
-    const intent = (req.cookies as Record<string, string> | undefined)?.[
-      OAUTH_LINK_COOKIE
-    ];
-    if (!intent || isLinkIntentBound(intent)) {
-      return;
-    }
+  private bindPendingIntents(req: Request, res: Response, state: string): void {
+    const cookies = req.cookies as Record<string, string> | undefined;
 
-    res.cookie(OAUTH_LINK_COOKIE, bindLinkIntent(intent, state), {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: this.isProduction,
-      path: OAUTH_LINK_COOKIE_PATH,
-      maxAge: COOKIE_MAX_AGE_MS
-    });
+    for (const name of [OAUTH_LINK_COOKIE, OAUTH_REAUTH_COOKIE]) {
+      const intent = cookies?.[name];
+      if (!intent || isIntentBound(intent)) {
+        continue;
+      }
+
+      res.cookie(name, bindIntent(intent, state), {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: this.isProduction,
+        path: OAUTH_INTENT_COOKIE_PATH,
+        maxAge: COOKIE_MAX_AGE_MS
+      });
+    }
   }
 
   private readPendingStates(req: Request): PendingState[] {

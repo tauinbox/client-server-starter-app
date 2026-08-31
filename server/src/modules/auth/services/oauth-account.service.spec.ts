@@ -178,9 +178,13 @@ describe('OAuthAccountService', () => {
         { provider: 'google', userId: 'user-1' }
       ]);
 
-      await expect(service.unlinkProvider('user-1', 'google')).rejects.toThrow(
-        'Cannot unlink'
-      );
+      // The errorKey is the contract; the message is user-facing copy that has
+      // been reworded once already.
+      await expect(
+        service.unlinkProvider('user-1', 'google')
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.UNLINK_LAST_PROVIDER }
+      });
       expect(mockManager.delete).not.toHaveBeenCalled();
     });
 

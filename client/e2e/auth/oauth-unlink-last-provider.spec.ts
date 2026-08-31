@@ -35,7 +35,9 @@ test.describe('OAuth — unlink last provider safety', () => {
         email,
         firstName: 'John',
         lastName: 'Doe',
-        password: '',
+        // Null, not empty: this is what an account created through a
+        // provider actually holds, and the guard reads it that way.
+        password: null,
         isActive: true,
         roles: ['user'],
         isEmailVerified: true,
@@ -76,7 +78,9 @@ test.describe('OAuth — unlink last provider safety', () => {
     // getByText (snackbar text is the most uniquely-identifiable thing on
     // screen) — locating the container directly trips strict mode when an
     // unrelated snackbar from earlier in the suite is still mid-exit.
-    await expect(page.getByText(/last OAuth provider/i).first()).toBeVisible();
+    await expect(
+      page.getByText(/only way you can sign in/i).first()
+    ).toBeVisible();
 
     // The Google account is still linked — Disconnect button persists,
     // there is no Connect button on this row. Use anchored regex so the match

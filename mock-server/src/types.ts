@@ -13,7 +13,8 @@ export interface MockUser {
   email: string;
   firstName: string;
   lastName: string;
-  password: string;
+  /** Null for an account created through a provider, which holds no password. */
+  password: string | null;
   isActive: boolean;
   roles: string[];
   isEmailVerified: boolean;
@@ -294,6 +295,13 @@ export interface MockOAuthData {
   expiresAt: number;
 }
 
+export interface MockReauthProof {
+  userId: string;
+  /** Seconds, like the `iat` the real proof carries. */
+  issuedAt: number;
+  expiresAt: number;
+}
+
 export interface State {
   users: Map<string, MockUser>;
   oauthAccounts: Map<string, OAuthAccount[]>;
@@ -301,6 +309,10 @@ export interface State {
   // signs the payload into the cookie itself; keeping it server-side here is
   // observably identical and needs no signing key.
   oauthDataTokens: Map<string, MockOAuthData>;
+  // Keyed by the opaque value of the `reauth_proof` cookie. The real server
+  // signs a JWT; the mock has no provider round trip to mint one, so a control
+  // route seeds this instead.
+  reauthProofs: Map<string, MockReauthProof>;
   refreshTokens: Map<string, string>;
   // Revoked refresh tokens — kept around to detect token reuse (OAuth 2.0 BCP).
   // If a token was rotated (moved to this map) and is presented again before

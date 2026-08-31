@@ -86,6 +86,14 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
         });
         return res.json();
       },
+      async issueReauthProof(userId) {
+        const res = await fetch(`${baseUrl}/__control/reauth-proof`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        return res.json();
+      },
       async seedRoles(roles) {
         await fetch(`${baseUrl}/__control/roles`, {
           method: 'POST',

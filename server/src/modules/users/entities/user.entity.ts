@@ -111,4 +111,15 @@ export class User {
 
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })
   deletedAt: Date | null;
+
+  /**
+   * Tells an OAuth-only account apart from one that holds a password, without
+   * putting the hash on the wire. It is an accessor rather than a column
+   * because the value is derived; `@Expose()` is what makes class-transformer
+   * serialize an accessor at all.
+   */
+  @Expose()
+  get hasPassword(): boolean {
+    return this.password !== null;
+  }
 }
