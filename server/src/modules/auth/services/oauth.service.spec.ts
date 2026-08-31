@@ -617,10 +617,20 @@ describe('OAuthService', () => {
   });
 
   describe('linkOAuthToUser', () => {
+    // Seconds, as a JWT `iat` is.
+    const LINK_TOKEN_IAT = Math.floor(
+      new Date('2026-01-01T00:00:00Z').getTime() / 1000
+    );
+
     it('should link OAuth account to active user', async () => {
       mockUsersService.findOne.mockResolvedValue(mockUser);
 
-      await service.linkOAuthToUser('user-1', 'google', 'google-123');
+      await service.linkOAuthToUser(
+        'user-1',
+        'google',
+        'google-123',
+        LINK_TOKEN_IAT
+      );
 
       expect(mockUsersService.findOne).toHaveBeenCalledWith('user-1');
       expect(mockOAuthAccountService.createOAuthAccount).toHaveBeenCalledWith(
@@ -635,7 +645,12 @@ describe('OAuthService', () => {
       mockUsersService.findOne.mockResolvedValue(inactiveUser);
 
       await expect(
-        service.linkOAuthToUser('user-1', 'google', 'google-123')
+        service.linkOAuthToUser(
+          'user-1',
+          'google',
+          'google-123',
+          LINK_TOKEN_IAT
+        )
       ).rejects.toThrow(HttpException);
     });
 
@@ -651,7 +666,12 @@ describe('OAuthService', () => {
       });
 
       await expect(
-        service.linkOAuthToUser('user-1', 'google', 'google-123')
+        service.linkOAuthToUser(
+          'user-1',
+          'google',
+          'google-123',
+          LINK_TOKEN_IAT
+        )
       ).rejects.toThrow(HttpException);
     });
 
@@ -667,7 +687,12 @@ describe('OAuthService', () => {
       });
 
       await expect(
-        service.linkOAuthToUser('user-1', 'google', 'google-123')
+        service.linkOAuthToUser(
+          'user-1',
+          'google',
+          'google-123',
+          LINK_TOKEN_IAT
+        )
       ).resolves.toBeUndefined();
     });
 
@@ -683,8 +708,52 @@ describe('OAuthService', () => {
       });
 
       await expect(
-        service.linkOAuthToUser('user-1', 'google', 'google-123')
+        service.linkOAuthToUser(
+          'user-1',
+          'google',
+          'google-123',
+          LINK_TOKEN_IAT
+        )
       ).resolves.toBeUndefined();
+    });
+
+    // Regression: the link cookie can outlive the session that minted it, so a
+    // token older than the last revocation must link nothing.
+    it('should refuse a link token issued before the last session revocation', async () => {
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        tokenRevokedAt: new Date((LINK_TOKEN_IAT + 60) * 1000)
+      });
+
+      await expect(
+        service.linkOAuthToUser(
+          'user-1',
+          'google',
+          'google-123',
+          LINK_TOKEN_IAT
+        )
+      ).rejects.toThrow(HttpException);
+      expect(mockOAuthAccountService.createOAuthAccount).not.toHaveBeenCalled();
+    });
+
+    it('should link when the token was issued after the last revocation', async () => {
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        tokenRevokedAt: new Date((LINK_TOKEN_IAT - 60) * 1000)
+      });
+
+      await service.linkOAuthToUser(
+        'user-1',
+        'google',
+        'google-123',
+        LINK_TOKEN_IAT
+      );
+
+      expect(mockOAuthAccountService.createOAuthAccount).toHaveBeenCalledWith(
+        'user-1',
+        'google',
+        'google-123'
+      );
     });
 
     it('should rethrow non-unique-violation errors', async () => {
@@ -693,7 +762,12 @@ describe('OAuthService', () => {
       mockOAuthAccountService.createOAuthAccount.mockRejectedValue(dbError);
 
       await expect(
-        service.linkOAuthToUser('user-1', 'google', 'google-123')
+        service.linkOAuthToUser(
+          'user-1',
+          'google',
+          'google-123',
+          LINK_TOKEN_IAT
+        )
       ).rejects.toThrow('Connection lost');
     });
   });

@@ -1377,7 +1377,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/register` | None | Register a new user |
 | POST | `/auth/login` | None | Log in. Sets the `refresh_token` HttpOnly cookie and returns an access token |
 | POST | `/auth/refresh-token` | None | Refresh the access token. Reads the `refresh_token` cookie and rotates it |
-| POST | `/auth/logout` | Bearer | Log out. Revokes the refresh tokens |
+| POST | `/auth/logout` | Bearer | Log out. Revokes the refresh tokens and cancels a started OAuth link |
 | GET | `/auth/profile` | Bearer | Get the profile of the current user |
 | PATCH | `/auth/profile` | Bearer | Update your own profile: the name and the password. `currentPassword` is necessary for a password change. A user with OAuth only can omit it |
 | POST | `/auth/profile/email/initiate` | Bearer | Start a self-service email change. Throttled to 3 calls each hour. Requires the current password. Rejects an account with OAuth only |
@@ -1389,7 +1389,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/forgot-password` | None | Request a password reset email. A CAPTCHA token is necessary near the rate limit |
 | GET | `/auth/captcha-config` | None | Public CAPTCHA configuration: the site key and the enabled flag |
 | POST | `/auth/reset-password` | None | Reset the password with a token |
-| POST | `/auth/oauth/link-init` | Bearer | Start an OAuth account link. Sets a cookie with a short life, thus the next OAuth flow attaches the provider to the current user |
+| POST | `/auth/oauth/link-init` | Bearer | Start an OAuth account link. Sets a cookie with a short life, thus the next OAuth flow attaches the provider to the current user. A logout cancels it |
 | POST | `/auth/oauth/exchange` | None | Exchange the OAuth-data cookie from the callback for the auth response: an access token and a refresh cookie |
 | GET | `/auth/oauth/accounts` | Bearer | List the linked OAuth accounts |
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink an OAuth provider |

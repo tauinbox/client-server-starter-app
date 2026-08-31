@@ -356,9 +356,15 @@ export class OAuthController {
       const payload = this.jwtService.verify<{
         sub: string;
         purpose?: string;
+        iat?: number;
       }>(linkToken);
       if (payload.purpose !== TOKEN_PURPOSE.OAUTH_LINK) {
         throw new Error('Unexpected token purpose');
+      }
+      // The service compares this against the last session revocation, so a
+      // token without one is refused rather than trusted.
+      if (typeof payload.iat !== 'number') {
+        throw new Error('Link token carries no issue time');
       }
       const userId = payload.sub;
 
@@ -366,6 +372,7 @@ export class OAuthController {
         userId,
         profile.provider,
         profile.providerId,
+        payload.iat,
         extractAuditContext(req)
       );
 

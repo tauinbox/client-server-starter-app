@@ -202,11 +202,15 @@ export class OAuthService {
    * the provider's address is deliberately not passed in, because linking a
    * provider whose profile carries a different mailbox is legitimate - the
    * session already proves identity.
+   *
+   * `linkTokenIssuedAt` is the `iat` of the link token, in seconds. It is
+   * required, not optional: the caller must state when the intent was proved.
    */
   async linkOAuthToUser(
     userId: string,
     provider: string,
     providerId: string,
+    linkTokenIssuedAt: number,
     auditContext?: AuditContext
   ): Promise<void> {
     const user = await this.usersService.findOne(userId);
@@ -215,6 +219,21 @@ export class OAuthService {
         {
           message: 'User account not found or deactivated',
           errorKey: ErrorKeys.AUTH.USER_NOT_FOUND_OR_DEACTIVATED
+        },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+    // The link intent travels in a browser cookie that can outlive the session
+    // that minted it - another tab, another device, a replayed request. Same
+    // comparison shape as the JWT strategy, so the two cannot drift.
+    if (
+      user.tokenRevokedAt &&
+      linkTokenIssuedAt < user.tokenRevokedAt.getTime() / 1000
+    ) {
+      throw new HttpException(
+        {
+          message: 'Token has been revoked',
+          errorKey: ErrorKeys.AUTH.TOKEN_REVOKED
         },
         HttpStatus.UNAUTHORIZED
       );

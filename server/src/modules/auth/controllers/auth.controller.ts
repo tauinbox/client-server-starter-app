@@ -58,6 +58,10 @@ import { RegisterResource } from '../decorators/register-resource.decorator';
 import { Request as ExpressRequest } from 'express';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { CaptchaRequiredGuard } from '../captcha/captcha-required.guard';
+import {
+  OAUTH_LINK_COOKIE,
+  OAUTH_LINK_COOKIE_PATH
+} from '../constants/oauth.constants';
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
 
@@ -100,6 +104,13 @@ export class AuthController {
 
   private clearRefreshTokenCookie(res: Response): void {
     res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
+  }
+
+  // A cookie is identified by name plus path, so the refresh clear above never
+  // touches this one. An abandoned link attempt must not outlive the session
+  // that started it: the callback links whatever identity signs in next.
+  private clearOAuthLinkCookie(res: Response): void {
+    res.clearCookie(OAUTH_LINK_COOKIE, { path: OAUTH_LINK_COOKIE_PATH });
   }
 
   @Public()
@@ -192,6 +203,7 @@ export class AuthController {
   ) {
     await this.authService.logout(req.user.userId);
     this.clearRefreshTokenCookie(res);
+    this.clearOAuthLinkCookie(res);
     await this.auditService.log({
       action: AuditAction.USER_LOGOUT,
       actorId: req.user.userId,
@@ -249,6 +261,7 @@ export class AuthController {
     if (updateProfileDto.password) {
       await this.authService.logout(req.user.userId);
       this.clearRefreshTokenCookie(res);
+      this.clearOAuthLinkCookie(res);
       await this.auditService.log({
         action: AuditAction.PASSWORD_CHANGE,
         actorId: req.user.userId,
