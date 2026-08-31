@@ -189,21 +189,26 @@ jobs:
             cd /home/deploy/nexus
 
             # The repository is public and this clone has no credential
-            # helper, so the fetch used to go out anonymous. GitHub answers
-            # `GET /info/refs` with 200 and then answers the anonymous
+            # helper, so the fetch used to go out anonymous. On 2026-08-31,
+            # for a window of about 15 minutes, GitHub answered `GET
+            # /info/refs` from this host with 200 and answered the anonymous
             # `POST /git-upload-pack` with 401 and `WWW-Authenticate: Basic`.
             # Git handles a 401 by asking a credential helper and repeating the
-            # POST with an Authorization header - with no helper configured it
-            # falls back to prompting, and a deploy has no TTY, so it dies on
-            # `fatal: could not read Username`. That killed all three attempts
-            # of run 33383448411.
+            # POST - with none configured it falls back to prompting, and a
+            # deploy has no TTY, so it dies on `fatal: could not read
+            # Username`. That killed all three attempts of run 33383448411.
             #
-            # Traced with GIT_CURL_VERBOSE: GET 200, anonymous POST 401, then
-            # the same POST with an Authorization header 200. So a helper is
-            # the fix, and the retry only covers transient network failures.
-            # The helper reads the token from the environment at the moment git
-            # runs it, so the value never reaches the process table, and the
-            # job forwards a read-only token that expires with the job.
+            # Observed on this host with GIT_CURL_VERBOSE, at 10:52 UTC. Every
+            # anonymous sample taken after the window answered 200 (curl 40/40,
+            # git 40/40), so the fault was an episode, not a steady state, and
+            # the host configuration had not changed since February.
+            #
+            # Authenticating removes the dependency on anonymous service
+            # altogether. The retry covers a transient failure only; 15 seconds
+            # of retrying would not have outlasted that window. The helper
+            # reads the token from the environment at the moment git runs it,
+            # so the value never reaches the process table, and the job
+            # forwards a read-only token that expires with the job.
             git_authed() {
               GIT_TERMINAL_PROMPT=0 git \
                 -c credential.helper= \
