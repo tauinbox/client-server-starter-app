@@ -1270,10 +1270,20 @@ The `resolve` job of `rollback.yml` does not check out the repository. Thus it w
 `client/Dockerfile` current. It uses the docker ecosystem each week, and it ignores a major bump of
 `node` and of `nginx`. Thus a build is reproducible and still gets reviewed upstream base updates.
 
-The two deploy paths refresh the checkout on the host with `git pull --ff-only`. Then they check out
-`docker-compose.yml` at the commit of the images that they deploy. Thus a merge that lands during a
-deploy cannot pair a newer compose file with older images. `rollback.yml` does the same for its own
-target SHA. The next run restores the file before it pulls.
+The two deploy paths refresh the checkout on the host with `git_authed_retry pull --ff-only`. Then
+they check out `docker-compose.yml` at the commit of the images that they deploy. Thus a merge that
+lands during a deploy cannot pair a newer compose file with older images. `rollback.yml` does the same
+for its own target SHA. The next run restores the file before it pulls.
+
+That fetch is authenticated. The host clone talks to GitHub over HTTPS and the repository is public,
+so the fetch used to go out anonymous. GitHub answers the anonymous `POST /git-upload-pack` with 401
+and `WWW-Authenticate: Basic`, and git answers a 401 by asking a credential helper and repeating the
+request. The clone had no helper, so git tried to prompt, and a deploy has no terminal. The deploy
+then died on `fatal: could not read Username for 'https://github.com'` before it touched a container.
+`git_authed` adds a helper that reads `GH_FETCH_TOKEN` from the environment at the moment git runs it,
+so the token stays out of the process table. `git_authed_retry` adds 3 attempts for a transient
+network failure. `GH_FETCH_TOKEN` carries the job's own `GITHUB_TOKEN`, and each deploy job declares
+`permissions: contents: read`, so the forwarded token is read-only and expires with the job.
 
 Each workflow that touches the VPS shares the `deploy-production` concurrency group, thus there is no
 race condition. `rollback.yml` is the one member with `cancel-in-progress: true`. Thus an emergency

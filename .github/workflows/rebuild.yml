@@ -151,6 +151,11 @@ jobs:
     name: Deploy to VPS
     needs: rebuild-push
     runs-on: ubuntu-latest
+    permissions:
+      # The job forwards this token to the VPS so the deploy fetch is
+      # authenticated. Pin it read-only here rather than inheriting the
+      # repository default, which a later settings change could widen.
+      contents: read
     # Same bound as deploy.yml's SSH job, and for the same reason — see the
     # comment there. Only this job is bounded: the rebuild-push job above runs
     # a no-cache image build and legitimately takes far longer.
@@ -178,14 +183,54 @@ jobs:
           # See deploy.yml — this job forwards the same secret set through
           # `envs` below.
           fingerprint: ${{ steps.ssh-client.outputs.fingerprint }}
-          envs: DEPLOY_SHA,OWNER,GRAFANA_ADMIN_PASSWORD,GRAFANA_ROOT_URL,ALERT_WEBHOOK_URL,JWT_PRIVATE_KEY,JWT_PUBLIC_KEY,DB_PASSWORD,GOOGLE_CLIENT_SECRET,FACEBOOK_CLIENT_SECRET,VK_CLIENT_SECRET,ADMIN_PASSWORD,SMTP_HOST,SMTP_PORT,SMTP_USER,SMTP_PASS,SMTP_FROM,TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,PADDLE_API_KEY,PADDLE_WEBHOOK_SECRET,YOOKASSA_SHOP_ID,YOOKASSA_SECRET_KEY
+          envs: DEPLOY_SHA,OWNER,GRAFANA_ADMIN_PASSWORD,GRAFANA_ROOT_URL,ALERT_WEBHOOK_URL,JWT_PRIVATE_KEY,JWT_PUBLIC_KEY,DB_PASSWORD,GOOGLE_CLIENT_SECRET,FACEBOOK_CLIENT_SECRET,VK_CLIENT_SECRET,ADMIN_PASSWORD,SMTP_HOST,SMTP_PORT,SMTP_USER,SMTP_PASS,SMTP_FROM,TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,PADDLE_API_KEY,PADDLE_WEBHOOK_SECRET,YOOKASSA_SHOP_ID,YOOKASSA_SECRET_KEY,GH_FETCH_TOKEN
           script: |
             set -euo pipefail
             cd /home/deploy/nexus
+
+            # The repository is public and this clone has no credential
+            # helper, so the fetch used to go out anonymous. GitHub answers
+            # `GET /info/refs` with 200 and then answers the anonymous
+            # `POST /git-upload-pack` with 401 and `WWW-Authenticate: Basic`.
+            # Git handles a 401 by asking a credential helper and repeating the
+            # POST with an Authorization header - with no helper configured it
+            # falls back to prompting, and a deploy has no TTY, so it dies on
+            # `fatal: could not read Username`. That killed all three attempts
+            # of run 33383448411.
+            #
+            # Traced with GIT_CURL_VERBOSE: GET 200, anonymous POST 401, then
+            # the same POST with an Authorization header 200. So a helper is
+            # the fix, and the retry only covers transient network failures.
+            # The helper reads the token from the environment at the moment git
+            # runs it, so the value never reaches the process table, and the
+            # job forwards a read-only token that expires with the job.
+            git_authed() {
+              GIT_TERMINAL_PROMPT=0 git \
+                -c credential.helper= \
+                -c credential.helper='!f() { echo username=x-access-token; echo "password=$GH_FETCH_TOKEN"; }; f' \
+                "$@"
+            }
+
+            git_authed_retry() {
+              GIT_ATTEMPT=1
+              while :; do
+                if git_authed "$@"; then
+                  return 0
+                fi
+                if [ "$GIT_ATTEMPT" -ge 3 ]; then
+                  echo "ERROR: git $* failed on all $GIT_ATTEMPT attempts" >&2
+                  return 1
+                fi
+                echo "git $* failed (attempt $GIT_ATTEMPT) - retrying"
+                sleep $((GIT_ATTEMPT * 5))
+                GIT_ATTEMPT=$((GIT_ATTEMPT + 1))
+              done
+            }
+
             # Clean up docker-compose.yml if an earlier deploy or rollback left
             # it checked out at another commit
             git checkout HEAD -- docker-compose.yml 2>/dev/null || true
-            git pull --ff-only
+            git_authed_retry pull --ff-only
 
             # Pin the compose file to the commit the images were rebuilt from —
             # master can move between the rebuild and this deploy. See deploy.yml.
@@ -318,3 +363,4 @@ jobs:
           PADDLE_WEBHOOK_SECRET: ${{ secrets.PADDLE_WEBHOOK_SECRET }}
           YOOKASSA_SHOP_ID: ${{ secrets.YOOKASSA_SHOP_ID }}
           YOOKASSA_SECRET_KEY: ${{ secrets.YOOKASSA_SECRET_KEY }}
+          GH_FETCH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
