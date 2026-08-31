@@ -1270,10 +1270,20 @@ The `resolve` job of `rollback.yml` does not check out the repository. Thus it w
 `client/Dockerfile` current. It uses the docker ecosystem each week, and it ignores a major bump of
 `node` and of `nginx`. Thus a build is reproducible and still gets reviewed upstream base updates.
 
-The two deploy paths refresh the checkout on the host with `git pull --ff-only`. Then they check out
-`docker-compose.yml` at the commit of the images that they deploy. Thus a merge that lands during a
-deploy cannot pair a newer compose file with older images. `rollback.yml` does the same for its own
-target SHA. The next run restores the file before it pulls.
+The two deploy paths refresh the checkout on the host with `git_authed_retry pull --ff-only`. Then
+they check out `docker-compose.yml` at the commit of the images that they deploy. Thus a merge that
+lands during a deploy cannot pair a newer compose file with older images. `rollback.yml` does the same
+for its own target SHA. The next run restores the file before it pulls.
+
+That fetch is authenticated. The host clone talks to GitHub over HTTPS and the repository is public,
+so the fetch used to go out anonymous. GitHub answers the anonymous `POST /git-upload-pack` with 401
+and `WWW-Authenticate: Basic`, and git answers a 401 by asking a credential helper and repeating the
+request. The clone had no helper, so git tried to prompt, and a deploy has no terminal. The deploy
+then died on `fatal: could not read Username for 'https://github.com'` before it touched a container.
+`git_authed` adds a helper that reads `GH_FETCH_TOKEN` from the environment at the moment git runs it,
+so the token stays out of the process table. `git_authed_retry` adds 3 attempts for a transient
+network failure. `GH_FETCH_TOKEN` carries the job's own `GITHUB_TOKEN`, and each deploy job declares
+`permissions: contents: read`, so the forwarded token is read-only and expires with the job.
 
 Each workflow that touches the VPS shares the `deploy-production` concurrency group, thus there is no
 race condition. `rollback.yml` is the one member with `cancel-in-progress: true`. Thus an emergency
@@ -1324,7 +1334,7 @@ the script is the authoritative reference for the key list.
 |---|---|---|---|
 | `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` | all VPS workflows | - (SSH auth) | How Actions reaches the VPS |
 | `VPS_HOST_KEY` | all VPS workflows | - (SSH host verification) | The public key of the VPS host, as one line in the `ssh-keyscan` output format. Each SSH job verifies the far side against it before it authenticates. Thus a redirected connection cannot collect the deploy key and the secrets with it. **An empty value fails the job by design**, because the SSH client skips the verification silently when it has no key to compare against. **The value must be the ECDSA key of the host.** The host answers with the host key that the client asks for. The Go client inside `drone-ssh` prefers `ecdsa-sha2-nistp256`. Thus an `ssh-ed25519` value fails each job with `host key fingerprint mismatch`. Local OpenSSH prefers ed25519 and verifies against such a value without an error, thus the incorrect key looks correct. Take the key again if a person reinstalls the host: run `ssh-keyscan -t ecdsa <host>` and compare it with `/etc/ssh/ssh_host_ecdsa_key.pub`, read on the host itself. A reboot or a resize keeps the same key. |
-| `GITHUB_TOKEN` | all | - (GHCR login) | Actions supplies it automatically |
+| `GITHUB_TOKEN` | all | `GH_FETCH_TOKEN` on the VPS (deploy, rebuild, rollback) | Actions supplies it automatically. It logs the build jobs in to GHCR, and the three deploy jobs forward it to the host so the `git` fetch there is authenticated. Those jobs pin `permissions: contents: read`, so the forwarded copy is read-only and expires with the job. |
 | `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_ROOT_URL` | deploy, rebuild | `docker-compose.yml` `${}` | Environment of the Grafana container. An empty `GRAFANA_ADMIN_PASSWORD` stops the deploy, thus production gets no silent `admin` default. |
 | `ALERT_WEBHOOK_URL` | deploy, rebuild | root `.env`, then `docker-compose.yml` `${}` | The address to which Grafana POSTs a firing alert. An empty value stops the deploy, because Grafana exits at startup when a provisioned webhook has no URL. Treat the URL as a capability: a person who can POST to it can inject false alerts. |
 | `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` | deploy, rebuild, rotate-keys | `server/.env` | The RS256 keypair, as base64 PEM |
