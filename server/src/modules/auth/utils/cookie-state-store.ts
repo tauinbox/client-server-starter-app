@@ -1,7 +1,13 @@
-import { randomBytes, timingSafeEqual } from 'crypto';
+import { randomBytes } from 'crypto';
 import type { CookieOptions, Request, Response } from 'express';
 import type OAuth2Strategy from 'passport-oauth2';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
+import {
+  OAUTH_LINK_COOKIE,
+  OAUTH_LINK_COOKIE_PATH
+} from '../constants/oauth.constants';
+import { bindLinkIntent, isLinkIntentBound } from './oauth-link-intent';
+import { timingSafeStringEqual } from './timing-safe-equal';
 
 const COOKIE_NAME_PREFIX = 'oauth_state_';
 const COOKIE_MAX_AGE_MS = 5 * 60 * 1000;
@@ -27,20 +33,6 @@ const MAX_PENDING_STATES = 5;
 interface PendingState {
   state: string;
   expiresAt: number;
-}
-
-/**
- * Compares without leaking how many leading characters matched. The length
- * check runs first because timingSafeEqual throws on differing lengths - the
- * state's length is fixed and not a secret, so revealing it costs nothing.
- */
-function timingSafeStringEqual(a: string, b: string): boolean {
-  const bufferA = Buffer.from(a, 'utf8');
-  const bufferB = Buffer.from(b, 'utf8');
-  if (bufferA.length !== bufferB.length) {
-    return false;
-  }
-  return timingSafeEqual(bufferA, bufferB);
 }
 
 function serialize(pending: PendingState[]): string {
@@ -94,6 +86,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
     ].slice(-MAX_PENDING_STATES);
 
     res.cookie(this.cookieName, serialize(pending), this.cookieOptions());
+    this.bindPendingLinkIntent(req, res, state);
 
     callback(null, state);
   }
@@ -144,6 +137,38 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
     }
 
     callback(null, true, providedState);
+  }
+
+  /**
+   * The link intent is a browser-wide cookie, so every callback that finds it
+   * takes the link branch, whatever request started that callback. Tying it to
+   * the state this flow just minted makes it apply to this flow alone.
+   *
+   * An intent that an earlier flow already claimed is left untouched: handing it
+   * to the flow that runs now is the defect itself in a new place. The rewrite
+   * refreshes the cookie's own maxAge, which extends nothing in practice - the
+   * link token inside it carries its own expiry, and the callback still verifies
+   * that.
+   */
+  private bindPendingLinkIntent(
+    req: Request,
+    res: Response,
+    state: string
+  ): void {
+    const intent = (req.cookies as Record<string, string> | undefined)?.[
+      OAUTH_LINK_COOKIE
+    ];
+    if (!intent || isLinkIntentBound(intent)) {
+      return;
+    }
+
+    res.cookie(OAUTH_LINK_COOKIE, bindLinkIntent(intent, state), {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: this.isProduction,
+      path: OAUTH_LINK_COOKIE_PATH,
+      maxAge: COOKIE_MAX_AGE_MS
+    });
   }
 
   private readPendingStates(req: Request): PendingState[] {

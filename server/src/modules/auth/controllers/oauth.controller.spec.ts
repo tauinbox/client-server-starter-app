@@ -13,6 +13,7 @@ import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys, TOKEN_PURPOSE } from '@app/shared/constants';
+import { bindLinkIntent } from '../utils/oauth-link-intent';
 
 // Seconds, as a JWT `iat` is.
 const LINK_TOKEN_IAT = Math.floor(
@@ -45,13 +46,29 @@ function mockResponse(): MockedResponse & Response {
   } as MockedResponse & Response;
 }
 
+// The state that CookieStateStore minted for the flow under test. The link
+// intent is consumable by the flow that carries this state and by no other.
+const FLOW_STATE = 'a'.repeat(64);
+
 function mockExpressRequest(
   user: OAuthUserProfile,
-  cookies: Record<string, string> = {}
+  cookies: Record<string, string> = {},
+  state: string = FLOW_STATE
 ): ExpressRequest & { user: OAuthUserProfile } {
-  return { user, cookies, headers: {}, ip: '127.0.0.1' } as ExpressRequest & {
-    user: OAuthUserProfile;
+  // @ts-expect-error testing mock
+  const req: ExpressRequest & { user: OAuthUserProfile } = {
+    user,
+    cookies,
+    query: { state },
+    headers: {},
+    ip: '127.0.0.1'
   };
+  return req;
+}
+
+/** Builds the cookie the store writes once a flow claims the intent. */
+function linkCookie(token: string, state: string = FLOW_STATE) {
+  return { oauth_link: bindLinkIntent(token, state) };
 }
 
 describe('OAuthController', () => {
@@ -371,7 +388,7 @@ describe('OAuthController', () => {
       };
 
       await controller.googleCallback(
-        mockExpressRequest(profile, { oauth_link: 'valid-link-token' }),
+        mockExpressRequest(profile, linkCookie('valid-link-token')),
         res
       );
 
@@ -410,7 +427,7 @@ describe('OAuthController', () => {
       };
 
       await controller.googleCallback(
-        mockExpressRequest(profile, { oauth_link: 'link-token-without-iat' }),
+        mockExpressRequest(profile, linkCookie('link-token-without-iat')),
         res
       );
 
@@ -439,7 +456,7 @@ describe('OAuthController', () => {
       };
 
       await controller.googleCallback(
-        mockExpressRequest(profile, { oauth_link: 'access-token' }),
+        mockExpressRequest(profile, linkCookie('access-token')),
         res
       );
 
@@ -465,7 +482,7 @@ describe('OAuthController', () => {
       };
 
       await controller.googleCallback(
-        mockExpressRequest(profile, { oauth_link: 'bad-token' }),
+        mockExpressRequest(profile, linkCookie('bad-token')),
         res
       );
 
@@ -500,6 +517,67 @@ describe('OAuthController', () => {
 
       expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(profile);
       expect(oauthServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
+    });
+
+    // The link cookie names a user, never a flow. Somebody who signs in at an
+    // abandoned browser starts their own flow, so their callback must stay a
+    // sign-in rather than hand their identity to the account that walked away.
+    it('should sign in, not link, when the intent belongs to another flow', async () => {
+      oauthServiceMock.loginWithOAuth.mockResolvedValue({
+        tokens: { access_token: 'token' },
+        user: { id: '2', email: 'stranger@example.com' }
+      });
+
+      const res = mockResponse();
+      const profile: OAuthUserProfile = {
+        provider: OAuthProvider.GOOGLE,
+        providerId: 'stranger-456',
+        email: 'stranger@example.com',
+        firstName: 'Stranger',
+        lastName: 'Person',
+        emailVerified: true
+      };
+
+      const abandonedState = 'b'.repeat(64);
+      await controller.googleCallback(
+        mockExpressRequest(
+          profile,
+          linkCookie('valid-link-token', abandonedState)
+        ),
+        res
+      );
+
+      expect(oauthServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
+      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(profile);
+      // The abandoned flow may still finish, so its intent is left in place.
+      expect(res.clearCookie).not.toHaveBeenCalled();
+    });
+
+    // An intent that reaches a callback without passing through the store
+    // belongs to no flow, so nothing may consume it.
+    it('should sign in, not link, when the intent is bound to no flow', async () => {
+      oauthServiceMock.loginWithOAuth.mockResolvedValue({
+        tokens: { access_token: 'token' },
+        user: { id: '2', email: 'stranger@example.com' }
+      });
+
+      const res = mockResponse();
+      const profile: OAuthUserProfile = {
+        provider: OAuthProvider.GOOGLE,
+        providerId: 'stranger-456',
+        email: 'stranger@example.com',
+        firstName: 'Stranger',
+        lastName: 'Person',
+        emailVerified: true
+      };
+
+      await controller.googleCallback(
+        mockExpressRequest(profile, { oauth_link: 'valid-link-token' }),
+        res
+      );
+
+      expect(oauthServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
+      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(profile);
     });
   });
 

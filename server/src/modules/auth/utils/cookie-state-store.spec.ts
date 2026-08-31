@@ -1,5 +1,6 @@
 import { CookieStateStore } from './cookie-state-store';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
+import { bindLinkIntent, readLinkIntentForFlow } from './oauth-link-intent';
 import type { Request, Response } from 'express';
 
 /**
@@ -137,6 +138,66 @@ describe('CookieStateStore', () => {
         done();
       });
     });
+  });
+
+  /**
+   * The link intent names a user and no flow, so any callback that finds it
+   * takes the link branch. Binding it to the state the flow mints here is what
+   * confines it to that one flow.
+   */
+  describe('link intent binding', () => {
+    const LINK_TOKEN = 'link-token';
+
+    it('should tie an unclaimed intent to the state it mints', (done) => {
+      const store = new CookieStateStore(OAuthProvider.GOOGLE, false);
+      const { req, cookies } = mockReqRes({ oauth_link: LINK_TOKEN });
+
+      store.store(req, (err, state) => {
+        expect(err).toBeNull();
+        expect(readLinkIntentForFlow(cookies['oauth_link'], state)).toBe(
+          LINK_TOKEN
+        );
+        done();
+      });
+    });
+
+    it('should leave an intent that an earlier flow already claimed', (done) => {
+      const store = new CookieStateStore(OAuthProvider.GOOGLE, false);
+      const abandonedState = 'a'.repeat(64);
+      const claimed = bindLinkIntent(LINK_TOKEN, abandonedState);
+      const { req, cookies } = mockReqRes({ oauth_link: claimed });
+
+      store.store(req, (err, state) => {
+        expect(err).toBeNull();
+        expect(cookies['oauth_link']).toBe(claimed);
+        // The second flow gets nothing, which is the takeover closing.
+        expect(readLinkIntentForFlow(cookies['oauth_link'], state)).toBeNull();
+        // The first flow still owns it.
+        expect(
+          readLinkIntentForFlow(cookies['oauth_link'], abandonedState)
+        ).toBe(LINK_TOKEN);
+        done();
+      });
+    });
+
+    it.each(Object.values(OAuthProvider))(
+      'should write no link cookie for %s when the request carries none',
+      (provider, done: jest.DoneCallback) => {
+        const store = new CookieStateStore(provider, false);
+        const { req, cookieFn } = mockReqRes();
+
+        store.store(req, (err) => {
+          expect(err).toBeNull();
+          expect(cookieFn).toHaveBeenCalledTimes(1);
+          expect(cookieFn).toHaveBeenCalledWith(
+            `oauth_state_${provider}`,
+            expect.any(String),
+            expect.any(Object)
+          );
+          done();
+        });
+      }
+    );
   });
 
   describe('verify', () => {

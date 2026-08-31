@@ -1212,14 +1212,30 @@ query `?error=access_denied`, which is how each provider reports a declined cons
 instead of `/login`. Thus a link attempt that started on the profile page ends there. The filter also
 clears that cookie, because the attempt is over.
 
-**The link intent ends with the session.** `POST /auth/logout` clears the `oauth_link` cookie, and so
-does a self-service password change, which revokes the sessions for the same reason. The
+**The link intent belongs to one authorization flow.** `CookieStateStore.store` ties an unclaimed
+intent to the one-time state it mints, and rewrites the cookie as `b:<state>:<token>`. The callback
+takes the link branch only when that bound state equals the state the callback presents, compared
+with the same timing-safe helper the store uses. An intent that a different flow claimed, and an
+intent that no flow claimed, are both a plain sign-in. An intent that an earlier flow already claimed
+is never rebound: handing it to the flow that runs now is the same defect in a new place. A
+mismatched intent is left in place rather than cleared, because its own flow may still finish.
+
+The marker and the separator are both `:`, which appears neither in a hex state nor in a JWT. The
+intent is not carried inside the `oauth_state_<provider>` cookie, whose separators are `.` and `-`,
+and a JWT holds both. The binding runs inside `store` and adds no parameter, because
+`passport-oauth2` dispatches on `store.length` and `verify.length`.
+
+**The link intent also ends with the session.** `POST /auth/logout` clears the `oauth_link` cookie,
+and so does a self-service password change, which revokes the sessions for the same reason. The
 refresh-token clear cannot do it, because a cookie has a path and the two cookies sit on different
 paths: `/api/v1/auth` and `/api/v1/auth/oauth`. `linkOAuthToUser` also refuses a link token whose
-`iat` is earlier than `User.tokenRevokedAt`, which is the comparison the JWT strategy makes. The
-second leg holds when the cookie reaches the callback from a different tab or a different device. A
-link token with no `iat` links nothing. Without both legs, an abandoned link attempt attaches the
-next provider identity in that browser to the account that started it.
+`iat` is earlier than `User.tokenRevokedAt`, which is the comparison the JWT strategy makes. That leg
+holds when the cookie reaches the callback from a different tab or a different device. A link token
+with no `iat` links nothing.
+
+The two session legs do not fire when the session does not end, which is why the flow binding above
+exists. Without all three, an abandoned link attempt attaches the next provider identity in that
+browser to the account that started it.
 
 A provider that nobody configured still returns 404. The validated `CLIENT_URL` value comes from one
 provider (`auth/providers/client-url.provider.ts`), which the controller and the filter share.
