@@ -129,6 +129,33 @@ test.describe('Email verification', () => {
     await expect(page.getByText(/invalid or expired/i)).toBeVisible();
   });
 
+  test('should show error for an expired verification token', async ({
+    _mockServer,
+    page
+  }) => {
+    await page.goto('/register');
+    const main = page.getByRole('main');
+    await page.getByLabel('Email').fill('expired-verify@example.com');
+    await page.getByLabel('First Name').fill('Expired');
+    await page.getByLabel('Last Name').fill('Verify');
+    await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await main.getByRole('button', { name: 'Register' }).click();
+
+    await expect(page).toHaveURL(/.*\/login\?registered=pending-verification$/);
+
+    const tokens = await _mockServer.getTokens();
+    const token = Object.keys(tokens.emailVerificationTokens)[0];
+    expect(token).toBeTruthy();
+
+    // The token lives 24 hours, so the test ages it instead of waiting.
+    await _mockServer.expireToken(token);
+
+    await page.goto(`/verify-email?token=${token}`);
+
+    await expect(page.getByText('Verification Failed')).toBeVisible();
+    await expect(page.getByText(/token has expired/i)).toBeVisible();
+  });
+
   test('should allow login after email verification', async ({
     _mockServer,
     page

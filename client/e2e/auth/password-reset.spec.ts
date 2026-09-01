@@ -114,6 +114,35 @@ test.describe('Password reset', () => {
     await expect(page.getByText(/invalid or expired/i)).toBeVisible();
   });
 
+  test('should show error for an expired reset token', async ({
+    _mockServer,
+    page
+  }) => {
+    await fetch(`${_mockServer.url}/api/v1/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'user@example.com' })
+    });
+
+    const tokens = await _mockServer.getTokens();
+    const tokenEntry = Object.entries(tokens.passwordResetTokens).find(
+      ([, userId]) => userId === mockId('user-2')
+    );
+    expect(tokenEntry).toBeTruthy();
+    const token = tokenEntry![0];
+
+    // The token lives 30 minutes, so the test ages it instead of waiting.
+    await _mockServer.expireToken(token);
+
+    await page.goto(`/reset-password?token=${token}`);
+    await page.getByLabel('New Password').fill('NewPassword123');
+    await page.getByLabel('Confirm Password').fill('NewPassword123');
+    await page.getByRole('button', { name: /reset password/i }).click();
+
+    await expect(page.getByText(/token has expired/i)).toBeVisible();
+    await expect(page).toHaveURL(/.*\/reset-password/);
+  });
+
   test('should validate minimum password length on reset form', async ({
     _mockServer,
     page

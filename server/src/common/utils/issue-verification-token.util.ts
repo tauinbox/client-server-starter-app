@@ -1,7 +1,6 @@
 import * as crypto from 'crypto';
+import { VERIFICATION_TOKEN_EXPIRY_MS } from '@app/shared/constants';
 import { hashToken } from './hash-token';
-
-export const VERIFICATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 export interface IssuedVerificationToken {
   rawToken: string;

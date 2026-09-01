@@ -30,6 +30,9 @@ export type TokensSnapshot = {
 export type ControlApi = {
   getState(): Promise<StateSnapshot>;
   getTokens(): Promise<TokensSnapshot>;
+  // Ages a verification or reset token past its deadline. Both families
+  // outlive any test run, so an E2E drives the expiry through the state.
+  expireToken(token: string): Promise<void>;
   seedUsers(users: MockUser[]): Promise<void>;
   seedOAuthAccounts(userId: string, accounts: OAuthAccount[]): Promise<void>;
   seedRoles(roles: MockRole[]): Promise<void>;

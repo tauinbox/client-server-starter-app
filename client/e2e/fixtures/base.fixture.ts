@@ -64,6 +64,13 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
         const res = await fetch(`${baseUrl}/__control/tokens`);
         return res.json();
       },
+      async expireToken(token) {
+        await fetch(`${baseUrl}/__control/expire-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+      },
       async seedUsers(users) {
         await fetch(`${baseUrl}/__control/users`, {
           method: 'POST',

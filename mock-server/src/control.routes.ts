@@ -15,6 +15,7 @@ import type {
   MockCustomer,
   MockCustomerGrant,
   MockInvoice,
+  MockIssuedToken,
   MockPaymentMethod,
   MockPermission,
   MockRole,
@@ -84,6 +85,14 @@ function buildStateSnapshot(state: State): StateSnapshot {
   };
 }
 
+function mapTokensToUserIds(
+  tokens: Map<string, MockIssuedToken>
+): Record<string, string> {
+  return Object.fromEntries(
+    [...tokens.entries()].map(([token, issued]) => [token, issued.userId])
+  );
+}
+
 // POST /__control/reset
 router.post('/reset', (_req, res) => {
   resetState();
@@ -115,10 +124,35 @@ router.post('/users', (req, res) => {
 router.get('/tokens', (_req, res) => {
   const state = getState();
   res.json({
-    emailVerificationTokens: Object.fromEntries(state.emailVerificationTokens),
-    passwordResetTokens: Object.fromEntries(state.passwordResetTokens),
+    emailVerificationTokens: mapTokensToUserIds(state.emailVerificationTokens),
+    passwordResetTokens: mapTokensToUserIds(state.passwordResetTokens),
     pendingEmailTokens: Object.fromEntries(state.pendingEmailTokens)
   });
+});
+
+// POST /__control/expire-token — move a mailed token past its deadline.
+// The verification and reset tokens live for 24 hours and 30 minutes, so an
+// E2E cannot wait one out. This ages the token instead of shifting the clock.
+router.post('/expire-token', (req, res) => {
+  const { token }: { token: string } = req.body;
+
+  if (!token) {
+    res.status(400).json({ message: 'Body must have token' });
+    return;
+  }
+
+  const state = getState();
+  const issued =
+    state.emailVerificationTokens.get(token) ??
+    state.passwordResetTokens.get(token);
+
+  if (!issued) {
+    res.status(404).json({ message: `Unknown token ${token}` });
+    return;
+  }
+
+  issued.expiresAt = new Date(Date.now() - 1000).toISOString();
+  res.json({ message: `Token ${token} has expired` });
 });
 
 // POST /__control/oauth-accounts — add OAuth accounts for a user

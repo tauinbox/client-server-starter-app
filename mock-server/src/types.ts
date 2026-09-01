@@ -302,6 +302,13 @@ export interface MockReauthProof {
   expiresAt: number;
 }
 
+// A single-use mailed token. The server bounds both families by a deadline it
+// stores on the user row; the mock keeps the deadline beside the token itself.
+export interface MockIssuedToken {
+  userId: string;
+  expiresAt: string;
+}
+
 export interface State {
   users: Map<string, MockUser>;
   oauthAccounts: Map<string, OAuthAccount[]>;
@@ -319,8 +326,8 @@ export interface State {
   // it would naturally expire, treat as a possible compromise: revoke all
   // sessions for the user.
   revokedRefreshTokens: Map<string, string>; // token -> userId
-  emailVerificationTokens: Map<string, string>; // token -> userId
-  passwordResetTokens: Map<string, string>; // token -> userId
+  emailVerificationTokens: Map<string, MockIssuedToken>;
+  passwordResetTokens: Map<string, MockIssuedToken>;
   pendingEmailTokens: Map<string, string>; // token -> userId
   resources: Map<string, MockResource>;
   actions: Map<string, MockAction>;
