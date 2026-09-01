@@ -601,6 +601,16 @@ The service translates the message with `TranslocoService`. It uses the translat
 action. It takes the duration and the position from `MAT_SNACK_BAR_DEFAULT_OPTIONS`. Thus a call site
 does not repeat the configuration.
 
+**A call site inside a feature must know that its scope is loaded.** The service translates at once,
+and a feature translation file is a lazily fetched scope. A call from `ngOnInit` therefore can run
+before the file lands, and `translate()` then answers with the key, which puts a raw dot-path on the
+screen. A template gets the scope through `*transloco="let t; scope: '<name>'"`, but that directive
+runs after `ngOnInit`. An init-time notification must wait for the scope first, as
+`ProfileComponent.ngOnInit` does with `TranslocoService.load('auth/<lang>')`. A scope that is already
+in the cache emits at once, so the wait costs nothing on the ordinary load.
+`e2e/auth/profile-init-toast-i18n.spec.ts` holds that behaviour: it delays the scope file and asserts
+that the key never reaches the screen.
+
 The `HttpErrorResponse` overload uses the same parse sequence as `errorInterceptor`. It uses the
 translated `errorKey` first. If no translation exists, it uses the server `message`. If that is
 absent, it uses the translated `fallbackKey`. If that is also absent, it shows the status code.
@@ -951,7 +961,7 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 228 Playwright tests. They cover auth, users, admin, billing, a11y,
+**Coverage.** The suite has 229 Playwright tests. They cover auth, users, admin, billing, a11y,
 keyboard and visual. There are also 1201 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
