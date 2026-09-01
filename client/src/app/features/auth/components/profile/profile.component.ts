@@ -37,7 +37,7 @@ import type { UpdateProfile } from '../../models/auth.types';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { Observable } from 'rxjs';
-import { concat, defer, tap } from 'rxjs';
+import { concat, defer, take, tap } from 'rxjs';
 import {
   isOAuthProvider,
   OAUTH_URLS,
@@ -299,8 +299,19 @@ export class ProfileComponent implements OnInit {
   ngOnInit() {
     this.loadProfile();
     this.loadOAuthAccounts();
-    this.#checkOAuthLinkedParam();
-    this.#resumeEmailChangeAfterReauth();
+
+    // Both of these report their outcome through a snackbar, and both run on
+    // the load that follows a provider round trip. The `auth` translations are
+    // a lazily fetched scope, so at this point `translate()` can still answer
+    // with the key itself and put a raw dot-path on screen. Wait for the scope
+    // first; an already-loaded one emits from the cache with no extra delay.
+    this.#transloco
+      .load(`auth/${this.#transloco.getActiveLang()}`)
+      .pipe(take(1), takeUntilDestroyed(this.#destroyRef))
+      .subscribe(() => {
+        this.#checkOAuthLinkedParam();
+        this.#resumeEmailChangeAfterReauth();
+      });
   }
 
   /**

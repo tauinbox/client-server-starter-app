@@ -100,11 +100,25 @@ test.describe('OAuth-only account changes its email', () => {
     await page.addInitScript(() =>
       sessionStorage.setItem('pending_email_change', 'new-address@example.com')
     );
+    // The outcome is a snackbar, and its 5000ms life is the same as the default
+    // expect timeout. It is raised only after the initiate round trip and the
+    // lazily fetched `auth` translation scope both land, so an assertion that
+    // starts when `goto` resolves races both. Anchor it to the response and
+    // leave the scope room to arrive.
+    const initiated = page.waitForResponse(
+      (res) =>
+        res.url().includes('/auth/profile/email/initiate') &&
+        res.status() === 200,
+      { timeout: 15_000 }
+    );
     await page.goto('/profile?reauth=ok');
+    await initiated;
 
-    await expect(
-      page.getByText(/confirmation link sent/i).first()
-    ).toBeVisible();
+    await expect(page.getByText(/confirmation link sent/i).first()).toBeVisible(
+      {
+        timeout: 10_000
+      }
+    );
 
     const state = (await _mockServer.getState()) as {
       users: { id: string; email: string }[];
