@@ -33,14 +33,20 @@ async function clearMailpit(): Promise<void> {
   await fetch(`${MAILPIT_URL}/api/v1/messages`, { method: 'DELETE' });
 }
 
-async function waitForEmailHtml(toAddress: string): Promise<string> {
+/** Waits for one message to an address, optionally for one subject only. */
+async function waitForEmailHtml(
+  toAddress: string,
+  subject?: string
+): Promise<string> {
   for (let attempt = 0; attempt < 40; attempt++) {
     try {
       const listRes = await fetch(`${MAILPIT_URL}/api/v1/messages`);
       if (listRes.ok) {
         const list = (await listRes.json()) as MailpitList;
-        const hit = list.messages?.find((m) =>
-          m.To?.some((t) => t.Address === toAddress)
+        const hit = list.messages?.find(
+          (m) =>
+            m.To?.some((t) => t.Address === toAddress) &&
+            (subject === undefined || m.Subject === subject)
         );
         if (hit) {
           const full = (await fetch(
@@ -54,7 +60,9 @@ async function waitForEmailHtml(toAddress: string): Promise<string> {
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  throw new Error(`No email delivered to ${toAddress} within the timeout`);
+  throw new Error(
+    `No email${subject ? ` "${subject}"` : ''} delivered to ${toAddress} within the timeout`
+  );
 }
 
 runWithInfra('Email delivery (e2e)', () => {
@@ -125,5 +133,51 @@ runWithInfra('Email delivery (e2e)', () => {
       tokens?: { access_token?: string };
     };
     expect(loginBody.tokens?.access_token).toBeTruthy();
+  }, 60000);
+
+  // The notice is the only signal the owner of the account gets, so it is
+  // proved against a real SMTP sink and not only against a mocked mailer.
+  it('delivers a password-changed notice after a self-service change', async () => {
+    await clearMailpit();
+    const email = `pwd-notice-${Date.now()}@example.com`;
+    const password = 'Password1';
+
+    await request(http())
+      .post('/api/v1/auth/register')
+      .send({ email, password, firstName: 'Del', lastName: 'Ivery' })
+      .expect(201);
+
+    const verificationHtml = await waitForEmailHtml(email);
+    const decoded = verificationHtml
+      .replace(/&#x3d;/gi, '=')
+      .replace(/&#61;/g, '=');
+    const match = decoded.match(/verify-email\?token=([A-Fa-f0-9]+)/);
+    if (!match) {
+      throw new Error('Verification email did not contain a token link');
+    }
+
+    await request(http())
+      .post('/api/v1/auth/verify-email')
+      .send({ token: match[1] })
+      .expect(200);
+
+    const login = await request(http())
+      .post('/api/v1/auth/login')
+      .send({ email, password })
+      .expect(200);
+    const accessToken = (login.body as { tokens: { access_token: string } })
+      .tokens.access_token;
+
+    await request(http())
+      .patch('/api/v1/auth/profile')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ password: 'Password2', currentPassword: password })
+      .expect(200);
+
+    const notice = await waitForEmailHtml(email, 'Your password was changed');
+    expect(notice).toContain('profile page');
+    expect(notice).toContain('UTC');
+    // A notice must carry no action link at all.
+    expect(notice).not.toContain('<a href');
   }, 60000);
 });

@@ -303,5 +303,16 @@ export class OAuthService {
       details: { provider },
       context: auditContext
     });
+
+    this.mailService
+      .sendOAuthLinkedNotification(
+        user.email,
+        provider,
+        user.locale,
+        auditContext?.ip
+      )
+      .catch((err) =>
+        this.logger.error('Failed to send provider-linked notification', err)
+      );
   }
 }

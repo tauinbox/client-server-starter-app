@@ -421,6 +421,10 @@ router.patch('/:id', adminGuard, requireUuid('id'), (req, res) => {
       details: { source: 'admin' },
       ip: req.ip
     });
+
+    console.log(
+      `[PASSWORD CHANGED] To: ${user.email}\n  Source: administrator | IP: ${req.ip}`
+    );
     pushToUser(id, { type: 'session_invalidated', userId: id });
   }
 

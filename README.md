@@ -65,6 +65,12 @@ management and theming.
   verified. The system mails the token only to that address, thus the redemption of the token proves
   control of the mailbox. Thus an account that OAuth created recovers in one step, and the server does
   not answer 403.
+- **Notification of a credential change.** The owner of the account gets a message after a
+  self-service password change, an administrator password change, a completed password reset, and a
+  link or an unlink of a sign-in provider. The message names what changed, the UTC time and the IP
+  address, and it tells the reader what to do if the change was not theirs. It has no action link,
+  because the mailbox can be under the control of the attacker. Delivery is best effort: a mail
+  failure is logged and the operation stays successful.
 - **A CAPTCHA soft trigger on register and forgot-password.** The server activates the Cloudflare
   Turnstile challenge only when `X-RateLimit-Remaining` is 1 or less for the IP of the caller. Thus a
   legitimate user usually does not see it.

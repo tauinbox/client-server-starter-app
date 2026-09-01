@@ -76,6 +76,10 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
     ip: req.ip
   });
 
+  console.log(
+    `[PROVIDER UNLINKED] To: ${user.email}\n  Provider: ${provider} | IP: ${req.ip}`
+  );
+
   res.json({ message: `${provider} account unlinked successfully` });
 });
 

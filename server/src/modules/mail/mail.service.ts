@@ -11,11 +11,23 @@ import type { SupportedLocale } from '@app/shared/constants';
 import { maskEmail } from '../../common/utils/escape-html';
 import { EMAIL_TEMPLATE_SOURCE } from './email.template';
 import {
+  CredentialChangeDetails,
   EmailMessage,
   MAIL_APP_NAME,
   MAIL_FOOTER,
-  mailMessages
+  mailMessages,
+  PasswordChangeSource
 } from './mail-content';
+
+/**
+ * UTC is used rather than a locale-formatted local time: the server does not
+ * know the time zone of the reader, and an unlabelled local stamp is worse than
+ * an explicit UTC one when the reader must judge whether the change was theirs.
+ */
+function credentialChangeDetails(ip?: string): CredentialChangeDetails {
+  const when = `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+  return ip ? { when, ip } : { when };
+}
 
 @Injectable()
 export class MailService {
@@ -136,6 +148,53 @@ export class MailService {
     const loc = normalizeLocale(locale);
     const message = mailMessages(loc).emailChangeCompleted(newEmail);
     await this.send(oldEmail, message, loc);
+  }
+
+  /**
+   * Notifications below tell the account owner that a credential changed. They
+   * are the only signal a victim of a takeover receives, so they always go to
+   * the account address and never to an address supplied by the request.
+   */
+  async sendPasswordChangedNotification(
+    email: string,
+    source: PasswordChangeSource,
+    locale: string = DEFAULT_LOCALE,
+    ip?: string
+  ): Promise<void> {
+    const loc = normalizeLocale(locale);
+    const message = mailMessages(loc).passwordChanged(
+      source,
+      credentialChangeDetails(ip)
+    );
+    await this.send(email, message, loc);
+  }
+
+  async sendOAuthLinkedNotification(
+    email: string,
+    provider: string,
+    locale: string = DEFAULT_LOCALE,
+    ip?: string
+  ): Promise<void> {
+    const loc = normalizeLocale(locale);
+    const message = mailMessages(loc).oauthLinked(
+      provider,
+      credentialChangeDetails(ip)
+    );
+    await this.send(email, message, loc);
+  }
+
+  async sendOAuthUnlinkedNotification(
+    email: string,
+    provider: string,
+    locale: string = DEFAULT_LOCALE,
+    ip?: string
+  ): Promise<void> {
+    const loc = normalizeLocale(locale);
+    const message = mailMessages(loc).oauthUnlinked(
+      provider,
+      credentialChangeDetails(ip)
+    );
+    await this.send(email, message, loc);
   }
 
   private renderHtml(message: EmailMessage, locale: SupportedLocale): string {

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { instanceToPlain } from 'class-transformer';
 import { OAuthService } from './oauth.service';
@@ -61,6 +61,7 @@ describe('OAuthService', () => {
   };
   let mockMailService: {
     sendEmailVerification: jest.Mock;
+    sendOAuthLinkedNotification: jest.Mock;
   };
   let mockEntitlementService: {
     limitFor: jest.Mock;
@@ -86,6 +87,7 @@ describe('OAuthService', () => {
     password: '$2b$10$hashedpassword',
     isActive: true,
     isEmailVerified: true,
+    locale: 'en',
     failedLoginAttempts: 0,
     lockedUntil: null,
     roles: [mockUserRole]
@@ -162,7 +164,8 @@ describe('OAuthService', () => {
     };
 
     mockMailService = {
-      sendEmailVerification: jest.fn().mockResolvedValue(undefined)
+      sendEmailVerification: jest.fn().mockResolvedValue(undefined),
+      sendOAuthLinkedNotification: jest.fn().mockResolvedValue(undefined)
     };
 
     // Free tier by default: no plan-specific allowance, so pruning must fall
@@ -638,6 +641,48 @@ describe('OAuthService', () => {
         'google',
         'google-123'
       );
+    });
+
+    // A linked provider is a permanent extra credential on the account, so
+    // the owner is told which provider was added and when.
+    it('should notify the account owner that a provider was linked', async () => {
+      mockUsersService.findOne.mockResolvedValue(mockUser);
+
+      await service.linkOAuthToUser(
+        'user-1',
+        'google',
+        'google-123',
+        LINK_TOKEN_IAT,
+        { ip: '198.51.100.7' }
+      );
+
+      expect(mockMailService.sendOAuthLinkedNotification).toHaveBeenCalledWith(
+        mockUser.email,
+        'google',
+        mockUser.locale,
+        '198.51.100.7'
+      );
+    });
+
+    it('should complete the link when the notification fails', async () => {
+      const loggerError = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+      mockMailService.sendOAuthLinkedNotification.mockRejectedValueOnce(
+        new Error('smtp down')
+      );
+      mockUsersService.findOne.mockResolvedValue(mockUser);
+
+      await service.linkOAuthToUser(
+        'user-1',
+        'google',
+        'google-123',
+        LINK_TOKEN_IAT
+      );
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(mockOAuthAccountService.createOAuthAccount).toHaveBeenCalled();
+      expect(loggerError).toHaveBeenCalled();
     });
 
     it('should throw when user is deactivated', async () => {

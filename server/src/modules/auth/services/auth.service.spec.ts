@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { instanceToPlain } from 'class-transformer';
 import * as bcrypt from 'bcrypt';
@@ -76,6 +76,7 @@ describe('AuthService', () => {
     pruneOldestTokens: jest.Mock;
   };
   let mockMailService: {
+    sendPasswordChangedNotification: jest.Mock;
     sendEmailVerification: jest.Mock;
     sendPasswordReset: jest.Mock;
     sendEmailChangeConfirmation: jest.Mock;
@@ -224,6 +225,7 @@ describe('AuthService', () => {
     };
 
     mockMailService = {
+      sendPasswordChangedNotification: jest.fn().mockResolvedValue(undefined),
       sendEmailVerification: jest.fn().mockResolvedValue(undefined),
       sendPasswordReset: jest.fn().mockResolvedValue(undefined),
       sendEmailChangeConfirmation: jest.fn().mockResolvedValue(undefined),
@@ -887,6 +889,42 @@ describe('AuthService', () => {
   });
 
   describe('resetPassword', () => {
+    // A stolen reset link produces a completed takeover that the audit trail
+    // alone never shows the owner, so the completion has to notify.
+    it('should notify the account owner that the password was reset', async () => {
+      mockUsersService.findByPasswordResetToken.mockResolvedValue({
+        ...mockUser,
+        passwordResetExpiresAt: new Date(Date.now() + 3600000)
+      });
+
+      await service.resetPassword('valid-token', 'NewPassword1', {
+        ip: '198.51.100.7'
+      });
+
+      expect(
+        mockMailService.sendPasswordChangedNotification
+      ).toHaveBeenCalledWith('test@example.com', 'reset', 'en', '198.51.100.7');
+    });
+
+    it('should complete the reset when the notification fails', async () => {
+      const loggerError = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+      mockMailService.sendPasswordChangedNotification.mockRejectedValueOnce(
+        new Error('smtp down')
+      );
+      mockUsersService.findByPasswordResetToken.mockResolvedValue({
+        ...mockUser,
+        passwordResetExpiresAt: new Date(Date.now() + 3600000)
+      });
+
+      const result = await service.resetPassword('valid-token', 'NewPassword1');
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(result.message).toContain('reset successfully');
+      expect(loggerError).toHaveBeenCalled();
+    });
+
     it('should reset password, clear token, and invalidate sessions atomically', async () => {
       const user = {
         ...mockUser,

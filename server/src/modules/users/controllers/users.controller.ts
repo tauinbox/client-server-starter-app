@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   HttpStatus,
+  Logger,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -17,6 +18,7 @@ import {
 import { packRules } from '@casl/ability/extra';
 import { subject } from '@casl/ability';
 import { UsersService } from '../services/users.service';
+import { MailService } from '../../mail/mail.service';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto';
@@ -63,8 +65,11 @@ import { UserRestoredEvent } from '../events/user-restored.event';
 @UseInterceptors(ClassSerializerInterceptor)
 @SerializeOptions({ groups: ['privileged'] })
 export class UsersController {
+  private readonly logger = new Logger(UsersController.name);
+
   constructor(
     private readonly usersService: UsersService,
+    private readonly mailService: MailService,
     private readonly eventEmitter: EventEmitter2,
     private readonly auditService: AuditService,
     private readonly metricsService: MetricsService,
@@ -290,6 +295,17 @@ export class UsersController {
         details: { source: 'admin' },
         context: extractAuditContext(req)
       });
+
+      this.mailService
+        .sendPasswordChangedNotification(
+          updatedUser.email,
+          'admin',
+          updatedUser.locale,
+          req.ip
+        )
+        .catch((err) =>
+          this.logger.error('Failed to send password-changed notification', err)
+        );
     }
 
     // An admin email change exists to recover an account whose address is
