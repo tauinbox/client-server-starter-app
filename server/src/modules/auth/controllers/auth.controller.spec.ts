@@ -5,6 +5,7 @@ import { Request as ExpressRequest, Response } from 'express';
 import { AuthController } from './auth.controller';
 import { AuthService } from '../services/auth.service';
 import { UsersService } from '../../users/services/users.service';
+import { MailService } from '../../mail/mail.service';
 import { PermissionService } from '../services/permission.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { AuditService } from '../../audit/audit.service';
@@ -112,6 +113,7 @@ describe('AuthController', () => {
   let auditServiceMock: {
     log: jest.Mock;
   };
+  let mailServiceMock: { sendPasswordChangedNotification: jest.Mock };
   let configValues: Record<string, string | undefined>;
 
   const mockAuthResult = {
@@ -174,6 +176,10 @@ describe('AuthController', () => {
       log: jest.fn().mockResolvedValue(undefined)
     };
 
+    mailServiceMock = {
+      sendPasswordChangedNotification: jest.fn().mockResolvedValue(undefined)
+    };
+
     configValues = {
       JWT_REFRESH_EXPIRATION: '604800',
       ENVIRONMENT: 'development'
@@ -187,6 +193,7 @@ describe('AuthController', () => {
         { provide: PermissionService, useValue: permissionServiceMock },
         { provide: CaslAbilityFactory, useValue: caslAbilityFactoryMock },
         { provide: AuditService, useValue: auditServiceMock },
+        { provide: MailService, useValue: mailServiceMock },
         {
           provide: MetricsService,
           useValue: { recordAuthEvent: jest.fn() }
@@ -513,6 +520,58 @@ describe('AuthController', () => {
           details: { source: 'self' }
         })
       );
+    });
+
+    it('should notify the account owner about a self-service password change', async () => {
+      const req = mockJwtRequest('user-1') as JwtAuthRequest;
+      const res = mockResponse();
+      userServiceMock.update.mockResolvedValueOnce({
+        id: 'user-1',
+        email: 'owner@example.com',
+        locale: 'ru'
+      });
+
+      await controller.updateProfile(
+        req,
+        { password: 'NewPassword1', currentPassword: 'CurrentPass1' },
+        res
+      );
+
+      expect(
+        mailServiceMock.sendPasswordChangedNotification
+      ).toHaveBeenCalledWith('owner@example.com', 'self', 'ru', '127.0.0.1');
+    });
+
+    it('should not notify when the profile update carries no password', async () => {
+      const req = mockJwtRequest('user-1') as JwtAuthRequest;
+      const res = mockResponse();
+
+      await controller.updateProfile(req, { firstName: 'Updated' }, res);
+
+      expect(
+        mailServiceMock.sendPasswordChangedNotification
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should update the profile when the notification fails', async () => {
+      const loggerError = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+      mailServiceMock.sendPasswordChangedNotification.mockRejectedValueOnce(
+        new Error('smtp down')
+      );
+      const req = mockJwtRequest('user-1') as JwtAuthRequest;
+      const res = mockResponse();
+
+      const result = await controller.updateProfile(
+        req,
+        { password: 'NewPassword1', currentPassword: 'CurrentPass1' },
+        res
+      );
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(result).toBeDefined();
+      expect(loggerError).toHaveBeenCalled();
     });
 
     it('should strip currentPassword before delegating to userService.update', async () => {

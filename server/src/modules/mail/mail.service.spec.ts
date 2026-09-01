@@ -182,6 +182,31 @@ describe('MailService', () => {
     });
   });
 
+  describe('credential-change notifications', () => {
+    it('should not throw when sending a password-changed notice', async () => {
+      await expect(
+        service.sendPasswordChangedNotification(
+          'user@example.com',
+          'self',
+          'en',
+          '198.51.100.7'
+        )
+      ).resolves.not.toThrow();
+    });
+
+    it('should not throw when sending a provider-linked notice', async () => {
+      await expect(
+        service.sendOAuthLinkedNotification('user@example.com', 'google', 'ru')
+      ).resolves.not.toThrow();
+    });
+
+    it('should not throw when sending a provider-unlinked notice', async () => {
+      await expect(
+        service.sendOAuthUnlinkedNotification('user@example.com', 'vk', 'en')
+      ).resolves.not.toThrow();
+    });
+  });
+
   describe('with a queue (Redis configured)', () => {
     let queuedService: MailService;
     const add = jest.fn().mockResolvedValue(undefined);
@@ -205,6 +230,26 @@ describe('MailService', () => {
         queuedService.sendPasswordReset('user@example.com', 'tok-123', 'en')
       ).resolves.toBeUndefined();
       expect(add).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders a credential-change notice with the UTC stamp and the IP', async () => {
+      await queuedService.sendOAuthLinkedNotification(
+        'user@example.com',
+        'google',
+        'en',
+        '198.51.100.7'
+      );
+
+      const [, data] = add.mock.calls[0] as [string, MailJobData];
+      expect(data.to).toBe('user@example.com');
+      expect(data.subject).toBe(
+        'A sign-in provider was linked to your account'
+      );
+      expect(data.html).toContain('Google');
+      expect(data.html).toContain('198.51.100.7');
+      expect(data.html).toContain(' UTC');
+      // No action link: the notice must not carry a clickable control.
+      expect(data.html).not.toContain('<a href');
     });
 
     it('enqueues a rendered send job instead of delivering inline', async () => {

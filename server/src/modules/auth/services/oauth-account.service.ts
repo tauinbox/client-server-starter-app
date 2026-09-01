@@ -40,9 +40,16 @@ export class OAuthAccountService {
    * account serialize: the second waits, then counts the row the first already
    * deleted and is rejected, instead of both reading the same pre-delete state
    * and leaving an account nobody can log into.
+   *
+   * Returns the address and locale of the account, so the caller can notify the
+   * owner after the transaction commits. A rolled-back unlink therefore cannot
+   * produce a message about a change that did not happen.
    */
-  async unlinkProvider(userId: string, provider: string): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
+  async unlinkProvider(
+    userId: string,
+    provider: string
+  ): Promise<{ email: string; locale: string }> {
+    return this.dataSource.transaction(async (manager) => {
       const user = await manager.findOne(User, {
         where: { id: userId },
         lock: { mode: 'pessimistic_write' }
@@ -87,6 +94,8 @@ export class OAuthAccountService {
       }
 
       await manager.delete(OAuthAccount, { userId, provider });
+
+      return { email: user.email, locale: user.locale };
     });
   }
 }

@@ -8,6 +8,7 @@ import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
 import { AuditService } from '../../audit/audit.service';
+import { MailService } from '../../mail/mail.service';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthUserProfile } from '../types/oauth-profile';
@@ -89,6 +90,7 @@ describe('OAuthController', () => {
     log: jest.Mock;
     logFireAndForget: jest.Mock;
   };
+  let mailServiceMock: { sendOAuthUnlinkedNotification: jest.Mock };
   let configValues: Record<string, string | undefined>;
 
   beforeEach(async () => {
@@ -111,7 +113,13 @@ describe('OAuthController', () => {
 
     oauthAccountServiceMock = {
       findByUserId: jest.fn(),
-      unlinkProvider: jest.fn().mockResolvedValue(undefined)
+      unlinkProvider: jest
+        .fn()
+        .mockResolvedValue({ email: 'owner@example.com', locale: 'ru' })
+    };
+
+    mailServiceMock = {
+      sendOAuthUnlinkedNotification: jest.fn().mockResolvedValue(undefined)
     };
 
     auditServiceMock = {
@@ -132,6 +140,7 @@ describe('OAuthController', () => {
         { provide: OAuthService, useValue: oauthServiceMock },
         { provide: OAuthAccountService, useValue: oauthAccountServiceMock },
         { provide: AuditService, useValue: auditServiceMock },
+        { provide: MailService, useValue: mailServiceMock },
         {
           provide: ConfigService,
           useValue: {
@@ -187,6 +196,54 @@ describe('OAuthController', () => {
   });
 
   describe('unlinkOAuth', () => {
+    // The address comes from the row the service read under the row lock, not
+    // from the request, and the send runs after that transaction commits.
+    it('should notify the account owner that a provider was unlinked', async () => {
+      await controller.unlinkOAuth(
+        'google',
+        mockJwtRequest('user-1') as JwtAuthRequest
+      );
+
+      expect(
+        mailServiceMock.sendOAuthUnlinkedNotification
+      ).toHaveBeenCalledWith('owner@example.com', 'google', 'ru', '127.0.0.1');
+    });
+
+    it('should not notify when the unlink is rejected', async () => {
+      oauthAccountServiceMock.unlinkProvider.mockRejectedValueOnce(
+        new Error('last provider')
+      );
+
+      await expect(
+        controller.unlinkOAuth(
+          'google',
+          mockJwtRequest('user-1') as JwtAuthRequest
+        )
+      ).rejects.toThrow('last provider');
+
+      expect(
+        mailServiceMock.sendOAuthUnlinkedNotification
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should unlink successfully when the notification fails', async () => {
+      const loggerError = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+      mailServiceMock.sendOAuthUnlinkedNotification.mockRejectedValueOnce(
+        new Error('smtp down')
+      );
+
+      const result = await controller.unlinkOAuth(
+        'google',
+        mockJwtRequest('user-1') as JwtAuthRequest
+      );
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(result.message).toContain('unlinked');
+      expect(loggerError).toHaveBeenCalled();
+    });
+
     it('should delegate to the service and audit the unlink', async () => {
       const result = await controller.unlinkOAuth(
         'google',

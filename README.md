@@ -65,6 +65,12 @@ management and theming.
   verified. The system mails the token only to that address, thus the redemption of the token proves
   control of the mailbox. Thus an account that OAuth created recovers in one step, and the server does
   not answer 403.
+- **Notification of a credential change.** The owner of the account gets a message after a
+  self-service password change, an administrator password change, a completed password reset, and a
+  link or an unlink of a sign-in provider. The message names what changed, the UTC time and the IP
+  address, and it tells the reader what to do if the change was not theirs. It has no action link,
+  because the mailbox can be under the control of the attacker. Delivery is best effort: a mail
+  failure is logged and the operation stays successful.
 - **A CAPTCHA soft trigger on register and forgot-password.** The server activates the Cloudflare
   Turnstile challenge only when `X-RateLimit-Remaining` is 1 or less for the IP of the caller. Thus a
   legitimate user usually does not see it.
@@ -1694,8 +1700,8 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2050 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 350 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 349 passed and 1 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2072 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 352 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 350 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1186 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 226 tests pass |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 490 tests pass |

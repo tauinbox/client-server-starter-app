@@ -37,6 +37,7 @@ import { OAuthUserProfile } from '../types/oauth-profile';
 import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { AuditService } from '../../audit/audit.service';
+import { MailService } from '../../mail/mail.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import {
@@ -75,6 +76,7 @@ export class OAuthController {
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
     private readonly auditService: AuditService,
+    private readonly mailService: MailService,
     @Inject(CLIENT_URL) private readonly clientUrl: string
   ) {}
 
@@ -237,7 +239,10 @@ export class OAuthController {
     }
 
     const userId = req.user.userId;
-    await this.oauthAccountService.unlinkProvider(userId, provider);
+    const { email, locale } = await this.oauthAccountService.unlinkProvider(
+      userId,
+      provider
+    );
 
     await this.auditService.log({
       action: AuditAction.OAUTH_UNLINK,
@@ -248,6 +253,12 @@ export class OAuthController {
       details: { provider },
       context: extractAuditContext(req)
     });
+
+    this.mailService
+      .sendOAuthUnlinkedNotification(email, provider, locale, req.ip)
+      .catch((err) =>
+        this.logger.error('Failed to send provider-unlinked notification', err)
+      );
 
     return { message: `${provider} account unlinked successfully` };
   }

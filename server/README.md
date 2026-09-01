@@ -1189,6 +1189,26 @@ authenticate. The loser gets a 400.
 An unlink of a provider that is not linked returns 404 (`errors.auth.oauthProviderNotLinked`) and
 writes no audit row.
 
+**A credential change tells the owner.** An audit row is read by an operator during an investigation.
+A message is read by the owner in minutes, and that is what turns a silent takeover into a reported
+one. Five sites mail the account address: `AuthController.updateProfile` (self-service password
+change), `UsersController.update` (administrator password change), `AuthService.resetPassword` (a
+completed reset), `OAuthService.linkOAuthToUser` (a linked provider) and `OAuthController.unlinkOAuth`
+(an unlinked provider). Each send is fire-and-forget with a logged `.catch`, thus a mail outage never
+turns a password change into a 500.
+
+The address always comes from the account row, never from the request. `unlinkProvider` returns the
+address and the locale that it read under the row lock, and the controller sends after that
+transaction commits. Thus a rejected unlink sends no message.
+
+The notices carry no action link. The recipient can be the victim of the change, and a clickable
+control in a message that reaches a mailbox of the attacker is a new credential-bearing surface. The
+body names the change, the UTC time and the IP address, and it says to reset the password and to
+review the connected accounts. OWASP ASVS 5.0 requirement 6.3.7 asks for this notification.
+
+`mock-server/` prints the same three notices to stdout beside the audit calls that it already makes.
+The mock has no link path to mirror, because both provider halves answer 501.
+
 **Automatic linking is disabled.** When a local account already exists for the email address that
 OAuth asserts, the callback throws `OAUTH_EMAIL_ALREADY_REGISTERED` (409). It redirects to
 `/login?oauth_error=email_already_registered`. The user must log in with their password and then link

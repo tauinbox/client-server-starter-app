@@ -153,6 +153,24 @@ describe('OAuthAccountService', () => {
       mockManager.findOne.mockResolvedValue({ id: 'user-1', password });
     }
 
+    // The caller notifies the owner after the commit, so the address has to
+    // come from the row this transaction read, not from the request.
+    it('returns the address and locale of the account it unlinked', async () => {
+      mockManager.findOne.mockResolvedValue({
+        id: 'user-1',
+        password: 'hashed-password',
+        email: 'owner@example.com',
+        locale: 'ru'
+      });
+      mockManager.find.mockResolvedValue([
+        { provider: 'google', userId: 'user-1' }
+      ]);
+
+      await expect(service.unlinkProvider('user-1', 'google')).resolves.toEqual(
+        { email: 'owner@example.com', locale: 'ru' }
+      );
+    });
+
     it('should delete the account while holding a write lock on the user row', async () => {
       stubUser(null);
       mockManager.find.mockResolvedValue([

@@ -17,6 +17,7 @@ import { UsersService } from '../src/modules/users/services/users.service';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
 import { AuditService } from '../src/modules/audit/audit.service';
+import { MailService } from '../src/modules/mail/mail.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
 
@@ -39,6 +40,10 @@ describe('Admin user update DTO validation (e2e)', () => {
         { provide: PermissionService, useValue: {} },
         { provide: CaslAbilityFactory, useValue: {} },
         { provide: AuditService, useValue: { log: jest.fn() } },
+        {
+          provide: MailService,
+          useValue: { sendPasswordChangedNotification: jest.fn() }
+        },
         { provide: MetricsService, useValue: {} },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } }
       ]

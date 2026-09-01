@@ -494,6 +494,10 @@ router.post('/reset-password', (req, res) => {
     ip: req.ip
   });
 
+  console.log(
+    `[PASSWORD CHANGED] To: ${user.email}\n  Source: reset link | IP: ${req.ip}`
+  );
+
   res.json({ message: 'Password has been reset successfully' });
 });
 
@@ -706,6 +710,10 @@ router.patch('/profile', authGuard, (req, res) => {
       details: { source: 'self' },
       ip: req.ip
     });
+
+    console.log(
+      `[PASSWORD CHANGED] To: ${user.email}\n  Source: profile page | IP: ${req.ip}`
+    );
 
     // Invalidate all refresh tokens on password change (matches real server)
     const state = getState();

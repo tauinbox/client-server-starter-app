@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, Logger } from '@nestjs/common';
 import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { UsersController } from './users.controller';
 import { UsersService } from '../services/users.service';
+import { MailService } from '../../mail/mail.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -61,6 +62,7 @@ describe('UsersController', () => {
     getPermissionsForUser: jest.Mock;
   };
   let caslAbilityFactoryMock: { createForUser: jest.Mock };
+  let mailServiceMock: { sendPasswordChangedNotification: jest.Mock };
 
   beforeEach(async () => {
     usersServiceMock = {
@@ -91,6 +93,10 @@ describe('UsersController', () => {
 
     caslAbilityFactoryMock = { createForUser: jest.fn() };
 
+    mailServiceMock = {
+      sendPasswordChangedNotification: jest.fn().mockResolvedValue(undefined)
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
       providers: [
@@ -99,7 +105,8 @@ describe('UsersController', () => {
         { provide: AuditService, useValue: auditServiceMock },
         { provide: MetricsService, useValue: metricsServiceMock },
         { provide: PermissionService, useValue: permissionServiceMock },
-        { provide: CaslAbilityFactory, useValue: caslAbilityFactoryMock }
+        { provide: CaslAbilityFactory, useValue: caslAbilityFactoryMock },
+        { provide: MailService, useValue: mailServiceMock }
       ]
     })
       .overrideGuard(JwtAuthGuard)
@@ -379,6 +386,56 @@ describe('UsersController', () => {
           })
         })
       );
+    });
+
+    it('should notify the target account when an administrator sets a password', async () => {
+      const dto: UpdateUserDto = { password: 'NewPassword1' };
+      usersServiceMock.update.mockResolvedValue({
+        id: 'user-5',
+        email: 'target@example.com',
+        locale: 'ru'
+      });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req, mockAbility);
+
+      expect(
+        mailServiceMock.sendPasswordChangedNotification
+      ).toHaveBeenCalledWith('target@example.com', 'admin', 'ru', '127.0.0.1');
+    });
+
+    it('should NOT notify the target account when dto does not contain password', async () => {
+      const dto: UpdateUserDto = { firstName: 'Updated' };
+      usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req, mockAbility);
+
+      expect(
+        mailServiceMock.sendPasswordChangedNotification
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should complete the admin password change when the notification fails', async () => {
+      const loggerError = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+      mailServiceMock.sendPasswordChangedNotification.mockRejectedValueOnce(
+        new Error('smtp down')
+      );
+      const dto: UpdateUserDto = { password: 'NewPassword1' };
+      usersServiceMock.update.mockResolvedValue({
+        id: 'user-5',
+        email: 'target@example.com',
+        locale: 'en'
+      });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      const result = await controller.update('user-5', dto, req, mockAbility);
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(result).toBeDefined();
+      expect(loggerError).toHaveBeenCalled();
     });
 
     it('should NOT log PASSWORD_CHANGE when dto does not contain password', async () => {

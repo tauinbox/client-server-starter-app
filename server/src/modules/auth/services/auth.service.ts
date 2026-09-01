@@ -476,6 +476,17 @@ export class AuthService {
       context: auditContext
     });
 
+    this.mailService
+      .sendPasswordChangedNotification(
+        user.email,
+        'reset',
+        user.locale,
+        auditContext?.ip
+      )
+      .catch((err) =>
+        this.logger.error('Failed to send password-changed notification', err)
+      );
+
     return { message: 'Password has been reset successfully' };
   }
 

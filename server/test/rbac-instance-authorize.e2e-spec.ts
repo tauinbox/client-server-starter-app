@@ -33,6 +33,7 @@ import { ActionService } from '../src/modules/auth/services/action.service';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
 import { AuditService } from '../src/modules/audit/audit.service';
+import { MailService } from '../src/modules/mail/mail.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -154,6 +155,10 @@ describe('Instance-level @Authorize re-check', () => {
             log: jest.fn().mockResolvedValue(undefined),
             logFireAndForget: jest.fn()
           }
+        },
+        {
+          provide: MailService,
+          useValue: { sendPasswordChangedNotification: jest.fn() }
         },
         {
           provide: MetricsService,

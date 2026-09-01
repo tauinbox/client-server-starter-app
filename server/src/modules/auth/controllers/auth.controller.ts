@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Logger,
   Patch,
   Post,
   Request,
@@ -43,6 +44,7 @@ import { LoginDto } from '../dtos/login.dto';
 import { Authorize } from '../decorators/authorize.decorator';
 import { Public } from '../decorators/public.decorator';
 import { UsersService } from '../../users/services/users.service';
+import { MailService } from '../../mail/mail.service';
 import { AuthResponseDto } from '../dtos/auth-response.dto';
 import { JwtAuthRequest, LocalAuthRequest } from '../types/auth.request';
 import { VerifyEmailDto } from '../dtos/verify-email.dto';
@@ -80,12 +82,15 @@ const REFRESH_TOKEN_COOKIE = 'refresh_token';
 })
 @UseInterceptors(ClassSerializerInterceptor)
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly authService: AuthService,
     private readonly userService: UsersService,
     private readonly permissionService: PermissionService,
     private readonly caslAbilityFactory: CaslAbilityFactory,
     private readonly auditService: AuditService,
+    private readonly mailService: MailService,
     private readonly configService: ConfigService,
     private readonly metricsService: MetricsService
   ) {}
@@ -276,6 +281,17 @@ export class AuthController {
         details: { source: 'self' },
         context: extractAuditContext(req)
       });
+
+      this.mailService
+        .sendPasswordChangedNotification(
+          updatedUser.email,
+          'self',
+          updatedUser.locale,
+          req.ip
+        )
+        .catch((err) =>
+          this.logger.error('Failed to send password-changed notification', err)
+        );
     }
 
     return updatedUser;

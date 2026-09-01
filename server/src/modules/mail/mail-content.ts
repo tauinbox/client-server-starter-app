@@ -27,12 +27,75 @@ export const MAIL_FOOTER: Record<SupportedLocale, string> = {
 //   password reset — RESET_TOKEN_EXPIRY_MS (30 min)
 //   email change — EMAIL_CHANGE_TOKEN_EXPIRY_MS (1h)
 
+export type PasswordChangeSource = 'self' | 'admin' | 'reset';
+
+/** Context carried by a credential-change notice. */
+export interface CredentialChangeDetails {
+  /** Preformatted UTC stamp, for example "2026-09-01 12:34 UTC". */
+  when: string;
+  ip?: string;
+}
+
+const PROVIDER_LABELS: Record<string, string> = {
+  google: 'Google',
+  facebook: 'Facebook',
+  vk: 'VK'
+};
+
+function providerLabel(provider: string): string {
+  return PROVIDER_LABELS[provider] ?? provider;
+}
+
 interface MessageBuilders {
   verification: (url: string) => EmailMessage;
   passwordReset: (url: string) => EmailMessage;
   emailChangeConfirm: (url: string) => EmailMessage;
   emailChangeNotifyOld: (maskedEmail: string) => EmailMessage;
   emailChangeCompleted: (newEmail: string) => EmailMessage;
+  passwordChanged: (
+    source: PasswordChangeSource,
+    details: CredentialChangeDetails
+  ) => EmailMessage;
+  oauthLinked: (
+    provider: string,
+    details: CredentialChangeDetails
+  ) => EmailMessage;
+  oauthUnlinked: (
+    provider: string,
+    details: CredentialChangeDetails
+  ) => EmailMessage;
+}
+
+/**
+ * Notices below report a credential change that already happened. They carry no
+ * action link on purpose: the recipient may be the victim of the change, and a
+ * clickable control in a message that reaches an attacker-held mailbox is a new
+ * credential-bearing surface. Recovery goes through the password reset flow.
+ */
+const EN_PASSWORD_SOURCE: Record<PasswordChangeSource, string> = {
+  self: 'The password of your account was changed from the profile page.',
+  admin: 'An administrator changed the password of your account.',
+  reset: 'The password of your account was reset with a password-reset link.'
+};
+
+const RU_PASSWORD_SOURCE: Record<PasswordChangeSource, string> = {
+  self: 'Пароль вашего аккаунта изменён на странице профиля.',
+  admin: 'Администратор изменил пароль вашего аккаунта.',
+  reset: 'Пароль вашего аккаунта сброшен по ссылке восстановления.'
+};
+
+const EN_RECOVERY =
+  'If you did not make this change, reset your password immediately and review the connected accounts on your profile page.';
+
+const RU_RECOVERY =
+  'Если вы не выполняли это действие, немедленно сбросьте пароль и проверьте подключённые аккаунты на странице профиля.';
+
+function enDetails({ when, ip }: CredentialChangeDetails): string {
+  return ip ? `Time: ${when}. IP address: ${ip}.` : `Time: ${when}.`;
+}
+
+function ruDetails({ when, ip }: CredentialChangeDetails): string {
+  return ip ? `Время: ${when}. IP-адрес: ${ip}.` : `Время: ${when}.`;
 }
 
 const en: MessageBuilders = {
@@ -78,6 +141,34 @@ const en: MessageBuilders = {
     paragraphs: [
       `Your account email has been changed to ${newEmail}.`,
       "If this wasn't you, contact support immediately."
+    ]
+  }),
+  passwordChanged: (source, details) => ({
+    subject: 'Your password was changed',
+    heading: 'Password changed',
+    paragraphs: [
+      EN_PASSWORD_SOURCE[source],
+      enDetails(details),
+      'All active sessions were signed out.',
+      EN_RECOVERY
+    ]
+  }),
+  oauthLinked: (provider, details) => ({
+    subject: 'A sign-in provider was linked to your account',
+    heading: 'Sign-in provider linked',
+    paragraphs: [
+      `${providerLabel(provider)} can now be used to sign in to your account.`,
+      enDetails(details),
+      EN_RECOVERY
+    ]
+  }),
+  oauthUnlinked: (provider, details) => ({
+    subject: 'A sign-in provider was removed from your account',
+    heading: 'Sign-in provider removed',
+    paragraphs: [
+      `${providerLabel(provider)} can no longer be used to sign in to your account.`,
+      enDetails(details),
+      EN_RECOVERY
     ]
   })
 };
@@ -125,6 +216,34 @@ const ru: MessageBuilders = {
     paragraphs: [
       `Адрес электронной почты вашего аккаунта изменён на ${newEmail}.`,
       'Если это были не вы — немедленно свяжитесь с поддержкой.'
+    ]
+  }),
+  passwordChanged: (source, details) => ({
+    subject: 'Пароль вашего аккаунта изменён',
+    heading: 'Пароль изменён',
+    paragraphs: [
+      RU_PASSWORD_SOURCE[source],
+      ruDetails(details),
+      'Все активные сеансы завершены.',
+      RU_RECOVERY
+    ]
+  }),
+  oauthLinked: (provider, details) => ({
+    subject: 'К вашему аккаунту подключён способ входа',
+    heading: 'Способ входа подключён',
+    paragraphs: [
+      `Теперь для входа в аккаунт можно использовать ${providerLabel(provider)}.`,
+      ruDetails(details),
+      RU_RECOVERY
+    ]
+  }),
+  oauthUnlinked: (provider, details) => ({
+    subject: 'От вашего аккаунта отключён способ входа',
+    heading: 'Способ входа отключён',
+    paragraphs: [
+      `Использовать ${providerLabel(provider)} для входа в аккаунт больше нельзя.`,
+      ruDetails(details),
+      RU_RECOVERY
     ]
   })
 };
