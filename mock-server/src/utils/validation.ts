@@ -1,4 +1,8 @@
-import { SUPPORTED_LOCALES } from '@app/shared/constants';
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  SUPPORTED_LOCALES
+} from '@app/shared/constants';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -53,11 +57,11 @@ export function validateMinLength(
   return null;
 }
 
-/** The `@MinLength(8) @MaxLength(128)` pair every password field carries. */
+/** The `@MinLength` / `@MaxLength` pair every password field carries. */
 export function passwordLengthError(value: unknown): string | null {
   return (
-    validateMinLength(value, 8, 'password') ??
-    validateMaxLength(value, 128, 'password')
+    validateMinLength(value, MIN_PASSWORD_LENGTH, 'password') ??
+    validateMaxLength(value, MAX_PASSWORD_LENGTH, 'password')
   );
 }
 

@@ -46,6 +46,8 @@
     "newPassword": "New Password (Optional)",
     "passwordPlaceholder": "Leave blank to keep current password",
     "passwordMinLength": "Password must be at least 8 characters",
+    "passwordPattern": "Password must contain at least one uppercase letter, one lowercase letter and one number",
+    "passwordMaxLength": "Password must be no more than 128 characters",
     "roles": "Roles",
     "active": "Active",
     "emailNotVerified": "Email not verified",

@@ -2224,9 +2224,13 @@ The import covers:
   `UserPermissionsResponse` and `UserEffectivePermissionsResponse`.
 
   The RBAC types are `ResourceResponse`, `ActionResponse` and `RbacMetadataResponse`.
-- **Constants.** They are `PASSWORD_REGEX`, `PASSWORD_ERROR`, `MAX_FAILED_ATTEMPTS`,
-  `LOCKOUT_DURATION_MS`, `MAX_CONCURRENT_SESSIONS`, `MAX_PAGE_SIZE`, `DEFAULT_CURSOR_PAGE_SIZE`, the
-  user sort columns, `SYSTEM_ROLES` and `SystemRole`.
+- **Constants.** They are `PASSWORD_REGEX`, `PASSWORD_ERROR`, `MIN_PASSWORD_LENGTH`,
+  `MAX_PASSWORD_LENGTH`, `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, `MAX_CONCURRENT_SESSIONS`,
+  `MAX_PAGE_SIZE`, `DEFAULT_CURSOR_PAGE_SIZE`, the user sort columns, `SYSTEM_ROLES` and
+  `SystemRole`.
+
+  The password DTOs read the two length constants, thus `@MinLength` and `@MaxLength` cannot drift
+  away from the client form rules.
 
   Note that `PERMISSIONS` and `Permission` are gone. The code uses a typed `[Actions, Subjects]`
   tuple instead.

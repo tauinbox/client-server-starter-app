@@ -2,6 +2,7 @@ import { IsEmail, IsNotEmpty, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { normalizeEmail } from '@app/shared/utils/email';
+import { MAX_PASSWORD_LENGTH } from '@app/shared/constants';
 
 export class LoginDto {
   @ApiProperty({
@@ -18,6 +19,6 @@ export class LoginDto {
     example: 'Password123'
   })
   @IsNotEmpty()
-  @MaxLength(128)
+  @MaxLength(MAX_PASSWORD_LENGTH)
   password: string;
 }

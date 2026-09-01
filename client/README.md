@@ -315,8 +315,9 @@ src/app/
     │   │                              # lists the active shortcuts in category groups.
     │   ├── password-strength/         # PasswordStrengthComponent is a meter with 4 bars and an
     │   │                              # aria-live label. It maps a score of 0 to 4 to the
-    │   │                              # PASSWORD_REGEX rules. The register, profile and
-    │   │                              # reset-password pages use it.
+    │   │                              # PASSWORD_REGEX rules, and it states the rule in words
+    │   │                              # while the typed value breaks it. The register, profile
+    │   │                              # and reset-password pages use it.
     │   ├── password-toggle/           # PasswordToggleComponent is the reusable toggle for
     │   │                              # password visibility.
     │   └── captcha-widget/            # CaptchaWidgetComponent is the soft-trigger widget for

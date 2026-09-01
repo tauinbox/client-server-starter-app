@@ -62,8 +62,8 @@
     "errors": {
       "required": "This field is required",
       "email": "Please enter a valid email address",
-      "minlength": "Must be at least {{ requiredLength }} characters",
-      "maxlength": "Must be no more than {{ requiredLength }} characters",
+      "minLength": "Must be at least {{ minLength }} characters",
+      "maxLength": "Must be no more than {{ maxLength }} characters",
       "pattern": "Invalid format",
       "min": "Value must be at least {{ min }}",
       "max": "Value must be no more than {{ max }}",
@@ -79,7 +79,8 @@
     "weak": "Weak",
     "fair": "Fair",
     "good": "Good",
-    "strong": "Strong"
+    "strong": "Strong",
+    "requirements": "Use at least 8 characters, with one uppercase letter, one lowercase letter and one number."
   },
   "errors": {
     "auth": {

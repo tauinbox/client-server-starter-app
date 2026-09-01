@@ -5,6 +5,7 @@ import {
   input
 } from '@angular/core';
 import { TranslocoDirective } from '@jsverse/transloco';
+import { PASSWORD_REGEX } from '@app/shared/constants';
 
 export type PasswordStrengthScore = 0 | 1 | 2 | 3 | 4;
 
@@ -44,6 +45,15 @@ export class PasswordStrengthComponent {
   readonly labelKey = computed(() => {
     const score = this.score();
     return score === 0 ? '' : STRENGTH_LABEL_KEYS[score];
+  });
+
+  /**
+   * States the composition rule while the typed value still breaks it, so the
+   * user reads the requirement instead of only being told it was not met.
+   */
+  readonly showRequirements = computed(() => {
+    const password = this.password();
+    return password.length > 0 && !PASSWORD_REGEX.test(password);
   });
 
   protected readonly bars: readonly (1 | 2 | 3 | 4)[] = [1, 2, 3, 4];

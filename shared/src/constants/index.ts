@@ -1,4 +1,9 @@
-export { PASSWORD_REGEX, PASSWORD_ERROR } from './password.constants';
+export {
+  PASSWORD_REGEX,
+  PASSWORD_ERROR,
+  MIN_PASSWORD_LENGTH,
+  MAX_PASSWORD_LENGTH
+} from './password.constants';
 
 export {
   MAX_FAILED_ATTEMPTS,

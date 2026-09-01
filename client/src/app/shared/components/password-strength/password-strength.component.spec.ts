@@ -103,6 +103,37 @@ describe('PasswordStrengthComponent', () => {
     );
   });
 
+  describe('composition requirements hint', () => {
+    const HINT = '.password-requirements';
+
+    it('stays hidden while the field is empty', () => {
+      const root: HTMLElement = fixture.nativeElement;
+      expect(root.querySelector(HINT)).toBeNull();
+    });
+
+    it('states the rule while the typed value breaks it', () => {
+      fixture.componentRef.setInput('password', 'passwordonly');
+      fixture.detectChanges();
+
+      const hint: HTMLElement | null =
+        fixture.nativeElement.querySelector(HINT);
+      expect(hint).not.toBeNull();
+      expect(hint?.textContent).toContain('uppercase');
+      expect(hint?.textContent).toContain('lowercase');
+      expect(hint?.textContent).toContain('number');
+    });
+
+    it('disappears once the value satisfies the rule', () => {
+      fixture.componentRef.setInput('password', 'passwordonly');
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector(HINT)).not.toBeNull();
+
+      fixture.componentRef.setInput('password', 'Password1');
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector(HINT)).toBeNull();
+    });
+  });
+
   it('exposes a polite live region for screen readers', () => {
     fixture.componentRef.setInput('password', 'Abcdefg1');
     fixture.detectChanges();

@@ -19,7 +19,9 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import {
   email as emailValidator,
   form,
+  maxLength,
   minLength,
+  pattern,
   required,
   validate
 } from '@angular/forms/signals';
@@ -68,7 +70,12 @@ import {
   DENSITY_MIN
 } from '@core/services/display-preferences.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
-import { OAUTH_PROVIDER_FLAGS } from '@app/shared/constants';
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  OAUTH_PROVIDER_FLAGS,
+  PASSWORD_REGEX
+} from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 
 type ProfileData = {
@@ -202,8 +209,14 @@ export class ProfileComponent implements OnInit {
     required(path.lastName, {
       message: 'auth.profile.lastNameRequired'
     });
-    minLength(path.password, 8, {
+    minLength(path.password, MIN_PASSWORD_LENGTH, {
       message: 'auth.profile.passwordMinLength'
+    });
+    pattern(path.password, PASSWORD_REGEX, {
+      message: 'auth.profile.passwordPattern'
+    });
+    maxLength(path.password, MAX_PASSWORD_LENGTH, {
+      message: 'auth.profile.passwordMaxLength'
     });
     validate(path.currentPassword, ({ value, valueOf }) => {
       // An account created through a provider holds no password, so demanding
