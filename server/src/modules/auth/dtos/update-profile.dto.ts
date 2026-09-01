@@ -9,6 +9,8 @@ import {
   ValidateIf
 } from 'class-validator';
 import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
   PASSWORD_ERROR,
   PASSWORD_REGEX,
   SUPPORTED_LOCALES
@@ -38,11 +40,11 @@ export class UpdateProfileDto {
     description:
       'New password (min 8 characters, must contain uppercase, lowercase and number)',
     example: 'NewPassword123',
-    minLength: 8
+    minLength: MIN_PASSWORD_LENGTH
   })
   @ValidateIf(propertyIsDefined)
-  @MinLength(8)
-  @MaxLength(128)
+  @MinLength(MIN_PASSWORD_LENGTH)
+  @MaxLength(MAX_PASSWORD_LENGTH)
   @Matches(PASSWORD_REGEX, { message: PASSWORD_ERROR })
   password?: string;
 
@@ -56,7 +58,7 @@ export class UpdateProfileDto {
   @ValidateIf(propertyIsDefined)
   @IsString()
   @IsNotEmpty()
-  @MaxLength(128)
+  @MaxLength(MAX_PASSWORD_LENGTH)
   currentPassword?: string;
 
   @ApiPropertyOptional({

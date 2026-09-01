@@ -274,12 +274,71 @@ describe('UserEditComponent', () => {
       expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
     });
 
+    it('names the minLength rule instead of the generic unknown message', async () => {
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: 'short'
+      });
+      await fixture.whenStable();
+
+      const errors = component.userForm.password().errors();
+      expect(errors.find((e) => e.kind === 'minLength')?.message).toBe(
+        'users.edit.passwordMinLength'
+      );
+    });
+
+    it('rejects a password that breaks the composition rule', async () => {
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: 'passwordonly'
+      });
+      await fixture.whenStable();
+
+      const errors = component.userForm.password().errors();
+      expect(errors.some((e) => e.kind === 'pattern')).toBe(true);
+      expect(errors.find((e) => e.kind === 'pattern')?.message).toBe(
+        'users.edit.passwordPattern'
+      );
+    });
+
+    it('rejects a password longer than the server ceiling', async () => {
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: `Aa1${'x'.repeat(126)}`
+      });
+      await fixture.whenStable();
+
+      const errors = component.userForm.password().errors();
+      expect(errors.some((e) => e.kind === 'maxLength')).toBe(true);
+      expect(errors.find((e) => e.kind === 'maxLength')?.message).toBe(
+        'users.edit.passwordMaxLength'
+      );
+    });
+
+    it('keeps an empty password valid, since it means "unchanged"', async () => {
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: ''
+      });
+      await fixture.whenStable();
+
+      expect(component.userForm.password().valid()).toBe(true);
+    });
+
     it('should accept password of 8+ characters', async () => {
       component.userModel.set({
         email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
-        password: 'validpassword'
+        password: 'ValidPassword1'
       });
       await fixture.whenStable();
       expect(component.userForm().valid()).toBe(true);
@@ -536,7 +595,7 @@ describe('UserEditComponent', () => {
         email: 'test@example.com',
         firstName: 'Changed',
         lastName: 'User',
-        password: 'oldpassword1'
+        password: 'OldPassword1'
       });
       await fixture.whenStable();
       component.onSubmit();

@@ -130,8 +130,8 @@ describe('ProfileComponent', () => {
       firstName: 'Test',
       lastName: 'User',
       currentPassword: '',
-      password: 'newpassword123',
-      confirmPassword: 'newpassword123'
+      password: 'NewPassword123',
+      confirmPassword: 'NewPassword123'
     });
     await fixture.whenStable();
     fixture.detectChanges();
@@ -294,6 +294,43 @@ describe('ProfileComponent', () => {
       expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
     });
 
+    it('rejects a password that breaks the composition rule', async () => {
+      component.profileModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        currentPassword: 'CurrentPass1',
+        password: 'passwordonly',
+        confirmPassword: 'passwordonly'
+      });
+      await fixture.whenStable();
+
+      const errors = component.profileForm.password().errors();
+      expect(errors.some((e) => e.kind === 'pattern')).toBe(true);
+      expect(errors.find((e) => e.kind === 'pattern')?.message).toBe(
+        'auth.profile.passwordPattern'
+      );
+    });
+
+    it('rejects a password longer than the server ceiling', async () => {
+      const tooLong = `Aa1${'x'.repeat(126)}`;
+      component.profileModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        currentPassword: 'CurrentPass1',
+        password: tooLong,
+        confirmPassword: tooLong
+      });
+      await fixture.whenStable();
+
+      const errors = component.profileForm.password().errors();
+      expect(errors.some((e) => e.kind === 'maxLength')).toBe(true);
+      expect(errors.find((e) => e.kind === 'maxLength')?.message).toBe(
+        'auth.profile.passwordMaxLength'
+      );
+    });
+
     it('should allow empty password (optional)', async () => {
       component.profileModel.set({
         email: 'test@example.com',
@@ -313,8 +350,8 @@ describe('ProfileComponent', () => {
         firstName: 'Test',
         lastName: 'User',
         currentPassword: 'CurrentPass1',
-        password: 'newpassword123',
-        confirmPassword: 'different123'
+        password: 'NewPassword123',
+        confirmPassword: 'Different123'
       });
       await fixture.whenStable();
       const errors = component.profileForm.confirmPassword().errors();
@@ -327,8 +364,8 @@ describe('ProfileComponent', () => {
         firstName: 'Test',
         lastName: 'User',
         currentPassword: 'CurrentPass1',
-        password: 'newpassword123',
-        confirmPassword: 'newpassword123'
+        password: 'NewPassword123',
+        confirmPassword: 'NewPassword123'
       });
       await fixture.whenStable();
       expect(component.profileForm().valid()).toBe(true);
@@ -340,8 +377,8 @@ describe('ProfileComponent', () => {
         firstName: 'Test',
         lastName: 'User',
         currentPassword: '',
-        password: 'newpassword123',
-        confirmPassword: 'newpassword123'
+        password: 'NewPassword123',
+        confirmPassword: 'NewPassword123'
       });
       await fixture.whenStable();
       const errors = component.profileForm.currentPassword().errors();
@@ -423,8 +460,8 @@ describe('ProfileComponent', () => {
         firstName: 'Updated',
         lastName: 'User',
         currentPassword: 'CurrentPass1',
-        password: 'newpassword123',
-        confirmPassword: 'newpassword123'
+        password: 'NewPassword123',
+        confirmPassword: 'NewPassword123'
       });
       await fixture.whenStable();
       component.onSubmit();
@@ -432,7 +469,7 @@ describe('ProfileComponent', () => {
       expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
         firstName: 'Updated',
         lastName: 'User',
-        password: 'newpassword123',
+        password: 'NewPassword123',
         currentPassword: 'CurrentPass1'
       });
     });
@@ -468,8 +505,8 @@ describe('ProfileComponent', () => {
         firstName: 'Updated',
         lastName: 'User',
         currentPassword: 'CurrentPass1',
-        password: 'newpassword',
-        confirmPassword: 'newpassword'
+        password: 'NewPassword1',
+        confirmPassword: 'NewPassword1'
       });
       await fixture.whenStable();
       component.onSubmit();
@@ -737,8 +774,8 @@ describe('ProfileComponent', () => {
         firstName: 'Test',
         lastName: 'User',
         currentPassword: 'Password1',
-        password: 'newpassword123',
-        confirmPassword: 'newpassword123'
+        password: 'NewPassword123',
+        confirmPassword: 'NewPassword123'
       });
       await fixture.whenStable();
 
@@ -748,7 +785,7 @@ describe('ProfileComponent', () => {
       expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
         firstName: 'Test',
         lastName: 'User',
-        password: 'newpassword123',
+        password: 'NewPassword123',
         currentPassword: 'Password1'
       });
       // The update rehashes the current password and revokes the session, so an

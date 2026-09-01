@@ -796,9 +796,12 @@ To apply more than one restriction at the same time, use one of two methods. Use
   scopes the shortcuts automatically.
 - A responsive SCSS architecture.
 - Snackbar error notifications.
-- Form validation with error messages. A reusable password strength indicator
-  (`<app-password-strength>`) has a visual meter of 4 bars and an aria-live label. The register page,
-  the profile page and the reset-password page show it.
+- Form validation with error messages. The client applies the same password rules as the server:
+  the shared `PASSWORD_REGEX`, `MIN_PASSWORD_LENGTH` and `MAX_PASSWORD_LENGTH`. Thus a password that
+  breaks a rule gets a translated message on the field, and it does not need a server round trip.
+  A reusable password strength indicator (`<nxs-password-strength>`) has a visual meter of 4 bars,
+  an aria-live label and a hint that states the composition rule while the typed value breaks it.
+  The register page, the profile page and the reset-password page show it.
 - A 404 page and a 403 page.
 - The toolbar shows the version and the git hash through a `MatTooltip`.
 - **Collapsible side navigation.** The left panel is persistent, and it is 64 px narrow or 220 px
@@ -844,7 +847,8 @@ fullstack-starter-app/
 │       ├── types/          # UserResponse, AdminUserResponse, AuthResponse, CursorPaginatedResponse<T>,
 │       │                   # RoleResponse (public) / RoleAdminResponse (with isSystem/isSuper),
 │       │                   # PermissionResponse, UserPermissionsResponse, etc.
-│       ├── constants/      # PASSWORD_REGEX, cursor page size, SYSTEM_ROLES, MAX_CONCURRENT_SESSIONS,
+│       ├── constants/      # PASSWORD_REGEX, MIN/MAX_PASSWORD_LENGTH, cursor page size, SYSTEM_ROLES,
+│       │                   # MAX_CONCURRENT_SESSIONS,
 │       │                   # ENTITLED/OPEN/CHANGEABLE_SUBSCRIPTION_STATUSES (one definition each), etc.
 │       └── utils/          # feature-flag-evaluator (needs node:crypto, server + mock only),
 │                           # feature-flag-attribute-value + feature-flag-timestamp (also imported by
@@ -1702,8 +1706,8 @@ activates the git hooks through the `prepare` script.
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2072 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 352 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 350 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1186 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 226 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1201 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 228 tests pass |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 490 tests pass |
 
 ## CI/CD

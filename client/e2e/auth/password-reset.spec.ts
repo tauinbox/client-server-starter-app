@@ -124,7 +124,9 @@ test.describe('Password reset', () => {
     // Blur to trigger validation
     await page.getByText('Reset Password').first().click();
 
-    await expect(page.getByText(/at least 8 characters/i)).toBeVisible();
+    await expect(
+      page.getByText('Password must be at least 8 characters')
+    ).toBeVisible();
   });
 
   test('should show error when passwords do not match', async ({

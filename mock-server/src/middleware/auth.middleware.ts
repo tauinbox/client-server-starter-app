@@ -6,6 +6,7 @@ import {
   LOCKOUT_DURATION_MS,
   MAX_CONCURRENT_SESSIONS,
   MAX_FAILED_ATTEMPTS,
+  MAX_PASSWORD_LENGTH,
   PASSWORD_ERROR,
   PASSWORD_REGEX
 } from '@app/shared/constants';
@@ -762,7 +763,7 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
     currentPassword !== undefined &&
     (typeof currentPassword !== 'string' ||
       currentPassword.length === 0 ||
-      currentPassword.length > 128)
+      currentPassword.length > MAX_PASSWORD_LENGTH)
   ) {
     res.status(400).json(validationError('currentPassword is required'));
     return;

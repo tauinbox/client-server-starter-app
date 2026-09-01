@@ -109,11 +109,40 @@ describe('ResetPasswordComponent', () => {
 
     it('should accept password of 8+ characters', async () => {
       component.resetPasswordModel.set({
-        password: 'validpass',
+        password: 'ValidPass1',
         confirmPassword: ''
       });
       await fixture.whenStable();
       expect(component.resetPasswordForm.password().valid()).toBe(true);
+    });
+
+    it('rejects a password that breaks the composition rule', async () => {
+      component.resetPasswordModel.set({
+        password: 'passwordonly',
+        confirmPassword: 'passwordonly'
+      });
+      await fixture.whenStable();
+
+      const errors = component.resetPasswordForm.password().errors();
+      expect(errors.some((e) => e.kind === 'pattern')).toBe(true);
+      expect(errors.find((e) => e.kind === 'pattern')?.message).toBe(
+        'auth.resetPassword.passwordPattern'
+      );
+    });
+
+    it('rejects a password longer than the server ceiling', async () => {
+      const tooLong = `Aa1${'x'.repeat(126)}`;
+      component.resetPasswordModel.set({
+        password: tooLong,
+        confirmPassword: tooLong
+      });
+      await fixture.whenStable();
+
+      const errors = component.resetPasswordForm.password().errors();
+      expect(errors.some((e) => e.kind === 'maxLength')).toBe(true);
+      expect(errors.find((e) => e.kind === 'maxLength')?.message).toBe(
+        'auth.resetPassword.passwordMaxLength'
+      );
     });
 
     it('should require confirmPassword', () => {

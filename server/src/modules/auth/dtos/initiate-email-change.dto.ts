@@ -8,6 +8,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { normalizeEmail } from '@app/shared/utils/email';
+import { MAX_PASSWORD_LENGTH } from '@app/shared/constants';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 
 export class InitiateEmailChangeDto {
@@ -30,6 +31,6 @@ export class InitiateEmailChangeDto {
   @ValidateIf(propertyIsDefined)
   @IsString()
   @IsNotEmpty()
-  @MaxLength(128)
+  @MaxLength(MAX_PASSWORD_LENGTH)
   currentPassword?: string;
 }

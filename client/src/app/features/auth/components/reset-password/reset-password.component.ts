@@ -12,7 +12,14 @@ import {
   MatCardHeader,
   MatCardTitle
 } from '@angular/material/card';
-import { form, minLength, required, validate } from '@angular/forms/signals';
+import {
+  form,
+  maxLength,
+  minLength,
+  pattern,
+  required,
+  validate
+} from '@angular/forms/signals';
 import { MatIcon } from '@angular/material/icon';
 import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
@@ -26,6 +33,11 @@ import { PasswordStrengthComponent } from '@shared/components/password-strength/
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_REGEX
+} from '@app/shared/constants';
 
 type ResetPasswordData = {
   password: string;
@@ -74,8 +86,14 @@ export class ResetPasswordComponent implements OnInit {
     required(path.password, {
       message: 'auth.resetPassword.passwordRequired'
     });
-    minLength(path.password, 8, {
+    minLength(path.password, MIN_PASSWORD_LENGTH, {
       message: 'auth.resetPassword.passwordMinLength'
+    });
+    pattern(path.password, PASSWORD_REGEX, {
+      message: 'auth.resetPassword.passwordPattern'
+    });
+    maxLength(path.password, MAX_PASSWORD_LENGTH, {
+      message: 'auth.resetPassword.passwordMaxLength'
     });
     required(path.confirmPassword, {
       message: 'auth.resetPassword.confirmPasswordRequired'

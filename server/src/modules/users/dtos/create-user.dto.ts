@@ -11,6 +11,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
   PASSWORD_ERROR,
   PASSWORD_REGEX,
   SUPPORTED_LOCALES
@@ -47,11 +49,11 @@ export class CreateUserDto {
     description:
       'The password of the user (min 8 characters, must contain uppercase, lowercase and number)',
     example: 'Password123',
-    minLength: 8
+    minLength: MIN_PASSWORD_LENGTH
   })
   @IsNotEmpty()
-  @MinLength(8)
-  @MaxLength(128)
+  @MinLength(MIN_PASSWORD_LENGTH)
+  @MaxLength(MAX_PASSWORD_LENGTH)
   @Matches(PASSWORD_REGEX, { message: PASSWORD_ERROR })
   password: string;
 

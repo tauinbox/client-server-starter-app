@@ -15,7 +15,9 @@ import {
 import {
   email as emailValidator,
   form,
+  maxLength,
   minLength,
+  pattern,
   required
 } from '@angular/forms/signals';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
@@ -30,7 +32,12 @@ import { PasswordToggleComponent } from '@shared/components/password-toggle/pass
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
 import { CaptchaWidgetComponent } from '@shared/components/captcha-widget/captcha-widget.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
-import { ErrorKeys } from '@app/shared/constants';
+import {
+  ErrorKeys,
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_REGEX
+} from '@app/shared/constants';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 
 type RegisterData = {
@@ -87,8 +94,14 @@ export class RegisterComponent {
     required(path.firstName, { message: 'auth.register.firstNameRequired' });
     required(path.lastName, { message: 'auth.register.lastNameRequired' });
     required(path.password, { message: 'auth.register.passwordRequired' });
-    minLength(path.password, 8, {
+    minLength(path.password, MIN_PASSWORD_LENGTH, {
       message: 'auth.register.passwordMinLength'
+    });
+    pattern(path.password, PASSWORD_REGEX, {
+      message: 'auth.register.passwordPattern'
+    });
+    maxLength(path.password, MAX_PASSWORD_LENGTH, {
+      message: 'auth.register.passwordMaxLength'
     });
   });
 

@@ -1,7 +1,13 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { Component, signal, viewChild } from '@angular/core';
-import { form, required, email } from '@angular/forms/signals';
+import {
+  form,
+  required,
+  email,
+  maxLength,
+  minLength
+} from '@angular/forms/signals';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 import { NxsFormFieldComponent } from './nxs-form-field.component';
@@ -35,6 +41,21 @@ class TestHostComponent {
   autocomplete = 'on';
 
   readonly formField = viewChild(NxsFormFieldComponent);
+}
+
+@Component({
+  selector: 'nxs-test-length-host',
+  imports: [NxsFormFieldComponent],
+  template: `
+    <nxs-form-field [field]="testForm.name" label="forms.errors.required" />
+  `
+})
+class LengthHostComponent {
+  model = signal({ name: '' });
+  testForm = form(this.model, (path) => {
+    minLength(path.name, 8);
+    maxLength(path.name, 10);
+  });
 }
 
 describe('NxsFormFieldComponent', () => {
@@ -169,5 +190,45 @@ describe('NxsFormFieldComponent', () => {
       const input = fixture.nativeElement.querySelector('input');
       expect(input).toBeNull();
     });
+  });
+});
+
+describe('NxsFormFieldComponent length errors without a schema message', () => {
+  let fixture: ComponentFixture<LengthHostComponent>;
+  let host: LengthHostComponent;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [LengthHostComponent, TranslocoTestingModuleWithLangs],
+      providers: [provideNoopAnimations()]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(LengthHostComponent);
+    host = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('states the minimum length instead of the generic unknown message', async () => {
+    host.model.set({ name: 'short' });
+    host.testForm.name().markAsTouched();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const errorEl = fixture.nativeElement.querySelector('mat-error');
+    expect(errorEl).toBeTruthy();
+    expect(errorEl.textContent).toContain('at least 8 characters');
+    expect(errorEl.textContent).not.toContain('This field is invalid');
+  });
+
+  it('states the maximum length instead of the generic unknown message', async () => {
+    host.model.set({ name: 'far too long' });
+    host.testForm.name().markAsTouched();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const errorEl = fixture.nativeElement.querySelector('mat-error');
+    expect(errorEl).toBeTruthy();
+    expect(errorEl.textContent).toContain('no more than 10 characters');
+    expect(errorEl.textContent).not.toContain('This field is invalid');
   });
 });

@@ -35,7 +35,7 @@ test.describe('Register page', () => {
     await page.getByLabel('Email').fill('not-an-email');
     await page.getByLabel('First Name').fill('John');
     await page.getByLabel('Last Name').fill('Doe');
-    await page.getByLabel('Password', { exact: true }).fill('password123');
+    await page.getByLabel('Password', { exact: true }).fill('Password123');
 
     await expect(main.getByRole('button', { name: 'Register' })).toBeDisabled();
   });
@@ -68,7 +68,7 @@ test.describe('Register page', () => {
     await page.getByLabel('First Name').blur();
     await page.getByLabel('Last Name').fill('Doe');
     await page.getByLabel('Last Name').blur();
-    await page.getByLabel('Password', { exact: true }).fill('password123');
+    await page.getByLabel('Password', { exact: true }).fill('Password123');
 
     await expect(main.getByRole('button', { name: 'Register' })).toBeEnabled();
   });
@@ -119,6 +119,44 @@ test.describe('Register page', () => {
     await expect(
       page.getByText('Password must be at least 8 characters')
     ).toBeVisible();
+  });
+
+  test('should show the composition rule instead of a generic server error', async ({
+    _mockServer,
+    page
+  }) => {
+    await page.goto('/register');
+
+    const main = page.getByRole('main');
+    await page.getByLabel('Email').fill('newuser@example.com');
+    await page.getByLabel('First Name').fill('Jane');
+    await page.getByLabel('Last Name').fill('Smith');
+    await page.getByLabel('Password', { exact: true }).fill('passwordonly');
+
+    await expect(page.getByText(/Use at least 8 characters/i)).toBeVisible();
+
+    await page.getByLabel('Email').click();
+
+    await expect(
+      page.getByText(
+        'Password must contain at least one uppercase letter, one lowercase letter and one number'
+      )
+    ).toBeVisible();
+    await expect(main.getByRole('button', { name: 'Register' })).toBeDisabled();
+  });
+
+  test('hides the requirements hint once the password satisfies the rule', async ({
+    _mockServer,
+    page
+  }) => {
+    await page.goto('/register');
+
+    const passwordInput = page.getByLabel('Password', { exact: true });
+    await passwordInput.fill('passwordonly');
+    await expect(page.getByText(/Use at least 8 characters/i)).toBeVisible();
+
+    await passwordInput.fill('Password123');
+    await expect(page.getByText(/Use at least 8 characters/i)).toBeHidden();
   });
 
   test('should register successfully and redirect to login with pending verification', async ({

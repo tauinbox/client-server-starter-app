@@ -116,10 +116,43 @@ describe('RegisterComponent', () => {
         email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
-        password: 'longpassword'
+        password: 'LongPassword1'
       });
       await fixture.whenStable();
       expect(component.registerForm.password().valid()).toBe(true);
+    });
+
+    it('rejects a password that breaks the composition rule', async () => {
+      component.registerModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: 'passwordonly'
+      });
+      await fixture.whenStable();
+
+      const errors = component.registerForm.password().errors();
+      expect(errors.some((e) => e.kind === 'pattern')).toBe(true);
+      expect(errors.find((e) => e.kind === 'pattern')?.message).toBe(
+        'auth.register.passwordPattern'
+      );
+      expect(component.registerForm.password().valid()).toBe(false);
+    });
+
+    it('rejects a password longer than the server ceiling', async () => {
+      component.registerModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: `Aa1${'x'.repeat(126)}`
+      });
+      await fixture.whenStable();
+
+      const errors = component.registerForm.password().errors();
+      expect(errors.some((e) => e.kind === 'maxLength')).toBe(true);
+      expect(errors.find((e) => e.kind === 'maxLength')?.message).toBe(
+        'auth.register.passwordMaxLength'
+      );
     });
 
     it('should be valid with correct values', async () => {
@@ -127,7 +160,7 @@ describe('RegisterComponent', () => {
         email: 'test@example.com',
         firstName: 'Test',
         lastName: 'User',
-        password: 'password123'
+        password: 'Password123'
       });
       await fixture.whenStable();
       expect(component.registerForm().valid()).toBe(true);
@@ -139,7 +172,7 @@ describe('RegisterComponent', () => {
       email: 'test@example.com',
       firstName: 'Test',
       lastName: 'User',
-      password: 'password123'
+      password: 'Password123'
     };
 
     it('should not call register when form is invalid', () => {
@@ -261,7 +294,7 @@ describe('RegisterComponent', () => {
       email: 'test@example.com',
       firstName: 'Test',
       lastName: 'User',
-      password: 'password123'
+      password: 'Password123'
     };
 
     it('shows captcha on CAPTCHA_REQUIRED response and disables submit until token', async () => {

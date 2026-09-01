@@ -20,7 +20,14 @@ import { PasswordToggleComponent } from '@shared/components/password-toggle/pass
 import { Router, RouterLink } from '@angular/router';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import { email, form, minLength, required } from '@angular/forms/signals';
+import {
+  email,
+  form,
+  maxLength,
+  minLength,
+  pattern,
+  required
+} from '@angular/forms/signals';
 import {
   MatFormField,
   MatLabel,
@@ -45,6 +52,11 @@ import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service'
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { UsersStore } from '../../store/users.store';
 import type { RoleAdminResponse } from '@app/shared/types';
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_REGEX
+} from '@app/shared/constants';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 
@@ -125,7 +137,15 @@ export class UserEditComponent implements OnInit, OnDestroy {
     email(path.email, { message: 'users.edit.emailInvalid' });
     required(path.firstName, { message: 'users.edit.firstNameRequired' });
     required(path.lastName, { message: 'users.edit.lastNameRequired' });
-    minLength(path.password, 8);
+    minLength(path.password, MIN_PASSWORD_LENGTH, {
+      message: 'users.edit.passwordMinLength'
+    });
+    pattern(path.password, PASSWORD_REGEX, {
+      message: 'users.edit.passwordPattern'
+    });
+    maxLength(path.password, MAX_PASSWORD_LENGTH, {
+      message: 'users.edit.passwordMaxLength'
+    });
   });
 
   protected readonly formChanged = computed(() => {
