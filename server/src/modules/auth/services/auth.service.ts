@@ -26,13 +26,12 @@ import {
   ErrorKeys,
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
+  RESET_TOKEN_EXPIRY_MS,
   SYSTEM_ROLES,
   TOKEN_PURPOSE
 } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
-
-const RESET_TOKEN_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
 
 type ConfirmEmailChangeOutcome =
   | {

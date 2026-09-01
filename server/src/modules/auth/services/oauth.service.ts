@@ -14,10 +14,12 @@ import { MailService } from '../../mail/mail.service';
 import { hashToken } from '../../../common/utils/hash-token';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
-import { SYSTEM_ROLES, ErrorKeys } from '@app/shared/constants';
+import {
+  SYSTEM_ROLES,
+  ErrorKeys,
+  VERIFICATION_TOKEN_EXPIRY_MS
+} from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
-
-const VERIFICATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class OAuthService {

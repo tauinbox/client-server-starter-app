@@ -8,6 +8,10 @@ export const BCRYPT_SALT_ROUNDS = 12;
 
 export const EMAIL_CHANGE_TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
+export const VERIFICATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+export const RESET_TOKEN_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
+
 export const JWT_ISSUER = 'nexus-api';
 
 export const JWT_AUDIENCE = 'nexus-client';

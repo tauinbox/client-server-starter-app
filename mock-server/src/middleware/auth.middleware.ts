@@ -8,7 +8,9 @@ import {
   MAX_FAILED_ATTEMPTS,
   MAX_PASSWORD_LENGTH,
   PASSWORD_ERROR,
-  PASSWORD_REGEX
+  PASSWORD_REGEX,
+  RESET_TOKEN_EXPIRY_MS,
+  VERIFICATION_TOKEN_EXPIRY_MS
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
@@ -94,7 +96,10 @@ router.post('/register', (req, res) => {
 
   // Store a verification token (plain UUID — no hashing in mock)
   const verificationToken = uuidv4();
-  state.emailVerificationTokens.set(verificationToken, user.id);
+  state.emailVerificationTokens.set(verificationToken, {
+    userId: user.id,
+    expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS).toISOString()
+  });
 
   logAudit('USER_REGISTER', {
     actorId: user.id,
@@ -260,9 +265,9 @@ router.post('/verify-email', (req, res) => {
   }
 
   const state = getState();
-  const userId = state.emailVerificationTokens.get(token);
+  const issued = state.emailVerificationTokens.get(token);
 
-  if (!userId) {
+  if (!issued) {
     res.status(400).json({
       message: 'Invalid or expired verification token',
       errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN
@@ -270,11 +275,19 @@ router.post('/verify-email', (req, res) => {
     return;
   }
 
-  const user = findUserById(userId);
+  const user = findUserById(issued.userId);
   if (!user) {
     res.status(400).json({
       message: 'Invalid or expired verification token',
       errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN
+    });
+    return;
+  }
+
+  if (new Date(issued.expiresAt).getTime() < Date.now()) {
+    res.status(400).json({
+      message: 'Verification token has expired. Please request a new one.',
+      errorKey: ErrorKeys.AUTH.VERIFICATION_TOKEN_EXPIRED
     });
     return;
   }
@@ -319,15 +332,18 @@ router.post('/resend-verification', (req, res) => {
   const state = getState();
 
   // Remove any existing verification token for this user
-  for (const [token, uid] of state.emailVerificationTokens.entries()) {
-    if (uid === user.id) {
+  for (const [token, issued] of state.emailVerificationTokens.entries()) {
+    if (issued.userId === user.id) {
       state.emailVerificationTokens.delete(token);
     }
   }
 
   // Create new verification token
   const verificationToken = uuidv4();
-  state.emailVerificationTokens.set(verificationToken, user.id);
+  state.emailVerificationTokens.set(verificationToken, {
+    userId: user.id,
+    expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS).toISOString()
+  });
 
   const verifyUrl = `http://localhost:4200/verify-email?token=${verificationToken}`;
   console.log(`[EMAIL VERIFICATION] To: ${email}\n  Verify URL: ${verifyUrl}`);
@@ -380,15 +396,18 @@ router.post('/forgot-password', (req, res) => {
   const state = getState();
 
   // Remove any existing reset token for this user
-  for (const [token, uid] of state.passwordResetTokens.entries()) {
-    if (uid === user.id) {
+  for (const [token, issued] of state.passwordResetTokens.entries()) {
+    if (issued.userId === user.id) {
       state.passwordResetTokens.delete(token);
     }
   }
 
   // Create new reset token
   const resetToken = uuidv4();
-  state.passwordResetTokens.set(resetToken, user.id);
+  state.passwordResetTokens.set(resetToken, {
+    userId: user.id,
+    expiresAt: new Date(Date.now() + RESET_TOKEN_EXPIRY_MS).toISOString()
+  });
 
   logAudit('PASSWORD_RESET_REQUEST', {
     actorEmail: email,
@@ -430,9 +449,9 @@ router.post('/reset-password', (req, res) => {
   }
 
   const state = getState();
-  const userId = state.passwordResetTokens.get(token);
+  const issued = state.passwordResetTokens.get(token);
 
-  if (!userId) {
+  if (!issued) {
     res.status(400).json({
       message: 'Invalid or expired password reset token',
       errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN
@@ -440,11 +459,23 @@ router.post('/reset-password', (req, res) => {
     return;
   }
 
-  const user = findUserById(userId);
-  if (!user) {
+  const user = findUserById(issued.userId);
+
+  // Deactivation must also void a reset token issued while the account was
+  // still active, matching the isActive gate in forgot-password. The response
+  // stays identical to the not-found case so it reveals no account state.
+  if (!user || !user.isActive) {
     res.status(400).json({
       message: 'Invalid or expired password reset token',
       errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN
+    });
+    return;
+  }
+
+  if (new Date(issued.expiresAt).getTime() < Date.now()) {
+    res.status(400).json({
+      message: 'Password reset token has expired. Please request a new one.',
+      errorKey: ErrorKeys.AUTH.RESET_TOKEN_EXPIRED
     });
     return;
   }
