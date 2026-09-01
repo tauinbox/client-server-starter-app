@@ -961,7 +961,7 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 229 Playwright tests. They cover auth, users, admin, billing, a11y,
+**Coverage.** The suite has 231 Playwright tests. They cover auth, users, admin, billing, a11y,
 keyboard and visual. There are also 1201 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
