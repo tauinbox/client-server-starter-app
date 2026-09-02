@@ -35,6 +35,12 @@ export class UserResponseDto {
   })
   hasPassword: boolean;
 
+  @ApiProperty({
+    example: false,
+    description: 'True when the account has a verified second factor'
+  })
+  mfaEnabled: boolean;
+
   @ApiProperty({ example: 'en' })
   locale: string;
 

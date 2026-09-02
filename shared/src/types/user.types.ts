@@ -14,6 +14,12 @@ export type UserResponse = {
    * instead of a current password.
    */
   hasPassword: boolean;
+  /**
+   * True when the account has completed a two-factor enrolment. A started but
+   * unverified enrolment is not counted: only a proven authenticator turns the
+   * factor on.
+   */
+  mfaEnabled: boolean;
   locale: string;
   createdAt: string;
   updatedAt: string;

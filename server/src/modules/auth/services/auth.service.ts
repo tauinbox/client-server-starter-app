@@ -17,6 +17,7 @@ import { MailService } from '../../mail/mail.service';
 import { AuditService, AuditContext } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { BreachedPasswordService } from '../breached-password/breached-password.service';
+import { MfaService } from './mfa.service';
 import { hashToken } from '../../../common/utils/hash-token';
 import { issueEmailVerificationToken } from '../../../common/utils/issue-verification-token.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
@@ -104,7 +105,8 @@ export class AuthService {
     private metricsService: MetricsService,
     private sessionIssuer: SessionIssuerService,
     private jwtService: JwtService,
-    private breachedPasswordService: BreachedPasswordService
+    private breachedPasswordService: BreachedPasswordService,
+    private mfaService: MfaService
   ) {}
 
   // Dummy hash for constant-time rejection (prevents timing attacks).
@@ -215,6 +217,11 @@ export class AuthService {
     return user;
   }
 
+  /**
+   * Turns a proven identity into a session. It is deliberately unaware of which
+   * factors were checked: the password path and the second-factor path both
+   * arrive here only once every gate the account carries has been passed.
+   */
   async login(user: LocalAuthRequest['user']) {
     return this.sessionIssuer.issueSession(user);
   }
@@ -887,12 +894,21 @@ export class AuthService {
    * The proof is bounded by its own 300 second expiry and by the last session
    * revocation. It is NOT single use: the cookie is cleared after a successful
    * change, but nothing on the server records that it was spent.
+   *
+   * An account that carries a second factor may present a code instead of
+   * either of the two. That is the only factor an OAuth-only holder of an
+   * authenticator can present without a provider round trip.
    */
-  private async assertStepUp(
+  async assertStepUp(
     user: User,
     currentPassword: string | undefined,
-    reauthProof: string | undefined
+    reauthProof: string | undefined,
+    totpCode?: string
   ): Promise<void> {
+    if (this.mfaService.isValidStepUpCode(user, totpCode)) {
+      return;
+    }
+
     if (user.password === null) {
       this.assertReauthProof(user, reauthProof);
       return;

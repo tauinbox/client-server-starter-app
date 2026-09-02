@@ -17,6 +17,24 @@ describe('isAuthExcludedUrl', () => {
     expect(isAuthExcludedUrl(request)).toBe(true);
   });
 
+  // A 401 here says the code was wrong, not that the session expired. Routing
+  // it into the refresh path swallowed the second attempt entirely.
+  it('should return true for the two-factor verify URL', () => {
+    const request = new HttpRequest('POST', '/api/v1/auth/mfa/verify', {});
+    expect(isAuthExcludedUrl(request)).toBe(true);
+  });
+
+  it('should return true for the two-factor recovery URL', () => {
+    const request = new HttpRequest('POST', '/api/v1/auth/mfa/recovery', {});
+    expect(isAuthExcludedUrl(request)).toBe(true);
+  });
+
+  it('should return false for the two-factor setup URL', () => {
+    // Enrolment happens inside a session, so a 401 there is a session verdict.
+    const request = new HttpRequest('POST', '/api/v1/auth/mfa/setup', {});
+    expect(isAuthExcludedUrl(request)).toBe(false);
+  });
+
   it('should return false for profile URL', () => {
     const request = new HttpRequest('GET', '/api/v1/auth/profile');
     expect(isAuthExcludedUrl(request)).toBe(false);

@@ -1,0 +1,51 @@
+@use 'abstracts/variables' as vars;
+@use 'abstracts/functions' as func;
+
+:host {
+  display: block;
+
+  .two-factor-status {
+    display: flex;
+    gap: vars.$spacing-xs;
+    align-items: center;
+    margin-bottom: vars.$spacing-sm;
+    font-weight: 500;
+  }
+
+  .two-factor-note {
+    margin-block: 0 vars.$spacing-md;
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .two-factor-qr {
+    display: block;
+    width: func.rem(180);
+    height: func.rem(180);
+    margin-bottom: vars.$spacing-sm;
+    background-color: #fff;
+    border-radius: func.rem(4);
+  }
+
+  .two-factor-secret {
+    margin-block: 0 vars.$spacing-md;
+    font-size: vars.$font-size-sm;
+    overflow-wrap: anywhere;
+  }
+
+  .two-factor-codes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(func.rem(160), 1fr));
+    gap: vars.$spacing-xs;
+    padding: 0;
+    margin-block: 0 vars.$spacing-md;
+    list-style: none;
+  }
+
+  .two-factor-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: vars.$spacing-xs;
+    align-items: center;
+  }
+}

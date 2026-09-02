@@ -113,6 +113,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | `VK_CLIENT_ID` | - | VK OAuth client ID |
 | `VK_CLIENT_SECRET` | - | VK OAuth client secret |
 | `CLIENT_URL` | `http://localhost:4200` | Client URL for the OAuth callback redirects |
+| `MFA_ENCRYPTION_KEY` | - | Base64 of 32 random bytes. It encrypts the two-factor secret column with AES-256-GCM, because a code check needs the original secret back and thus a hash is the wrong tool. While the value is empty, two-factor enrolment answers HTTP 503 and the rest of the application is unchanged. A value that decodes to any other length stops the boot |
 | `ADMIN_EMAIL` | - | Email address of the initial administrator. The server makes the account at startup when it does not exist. It skips this step when the value is empty |
 | `ADMIN_PASSWORD` | - | Password of the initial administrator |
 | `ADMIN_FIRST_NAME` | `Admin` | First name of the initial administrator |

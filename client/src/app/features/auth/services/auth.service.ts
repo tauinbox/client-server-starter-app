@@ -11,6 +11,10 @@ import type { UserPermissionsResponse } from '@app/shared/types';
 import type {
   AuthResponse,
   LoginCredentials,
+  LoginResponse,
+  MfaDisableRequest,
+  MfaRecoveryCodesResponse,
+  MfaSetupResponse,
   RegisterRequest,
   TokensResponse,
   UpdateProfile
@@ -125,19 +129,82 @@ export class AuthService {
     this.#tokenService.forceLogout(this.#router.url);
   }
 
-  login(credentials: LoginCredentials): Observable<AuthResponse> {
+  /**
+   * A correct password does not always end the sign-in: an account carrying a
+   * second factor answers with a challenge instead of a session. Nothing is
+   * saved in that case, so the caller stays signed out until it presents a code.
+   */
+  login(credentials: LoginCredentials): Observable<LoginResponse> {
     return this.#http
-      .post<AuthResponse>(AuthApiEnum.Login, credentials, {
+      .post<LoginResponse>(AuthApiEnum.Login, credentials, {
         context: silentContext()
       })
       .pipe(
         switchMap((response) => {
-          this.#authStore.saveAuthResponse(response);
-          return from(this.completeAuthentication()).pipe(
-            switchMap(() => [response])
-          );
+          if ('mfaRequired' in response) {
+            return [response];
+          }
+          return this.startSession(response);
         })
       );
+  }
+
+  /** Finishes a sign-in with a code from the authenticator app. */
+  verifyMfa(mfaToken: string, code: string): Observable<AuthResponse> {
+    return this.#http
+      .post<AuthResponse>(
+        AuthApiEnum.MfaVerify,
+        { mfaToken, code },
+        { context: silentContext() }
+      )
+      .pipe(switchMap((response) => this.startSession(response)));
+  }
+
+  /** Finishes a sign-in with one of the recovery codes. */
+  verifyMfaRecoveryCode(
+    mfaToken: string,
+    recoveryCode: string
+  ): Observable<AuthResponse> {
+    return this.#http
+      .post<AuthResponse>(
+        AuthApiEnum.MfaRecovery,
+        { mfaToken, recoveryCode },
+        { context: silentContext() }
+      )
+      .pipe(switchMap((response) => this.startSession(response)));
+  }
+
+  /** Starts an enrolment and returns the secret to put in front of the user. */
+  startMfaSetup(currentPassword?: string): Observable<MfaSetupResponse> {
+    return this.#http.post<MfaSetupResponse>(
+      AuthApiEnum.MfaSetup,
+      currentPassword ? { currentPassword } : {},
+      { context: silentContext() }
+    );
+  }
+
+  /** Confirms the authenticator and returns the recovery codes, once. */
+  enableMfa(code: string): Observable<MfaRecoveryCodesResponse> {
+    return this.#http.post<MfaRecoveryCodesResponse>(
+      AuthApiEnum.MfaEnable,
+      { code },
+      { context: silentContext() }
+    );
+  }
+
+  disableMfa(request: MfaDisableRequest): Observable<{ message: string }> {
+    return this.#http.post<{ message: string }>(
+      AuthApiEnum.MfaDisable,
+      request,
+      { context: silentContext() }
+    );
+  }
+
+  private startSession(response: AuthResponse): Observable<AuthResponse> {
+    this.#authStore.saveAuthResponse(response);
+    return from(this.completeAuthentication()).pipe(
+      switchMap(() => [response])
+    );
   }
 
   /**

@@ -185,6 +185,8 @@
           </mat-card>
         }
 
+        <nxs-two-factor [user]="u" (changed)="loadProfile()" />
+
         <mat-card>
           <mat-card-header>
             <mat-card-title>{{ t('auth.profile.preferences') }}</mat-card-title>

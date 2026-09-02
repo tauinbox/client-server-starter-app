@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { HttpException, Logger, UnauthorizedException } from '@nestjs/common';
 import { Request as ExpressRequest, Response } from 'express';
 import { AuthController } from './auth.controller';
+import { MfaService } from '../services/mfa.service';
 import { AuthService } from '../services/auth.service';
 import { UsersService } from '../../users/services/users.service';
 import { MailService } from '../../mail/mail.service';
@@ -63,6 +64,7 @@ function mockLocalAuthRequest(
     roles: [mockAdminRole],
     isEmailVerified: true,
     hasPassword: true,
+    mfaEnabled: false,
     locale: 'en',
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
@@ -86,6 +88,19 @@ function mockResponse(): MockedResponse & Response {
     Response;
 }
 
+/**
+ * The login handler answers with a session or with a second-factor challenge.
+ * These cases are the session half, so the challenge shape is an outright
+ * failure rather than something to branch on.
+ */
+function assertSession(
+  result: Awaited<ReturnType<AuthController['login']>>
+): asserts result is Extract<typeof result, { tokens: unknown }> {
+  if ('mfaRequired' in result) {
+    throw new Error('Expected a session response, got an MFA challenge');
+  }
+}
+
 describe('AuthController', () => {
   let controller: AuthController;
   let authServiceMock: {
@@ -98,6 +113,9 @@ describe('AuthController', () => {
     forgotPassword: jest.Mock;
     resetPassword: jest.Mock;
     verifyCurrentPassword: jest.Mock;
+  };
+  let mfaServiceMock: {
+    issuePendingToken: jest.Mock;
   };
   let userServiceMock: {
     findOne: jest.Mock;
@@ -154,6 +172,12 @@ describe('AuthController', () => {
       verifyCurrentPassword: jest.fn().mockResolvedValue(undefined)
     };
 
+    mfaServiceMock = {
+      issuePendingToken: jest
+        .fn()
+        .mockReturnValue({ mfaToken: 'mfa-token', expiresIn: 300 })
+    };
+
     userServiceMock = {
       findOne: jest
         .fn()
@@ -189,6 +213,7 @@ describe('AuthController', () => {
       controllers: [AuthController],
       providers: [
         { provide: AuthService, useValue: authServiceMock },
+        { provide: MfaService, useValue: mfaServiceMock },
         { provide: UsersService, useValue: userServiceMock },
         { provide: PermissionService, useValue: permissionServiceMock },
         { provide: CaslAbilityFactory, useValue: caslAbilityFactoryMock },
@@ -266,12 +291,31 @@ describe('AuthController', () => {
       const res = mockResponse();
 
       const result = await controller.login(req, res);
+      assertSession(result);
 
       expect(result).toEqual({
         tokens: { access_token: 'access-token', expires_in: 3600 },
         user: mockAuthResult.user
       });
       expect(result.tokens).not.toHaveProperty('refresh_token');
+    });
+
+    it('should answer with a challenge, not a session, when the account carries a second factor', async () => {
+      const req = mockLocalAuthRequest() as LocalAuthRequest;
+      req.user.totpEnabledAt = new Date('2026-01-01');
+      const res = mockResponse();
+
+      const result = await controller.login(req, res);
+
+      expect(result).toEqual({
+        mfaRequired: true,
+        mfaToken: 'mfa-token',
+        expiresIn: 300
+      });
+      // No session is owed yet: no cookie, no success entry, no metric.
+      expect(res.cookie).not.toHaveBeenCalled();
+      expect(authServiceMock.login).not.toHaveBeenCalled();
+      expect(auditServiceMock.log).not.toHaveBeenCalled();
     });
 
     it('should set refresh_token cookie', async () => {
@@ -313,6 +357,7 @@ describe('AuthController', () => {
       const res = mockResponse();
 
       const result = await controller.login(req, res);
+      assertSession(result);
 
       expect(Array.isArray(result.user.roles)).toBe(true);
       expect(result.user.roles).toHaveLength(1);

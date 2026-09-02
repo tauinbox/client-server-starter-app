@@ -31,6 +31,7 @@ import { DOCUMENT, DatePipe } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 import { SessionStorageService } from '@core/services/session-storage.service';
 import { NotifyService } from '@core/services/notify.service';
+import { TwoFactorComponent } from '../two-factor/two-factor.component';
 import type { UserResponse } from '@app/shared/types';
 import type { UpdateProfile } from '../../models/auth.types';
 import type { HttpErrorResponse } from '@angular/common/http';
@@ -141,7 +142,8 @@ function canonicalEmail(value: string | undefined): string {
     MatButtonToggle,
     MatButtonToggleGroup,
     MatSlider,
-    MatSliderThumb
+    MatSliderThumb,
+    TwoFactorComponent
   ],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',

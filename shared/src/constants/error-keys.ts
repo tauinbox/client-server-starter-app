@@ -38,7 +38,14 @@ export const ErrorKeys = {
     SAME_EMAIL: 'errors.auth.sameEmail',
     PENDING_EMAIL_TOKEN_EXPIRED: 'errors.auth.pendingEmailTokenExpired',
     REAUTH_REQUIRED: 'errors.auth.reauthRequired',
-    PASSWORD_BREACHED: 'errors.auth.passwordBreached'
+    PASSWORD_BREACHED: 'errors.auth.passwordBreached',
+    MFA_UNAVAILABLE: 'errors.auth.mfaUnavailable',
+    MFA_ALREADY_ENABLED: 'errors.auth.mfaAlreadyEnabled',
+    MFA_NOT_ENABLED: 'errors.auth.mfaNotEnabled',
+    MFA_SETUP_REQUIRED: 'errors.auth.mfaSetupRequired',
+    MFA_INVALID_CODE: 'errors.auth.mfaInvalidCode',
+    MFA_INVALID_RECOVERY_CODE: 'errors.auth.mfaInvalidRecoveryCode',
+    MFA_INVALID_PENDING_TOKEN: 'errors.auth.mfaInvalidPendingToken'
   },
   USERS: {
     NOT_FOUND: 'errors.users.notFound',

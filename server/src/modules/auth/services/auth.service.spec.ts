@@ -22,6 +22,7 @@ import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { BreachedPasswordService } from '../breached-password/breached-password.service';
+import { MfaService } from './mfa.service';
 import { SessionIssuerService } from './session-issuer.service';
 import { SessionLimitService } from './session-limit.service';
 import { EntitlementService } from '../../entitlements/entitlement.service';
@@ -104,6 +105,9 @@ describe('AuthService', () => {
     sign: jest.Mock;
     verify: jest.Mock;
   };
+  let mockMfaService: {
+    isValidStepUpCode: jest.Mock;
+  };
 
   const mockUserRole = {
     id: 'role-uuid-user',
@@ -124,6 +128,7 @@ describe('AuthService', () => {
     lastName: 'Doe',
     password: '$2b$10$hashedpassword',
     hasPassword: true,
+    mfaEnabled: false,
     isActive: true,
     isEmailVerified: true,
     locale: 'en',
@@ -137,6 +142,9 @@ describe('AuthService', () => {
     pendingEmailToken: null,
     pendingEmailExpiresAt: null,
     tokenRevokedAt: null,
+    totpSecret: null,
+    totpEnabledAt: null,
+    totpRecoveryCodes: null,
     roles: [mockUserRole],
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
@@ -269,6 +277,10 @@ describe('AuthService', () => {
       verify: jest.fn()
     };
 
+    mockMfaService = {
+      isValidStepUpCode: jest.fn().mockReturnValue(false)
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -288,7 +300,8 @@ describe('AuthService', () => {
         {
           provide: BreachedPasswordService,
           useValue: mockBreachedPasswordService
-        }
+        },
+        { provide: MfaService, useValue: mockMfaService }
       ]
     }).compile();
 
@@ -1208,7 +1221,11 @@ describe('AuthService', () => {
     it('should return the User entity instance so @Exclude() fields can be stripped downstream', async () => {
       // hasPassword is a get-only accessor on User, so it must not travel in
       // the source of an Object.assign onto a real instance.
-      const { hasPassword: _derived, ...columns } = mockUser;
+      const {
+        hasPassword: _derived,
+        mfaEnabled: _derivedMfa,
+        ...columns
+      } = mockUser;
       const entity = Object.assign(new User(), columns, {
         passwordResetToken: 'hashed-reset-token'
       });
@@ -1468,6 +1485,43 @@ describe('AuthService', () => {
         service.verifyCurrentPassword(oauthOnlyUser.id, undefined)
       ).resolves.toBeUndefined();
       expect(compareSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('assertStepUp', () => {
+    it('accepts a valid authenticator code in place of the provider round trip', async () => {
+      // An account created through a provider holds no password, so before the
+      // second factor existed a provider round trip was its only way to step up.
+      const user = { id: 'user-1', password: null } as User;
+      mockMfaService.isValidStepUpCode.mockImplementation(
+        (_user: User, code: string | undefined) => code === '123456'
+      );
+
+      await expect(
+        service.assertStepUp(user, undefined, undefined, '123456')
+      ).resolves.toBeUndefined();
+    });
+
+    it('still demands the provider proof when the code is wrong', async () => {
+      const user = { id: 'user-1', password: null } as User;
+      mockMfaService.isValidStepUpCode.mockReturnValue(false);
+
+      await expect(
+        service.assertStepUp(user, undefined, undefined, '000000')
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
+      });
+    });
+
+    it('accepts a valid authenticator code in place of the password', async () => {
+      const compare = jest.spyOn(bcrypt, 'compare').mockClear();
+      const user = { id: 'user-1', password: '$2b$12$hash' } as User;
+      mockMfaService.isValidStepUpCode.mockReturnValue(true);
+
+      await expect(
+        service.assertStepUp(user, undefined, undefined, '123456')
+      ).resolves.toBeUndefined();
+      expect(compare).not.toHaveBeenCalled();
     });
   });
 

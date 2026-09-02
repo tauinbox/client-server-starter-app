@@ -7,6 +7,7 @@ import {
   MAX_CONCURRENT_SESSIONS,
   MAX_FAILED_ATTEMPTS,
   MAX_PASSWORD_LENGTH,
+  MFA_PENDING_TOKEN_EXPIRY_SECONDS,
   RESET_TOKEN_EXPIRY_MS,
   VERIFICATION_TOKEN_EXPIRY_MS
 } from '@app/shared/constants';
@@ -17,7 +18,7 @@ import {
   validateLocale,
   validateMaxLength
 } from '../utils/validation';
-import { generateTokens } from '../jwt.utils';
+import { generateMfaPendingToken, generateTokens } from '../jwt.utils';
 import {
   breachedPasswordEnvelope,
   isBreachedPassword
@@ -224,6 +225,18 @@ router.post('/login', (req, res) => {
   if (user.failedLoginAttempts > 0 || user.lockedUntil) {
     user.failedLoginAttempts = 0;
     user.lockedUntil = null;
+  }
+
+  // An account that carries a second factor is not signed in yet. A correct
+  // password buys only the right to present a code, so no session and no
+  // success entry are produced here.
+  if (user.totpEnabledAt) {
+    res.json({
+      mfaRequired: true,
+      mfaToken: generateMfaPendingToken(user),
+      expiresIn: MFA_PENDING_TOKEN_EXPIRY_SECONDS
+    });
+    return;
   }
 
   const state = getState();

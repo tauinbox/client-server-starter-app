@@ -27,6 +27,14 @@ management and theming.
   clears the lock. An administrator can also unlock the account from the user-edit page.
 - **Email verification.** A new registration requires email verification before the first login, and
   a login before that answers HTTP 403. A resend-verification endpoint is available.
+- **Two-factor authentication.** TOTP, optional for every account and forced on none. The profile
+  page shows a QR code and a manual key, and the factor stays off until a code from the
+  authenticator proves the setup worked. Enrolment answers with ten single-use recovery codes,
+  stored as hashes and readable exactly once. After that a correct password no longer signs the
+  account in: it returns a 300 second `mfa_pending` token, which the bearer strategy refuses, and
+  only a code or a recovery code turns it into a session. The shared secret is encrypted at rest
+  with `MFA_ENCRYPTION_KEY`; while that key is empty, enrolment answers HTTP 503 and every other
+  path is unchanged.
 
   An OAuth user becomes verified only when the provider asserts `email_verified=true` for that same
   address. Google and Facebook do this. The rule applies at the creation of the account and at each
@@ -1001,6 +1009,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `DB_POOL_IDLE_TIMEOUT` | `30000` | Milliseconds before the pool closes an idle connection |
 | `DB_POOL_CONNECTION_TIMEOUT` | `5000` | Milliseconds to wait for a connection before an error |
 | `SMTP_FROM` | `noreply@example.com` | Default "from" address of an email |
+| `MFA_ENCRYPTION_KEY` | - | Base64 of 32 random bytes. It encrypts the two-factor secret column with AES-256-GCM, because a code check needs the original secret back and thus a hash is the wrong tool. While the value is empty, two-factor enrolment answers HTTP 503 and the rest of the application is unchanged. A value that decodes to any other length stops the boot |
 | `ADMIN_EMAIL` | - | Email address of the initial administrator. The server seeds the account at startup, and it skips this step when the value is empty |
 | `ADMIN_PASSWORD` | - | Password of the initial administrator |
 | `ADMIN_FIRST_NAME` | `Admin` | First name of the initial administrator |
@@ -1355,6 +1364,7 @@ the script is the authoritative reference for the key list.
 | `DB_PASSWORD` | deploy, rebuild | `server/.env` and root `.env` | It must be equal to the password of the postgres volume. Refer to the caution below |
 | `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_SECRET`, `VK_CLIENT_SECRET` | deploy, rebuild | `server/.env` | The OAuth client secrets |
 | `ADMIN_PASSWORD` | deploy, rebuild | `server/.env` | The password of the initial administrator |
+| `MFA_ENCRYPTION_KEY` | deploy, rebuild | `server/.env` | The AES-256-GCM key of the two-factor secret column. It is not stored with the data it protects. While the secret is empty, two-factor enrolment answers HTTP 503 and nothing else changes |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | deploy, rebuild | `server/.env` | Outgoing email |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | deploy, rebuild | `server/.env` | The Cloudflare Turnstile CAPTCHA on `/register` and `/forgot-password`. The site key is public, but the workflow injects it in the same way for safety during a rebuild. The CAPTCHA stays disabled while one of the two is empty. Refer to [Enabling CAPTCHA in production](server/README.md#enabling-captcha-in-production) |
 | `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` | deploy, rebuild | `server/.env` | The credentials of the billing providers. Billing stays hidden until the full pair of a provider has a value. Keep them empty until a person connects a provider |
@@ -1706,11 +1716,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2097 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 352 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 350 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1201 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 232 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 509 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2154 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 355 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 353 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1223 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 235 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 533 tests pass |
 
 ## CI/CD
 
@@ -1759,6 +1769,13 @@ The wrapper retries a maximum of 3 times, 15 s apart. It retries **only** when t
 - **Account lockout** starts after 5 failed logins. The cooldown is 15 minutes. A password reset
   clears it, and the end of the window also clears it.
 - **Email verification** is necessary before the first login.
+- **Two-factor authentication** is available to every account. A password on an enrolled account
+  buys only an `mfa_pending` token, which `JwtStrategy` refuses as a bearer credential, so one
+  factor alone reaches nothing. The two challenge routes carry the login throttle, including the
+  long window that counts failures only, and each refused code is audited. A recovery code is spent
+  by deleting its hash, so it works once. The TOTP secret is encrypted (AES-256-GCM), not hashed,
+  because verification needs the original value; the key lives in `MFA_ENCRYPTION_KEY` and never in
+  the database.
 - A **password reset token** is single-use and expires in 30 minutes. The reset revokes each session.
 - An **administrator password change** immediately revokes each session of the target user.
 - An **administrator email change** does the same. The endpoint exists to recover an account whose

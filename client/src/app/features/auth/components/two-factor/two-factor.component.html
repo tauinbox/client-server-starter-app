@@ -1,0 +1,193 @@
+<mat-card *transloco="let t; scope: 'auth'">
+  <mat-card-header>
+    <mat-card-title>{{ t('auth.twoFactor.title') }}</mat-card-title>
+  </mat-card-header>
+
+  <mat-card-content>
+    @if (!accountHasPassword()) {
+      <p class="two-factor-note" role="note">
+        {{ t('auth.twoFactor.needsPassword') }}
+      </p>
+    } @else {
+      @switch (stage()) {
+        @case ('password') {
+          <p class="two-factor-note">
+            {{ t('auth.twoFactor.confirmItIsYou') }}
+          </p>
+
+          <nxs-form-field
+            [field]="passwordForm.currentPassword"
+            label="auth.twoFactor.currentPassword"
+            [type]="setupPwdToggle.show() ? 'text' : 'password'"
+            prefixIcon="lock"
+            autocomplete="current-password"
+          >
+            <nxs-password-toggle formFieldSuffix #setupPwdToggle />
+          </nxs-form-field>
+
+          <div class="two-factor-actions">
+            <button
+              matButton="filled"
+              type="button"
+              [disabled]="passwordForm().invalid() || busy()"
+              (click)="requestSecret()"
+            >
+              @if (busy()) {
+                <span class="app-btn-loading">
+                  <mat-spinner diameter="20"></mat-spinner>
+                  {{ t('auth.twoFactor.working') }}
+                </span>
+              } @else {
+                {{ t('auth.twoFactor.continue') }}
+              }
+            </button>
+            <button matButton="text" type="button" (click)="cancel()">
+              {{ t('auth.twoFactor.cancel') }}
+            </button>
+          </div>
+        }
+
+        @case ('confirm') {
+          @let currentSetup = setup();
+          @if (currentSetup) {
+            <p class="two-factor-note">{{ t('auth.twoFactor.scanHint') }}</p>
+
+            <img
+              class="two-factor-qr"
+              [src]="currentSetup.qrDataUrl"
+              [alt]="t('auth.twoFactor.qrAlt')"
+            />
+
+            <p class="two-factor-secret">
+              {{ t('auth.twoFactor.manualKey') }}
+              <code>{{ currentSetup.secret }}</code>
+            </p>
+          }
+
+          <nxs-form-field
+            [field]="codeForm.code"
+            label="auth.twoFactor.code"
+            type="text"
+            prefixIcon="password"
+            autocomplete="one-time-code"
+          />
+
+          <div class="two-factor-actions">
+            <button
+              matButton="filled"
+              type="button"
+              [disabled]="codeForm().invalid() || busy()"
+              (click)="confirmCode()"
+            >
+              @if (busy()) {
+                <span class="app-btn-loading">
+                  <mat-spinner diameter="20"></mat-spinner>
+                  {{ t('auth.twoFactor.working') }}
+                </span>
+              } @else {
+                {{ t('auth.twoFactor.turnOn') }}
+              }
+            </button>
+            <button matButton="text" type="button" (click)="cancel()">
+              {{ t('auth.twoFactor.cancel') }}
+            </button>
+          </div>
+        }
+
+        @case ('codes') {
+          <p class="two-factor-note">{{ t('auth.twoFactor.recoveryHint') }}</p>
+
+          <ul class="two-factor-codes">
+            @for (code of recoveryCodes(); track code) {
+              <li>
+                <code>{{ code }}</code>
+              </li>
+            }
+          </ul>
+
+          <div class="two-factor-actions">
+            <button
+              matButton="filled"
+              type="button"
+              (click)="acknowledgeCodes()"
+            >
+              {{ t('auth.twoFactor.codesSaved') }}
+            </button>
+          </div>
+        }
+
+        @case ('disable') {
+          <p class="two-factor-note">{{ t('auth.twoFactor.disableHint') }}</p>
+
+          <nxs-form-field
+            [field]="passwordForm.currentPassword"
+            label="auth.twoFactor.currentPassword"
+            [type]="disablePwdToggle.show() ? 'text' : 'password'"
+            prefixIcon="lock"
+            autocomplete="current-password"
+          >
+            <nxs-password-toggle formFieldSuffix #disablePwdToggle />
+          </nxs-form-field>
+
+          <div class="two-factor-actions">
+            <button
+              matButton="filled"
+              type="button"
+              [disabled]="passwordForm().invalid() || busy()"
+              (click)="disable()"
+            >
+              @if (busy()) {
+                <span class="app-btn-loading">
+                  <mat-spinner diameter="20"></mat-spinner>
+                  {{ t('auth.twoFactor.working') }}
+                </span>
+              } @else {
+                {{ t('auth.twoFactor.turnOff') }}
+              }
+            </button>
+            <button matButton="text" type="button" (click)="cancel()">
+              {{ t('auth.twoFactor.cancel') }}
+            </button>
+          </div>
+        }
+
+        @default {
+          <div class="two-factor-status">
+            <mat-icon>{{ enabled() ? 'lock' : 'lock_open' }}</mat-icon>
+            <span>{{
+              enabled() ? t('auth.twoFactor.isOn') : t('auth.twoFactor.isOff')
+            }}</span>
+          </div>
+
+          <p class="two-factor-note">
+            {{
+              enabled()
+                ? t('auth.twoFactor.onHint')
+                : t('auth.twoFactor.offHint')
+            }}
+          </p>
+
+          <div class="two-factor-actions">
+            @if (enabled()) {
+              <button
+                matButton="outlined"
+                type="button"
+                (click)="startDisable()"
+              >
+                {{ t('auth.twoFactor.turnOff') }}
+              </button>
+            } @else {
+              <button
+                matButton="filled"
+                type="button"
+                (click)="startEnrolment()"
+              >
+                {{ t('auth.twoFactor.turnOn') }}
+              </button>
+            }
+          </div>
+        }
+      }
+    }
+  </mat-card-content>
+</mat-card>

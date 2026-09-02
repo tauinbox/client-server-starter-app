@@ -115,7 +115,14 @@ router.post('/users', (req, res) => {
 
   const state = getState();
   for (const user of users) {
-    state.users.set(user.id, user);
+    // A test seeds the fields it cares about. Anything it leaves out has to
+    // land as the null the rest of the mock reads, not as undefined.
+    state.users.set(user.id, {
+      ...user,
+      totpSecret: user.totpSecret ?? null,
+      totpEnabledAt: user.totpEnabledAt ?? null,
+      totpRecoveryCodes: user.totpRecoveryCodes ?? null
+    });
   }
 
   res.json({ message: `Added/updated ${users.length} user(s)` });

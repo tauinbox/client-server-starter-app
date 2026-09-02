@@ -12,116 +12,178 @@
         </div>
       }
 
-      <form (submit)="$event.preventDefault(); onSubmit()">
-        <nxs-form-field
-          [field]="loginForm.email"
-          label="auth.login.email"
-          type="email"
-          prefixIcon="email"
-          autocomplete="email"
-        />
+      @if (mfaChallenge()) {
+        <form (submit)="$event.preventDefault(); onSubmitMfa()">
+          <p class="mfa-hint">
+            {{
+              usingRecoveryCode()
+                ? t('auth.login.mfaRecoveryHint')
+                : t('auth.login.mfaHint')
+            }}
+          </p>
 
-        <nxs-form-field
-          [field]="loginForm.password"
-          label="auth.login.password"
-          [type]="pwdToggle.show() ? 'text' : 'password'"
-          prefixIcon="lock"
-          autocomplete="current-password"
-        >
-          <nxs-password-toggle formFieldSuffix #pwdToggle />
-        </nxs-form-field>
+          <nxs-form-field
+            [field]="mfaForm.code"
+            [label]="
+              usingRecoveryCode()
+                ? 'auth.login.mfaRecoveryCode'
+                : 'auth.login.mfaCode'
+            "
+            type="text"
+            prefixIcon="password"
+            autocomplete="one-time-code"
+          />
 
-        @if (error()) {
-          <div class="error-message" role="alert">
-            {{ error() }}
-            @if (lockoutSeconds() > 0) {
-              <div class="lockout-countdown">
-                {{
-                  t('auth.login.lockoutCountdown', {
-                    seconds: lockoutSeconds()
-                  })
-                }}
-              </div>
-            }
+          @if (error()) {
+            <div class="error-message" role="alert">{{ error() }}</div>
+          }
+
+          <div class="form-actions">
+            <button
+              matButton="filled"
+              type="submit"
+              [disabled]="mfaForm().invalid() || loading()"
+            >
+              @if (loading()) {
+                <span class="app-btn-loading">
+                  <mat-spinner diameter="24"></mat-spinner>
+                  {{ t('auth.login.loggingIn') }}
+                </span>
+              } @else {
+                {{ t('auth.login.mfaVerify') }}
+              }
+            </button>
           </div>
-        }
 
-        @if (emailNotVerified()) {
-          <div class="verification-actions">
-            @if (verificationResent()) {
-              <span class="verification-sent">{{
-                t('auth.login.verificationSent')
-              }}</span>
-            } @else {
+          <div class="mfa-links">
+            <button
+              matButton="text"
+              type="button"
+              (click)="toggleRecoveryCode()"
+            >
+              {{
+                usingRecoveryCode()
+                  ? t('auth.login.mfaUseAuthenticator')
+                  : t('auth.login.mfaUseRecoveryCode')
+              }}
+            </button>
+            <button matButton="text" type="button" (click)="cancelMfa()">
+              {{ t('auth.login.mfaCancel') }}
+            </button>
+          </div>
+        </form>
+      } @else {
+        <form (submit)="$event.preventDefault(); onSubmit()">
+          <nxs-form-field
+            [field]="loginForm.email"
+            label="auth.login.email"
+            type="email"
+            prefixIcon="email"
+            autocomplete="email"
+          />
+
+          <nxs-form-field
+            [field]="loginForm.password"
+            label="auth.login.password"
+            [type]="pwdToggle.show() ? 'text' : 'password'"
+            prefixIcon="lock"
+            autocomplete="current-password"
+          >
+            <nxs-password-toggle formFieldSuffix #pwdToggle />
+          </nxs-form-field>
+
+          @if (error()) {
+            <div class="error-message" role="alert">
+              {{ error() }}
+              @if (lockoutSeconds() > 0) {
+                <div class="lockout-countdown">
+                  {{
+                    t('auth.login.lockoutCountdown', {
+                      seconds: lockoutSeconds()
+                    })
+                  }}
+                </div>
+              }
+            </div>
+          }
+
+          @if (emailNotVerified()) {
+            <div class="verification-actions">
+              @if (verificationResent()) {
+                <span class="verification-sent">{{
+                  t('auth.login.verificationSent')
+                }}</span>
+              } @else {
+                <button
+                  matButton="text"
+                  type="button"
+                  [disabled]="resendingVerification()"
+                  (click)="resendVerification()"
+                >
+                  @if (resendingVerification()) {
+                    <span class="app-btn-loading">
+                      <mat-spinner diameter="16"></mat-spinner>
+                      {{ t('auth.login.sending') }}
+                    </span>
+                  } @else {
+                    {{ t('auth.login.resendVerificationEmail') }}
+                  }
+                </button>
+              }
+            </div>
+          }
+
+          <div class="form-actions">
+            <button
+              matButton="filled"
+              type="submit"
+              [disabled]="
+                loginForm().invalid() || loading() || lockoutSeconds() > 0
+              "
+            >
+              @if (loading()) {
+                <span class="app-btn-loading">
+                  <mat-spinner diameter="24"></mat-spinner>
+                  {{ t('auth.login.loggingIn') }}
+                </span>
+              } @else {
+                {{ t('auth.login.title') }}
+              }
+            </button>
+          </div>
+
+          <div class="forgot-password-link">
+            <a routerLink="/forgot-password">{{
+              t('auth.login.forgotPassword')
+            }}</a>
+          </div>
+        </form>
+
+        @if (visibleOAuthProviders().length > 0) {
+          <div class="oauth-divider">
+            <mat-divider></mat-divider>
+            <span class="oauth-divider-text">{{
+              t('auth.login.oauthDivider')
+            }}</span>
+            <mat-divider></mat-divider>
+          </div>
+
+          <div class="oauth-buttons">
+            @for (provider of visibleOAuthProviders(); track provider.id) {
               <button
-                matButton="text"
+                matButton="outlined"
                 type="button"
-                [disabled]="resendingVerification()"
-                (click)="resendVerification()"
+                class="oauth-button"
+                (click)="onOAuthLogin(provider.id)"
               >
-                @if (resendingVerification()) {
-                  <span class="app-btn-loading">
-                    <mat-spinner diameter="16"></mat-spinner>
-                    {{ t('auth.login.sending') }}
-                  </span>
-                } @else {
-                  {{ t('auth.login.resendVerificationEmail') }}
-                }
+                <span class="oauth-btn-content">
+                  <mat-icon [svgIcon]="provider.icon"></mat-icon>
+                  <span>{{ t(provider.labelKey) }}</span>
+                </span>
               </button>
             }
           </div>
         }
-
-        <div class="form-actions">
-          <button
-            matButton="filled"
-            type="submit"
-            [disabled]="
-              loginForm().invalid() || loading() || lockoutSeconds() > 0
-            "
-          >
-            @if (loading()) {
-              <span class="app-btn-loading">
-                <mat-spinner diameter="24"></mat-spinner>
-                {{ t('auth.login.loggingIn') }}
-              </span>
-            } @else {
-              {{ t('auth.login.title') }}
-            }
-          </button>
-        </div>
-
-        <div class="forgot-password-link">
-          <a routerLink="/forgot-password">{{
-            t('auth.login.forgotPassword')
-          }}</a>
-        </div>
-      </form>
-
-      @if (visibleOAuthProviders().length > 0) {
-        <div class="oauth-divider">
-          <mat-divider></mat-divider>
-          <span class="oauth-divider-text">{{
-            t('auth.login.oauthDivider')
-          }}</span>
-          <mat-divider></mat-divider>
-        </div>
-
-        <div class="oauth-buttons">
-          @for (provider of visibleOAuthProviders(); track provider.id) {
-            <button
-              matButton="outlined"
-              type="button"
-              class="oauth-button"
-              (click)="onOAuthLogin(provider.id)"
-            >
-              <span class="oauth-btn-content">
-                <mat-icon [svgIcon]="provider.icon"></mat-icon>
-                <span>{{ t(provider.labelKey) }}</span>
-              </span>
-            </button>
-          }
-        </div>
       }
     </mat-card-content>
 

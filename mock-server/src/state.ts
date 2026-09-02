@@ -244,6 +244,9 @@ export function toUserResponse(user: MockUser): UserResponse {
     pendingEmail: _____,
     pendingEmailToken: ______,
     pendingEmailExpiresAt: _______,
+    totpSecret: ________,
+    totpEnabledAt: _________,
+    totpRecoveryCodes: __________,
     roles: roleNames,
     ...rest
   } = user;
@@ -251,7 +254,12 @@ export function toUserResponse(user: MockUser): UserResponse {
     const role = Array.from(state.roles.values()).find((r) => r.name === name);
     return role ? [toRolePublicResponse(role)] : [];
   });
-  return { ...rest, roles, hasPassword: user.password !== null };
+  return {
+    ...rest,
+    roles,
+    hasPassword: user.password !== null,
+    mfaEnabled: Boolean(user.totpEnabledAt)
+  };
 }
 
 export function toAdminUserResponse(user: MockUser): AdminUserResponse {
@@ -262,6 +270,9 @@ export function toAdminUserResponse(user: MockUser): AdminUserResponse {
     pendingEmail: ____,
     pendingEmailToken: _____,
     pendingEmailExpiresAt: ______,
+    totpSecret: _______,
+    totpEnabledAt: ________,
+    totpRecoveryCodes: _________,
     roles: roleNames,
     ...rest
   } = user;
@@ -269,7 +280,12 @@ export function toAdminUserResponse(user: MockUser): AdminUserResponse {
     const role = Array.from(state.roles.values()).find((r) => r.name === name);
     return role ? [toRoleAdminResponse(role)] : [];
   });
-  return { ...rest, roles, hasPassword: user.password !== null };
+  return {
+    ...rest,
+    roles,
+    hasPassword: user.password !== null,
+    mfaEnabled: Boolean(user.totpEnabledAt)
+  };
 }
 
 export function addOAuthAccounts(

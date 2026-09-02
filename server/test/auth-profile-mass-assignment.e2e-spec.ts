@@ -16,6 +16,7 @@ import * as request from 'supertest';
 import type { Server } from 'http';
 import { AuthController } from '../src/modules/auth/controllers/auth.controller';
 import { AuthService } from '../src/modules/auth/services/auth.service';
+import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
@@ -41,6 +42,18 @@ describe('Profile mass-assignment protection (e2e)', () => {
       controllers: [AuthController],
       providers: [
         { provide: AuthService, useValue: {} },
+        {
+          // These suites never present a second factor. The mock answers the two
+          // members AuthService and AuthController read, so the branch is simply
+          // never taken.
+          provide: MfaService,
+          useValue: {
+            isValidStepUpCode: jest.fn().mockReturnValue(false),
+            issuePendingToken: jest
+              .fn()
+              .mockReturnValue({ mfaToken: 'mfa', expiresIn: 300 })
+          }
+        },
         { provide: UsersService, useValue: usersService },
         { provide: PermissionService, useValue: {} },
         { provide: CaslAbilityFactory, useValue: {} },

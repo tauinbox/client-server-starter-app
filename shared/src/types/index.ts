@@ -9,6 +9,10 @@ export type {
 export type {
   TokensResponse,
   AuthResponse,
+  MfaRequiredResponse,
+  LoginResponse,
+  MfaSetupResponse,
+  MfaRecoveryCodesResponse,
   CaptchaProvider,
   CaptchaConfigResponse
 } from './auth.types';

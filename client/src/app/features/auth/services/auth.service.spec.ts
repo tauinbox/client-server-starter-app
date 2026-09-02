@@ -55,6 +55,7 @@ function createMockAuthResponse(): AuthResponse {
       roles: [mockUserRole],
       isEmailVerified: true,
       hasPassword: true,
+      mfaEnabled: false,
       locale: 'en',
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
@@ -184,6 +185,104 @@ describe('AuthService', () => {
       .forEach((req) => req.flush({ rules: [] }));
     httpMock.verify();
     TestBed.resetTestingModule();
+  });
+
+  describe('two-factor sign-in', () => {
+    const challenge = {
+      mfaRequired: true as const,
+      mfaToken: 'pending-token',
+      expiresIn: 300
+    };
+
+    it('saves nothing when the password only buys a challenge', async () => {
+      const loginPromise = firstValueFrom(
+        service.login({ email: 'test@example.com', password: 'password' })
+      );
+
+      httpMock.expectOne(AuthApiEnum.Login).flush(challenge);
+
+      await expect(loginPromise).resolves.toEqual(challenge);
+      // A challenge is not a session: saving it would sign the caller in with
+      // one factor, which is the whole thing the second factor prevents.
+      expect(authStoreMock.saveAuthResponse).not.toHaveBeenCalled();
+      httpMock.expectNone(AuthApiEnum.Permissions);
+    });
+
+    it('starts the session once the code is accepted', async () => {
+      const mockAuth = createMockAuthResponse();
+      const verifyPromise = firstValueFrom(
+        service.verifyMfa('pending-token', '123456')
+      );
+
+      const req = httpMock.expectOne(AuthApiEnum.MfaVerify);
+      expect(req.request.body).toEqual({
+        mfaToken: 'pending-token',
+        code: '123456'
+      });
+      req.flush(mockAuth);
+      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
+
+      await expect(verifyPromise).resolves.toEqual(mockAuth);
+      expect(authStoreMock.saveAuthResponse).toHaveBeenCalledWith(mockAuth);
+    });
+
+    it('starts the session from a recovery code too', async () => {
+      const mockAuth = createMockAuthResponse();
+      const recoveryPromise = firstValueFrom(
+        service.verifyMfaRecoveryCode('pending-token', 'AAAAAAAA-AAAAAAAA')
+      );
+
+      const req = httpMock.expectOne(AuthApiEnum.MfaRecovery);
+      expect(req.request.body).toEqual({
+        mfaToken: 'pending-token',
+        recoveryCode: 'AAAAAAAA-AAAAAAAA'
+      });
+      req.flush(mockAuth);
+      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
+
+      await expect(recoveryPromise).resolves.toEqual(mockAuth);
+      expect(authStoreMock.saveAuthResponse).toHaveBeenCalledWith(mockAuth);
+    });
+  });
+
+  describe('two-factor enrolment', () => {
+    it('sends the current password with the setup request', async () => {
+      const setupPromise = firstValueFrom(service.startMfaSetup('Password1'));
+
+      const req = httpMock.expectOne(AuthApiEnum.MfaSetup);
+      expect(req.request.body).toEqual({ currentPassword: 'Password1' });
+      req.flush({ secret: 'S', otpauthUri: 'otpauth://', qrDataUrl: 'data:' });
+
+      await expect(setupPromise).resolves.toEqual({
+        secret: 'S',
+        otpauthUri: 'otpauth://',
+        qrDataUrl: 'data:'
+      });
+    });
+
+    it('returns the recovery codes the enable call answers with', async () => {
+      const enablePromise = firstValueFrom(service.enableMfa('123456'));
+
+      const req = httpMock.expectOne(AuthApiEnum.MfaEnable);
+      expect(req.request.body).toEqual({ code: '123456' });
+      req.flush({ recoveryCodes: ['AAAAAAAA-AAAAAAAA'] });
+
+      await expect(enablePromise).resolves.toEqual({
+        recoveryCodes: ['AAAAAAAA-AAAAAAAA']
+      });
+    });
+
+    it('posts the step-up factor when the account turns it off', async () => {
+      const disablePromise = firstValueFrom(
+        service.disableMfa({ currentPassword: 'Password1' })
+      );
+
+      const req = httpMock.expectOne(AuthApiEnum.MfaDisable);
+      expect(req.request.body).toEqual({ currentPassword: 'Password1' });
+      req.flush({ message: 'off' });
+
+      await expect(disablePromise).resolves.toEqual({ message: 'off' });
+    });
   });
 
   describe('login', () => {

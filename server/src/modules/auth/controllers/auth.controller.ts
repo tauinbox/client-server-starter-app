@@ -34,6 +34,7 @@ import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { AuthService } from '../services/auth.service';
+import { MfaService } from '../services/mfa.service';
 import { PermissionService } from '../services/permission.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
@@ -45,7 +46,9 @@ import { Authorize } from '../decorators/authorize.decorator';
 import { Public } from '../decorators/public.decorator';
 import { UsersService } from '../../users/services/users.service';
 import { MailService } from '../../mail/mail.service';
-import { AuthResponseDto } from '../dtos/auth-response.dto';
+import { AuthResponseDto, TokensResponseDto } from '../dtos/auth-response.dto';
+import { MfaRequiredResponseDto } from '../dtos/mfa.dto';
+import { User } from '../../users/entities/user.entity';
 import { JwtAuthRequest, LocalAuthRequest } from '../types/auth.request';
 import { VerifyEmailDto } from '../dtos/verify-email.dto';
 import { ResendVerificationDto } from '../dtos/resend-verification.dto';
@@ -86,6 +89,7 @@ export class AuthController {
 
   constructor(
     private readonly authService: AuthService,
+    private readonly mfaService: MfaService,
     private readonly userService: UsersService,
     private readonly permissionService: PermissionService,
     private readonly caslAbilityFactory: CaslAbilityFactory,
@@ -158,7 +162,20 @@ export class AuthController {
   async login(
     @Request() req: LocalAuthRequest,
     @Res({ passthrough: true }) res: Response
-  ) {
+  ): Promise<
+    | MfaRequiredResponseDto
+    | { tokens: Omit<TokensResponseDto, 'refresh_token'>; user: User }
+  > {
+    // An account carrying a second factor is not signed in yet, so a correct
+    // password buys only the right to present a code: no session cookie and no
+    // success entry. POST /auth/mfa/verify finishes both.
+    if (req.user.totpEnabledAt) {
+      const { mfaToken, expiresIn } = this.mfaService.issuePendingToken(
+        req.user
+      );
+      return { mfaRequired: true, mfaToken, expiresIn };
+    }
+
     const result = await this.authService.login(req.user);
     await this.auditService.log({
       action: AuditAction.USER_LOGIN_SUCCESS,

@@ -34,3 +34,29 @@ export const OAUTH_DATA_COOKIE_OPTIONS: CookieOptions = {
 export const REAUTH_PROOF_COOKIE = 'reauth_proof';
 export const REAUTH_PROOF_COOKIE_PATH = '/api/v1/auth';
 export const REAUTH_PROOF_MAX_AGE_MS = 300 * 1000;
+
+/**
+ * The mock accepts one fixed code and hands out one fixed secret. A real
+ * time-based code would make every end-to-end run depend on the clock, which
+ * is a flake by construction rather than a test of anything.
+ */
+export const MOCK_TOTP_SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+
+export const MOCK_TOTP_CODE = '123456';
+
+/** A 1x1 transparent PNG. The client only needs a renderable image here. */
+export const MOCK_TOTP_QR_DATA_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+export const MOCK_RECOVERY_CODES: readonly string[] = [
+  'AAAAAAAA-AAAAAAAA',
+  'BBBBBBBB-BBBBBBBB',
+  'CCCCCCCC-CCCCCCCC',
+  'DDDDDDDD-DDDDDDDD',
+  'EEEEEEEE-EEEEEEEE',
+  'FFFFFFFF-FFFFFFFF',
+  'GGGGGGGG-GGGGGGGG',
+  'HHHHHHHH-HHHHHHHH',
+  'IIIIIIII-IIIIIIII',
+  'JJJJJJJJ-JJJJJJJJ'
+];
