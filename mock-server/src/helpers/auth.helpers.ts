@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { validateToken, type DecodedToken } from '../jwt.utils';
-import { findUserById } from '../state';
+import { ErrorKeys } from '@app/shared/constants';
+import { findUserById, mustEnrolMfa } from '../state';
 import type { AuthenticatedRequest, MockUser } from '../types';
 
 export function extractBearerToken(req: Request): string | null {
@@ -39,12 +40,27 @@ export function requireAuth(
   return result;
 }
 
+export type GuardError = {
+  error: number;
+  message?: string;
+  errorKey?: string;
+};
+
 export function requireAdmin(
   req: Request
-): { user: MockUser; decoded: DecodedToken } | { error: number } {
+): { user: MockUser; decoded: DecodedToken } | GuardError {
   const result = requireAuth(req);
   if ('error' in result) return result;
   if (!result.user.roles?.includes('admin')) return { error: 403 };
+  // Mirrors MfaRequiredGuard, which travels with @Authorize on the server.
+  if (mustEnrolMfa(result.user)) {
+    return {
+      error: 403,
+      message:
+        'Two-factor authentication must be turned on before this account can use the administration surface',
+      errorKey: ErrorKeys.AUTH.MFA_ENROLMENT_REQUIRED
+    };
+  }
   return result;
 }
 
@@ -65,8 +81,13 @@ export function authGuard(req: Request, res: Response, next: NextFunction) {
 export function adminGuard(req: Request, res: Response, next: NextFunction) {
   const result = requireAdmin(req);
   if ('error' in result) {
-    const msg = result.error === 403 ? 'Forbidden' : 'Unauthorized';
-    res.status(result.error).json({ message: msg, statusCode: result.error });
+    const msg =
+      result.message ?? (result.error === 403 ? 'Forbidden' : 'Unauthorized');
+    res.status(result.error).json({
+      message: msg,
+      statusCode: result.error,
+      ...(result.errorKey ? { errorKey: result.errorKey } : {})
+    });
     return;
   }
   (req as AuthenticatedRequest).user = result.user;

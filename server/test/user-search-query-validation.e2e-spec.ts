@@ -21,6 +21,7 @@ import { AuditService } from '../src/modules/audit/audit.service';
 import { MailService } from '../src/modules/mail/mail.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
+import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
 
 const EMPTY_PAGE = {
@@ -57,6 +58,8 @@ describe('User search query DTO validation (e2e)', () => {
       ]
     })
       .overrideGuard(PermissionsGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(MfaRequiredGuard)
       .useValue({ canActivate: () => true })
       .compile();
 

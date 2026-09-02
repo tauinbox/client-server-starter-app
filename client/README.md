@@ -62,6 +62,10 @@ src/app/
 │   │   │                   # denied, for example a disabled button with a tooltip.
 │   │   ├── guards/         # authGuard, guestGuard, permissionGuard(action, subject), and
 │   │   │                   # instancePermissionGuard(action, subject, instanceFactory).
+│   │   │                   # Every permission guard first calls mfaEnrolmentRedirect(): an account
+│   │   │                   # that owes the two-factor enrolment its role demands goes to /profile,
+│   │   │                   # where the enrolment card is, because the server refuses the same
+│   │   │                   # routes with 403 errors.auth.mfaEnrolmentRequired.
 │   │   │                   # All guards use ensureAuthenticated(). If no user was persisted, that
 │   │   │                   # function goes directly to /login. It does not start a refresh, which
 │   │   │                   # can only answer 401.
@@ -77,8 +81,11 @@ src/app/
 │   │   ├── services/       # AuthService owns the HTTP calls, the refresh schedule and
 │   │   │                   # fetchPermissions(): Promise<void>. Also rbac-metadata.service.ts.
 │   │   └── store/          # AuthStore is an NgRx Signal Store. Its state holds accessToken (in
-│   │                       # memory), user (in localStorage as auth_user) and
-│   │                       # ability: AppAbility | null. Also RbacMetadataStore.
+│   │                       # memory), user (in localStorage as auth_user),
+│   │                       # ability: AppAbility | null and mfaMandatory (the server policy, read
+│   │                       # from GET /auth/permissions, never persisted). The computed
+│   │                       # mustEnrolMfa() is mfaMandatory AND a profile with no factor.
+│   │                       # Also RbacMetadataStore.
 │   ├── feature-flags/      # Client core of the feature-flags subsystem
 │   │   ├── services/       # FeatureFlagService calls HttpClient.get('/api/v1/feature-flags',
 │   │   │                   # { withCredentials: true }). It uses the silent-error context, thus a
@@ -119,7 +126,9 @@ src/app/
 │       │   │                            # permissions, an effect() sends the user to /forbidden.
 │       │   │                            # The effect calls the shared canAccessAdminPanel helper,
 │       │   │                            # which adminPanelGuard and the admin entry in
-│       │   │                            # SidenavStateService.navLinks also use.
+│       │   │                            # SidenavStateService.navLinks also use. That helper is
+│       │   │                            # false while mustEnrolMfa() is true, so the entry point
+│       │   │                            # is hidden instead of failing.
 │       │   │                            # The effect runs only when isAuthenticated() is true,
 │       │   │                            # thus a logout does not flash the /forbidden page.
 │       │   ├── roles/
@@ -393,6 +402,10 @@ src/app/
 | `/forbidden` | ForbiddenComponent | - |
 | `/**` | PageNotFoundComponent | - |
 
+Every row that names `permissionGuard`, `instancePermissionGuard` or `adminPanelGuard` also carries
+the two-factor gate: while `MFA_REQUIRED_FOR_ADMINS` is on and the account holds a super role with
+no enrolment, the guard answers with a redirect to `/profile` instead of the route.
+
 ### State Management
 
 The project uses the NgRx Signal Store (`@ngrx/signals`).
@@ -410,11 +423,16 @@ State:
   the app ignores a stale or malformed entry. It then starts in the logged-out state. It does not
   show a partial user.
 - `ability` is an `AppAbility` or `null`.
+- `mfaMandatory` is the server policy from `GET /auth/permissions`. It is true when the account
+  holds a super role and the deployment demands a second factor from such an account. The app never
+  persists it: a stale copy would gate a session the server admits, or open one it refuses.
 
-Computed signals: `isAuthenticated` (an access token is present), `user`, and `roles`.
+Computed signals: `isAuthenticated` (an access token is present), `user`, `roles`, and
+`mustEnrolMfa` (`mfaMandatory` and a profile that carries no factor). Every permission guard reads
+`mustEnrolMfa` and redirects to `/profile`, where the enrolment card is.
 
-Methods: `hasPermissions(check)`, `setRules(rules)`, `hasPersistedUser()`, `saveAuthResponse()` and
-`clearSession()`.
+Methods: `hasPermissions(check)`, `setRules(rules)`, `setMfaMandatory(flag)`, `hasPersistedUser()`,
+`saveAuthResponse()` and `clearSession()`.
 
 `hasPermissions(check)` accepts one check or an array of checks. **An empty array denies access.**
 Without this rule, `[].every()` gives access to all callers. The method reads the ability signal
@@ -637,7 +655,8 @@ has exactly one meaning.
    `NotifyService.error(httpErrorResponse)`. It ignores a 401. `NotifyService` does the parse
    sequence of `errorKey`, then `message`, then the status. On the first 403, the interceptor reads
    `GET /auth/permissions` silently. Then it calls `AuthStore.setRules()`, which starts
-   `RequirePermissionsDirective` through `effect()`. Then it retries the original request one time.
+   `RequirePermissionsDirective` through `effect()`, and `AuthStore.setMfaMandatory()` with the
+   policy the same answer carries. Then it retries the original request one time.
    The `RBAC_RETRY_CONTEXT` token prevents a retry loop. The interceptor handles a failed permissions
    read and a failed retry separately, and shows the applicable error.
 2. **jwtInterceptor** attaches the `Authorization: Bearer` header to a same-origin request only. A
@@ -964,7 +983,7 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 235 Playwright tests. They cover auth, users, admin, billing, a11y,
+**Coverage.** The suite has 237 Playwright tests. They cover auth, users, admin, billing, a11y,
 keyboard and visual. There are also 1201 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page

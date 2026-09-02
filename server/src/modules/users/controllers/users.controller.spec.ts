@@ -20,6 +20,7 @@ import { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto
 import { UserPasswordChangedByAdminEvent } from '../events/user-password-changed-by-admin.event';
 import { UserSessionRevocationRequiredEvent } from '../events/user-session-revocation-required.event';
 import type { AppAbility } from '../../auth/casl/app-ability';
+import { MfaRequiredGuard } from '../../auth/guards/mfa-required.guard';
 
 const allowAllGuard = { canActivate: () => true };
 
@@ -113,6 +114,8 @@ describe('UsersController', () => {
       .useValue(allowAllGuard)
       .overrideGuard(PermissionsGuard)
       .useValue(allowAllGuard)
+      .overrideGuard(MfaRequiredGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     controller = module.get<UsersController>(UsersController);

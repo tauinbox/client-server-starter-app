@@ -28,6 +28,7 @@ import {
   findUserById,
   getPackedRulesForUser,
   getState,
+  isMfaMandatoryFor,
   logAudit,
   toUserResponse
 } from '../state';
@@ -684,7 +685,11 @@ router.get('/profile', authGuard, (req, res) => {
 router.get('/permissions', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const rules = getPackedRulesForUser(user);
-  res.json({ roles: user.roles, rules });
+  res.json({
+    roles: user.roles,
+    rules,
+    mfaMandatory: isMfaMandatoryFor(user)
+  });
 });
 
 // PATCH /api/v1/auth/profile

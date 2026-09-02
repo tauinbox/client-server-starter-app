@@ -34,7 +34,9 @@ management and theming.
   account in: it returns a 300 second `mfa_pending` token, which the bearer strategy refuses, and
   only a code or a recovery code turns it into a session. The shared secret is encrypted at rest
   with `MFA_ENCRYPTION_KEY`; while that key is empty, enrolment answers HTTP 503 and every other
-  path is unchanged.
+  path is unchanged. `MFA_REQUIRED_FOR_ADMINS=true` makes the factor mandatory for an account that
+  holds a super role: it still signs in and still reaches its profile, but every route behind an
+  authorization check answers 403 until the enrolment is complete.
 
   An OAuth user becomes verified only when the provider asserts `email_verified=true` for that same
   address. Google and Facebook do this. The rule applies at the creation of the account and at each
@@ -1010,6 +1012,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `DB_POOL_CONNECTION_TIMEOUT` | `5000` | Milliseconds to wait for a connection before an error |
 | `SMTP_FROM` | `noreply@example.com` | Default "from" address of an email |
 | `MFA_ENCRYPTION_KEY` | - | Base64 of 32 random bytes. It encrypts the two-factor secret column with AES-256-GCM, because a code check needs the original secret back and thus a hash is the wrong tool. While the value is empty, two-factor enrolment answers HTTP 503 and the rest of the application is unchanged. A value that decodes to any other length stops the boot |
+| `MFA_REQUIRED_FOR_ADMINS` | `false` | Set to `true` to make two-factor authentication mandatory for every account that holds a super role. Such an account signs in and reaches its profile as before, but no route behind an authorization check answers it until the enrolment is complete. The requirement stays off while `MFA_ENCRYPTION_KEY` is empty, because enrolment is unavailable in that state |
 | `ADMIN_EMAIL` | - | Email address of the initial administrator. The server seeds the account at startup, and it skips this step when the value is empty |
 | `ADMIN_PASSWORD` | - | Password of the initial administrator |
 | `ADMIN_FIRST_NAME` | `Admin` | First name of the initial administrator |
@@ -1365,6 +1368,7 @@ the script is the authoritative reference for the key list.
 | `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_SECRET`, `VK_CLIENT_SECRET` | deploy, rebuild | `server/.env` | The OAuth client secrets |
 | `ADMIN_PASSWORD` | deploy, rebuild | `server/.env` | The password of the initial administrator |
 | `MFA_ENCRYPTION_KEY` | deploy, rebuild | `server/.env` | The AES-256-GCM key of the two-factor secret column. It is not stored with the data it protects. While the secret is empty, two-factor enrolment answers HTTP 503 and nothing else changes |
+| `MFA_REQUIRED_FOR_ADMINS` | deploy, rebuild | `server/.env` | Not a credential, but carried the same way because this is the only channel that survives a from-scratch rebuild of the host. Set it to `true` to make two-factor authentication mandatory for every account with a super role. It has no effect while `MFA_ENCRYPTION_KEY` is empty |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | deploy, rebuild | `server/.env` | Outgoing email |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | deploy, rebuild | `server/.env` | The Cloudflare Turnstile CAPTCHA on `/register` and `/forgot-password`. The site key is public, but the workflow injects it in the same way for safety during a rebuild. The CAPTCHA stays disabled while one of the two is empty. Refer to [Enabling CAPTCHA in production](server/README.md#enabling-captcha-in-production) |
 | `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` | deploy, rebuild | `server/.env` | The credentials of the billing providers. Billing stays hidden until the full pair of a provider has a value. Keep them empty until a person connects a provider |
@@ -1502,6 +1506,11 @@ npm run lint               # Lint check
 npm run format:check       # Prettier check
 npm run check:imports      # Repo-wide cycle + barrel check (same script in all workspaces)
 ```
+
+The mock reads `MFA_REQUIRED_FOR_ADMINS` on every request, in the same way that the server reads its
+own configuration, so one flag turns the two-factor requirement on for both. The mock keeps no
+encrypted secret, thus it has no equivalent of `MFA_ENCRYPTION_KEY` and the flag is its whole
+condition.
 
 ### Server (`cd server`)
 
@@ -1716,11 +1725,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2154 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 355 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 353 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1223 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 235 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 533 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2168 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 360 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 358 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1233 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 237 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 540 tests pass |
 
 ## CI/CD
 
@@ -1775,7 +1784,10 @@ The wrapper retries a maximum of 3 times, 15 s apart. It retries **only** when t
   long window that counts failures only, and each refused code is audited. A recovery code is spent
   by deleting its hash, so it works once. The TOTP secret is encrypted (AES-256-GCM), not hashed,
   because verification needs the original value; the key lives in `MFA_ENCRYPTION_KEY` and never in
-  the database.
+  the database. With `MFA_REQUIRED_FOR_ADMINS=true` the factor is mandatory for an account holding a
+  super role: `MfaRequiredGuard` travels with `@Authorize`, so such an account signs in and reaches
+  its profile but gets 403 `errors.auth.mfaEnrolmentRequired` from every authorized route until it
+  enrols.
 - A **password reset token** is single-use and expires in 30 minutes. The reset revokes each session.
 - An **administrator password change** immediately revokes each session of the target user.
 - An **administrator email change** does the same. The endpoint exists to recover an account whose

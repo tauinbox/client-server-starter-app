@@ -29,6 +29,7 @@ import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { DOCUMENT, DatePipe } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
+import { AuthStore } from '../../store/auth.store';
 import { SessionStorageService } from '@core/services/session-storage.service';
 import { NotifyService } from '@core/services/notify.service';
 import { TwoFactorComponent } from '../two-factor/two-factor.component';
@@ -162,6 +163,9 @@ export class ProfileComponent implements OnInit {
   readonly #languageService = inject(LanguageService);
   readonly #flagsStore = inject(FeatureFlagsStore);
   readonly #displayPreferences = inject(DisplayPreferencesService);
+  readonly #authStore = inject(AuthStore);
+
+  protected readonly mustEnrolMfa = this.#authStore.mustEnrolMfa;
 
   protected readonly displayDensity = this.#displayPreferences.density;
   protected readonly densityMin = DENSITY_MIN;

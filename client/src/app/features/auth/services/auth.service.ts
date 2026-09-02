@@ -442,6 +442,7 @@ export class AuthService {
     )
       .then((response) => {
         this.#authStore.setRules(response.rules);
+        this.#authStore.setMfaMandatory(response.mfaMandatory);
       })
       .catch((error: HttpErrorResponse) => {
         // Fail closed: the ability stays null and every guarded route denies,
@@ -453,8 +454,11 @@ export class AuthService {
   fetchRbacMetadata(): Promise<void> {
     // GET /rbac/metadata requires `read Permission` on the server; skip the
     // doomed request (and its server-side denial audit entry) for users
-    // without it. Callers must ensure permissions are already loaded.
+    // without it, and for an account that owes its two-factor enrolment, which
+    // the same route refuses. Callers must ensure permissions are already
+    // loaded.
     if (
+      this.#authStore.mustEnrolMfa() ||
       !this.#authStore.hasPermissions({ action: 'read', subject: 'Permission' })
     ) {
       return Promise.resolve();

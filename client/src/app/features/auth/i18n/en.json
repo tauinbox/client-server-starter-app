@@ -153,7 +153,9 @@
     "reauthConfirmButton": "Continue to {{ provider }}",
     "errorReauthFailed": "We could not confirm it is you. Nothing was changed. Please try again.",
     "errorReauthNoProvider": "No sign-in provider is connected, so we cannot confirm it is you. Connect one first.",
-    "errorPasswordBeforeEmail": "Save your new password first, then change your email."
+    "errorPasswordBeforeEmail": "Save your new password first, then change your email.",
+    "mfaRequiredTitle": "Two-factor authentication is required for your role",
+    "mfaRequiredText": "Your account has administration rights. Turn two-factor authentication on below to use the administration pages again."
   },
   "confirmEmailChange": {
     "title": "Confirm Email Change",

@@ -14,6 +14,7 @@ import {
   LogAuditOptions
 } from '../../audit/decorators/log-audit.decorator';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { MfaRequiredGuard } from '../guards/mfa-required.guard';
 
 function getAuditOptions(
   methodName: keyof RolesController
@@ -101,6 +102,8 @@ describe('RolesController', () => {
       .useValue(allowAllGuard)
       .overrideGuard(PermissionsGuard)
       .useValue(allowAllGuard)
+      .overrideGuard(MfaRequiredGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     controller = module.get<RolesController>(RolesController);

@@ -4,8 +4,12 @@ import { canAccessAdminPanel } from './can-access-admin-panel';
 type GrantedCheck = Pick<PermissionCheck, 'action' | 'subject'>;
 type HasPermissionsFn = (check: PermissionCheck | PermissionCheck[]) => boolean;
 
-function makeAuthStore(granted: GrantedCheck[]): {
+function makeAuthStore(
+  granted: GrantedCheck[],
+  mustEnrolMfa = false
+): {
   hasPermissions: ReturnType<typeof vi.fn<HasPermissionsFn>>;
+  mustEnrolMfa: () => boolean;
 } {
   return {
     hasPermissions: vi.fn<HasPermissionsFn>((check) => {
@@ -13,7 +17,8 @@ function makeAuthStore(granted: GrantedCheck[]): {
       return checks.every(({ action, subject }) =>
         granted.some((g) => g.action === action && g.subject === subject)
       );
-    })
+    }),
+    mustEnrolMfa: () => mustEnrolMfa
   };
 }
 
@@ -46,6 +51,12 @@ describe('canAccessAdminPanel', () => {
   it('returns false when user has none of the required permissions', () => {
     const store = makeAuthStore([]);
     expect(canAccessAdminPanel(store)).toBe(false);
+  });
+
+  it('returns false while the account owes a two-factor enrolment', () => {
+    const store = makeAuthStore([{ action: 'search', subject: 'User' }], true);
+    expect(canAccessAdminPanel(store)).toBe(false);
+    expect(store.hasPermissions).not.toHaveBeenCalled();
   });
 
   it('short-circuits on the first granted permission', () => {

@@ -17,6 +17,7 @@ describe('adminPanelGuard', () => {
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
     hasPersistedUser: ReturnType<typeof vi.fn>;
     hasPermissions: ReturnType<typeof vi.fn>;
+    mustEnrolMfa: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
@@ -34,7 +35,8 @@ describe('adminPanelGuard', () => {
       isAuthenticated: vi.fn().mockReturnValue(true),
       isAccessTokenExpired: vi.fn().mockReturnValue(false),
       hasPersistedUser: vi.fn().mockReturnValue(true),
-      hasPermissions: vi.fn().mockReturnValue(false)
+      hasPermissions: vi.fn().mockReturnValue(false),
+      mustEnrolMfa: vi.fn().mockReturnValue(false)
     };
 
     authServiceMock = {
@@ -55,6 +57,13 @@ describe('adminPanelGuard', () => {
     authStoreMock.hasPermissions.mockReturnValue(true);
 
     expect(run()).toBe(true);
+  });
+
+  it('should send an account that owes a two-factor enrolment to the profile', () => {
+    authStoreMock.hasPermissions.mockReturnValue(true);
+    authStoreMock.mustEnrolMfa.mockReturnValue(true);
+
+    expect(String(run())).toBe('/profile');
   });
 
   it('should redirect to forbidden when no admin-panel permission is held', () => {

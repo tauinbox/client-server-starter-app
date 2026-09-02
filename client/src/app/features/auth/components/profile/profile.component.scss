@@ -175,6 +175,30 @@ form {
 
 // Sits between the form fields, so it carries the same row rhythm the shared
 // wrapper owns rather than adding spacing to the container.
+.mfa-required-notice {
+  display: flex;
+  gap: vars.$spacing-md;
+  align-items: flex-start;
+  padding: vars.$spacing-md;
+  color: var(--mat-sys-on-secondary-container);
+  background: var(--mat-sys-secondary-container);
+  border-radius: func.rem(8);
+
+  mat-icon {
+    flex-shrink: 0;
+  }
+}
+
+.mfa-required-title {
+  margin: 0 0 vars.$spacing-xs;
+  font-weight: 500;
+}
+
+.mfa-required-text {
+  margin: 0;
+  font-size: vars.$font-size-sm;
+}
+
 .reauth-notice {
   padding: vars.$spacing-sm;
   margin-bottom: vars.$space-form-row-gap;

@@ -8,6 +8,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UsersController } from '../src/modules/users/controllers/users.controller';
+import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { MailService } from '../src/modules/mail/mail.service';
 import { AuditService } from '../src/modules/audit/audit.service';
@@ -124,7 +125,10 @@ describe('UsersService.update — email change side effects', () => {
         },
         { provide: MailService, useValue: mailService }
       ]
-    }).compile();
+    })
+      .overrideGuard(MfaRequiredGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     usersService = moduleRef.get(UsersService);
   });
@@ -313,7 +317,10 @@ describe('Admin email change - session revocation through the real event bus', (
         { provide: PermissionService, useValue: {} },
         { provide: CaslAbilityFactory, useValue: {} }
       ]
-    }).compile();
+    })
+      .overrideGuard(MfaRequiredGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     await module.init();
     controller = module.get(UsersController);
