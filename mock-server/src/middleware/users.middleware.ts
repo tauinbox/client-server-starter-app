@@ -2,11 +2,13 @@ import { Router } from 'express';
 import {
   ALLOWED_USER_SORT_COLUMNS,
   ErrorKeys,
-  MAX_USER_FILTER_LENGTH,
-  PASSWORD_ERROR,
-  PASSWORD_REGEX
+  MAX_USER_FILTER_LENGTH
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
+import {
+  breachedPasswordEnvelope,
+  isBreachedPassword
+} from '../helpers/breached-password.helpers';
 import {
   isValidEmail,
   passwordLengthError,
@@ -313,11 +315,11 @@ router.patch('/:id', adminGuard, requireUuid('id'), (req, res) => {
       res.status(400).json(validationError(pwLenErr));
       return;
     }
-    // Regex must be checked with the rest of the DTO validation, before any
-    // field assignment: the real server validates the whole DTO first and
-    // never partially mutates on a 400.
-    if (!PASSWORD_REGEX.test(password)) {
-      res.status(400).json(validationError(PASSWORD_ERROR));
+    // The blocklist verdict comes from UsersService.update on the real server,
+    // after the ability check and before any field assignment, so a 400 must
+    // leave the record unchanged.
+    if (isBreachedPassword(password)) {
+      res.status(400).json(breachedPasswordEnvelope());
       return;
     }
   }

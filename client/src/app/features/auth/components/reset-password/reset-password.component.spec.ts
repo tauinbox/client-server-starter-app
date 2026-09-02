@@ -116,18 +116,15 @@ describe('ResetPasswordComponent', () => {
       expect(component.resetPasswordForm.password().valid()).toBe(true);
     });
 
-    it('rejects a password that breaks the composition rule', async () => {
+    it('accepts a password made only of lower-case letters', async () => {
       component.resetPasswordModel.set({
         password: 'passwordonly',
         confirmPassword: 'passwordonly'
       });
       await fixture.whenStable();
 
-      const errors = component.resetPasswordForm.password().errors();
-      expect(errors.some((e) => e.kind === 'pattern')).toBe(true);
-      expect(errors.find((e) => e.kind === 'pattern')?.message).toBe(
-        'auth.resetPassword.passwordPattern'
-      );
+      expect(component.resetPasswordForm.password().errors()).toEqual([]);
+      expect(component.resetPasswordForm.password().valid()).toBe(true);
     });
 
     it('rejects a password longer than the server ceiling', async () => {

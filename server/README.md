@@ -128,6 +128,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to keep an audit log entry before the nightly deletion |
 | `TURNSTILE_SITE_KEY` | - | Cloudflare Turnstile site key, which is public. The two Turnstile keys are necessary before the CAPTCHA operates. Refer to [Enabling CAPTCHA in production](#enabling-captcha-in-production) |
 | `TURNSTILE_SECRET_KEY` | - | Cloudflare Turnstile secret key. The CAPTCHA stays disabled while one of the two keys is empty |
+| `PWNED_PASSWORDS_RANGE_URL` | `https://api.pwnedpasswords.com/range` | Range endpoint of the breached-password blocklist. Every path that SETS a password asks it, sending only the first five hex characters of the SHA-1 of the candidate. Point it at a self-hosted mirror when outbound access to the default host is closed. The check fails open, so an unreachable endpoint accepts the password and increments `password_breach_lookups_total{outcome="unavailable"}` |
 | `DB_POOL_MAX` | `10` | Maximum size of the PostgreSQL connection pool |
 | `DB_POOL_IDLE_TIMEOUT` | `30000` | Milliseconds before the pool closes an idle connection |
 | `DB_POOL_CONNECTION_TIMEOUT` | `5000` | Milliseconds to wait for a connection before an error |
@@ -242,8 +243,13 @@ other source.
 The metrics are `http_requests_total`, `http_request_duration_seconds`, `auth_events_total`,
 `rbac_permission_denied_total{action,subject,level}`, `mail_queue_jobs{state}`,
 `mail_jobs_processed_total{outcome}`, `db_pool_connections{state}`,
-`cache_requests_total{cache,outcome}`, `billing_usage_records_unrated_total{meter}` and
+`cache_requests_total{cache,outcome}`, `billing_usage_records_unrated_total{meter}`,
+`password_breach_lookups_total{outcome}` and
 `dependency_up{dependency}`. The module also supplies `HttpMetricsInterceptor`.
+
+`password_breach_lookups_total{outcome="unavailable"}` needs an alert. The breached-password check
+fails open, so a blocklist that stops answering is silent in every other signal: registrations keep
+succeeding and no error rate moves. That counter is the only place the gap shows.
 
 `schedule/` uses `@nestjs/schedule` for the cron jobs.
 
@@ -2224,7 +2230,7 @@ The import covers:
   `UserPermissionsResponse` and `UserEffectivePermissionsResponse`.
 
   The RBAC types are `ResourceResponse`, `ActionResponse` and `RbacMetadataResponse`.
-- **Constants.** They are `PASSWORD_REGEX`, `PASSWORD_ERROR`, `MIN_PASSWORD_LENGTH`,
+- **Constants.** They are `MIN_PASSWORD_LENGTH`,
   `MAX_PASSWORD_LENGTH`, `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, `MAX_CONCURRENT_SESSIONS`,
   `MAX_PAGE_SIZE`, `DEFAULT_CURSOR_PAGE_SIZE`, the user sort columns, `SYSTEM_ROLES` and
   `SystemRole`.

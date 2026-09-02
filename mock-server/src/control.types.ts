@@ -35,6 +35,9 @@ export type ControlApi = {
   expireToken(token: string): Promise<void>;
   seedUsers(users: MockUser[]): Promise<void>;
   seedOAuthAccounts(userId: string, accounts: OAuthAccount[]): Promise<void>;
+  // Adds values to the mock breach corpus, so a set-password route refuses
+  // them the way the server refuses a value the public range API lists.
+  seedBreachedPasswords(passwords: string[]): Promise<void>;
   seedRoles(roles: MockRole[]): Promise<void>;
   seedPermissions(permissions: MockPermission[]): Promise<void>;
   seedRolePermissions(rolePermissions: MockRolePermission[]): Promise<void>;

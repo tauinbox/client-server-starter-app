@@ -10,8 +10,8 @@ test.describe('Profile password change', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await page.getByLabel('New Password (Optional)').fill('NewPassword1');
-    await page.getByLabel('Confirm New Password').fill('NewPassword1');
+    await page.getByLabel('New Password (Optional)').fill('Quartz-Meadow-77');
+    await page.getByLabel('Confirm New Password').fill('Quartz-Meadow-77');
 
     // currentPassword field is now visible (rendered when new password entered).
     // Submit with it left empty — form-level validation must keep submit disabled.
@@ -27,9 +27,9 @@ test.describe('Profile password change', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await page.getByLabel('New Password (Optional)').fill('NewPassword1');
+    await page.getByLabel('New Password (Optional)').fill('Quartz-Meadow-77');
     await page.getByLabel('Current Password').fill('WrongPass1');
-    await page.getByLabel('Confirm New Password').fill('NewPassword1');
+    await page.getByLabel('Confirm New Password').fill('Quartz-Meadow-77');
     await page.getByLabel('First Name').click(); // blur
 
     await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -49,9 +49,9 @@ test.describe('Profile password change', () => {
     await loginViaUi(page, _mockServer.url);
 
     // Current Password field only appears once the user starts typing a new password.
-    await page.getByLabel('New Password (Optional)').fill('NewPassword1');
+    await page.getByLabel('New Password (Optional)').fill('Quartz-Meadow-77');
     await page.getByLabel('Current Password').fill('Password1');
-    await page.getByLabel('Confirm New Password').fill('NewPassword1');
+    await page.getByLabel('Confirm New Password').fill('Quartz-Meadow-77');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByText('Profile updated successfully')).toBeVisible();
@@ -65,7 +65,7 @@ test.describe('Profile password change', () => {
 
     await expect(page.getByLabel('Current Password')).not.toBeVisible();
 
-    await page.getByLabel('New Password (Optional)').fill('NewPassword1');
+    await page.getByLabel('New Password (Optional)').fill('Quartz-Meadow-77');
     await expect(page.getByLabel('Current Password')).toBeVisible();
 
     await page.getByLabel('New Password (Optional)').clear();

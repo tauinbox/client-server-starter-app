@@ -9,6 +9,7 @@ import { User } from '../entities/user.entity';
 import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { BreachedPasswordService } from '../../auth/breached-password/breached-password.service';
 import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
 import type { AppAbility } from '../../auth/casl/app-ability';
 
@@ -28,6 +29,7 @@ describe('UsersService', () => {
   };
   let mockDataSource: { transaction: jest.Mock };
   let mockMailService: { sendEmailVerification: jest.Mock };
+  let mockBreachedPasswordService: { assertNotBreached: jest.Mock };
   let mockAuditService: { logFireAndForget: jest.Mock };
   let mockQueryBuilder: {
     leftJoinAndSelect: jest.Mock;
@@ -88,6 +90,9 @@ describe('UsersService', () => {
       sendEmailVerification: jest.fn().mockResolvedValue(undefined)
     };
     mockAuditService = { logFireAndForget: jest.fn() };
+    mockBreachedPasswordService = {
+      assertNotBreached: jest.fn().mockResolvedValue(undefined)
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -111,6 +116,10 @@ describe('UsersService', () => {
         {
           provide: MailService,
           useValue: mockMailService
+        },
+        {
+          provide: BreachedPasswordService,
+          useValue: mockBreachedPasswordService
         }
       ]
     }).compile();
@@ -151,6 +160,35 @@ describe('UsersService', () => {
       });
       expect(mockRepository.save).toHaveBeenCalledWith(mockUser);
       expect(result).toEqual(mockUser);
+    });
+
+    it('refuses a breached password before the address conflict check', async () => {
+      mockBreachedPasswordService.assertNotBreached.mockRejectedValue(
+        new HttpException(
+          { message: 'breached', errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED },
+          HttpStatus.BAD_REQUEST
+        )
+      );
+
+      await expect(service.create(createUserDto)).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED }
+      });
+      expect(mockRepository.findOne).not.toHaveBeenCalled();
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('accepts a password made only of lower-case letters', async () => {
+      mockRepository.findOne.mockResolvedValue(null);
+      mockRepository.create.mockReturnValue(mockUser);
+      mockRepository.save.mockResolvedValue(mockUser);
+      jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
+
+      await service.create({ ...createUserDto, password: 'kettlesunrise' });
+
+      expect(bcrypt.hash).toHaveBeenCalledWith(
+        'kettlesunrise',
+        BCRYPT_SALT_ROUNDS
+      );
     });
 
     it('should throw HttpException when email already exists', async () => {
@@ -416,6 +454,39 @@ describe('UsersService', () => {
       expect(mockRepository.merge).toHaveBeenCalledWith(mockUser, {
         password: 'new-hashed'
       });
+    });
+
+    it('refuses a breached password before it hashes anything', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      const hash = jest
+        .spyOn(bcrypt, 'hash')
+        .mockResolvedValue('new-hashed' as never);
+      hash.mockClear();
+      mockBreachedPasswordService.assertNotBreached.mockRejectedValue(
+        new HttpException(
+          { message: 'breached', errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED },
+          HttpStatus.BAD_REQUEST
+        )
+      );
+
+      await expect(
+        service.update('user-1', { password: 'Password1' }, SYSTEM_ABILITY)
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED }
+      });
+      expect(hash).not.toHaveBeenCalled();
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('spends no lookup on an update that carries no password', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      mockRepository.save.mockResolvedValue(mockUser);
+
+      await service.update('user-1', { firstName: 'Updated' }, SYSTEM_ABILITY);
+
+      expect(
+        mockBreachedPasswordService.assertNotBreached
+      ).not.toHaveBeenCalled();
     });
 
     it('should throw HttpException when user not found', async () => {

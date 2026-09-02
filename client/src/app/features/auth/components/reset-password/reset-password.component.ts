@@ -16,7 +16,6 @@ import {
   form,
   maxLength,
   minLength,
-  pattern,
   required,
   validate
 } from '@angular/forms/signals';
@@ -35,8 +34,7 @@ import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import {
   MAX_PASSWORD_LENGTH,
-  MIN_PASSWORD_LENGTH,
-  PASSWORD_REGEX
+  MIN_PASSWORD_LENGTH
 } from '@app/shared/constants';
 
 type ResetPasswordData = {
@@ -88,9 +86,6 @@ export class ResetPasswordComponent implements OnInit {
     });
     minLength(path.password, MIN_PASSWORD_LENGTH, {
       message: 'auth.resetPassword.passwordMinLength'
-    });
-    pattern(path.password, PASSWORD_REGEX, {
-      message: 'auth.resetPassword.passwordPattern'
     });
     maxLength(path.password, MAX_PASSWORD_LENGTH, {
       message: 'auth.resetPassword.passwordMaxLength'

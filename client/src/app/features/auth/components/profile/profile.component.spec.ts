@@ -294,7 +294,7 @@ describe('ProfileComponent', () => {
       expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
     });
 
-    it('rejects a password that breaks the composition rule', async () => {
+    it('accepts a password made only of lower-case letters', async () => {
       component.profileModel.set({
         email: 'test@example.com',
         firstName: 'Test',
@@ -305,11 +305,8 @@ describe('ProfileComponent', () => {
       });
       await fixture.whenStable();
 
-      const errors = component.profileForm.password().errors();
-      expect(errors.some((e) => e.kind === 'pattern')).toBe(true);
-      expect(errors.find((e) => e.kind === 'pattern')?.message).toBe(
-        'auth.profile.passwordPattern'
-      );
+      expect(component.profileForm.password().errors()).toEqual([]);
+      expect(component.profileForm.password().valid()).toBe(true);
     });
 
     it('rejects a password longer than the server ceiling', async () => {

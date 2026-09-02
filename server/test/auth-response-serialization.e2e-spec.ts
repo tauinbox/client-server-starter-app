@@ -28,6 +28,7 @@ import { CaptchaRequiredGuard } from '../src/modules/auth/captcha/captcha-requir
 import { UsersService } from '../src/modules/users/services/users.service';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
+import { BreachedPasswordService } from '../src/modules/auth/breached-password/breached-password.service';
 import { SessionIssuerService } from '../src/modules/auth/services/session-issuer.service';
 import { SessionLimitService } from '../src/modules/auth/services/session-limit.service';
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
@@ -156,6 +157,10 @@ describe('Auth response serialization (e2e)', () => {
       imports: [JwtModule.register({ secret: 'test-secret' })],
       controllers: [AuthController, OAuthController],
       providers: [
+        {
+          provide: BreachedPasswordService,
+          useValue: { assertNotBreached: jest.fn() }
+        },
         AuthService,
         OAuthService,
         SessionIssuerService,

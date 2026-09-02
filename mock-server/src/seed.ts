@@ -750,3 +750,23 @@ function generateProducts(): MockProduct[] {
 }
 
 export const seedProducts: MockProduct[] = generateProducts();
+
+/**
+ * The real server asks a public range API whether a password is in a breach
+ * corpus. The mock must never reach the network, so it carries a fixed sample
+ * of that corpus; `POST /__control/breached-passwords` seeds more.
+ *
+ * Every entry was confirmed present in the real corpus, so a value the mock
+ * refuses is a value the server refuses too. The source of the verdict differs
+ * between the two; the verdict does not.
+ */
+export const seedBreachedPasswords: readonly string[] = [
+  '123456',
+  '12345678',
+  'password',
+  'qwerty',
+  'letmein',
+  'admin123',
+  'Password1',
+  'Password123'
+];

@@ -13,7 +13,9 @@ test.describe('Email verification', () => {
     await page.getByLabel('Email').fill('verify-test@example.com');
     await page.getByLabel('First Name').fill('Verify');
     await page.getByLabel('Last Name').fill('Test');
-    await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await page
+      .getByLabel('Password', { exact: true })
+      .fill('Sunrise-Kettle-19');
     await main.getByRole('button', { name: 'Register' }).click();
 
     // Should redirect to login with pending-verification
@@ -138,7 +140,9 @@ test.describe('Email verification', () => {
     await page.getByLabel('Email').fill('expired-verify@example.com');
     await page.getByLabel('First Name').fill('Expired');
     await page.getByLabel('Last Name').fill('Verify');
-    await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await page
+      .getByLabel('Password', { exact: true })
+      .fill('Sunrise-Kettle-19');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(page).toHaveURL(/.*\/login\?registered=pending-verification$/);

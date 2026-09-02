@@ -26,6 +26,7 @@ import { TokenGeneratorService } from '../src/modules/auth/services/token-genera
 import { MailService } from '../src/modules/mail/mail.service';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
+import { BreachedPasswordService } from '../src/modules/auth/breached-password/breached-password.service';
 import { User } from '../src/modules/users/entities/user.entity';
 
 const USER_ID = 'user-1';
@@ -170,6 +171,10 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
 
     const moduleRef = await Test.createTestingModule({
       providers: [
+        {
+          provide: BreachedPasswordService,
+          useValue: { assertNotBreached: jest.fn() }
+        },
         AuthService,
         RefreshTokenService,
         SessionIssuerService,

@@ -68,6 +68,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
     auditLogs: state.auditLogs,
     captchaConfig: state.captchaConfig,
     captchaAttempts: state.captchaAttempts.size,
+    breachedPasswords: Array.from(state.breachedPasswords),
     featureFlags: Array.from(state.featureFlags.values()),
     featureFlagRules: state.featureFlagRules,
     plans: Array.from(state.plans.values()),
@@ -223,6 +224,28 @@ router.post('/reauth-proof', (req, res) => {
   });
 
   res.json({ token });
+});
+
+// POST /__control/breached-passwords — extend the mock breach corpus
+// The real server asks a public range API. The mock must not reach the
+// network, so it carries a fixed sample and a test seeds any value it needs
+// the server to refuse.
+router.post('/breached-passwords', (req, res) => {
+  const passwords: unknown = req.body;
+  if (
+    !Array.isArray(passwords) ||
+    passwords.some((value) => typeof value !== 'string')
+  ) {
+    res.status(400).json({ message: 'Body must be an array of strings' });
+    return;
+  }
+
+  const state = getState();
+  for (const password of passwords as string[]) {
+    state.breachedPasswords.add(password);
+  }
+
+  res.json({ count: state.breachedPasswords.size });
 });
 
 // POST /__control/roles — add or override roles

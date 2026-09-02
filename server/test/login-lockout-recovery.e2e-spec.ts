@@ -22,7 +22,7 @@ runWithInfra('Lockout recovery (e2e)', () => {
   let usersService: UsersService;
 
   const password = 'Password1';
-  const newPassword = 'NewPassword1';
+  const newPassword = 'Quartz-Meadow-77';
   const emails: string[] = [];
 
   const statusOf = async (run: Promise<unknown>): Promise<number> => {

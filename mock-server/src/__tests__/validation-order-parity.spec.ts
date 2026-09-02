@@ -1,5 +1,5 @@
 import type { Server } from 'http';
-import { ErrorKeys, PASSWORD_ERROR } from '@app/shared/constants';
+import { ErrorKeys, MIN_PASSWORD_LENGTH } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState } from '../state';
@@ -8,8 +8,22 @@ import { mockId } from '../utils/mock-id';
 let server: Server;
 let baseUrl: string;
 
-// Satisfies the min-length check but fails PASSWORD_REGEX (no uppercase).
-const INVALID_PASSWORD = 'nouppercase1';
+// Fails the `@MinLength` the password field still carries, which is the
+// remaining DTO-level password validator now the composition regex is gone.
+const INVALID_PASSWORD = 'short';
+const PASSWORD_LENGTH_ERROR = `password must be longer than or equal to ${MIN_PASSWORD_LENGTH} characters`;
+
+// Seeded into the mock breach corpus, so the blocklist refuses it.
+const BREACHED_PASSWORD = 'Password1';
+
+async function seedBreached(baseUrl: string, values: string[]): Promise<void> {
+  const res = await fetch(`${baseUrl}/__control/breached-passwords`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(values)
+  });
+  expect(res.status).toBe(200);
+}
 
 beforeAll(async () => {
   resetState();
@@ -45,7 +59,7 @@ function authHeaders(token: string): Record<string, string> {
 }
 
 describe('PATCH /api/v1/users/:id validates the whole body before mutating', () => {
-  it('a 400 on the password regex leaves the other fields untouched', async () => {
+  it('a 400 on the password length leaves the other fields untouched', async () => {
     const token = await login('admin@example.com');
 
     const res = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
@@ -60,7 +74,7 @@ describe('PATCH /api/v1/users/:id validates the whole body before mutating', () 
 
     expect(res.status).toBe(400);
     const body = (await res.json()) as { message: string };
-    expect(body.message).toBe(PASSWORD_ERROR);
+    expect(body.message).toBe(PASSWORD_LENGTH_ERROR);
 
     const after = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
       headers: authHeaders(token)
@@ -77,7 +91,7 @@ describe('PATCH /api/v1/users/:id validates the whole body before mutating', () 
 });
 
 describe('PATCH /api/v1/auth/profile validates the whole body before mutating', () => {
-  it('a 400 on the password regex leaves the profile untouched', async () => {
+  it('a 400 on the password length leaves the profile untouched', async () => {
     const token = await login('user@example.com');
 
     const res = await fetch(`${baseUrl}/api/v1/auth/profile`, {
@@ -93,7 +107,7 @@ describe('PATCH /api/v1/auth/profile validates the whole body before mutating', 
 
     expect(res.status).toBe(400);
     const body = (await res.json()) as { message: string };
-    expect(body.message).toBe(PASSWORD_ERROR);
+    expect(body.message).toBe(PASSWORD_LENGTH_ERROR);
 
     const after = await fetch(`${baseUrl}/api/v1/auth/profile`, {
       headers: authHeaders(token)
@@ -106,7 +120,7 @@ describe('PATCH /api/v1/auth/profile validates the whole body before mutating', 
     expect(profile.locale).toBe('en');
   });
 
-  it('reports the regex failure before the currentPassword check (DTO validation first)', async () => {
+  it('reports the length failure before the currentPassword check (DTO validation first)', async () => {
     const token = await login('user@example.com');
 
     const res = await fetch(`${baseUrl}/api/v1/auth/profile`, {
@@ -120,7 +134,157 @@ describe('PATCH /api/v1/auth/profile validates the whole body before mutating', 
 
     expect(res.status).toBe(400);
     const body = (await res.json()) as { message: string };
-    expect(body.message).toBe(PASSWORD_ERROR);
+    expect(body.message).toBe(PASSWORD_LENGTH_ERROR);
+  });
+});
+
+describe('the breach blocklist mirrors the server verdict', () => {
+  it('refuses a listed password on the admin update and leaves the row untouched', async () => {
+    const token = await login('admin@example.com');
+
+    const res = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({
+        firstName: 'Changed',
+        password: BREACHED_PASSWORD
+      })
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      message:
+        'This password has appeared in a public data breach. Please choose a different one.',
+      statusCode: 400,
+      errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED
+    });
+
+    const after = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
+      headers: authHeaders(token)
+    });
+    const user = (await after.json()) as { firstName: string };
+    expect(user.firstName).toBe('John');
+  });
+
+  it('refuses a listed password on the profile update and leaves it untouched', async () => {
+    const token = await login('user@example.com');
+
+    const res = await fetch(`${baseUrl}/api/v1/auth/profile`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({
+        firstName: 'Changed',
+        password: BREACHED_PASSWORD,
+        currentPassword: 'Password1'
+      })
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { errorKey: string };
+    expect(body.errorKey).toBe(ErrorKeys.AUTH.PASSWORD_BREACHED);
+
+    const after = await fetch(`${baseUrl}/api/v1/auth/profile`, {
+      headers: authHeaders(token)
+    });
+    const profile = (await after.json()) as { firstName: string };
+    expect(profile.firstName).toBe('Regular');
+  });
+
+  it('reports a wrong currentPassword before the blocklist verdict', async () => {
+    const token = await login('user@example.com');
+
+    const res = await fetch(`${baseUrl}/api/v1/auth/profile`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({
+        password: BREACHED_PASSWORD,
+        currentPassword: 'wrong-current'
+      })
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { errorKey: string };
+    expect(body.errorKey).toBe(ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD);
+  });
+
+  it('refuses a listed password on register, ahead of the address conflict', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: 'admin@example.com',
+        firstName: 'Taken',
+        lastName: 'Address',
+        password: BREACHED_PASSWORD
+      })
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { errorKey: string };
+    expect(body.errorKey).toBe(ErrorKeys.AUTH.PASSWORD_BREACHED);
+  });
+
+  it('reports an invalid reset token before the blocklist verdict', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        token: 'no-such-token',
+        password: BREACHED_PASSWORD
+      })
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { errorKey: string };
+    expect(body.errorKey).toBe(ErrorKeys.AUTH.INVALID_RESET_TOKEN);
+  });
+
+  it('refuses a value a test seeds through the control route', async () => {
+    const password = 'Sunrise-Kettle-19';
+
+    const accepted = await fetch(`${baseUrl}/api/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: 'seeded-clean@example.com',
+        firstName: 'Clean',
+        lastName: 'Value',
+        password
+      })
+    });
+    expect(accepted.status).toBe(201);
+
+    await seedBreached(baseUrl, [password]);
+
+    const refused = await fetch(`${baseUrl}/api/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: 'seeded-breached@example.com',
+        firstName: 'Seeded',
+        lastName: 'Value',
+        password
+      })
+    });
+
+    expect(refused.status).toBe(400);
+    const body = (await refused.json()) as { errorKey: string };
+    expect(body.errorKey).toBe(ErrorKeys.AUTH.PASSWORD_BREACHED);
+  });
+
+  it('accepts a password made only of lower-case letters', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: 'lowercase-only@example.com',
+        firstName: 'Lower',
+        lastName: 'Case',
+        password: 'kettlesunrise'
+      })
+    });
+
+    expect(res.status).toBe(201);
   });
 });
 
@@ -147,7 +311,7 @@ describe('body validation precedes the entity lookup', () => {
       method: 'PATCH',
       path: `/api/v1/users/${UNKNOWN}`,
       malformed: { password: INVALID_PASSWORD },
-      malformedMessage: PASSWORD_ERROR,
+      malformedMessage: PASSWORD_LENGTH_ERROR,
       wellFormed: { firstName: 'Valid' },
       notFoundKey: ErrorKeys.USERS.NOT_FOUND
     },

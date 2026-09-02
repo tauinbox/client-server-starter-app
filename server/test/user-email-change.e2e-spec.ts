@@ -12,6 +12,7 @@ import { UsersService } from '../src/modules/users/services/users.service';
 import { MailService } from '../src/modules/mail/mail.service';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
+import { BreachedPasswordService } from '../src/modules/auth/breached-password/breached-password.service';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
 import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
@@ -109,6 +110,10 @@ describe('UsersService.update — email change side effects', () => {
 
     const moduleRef = await Test.createTestingModule({
       providers: [
+        {
+          provide: BreachedPasswordService,
+          useValue: { assertNotBreached: jest.fn() }
+        },
         UsersService,
         { provide: getRepositoryToken(User), useValue: repo },
         { provide: DataSource, useValue: {} },
@@ -276,6 +281,10 @@ describe('Admin email change - session revocation through the real event bus', (
       imports: [EventEmitterModule.forRoot()],
       controllers: [UsersController],
       providers: [
+        {
+          provide: BreachedPasswordService,
+          useValue: { assertNotBreached: jest.fn() }
+        },
         UsersService,
         SessionRevocationListener,
         {

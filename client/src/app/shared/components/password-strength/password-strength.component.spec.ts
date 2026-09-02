@@ -17,20 +17,20 @@ describe('calculatePasswordStrength', () => {
     expect(calculatePasswordStrength('abc')).toBe(1);
   });
 
-  it('returns 2 (Fair) for length-only without case mix or digits', () => {
-    expect(calculatePasswordStrength('abcdefgh')).toBe(2);
+  it('returns 1 (Weak) for a value that only just clears the minimum', () => {
+    expect(calculatePasswordStrength('abcdefgh')).toBe(1);
   });
 
-  it('returns 3 (Good) when length, lowercase and uppercase are present but no digit', () => {
-    expect(calculatePasswordStrength('Abcdefgh')).toBe(3);
+  it('adds a point for three character classes', () => {
+    expect(calculatePasswordStrength('Abcdefg1')).toBe(2);
   });
 
-  it('returns 4 (Strong) when all PASSWORD_REGEX rules are satisfied', () => {
-    expect(calculatePasswordStrength('Abcdefg1')).toBe(4);
+  it('returns 3 (Good) for a long value carrying every character class', () => {
+    expect(calculatePasswordStrength('Str0ngPassword!')).toBe(3);
   });
 
-  it('returns 4 (Strong) for a long mixed password', () => {
-    expect(calculatePasswordStrength('Str0ngPassword!')).toBe(4);
+  it('returns 4 (Strong) for a long lower-case passphrase, which the composition rules used to refuse', () => {
+    expect(calculatePasswordStrength('correcthorsebatterystaple')).toBe(4);
   });
 
   it('returns 1 (Weak) for a single uppercase letter (Math.max floor)', () => {
@@ -80,7 +80,7 @@ describe('PasswordStrengthComponent', () => {
   });
 
   it('renders the Strong label and 4 filled bars for a strong password', () => {
-    fixture.componentRef.setInput('password', 'Str0ngPassword!');
+    fixture.componentRef.setInput('password', 'correcthorsebatterystaple');
     fixture.detectChanges();
 
     const root: HTMLElement = fixture.nativeElement;
@@ -92,8 +92,8 @@ describe('PasswordStrengthComponent', () => {
     );
   });
 
-  it('renders the Good label for an 8-char mixed-case password without digits', () => {
-    fixture.componentRef.setInput('password', 'Abcdefgh');
+  it('renders the Good label for a long mixed password', () => {
+    fixture.componentRef.setInput('password', 'Str0ngPassword!');
     fixture.detectChanges();
 
     const root: HTMLElement = fixture.nativeElement;
@@ -103,7 +103,7 @@ describe('PasswordStrengthComponent', () => {
     );
   });
 
-  describe('composition requirements hint', () => {
+  describe('strength hint', () => {
     const HINT = '.password-requirements';
 
     it('stays hidden while the field is empty', () => {
@@ -111,31 +111,31 @@ describe('PasswordStrengthComponent', () => {
       expect(root.querySelector(HINT)).toBeNull();
     });
 
-    it('states the rule while the typed value breaks it', () => {
-      fixture.componentRef.setInput('password', 'passwordonly');
+    it('advises on length while the value scores low, and never names a composition rule', () => {
+      fixture.componentRef.setInput('password', 'Abcdefg1');
       fixture.detectChanges();
 
       const hint: HTMLElement | null =
         fixture.nativeElement.querySelector(HINT);
       expect(hint).not.toBeNull();
-      expect(hint?.textContent).toContain('uppercase');
-      expect(hint?.textContent).toContain('lowercase');
-      expect(hint?.textContent).toContain('number');
+      expect(hint?.textContent).toContain('12 characters');
+      expect(hint?.textContent).not.toContain('uppercase');
+      expect(hint?.textContent).not.toContain('lowercase');
     });
 
-    it('disappears once the value satisfies the rule', () => {
-      fixture.componentRef.setInput('password', 'passwordonly');
+    it('disappears once the value scores Good or better', () => {
+      fixture.componentRef.setInput('password', 'Abcdefg1');
       fixture.detectChanges();
       expect(fixture.nativeElement.querySelector(HINT)).not.toBeNull();
 
-      fixture.componentRef.setInput('password', 'Password1');
+      fixture.componentRef.setInput('password', 'correcthorsebatterystaple');
       fixture.detectChanges();
       expect(fixture.nativeElement.querySelector(HINT)).toBeNull();
     });
   });
 
   it('exposes a polite live region for screen readers', () => {
-    fixture.componentRef.setInput('password', 'Abcdefg1');
+    fixture.componentRef.setInput('password', 'correcthorsebatterystaple');
     fixture.detectChanges();
 
     const root: HTMLElement = fixture.nativeElement;

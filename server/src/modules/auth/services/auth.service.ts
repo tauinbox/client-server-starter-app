@@ -16,6 +16,7 @@ import { TokenGeneratorService } from './token-generator.service';
 import { MailService } from '../../mail/mail.service';
 import { AuditService, AuditContext } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { BreachedPasswordService } from '../breached-password/breached-password.service';
 import { hashToken } from '../../../common/utils/hash-token';
 import { issueEmailVerificationToken } from '../../../common/utils/issue-verification-token.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
@@ -102,7 +103,8 @@ export class AuthService {
     private auditService: AuditService,
     private metricsService: MetricsService,
     private sessionIssuer: SessionIssuerService,
-    private jwtService: JwtService
+    private jwtService: JwtService,
+    private breachedPasswordService: BreachedPasswordService
   ) {}
 
   // Dummy hash for constant-time rejection (prevents timing attacks).
@@ -221,6 +223,11 @@ export class AuthService {
     registerDto: RegisterDto,
     auditContext?: AuditContext
   ): Promise<{ message: string }> {
+    // Ahead of the address conflict below, so the caller reads the same verdict
+    // whether or not the address happens to be taken, and ahead of the hash so
+    // a refused password never costs a bcrypt round.
+    await this.breachedPasswordService.assertNotBreached(registerDto.password);
+
     // Compute hash outside the transaction (CPU-intensive, no DB involvement)
     const hashedPassword = await bcrypt.hash(
       registerDto.password,
@@ -437,6 +444,10 @@ export class AuthService {
         HttpStatus.BAD_REQUEST
       );
     }
+
+    // After the token checks: the token is what authorises this call, and an
+    // invalid one must not buy an outbound lookup.
+    await this.breachedPasswordService.assertNotBreached(newPassword);
 
     // Compute hash outside the transaction (CPU-intensive, no DB involvement)
     const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);

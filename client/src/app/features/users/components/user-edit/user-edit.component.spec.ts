@@ -289,7 +289,7 @@ describe('UserEditComponent', () => {
       );
     });
 
-    it('rejects a password that breaks the composition rule', async () => {
+    it('accepts a password made only of lower-case letters', async () => {
       component.userModel.set({
         email: 'test@example.com',
         firstName: 'Test',
@@ -298,11 +298,8 @@ describe('UserEditComponent', () => {
       });
       await fixture.whenStable();
 
-      const errors = component.userForm.password().errors();
-      expect(errors.some((e) => e.kind === 'pattern')).toBe(true);
-      expect(errors.find((e) => e.kind === 'pattern')?.message).toBe(
-        'users.edit.passwordPattern'
-      );
+      expect(component.userForm.password().errors()).toEqual([]);
+      expect(component.userForm.password().valid()).toBe(true);
     });
 
     it('rejects a password longer than the server ceiling', async () => {

@@ -62,7 +62,8 @@ import {
   seedFeatureFlags,
   seedFeatureFlagRules,
   seedPlans,
-  seedProducts
+  seedProducts,
+  seedBreachedPasswords
 } from './seed';
 
 // Each Playwright worker imports this module in its own process,
@@ -96,6 +97,7 @@ export function resetState(): void {
     auditLogs: [],
     captchaConfig: { enabled: false, siteKey: null },
     captchaAttempts: new Map(),
+    breachedPasswords: new Set(seedBreachedPasswords),
     featureFlags: new Map(seedFeatureFlags.map((f) => [f.id, { ...f }])),
     featureFlagRules: seedFeatureFlagRules.map((r) => ({
       ...r,

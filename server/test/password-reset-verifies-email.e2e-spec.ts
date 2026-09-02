@@ -20,7 +20,7 @@ runWithInfra('Password reset verifies the email (e2e)', () => {
   let authService: AuthService;
   let usersService: UsersService;
 
-  const newPassword = 'NewPassword1';
+  const newPassword = 'Quartz-Meadow-77';
   const emails: string[] = [];
 
   const statusOf = async (run: Promise<unknown>): Promise<number> => {

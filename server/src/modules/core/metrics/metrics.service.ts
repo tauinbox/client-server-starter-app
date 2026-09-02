@@ -26,6 +26,13 @@ export type CacheName =
 
 export type CacheOutcome = 'hit' | 'miss';
 
+/**
+ * `unavailable` is the fail-open branch: the blocklist could not be reached, so
+ * the password was accepted unchecked. Without this label a check that is never
+ * wired looks exactly like a check that always passes.
+ */
+export type BreachLookupOutcome = 'clean' | 'breached' | 'unavailable';
+
 @Injectable()
 export class MetricsService {
   constructor(
@@ -44,7 +51,9 @@ export class MetricsService {
     @InjectMetric('billing_usage_records_unrated_total')
     private readonly unratedUsageCounter: Counter<string>,
     @InjectMetric('billing_off_session_charges_unmatched_total')
-    private readonly unmatchedChargeCounter: Counter<string>
+    private readonly unmatchedChargeCounter: Counter<string>,
+    @InjectMetric('password_breach_lookups_total')
+    private readonly breachLookupCounter: Counter<string>
   ) {}
 
   recordHttpRequest(
@@ -84,5 +93,9 @@ export class MetricsService {
 
   recordUnmatchedOffSessionCharge(provider: BillingProviderId): void {
     this.unmatchedChargeCounter.inc({ provider });
+  }
+
+  recordBreachLookup(outcome: BreachLookupOutcome): void {
+    this.breachLookupCounter.inc({ outcome });
   }
 }

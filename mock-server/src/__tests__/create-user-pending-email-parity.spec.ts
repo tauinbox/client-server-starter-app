@@ -71,7 +71,7 @@ const createBody = {
   email: CLAIMED_EMAIL,
   firstName: 'Pending',
   lastName: 'Claim',
-  password: 'Password1'
+  password: 'Sunrise-Kettle-19'
 };
 
 // Both create paths resolve the same uniqueness rule on the real server -
