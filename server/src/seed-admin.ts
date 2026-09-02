@@ -9,7 +9,12 @@ import { Role } from './modules/auth/entities/role.entity';
 
 dotenv.config();
 
-async function seedAdmin(): Promise<void> {
+/**
+ * Exported so a spec can drive it. The container entrypoint runs this file
+ * under `set -e`, so anything that exits non-zero here stops the API from
+ * starting; that contract is what `seed-admin.spec.ts` pins.
+ */
+export async function seedAdmin(): Promise<void> {
   const email = process.env['ADMIN_EMAIL'];
   const password = process.env['ADMIN_PASSWORD'];
   const firstName = process.env['ADMIN_FIRST_NAME'] ?? 'Admin';
@@ -18,24 +23,6 @@ async function seedAdmin(): Promise<void> {
   if (!email || !password) {
     console.log('ADMIN_EMAIL or ADMIN_PASSWORD not set, skipping admin seed');
     return;
-  }
-
-  // The same blocklist the set-password routes apply. A seeded admin is the
-  // account least able to afford a public password, and unlike a request this
-  // runs once at deploy time, so refusing costs nothing that a corrected
-  // ADMIN_PASSWORD does not fix.
-  const breachOutcome = await lookupBreachedPassword(password, {
-    rangeUrl: process.env['PWNED_PASSWORDS_RANGE_URL'],
-    onUnavailable: (reason) =>
-      console.warn(
-        `Breached-password lookup ${reason} - ADMIN_PASSWORD seeded unchecked`
-      )
-  });
-  if (breachOutcome === 'breached') {
-    console.error(
-      'ADMIN_PASSWORD appears in a public data breach - choose a different value'
-    );
-    process.exit(1);
   }
 
   const dataSource = new DataSource(postgresConfig());
@@ -72,6 +59,26 @@ async function seedAdmin(): Promise<void> {
       process.exit(1);
     }
 
+    // The same blocklist the set-password routes apply, and only on the branch
+    // that actually sets a password. It WARNS and continues: this script runs
+    // from the container entrypoint under `set -e`, so a non-zero exit here
+    // stops the API from starting at all. A weak seed password is a problem to
+    // fix at leisure; refusing to boot over it is an outage.
+    const breachOutcome = await lookupBreachedPassword(password, {
+      rangeUrl: process.env['PWNED_PASSWORDS_RANGE_URL'],
+      onUnavailable: (reason) =>
+        console.warn(
+          `Breached-password lookup ${reason} - ADMIN_PASSWORD seeded unchecked`
+        )
+    });
+    if (breachOutcome === 'breached') {
+      console.warn(
+        'WARNING: ADMIN_PASSWORD appears in a public data breach. The admin ' +
+          'user is being created with it - change the password after the ' +
+          'first sign-in and rotate the ADMIN_PASSWORD secret.'
+      );
+    }
+
     const hashedPassword = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
     const admin = userRepo.create({
       email,
@@ -90,7 +97,9 @@ async function seedAdmin(): Promise<void> {
   }
 }
 
-seedAdmin().catch((err: unknown) => {
-  console.error('Failed to seed admin:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  seedAdmin().catch((err: unknown) => {
+    console.error('Failed to seed admin:', err);
+    process.exit(1);
+  });
+}

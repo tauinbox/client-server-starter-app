@@ -1909,6 +1909,12 @@ The administrator seeder (`src/seed-admin.ts`) reads `ADMIN_EMAIL`, `ADMIN_PASSW
 `ADMIN_FIRST_NAME` and `ADMIN_LAST_NAME` from the environment. It is idempotent: it skips the work
 when the user exists, and when `ADMIN_EMAIL` has no value.
 
+**The seeder must never exit non-zero, and `seed-admin.spec.ts` pins that.** The entrypoint runs it
+under `set -e`, so any non-zero exit aborts the entrypoint and the API never starts. It checks the
+breached-password blocklist on the branch that creates the user, and a listed `ADMIN_PASSWORD`
+produces a WARNING in the deploy log, not a refusal. Trading the whole API for a weak seed password
+is not a trade worth making, and it caused a production outage on 2026-09-02.
+
 The `docker-compose.yml` file in the root of the repository is the **production** stack. It holds the
 db, redis, server, client and monitoring services, and the deploy puts it on the VPS. Do not use it
 locally.
