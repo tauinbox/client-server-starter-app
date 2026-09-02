@@ -36,7 +36,7 @@ function register(body: Record<string, unknown>): Promise<Response> {
 
 const validBody = {
   email: 'taken@example.com',
-  password: 'Password1',
+  password: 'Sunrise-Kettle-19',
   firstName: 'Conflict',
   lastName: 'Probe'
 };

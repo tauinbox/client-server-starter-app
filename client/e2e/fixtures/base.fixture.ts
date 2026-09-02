@@ -101,6 +101,13 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
         });
         return res.json();
       },
+      async seedBreachedPasswords(passwords) {
+        await fetch(`${baseUrl}/__control/breached-passwords`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(passwords)
+        });
+      },
       async seedRoles(roles) {
         await fetch(`${baseUrl}/__control/roles`, {
           method: 'POST',

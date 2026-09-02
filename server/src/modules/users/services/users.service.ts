@@ -11,6 +11,7 @@ import type { AbilityOrSystem } from '../../auth/casl/app-ability';
 import { AuditService } from '../../audit/audit.service';
 import { assertCan } from '../../../common/utils/assert-can.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { BreachedPasswordService } from '../../auth/breached-password/breached-password.service';
 import { MailService } from '../../mail/mail.service';
 import { issueEmailVerificationToken } from '../../../common/utils/issue-verification-token.util';
 import { User } from '../entities/user.entity';
@@ -40,11 +41,16 @@ export class UsersService {
     private dataSource: DataSource,
     private auditService: AuditService,
     private metricsService: MetricsService,
-    private mailService: MailService
+    private mailService: MailService,
+    private breachedPasswordService: BreachedPasswordService
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
     const { email, password } = createUserDto;
+
+    // Ahead of the address conflict, matching AuthService.register: both routes
+    // carry the same DTO and must answer the same way for the same body.
+    await this.breachedPasswordService.assertNotBreached(password);
 
     // Reject if address is held by another user as primary email OR as a
     // pending email-change request — both are reservations on the address.
@@ -245,6 +251,9 @@ export class UsersService {
     const changes: Partial<User> = { ...rest };
 
     if (rest.password) {
+      // After the ability check, which decides whether this caller may write to
+      // the record at all, and before the hash.
+      await this.breachedPasswordService.assertNotBreached(rest.password);
       changes.password = await bcrypt.hash(rest.password, BCRYPT_SALT_ROUNDS);
     }
 

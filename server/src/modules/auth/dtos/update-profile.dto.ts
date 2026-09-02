@@ -3,7 +3,6 @@ import {
   IsIn,
   IsNotEmpty,
   IsString,
-  Matches,
   MaxLength,
   MinLength,
   ValidateIf
@@ -11,8 +10,6 @@ import {
 import {
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
-  PASSWORD_ERROR,
-  PASSWORD_REGEX,
   SUPPORTED_LOCALES
 } from '@app/shared/constants';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
@@ -38,14 +35,13 @@ export class UpdateProfileDto {
 
   @ApiPropertyOptional({
     description:
-      'New password (min 8 characters, must contain uppercase, lowercase and number)',
-    example: 'NewPassword123',
+      'New password. Rejected when it appears in a public breach corpus.',
+    example: 'Sunrise-Kettle-19',
     minLength: MIN_PASSWORD_LENGTH
   })
   @ValidateIf(propertyIsDefined)
   @MinLength(MIN_PASSWORD_LENGTH)
   @MaxLength(MAX_PASSWORD_LENGTH)
-  @Matches(PASSWORD_REGEX, { message: PASSWORD_ERROR })
   password?: string;
 
   @ApiPropertyOptional({

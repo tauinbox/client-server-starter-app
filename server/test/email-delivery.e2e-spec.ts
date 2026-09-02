@@ -97,7 +97,7 @@ runWithInfra('Email delivery (e2e)', () => {
   it('delivers a verification email whose token unblocks login', async () => {
     await clearMailpit();
     const email = `delivery-${Date.now()}@example.com`;
-    const password = 'Password1';
+    const password = 'Sunrise-Kettle-19';
 
     await request(http())
       .post('/api/v1/auth/register')
@@ -140,7 +140,7 @@ runWithInfra('Email delivery (e2e)', () => {
   it('delivers a password-changed notice after a self-service change', async () => {
     await clearMailpit();
     const email = `pwd-notice-${Date.now()}@example.com`;
-    const password = 'Password1';
+    const password = 'Sunrise-Kettle-19';
 
     await request(http())
       .post('/api/v1/auth/register')
@@ -171,7 +171,7 @@ runWithInfra('Email delivery (e2e)', () => {
     await request(http())
       .patch('/api/v1/auth/profile')
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ password: 'Password2', currentPassword: password })
+      .send({ password: 'Quartz-Meadow-77', currentPassword: password })
       .expect(200);
 
     const notice = await waitForEmailHtml(email, 'Your password was changed');

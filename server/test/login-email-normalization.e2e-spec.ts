@@ -21,7 +21,7 @@ runWithInfra('Login email normalization (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   const email = `login-normalize-${Date.now()}@example.com`;
-  const password = 'Password1';
+  const password = 'Sunrise-Kettle-19';
 
   beforeAll(async () => {
     const moduleRef: TestingModule = await withPrivateThrottlerStorage(

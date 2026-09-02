@@ -35,7 +35,9 @@ test.describe('Register page', () => {
     await page.getByLabel('Email').fill('not-an-email');
     await page.getByLabel('First Name').fill('John');
     await page.getByLabel('Last Name').fill('Doe');
-    await page.getByLabel('Password', { exact: true }).fill('Password123');
+    await page
+      .getByLabel('Password', { exact: true })
+      .fill('Sunrise-Kettle-19');
 
     await expect(main.getByRole('button', { name: 'Register' })).toBeDisabled();
   });
@@ -68,7 +70,9 @@ test.describe('Register page', () => {
     await page.getByLabel('First Name').blur();
     await page.getByLabel('Last Name').fill('Doe');
     await page.getByLabel('Last Name').blur();
-    await page.getByLabel('Password', { exact: true }).fill('Password123');
+    await page
+      .getByLabel('Password', { exact: true })
+      .fill('Sunrise-Kettle-19');
 
     await expect(main.getByRole('button', { name: 'Register' })).toBeEnabled();
   });
@@ -121,7 +125,7 @@ test.describe('Register page', () => {
     ).toBeVisible();
   });
 
-  test('should show the composition rule instead of a generic server error', async ({
+  test('accepts a lower-case password and only advises on length', async ({
     _mockServer,
     page
   }) => {
@@ -133,19 +137,17 @@ test.describe('Register page', () => {
     await page.getByLabel('Last Name').fill('Smith');
     await page.getByLabel('Password', { exact: true }).fill('passwordonly');
 
-    await expect(page.getByText(/Use at least 8 characters/i)).toBeVisible();
+    await expect(page.getByText(/Longer is stronger/i)).toBeVisible();
 
     await page.getByLabel('Email').click();
 
-    await expect(
-      page.getByText(
-        'Password must contain at least one uppercase letter, one lowercase letter and one number'
-      )
-    ).toBeVisible();
-    await expect(main.getByRole('button', { name: 'Register' })).toBeDisabled();
+    // The composition rules are gone: a lower-case value of adequate length is
+    // a valid password and the form must let it through.
+    await expect(page.getByText(/uppercase letter/i)).toBeHidden();
+    await expect(main.getByRole('button', { name: 'Register' })).toBeEnabled();
   });
 
-  test('hides the requirements hint once the password satisfies the rule', async ({
+  test('hides the strength hint once the password scores well', async ({
     _mockServer,
     page
   }) => {
@@ -153,10 +155,10 @@ test.describe('Register page', () => {
 
     const passwordInput = page.getByLabel('Password', { exact: true });
     await passwordInput.fill('passwordonly');
-    await expect(page.getByText(/Use at least 8 characters/i)).toBeVisible();
+    await expect(page.getByText(/Longer is stronger/i)).toBeVisible();
 
-    await passwordInput.fill('Password123');
-    await expect(page.getByText(/Use at least 8 characters/i)).toBeHidden();
+    await passwordInput.fill('Sunrise-Kettle-19');
+    await expect(page.getByText(/Longer is stronger/i)).toBeHidden();
   });
 
   test('should register successfully and redirect to login with pending verification', async ({
@@ -172,7 +174,9 @@ test.describe('Register page', () => {
     await page.getByLabel('First Name').blur();
     await page.getByLabel('Last Name').fill('Smith');
     await page.getByLabel('Last Name').blur();
-    await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await page
+      .getByLabel('Password', { exact: true })
+      .fill('Sunrise-Kettle-19');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(page).toHaveURL(/.*\/login\?registered=pending-verification$/);
@@ -195,7 +199,9 @@ test.describe('Register page', () => {
     await page.getByLabel('First Name').blur();
     await page.getByLabel('Last Name').fill('Doe');
     await page.getByLabel('Last Name').blur();
-    await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await page
+      .getByLabel('Password', { exact: true })
+      .fill('Sunrise-Kettle-19');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(
@@ -227,7 +233,9 @@ test.describe('Register page', () => {
     await page.getByLabel('First Name').blur();
     await page.getByLabel('Last Name').fill('Doe');
     await page.getByLabel('Last Name').blur();
-    await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await page
+      .getByLabel('Password', { exact: true })
+      .fill('Sunrise-Kettle-19');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(page.locator('.error-message')).toBeVisible();
@@ -253,10 +261,38 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const meter = page.locator('[role="progressbar"][aria-valuemax="4"]');
-    await page.getByLabel('Password', { exact: true }).fill('Str0ngPassword!');
+    await page
+      .getByLabel('Password', { exact: true })
+      .fill('correcthorsebatterystaple');
 
     await expect(meter).toHaveAttribute('data-strength', '4');
     await expect(meter).toContainText('Strong');
+  });
+
+  test('refuses a password listed in a public breach corpus', async ({
+    _mockServer,
+    page
+  }) => {
+    await page.goto('/register');
+
+    const main = page.getByRole('main');
+    await page.getByLabel('Email').fill('breached@example.com');
+    await page.getByLabel('Email').blur();
+    await page.getByLabel('First Name').fill('Jane');
+    await page.getByLabel('First Name').blur();
+    await page.getByLabel('Last Name').fill('Smith');
+    await page.getByLabel('Last Name').blur();
+    // Seeded into the mock corpus, and genuinely one of the most breached
+    // values there is, so the real server refuses it too.
+    await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await main.getByRole('button', { name: 'Register' }).click();
+
+    await expect(
+      page.getByText(
+        'This password has appeared in a public data breach. Please choose a different one.'
+      )
+    ).toBeVisible();
+    await expect(page).toHaveURL(/.*\/register$/);
   });
 
   test('should have a link to login page', async ({ _mockServer, page }) => {

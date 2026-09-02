@@ -25,7 +25,6 @@ import {
   form,
   maxLength,
   minLength,
-  pattern,
   required
 } from '@angular/forms/signals';
 import {
@@ -54,8 +53,7 @@ import { UsersStore } from '../../store/users.store';
 import type { RoleAdminResponse } from '@app/shared/types';
 import {
   MAX_PASSWORD_LENGTH,
-  MIN_PASSWORD_LENGTH,
-  PASSWORD_REGEX
+  MIN_PASSWORD_LENGTH
 } from '@app/shared/constants';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
@@ -139,9 +137,6 @@ export class UserEditComponent implements OnInit, OnDestroy {
     required(path.lastName, { message: 'users.edit.lastNameRequired' });
     minLength(path.password, MIN_PASSWORD_LENGTH, {
       message: 'users.edit.passwordMinLength'
-    });
-    pattern(path.password, PASSWORD_REGEX, {
-      message: 'users.edit.passwordPattern'
     });
     maxLength(path.password, MAX_PASSWORD_LENGTH, {
       message: 'users.edit.passwordMaxLength'

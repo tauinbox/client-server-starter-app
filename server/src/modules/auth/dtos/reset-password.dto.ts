@@ -1,16 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsNotEmpty,
-  IsString,
-  Matches,
-  MaxLength,
-  MinLength
-} from 'class-validator';
+import { IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
 import {
   MAX_PASSWORD_LENGTH,
-  MIN_PASSWORD_LENGTH,
-  PASSWORD_ERROR,
-  PASSWORD_REGEX
+  MIN_PASSWORD_LENGTH
 } from '@app/shared/constants';
 
 export class ResetPasswordDto {
@@ -24,13 +16,12 @@ export class ResetPasswordDto {
 
   @ApiProperty({
     description:
-      'New password (min 8 characters, must contain uppercase, lowercase and number)',
+      'New password. Rejected when it appears in a public breach corpus.',
     minLength: MIN_PASSWORD_LENGTH
   })
   @IsString()
   @IsNotEmpty()
   @MinLength(MIN_PASSWORD_LENGTH)
   @MaxLength(MAX_PASSWORD_LENGTH)
-  @Matches(PASSWORD_REGEX, { message: PASSWORD_ERROR })
   password: string;
 }

@@ -26,6 +26,7 @@ import { VkStrategy } from './strategies/vk.strategy';
 import { User } from '../users/entities/user.entity';
 import { CaslModule } from './casl/casl.module';
 import { CaptchaModule } from './captcha/captcha.module';
+import { BreachedPasswordModule } from './breached-password/breached-password.module';
 import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { SessionLimitService } from './services/session-limit.service';
 import { SessionIssuerService } from './services/session-issuer.service';
@@ -62,6 +63,7 @@ function conditionalProvider(
     UsersModule,
     CaslModule,
     CaptchaModule,
+    BreachedPasswordModule,
     // The concurrent-session allowance is plan-driven; the resolver carries no
     // auth dependency of its own, so this edge is one-way.
     EntitlementsModule,

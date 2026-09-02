@@ -50,6 +50,10 @@ describe('MetricsService', () => {
         {
           provide: getToken('billing_off_session_charges_unmatched_total'),
           useValue: mockCounter
+        },
+        {
+          provide: getToken('password_breach_lookups_total'),
+          useValue: mockCounter
         }
       ]
     }).compile();
@@ -155,6 +159,14 @@ describe('MetricsService', () => {
       service.recordUnratedUsage('api_calls');
 
       expect(mockCounter.inc).toHaveBeenCalledWith({ meter: 'api_calls' });
+    });
+  });
+
+  describe('recordBreachLookup', () => {
+    it('increments the counter with the verdict as the only label', () => {
+      service.recordBreachLookup('unavailable');
+
+      expect(mockCounter.inc).toHaveBeenCalledWith({ outcome: 'unavailable' });
     });
   });
 });

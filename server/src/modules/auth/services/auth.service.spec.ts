@@ -21,6 +21,7 @@ import { MailService } from '../../mail/mail.service';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { BreachedPasswordService } from '../breached-password/breached-password.service';
 import { SessionIssuerService } from './session-issuer.service';
 import { SessionLimitService } from './session-limit.service';
 import { EntitlementService } from '../../entitlements/entitlement.service';
@@ -92,6 +93,9 @@ describe('AuthService', () => {
   };
   let mockMetricsService: {
     recordAuthEvent: jest.Mock;
+  };
+  let mockBreachedPasswordService: {
+    assertNotBreached: jest.Mock;
   };
   let mockEntitlementService: {
     limitFor: jest.Mock;
@@ -250,6 +254,10 @@ describe('AuthService', () => {
       recordAuthEvent: jest.fn()
     };
 
+    mockBreachedPasswordService = {
+      assertNotBreached: jest.fn().mockResolvedValue(undefined)
+    };
+
     // Free tier by default: no plan-specific allowance, so pruning must fall
     // back to the constant. Individual tests raise or break it.
     mockEntitlementService = {
@@ -276,7 +284,11 @@ describe('AuthService', () => {
         { provide: MailService, useValue: mockMailService },
         { provide: AuditService, useValue: mockAuditService },
         { provide: MetricsService, useValue: mockMetricsService },
-        { provide: JwtService, useValue: mockJwtService }
+        { provide: JwtService, useValue: mockJwtService },
+        {
+          provide: BreachedPasswordService,
+          useValue: mockBreachedPasswordService
+        }
       ]
     }).compile();
 
@@ -285,6 +297,30 @@ describe('AuthService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('the blocklist is never consulted on a verify path', () => {
+    it('skips it on login', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(mockUser);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      await service.validateUser('test@example.com', 'Password1');
+
+      expect(
+        mockBreachedPasswordService.assertNotBreached
+      ).not.toHaveBeenCalled();
+    });
+
+    it('skips it on the current-password step up', async () => {
+      mockUsersService.findOne.mockResolvedValue(mockUser);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      await service.verifyCurrentPassword('user-1', 'Password1');
+
+      expect(
+        mockBreachedPasswordService.assertNotBreached
+      ).not.toHaveBeenCalled();
+    });
   });
 
   describe('validateUser', () => {
@@ -691,6 +727,36 @@ describe('AuthService', () => {
       expect(mockManager.save).not.toHaveBeenCalled();
     });
 
+    it('refuses a breached password before it opens the transaction', async () => {
+      mockBreachedPasswordService.assertNotBreached.mockRejectedValue(
+        new HttpException(
+          { message: 'breached', errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED },
+          HttpStatus.BAD_REQUEST
+        )
+      );
+
+      await expect(service.register(registerDto)).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED }
+      });
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('accepts a password made only of lower-case letters', async () => {
+      mockManager.findOne.mockResolvedValue(null);
+      mockManager.save.mockResolvedValue(savedUser);
+
+      await expect(
+        service.register({ ...registerDto, password: 'kettlesunrise' })
+      ).resolves.toEqual(
+        expect.objectContaining({
+          message: expect.stringContaining('Registration successful')
+        })
+      );
+      expect(
+        mockBreachedPasswordService.assertNotBreached
+      ).toHaveBeenCalledWith('kettlesunrise');
+    });
+
     it('translates a unique violation on the insert into the same 409', async () => {
       mockManager.findOne.mockResolvedValue(null); // check passes
       mockManager.save.mockRejectedValue({ code: '23505' }); // index rejects
@@ -889,6 +955,37 @@ describe('AuthService', () => {
   });
 
   describe('resetPassword', () => {
+    it('refuses a breached password after the token clears', async () => {
+      mockUsersService.findByPasswordResetToken.mockResolvedValue({
+        ...mockUser,
+        passwordResetExpiresAt: new Date(Date.now() + 3600000)
+      });
+      mockBreachedPasswordService.assertNotBreached.mockRejectedValue(
+        new HttpException(
+          { message: 'breached', errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED },
+          HttpStatus.BAD_REQUEST
+        )
+      );
+
+      await expect(
+        service.resetPassword('valid-token', 'Password1')
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED }
+      });
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('spends no lookup on an invalid token', async () => {
+      mockUsersService.findByPasswordResetToken.mockResolvedValue(null);
+
+      await expect(
+        service.resetPassword('bad-token', 'Password1')
+      ).rejects.toThrow(HttpException);
+      expect(
+        mockBreachedPasswordService.assertNotBreached
+      ).not.toHaveBeenCalled();
+    });
+
     // A stolen reset link produces a completed takeover that the audit trail
     // alone never shows the owner, so the completion has to notify.
     it('should notify the account owner that the password was reset', async () => {

@@ -2,7 +2,6 @@ import {
   IsEmail,
   IsIn,
   IsNotEmpty,
-  Matches,
   MaxLength,
   MinLength,
   ValidateIf
@@ -13,8 +12,6 @@ import { normalizeEmail } from '@app/shared/utils/email';
 import {
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
-  PASSWORD_ERROR,
-  PASSWORD_REGEX,
   SUPPORTED_LOCALES
 } from '@app/shared/constants';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
@@ -47,14 +44,13 @@ export class CreateUserDto {
 
   @ApiProperty({
     description:
-      'The password of the user (min 8 characters, must contain uppercase, lowercase and number)',
-    example: 'Password123',
+      'The password of the user. Rejected when it appears in a public breach corpus.',
+    example: 'Sunrise-Kettle-19',
     minLength: MIN_PASSWORD_LENGTH
   })
   @IsNotEmpty()
   @MinLength(MIN_PASSWORD_LENGTH)
   @MaxLength(MAX_PASSWORD_LENGTH)
-  @Matches(PASSWORD_REGEX, { message: PASSWORD_ERROR })
   password: string;
 
   @ApiPropertyOptional({

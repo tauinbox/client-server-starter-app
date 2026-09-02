@@ -21,7 +21,6 @@ import {
   form,
   maxLength,
   minLength,
-  pattern,
   required,
   validate
 } from '@angular/forms/signals';
@@ -73,8 +72,7 @@ import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.s
 import {
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
-  OAUTH_PROVIDER_FLAGS,
-  PASSWORD_REGEX
+  OAUTH_PROVIDER_FLAGS
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 
@@ -211,9 +209,6 @@ export class ProfileComponent implements OnInit {
     });
     minLength(path.password, MIN_PASSWORD_LENGTH, {
       message: 'auth.profile.passwordMinLength'
-    });
-    pattern(path.password, PASSWORD_REGEX, {
-      message: 'auth.profile.passwordPattern'
     });
     maxLength(path.password, MAX_PASSWORD_LENGTH, {
       message: 'auth.profile.passwordMaxLength'

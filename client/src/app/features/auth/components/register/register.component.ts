@@ -17,7 +17,6 @@ import {
   form,
   maxLength,
   minLength,
-  pattern,
   required
 } from '@angular/forms/signals';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
@@ -35,8 +34,7 @@ import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import {
   ErrorKeys,
   MAX_PASSWORD_LENGTH,
-  MIN_PASSWORD_LENGTH,
-  PASSWORD_REGEX
+  MIN_PASSWORD_LENGTH
 } from '@app/shared/constants';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 
@@ -96,9 +94,6 @@ export class RegisterComponent {
     required(path.password, { message: 'auth.register.passwordRequired' });
     minLength(path.password, MIN_PASSWORD_LENGTH, {
       message: 'auth.register.passwordMinLength'
-    });
-    pattern(path.password, PASSWORD_REGEX, {
-      message: 'auth.register.passwordPattern'
     });
     maxLength(path.password, MAX_PASSWORD_LENGTH, {
       message: 'auth.register.passwordMaxLength'

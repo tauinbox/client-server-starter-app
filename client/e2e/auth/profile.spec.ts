@@ -160,8 +160,8 @@ test.describe('Profile page', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await page.getByLabel('New Password (Optional)').fill('NewPass123');
-    await page.getByLabel('Confirm New Password').fill('NewPass123');
+    await page.getByLabel('New Password (Optional)').fill('Quartz-Meadow-77');
+    await page.getByLabel('Confirm New Password').fill('Quartz-Meadow-77');
     await page.getByLabel('Current Password').fill('Password1');
 
     await expect(
@@ -175,8 +175,8 @@ test.describe('Profile page', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await page.getByLabel('New Password (Optional)').fill('NewPass123');
-    await page.getByLabel('Confirm New Password').fill('NewPass123');
+    await page.getByLabel('New Password (Optional)').fill('Quartz-Meadow-77');
+    await page.getByLabel('Confirm New Password').fill('Quartz-Meadow-77');
 
     await expect(
       page.getByRole('button', { name: 'Save', exact: true })
@@ -189,7 +189,7 @@ test.describe('Profile page', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await page.getByLabel('New Password (Optional)').fill('NewPass123');
+    await page.getByLabel('New Password (Optional)').fill('Quartz-Meadow-77');
     await page.getByLabel('Confirm New Password').fill('different1');
     await page.getByLabel('First Name').click();
 

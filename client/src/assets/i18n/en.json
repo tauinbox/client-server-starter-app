@@ -80,7 +80,7 @@
     "fair": "Fair",
     "good": "Good",
     "strong": "Strong",
-    "requirements": "Use at least 8 characters, with one uppercase letter, one lowercase letter and one number."
+    "requirements": "Longer is stronger. Aim for at least 12 characters, and note that a password found in a public data breach is refused."
   },
   "errors": {
     "auth": {
@@ -112,7 +112,8 @@
       "captchaGateFailure": "CAPTCHA gate cannot evaluate rate-limit state. Please try again later.",
       "sameEmail": "New email is the same as your current email",
       "pendingEmailTokenExpired": "Email-change confirmation token is invalid or expired",
-      "reauthRequired": "Confirm it is you with your sign-in provider, then try again"
+      "reauthRequired": "Confirm it is you with your sign-in provider, then try again",
+      "passwordBreached": "This password has appeared in a public data breach. Please choose a different one."
     },
     "users": {
       "notFound": "User not found",

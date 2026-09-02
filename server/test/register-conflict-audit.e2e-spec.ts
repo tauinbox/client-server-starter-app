@@ -22,7 +22,7 @@ runWithInfra('Register conflict is audited (e2e)', () => {
 
   const registerDto = (email: string) => ({
     email,
-    password: 'Password1',
+    password: 'Sunrise-Kettle-19',
     firstName: 'Conflict',
     lastName: 'Probe'
   });

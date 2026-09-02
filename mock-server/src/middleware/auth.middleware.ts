@@ -7,8 +7,6 @@ import {
   MAX_CONCURRENT_SESSIONS,
   MAX_FAILED_ATTEMPTS,
   MAX_PASSWORD_LENGTH,
-  PASSWORD_ERROR,
-  PASSWORD_REGEX,
   RESET_TOKEN_EXPIRY_MS,
   VERIFICATION_TOKEN_EXPIRY_MS
 } from '@app/shared/constants';
@@ -20,6 +18,10 @@ import {
   validateMaxLength
 } from '../utils/validation';
 import { generateTokens } from '../jwt.utils';
+import {
+  breachedPasswordEnvelope,
+  isBreachedPassword
+} from '../helpers/breached-password.helpers';
 import {
   findUserByEmail,
   findUserById,
@@ -443,11 +445,6 @@ router.post('/reset-password', (req, res) => {
     return;
   }
 
-  if (!PASSWORD_REGEX.test(password)) {
-    res.status(400).json(validationError(PASSWORD_ERROR));
-    return;
-  }
-
   const state = getState();
   const issued = state.passwordResetTokens.get(token);
 
@@ -477,6 +474,13 @@ router.post('/reset-password', (req, res) => {
       message: 'Password reset token has expired. Please request a new one.',
       errorKey: ErrorKeys.AUTH.RESET_TOKEN_EXPIRED
     });
+    return;
+  }
+
+  // The server checks the blocklist inside the service, after the token checks
+  // that authorise the call: an invalid token must not buy a lookup.
+  if (isBreachedPassword(password)) {
+    res.status(400).json(breachedPasswordEnvelope());
     return;
   }
 
@@ -704,14 +708,6 @@ router.patch('/profile', authGuard, (req, res) => {
       return;
     }
 
-    // Regex is part of DTO validation on the real server: it fails before the
-    // currentPassword business check and before any field assignment, so a 400
-    // must leave the profile unchanged.
-    if (!PASSWORD_REGEX.test(password)) {
-      res.status(400).json(validationError(PASSWORD_ERROR));
-      return;
-    }
-
     // OAuth-only users (no password set) may set their first password without
     // currentPassword. Users with an existing password must supply a matching one.
     if (user.password !== null) {
@@ -724,6 +720,14 @@ router.patch('/profile', authGuard, (req, res) => {
         });
         return;
       }
+    }
+
+    // The blocklist verdict comes from UsersService.update on the real server,
+    // after the step up and before any field assignment, so a 400 must leave
+    // the profile unchanged.
+    if (isBreachedPassword(password)) {
+      res.status(400).json(breachedPasswordEnvelope());
+      return;
     }
   }
 

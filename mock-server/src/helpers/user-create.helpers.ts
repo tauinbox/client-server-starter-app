@@ -1,9 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import {
-  ErrorKeys,
-  PASSWORD_ERROR,
-  PASSWORD_REGEX
-} from '@app/shared/constants';
+import { ErrorKeys } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
   isValidEmail,
@@ -13,6 +9,10 @@ import {
 } from '../utils/validation';
 import { findUserByEmail, findUserByPendingEmail } from '../state';
 import { validationError } from './validation-error.helpers';
+import {
+  breachedPasswordEnvelope,
+  isBreachedPassword
+} from './breached-password.helpers';
 import type { MockUser } from '../types';
 
 export interface CreateUserFields {
@@ -83,8 +83,11 @@ export function validateCreateUserBody(
     locale: typeof locale === 'string' ? locale : 'en'
   };
 
-  if (!PASSWORD_REGEX.test(fields.password)) {
-    return { ok: false, status: 400, body: validationError(PASSWORD_ERROR) };
+  // The server checks the blocklist inside the service, after the DTO clears
+  // and ahead of the address conflict below, so both routes answer the same
+  // way for the same body.
+  if (isBreachedPassword(fields.password)) {
+    return { ok: false, status: 400, body: breachedPasswordEnvelope() };
   }
 
   const localeErr = validateLocale(locale);

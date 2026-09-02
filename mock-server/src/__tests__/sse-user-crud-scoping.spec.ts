@@ -84,7 +84,7 @@ describe('SSE user_crud_events scoping', () => {
         email: 'sse-created@example.com',
         firstName: 'Sse',
         lastName: 'Created',
-        password: 'Password1'
+        password: 'Sunrise-Kettle-19'
       })
     });
     expect(res.status).toBe(201);

@@ -364,6 +364,10 @@ export interface State {
   // Per-route + per-IP attempt tracker for captcha soft-trigger. Keyed
   // `${routeName}:${ip}`.
   captchaAttempts: Map<string, CaptchaAttemptWindow>;
+  // Sample of the public breach corpus the server checks a new password
+  // against. Seeded from `seedBreachedPasswords`; a test adds more through
+  // `POST /__control/breached-passwords`.
+  breachedPasswords: Set<string>;
 }
 
 export interface AuthenticatedRequest extends Request {

@@ -89,6 +89,13 @@ export const MAIL_QUEUE_REF = Symbol('MAIL_QUEUE_REF');
       help: 'Off-session charges a provider confirmed against no pending invoice',
       labelNames: ['provider']
     }),
+    // The `outcome` label is the closed BreachLookupOutcome union; the password
+    // itself never reaches a label, only the verdict.
+    makeCounterProvider({
+      name: 'password_breach_lookups_total',
+      help: 'Breached-password blocklist lookups by verdict, including the fail-open branch',
+      labelNames: ['outcome']
+    }),
     {
       provide: SSE_CONNECTIONS_REF,
       useFactory: (): SseConnectionsRef => ({ getCount: () => 0 })
