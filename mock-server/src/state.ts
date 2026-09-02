@@ -369,6 +369,37 @@ export function getResolvedPermissionsForUser(
   return Array.from(permissionMap.values());
 }
 
+/**
+ * Mirrors the super-role test of CaslAbilityFactory: the flag lives on the
+ * role, so a name is never enough on its own.
+ */
+export function hasSuperRole(user: MockUser): boolean {
+  const currentState = getState();
+
+  return user.roles.some((roleName) => {
+    for (const role of currentState.roles.values()) {
+      if (role.name === roleName && role.isSuper) return true;
+    }
+    return false;
+  });
+}
+
+/**
+ * Mirrors MfaPolicyService. The real server also needs MFA_ENCRYPTION_KEY,
+ * because enrolment answers 503 without it; the mock stores no secret, so its
+ * enrolment is always available and the opt-in flag is the whole condition.
+ */
+export function isMfaMandatoryFor(user: MockUser): boolean {
+  return (
+    process.env['MFA_REQUIRED_FOR_ADMINS'] === 'true' && hasSuperRole(user)
+  );
+}
+
+/** True when the account must enrol before a protected route answers it. */
+export function mustEnrolMfa(user: MockUser): boolean {
+  return isMfaMandatoryFor(user) && !user.totpEnabledAt;
+}
+
 export function getPackedRulesForUser(user: MockUser): unknown[][] {
   const { can, cannot, build } = new AbilityBuilder<MockAbility>(
     createMongoAbility
@@ -376,14 +407,7 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
 
   const currentState = getState();
 
-  const hasSuperRole = user.roles.some((roleName) => {
-    for (const role of currentState.roles.values()) {
-      if (role.name === roleName && role.isSuper) return true;
-    }
-    return false;
-  });
-
-  if (hasSuperRole) {
+  if (hasSuperRole(user)) {
     can('manage', 'all');
     return packRules(build().rules);
   }

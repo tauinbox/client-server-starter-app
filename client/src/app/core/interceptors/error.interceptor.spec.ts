@@ -29,7 +29,10 @@ describe('errorInterceptor', () => {
     info: ReturnType<typeof vi.fn>;
     warn: ReturnType<typeof vi.fn>;
   };
-  let authStoreMock: { setRules: ReturnType<typeof vi.fn> };
+  let authStoreMock: {
+    setRules: ReturnType<typeof vi.fn>;
+    setMfaMandatory: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     notifyMock = {
@@ -38,7 +41,7 @@ describe('errorInterceptor', () => {
       info: vi.fn(),
       warn: vi.fn()
     };
-    authStoreMock = { setRules: vi.fn() };
+    authStoreMock = { setRules: vi.fn(), setMfaMandatory: vi.fn() };
 
     TestBed.configureTestingModule({
       imports: [TranslocoTestingModuleWithLangs],

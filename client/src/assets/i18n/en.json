@@ -120,6 +120,7 @@
       "mfaSetupRequired": "Start the two-factor setup before you confirm a code.",
       "mfaInvalidCode": "That verification code is incorrect.",
       "mfaInvalidRecoveryCode": "That recovery code is invalid or was already used.",
+      "mfaEnrolmentRequired": "Two-factor authentication must be turned on before this account can use the administration pages.",
       "mfaInvalidPendingToken": "The two-factor sign-in expired. Please sign in again."
     },
     "users": {

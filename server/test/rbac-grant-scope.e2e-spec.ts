@@ -32,6 +32,7 @@ import {
 } from '../src/modules/auth/casl/app-ability';
 import { resolveConditions } from '../src/modules/auth/casl/resolve-conditions';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
+import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
 import { RolesController } from '../src/modules/auth/controllers/roles.controller';
 import { RoleService } from '../src/modules/auth/services/role.service';
@@ -193,6 +194,8 @@ describe('Grant scope over the HTTP path', () => {
       .useClass(TestJwtAuthGuard)
       .overrideGuard(PermissionsGuard)
       .useClass(TestPermissionsGuard)
+      .overrideGuard(MfaRequiredGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     app = moduleRef.createNestApplication();

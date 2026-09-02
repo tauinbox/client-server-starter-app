@@ -17,6 +17,7 @@ describe('permissionGuard', () => {
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
     hasPersistedUser: ReturnType<typeof vi.fn>;
     hasPermissions: ReturnType<typeof vi.fn>;
+    mustEnrolMfa: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
@@ -31,7 +32,8 @@ describe('permissionGuard', () => {
       isAuthenticated: vi.fn().mockReturnValue(true),
       isAccessTokenExpired: vi.fn().mockReturnValue(false),
       hasPersistedUser: vi.fn().mockReturnValue(true),
-      hasPermissions: vi.fn().mockReturnValue(false)
+      hasPermissions: vi.fn().mockReturnValue(false),
+      mustEnrolMfa: vi.fn().mockReturnValue(false)
     };
 
     authServiceMock = {
@@ -69,6 +71,18 @@ describe('permissionGuard', () => {
 
     expect(String(result)).toBe('/forbidden');
     expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('should send an account that owes a two-factor enrolment to the profile', () => {
+    authStoreMock.hasPermissions.mockReturnValue(true);
+    authStoreMock.mustEnrolMfa.mockReturnValue(true);
+
+    const result = TestBed.runInInjectionContext(() =>
+      permissionGuard('search', 'User')(mockRoute, mockState)
+    );
+
+    expect(String(result)).toBe('/profile');
+    expect(authStoreMock.hasPermissions).not.toHaveBeenCalled();
   });
 
   it('should attempt refresh when not authenticated', async () => {
@@ -124,6 +138,7 @@ describe('instancePermissionGuard', () => {
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
     hasPersistedUser: ReturnType<typeof vi.fn>;
     hasPermissions: ReturnType<typeof vi.fn>;
+    mustEnrolMfa: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
@@ -141,7 +156,8 @@ describe('instancePermissionGuard', () => {
       isAuthenticated: vi.fn().mockReturnValue(true),
       isAccessTokenExpired: vi.fn().mockReturnValue(false),
       hasPersistedUser: vi.fn().mockReturnValue(true),
-      hasPermissions: vi.fn().mockReturnValue(false)
+      hasPermissions: vi.fn().mockReturnValue(false),
+      mustEnrolMfa: vi.fn().mockReturnValue(false)
     };
 
     authServiceMock = {
@@ -168,6 +184,20 @@ describe('instancePermissionGuard', () => {
     );
 
     expect(result).toBe(true);
+  });
+
+  it('should send an account that owes a two-factor enrolment to the profile', () => {
+    authStoreMock.hasPermissions.mockReturnValue(true);
+    authStoreMock.mustEnrolMfa.mockReturnValue(true);
+
+    const result = TestBed.runInInjectionContext(() =>
+      instancePermissionGuard('update', 'User', (route) => ({
+        id: route.params['id']
+      }))(mockRoute, mockState)
+    );
+
+    expect(String(result)).toBe('/profile');
+    expect(authStoreMock.hasPermissions).not.toHaveBeenCalled();
   });
 
   it('should pass instance data from route params to hasPermissions', () => {

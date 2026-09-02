@@ -9,6 +9,7 @@ import { UsersService } from '../../users/services/users.service';
 import { MailService } from '../../mail/mail.service';
 import { PermissionService } from '../services/permission.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
+import { MfaPolicyService } from '../services/mfa-policy.service';
 import { AuditService } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
@@ -18,6 +19,7 @@ import { JwtAuthRequest, LocalAuthRequest } from '../types/auth.request';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
+import { MfaRequiredGuard } from '../guards/mfa-required.guard';
 
 const allowAllGuard = { canActivate: () => true };
 
@@ -128,6 +130,9 @@ describe('AuthController', () => {
   let caslAbilityFactoryMock: {
     createForUser: jest.Mock;
   };
+  let mfaPolicyMock: {
+    appliesTo: jest.Mock;
+  };
   let auditServiceMock: {
     log: jest.Mock;
   };
@@ -196,6 +201,10 @@ describe('AuthController', () => {
       createForUser: jest.fn().mockResolvedValue({ rules: [] })
     };
 
+    mfaPolicyMock = {
+      appliesTo: jest.fn().mockResolvedValue(false)
+    };
+
     auditServiceMock = {
       log: jest.fn().mockResolvedValue(undefined)
     };
@@ -217,6 +226,7 @@ describe('AuthController', () => {
         { provide: UsersService, useValue: userServiceMock },
         { provide: PermissionService, useValue: permissionServiceMock },
         { provide: CaslAbilityFactory, useValue: caslAbilityFactoryMock },
+        { provide: MfaPolicyService, useValue: mfaPolicyMock },
         { provide: AuditService, useValue: auditServiceMock },
         { provide: MailService, useValue: mailServiceMock },
         {
@@ -248,6 +258,8 @@ describe('AuthController', () => {
       .useValue(allowAllGuard)
       .overrideGuard(CaptchaRequiredGuard)
       .useValue(allowAllGuard)
+      .overrideGuard(MfaRequiredGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     controller = module.get<AuthController>(AuthController);
@@ -671,7 +683,21 @@ describe('AuthController', () => {
         [{ name: 'admin' }],
         []
       );
-      expect(result).toEqual({ roles: ['admin'], rules: [] });
+      expect(result).toEqual({
+        roles: ['admin'],
+        rules: [],
+        mfaMandatory: false
+      });
+    });
+
+    it('should report the two-factor demand the policy resolves', async () => {
+      mfaPolicyMock.appliesTo.mockResolvedValue(true);
+      const req = mockJwtRequest('user-1') as JwtAuthRequest;
+
+      const result = await controller.getPermissions(req);
+
+      expect(mfaPolicyMock.appliesTo).toHaveBeenCalledWith('user-1');
+      expect(result.mfaMandatory).toBe(true);
     });
   });
 

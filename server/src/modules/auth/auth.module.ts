@@ -12,7 +12,7 @@ import { MfaController } from './controllers/mfa.controller';
 import { OAuthController } from './controllers/oauth.controller';
 import { AuthService } from './services/auth.service';
 import { MfaService } from './services/mfa.service';
-import { SecretEncryptionService } from '../../common/crypto/secret-encryption.service';
+import { CryptoModule } from '../../common/crypto/crypto.module';
 import { OAuthService } from './services/oauth.service';
 import { TokenGeneratorService } from './services/token-generator.service';
 import { RefreshToken } from './entities/refresh-token.entity';
@@ -65,6 +65,7 @@ function conditionalProvider(
   imports: [
     UsersModule,
     CaslModule,
+    CryptoModule,
     CaptchaModule,
     BreachedPasswordModule,
     // The concurrent-session allowance is plan-driven; the resolver carries no
@@ -97,7 +98,6 @@ function conditionalProvider(
   providers: [
     AuthService,
     MfaService,
-    SecretEncryptionService,
     OAuthService,
     TokenGeneratorService,
     LocalStrategy,

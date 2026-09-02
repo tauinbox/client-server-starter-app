@@ -21,6 +21,7 @@ import { Subscription } from '../src/modules/billing/entities/subscription.entit
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
+import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 import { BillingAdminService } from '../src/modules/billing/services/billing-admin.service';
 import { UsageService } from '../src/modules/billing/services/usage.service';
 import { BillingAdminController } from '../src/modules/billing/controllers/billing-admin.controller';
@@ -118,6 +119,8 @@ describe('Billing admin (e2e)', () => {
     })
       .overrideGuard(PermissionsGuard)
       .useClass(TestPermissionsGuard)
+      .overrideGuard(MfaRequiredGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     app = moduleRef.createNestApplication();

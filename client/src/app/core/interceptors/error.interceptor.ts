@@ -65,6 +65,7 @@ export const errorInterceptor: HttpInterceptorFn = (
             }),
             switchMap((response) => {
               authStore.setRules(response.rules);
+              authStore.setMfaMandatory(response.mfaMandatory);
               const retried = request.clone({
                 context: request.context.set(RBAC_RETRY_CONTEXT, true)
               });

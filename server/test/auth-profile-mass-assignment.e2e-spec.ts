@@ -20,10 +20,12 @@ import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
+import { MfaPolicyService } from '../src/modules/auth/services/mfa-policy.service';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MailService } from '../src/modules/mail/mail.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
+import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 import { CaptchaRequiredGuard } from '../src/modules/auth/captcha/captcha-required.guard';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 
@@ -57,6 +59,10 @@ describe('Profile mass-assignment protection (e2e)', () => {
         { provide: UsersService, useValue: usersService },
         { provide: PermissionService, useValue: {} },
         { provide: CaslAbilityFactory, useValue: {} },
+        {
+          provide: MfaPolicyService,
+          useValue: { appliesTo: jest.fn().mockResolvedValue(false) }
+        },
         { provide: AuditService, useValue: { log: jest.fn() } },
         {
           provide: MailService,
@@ -70,6 +76,8 @@ describe('Profile mass-assignment protection (e2e)', () => {
       .overrideGuard(PermissionsGuard)
       .useValue({ canActivate: () => true })
       .overrideGuard(CaptchaRequiredGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(MfaRequiredGuard)
       .useValue({ canActivate: () => true })
       .compile();
 

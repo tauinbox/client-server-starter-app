@@ -84,6 +84,7 @@ describe('AuthService', () => {
     clearSession: ReturnType<typeof vi.fn>;
     setRules: ReturnType<typeof vi.fn>;
     hasPermissions: ReturnType<typeof vi.fn>;
+    mustEnrolMfa: ReturnType<typeof vi.fn>;
   };
   let tokenServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
@@ -124,7 +125,8 @@ describe('AuthService', () => {
       updateCurrentUser: vi.fn(),
       clearSession: vi.fn(),
       setRules: vi.fn(),
-      hasPermissions: vi.fn().mockReturnValue(false)
+      hasPermissions: vi.fn().mockReturnValue(false),
+      mustEnrolMfa: vi.fn().mockReturnValue(false)
     };
 
     tokenServiceMock = {
@@ -311,6 +313,20 @@ describe('AuthService', () => {
 
     it('should not fetch RBAC metadata when the user lacks read Permission', async () => {
       authStoreMock.hasPermissions.mockReturnValue(false);
+      const loginPromise = firstValueFrom(
+        service.login({ email: 'test@example.com', password: 'password' })
+      );
+
+      httpMock.expectOne(AuthApiEnum.Login).flush(createMockAuthResponse());
+      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
+      await loginPromise;
+
+      expect(rbacMetadataServiceMock.getMetadata).not.toHaveBeenCalled();
+    });
+
+    it('should skip RBAC metadata while the account owes a two-factor enrolment', async () => {
+      authStoreMock.hasPermissions.mockReturnValue(true);
+      authStoreMock.mustEnrolMfa.mockReturnValue(true);
       const loginPromise = firstValueFrom(
         service.login({ email: 'test@example.com', password: 'password' })
       );

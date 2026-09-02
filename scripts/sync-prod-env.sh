@@ -46,6 +46,9 @@ upsert FACEBOOK_CLIENT_SECRET "${FACEBOOK_CLIENT_SECRET:-}" "$SERVER_ENV"
 upsert VK_CLIENT_SECRET       "${VK_CLIENT_SECRET:-}"       "$SERVER_ENV"
 upsert ADMIN_PASSWORD         "${ADMIN_PASSWORD:-}"         "$SERVER_ENV"
 upsert MFA_ENCRYPTION_KEY     "${MFA_ENCRYPTION_KEY:-}"     "$SERVER_ENV"
+# Not a credential, but managed here because this script is the only
+# channel that survives a from-scratch rebuild of the host.
+upsert MFA_REQUIRED_FOR_ADMINS "${MFA_REQUIRED_FOR_ADMINS:-}"  "$SERVER_ENV"
 upsert SMTP_HOST              "${SMTP_HOST:-}"              "$SERVER_ENV"
 upsert SMTP_PORT              "${SMTP_PORT:-}"              "$SERVER_ENV"
 upsert SMTP_USER              "${SMTP_USER:-}"              "$SERVER_ENV"

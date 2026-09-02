@@ -27,6 +27,9 @@ type AuthState = {
   accessToken: string | null; // in-memory ONLY — lost on page reload
   user: UserResponse | null; // persisted to localStorage (for reload detection)
   ability: AppAbility | null;
+  // Server policy, refreshed with the rules. Never persisted: a stale copy
+  // would either gate a session the server admits or open one it refuses.
+  mfaMandatory: boolean;
 };
 
 export const AuthStore = signalStore(
@@ -36,12 +39,21 @@ export const AuthStore = signalStore(
     return {
       accessToken: null,
       user: storage.getItem(AUTH_USER_KEY, isPersistedUser) ?? null,
-      ability: null
+      ability: null,
+      mfaMandatory: false
     };
   }),
   withComputed((store) => ({
     isAuthenticated: computed(() => store.accessToken() !== null),
-    roles: computed<RoleResponse[]>(() => store.user()?.roles ?? [])
+    roles: computed<RoleResponse[]>(() => store.user()?.roles ?? []),
+    /**
+     * True while the account owes the second factor its role requires. The
+     * protected routes answer such a session with 403, so the client sends it
+     * to the enrolment card instead of a denied page.
+     */
+    mustEnrolMfa: computed(
+      () => store.mfaMandatory() && store.user()?.mfaEnabled === false
+    )
   })),
   withMethods((store) => {
     const storage = inject(LocalStorageService);
@@ -89,7 +101,12 @@ export const AuthStore = signalStore(
 
     function clearSession(): void {
       storage.removeItem(AUTH_USER_KEY);
-      patchState(store, { accessToken: null, user: null, ability: null });
+      patchState(store, {
+        accessToken: null,
+        user: null,
+        ability: null,
+        mfaMandatory: false
+      });
     }
 
     function hasPersistedUser(): boolean {
@@ -106,6 +123,12 @@ export const AuthStore = signalStore(
         unpackRules(rules as PackRule<RawRuleOf<AppAbility>>[])
       );
       patchState(store, { ability });
+    }
+
+    function setMfaMandatory(
+      mfaMandatory: UserPermissionsResponse['mfaMandatory']
+    ): void {
+      patchState(store, { mfaMandatory: mfaMandatory === true });
     }
 
     function hasPermissions(
@@ -134,6 +157,7 @@ export const AuthStore = signalStore(
       clearSession,
       hasPersistedUser,
       setRules,
+      setMfaMandatory,
       hasPermissions
     };
   })

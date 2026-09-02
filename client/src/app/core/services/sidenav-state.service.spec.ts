@@ -20,6 +20,7 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
 
     const authStoreMock = {
       hasPermissions: vi.fn(() => adminAccessSignal()),
+      mustEnrolMfa: vi.fn(() => false),
       user: userSignal
     };
 

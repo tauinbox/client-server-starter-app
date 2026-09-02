@@ -22,6 +22,7 @@ import type { Subjects } from '../src/modules/auth/casl/app-ability';
 import * as request from 'supertest';
 import { Server } from 'http';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
+import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
 import { UsersController } from '../src/modules/users/controllers/users.controller';
 import { RolesController } from '../src/modules/auth/controllers/roles.controller';
@@ -187,6 +188,8 @@ describe('Instance-level @Authorize re-check', () => {
       .useClass(TestJwtAuthGuard)
       .overrideGuard(PermissionsGuard)
       .useClass(TestPermissionsGuard)
+      .overrideGuard(MfaRequiredGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     app = moduleRef.createNestApplication();

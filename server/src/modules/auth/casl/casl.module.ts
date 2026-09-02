@@ -12,6 +12,8 @@ import { ResourceService } from '../services/resource.service';
 import { ActionService } from '../services/action.service';
 import { ResourceSyncService } from '../services/resource-sync.service';
 import { ResourceRegistryService } from '../services/resource-registry.service';
+import { MfaPolicyService } from '../services/mfa-policy.service';
+import { CryptoModule } from '../../../common/crypto/crypto.module';
 
 /**
  * Shared CASL module — provides PermissionService, CaslAbilityFactory,
@@ -19,9 +21,12 @@ import { ResourceRegistryService } from '../services/resource-registry.service';
  * Imported by both AuthModule and UsersModule so that PermissionsGuard
  * (applied via @Authorize in UsersController) can resolve its deps without
  * creating a circular dependency between AuthModule and UsersModule.
+ * MfaPolicyService lives here for the same reason: MfaRequiredGuard travels
+ * with the same decorator and must resolve in every module that carries it.
  */
 @Module({
   imports: [
+    CryptoModule,
     DiscoveryModule,
     TypeOrmModule.forFeature([
       User,
@@ -33,6 +38,7 @@ import { ResourceRegistryService } from '../services/resource-registry.service';
   ],
   providers: [
     PermissionService,
+    MfaPolicyService,
     CaslAbilityFactory,
     ResourceService,
     ActionService,
@@ -41,6 +47,7 @@ import { ResourceRegistryService } from '../services/resource-registry.service';
   ],
   exports: [
     PermissionService,
+    MfaPolicyService,
     CaslAbilityFactory,
     ResourceService,
     ActionService,

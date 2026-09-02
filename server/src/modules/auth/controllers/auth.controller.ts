@@ -37,12 +37,14 @@ import { AuthService } from '../services/auth.service';
 import { MfaService } from '../services/mfa.service';
 import { PermissionService } from '../services/permission.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
+import { MfaPolicyService } from '../services/mfa-policy.service';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
 import { RegisterDto } from '../dtos/register.dto';
 import { UpdateProfileDto } from '../dtos/update-profile.dto';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { LoginDto } from '../dtos/login.dto';
 import { Authorize } from '../decorators/authorize.decorator';
+import { SkipMfaEnrolmentGate } from '../decorators/skip-mfa-enrolment-gate.decorator';
 import { Public } from '../decorators/public.decorator';
 import { UsersService } from '../../users/services/users.service';
 import { MailService } from '../../mail/mail.service';
@@ -58,6 +60,7 @@ import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
 import { ConfirmEmailChangeDto } from '../dtos/confirm-email-change.dto';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import type { UserPermissionsResponse } from '@app/shared/types';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { RegisterResource } from '../decorators/register-resource.decorator';
 import { Request as ExpressRequest } from 'express';
@@ -93,6 +96,7 @@ export class AuthController {
     private readonly userService: UsersService,
     private readonly permissionService: PermissionService,
     private readonly caslAbilityFactory: CaslAbilityFactory,
+    private readonly mfaPolicy: MfaPolicyService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
@@ -254,6 +258,10 @@ export class AuthController {
   }
 
   @Authorize(['update', 'Profile'])
+  // The two-factor gate shuts the administration surface, never the account's
+  // own credentials: an account with no password sets one here before it can
+  // satisfy the step-up that enrolment needs.
+  @SkipMfaEnrolmentGate()
   @Patch('profile')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update the current user profile' })
@@ -369,10 +377,13 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user permissions' })
   @ApiOkResponse({ description: 'User permissions' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  async getPermissions(@Request() req: JwtAuthRequest) {
-    const [roles, permissions] = await Promise.all([
+  async getPermissions(
+    @Request() req: JwtAuthRequest
+  ): Promise<UserPermissionsResponse> {
+    const [roles, permissions, mfaMandatory] = await Promise.all([
       this.permissionService.getRolesForUser(req.user.userId),
-      this.permissionService.getPermissionsForUser(req.user.userId)
+      this.permissionService.getPermissionsForUser(req.user.userId),
+      this.mfaPolicy.appliesTo(req.user.userId)
     ]);
     const ability = await this.caslAbilityFactory.createForUser(
       req.user.userId,
@@ -380,7 +391,11 @@ export class AuthController {
       permissions
     );
     const roleNames = roles.map((r) => r.name);
-    return { roles: roleNames, rules: packRules(ability.rules) };
+    return {
+      roles: roleNames,
+      rules: packRules(ability.rules),
+      mfaMandatory
+    };
   }
 
   @Public()

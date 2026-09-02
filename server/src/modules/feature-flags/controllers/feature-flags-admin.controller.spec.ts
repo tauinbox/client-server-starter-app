@@ -8,6 +8,7 @@ import { PermissionsGuard } from '../../auth/guards/permissions.guard';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import type { JwtAuthRequest } from '../../auth/types/auth.request';
+import { MfaRequiredGuard } from '../../auth/guards/mfa-required.guard';
 
 describe('FeatureFlagsAdminController', () => {
   let controller: FeatureFlagsAdminController;
@@ -68,6 +69,8 @@ describe('FeatureFlagsAdminController', () => {
       ]
     })
       .overrideGuard(PermissionsGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(MfaRequiredGuard)
       .useValue({ canActivate: () => true })
       .compile();
 

@@ -20,6 +20,7 @@ import { AuditService } from '../src/modules/audit/audit.service';
 import { MailService } from '../src/modules/mail/mail.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
+import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 
 const TARGET_ID = '4f9d38f6-6c67-4a54-9d5e-111111111111';
 
@@ -49,6 +50,8 @@ describe('Admin user update DTO validation (e2e)', () => {
       ]
     })
       .overrideGuard(PermissionsGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(MfaRequiredGuard)
       .useValue({ canActivate: () => true })
       .compile();
 

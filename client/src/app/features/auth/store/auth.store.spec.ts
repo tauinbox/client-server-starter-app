@@ -255,6 +255,47 @@ describe('AuthStore', () => {
     });
   });
 
+  describe('mustEnrolMfa', () => {
+    it('is false while the server asks for no second factor', () => {
+      const store = createStore(createMockUser());
+
+      expect(store.mustEnrolMfa()).toBe(false);
+    });
+
+    it('is true for a required account that has not enrolled', () => {
+      const store = createStore(createMockUser());
+
+      store.setMfaMandatory(true);
+
+      expect(store.mustEnrolMfa()).toBe(true);
+    });
+
+    it('is false once the account carries the factor', () => {
+      const store = createStore({ ...createMockUser(), mfaEnabled: true });
+
+      store.setMfaMandatory(true);
+
+      expect(store.mustEnrolMfa()).toBe(false);
+    });
+
+    it('is false for an anonymous session', () => {
+      const store = createStore(null);
+
+      store.setMfaMandatory(true);
+
+      expect(store.mustEnrolMfa()).toBe(false);
+    });
+
+    it('drops the requirement when the session ends', () => {
+      const store = createStore(createMockUser());
+      store.setMfaMandatory(true);
+
+      store.clearSession();
+
+      expect(store.mustEnrolMfa()).toBe(false);
+    });
+  });
+
   describe('setRules and hasPermissions', () => {
     it('should return false when no rules are set', () => {
       const store = createStore(null);

@@ -6,6 +6,20 @@
   } @else {
     @let u = user();
     @if (u) {
+      @if (mustEnrolMfa()) {
+        <div class="mfa-required-notice" role="alert">
+          <mat-icon>security</mat-icon>
+          <div>
+            <p class="mfa-required-title">
+              {{ t('auth.profile.mfaRequiredTitle') }}
+            </p>
+            <p class="mfa-required-text">
+              {{ t('auth.profile.mfaRequiredText') }}
+            </p>
+          </div>
+        </div>
+      }
+
       <mat-card class="header-card">
         <mat-card-content>
           <div class="profile-hero">

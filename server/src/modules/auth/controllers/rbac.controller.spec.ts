@@ -13,6 +13,7 @@ import { PermissionsGuard } from '../guards/permissions.guard';
 import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import type { AppAbility } from '../casl/app-ability';
+import { MfaRequiredGuard } from '../guards/mfa-required.guard';
 
 const allowAllGuard = { canActivate: () => true };
 
@@ -109,6 +110,8 @@ describe('RbacController', () => {
       .useValue(allowAllGuard)
       .overrideGuard(PermissionsGuard)
       .useValue(allowAllGuard)
+      .overrideGuard(MfaRequiredGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     controller = module.get<RbacController>(RbacController);

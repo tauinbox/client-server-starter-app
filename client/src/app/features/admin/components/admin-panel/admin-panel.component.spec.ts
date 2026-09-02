@@ -23,6 +23,7 @@ describe('AdminPanelComponent — auto-redirect on permission loss', () => {
     isAuthenticatedSignal = signal(initialAuthenticated);
     const authStoreMock = {
       hasPermissions: vi.fn(() => canAccessSignal()),
+      mustEnrolMfa: vi.fn(() => false),
       isAuthenticated: isAuthenticatedSignal
     };
 

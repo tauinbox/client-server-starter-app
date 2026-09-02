@@ -45,6 +45,13 @@ export const configValidationSchema = Joi.object({
   // secret nobody can protect. A present but malformed value is a
   // configuration error and must abort the boot, which is what this validates.
   MFA_ENCRYPTION_KEY: Joi.string().base64().length(44).optional().allow(''),
+  // Opt-in: an account holding a super role reaches no route behind
+  // `@Authorize` until it has enrolled a second factor. It stays inert while
+  // MFA_ENCRYPTION_KEY is empty, because enrolment answers 503 in that state.
+  MFA_REQUIRED_FOR_ADMINS: Joi.string()
+    .valid('true', 'false')
+    .optional()
+    .allow(''),
   // Below the client's refresh window there is no interval to schedule, so
   // every open tab would refresh once per round trip.
   JWT_EXPIRATION: Joi.number().min(MIN_JWT_EXPIRATION_SECONDS).required(),

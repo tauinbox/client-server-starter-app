@@ -52,6 +52,14 @@ export type PackedRules = unknown[][];
 export type UserPermissionsResponse = {
   roles: string[];
   rules: PackedRules;
+  /**
+   * True when this account holds a super role and the deployment demands a
+   * second factor from such an account. The rules stay whole: the demand is a
+   * gate in front of them, so the client reads it beside `mfaEnabled` to send
+   * the holder to the enrolment screen instead of a denied page. Distinct from
+   * the `mfaRequired` of a login answer, which reports one challenge.
+   */
+  mfaMandatory: boolean;
 };
 
 export type UserEffectivePermissionsResponse = {
