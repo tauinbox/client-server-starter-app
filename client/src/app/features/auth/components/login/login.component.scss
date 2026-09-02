@@ -53,6 +53,20 @@
     }
   }
 
+  .mfa-hint {
+    margin-block: 0 vars.$spacing-md;
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .mfa-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: vars.$spacing-xs;
+    justify-content: center;
+    margin-top: vars.$spacing-xs;
+  }
+
   .forgot-password-link {
     margin-top: vars.$spacing-xs;
     text-align: center;

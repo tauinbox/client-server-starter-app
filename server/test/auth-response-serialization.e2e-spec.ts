@@ -14,6 +14,7 @@ import type { Server } from 'http';
 import { AuthController } from '../src/modules/auth/controllers/auth.controller';
 import { OAuthController } from '../src/modules/auth/controllers/oauth.controller';
 import { AuthService } from '../src/modules/auth/services/auth.service';
+import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { OAuthService } from '../src/modules/auth/services/oauth.service';
 import { OAuthAccountService } from '../src/modules/auth/services/oauth-account.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
@@ -46,6 +47,7 @@ const PUBLIC_USER_FIELDS = [
   'roles',
   'isEmailVerified',
   'hasPassword',
+  'mfaEnabled',
   'locale',
   'createdAt',
   'updatedAt',
@@ -73,7 +75,10 @@ const HIDDEN_USER_FIELDS = [
   'pendingEmail',
   'pendingEmailToken',
   'pendingEmailExpiresAt',
-  'tokenRevokedAt'
+  'tokenRevokedAt',
+  'totpSecret',
+  'totpEnabledAt',
+  'totpRecoveryCodes'
 ];
 
 function createUserEntity(): User {
@@ -162,6 +167,18 @@ describe('Auth response serialization (e2e)', () => {
           useValue: { assertNotBreached: jest.fn() }
         },
         AuthService,
+        {
+          // These suites never present a second factor. The mock answers the two
+          // members AuthService and AuthController read, so the branch is simply
+          // never taken.
+          provide: MfaService,
+          useValue: {
+            isValidStepUpCode: jest.fn().mockReturnValue(false),
+            issuePendingToken: jest
+              .fn()
+              .mockReturnValue({ mfaToken: 'mfa', expiresIn: 300 })
+          }
+        },
         OAuthService,
         SessionIssuerService,
         SessionLimitService,

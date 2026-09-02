@@ -34,7 +34,10 @@ import { take } from 'rxjs/operators';
 import { isOAuthProvider, OAUTH_URLS } from '../../constants/auth-api.const';
 import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
 import { safeReturnUrl } from '../../utils/safe-return-url';
-import type { LockoutErrorData } from '../../models/auth.types';
+import type {
+  LockoutErrorData,
+  MfaRequiredResponse
+} from '../../models/auth.types';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
@@ -114,6 +117,17 @@ export class LoginComponent implements OnInit, OnDestroy {
   // Post-registration banner
   protected readonly pendingVerification = signal(false);
 
+  // The challenge a correct password buys on an account with a second factor.
+  // Holding it here, rather than in storage, keeps it out of every other tab
+  // and drops it the moment the user leaves the page.
+  protected readonly mfaChallenge = signal<MfaRequiredResponse | null>(null);
+  protected readonly usingRecoveryCode = signal(false);
+
+  readonly mfaModel = signal<{ code: string }>({ code: '' });
+  readonly mfaForm = form(this.mfaModel, (path) => {
+    required(path.code, { message: 'auth.login.mfaCodeRequired' });
+  });
+
   readonly loginModel = signal<LoginData>({ email: '', password: '' });
   readonly loginForm = form(this.loginModel, (path) => {
     required(path.email, { message: 'auth.login.emailRequired' });
@@ -175,8 +189,12 @@ export class LoginComponent implements OnInit, OnDestroy {
       .login(this.loginModel())
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
-        next: () => {
+        next: (response) => {
           this.loading.set(false);
+          if ('mfaRequired' in response) {
+            this.mfaChallenge.set(response);
+            return;
+          }
           void this.#router.navigateByUrl(this.#returnUrl());
         },
         error: (err: HttpErrorResponse) => {
@@ -184,6 +202,44 @@ export class LoginComponent implements OnInit, OnDestroy {
           this.#handleLoginError(err);
         }
       });
+  }
+
+  onSubmitMfa(): void {
+    const challenge = this.mfaChallenge();
+    if (!challenge || this.mfaForm().invalid()) return;
+
+    this.loading.set(true);
+    this.error.set(null);
+
+    const code = this.mfaModel().code.trim();
+    const request$ = this.usingRecoveryCode()
+      ? this.#authService.verifyMfaRecoveryCode(challenge.mfaToken, code)
+      : this.#authService.verifyMfa(challenge.mfaToken, code);
+
+    request$.pipe(takeUntilDestroyed(this.#destroyRef)).subscribe({
+      next: () => {
+        this.loading.set(false);
+        void this.#router.navigateByUrl(this.#returnUrl());
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loading.set(false);
+        this.#handleMfaError(err);
+      }
+    });
+  }
+
+  toggleRecoveryCode(): void {
+    this.usingRecoveryCode.update((using) => !using);
+    this.mfaModel.set({ code: '' });
+    this.error.set(null);
+  }
+
+  /** Drops the challenge and puts the password form back. */
+  cancelMfa(): void {
+    this.mfaChallenge.set(null);
+    this.usingRecoveryCode.set(false);
+    this.mfaModel.set({ code: '' });
+    this.error.set(null);
   }
 
   resendVerification(): void {
@@ -247,6 +303,29 @@ export class LoginComponent implements OnInit, OnDestroy {
 
     this.error.set(
       this.#resolveErrorMessage(err, 'auth.login.errorCredentialsInvalid')
+    );
+  }
+
+  /**
+   * An expired challenge cannot be retried with a code, so the password form
+   * comes back rather than leaving the user typing into a dead field.
+   */
+  #handleMfaError(err: HttpErrorResponse): void {
+    if (err.error?.errorKey === ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN) {
+      this.cancelMfa();
+      this.error.set(
+        this.#resolveErrorMessage(err, 'errors.auth.mfaInvalidPendingToken')
+      );
+      return;
+    }
+
+    this.error.set(
+      this.#resolveErrorMessage(
+        err,
+        this.usingRecoveryCode()
+          ? 'errors.auth.mfaInvalidRecoveryCode'
+          : 'errors.auth.mfaInvalidCode'
+      )
     );
   }
 

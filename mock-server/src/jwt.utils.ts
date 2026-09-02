@@ -1,5 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
-import { TOKEN_PURPOSE } from '@app/shared/constants';
+import {
+  MFA_PENDING_TOKEN_EXPIRY_SECONDS,
+  TOKEN_PURPOSE
+} from '@app/shared/constants';
 import type { MockUser } from './types';
 
 function base64url(obj: Record<string, unknown>): string {
@@ -20,6 +23,26 @@ export function generateAccessToken(
     email: user.email,
     roles: user.roles,
     purpose: TOKEN_PURPOSE.ACCESS,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + expiresInSeconds
+  });
+  return `${header}.${payload}.mock-signature`;
+}
+
+/**
+ * What a correct password buys on an account that carries a second factor. It
+ * carries the mfa-pending purpose, so validateToken below refuses it as a
+ * bearer credential exactly as JwtStrategy does.
+ */
+export function generateMfaPendingToken(
+  user: MockUser,
+  expiresInSeconds = MFA_PENDING_TOKEN_EXPIRY_SECONDS
+): string {
+  const header = base64url({ alg: 'HS256', typ: 'JWT' });
+  const payload = base64url({
+    sub: user.id,
+    email: user.email,
+    purpose: TOKEN_PURPOSE.MFA_PENDING,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + expiresInSeconds
   });

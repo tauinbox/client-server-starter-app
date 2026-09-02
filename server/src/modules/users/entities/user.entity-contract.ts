@@ -38,6 +38,9 @@ type _ExcludedFields =
   | 'pendingEmailToken'
   | 'pendingEmailExpiresAt'
   | 'tokenRevokedAt'
+  | 'totpSecret'
+  | 'totpEnabledAt'
+  | 'totpRecoveryCodes'
   | 'failedLoginAttempts'
   | 'lockedUntil';
 

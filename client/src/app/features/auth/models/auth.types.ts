@@ -1,7 +1,14 @@
 import type { CreateUser, User } from '@shared/models/user.types';
 import type { JwtPayload } from 'jwt-decode';
 
-export type { TokensResponse, AuthResponse } from '@app/shared/types';
+export type {
+  TokensResponse,
+  AuthResponse,
+  LoginResponse,
+  MfaRequiredResponse,
+  MfaSetupResponse,
+  MfaRecoveryCodesResponse
+} from '@app/shared/types';
 
 export type LoginCredentials = {
   email: string;
@@ -39,6 +46,12 @@ export type VerifyEmailRequest = {
 
 export type ResendVerificationRequest = {
   email: string;
+};
+
+/** What the two-factor card sends to turn the factor off. */
+export type MfaDisableRequest = {
+  currentPassword?: string;
+  code?: string;
 };
 
 export type LockoutErrorData = {

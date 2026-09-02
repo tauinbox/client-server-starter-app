@@ -103,6 +103,30 @@ export class User {
   @Exclude()
   tokenRevokedAt: Date | null;
 
+  /**
+   * The TOTP shared secret, encrypted by SecretEncryptionService. It cannot be
+   * hashed: verifying a code needs the original value back.
+   *
+   * A value here with no `totpEnabledAt` is an enrolment that was started and
+   * never proven, which grants nothing.
+   */
+  @Column({ name: 'totp_secret', type: 'varchar', nullable: true })
+  @Exclude()
+  totpSecret: string | null;
+
+  @Column({ name: 'totp_enabled_at', type: 'timestamptz', nullable: true })
+  @Exclude()
+  totpEnabledAt: Date | null;
+
+  /**
+   * Hashes of the recovery codes that are still unspent. A code is consumed by
+   * removing its hash, so single use is a property of the storage rather than
+   * of a flag somebody must remember to set.
+   */
+  @Column({ name: 'totp_recovery_codes', type: 'jsonb', nullable: true })
+  @Exclude()
+  totpRecoveryCodes: string[] | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz', precision: 3 })
   createdAt: Date;
 
@@ -121,5 +145,14 @@ export class User {
   @Expose()
   get hasPassword(): boolean {
     return this.password !== null;
+  }
+
+  /**
+   * Tells the client that a second factor guards this account, without putting
+   * the enrolment timestamp or the secret on the wire.
+   */
+  @Expose()
+  get mfaEnabled(): boolean {
+    return this.totpEnabledAt !== null;
   }
 }

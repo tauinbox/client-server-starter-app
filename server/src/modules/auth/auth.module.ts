@@ -8,8 +8,11 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { UsersModule } from '../users/users.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './controllers/auth.controller';
+import { MfaController } from './controllers/mfa.controller';
 import { OAuthController } from './controllers/oauth.controller';
 import { AuthService } from './services/auth.service';
+import { MfaService } from './services/mfa.service';
+import { SecretEncryptionService } from '../../common/crypto/secret-encryption.service';
 import { OAuthService } from './services/oauth.service';
 import { TokenGeneratorService } from './services/token-generator.service';
 import { RefreshToken } from './entities/refresh-token.entity';
@@ -86,12 +89,15 @@ function conditionalProvider(
   ],
   controllers: [
     AuthController,
+    MfaController,
     OAuthController,
     RolesController,
     RbacController
   ],
   providers: [
     AuthService,
+    MfaService,
+    SecretEncryptionService,
     OAuthService,
     TokenGeneratorService,
     LocalStrategy,
@@ -111,6 +117,13 @@ function conditionalProvider(
     clientUrlProvider,
     OAuthAuthenticationExceptionFilter
   ],
-  exports: [AuthService, OAuthService, CaslModule, RoleService, CaptchaModule]
+  exports: [
+    AuthService,
+    MfaService,
+    OAuthService,
+    CaslModule,
+    RoleService,
+    CaptchaModule
+  ]
 })
 export class AuthModule {}

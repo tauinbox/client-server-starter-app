@@ -40,6 +40,11 @@ export const configValidationSchema = Joi.object({
     otherwise: Joi.optional()
   }),
   JWT_MIN_IAT: Joi.number().integer().min(0).optional(),
+  // Base64 of 32 raw bytes, which is 44 characters with padding. Optional:
+  // without it two-factor enrolment is refused rather than performed with a
+  // secret nobody can protect. A present but malformed value is a
+  // configuration error and must abort the boot, which is what this validates.
+  MFA_ENCRYPTION_KEY: Joi.string().base64().length(44).optional().allow(''),
   // Below the client's refresh window there is no interval to schedule, so
   // every open tab would refresh once per round trip.
   JWT_EXPIRATION: Joi.number().min(MIN_JWT_EXPIRATION_SECONDS).required(),

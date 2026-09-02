@@ -43,6 +43,7 @@ const mockAuthResponse: AuthResponse = {
     roles: [mockUserRole],
     isEmailVerified: true,
     hasPassword: true,
+    mfaEnabled: false,
     locale: 'en',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -55,6 +56,8 @@ describe('LoginComponent', () => {
   let fixture: ComponentFixture<LoginComponent>;
   let authServiceMock: {
     login: ReturnType<typeof vi.fn>;
+    verifyMfa: ReturnType<typeof vi.fn>;
+    verifyMfaRecoveryCode: ReturnType<typeof vi.fn>;
   };
   let featureFlagServiceMock: {
     getEvaluatedFlags: ReturnType<typeof vi.fn>;
@@ -67,7 +70,9 @@ describe('LoginComponent', () => {
   beforeEach(async () => {
     queryParams = {};
     authServiceMock = {
-      login: vi.fn()
+      login: vi.fn(),
+      verifyMfa: vi.fn(),
+      verifyMfaRecoveryCode: vi.fn()
     };
     featureFlagServiceMock = {
       getEvaluatedFlags: vi
@@ -103,6 +108,126 @@ describe('LoginComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  describe('second factor', () => {
+    const challenge = {
+      mfaRequired: true as const,
+      mfaToken: 'pending-token',
+      expiresIn: 300
+    };
+
+    async function reachChallenge(): Promise<void> {
+      authServiceMock.login.mockReturnValue(of(challenge));
+      component.loginModel.set({
+        email: 'test@example.com',
+        password: 'Password1'
+      });
+      component.onSubmit();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    it('does not navigate when the password buys only a challenge', async () => {
+      const navigateSpy = vi.spyOn(router, 'navigateByUrl');
+
+      await reachChallenge();
+
+      expect(navigateSpy).not.toHaveBeenCalled();
+      const codeInput: HTMLInputElement | null =
+        fixture.nativeElement.querySelector(
+          'input[autocomplete="one-time-code"]'
+        );
+      expect(codeInput).toBeTruthy();
+    });
+
+    it('exchanges the code for a session and then navigates', async () => {
+      const navigateSpy = vi.spyOn(router, 'navigateByUrl');
+      await reachChallenge();
+      authServiceMock.verifyMfa.mockReturnValue(of(mockAuthResponse));
+
+      component.mfaModel.set({ code: '123456' });
+      component.onSubmitMfa();
+      await fixture.whenStable();
+
+      expect(authServiceMock.verifyMfa).toHaveBeenCalledWith(
+        'pending-token',
+        '123456'
+      );
+      expect(navigateSpy).toHaveBeenCalledWith('/');
+    });
+
+    it('sends a recovery code to the recovery route instead', async () => {
+      await reachChallenge();
+      authServiceMock.verifyMfaRecoveryCode.mockReturnValue(
+        of(mockAuthResponse)
+      );
+
+      component.toggleRecoveryCode();
+      component.mfaModel.set({ code: 'AAAAAAAA-AAAAAAAA' });
+      component.onSubmitMfa();
+      await fixture.whenStable();
+
+      expect(authServiceMock.verifyMfaRecoveryCode).toHaveBeenCalledWith(
+        'pending-token',
+        'AAAAAAAA-AAAAAAAA'
+      );
+      expect(authServiceMock.verifyMfa).not.toHaveBeenCalled();
+    });
+
+    it('puts the password form back when the challenge has expired', async () => {
+      await reachChallenge();
+      authServiceMock.verifyMfa.mockReturnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 401,
+              error: {
+                errorKey: ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN,
+                message: 'expired'
+              }
+            })
+        )
+      );
+
+      component.mfaModel.set({ code: '123456' });
+      component.onSubmitMfa();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const passwordInput: HTMLInputElement | null =
+        fixture.nativeElement.querySelector(
+          'input[autocomplete="current-password"]'
+        );
+      expect(passwordInput).toBeTruthy();
+    });
+
+    it('keeps the code form up when only the code was wrong', async () => {
+      await reachChallenge();
+      authServiceMock.verifyMfa.mockReturnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 401,
+              error: {
+                errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE,
+                message: 'wrong'
+              }
+            })
+        )
+      );
+
+      component.mfaModel.set({ code: '000000' });
+      component.onSubmitMfa();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const codeInput: HTMLInputElement | null =
+        fixture.nativeElement.querySelector(
+          'input[autocomplete="one-time-code"]'
+        );
+      expect(codeInput).toBeTruthy();
+    });
   });
 
   it('exposes the password field to password managers as the current password', () => {

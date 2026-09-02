@@ -51,6 +51,7 @@ describe('UsersService', () => {
     lastName: 'Doe',
     password: '$2b$10$hashedpassword',
     hasPassword: true,
+    mfaEnabled: false,
     isActive: true,
     locale: 'en',
     createdAt: new Date('2025-01-01'),
@@ -637,6 +638,7 @@ describe('UsersService', () => {
       const buildVerifiedUser = (): User => ({
         ...mockUser,
         hasPassword: mockUser.hasPassword,
+        mfaEnabled: mockUser.mfaEnabled,
         isEmailVerified: true,
         emailVerificationToken: null,
         emailVerificationExpiresAt: null
@@ -855,6 +857,7 @@ describe('UsersService', () => {
     const deletedUser: User = {
       ...mockUser,
       hasPassword: mockUser.hasPassword,
+      mfaEnabled: mockUser.mfaEnabled,
       deletedAt: new Date('2025-06-01'),
       isActive: false
     };

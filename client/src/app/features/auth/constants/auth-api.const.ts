@@ -17,7 +17,12 @@ export enum AuthApiEnum {
   Permissions = `${AUTH_API_V1}/permissions`,
   CaptchaConfig = `${AUTH_API_V1}/captcha-config`,
   InitiateEmailChange = `${AUTH_API_V1}/profile/email/initiate`,
-  ConfirmEmailChange = `${AUTH_API_V1}/profile/email/confirm`
+  ConfirmEmailChange = `${AUTH_API_V1}/profile/email/confirm`,
+  MfaSetup = `${AUTH_API_V1}/mfa/setup`,
+  MfaEnable = `${AUTH_API_V1}/mfa/enable`,
+  MfaDisable = `${AUTH_API_V1}/mfa/disable`,
+  MfaVerify = `${AUTH_API_V1}/mfa/verify`,
+  MfaRecovery = `${AUTH_API_V1}/mfa/recovery`
 }
 
 export const OAUTH_URLS = {

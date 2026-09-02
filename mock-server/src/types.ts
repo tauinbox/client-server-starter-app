@@ -22,6 +22,13 @@ export interface MockUser {
   failedLoginAttempts: number;
   lockedUntil: string | null;
   tokenRevokedAt: string | null;
+  /**
+   * The mock keeps a fixed secret rather than a real one: a time-based code
+   * would make every end-to-end run depend on the clock.
+   */
+  totpSecret: string | null;
+  totpEnabledAt: string | null;
+  totpRecoveryCodes: string[] | null;
   pendingEmail: string | null;
   pendingEmailToken: string | null;
   pendingEmailExpiresAt: string | null;

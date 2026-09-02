@@ -1,5 +1,9 @@
 {
-  "moduleFileExtensions": ["js", "json", "ts"],
+  "moduleFileExtensions": [
+    "js",
+    "json",
+    "ts"
+  ],
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
@@ -8,10 +12,28 @@
   "globalSetup": "<rootDir>/global-setup.ts",
   "globalTeardown": "<rootDir>/global-teardown.ts",
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
+    "^.+\\.ts$": "ts-jest",
+    "^.+\\.js$": [
+      "ts-jest",
+      {
+        "tsconfig": {
+          "allowJs": true
+        }
+      }
+    ]
   },
   "moduleNameMapper": {
     "^@app/shared/(.*)$": "<rootDir>/../../shared/src/$1",
     "^temporal-polyfill$": "<rootDir>/../node_modules/temporal-polyfill"
+  },
+  "transformIgnorePatterns": [
+    "/node_modules/(?!.*(@scure|@noble))"
+  ],
+  "testEnvironmentOptions": {
+    "customExportConditions": [
+      "node",
+      "require",
+      "default"
+    ]
   }
 }

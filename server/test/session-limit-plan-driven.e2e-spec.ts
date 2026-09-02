@@ -11,6 +11,7 @@ import { DataSource, Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 import { AuthService } from '../src/modules/auth/services/auth.service';
+import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
 import { SessionIssuerService } from '../src/modules/auth/services/session-issuer.service';
 import { SessionLimitService } from '../src/modules/auth/services/session-limit.service';
@@ -176,6 +177,18 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
           useValue: { assertNotBreached: jest.fn() }
         },
         AuthService,
+        {
+          // These suites never present a second factor. The mock answers the two
+          // members AuthService and AuthController read, so the branch is simply
+          // never taken.
+          provide: MfaService,
+          useValue: {
+            isValidStepUpCode: jest.fn().mockReturnValue(false),
+            issuePendingToken: jest
+              .fn()
+              .mockReturnValue({ mfaToken: 'mfa', expiresIn: 300 })
+          }
+        },
         RefreshTokenService,
         SessionIssuerService,
         SessionLimitService,

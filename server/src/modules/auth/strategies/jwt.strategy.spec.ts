@@ -208,6 +208,26 @@ describe('JwtStrategy', () => {
         });
       });
 
+      it('should throw 401 for an mfa-pending token presented as a bearer token', async () => {
+        // The intermediate token a correct password mints buys the right to
+        // present a second factor and nothing else. If the bearer strategy
+        // accepted it, the second factor would guard nothing.
+        mockRepository.findOne.mockResolvedValue({
+          id: 'user-1',
+          tokenRevokedAt: null
+        });
+
+        await expect(
+          strategy.validate({
+            ...basePayload,
+            purpose: TOKEN_PURPOSE.MFA_PENDING
+          })
+        ).rejects.toMatchObject({
+          status: 401,
+          response: { errorKey: ErrorKeys.AUTH.INVALID_TOKEN }
+        });
+      });
+
       it('should throw 401 when the purpose claim is absent (legacy token)', async () => {
         mockRepository.findOne.mockResolvedValue({
           id: 'user-1',

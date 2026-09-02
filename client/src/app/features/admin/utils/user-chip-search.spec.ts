@@ -26,6 +26,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     roles: [],
     isEmailVerified: true,
     hasPassword: true,
+    mfaEnabled: false,
     locale: 'en',
     createdAt: '',
     updatedAt: '',

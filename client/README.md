@@ -50,7 +50,9 @@ src/app/
 │                           # features/admin, so that users and admin do not depend on each other.
 ├── features/
 │   ├── auth/               # Login, register, profile, OAuth callback, verify-email,
-│   │                       # forgot-password, reset-password, forbidden
+│   │                       # forgot-password, reset-password, forbidden,
+│   │                       # two-factor (the enrolment card on the profile page;
+│   │                       # the login card holds the code step itself)
 │   │   ├── casl/           # app-ability.ts holds AppAbility, Actions and Subjects.
 │   │   │                   # Subjects contains the generated KnownSubjects and AnyObject.
 │   │   │                   # PermissionCheck holds action, subject and an optional instance.
@@ -962,7 +964,7 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 232 Playwright tests. They cover auth, users, admin, billing, a11y,
+**Coverage.** The suite has 235 Playwright tests. They cover auth, users, admin, billing, a11y,
 keyboard and visual. There are also 1201 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page

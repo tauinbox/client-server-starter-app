@@ -64,6 +64,8 @@ interface MessageBuilders {
     provider: string,
     details: CredentialChangeDetails
   ) => EmailMessage;
+  mfaEnabled: (details: CredentialChangeDetails) => EmailMessage;
+  mfaDisabled: (details: CredentialChangeDetails) => EmailMessage;
 }
 
 /**
@@ -170,6 +172,25 @@ const en: MessageBuilders = {
       enDetails(details),
       EN_RECOVERY
     ]
+  }),
+  mfaEnabled: (details) => ({
+    subject: 'Two-factor authentication was turned on',
+    heading: 'Two-factor authentication is on',
+    paragraphs: [
+      'Your account now asks for a code from your authenticator app after the password.',
+      enDetails(details),
+      'Keep your recovery codes somewhere safe. They are the only way in if you lose the device.',
+      EN_RECOVERY
+    ]
+  }),
+  mfaDisabled: (details) => ({
+    subject: 'Two-factor authentication was turned off',
+    heading: 'Two-factor authentication is off',
+    paragraphs: [
+      'Your account is now protected by its password alone.',
+      enDetails(details),
+      EN_RECOVERY
+    ]
   })
 };
 
@@ -242,6 +263,25 @@ const ru: MessageBuilders = {
     heading: 'Способ входа отключён',
     paragraphs: [
       `Использовать ${providerLabel(provider)} для входа в аккаунт больше нельзя.`,
+      ruDetails(details),
+      RU_RECOVERY
+    ]
+  }),
+  mfaEnabled: (details) => ({
+    subject: 'Включена двухфакторная аутентификация',
+    heading: 'Двухфакторная аутентификация включена',
+    paragraphs: [
+      'Теперь после пароля аккаунт запрашивает код из приложения-аутентификатора.',
+      ruDetails(details),
+      'Сохраните резервные коды в надёжном месте. Это единственный способ войти, если вы потеряете устройство.',
+      RU_RECOVERY
+    ]
+  }),
+  mfaDisabled: (details) => ({
+    subject: 'Отключена двухфакторная аутентификация',
+    heading: 'Двухфакторная аутентификация отключена',
+    paragraphs: [
+      'Теперь аккаунт защищён только паролем.',
       ruDetails(details),
       RU_RECOVERY
     ]

@@ -197,6 +197,26 @@ export class MailService {
     await this.send(email, message, loc);
   }
 
+  async sendMfaEnabledNotification(
+    email: string,
+    locale: string = DEFAULT_LOCALE,
+    ip?: string
+  ): Promise<void> {
+    const loc = normalizeLocale(locale);
+    const message = mailMessages(loc).mfaEnabled(credentialChangeDetails(ip));
+    await this.send(email, message, loc);
+  }
+
+  async sendMfaDisabledNotification(
+    email: string,
+    locale: string = DEFAULT_LOCALE,
+    ip?: string
+  ): Promise<void> {
+    const loc = normalizeLocale(locale);
+    const message = mailMessages(loc).mfaDisabled(credentialChangeDetails(ip));
+    await this.send(email, message, loc);
+  }
+
   private renderHtml(message: EmailMessage, locale: SupportedLocale): string {
     return this.template({
       lang: locale,
