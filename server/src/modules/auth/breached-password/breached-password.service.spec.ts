@@ -24,19 +24,28 @@ function prefixOf(password: string): string {
     .toUpperCase();
 }
 
+/** The four members the service reads off a fetch response. */
+type FetchResponseStub = Pick<
+  Response,
+  'ok' | 'status' | 'statusText' | 'text'
+>;
+
 describe('BreachedPasswordService', () => {
   let service: BreachedPasswordService;
   let recordBreachLookup: jest.Mock;
   let fetchMock: jest.Mock;
 
-  const okResponse = (body: string) =>
-    ({ ok: true, status: 200, statusText: 'OK', text: async () => body }) as
-      Response | never;
+  const okResponse = (body: string): FetchResponseStub => ({
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    text: () => Promise.resolve(body)
+  });
 
   beforeEach(async () => {
     recordBreachLookup = jest.fn();
     fetchMock = jest.fn();
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 
     const module = await Test.createTestingModule({
       providers: [
@@ -109,12 +118,13 @@ describe('BreachedPasswordService', () => {
     });
 
     it('accepts the password on a non-OK status, and counts it', async () => {
-      fetchMock.mockResolvedValue({
+      const failed: FetchResponseStub = {
         ok: false,
         status: 503,
         statusText: 'Service Unavailable',
-        text: async () => ''
-      } as Response);
+        text: () => Promise.resolve('')
+      };
+      fetchMock.mockResolvedValue(failed);
 
       await expect(
         service.assertNotBreached('Sunrise-Kettle-19')

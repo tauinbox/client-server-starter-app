@@ -745,13 +745,12 @@ describe('AuthService', () => {
       mockManager.findOne.mockResolvedValue(null);
       mockManager.save.mockResolvedValue(savedUser);
 
-      await expect(
-        service.register({ ...registerDto, password: 'kettlesunrise' })
-      ).resolves.toEqual(
-        expect.objectContaining({
-          message: expect.stringContaining('Registration successful')
-        })
-      );
+      const result = await service.register({
+        ...registerDto,
+        password: 'kettlesunrise'
+      });
+
+      expect(result.message).toContain('Registration successful');
       expect(
         mockBreachedPasswordService.assertNotBreached
       ).toHaveBeenCalledWith('kettlesunrise');

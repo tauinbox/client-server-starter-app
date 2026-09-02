@@ -228,7 +228,10 @@ describe('the breach blocklist mirrors the server verdict', () => {
     const res = await fetch(`${baseUrl}/api/v1/auth/reset-password`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ token: 'no-such-token', password: BREACHED_PASSWORD })
+      body: JSON.stringify({
+        token: 'no-such-token',
+        password: BREACHED_PASSWORD
+      })
     });
 
     expect(res.status).toBe(400);
