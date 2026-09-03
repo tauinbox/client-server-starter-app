@@ -1,4 +1,9 @@
-export { MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH } from './password.constants';
+export {
+  MIN_PASSWORD_LENGTH,
+  MAX_PASSWORD_LENGTH,
+  MAX_NEW_PASSWORD_BYTES,
+  MAX_NEW_PASSWORD_LENGTH
+} from './password.constants';
 
 export {
   MAX_FAILED_ATTEMPTS,

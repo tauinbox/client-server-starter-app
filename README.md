@@ -807,9 +807,10 @@ To apply more than one restriction at the same time, use one of two methods. Use
 - A responsive SCSS architecture.
 - Snackbar error notifications.
 - Form validation with error messages. The client applies the same password length rules as the
-  server: the shared `MIN_PASSWORD_LENGTH` and `MAX_PASSWORD_LENGTH`. Thus a password that is too
-  short gets a translated message on the field, and it does not need a server round trip. There is
-  no composition rule. The server refuses a password that appears in a public breach corpus, and
+  server: the shared `MIN_PASSWORD_LENGTH` and `MAX_NEW_PASSWORD_LENGTH`. Thus a password that is
+  too short gets a translated message on the field, and it does not need a server round trip. A new
+  password also gets a byte check, because bcrypt reads at most 72 bytes and a Cyrillic letter is
+  two of them. There is no composition rule. The server refuses a password that appears in a public breach corpus, and
   that verdict needs a round trip because only the server may query the corpus.
   A reusable password strength indicator (`<nxs-password-strength>`) has a visual meter of 4 bars,
   an aria-live label and a hint that advises on length while the typed value scores low.
@@ -859,12 +860,14 @@ fullstack-starter-app/
 │       ├── types/          # UserResponse, AdminUserResponse, AuthResponse, CursorPaginatedResponse<T>,
 │       │                   # RoleResponse (public) / RoleAdminResponse (with isSystem/isSuper),
 │       │                   # PermissionResponse, UserPermissionsResponse, etc.
-│       ├── constants/      # MIN/MAX_PASSWORD_LENGTH, cursor page size, SYSTEM_ROLES,
+│       ├── constants/      # MIN/MAX_PASSWORD_LENGTH, MAX_NEW_PASSWORD_LENGTH/_BYTES (72,
+│       │                   # the bcrypt input limit), cursor page size, SYSTEM_ROLES,
 │       │                   # MAX_CONCURRENT_SESSIONS,
 │       │                   # ENTITLED/OPEN/CHANGEABLE_SUBSCRIPTION_STATUSES (one definition each), etc.
 │       └── utils/          # feature-flag-evaluator (needs node:crypto, server + mock only),
 │                           # feature-flag-attribute-value + feature-flag-timestamp (also imported by
 │                           # the client, thus free of node built-ins), mongo-query-safety,
+│                           # password-bytes (TextEncoder, thus also free of node built-ins),
 │                           # time (Temporal barrel), money (BigInt value object)
 ├── client/                 # Angular 21 SPA
 │   ├── src/app/
@@ -1725,11 +1728,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2177 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2198 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 360 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 358 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1238 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1240 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 240 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 548 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 553 tests pass |
 
 ## CI/CD
 
@@ -1774,7 +1777,10 @@ The wrapper retries a maximum of 3 times, 15 s apart. It retries **only** when t
 
 ## Security
 
-- bcrypt hashes each password, with a cost factor of 12.
+- bcrypt hashes each password, with a cost factor of 12. bcrypt reads at most 72 bytes of its
+  input, thus each path that sets a password caps there, in characters and in bytes. A path that
+  verifies a password keeps the 128-character cap, because a stored hash covers the same truncated
+  prefix and a lower cap would lock out the owner of a long legacy password.
 - **Account lockout** starts after 5 failed logins. The cooldown is 15 minutes. A password reset
   clears it, and the end of the window also clears it.
 - **Email verification** is necessary before the first login.

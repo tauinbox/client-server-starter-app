@@ -33,9 +33,10 @@ import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-fie
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import {
-  MAX_PASSWORD_LENGTH,
+  MAX_NEW_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH
 } from '@app/shared/constants';
+import { passwordByteLimit } from '@shared/forms/password-byte-limit';
 
 type ResetPasswordData = {
   password: string;
@@ -87,9 +88,10 @@ export class ResetPasswordComponent implements OnInit {
     minLength(path.password, MIN_PASSWORD_LENGTH, {
       message: 'auth.resetPassword.passwordMinLength'
     });
-    maxLength(path.password, MAX_PASSWORD_LENGTH, {
+    maxLength(path.password, MAX_NEW_PASSWORD_LENGTH, {
       message: 'auth.resetPassword.passwordMaxLength'
     });
+    passwordByteLimit(path.password, 'auth.resetPassword.passwordMaxBytes');
     required(path.confirmPassword, {
       message: 'auth.resetPassword.confirmPasswordRequired'
     });

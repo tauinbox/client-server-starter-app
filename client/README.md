@@ -342,6 +342,10 @@ src/app/
     │                       # (<nxs-chips-autocomplete>) is a mat-chip-grid with a
     │                       # mat-autocomplete. It has a free-text mode and a mode with static or
     │                       # asynchronous option lists. DEFAULT_ERROR_KEYS is the error registry.
+    │                       # passwordByteLimit is the schema rule for a field that SETS a
+    │                       # password: bcrypt reads at most 72 bytes and maxLength counts
+    │                       # UTF-16 code units, so a 37-character Cyrillic password passes
+    │                       # every character cap and is then truncated.
     │                       # This directory has no barrel. Import each module directly. Refer to
     │                       # "Import hygiene and barrels" in the root README.
     ├── models/             # user.types
