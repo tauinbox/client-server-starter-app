@@ -11,8 +11,14 @@ import {
 import { authGuard, pruneOldestUserTokens } from '../helpers/auth.helpers';
 import { isValidReauthProof } from '../helpers/reauth.helpers';
 import { validationError } from '../helpers/validation-error.helpers';
-import { decodeToken, generateTokens } from '../jwt.utils';
-import { findUserById, getState, logAudit, toUserResponse } from '../state';
+import { decodeToken, generateSessionId, generateTokens } from '../jwt.utils';
+import {
+  findUserById,
+  getState,
+  logAudit,
+  registerSession,
+  toUserResponse
+} from '../state';
 import { resolveEntitlementLimit } from './billing.middleware';
 import {
   MOCK_RECOVERY_CODES,
@@ -137,8 +143,10 @@ function userFromPendingToken(mfaToken: unknown): MockUser | null {
 /** The sign-in the password alone did not buy. */
 function issueSession(req: Request, res: Response, user: MockUser): void {
   const state = getState();
-  const tokens = generateTokens(user);
+  const sessionId = generateSessionId();
+  const tokens = generateTokens(user, sessionId);
   state.refreshTokens.set(tokens.refresh_token, user.id);
+  registerSession(tokens.refresh_token, sessionId);
   pruneOldestUserTokens(
     state.refreshTokens,
     user.id,

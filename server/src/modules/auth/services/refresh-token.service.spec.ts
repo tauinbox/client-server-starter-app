@@ -14,6 +14,7 @@ describe('RefreshTokenService', () => {
     delete: jest.Mock;
     update: jest.Mock;
     count: jest.Mock;
+    exists: jest.Mock;
     createQueryBuilder: jest.Mock;
   };
   let mockQueryBuilder: {
@@ -37,6 +38,7 @@ describe('RefreshTokenService', () => {
       find: jest.fn(),
       findOne: jest.fn(),
       delete: jest.fn(),
+      exists: jest.fn(),
       update: jest.fn(),
       count: jest.fn(),
       createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder)
@@ -59,6 +61,48 @@ describe('RefreshTokenService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('hasLiveSession', () => {
+    it('asks only for an unrevoked row of that session that has not expired', async () => {
+      mockRepository.exists.mockResolvedValue(true);
+
+      const live = await service.hasLiveSession('session-1');
+
+      expect(live).toBe(true);
+      expect(mockRepository.exists).toHaveBeenCalledWith({
+        where: {
+          sessionId: 'session-1',
+          revoked: false,
+          expiresAt: expect.any(Object) as object
+        }
+      });
+    });
+
+    it('reports a session with no live row as over', async () => {
+      mockRepository.exists.mockResolvedValue(false);
+
+      await expect(service.hasLiveSession('session-1')).resolves.toBe(false);
+    });
+  });
+
+  describe('deleteBySessionId', () => {
+    it('deletes the whole chain of one session and reports the row count', async () => {
+      mockRepository.delete.mockResolvedValue({ affected: 2 });
+
+      const deleted = await service.deleteBySessionId('session-1');
+
+      expect(mockRepository.delete).toHaveBeenCalledWith({
+        sessionId: 'session-1'
+      });
+      expect(deleted).toBe(2);
+    });
+
+    it('reports zero when the session held no rows', async () => {
+      mockRepository.delete.mockResolvedValue({ affected: undefined });
+
+      await expect(service.deleteBySessionId('gone')).resolves.toBe(0);
+    });
+  });
+
   describe('createRefreshToken', () => {
     it('should create and save a refresh token with hashed value', async () => {
       const mockToken = {
@@ -74,11 +118,13 @@ describe('RefreshTokenService', () => {
       const result = await service.createRefreshToken(
         'user-1',
         'raw-token',
-        3600
+        3600,
+        'session-1'
       );
 
       expect(mockRepository.create).toHaveBeenCalledWith({
         userId: 'user-1',
+        sessionId: 'session-1',
         token: hashToken('raw-token'),
         expiresAt: expect.any(Date) as Date
       });
@@ -95,7 +141,7 @@ describe('RefreshTokenService', () => {
       );
 
       const before = Date.now();
-      await service.createRefreshToken('user-1', 'token', 7200);
+      await service.createRefreshToken('user-1', 'token', 7200, 'session-1');
       const after = Date.now();
 
       const createArg = mockRepository.create.mock.calls[0] as [

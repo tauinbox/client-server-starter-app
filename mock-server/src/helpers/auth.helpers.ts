@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { validateToken, type DecodedToken } from '../jwt.utils';
 import { ErrorKeys } from '@app/shared/constants';
-import { findUserById, mustEnrolMfa } from '../state';
+import { findUserById, isSessionLive, mustEnrolMfa } from '../state';
 import type { AuthenticatedRequest, MockUser } from '../types';
 
 export function extractBearerToken(req: Request): string | null {
@@ -28,6 +28,11 @@ export function authenticateRequest(
   ) {
     return null;
   }
+
+  // Fail closed on a missing session claim, matching JwtStrategy: a token that
+  // names no session cannot be ended by a sign-out on its own device.
+  if (typeof decoded.sid !== 'string' || decoded.sid === '') return null;
+  if (!isSessionLive(decoded.sid)) return null;
 
   return { user, decoded };
 }

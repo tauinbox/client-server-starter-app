@@ -331,6 +331,10 @@ export interface State {
   // route seeds this instead.
   reauthProofs: Map<string, MockReauthProof>;
   refreshTokens: Map<string, string>;
+  // Refresh token -> session id. The access token carries the same id, so a
+  // session ends when no live refresh token points at it any more. Mirrors the
+  // `session_id` column the real server keeps on `refresh_tokens`.
+  refreshSessions: Map<string, string>;
   // Revoked refresh tokens — kept around to detect token reuse (OAuth 2.0 BCP).
   // If a token was rotated (moved to this map) and is presented again before
   // it would naturally expire, treat as a possible compromise: revoke all

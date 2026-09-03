@@ -4,6 +4,7 @@ import {
   addOAuthAccounts,
   findUserById,
   getState,
+  registerSession,
   resetState,
   toInvoiceResponse,
   toSubscriptionResponse,
@@ -32,7 +33,7 @@ import {
 } from '@app/shared/constants';
 import { OAUTH_DATA_MAX_AGE_MS, REAUTH_PROOF_MAX_AGE_MS } from './constants';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
-import { generateTokens } from './jwt.utils';
+import { generateSessionId, generateTokens } from './jwt.utils';
 import { pruneOldestUserTokens } from './helpers/auth.helpers';
 import {
   billClosingUsagePeriod,
@@ -57,6 +58,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
     oauthDataTokens: state.oauthDataTokens.size,
     reauthProofs: state.reauthProofs.size,
     refreshTokens: state.refreshTokens.size,
+    refreshSessions: state.refreshSessions.size,
     revokedRefreshTokens: state.revokedRefreshTokens.size,
     emailVerificationTokens: state.emailVerificationTokens.size,
     passwordResetTokens: state.passwordResetTokens.size,
@@ -193,8 +195,10 @@ router.post('/oauth-data', (req, res) => {
   }
 
   const state = getState();
-  const tokens = generateTokens(user);
+  const sessionId = generateSessionId();
+  const tokens = generateTokens(user, sessionId);
   state.refreshTokens.set(tokens.refresh_token, user.id);
+  registerSession(tokens.refresh_token, sessionId);
   pruneOldestUserTokens(
     state.refreshTokens,
     user.id,

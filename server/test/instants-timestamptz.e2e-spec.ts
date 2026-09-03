@@ -140,8 +140,8 @@ runWithInfra('timestamptz instant columns (e2e)', () => {
 
       const instant = new Date('2026-07-01T05:30:00.000Z');
       await runner.query(
-        `INSERT INTO refresh_tokens (token, user_id, expires_at)
-         VALUES ($1, $2, $3)`,
+        `INSERT INTO refresh_tokens (token, user_id, expires_at, session_id)
+         VALUES ($1, $2, $3, gen_random_uuid())`,
         [`tsz-token-${Date.now()}`, userId, instant]
       );
 

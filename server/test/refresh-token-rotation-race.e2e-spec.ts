@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { HttpException, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
@@ -91,7 +92,12 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
 
   async function seedSession(): Promise<string> {
     const raw = `raw-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    await refreshTokenService.createRefreshToken(userId, raw, 3600);
+    await refreshTokenService.createRefreshToken(
+      userId,
+      raw,
+      3600,
+      randomUUID()
+    );
     return raw;
   }
 
