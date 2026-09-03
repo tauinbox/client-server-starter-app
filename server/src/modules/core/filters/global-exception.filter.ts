@@ -37,6 +37,19 @@ const PG_ERROR_MAP: Record<
   }
 };
 
+/**
+ * The envelope is closed: only the fields listed here reach the wire, so a key
+ * added to an HttpException body stays invisible until it is forwarded here.
+ */
+interface ResolvedException {
+  statusCode: number;
+  message: string;
+  errors?: string[];
+  errorKey?: string;
+  lockedUntil?: string;
+  retryAfter?: number;
+}
+
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
@@ -49,7 +62,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
     const path = httpAdapter.getRequestUrl(request) as string;
 
-    const { statusCode, message, errors, errorKey } =
+    const { statusCode, message, errors, errorKey, lockedUntil, retryAfter } =
       this.resolveException(exception);
 
     const body: ErrorResponse = {
@@ -61,7 +74,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path,
       ...(errors && { errors }),
-      ...(errorKey && { errorKey })
+      ...(errorKey && { errorKey }),
+      ...(lockedUntil && { lockedUntil }),
+      ...(retryAfter !== undefined && { retryAfter })
     };
 
     if (statusCode >= 500) {
@@ -73,15 +88,23 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       this.logger.warn(`${path} ${statusCode} — ${message}`);
     }
 
-    httpAdapter.reply(ctx.getResponse(), body, statusCode);
+    const response = ctx.getResponse<unknown>();
+
+    // Retry-After is the standard carrier of a retry delay. The body field
+    // stays as well: no route exposes response headers through CORS, so a
+    // browser cannot read this one.
+    if (retryAfter !== undefined) {
+      httpAdapter.setHeader(
+        response,
+        'Retry-After',
+        String(Math.max(0, retryAfter))
+      );
+    }
+
+    httpAdapter.reply(response, body, statusCode);
   }
 
-  private resolveException(exception: unknown): {
-    statusCode: number;
-    message: string;
-    errors?: string[];
-    errorKey?: string;
-  } {
+  private resolveException(exception: unknown): ResolvedException {
     if (exception instanceof HttpException) {
       return this.handleHttpException(exception);
     }
@@ -105,12 +128,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     };
   }
 
-  private handleHttpException(exception: HttpException): {
-    statusCode: number;
-    message: string;
-    errors?: string[];
-    errorKey?: string;
-  } {
+  private handleHttpException(exception: HttpException): ResolvedException {
     const statusCode = exception.getStatus();
     const response = exception.getResponse();
 
@@ -121,6 +139,14 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const responseObj = response as Record<string, unknown>;
     const rawMessage = responseObj['message'];
     const errorKey = responseObj['errorKey'] as string | undefined;
+    const rawLockedUntil = responseObj['lockedUntil'];
+    const rawRetryAfter = responseObj['retryAfter'];
+    const lockedUntil =
+      typeof rawLockedUntil === 'string' ? rawLockedUntil : undefined;
+    const retryAfter =
+      typeof rawRetryAfter === 'number' && Number.isFinite(rawRetryAfter)
+        ? rawRetryAfter
+        : undefined;
 
     if (Array.isArray(rawMessage)) {
       const stringMessages = rawMessage.map(String);
@@ -128,7 +154,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         statusCode,
         message: stringMessages.join('. '),
         errors: stringMessages,
-        errorKey
+        errorKey,
+        lockedUntil,
+        retryAfter
       };
     }
 
@@ -138,15 +166,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         typeof rawMessage === 'string'
           ? rawMessage
           : (exception.message ?? 'An error occurred'),
-      errorKey
+      errorKey,
+      lockedUntil,
+      retryAfter
     };
   }
 
-  private handleQueryFailedError(exception: QueryFailedError<Error>): {
-    statusCode: number;
-    message: string;
-    errorKey?: string;
-  } {
+  private handleQueryFailedError(
+    exception: QueryFailedError<Error>
+  ): ResolvedException {
     const { driverError } = exception;
     const code = 'code' in driverError ? String(driverError.code) : undefined;
 
@@ -174,6 +202,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       413: 'Payload Too Large',
       415: 'Unsupported Media Type',
       422: 'Unprocessable Entity',
+      423: 'Locked',
+      428: 'Precondition Required',
       429: 'Too Many Requests',
       500: 'Internal Server Error',
       501: 'Not Implemented',

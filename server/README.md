@@ -1299,9 +1299,11 @@ nothing persisted.
 **Token cleanup.** A daily cron job removes the expired tokens. A weekly cron job removes the tokens
 that are revoked and expired.
 
-**Account lockout.** 5 failed logins lock the account for 15 minutes, and the answer is HTTP 423. A
-password reset clears the lock. The end of the window clears it. An administrator can also unlock the
-account with a user update.
+**Account lockout.** 5 failed logins lock the account for 15 minutes, and the answer is HTTP 423 with
+`lockedUntil`, `retryAfter` and the standard `Retry-After` header. The lock is tested after the
+password comparison, thus a wrong password answers the generic 401 whatever the state of the account,
+and a locked account collects no more strikes. A password reset clears the lock. The end of the
+window clears it. An administrator can also unlock the account with a user update.
 
 **Email verification.** It is necessary before a login. The token expires in 24 hours, and the user
 can request the email again.
@@ -1319,7 +1321,7 @@ refresh tokens of the previous holder must die with it. A resubmitted address th
 revokes nothing.
 
 The server enforces the uniqueness of the address. A conflict answers HTTP 409 with
-`errorKey: errors.users.emailExists` and `field: 'email'`.
+`errorKey: errors.users.emailExists`.
 
 **Self-service email change.** The flow has two steps and confirms at the new address.
 

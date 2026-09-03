@@ -77,7 +77,7 @@ export class UsersService {
     try {
       return await this.userRepository.save(user);
     } catch (error: unknown) {
-      throw this.emailConflictOrOriginal(error, false);
+      throw this.emailConflictOrOriginal(error);
     }
   }
 
@@ -89,14 +89,13 @@ export class UsersService {
    * shape the exception filter would produce. Every unique index on users
    * covers an address, so any violation here is an address collision.
    */
-  private emailConflictOrOriginal(error: unknown, withField: boolean): unknown {
+  private emailConflictOrOriginal(error: unknown): unknown {
     if (!isUniqueViolation(error)) return error;
 
     return new HttpException(
       {
         message: 'User with this email already exists',
-        errorKey: ErrorKeys.USERS.EMAIL_EXISTS,
-        ...(withField && { field: 'email' })
+        errorKey: ErrorKeys.USERS.EMAIL_EXISTS
       },
       HttpStatus.CONFLICT
     );
@@ -277,8 +276,7 @@ export class UsersService {
         throw new HttpException(
           {
             message: 'User with this email already exists',
-            errorKey: ErrorKeys.USERS.EMAIL_EXISTS,
-            field: 'email'
+            errorKey: ErrorKeys.USERS.EMAIL_EXISTS
           },
           HttpStatus.CONFLICT
         );
@@ -299,7 +297,7 @@ export class UsersService {
     try {
       saved = await this.userRepository.save(user);
     } catch (error: unknown) {
-      throw this.emailConflictOrOriginal(error, true);
+      throw this.emailConflictOrOriginal(error);
     }
 
     if (pendingVerificationRawToken) {

@@ -6,4 +6,6 @@ export interface ErrorResponse {
   path: string;
   errors?: string[];
   errorKey?: string;
+  lockedUntil?: string;
+  retryAfter?: number;
 }

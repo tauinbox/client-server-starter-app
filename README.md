@@ -23,8 +23,11 @@ management and theming.
 
 - Registration and login with an email address and a password.
 - **Account lockout.** 5 sequential failed logins lock the account for 15 minutes. The answer is HTTP
-  423 with a countdown. The counter starts again when the window ends. A completed password reset
-  clears the lock. An administrator can also unlock the account from the user-edit page.
+  423 with a countdown, and it carries the standard `Retry-After` header. The server tests the lock
+  after it verifies the password, thus a wrong password always answers the generic 401 and only the
+  owner of the password sees the countdown. The counter starts again when the window ends. A
+  completed password reset clears the lock. An administrator can also unlock the account from the
+  user-edit page.
 - **Email verification.** A new registration requires email verification before the first login, and
   a login before that answers HTTP 403. A resend-verification endpoint is available.
 - **Two-factor authentication.** TOTP, optional for every account and forced on none. The profile
@@ -46,7 +49,7 @@ management and theming.
   An administrator email change through `PATCH /api/v1/users/:id` sets `isEmailVerified` to false. It
   makes a new hashed verification token and sends a new verification email. The server enforces the
   uniqueness of the address. A conflict answers HTTP 409 with
-  `errorKey: errors.users.emailExists` and `field: 'email'`.
+  `errorKey: errors.users.emailExists`.
 - **Self-service email change.** A user can change their own email address from `/profile`. The flow
   has two steps and confirms at the new address.
 
@@ -1781,8 +1784,10 @@ The wrapper retries a maximum of 3 times, 15 s apart. It retries **only** when t
   input, thus each path that sets a password caps there, in characters and in bytes. A path that
   verifies a password keeps the 128-character cap, because a stored hash covers the same truncated
   prefix and a lower cap would lock out the owner of a long legacy password.
-- **Account lockout** starts after 5 failed logins. The cooldown is 15 minutes. A password reset
-  clears it, and the end of the window also clears it.
+- **Account lockout** starts after 5 failed logins. The cooldown is 15 minutes. The lock is tested
+  after the password, thus a wrong password answers the generic 401 and the 423 countdown reaches
+  only a caller that holds the password. A password reset clears it, and the end of the window also
+  clears it.
 - **Email verification** is necessary before the first login.
 - **Two-factor authentication** is available to every account. A password on an enrolled account
   buys only an `mfa_pending` token, which `JwtStrategy` refuses as a bearer credential, so one

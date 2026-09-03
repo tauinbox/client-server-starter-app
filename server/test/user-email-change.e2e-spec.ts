@@ -213,7 +213,7 @@ describe('UsersService.update — email change side effects', () => {
     expect((caught as HttpException).getStatus()).toBe(HttpStatus.CONFLICT);
   });
 
-  it('throws 409 with EMAIL_EXISTS errorKey + field=email on duplicate (no MailService side effect)', async () => {
+  it('throws 409 with EMAIL_EXISTS errorKey on duplicate (no MailService side effect)', async () => {
     const dupe = buildSeedUser();
     dupe.id = 'user-2';
     dupe.email = 'taken@example.com';
@@ -233,8 +233,7 @@ describe('UsersService.update — email change side effects', () => {
     expect(caught).toBeInstanceOf(HttpException);
     expect((caught as HttpException).getStatus()).toBe(HttpStatus.CONFLICT);
     expect((caught as HttpException).getResponse()).toMatchObject({
-      errorKey: 'errors.users.emailExists',
-      field: 'email'
+      errorKey: 'errors.users.emailExists'
     });
     expect(mailService.sendEmailVerification).not.toHaveBeenCalled();
 

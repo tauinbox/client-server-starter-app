@@ -361,8 +361,7 @@ router.patch('/:id', adminGuard, requireUuid('id'), (req, res) => {
       res.status(409).json({
         message: 'User with this email already exists',
         statusCode: 409,
-        errorKey: ErrorKeys.USERS.EMAIL_EXISTS,
-        field: 'email'
+        errorKey: ErrorKeys.USERS.EMAIL_EXISTS
       });
       return;
     }
