@@ -81,7 +81,6 @@ test.describe('Error translation: login component errors', () => {
         contentType: 'application/json',
         body: JSON.stringify({
           message: RAW_MSG,
-          errorCode: 'EMAIL_NOT_VERIFIED',
           errorKey: ErrorKeys.AUTH.EMAIL_NOT_VERIFIED
         })
       })

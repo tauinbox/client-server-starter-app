@@ -93,4 +93,28 @@ describe('lockout recovery', () => {
       MAX_FAILED_ATTEMPTS
     );
   });
+
+  it('sets the Retry-After header beside the body field on a 423', async () => {
+    await lockAccount();
+
+    const res = await postJson('login', { email, password });
+    expect(res.status).toBe(423);
+
+    const body = (await res.json()) as { retryAfter: number };
+    expect(body.retryAfter).toBeGreaterThan(0);
+    expect(res.headers.get('retry-after')).toBe(String(body.retryAfter));
+  });
+
+  // A 423 in front of the credential check separates a real account from an
+  // unknown address, so a wrong password answers the generic 401 instead
+  it('answers 401 and adds no strike for a wrong password while locked', async () => {
+    await lockAccount();
+
+    const res = await postJson('login', { email, password: 'wrong-again' });
+    expect(res.status).toBe(401);
+    expect(res.headers.get('retry-after')).toBeNull();
+    expect(findUserByEmail(email)?.failedLoginAttempts).toBe(
+      MAX_FAILED_ATTEMPTS
+    );
+  });
 });

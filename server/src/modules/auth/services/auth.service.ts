@@ -122,7 +122,13 @@ export class AuthService {
   async validateUser(email: string, password: string): Promise<User> {
     const user = await this.usersService.findByEmail(email);
 
-    // Check account lockout
+    // Detect a lock here, but do not answer with one yet. A 423 in front of
+    // the credential check tells a caller that the address exists, which is
+    // the generic-failure rule that OWASP states for a wrong password
+    // whatever the account state. The lock is disclosed below, to a caller
+    // that proved it holds the password.
+    let openLockUntil: Date | null = null;
+
     if (user?.lockedUntil) {
       if (user.lockedUntil.getTime() > Date.now()) {
         this.auditService.logFireAndForget({
@@ -132,16 +138,16 @@ export class AuthService {
           targetType: 'User',
           details: { reason: 'account_locked' }
         });
-        throw this.lockedAccountException(user.lockedUntil);
+        openLockUntil = user.lockedUntil;
+      } else {
+        // The window elapsed. Restart the counter here: it is only ever
+        // cleared on a successful login, so leaving it at the threshold means
+        // the next wrong password re-locks the account on a single strike -
+        // one request per window keeps any known account locked indefinitely.
+        await this.usersService.resetLoginAttempts(user.id);
+        user.failedLoginAttempts = 0;
+        user.lockedUntil = null;
       }
-
-      // The window elapsed. Restart the counter here: it is only ever cleared
-      // on a successful login, so leaving it at the threshold means the next
-      // wrong password re-locks the account on a single strike - one request
-      // per window keeps any known account locked indefinitely.
-      await this.usersService.resetLoginAttempts(user.id);
-      user.failedLoginAttempts = 0;
-      user.lockedUntil = null;
     }
 
     const hashToCompare =
@@ -151,8 +157,10 @@ export class AuthService {
 
     if (!user || !user.isActive || !user.password || !isMatch) {
       let attemptsAfterIncrement: number | null = null;
-      // Handle failed login attempt atomically to prevent race conditions
-      if (user && user.isActive && user.password) {
+      // Handle failed login attempt atomically to prevent race conditions. A
+      // locked account must not accrue further strikes, or a locked-out user
+      // extends the window every time they retry.
+      if (user && user.isActive && user.password && !openLockUntil) {
         const { failedLoginAttempts, lockedUntil } =
           await this.usersService.incrementFailedAttemptsAndLockIfNeeded(
             user.id,
@@ -195,13 +203,17 @@ export class AuthService {
       );
     }
 
+    // The caller holds the password, so the lock window can be disclosed.
+    if (openLockUntil) {
+      throw this.lockedAccountException(openLockUntil);
+    }
+
     // Check email verification
     if (!user.isEmailVerified) {
       throw new HttpException(
         {
           message: 'Please verify your email address before logging in',
-          errorKey: ErrorKeys.AUTH.EMAIL_NOT_VERIFIED,
-          errorCode: 'EMAIL_NOT_VERIFIED'
+          errorKey: ErrorKeys.AUTH.EMAIL_NOT_VERIFIED
         },
         HttpStatus.FORBIDDEN
       );

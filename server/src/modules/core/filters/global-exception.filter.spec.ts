@@ -3,6 +3,8 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Logger,
   NotFoundException,
   UnauthorizedException
@@ -17,6 +19,7 @@ describe('GlobalExceptionFilter', () => {
   let mockHttpAdapter: {
     getRequestUrl: jest.Mock;
     reply: jest.Mock;
+    setHeader: jest.Mock;
   };
   let mockHost: ArgumentsHost;
   let loggerErrorSpy: jest.SpyInstance;
@@ -25,7 +28,8 @@ describe('GlobalExceptionFilter', () => {
   beforeEach(() => {
     mockHttpAdapter = {
       getRequestUrl: jest.fn().mockReturnValue('/api/v1/test'),
-      reply: jest.fn()
+      reply: jest.fn(),
+      setHeader: jest.fn()
     };
 
     const httpAdapterHost: HttpAdapterHost = {
@@ -132,6 +136,76 @@ describe('GlobalExceptionFilter', () => {
     expect(body.statusCode).toBe(403);
     expect(body.message).toBe('Forbidden');
     expect(body.error).toBe('Forbidden');
+  });
+
+  // --- Lockout envelope ---
+
+  it('should forward lockedUntil and retryAfter on a 423', () => {
+    const lockedUntil = new Date(Date.now() + 600000).toISOString();
+    filter.catch(
+      new HttpException(
+        {
+          message: 'Account is temporarily locked',
+          errorKey: 'errors.auth.accountLocked',
+          lockedUntil,
+          retryAfter: 600
+        },
+        HttpStatus.LOCKED
+      ),
+      mockHost
+    );
+
+    expect(getResponseStatus()).toBe(423);
+    const body = getResponseBody();
+    expect(body.error).toBe('Locked');
+    expect(body.lockedUntil).toBe(lockedUntil);
+    expect(body.retryAfter).toBe(600);
+  });
+
+  it('should set the Retry-After header from retryAfter', () => {
+    filter.catch(
+      new HttpException(
+        { message: 'Locked', retryAfter: 42 },
+        HttpStatus.LOCKED
+      ),
+      mockHost
+    );
+
+    expect(mockHttpAdapter.setHeader).toHaveBeenCalledWith(
+      expect.anything(),
+      'Retry-After',
+      '42'
+    );
+  });
+
+  it('should not set the Retry-After header when no delay is carried', () => {
+    filter.catch(new NotFoundException('User not found'), mockHost);
+
+    expect(mockHttpAdapter.setHeader).not.toHaveBeenCalled();
+  });
+
+  it('should ignore a non-numeric retryAfter and a non-string lockedUntil', () => {
+    filter.catch(
+      new HttpException(
+        { message: 'Locked', retryAfter: 'soon', lockedUntil: 12345 },
+        HttpStatus.LOCKED
+      ),
+      mockHost
+    );
+
+    const body = getResponseBody();
+    expect(body.retryAfter).toBeUndefined();
+    expect(body.lockedUntil).toBeUndefined();
+    expect(mockHttpAdapter.setHeader).not.toHaveBeenCalled();
+  });
+
+  it('should name every status the codebase throws', () => {
+    filter.catch(
+      new HttpException({ message: 'Password required' }, 428),
+      mockHost
+    );
+
+    expect(getResponseBody().error).toBe('Precondition Required');
   });
 
   // --- Validation errors ---

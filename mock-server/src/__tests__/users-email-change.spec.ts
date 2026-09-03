@@ -69,11 +69,12 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
     expect(res.status).toBe(409);
     const body = (await res.json()) as {
       errorKey: string;
-      field: string;
+      field?: string;
       message: string;
     };
     expect(body.errorKey).toBe('errors.users.emailExists');
-    expect(body.field).toBe('email');
+    // The server envelope is closed and never carried this key on the wire.
+    expect(body.field).toBeUndefined();
   });
 
   it('resets isEmailVerified when email changes', async () => {

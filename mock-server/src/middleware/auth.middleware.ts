@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import {
   EMAIL_CHANGE_TOKEN_EXPIRY_MS,
@@ -59,6 +59,25 @@ import {
   REFRESH_TOKEN_COOKIE
 } from '../constants';
 import { isValidReauthProof } from '../helpers/reauth.helpers';
+
+/**
+ * The 423 answer. It carries the standard Retry-After header, which the
+ * server sets from the same value in its exception filter.
+ */
+function respondLocked(res: Response, lockedUntil: string): void {
+  const retryAfter = Math.max(
+    0,
+    Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / 1000)
+  );
+  res.setHeader('Retry-After', String(retryAfter));
+  res.status(423).json({
+    message:
+      'Account is temporarily locked due to too many failed login attempts',
+    lockedUntil,
+    retryAfter,
+    errorKey: ErrorKeys.AUTH.ACCOUNT_LOCKED
+  });
+}
 
 const router = Router();
 
@@ -141,11 +160,14 @@ router.post('/login', (req, res) => {
 
   const user = findUserByEmail(email);
 
-  // Check account lockout
+  // Detect a lock here, but do not answer with one yet. Same order as the
+  // server: a 423 in front of the credential check tells a caller that the
+  // address exists.
+  let openLockUntil: string | null = null;
+
   if (user && user.lockedUntil) {
     const lockedUntilTime = new Date(user.lockedUntil).getTime();
     if (lockedUntilTime > Date.now()) {
-      const retryAfter = Math.ceil((lockedUntilTime - Date.now()) / 1000);
       logAudit('USER_LOGIN_FAILURE', {
         actorEmail: email,
         targetId: user.id,
@@ -153,26 +175,21 @@ router.post('/login', (req, res) => {
         details: { reason: 'account_locked' },
         ip: req.ip
       });
-      res.status(423).json({
-        message:
-          'Account is temporarily locked due to too many failed login attempts',
-        lockedUntil: user.lockedUntil,
-        retryAfter,
-        errorKey: ErrorKeys.AUTH.ACCOUNT_LOCKED
-      });
-      return;
+      openLockUntil = user.lockedUntil;
+    } else {
+      // Lock expired - clear it
+      user.lockedUntil = null;
+      user.failedLoginAttempts = 0;
     }
-    // Lock expired — clear it
-    user.lockedUntil = null;
-    user.failedLoginAttempts = 0;
   }
 
   // Plaintext comparison — mock only. Real server uses bcrypt.compare().
   if (!user || !user.isActive || !user.password || user.password !== password) {
     let attemptsAfterIncrement: number | null = null;
     // An account that holds no password cannot fail a password check, so it
-    // must not accrue lockout either. Same condition as the server.
-    if (user && user.isActive && user.password) {
+    // must not accrue lockout either. A locked account must not accrue one
+    // more strike. Same conditions as the server.
+    if (user && user.isActive && user.password && !openLockUntil) {
       user.failedLoginAttempts++;
       attemptsAfterIncrement = user.failedLoginAttempts;
 
@@ -180,7 +197,6 @@ router.post('/login', (req, res) => {
         user.lockedUntil = new Date(
           Date.now() + LOCKOUT_DURATION_MS
         ).toISOString();
-        const retryAfter = Math.ceil(LOCKOUT_DURATION_MS / 1000);
         logAudit('USER_LOGIN_FAILURE', {
           actorEmail: email,
           targetId: user.id,
@@ -191,13 +207,7 @@ router.post('/login', (req, res) => {
           },
           ip: req.ip
         });
-        res.status(423).json({
-          message:
-            'Account is temporarily locked due to too many failed login attempts',
-          lockedUntil: user.lockedUntil,
-          retryAfter,
-          errorKey: ErrorKeys.AUTH.ACCOUNT_LOCKED
-        });
+        respondLocked(res, user.lockedUntil);
         return;
       }
     }
@@ -219,11 +229,16 @@ router.post('/login', (req, res) => {
     return;
   }
 
+  // The caller holds the password, so the lock window can be disclosed.
+  if (openLockUntil) {
+    respondLocked(res, openLockUntil);
+    return;
+  }
+
   // Check email verification
   if (!user.isEmailVerified) {
     res.status(403).json({
       message: 'Please verify your email address before logging in',
-      errorCode: 'EMAIL_NOT_VERIFIED',
       errorKey: ErrorKeys.AUTH.EMAIL_NOT_VERIFIED
     });
     return;

@@ -550,8 +550,7 @@ describe('UsersService', () => {
         expect((err as HttpException).getStatus()).toBe(HttpStatus.CONFLICT);
         expect((err as HttpException).getResponse()).toEqual({
           message: 'User with this email already exists',
-          errorKey: ErrorKeys.USERS.EMAIL_EXISTS,
-          field: 'email'
+          errorKey: ErrorKeys.USERS.EMAIL_EXISTS
         });
       }
     });
@@ -709,8 +708,7 @@ describe('UsersService', () => {
         ).rejects.toMatchObject({
           status: HttpStatus.CONFLICT,
           response: {
-            errorKey: ErrorKeys.USERS.EMAIL_EXISTS,
-            field: 'email'
+            errorKey: ErrorKeys.USERS.EMAIL_EXISTS
           }
         });
         expect(mockMailService.sendEmailVerification).not.toHaveBeenCalled();
