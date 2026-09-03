@@ -9,6 +9,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute } from '@angular/router';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
+import { STEP_UP_OPERATION } from '@app/shared/constants';
 import { ProfileComponent } from './profile.component';
 import { AuthService } from '../../services/auth.service';
 import { NotifyService } from '@core/services/notify.service';
@@ -55,6 +56,7 @@ describe('ProfileComponent', () => {
     getOAuthAccounts: ReturnType<typeof vi.fn>;
     unlinkOAuthAccount: ReturnType<typeof vi.fn>;
     initOAuthLink: ReturnType<typeof vi.fn>;
+    initOAuthReauth: ReturnType<typeof vi.fn>;
   };
   let notifyMock: {
     success: ReturnType<typeof vi.fn>;
@@ -75,7 +77,10 @@ describe('ProfileComponent', () => {
       initiateEmailChange: vi.fn(),
       getOAuthAccounts: vi.fn().mockReturnValue(of([])),
       unlinkOAuthAccount: vi.fn(),
-      initOAuthLink: vi.fn().mockReturnValue(of({ message: 'Link initiated' }))
+      initOAuthLink: vi.fn().mockReturnValue(of({ message: 'Link initiated' })),
+      initOAuthReauth: vi
+        .fn()
+        .mockReturnValue(of({ message: 'Re-authentication initiated' }))
     };
     featureFlagServiceMock = {
       getEvaluatedFlags: vi
@@ -399,6 +404,108 @@ describe('ProfileComponent', () => {
       const errors = component.profileForm.currentPassword().errors();
       expect(errors.some((e) => e.kind === 'currentPasswordRequired')).toBe(
         false
+      );
+    });
+  });
+
+  describe('a first password on an account created through a provider', () => {
+    const oauthOnlyUser = { ...mockUser, hasPassword: false };
+
+    function typePassword(): void {
+      component.profileModel.set({
+        email: mockUser.email,
+        firstName: mockUser.firstName,
+        lastName: mockUser.lastName,
+        currentPassword: '',
+        password: 'Sunrise-Kettle-19',
+        confirmPassword: 'Sunrise-Kettle-19'
+      });
+    }
+
+    beforeEach(() => {
+      authServiceMock.getProfile.mockReturnValue(of(oauthOnlyUser));
+      authServiceMock.getOAuthAccounts.mockReturnValue(
+        of([{ provider: 'google', createdAt: '2025-01-01T00:00:00.000Z' }])
+      );
+    });
+
+    it('starts a provider round trip bound to the password instead of saving', async () => {
+      fixture.detectChanges();
+      typePassword();
+      await fixture.whenStable();
+
+      component.onSubmit();
+
+      expect(authServiceMock.initOAuthReauth).toHaveBeenCalledWith(
+        STEP_UP_OPERATION.PASSWORD_SET
+      );
+      // The password must never reach the server without the proof.
+      expect(authServiceMock.updateProfile).not.toHaveBeenCalledWith(
+        expect.objectContaining({ password: 'Sunrise-Kettle-19' })
+      );
+    });
+
+    it('never puts the password in session storage', async () => {
+      fixture.detectChanges();
+      typePassword();
+      await fixture.whenStable();
+
+      component.onSubmit();
+
+      const stored = sessionStorage.getItem('pending_password_set');
+      expect(stored).not.toBeNull();
+      expect(stored).not.toContain('Sunrise-Kettle-19');
+    });
+
+    it('asks for the password again on the load that follows the round trip', async () => {
+      sessionStorage.setItem('pending_password_set', 'true');
+      activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(notifyMock.info).toHaveBeenCalledWith(
+        'auth.profile.reauthDonePassword'
+      );
+      expect(authServiceMock.initiateEmailChange).not.toHaveBeenCalled();
+    });
+
+    it('sends the password once the round trip is done', async () => {
+      sessionStorage.setItem('pending_password_set', 'true');
+      activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
+      authServiceMock.updateProfile.mockReturnValue(of(oauthOnlyUser));
+
+      fixture.detectChanges();
+      typePassword();
+      await fixture.whenStable();
+
+      component.onSubmit();
+
+      expect(authServiceMock.updateProfile).toHaveBeenCalledWith(
+        expect.objectContaining({ password: 'Sunrise-Kettle-19' })
+      );
+    });
+
+    it('does not accept a round trip that was taken for the email change', async () => {
+      // That proof is bound to `email_change`, so a password submit behind it
+      // would be refused by the server. The form must start its own trip.
+      sessionStorage.setItem('pending_email_change', 'new@example.com');
+      activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
+      authServiceMock.initiateEmailChange.mockReturnValue(
+        of({ message: 'ok' })
+      );
+
+      fixture.detectChanges();
+      typePassword();
+      await fixture.whenStable();
+
+      component.onSubmit();
+
+      expect(authServiceMock.initOAuthReauth).toHaveBeenCalledWith(
+        STEP_UP_OPERATION.PASSWORD_SET
+      );
+      expect(authServiceMock.updateProfile).not.toHaveBeenCalledWith(
+        expect.objectContaining({ password: 'Sunrise-Kettle-19' })
       );
     });
   });

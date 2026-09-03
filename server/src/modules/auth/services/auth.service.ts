@@ -29,8 +29,10 @@ import {
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
   RESET_TOKEN_EXPIRY_MS,
+  STEP_UP_OPERATION,
   SYSTEM_ROLES,
-  TOKEN_PURPOSE
+  TOKEN_PURPOSE,
+  type StepUpOperation
 } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
@@ -677,7 +679,12 @@ export class AuthService {
   ): Promise<{ message: string }> {
     const user = await this.usersService.findOne(userId);
 
-    await this.assertStepUp(user, dto.currentPassword, reauthProof);
+    await this.assertStepUp(
+      user,
+      dto.currentPassword,
+      reauthProof,
+      STEP_UP_OPERATION.EMAIL_CHANGE
+    );
 
     if (dto.newEmail === user.email) {
       throw new HttpException(
@@ -891,9 +898,10 @@ export class AuthService {
    * proves itself by completing a provider round trip, which mints the
    * `reauth_proof` token this reads.
    *
-   * The proof is bounded by its own 300 second expiry and by the last session
-   * revocation. It is NOT single use: the cookie is cleared after a successful
-   * change, but nothing on the server records that it was spent.
+   * The proof is bounded by its own 300 second expiry, by the last session
+   * revocation, and by the operation it was minted for. It is still not single
+   * use inside that window, so `operation` is what stops one round trip from
+   * authorising a different sensitive change than the one the user asked for.
    *
    * An account that carries a second factor may present a code instead of
    * either of the two. That is the only factor an OAuth-only holder of an
@@ -903,6 +911,7 @@ export class AuthService {
     user: User,
     currentPassword: string | undefined,
     reauthProof: string | undefined,
+    operation: StepUpOperation,
     totpCode?: string
   ): Promise<void> {
     if (this.mfaService.isValidStepUpCode(user, totpCode)) {
@@ -910,7 +919,7 @@ export class AuthService {
     }
 
     if (user.password === null) {
-      this.assertReauthProof(user, reauthProof);
+      this.assertReauthProof(user, reauthProof, operation);
       return;
     }
 
@@ -932,7 +941,11 @@ export class AuthService {
     }
   }
 
-  private assertReauthProof(user: User, proof: string | undefined): void {
+  private assertReauthProof(
+    user: User,
+    proof: string | undefined,
+    operation: StepUpOperation
+  ): void {
     const reauthRequiredError = new HttpException(
       {
         message: 'Confirm it is you with your sign-in provider, then try again',
@@ -949,6 +962,7 @@ export class AuthService {
       const payload = this.jwtService.verify<{
         sub: string;
         purpose?: string;
+        operation?: string;
         iat?: number;
       }>(proof);
 
@@ -959,6 +973,7 @@ export class AuthService {
       if (
         payload.purpose !== TOKEN_PURPOSE.REAUTH_PROOF ||
         payload.sub !== user.id ||
+        payload.operation !== operation ||
         typeof payload.iat !== 'number' ||
         (revokedAtSeconds !== null && payload.iat < revokedAtSeconds)
       ) {
@@ -969,32 +984,20 @@ export class AuthService {
     }
   }
 
-  async verifyCurrentPassword(
+  /**
+   * Step-up for a caller known only by id. Loads the row and applies the same
+   * rule as `assertStepUp`, so a self-service route that already holds a user
+   * id does not have to fetch the user only to pass it straight back.
+   */
+  async assertStepUpForUser(
     userId: string,
-    currentPassword: string | undefined
+    currentPassword: string | undefined,
+    reauthProof: string | undefined,
+    operation: StepUpOperation
   ): Promise<void> {
     const user = await this.usersService.findOne(userId);
 
-    // OAuth-only users (no password set yet) may set their first password
-    // without supplying a current one — they never had one.
-    if (user.password === null) return;
-
-    const invalidCurrentPasswordError = new HttpException(
-      {
-        message: 'Current password is incorrect',
-        errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
-      },
-      HttpStatus.BAD_REQUEST
-    );
-
-    if (!currentPassword) {
-      throw invalidCurrentPasswordError;
-    }
-
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      throw invalidCurrentPasswordError;
-    }
+    await this.assertStepUp(user, currentPassword, reauthProof, operation);
   }
 
   async logout(userId: string): Promise<void> {

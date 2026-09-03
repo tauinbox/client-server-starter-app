@@ -34,6 +34,7 @@ import { SessionStorageService } from '@core/services/session-storage.service';
 import { NotifyService } from '@core/services/notify.service';
 import { TwoFactorComponent } from '../two-factor/two-factor.component';
 import type { UserResponse } from '@app/shared/types';
+import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import type { UpdateProfile } from '../../models/auth.types';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -97,6 +98,12 @@ type OAuthAccountInfo = {
  * as a full page load, so the address the user asked for has to survive it.
  */
 const PENDING_EMAIL_KEY = 'pending_email_change';
+
+/**
+ * The other resume path. It holds a marker and never the password itself: a
+ * credential must not sit in web storage, so the user types it again on return.
+ */
+const PENDING_PASSWORD_KEY = 'pending_password_set';
 
 /** Keyed by OAuthProvider so a new entry in OAUTH_URLS fails the build until it gets a label. */
 const PROVIDER_KEYS: Record<OAuthProvider, string> = {
@@ -297,6 +304,29 @@ export class ProfileComponent implements OnInit {
     return canonicalEmail(this.profileModel().email) !== loaded;
   });
 
+  /**
+   * True from the load that follows a completed round trip until the change it
+   * was taken for is accepted. The proof itself is an httpOnly cookie the page
+   * cannot read, so this is the only signal the form has that a submit is worth
+   * sending rather than another trip to the provider.
+   */
+  readonly #reauthConfirmed = signal(false);
+
+  protected readonly passwordSetNeedsReauth = computed(
+    () =>
+      !this.accountHasPassword() &&
+      this.passwordTyped() &&
+      !this.#reauthConfirmed()
+  );
+
+  /** Null when no notice applies, so the template reads one value. */
+  protected readonly reauthNoticeKey = computed(() => {
+    if (this.emailChangeNeedsReauth()) return 'auth.profile.reauthNotice';
+    if (this.passwordSetNeedsReauth())
+      return 'auth.profile.reauthNoticePassword';
+    return null;
+  });
+
   ngOnInit() {
     this.loadProfile();
     this.loadOAuthAccounts();
@@ -311,19 +341,25 @@ export class ProfileComponent implements OnInit {
       .pipe(take(1), takeUntilDestroyed(this.#destroyRef))
       .subscribe(() => {
         this.#checkOAuthLinkedParam();
-        this.#resumeEmailChangeAfterReauth();
+        this.#resumeAfterReauth();
       });
   }
 
   /**
    * Runs on the page load that follows a provider round trip. The proof lives
-   * in an httpOnly cookie the server set, so all this needs is the address the
-   * user asked for before leaving.
+   * in an httpOnly cookie the server set, so all this needs is which change the
+   * user asked for before leaving. The two pending keys are read separately,
+   * because an email change resumes on its own and a first password waits for
+   * the user to type it again.
    */
-  #resumeEmailChangeAfterReauth(): void {
+  #resumeAfterReauth(): void {
     const reauth = this.#route.snapshot.queryParamMap.get('reauth');
-    const pending = this.#sessionStorage.getItem<string>(PENDING_EMAIL_KEY);
+    const pendingEmail =
+      this.#sessionStorage.getItem<string>(PENDING_EMAIL_KEY);
+    const pendingPassword =
+      this.#sessionStorage.getItem<boolean>(PENDING_PASSWORD_KEY);
     this.#sessionStorage.removeItem(PENDING_EMAIL_KEY);
+    this.#sessionStorage.removeItem(PENDING_PASSWORD_KEY);
 
     if (reauth !== 'ok') return;
 
@@ -332,8 +368,22 @@ export class ProfileComponent implements OnInit {
       queryParamsHandling: 'merge'
     });
 
-    if (!pending) return;
+    // Confirmed for the password only. The proof is bound to the operation the
+    // round trip declared, so a trip taken for the address opens no password
+    // submit, and a bare `?reauth=ok` load opens nothing at all.
+    this.#reauthConfirmed.set(Boolean(pendingPassword) && !pendingEmail);
 
+    if (pendingEmail) {
+      this.#resumeEmailChange(pendingEmail);
+      return;
+    }
+
+    if (pendingPassword) {
+      this.#notify.info('auth.profile.reauthDonePassword');
+    }
+  }
+
+  #resumeEmailChange(pending: string): void {
     this.saving.set(true);
     this.#authService
       .initiateEmailChange(pending)
@@ -569,6 +619,11 @@ export class ProfileComponent implements OnInit {
       return;
     }
 
+    if (this.passwordSetNeedsReauth()) {
+      this.#startReauthForPasswordSet();
+      return;
+    }
+
     this.saving.set(true);
     this.error.set(null);
 
@@ -614,6 +669,15 @@ export class ProfileComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
+          // A proof that expired between the round trip and this submit leaves
+          // the form with nothing to retry against, so the next submit has to
+          // start a fresh round trip rather than repeat this failure.
+          if (
+            (err.error as { errorKey?: string } | null)?.errorKey ===
+            ErrorKeys.AUTH.REAUTH_REQUIRED
+          ) {
+            this.#reauthConfirmed.set(false);
+          }
           this.error.set(
             parseHttpErrorMessage(
               err,
@@ -669,7 +733,11 @@ export class ProfileComponent implements OnInit {
         )
       );
     }
-    ops.push(defer(() => this.#authService.initOAuthReauth()));
+    ops.push(
+      defer(() =>
+        this.#authService.initOAuthReauth(STEP_UP_OPERATION.EMAIL_CHANGE)
+      )
+    );
 
     concat(...ops)
       .pipe(takeUntilDestroyed(this.#destroyRef))
@@ -690,6 +758,80 @@ export class ProfileComponent implements OnInit {
               err,
               this.#transloco,
               'auth.profile.errorEmailChangeFailed'
+            )
+          );
+        }
+      });
+  }
+
+  /**
+   * The first password on an account created through a provider needs the same
+   * fresh proof of identity an email change needs, and the round trip is a full
+   * page load. The name fields are therefore saved before leaving, exactly as
+   * the email path saves them.
+   *
+   * The password itself is NOT carried across: a credential in session storage
+   * would be readable by any script on the origin, and the round trip exists to
+   * make a stolen session unable to bind one. The user types it again on
+   * return, which the resume notice asks for.
+   */
+  #startReauthForPasswordSet(): void {
+    const provider = this.reauthProvider();
+    if (!provider) {
+      this.error.set(
+        this.#transloco.translate('auth.profile.errorReauthNoProvider')
+      );
+      return;
+    }
+
+    this.saving.set(true);
+    this.error.set(null);
+
+    const values = this.profileModel();
+    const u = this.user();
+    const nameChanged =
+      !u || values.firstName !== u.firstName || values.lastName !== u.lastName;
+
+    const ops: Observable<unknown>[] = [];
+    if (nameChanged) {
+      ops.push(
+        this.#authService
+          .updateProfile({
+            firstName: values.firstName,
+            lastName: values.lastName
+          })
+          .pipe(
+            tap((user) => {
+              this.user.set(user);
+            })
+          )
+      );
+    }
+    ops.push(
+      defer(() =>
+        this.#authService.initOAuthReauth(STEP_UP_OPERATION.PASSWORD_SET)
+      )
+    );
+
+    concat(...ops)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        complete: () => {
+          this.#sessionStorage.setItem(PENDING_PASSWORD_KEY, true);
+          this.#notify.info('auth.profile.reauthRedirecting', {
+            provider: this.reauthProviderLabel()
+          });
+          if (this.#window) {
+            this.#window.location.href = OAUTH_URLS[provider];
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.saving.set(false);
+          this.error.set(
+            parseHttpErrorMessage(
+              err,
+              this.#transloco,
+              'auth.profile.errorUpdateFailed'
             )
           );
         }

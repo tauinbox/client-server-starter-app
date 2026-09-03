@@ -93,11 +93,11 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
         });
         return res.json();
       },
-      async issueReauthProof(userId) {
+      async issueReauthProof(userId, operation) {
         const res = await fetch(`${baseUrl}/__control/reauth-proof`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId })
+          body: JSON.stringify({ userId, operation })
         });
         return res.json();
       },

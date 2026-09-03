@@ -1,4 +1,5 @@
 import type { Request } from 'express';
+import type { StepUpOperation } from '@app/shared/constants';
 
 export type {
   AdminUserResponse,
@@ -307,6 +308,8 @@ export interface MockReauthProof {
   /** Seconds, like the `iat` the real proof carries. */
   issuedAt: number;
   expiresAt: number;
+  /** The sensitive operation the proof was minted for, like the real one. */
+  operation: StepUpOperation;
 }
 
 // A single-use mailed token. The server bounds both families by a deadline it

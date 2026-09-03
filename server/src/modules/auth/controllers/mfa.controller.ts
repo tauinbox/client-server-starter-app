@@ -23,7 +23,8 @@ import { ConfigService } from '@nestjs/config';
 import { Request as ExpressRequest, Response } from 'express';
 import {
   LOCKOUT_DURATION_MS,
-  MAX_FAILED_ATTEMPTS
+  MAX_FAILED_ATTEMPTS,
+  STEP_UP_OPERATION
 } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { AuthService } from '../services/auth.service';
@@ -118,7 +119,8 @@ export class MfaController {
     await this.authService.assertStepUp(
       user,
       dto.currentPassword,
-      this.reauthProof(req)
+      this.reauthProof(req),
+      STEP_UP_OPERATION.MFA_SETUP
     );
 
     return await this.mfaService.beginEnrolment(user);
@@ -161,6 +163,7 @@ export class MfaController {
       user,
       dto.currentPassword,
       this.reauthProof(req),
+      STEP_UP_OPERATION.MFA_DISABLE,
       dto.code
     );
 

@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { Request as ExpressRequest, Response } from 'express';
-import { ErrorKeys } from '@app/shared/constants';
+import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MfaController } from './mfa.controller';
 import { AuthService } from '../services/auth.service';
@@ -112,7 +112,8 @@ describe('MfaController', () => {
       expect(authService.assertStepUp).toHaveBeenCalledWith(
         mockUser,
         'Password1',
-        undefined
+        undefined,
+        STEP_UP_OPERATION.MFA_SETUP
       );
       expect(mfaService.beginEnrolment).toHaveBeenCalledWith(mockUser);
     });
@@ -123,7 +124,8 @@ describe('MfaController', () => {
       expect(authService.assertStepUp).toHaveBeenCalledWith(
         mockUser,
         undefined,
-        'proof'
+        'proof',
+        STEP_UP_OPERATION.MFA_SETUP
       );
     });
 
@@ -163,6 +165,7 @@ describe('MfaController', () => {
         mockUser,
         undefined,
         undefined,
+        STEP_UP_OPERATION.MFA_DISABLE,
         '123456'
       );
       expect(mfaService.disable).toHaveBeenCalled();

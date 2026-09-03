@@ -11,6 +11,8 @@ export {
   JWT_ISSUER,
   JWT_AUDIENCE,
   TOKEN_PURPOSE,
+  STEP_UP_OPERATION,
+  STEP_UP_OPERATIONS,
   TOKEN_REFRESH_WINDOW_SECONDS,
   MIN_JWT_EXPIRATION_SECONDS,
   REAUTH_PROOF_MAX_AGE_SECONDS,
@@ -21,7 +23,8 @@ export {
   TOTP_EPOCH_TOLERANCE_SECONDS,
   MFA_RECOVERY_CODE_COUNT,
   MFA_RECOVERY_CODE_BYTES,
-  type TokenPurpose
+  type TokenPurpose,
+  type StepUpOperation
 } from './auth.constants';
 
 export {

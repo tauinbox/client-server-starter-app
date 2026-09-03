@@ -1417,7 +1417,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/refresh-token` | None | Refresh the access token. Reads the `refresh_token` cookie and rotates it |
 | POST | `/auth/logout` | Bearer | Log out. Revokes the refresh tokens and cancels a started OAuth link |
 | GET | `/auth/profile` | Bearer | Get the profile of the current user |
-| PATCH | `/auth/profile` | Bearer | Update your own profile: the name and the password. `currentPassword` is necessary for a password change. A user with OAuth only can omit it |
+| PATCH | `/auth/profile` | Bearer | Update your own profile: the name and the password. A password change needs a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one, and a `reauth_proof` cookie minted for `password_set` for a user with OAuth only |
 | POST | `/auth/profile/email/initiate` | Bearer | Start a self-service email change. Throttled to 3 calls each hour. Requires the current password. Rejects an account with OAuth only |
 | POST | `/auth/profile/email/confirm` | None | Confirm an email change with the token from the new address. Applies the change in a transaction and revokes each session |
 | GET | `/auth/oauth/:provider` | None | Start an OAuth login. The providers are google, facebook and vk |
@@ -1427,7 +1427,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/forgot-password` | None | Request a password reset email. A CAPTCHA token is necessary near the rate limit |
 | GET | `/auth/captcha-config` | None | Public CAPTCHA configuration: the site key and the enabled flag |
 | POST | `/auth/reset-password` | None | Reset the password with a token |
-| POST | `/auth/oauth/reauth-init` | Bearer | Start a step-up re-authentication for an account that holds no password. Sets a short-lived cookie tied to the authorization flow that starts next. The callback mints a `reauth_proof` cookie, and only when the provider identity already belongs to the caller |
+| POST | `/auth/oauth/reauth-init` | Bearer | Start a step-up re-authentication for an account that holds no password. The body names the operation the proof is for. Sets a short-lived cookie tied to the authorization flow that starts next. The callback mints a `reauth_proof` cookie for that operation, and only when the provider identity already belongs to the caller |
 | POST | `/auth/oauth/link-init` | Bearer | Start an OAuth account link. Sets a cookie with a short life, thus the OAuth flow that starts next attaches the provider to the current user. The flow that starts next claims it, and no other flow can use it. A logout cancels it |
 | POST | `/auth/oauth/exchange` | None | Exchange the OAuth-data cookie from the callback for the auth response: an access token and a refresh cookie |
 | GET | `/auth/oauth/accounts` | Bearer | List the linked OAuth accounts |
@@ -1725,11 +1725,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2168 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2177 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 360 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 358 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1233 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 237 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 540 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1238 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 240 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 548 tests pass |
 
 ## CI/CD
 
@@ -1793,16 +1793,18 @@ The wrapper retries a maximum of 3 times, 15 s apart. It retries **only** when t
 - An **administrator email change** does the same. The endpoint exists to recover an account whose
   address an attacker controls. Thus the previous holder must not continue to authenticate with the
   tokens from before the change. A resubmitted address that does not change revokes nothing.
-- A **self-service password change** (`PATCH /auth/profile`) requires `currentPassword`. Thus a stolen
-  token cannot become a permanent account takeover. An account with OAuth only has no password, and
-  it can omit the field when it sets its first password.
-- A **self-service email change** (`POST /auth/profile/email/initiate`) requires a fresh proof of
-  identity, with the factor the account actually holds. An account with a password supplies it. An
-  account with OAuth only completes a round trip at its provider through
-  `POST /auth/oauth/reauth-init`, and the callback mints a `reauth_proof` cookie the change consumes.
-  The proof lasts 300 seconds, is HttpOnly, and dies with a session revocation. It is not single use.
-  The callback mints nothing unless the provider identity that just authenticated already belongs to
-  the caller, so a second account at the same provider proves nothing.
+- A **self-service password change** (`PATCH /auth/profile`) and a **self-service email change**
+  (`POST /auth/profile/email/initiate`) both require a fresh proof of identity, with the factor the
+  account actually holds. An account with a password supplies `currentPassword`. Thus a stolen token
+  cannot become a permanent account takeover. An account with OAuth only holds no password, so it
+  completes a round trip at its provider through `POST /auth/oauth/reauth-init`, and the callback
+  mints a `reauth_proof` cookie the change consumes. Before the password path was gated, a stolen
+  access token alone could bind a password that survived the logout and the token rotation.
+  The proof lasts 300 seconds, is HttpOnly, and dies with a session revocation. It is not single use,
+  so it also carries the operation it was minted for, and each sensitive action accepts only its own:
+  a proof taken to change an address cannot bind a password. The callback mints nothing unless the
+  provider identity that just authenticated already belongs to the caller, so a second account at the
+  same provider proves nothing.
 - The **refresh token cookie is HttpOnly**, with `SameSite=Strict`, the path `/api/v1/auth` and an
   expiry of 7 days. JavaScript can neither read nor steal the token, thus XSS cannot take it.
 

@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { ErrorKeys } from '@app/shared/constants';
+import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
 import { findUserById, getState, logAudit, toUserResponse } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
+import { validationError } from '../helpers/validation-error.helpers';
 import {
   OAUTH_DATA_COOKIE,
   OAUTH_DATA_COOKIE_PATH,
@@ -147,8 +149,18 @@ router.post('/link-init', authGuard, (_req, res) => {
 // POST /api/v1/auth/oauth/reauth-init (stub)
 // The real server sets an intent cookie that its provider callback consumes.
 // Both provider halves are 501 here, so the proof the callback would mint is
-// seeded by POST /__control/reauth-proof instead.
-router.post('/reauth-init', authGuard, (_req, res) => {
+// seeded by POST /__control/reauth-proof instead. The body is still validated,
+// because the operation it declares is what binds the proof.
+router.post('/reauth-init', authGuard, (req, res) => {
+  const { operation } = req.body as { operation?: unknown };
+
+  if (!isStepUpOperation(operation)) {
+    res
+      .status(400)
+      .json(validationError('operation must be a known step-up operation'));
+    return;
+  }
+
   res.json({ message: 'Re-authentication initiated' });
 });
 
