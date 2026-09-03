@@ -13,6 +13,7 @@ import { DataSource } from 'typeorm';
 import * as request from 'supertest';
 import type { Server } from 'http';
 import { JwtStrategy } from '../src/modules/auth/strategies/jwt.strategy';
+import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { buildJwtModuleOptions } from '../src/modules/auth/jwt-module-options.factory';
 import { TOKEN_PURPOSE } from '@app/shared/constants';
@@ -59,6 +60,12 @@ describe('JWT token purpose (e2e)', () => {
               findOne: () => Promise.resolve(FIRST_ROW_IN_USERS_TABLE)
             })
           }
+        },
+        {
+          // The session of a genuine access token is live here. The cases this
+          // suite guards all fail before the session read.
+          provide: RefreshTokenService,
+          useValue: { hasLiveSession: () => Promise.resolve(true) }
         }
       ]
     }).compile();
@@ -79,13 +86,28 @@ describe('JWT token purpose (e2e)', () => {
       sub: 'user-1',
       email: 'user@example.com',
       roles: ['user'],
-      purpose: TOKEN_PURPOSE.ACCESS
+      purpose: TOKEN_PURPOSE.ACCESS,
+      sid: 'session-1'
     });
 
     await request(server)
       .get('/protected')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
+  });
+
+  it('rejects an access token that names no session', async () => {
+    const token = jwt.sign({
+      sub: 'user-1',
+      email: 'user@example.com',
+      roles: ['user'],
+      purpose: TOKEN_PURPOSE.ACCESS
+    });
+
+    await request(server)
+      .get('/protected')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(401);
   });
 
   it('rejects an OAuth-data token used as a bearer token', async () => {

@@ -3,6 +3,7 @@ import { HttpException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { JwtStrategy } from './jwt.strategy';
+import { RefreshTokenService } from '../services/refresh-token.service';
 import { CustomJwtPayload } from '../types/jwt-payload';
 import { ErrorKeys, TOKEN_PURPOSE } from '@app/shared/constants';
 
@@ -30,6 +31,9 @@ describe('JwtStrategy', () => {
   let mockRepository: {
     findOne: jest.Mock;
   };
+  let mockRefreshTokenService: {
+    hasLiveSession: jest.Mock;
+  };
   let mockDataSource: {
     getRepository: jest.Mock;
   };
@@ -37,6 +41,10 @@ describe('JwtStrategy', () => {
   beforeEach(async () => {
     mockRepository = {
       findOne: jest.fn()
+    };
+
+    mockRefreshTokenService = {
+      hasLiveSession: jest.fn().mockResolvedValue(true)
     };
 
     mockDataSource = {
@@ -50,7 +58,8 @@ describe('JwtStrategy', () => {
           provide: ConfigService,
           useValue: buildConfigService()
         },
-        { provide: DataSource, useValue: mockDataSource }
+        { provide: DataSource, useValue: mockDataSource },
+        { provide: RefreshTokenService, useValue: mockRefreshTokenService }
       ]
     }).compile();
 
@@ -67,6 +76,7 @@ describe('JwtStrategy', () => {
       email: 'test@example.com',
       roles: ['user'],
       purpose: TOKEN_PURPOSE.ACCESS,
+      sid: 'session-1',
       iat: Math.floor(Date.now() / 1000) - 60, // issued 60 seconds ago
       exp: Math.floor(Date.now() / 1000) + 3540
     };
@@ -141,6 +151,7 @@ describe('JwtStrategy', () => {
         sub: 'user-1',
         email: 'test@example.com',
         purpose: TOKEN_PURPOSE.ACCESS,
+        sid: 'session-1',
         iat: basePayload.iat,
         exp: basePayload.exp
       };
@@ -148,6 +159,42 @@ describe('JwtStrategy', () => {
       const result = await strategy.validate(payloadWithoutRoles);
 
       expect(result.roles).toEqual([]);
+    });
+
+    describe('session claim', () => {
+      beforeEach(() => {
+        mockRepository.findOne.mockResolvedValue({
+          id: 'user-1',
+          tokenRevokedAt: null
+        });
+      });
+
+      it('asks whether the session named by the token is still live', async () => {
+        await strategy.validate(basePayload);
+
+        expect(mockRefreshTokenService.hasLiveSession).toHaveBeenCalledWith(
+          'session-1'
+        );
+      });
+
+      it('refuses a token carrying no session claim', async () => {
+        const { sid: _sid, ...withoutSid } = basePayload;
+
+        await expect(
+          strategy.validate(withoutSid as CustomJwtPayload)
+        ).rejects.toMatchObject({
+          response: { errorKey: ErrorKeys.AUTH.INVALID_TOKEN }
+        });
+        expect(mockRefreshTokenService.hasLiveSession).not.toHaveBeenCalled();
+      });
+
+      it('refuses a token whose session holds no live refresh row', async () => {
+        mockRefreshTokenService.hasLiveSession.mockResolvedValue(false);
+
+        await expect(strategy.validate(basePayload)).rejects.toMatchObject({
+          response: { errorKey: ErrorKeys.AUTH.TOKEN_REVOKED }
+        });
+      });
     });
 
     describe('token purpose and subject (fail closed)', () => {
@@ -285,7 +332,8 @@ describe('JwtStrategy', () => {
                 JWT_MIN_IAT: Math.floor(Date.now() / 1000)
               })
             },
-            { provide: DataSource, useValue: mockDataSource }
+            { provide: DataSource, useValue: mockDataSource },
+            { provide: RefreshTokenService, useValue: mockRefreshTokenService }
           ]
         }).compile();
         const rotationStrategy = module.get<JwtStrategy>(JwtStrategy);
@@ -313,7 +361,8 @@ describe('JwtStrategy', () => {
               provide: ConfigService,
               useValue: buildConfigService({ JWT_MIN_IAT: minIat })
             },
-            { provide: DataSource, useValue: mockDataSource }
+            { provide: DataSource, useValue: mockDataSource },
+            { provide: RefreshTokenService, useValue: mockRefreshTokenService }
           ]
         }).compile();
         rotationStrategy = module.get<JwtStrategy>(JwtStrategy);
@@ -339,7 +388,8 @@ describe('JwtStrategy', () => {
               provide: ConfigService,
               useValue: buildConfigService({ JWT_MIN_IAT: minIat })
             },
-            { provide: DataSource, useValue: mockDataSource }
+            { provide: DataSource, useValue: mockDataSource },
+            { provide: RefreshTokenService, useValue: mockRefreshTokenService }
           ]
         }).compile();
         const freshStrategy = module.get<JwtStrategy>(JwtStrategy);

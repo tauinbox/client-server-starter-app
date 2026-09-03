@@ -19,18 +19,24 @@ import {
   validateLocale,
   validateMaxLength
 } from '../utils/validation';
-import { generateMfaPendingToken, generateTokens } from '../jwt.utils';
+import {
+  generateMfaPendingToken,
+  generateSessionId,
+  generateTokens
+} from '../jwt.utils';
 import {
   breachedPasswordEnvelope,
   isBreachedPassword
 } from '../helpers/breached-password.helpers';
 import {
+  endSessionOfToken,
   findUserByEmail,
   findUserById,
   getPackedRulesForUser,
   getState,
   isMfaMandatoryFor,
   logAudit,
+  registerSession,
   toUserResponse
 } from '../state';
 import { authGuard, pruneOldestUserTokens } from '../helpers/auth.helpers';
@@ -243,8 +249,10 @@ router.post('/login', (req, res) => {
 
   const state = getState();
 
-  const tokens = generateTokens(user);
+  const sessionId = generateSessionId();
+  const tokens = generateTokens(user, sessionId);
   state.refreshTokens.set(tokens.refresh_token, user.id);
+  registerSession(tokens.refresh_token, sessionId);
   // Concurrent-session allowance is plan-driven; a plan carrying no `sessions`
   // limit (Free, usage) keeps the constant, exactly as the server resolves it.
   pruneOldestUserTokens(
@@ -636,12 +644,19 @@ router.post('/refresh-token', (req, res) => {
 
   // Rotate: move old token to revoked map (kept for reuse detection)
   // and issue a fresh pair.
+  const sessionId =
+    state.refreshSessions.get(cookieToken) ?? generateSessionId();
   state.refreshTokens.delete(cookieToken);
   state.revokedRefreshTokens.set(cookieToken, user.id);
 
-  // Generate new tokens
-  const tokens = generateTokens(user);
+  // Rotation stays inside one session, so the access token another tab of this
+  // device still holds keeps working.
+  const tokens = generateTokens(user, sessionId);
   state.refreshTokens.set(tokens.refresh_token, user.id);
+  // The binding of the revoked ancestor stays: a session ends as a whole, and
+  // `endSessionOfToken` needs the ancestors to clear the reuse-detection map
+  // too. Liveness reads the active map only, so this keeps nothing alive.
+  registerSession(tokens.refresh_token, sessionId);
 
   const { refresh_token, ...publicTokens } = tokens;
   res.cookie(REFRESH_TOKEN_COOKIE, refresh_token, REFRESH_COOKIE_OPTIONS);
@@ -652,27 +667,25 @@ router.post('/refresh-token', (req, res) => {
 router.post('/logout', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
 
-  // Remove all refresh tokens for this user (active + revoked) and revoke access tokens
-  const state = getState();
-  for (const [token, userId] of state.refreshTokens.entries()) {
-    if (userId === user.id) {
-      state.refreshTokens.delete(token);
-    }
-  }
-  for (const [token, userId] of state.revokedRefreshTokens.entries()) {
-    if (userId === user.id) {
-      state.revokedRefreshTokens.delete(token);
-    }
-  }
-  user.tokenRevokedAt = new Date().toISOString();
+  // Per device, not per account: the other sessions of this user stay, and no
+  // `tokenRevokedAt` is stamped. A cookie that never arrived ends nothing.
+  const cookieToken = (req.cookies as Record<string, string> | undefined)?.[
+    REFRESH_TOKEN_COOKIE
+  ];
+  const ownsToken =
+    cookieToken !== undefined &&
+    getState().refreshTokens.get(cookieToken) === user.id;
+  const endedSession = ownsToken ? endSessionOfToken(cookieToken) : false;
 
   logAudit('USER_LOGOUT', {
     actorId: user.id,
     actorEmail: user.email,
+    details: { scope: endedSession ? 'session' : 'none' },
     ip: req.ip
   });
 
   res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
+  res.setHeader('Clear-Site-Data', '"cache", "cookies"');
   res.json({ message: 'Successfully logged out' });
 });
 

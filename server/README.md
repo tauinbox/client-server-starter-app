@@ -982,8 +982,18 @@ also runs once more inside `loginWithOAuth`, which is the only writer of a user 
 
 **JwtStrategy** verifies the signature of the Bearer token. It pins the issuer, the audience and the
 signing algorithm. It requires the `access` token purpose and a `sub` claim that is not empty. It
-applies the `JWT_MIN_IAT` cutoff and the per-user `tokenRevokedAt` cutoff. It returns
-`PayloadFromJwt`, that is `{ userId, email, roles }`. There is no `isAdmin` flag.
+applies the `JWT_MIN_IAT` cutoff and the per-user `tokenRevokedAt` cutoff. It then requires a `sid`
+claim and asks `RefreshTokenService.hasLiveSession`, which looks for a row of that session which is
+not revoked and not expired, so a sign-out on one device refuses that device on its next request
+while the other devices continue. It returns `PayloadFromJwt`, that is `{ userId, email, roles }`.
+There is no `isAdmin` flag.
+
+**Sessions.** A sign-in mints a session id in `SessionIssuerService`. The access token carries it as
+`sid` and the refresh row stores it as `session_id`. Rotation revokes one row and inserts the next
+under the **same** session id, so a refresh in one tab does not strand the access token another tab
+of the same device holds. `AuthService.logoutSession` deletes every row of one session, which is what
+`POST /auth/logout` calls. `AuthService.logout` deletes every row of the account and stamps
+`tokenRevokedAt`; it belongs to the password change and to the other account-wide paths.
 
 **Token purpose.** The service signs three token types: access, OAuth link and OAuth data. The three
 use the same key. Thus each token carries an explicit `purpose` claim, and each consumer accepts only
@@ -1258,8 +1268,10 @@ and so does a self-service password change, which revokes the sessions for the s
 refresh-token clear cannot do it, because a cookie has a path and the two cookies sit on different
 paths: `/api/v1/auth` and `/api/v1/auth/oauth`. `linkOAuthToUser` also refuses a link token whose
 `iat` is earlier than `User.tokenRevokedAt`, which is the comparison the JWT strategy makes. That leg
-holds when the cookie reaches the callback from a different tab or a different device. A link token
-with no `iat` links nothing.
+holds when the cookie reaches the callback from a different tab or a different device, and it fires
+only on the paths that still write that column: a password change, a password reset, an administrator
+action and the reuse detector. The per-device logout writes none, so there the cookie clear plus the
+300 second expiry are the bound. A link token with no `iat` links nothing.
 
 The two session legs do not fire when the session does not end, which is why the flow binding above
 exists. Without all three, an abandoned link attempt attaches the next provider identity in that
@@ -1940,7 +1952,7 @@ The base URL is `/api/v1`.
 | POST | `/register` | None | Register a user and send a verification email. A taken address answers 409 and writes a `USER_REGISTER_CONFLICT` audit row. The existence of an account is intentionally discoverable here, thus the mitigation is detection. Refer to the "Account enumeration" row in the security section of the project spec |
 | POST | `/login` | None | Log in. It returns a JWT and a refresh token |
 | POST | `/refresh-token` | None | Refresh the access token |
-| POST | `/logout` | Bearer | Revoke each refresh token |
+| POST | `/logout` | Bearer | End the session of this device |
 | GET | `/profile` | Bearer | Get the current user |
 | PATCH | `/profile` | Bearer | Update your own profile: the name and the password. A password change needs a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one, and a `reauth_proof` cookie minted for `password_set` for an account with OAuth only |
 | POST | `/profile/email/initiate` | Bearer | Step 1 of the self-service email change, with a limit of 3 calls each hour. It requires a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one, and a `reauth_proof` cookie from a provider round trip for an account that has none. It stores `pendingEmail` and `pendingEmailToken` with an expiry of 1 h. It sends a confirmation link to the new address, and a masked alert with no link to the old address. The response is enumeration-safe |

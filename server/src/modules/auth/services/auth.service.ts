@@ -604,10 +604,14 @@ export class AuthService {
     }
 
     const roleNames = user.roles.map((r) => r.name);
+    // Rotation replaces a row inside one session, so the session id carries
+    // over. An access token another tab of the same device still holds keeps
+    // working, which a per-row id would have ended on every refresh.
     const tokens = this.tokenGenerator.generateTokens(
       user.id,
       user.email,
-      roleNames
+      roleNames,
+      tokenDoc.sessionId
     );
 
     const expiresIn = parseInt(
@@ -647,6 +651,7 @@ export class AuthService {
 
       await manager.save(RefreshToken, {
         userId: user.id,
+        sessionId: tokenDoc.sessionId,
         token: hashToken(tokens.refresh_token),
         expiresAt
       });
@@ -1000,8 +1005,38 @@ export class AuthService {
     await this.assertStepUp(user, currentPassword, reauthProof, operation);
   }
 
+  /**
+   * Ends every session of the account. This is the password-change teardown,
+   * not the sign-out button: a new credential has to invalidate what the old
+   * one issued, everywhere.
+   */
   async logout(userId: string): Promise<void> {
     await this.invalidateAllSessions(userId);
+  }
+
+  /**
+   * Ends the one session the presented refresh token belongs to. A device that
+   * signs out must not evict the other devices the plan pays for, so this
+   * writes no `tokenRevokedAt`: the access token of this device dies with its
+   * session row, and the others are untouched.
+   *
+   * Returns whether a session was actually ended, so the caller can audit the
+   * absent-cookie case apart from the ordinary one.
+   */
+  async logoutSession(userId: string, refreshToken?: string): Promise<boolean> {
+    if (!refreshToken) return false;
+
+    const tokenDoc = await this.refreshTokenService.findByToken(refreshToken);
+    // A token belonging to somebody else ends nothing: the cookie is cleared
+    // either way, so a mismatched value cannot be used to sign another account
+    // out of one of its devices.
+    if (!tokenDoc || tokenDoc.userId !== userId) return false;
+
+    const deleted = await this.refreshTokenService.deleteBySessionId(
+      tokenDoc.sessionId
+    );
+
+    return deleted > 0;
   }
 
   async revokeAllUserSessions(userId: string): Promise<void> {

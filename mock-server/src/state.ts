@@ -85,6 +85,7 @@ export function resetState(): void {
     oauthDataTokens: new Map(),
     reauthProofs: new Map(),
     refreshTokens: new Map(),
+    refreshSessions: new Map(),
     revokedRefreshTokens: new Map(),
     emailVerificationTokens: new Map(),
     passwordResetTokens: new Map(),
@@ -118,6 +119,45 @@ export function resetState(): void {
 
 export function getState(): State {
   return state;
+}
+
+/**
+ * Binds one refresh token to the session its access token names. Mirrors the
+ * `session_id` column of the real server, which the access token carries as the
+ * `sid` claim.
+ */
+export function registerSession(refreshToken: string, sessionId: string): void {
+  state.refreshSessions.set(refreshToken, sessionId);
+}
+
+/**
+ * A session lives as long as one live refresh token points at it. Rotation
+ * moves the binding to the successor token, so a refresh does not end the
+ * access tokens issued earlier in the same session.
+ */
+export function isSessionLive(sessionId: string): boolean {
+  for (const token of state.refreshTokens.keys()) {
+    if (state.refreshSessions.get(token) === sessionId) return true;
+  }
+  return false;
+}
+
+/**
+ * Ends the session of one refresh token and leaves the other devices of the
+ * account alone. Mirrors `AuthService.logoutSession`.
+ */
+export function endSessionOfToken(refreshToken: string): boolean {
+  const sessionId = state.refreshSessions.get(refreshToken);
+  if (sessionId === undefined) return false;
+
+  let ended = false;
+  for (const [token, sid] of state.refreshSessions.entries()) {
+    if (sid !== sessionId) continue;
+    if (state.refreshTokens.delete(token)) ended = true;
+    state.revokedRefreshTokens.delete(token);
+    state.refreshSessions.delete(token);
+  }
+  return ended;
 }
 
 export function findUserByEmail(email: string): MockUser | undefined {

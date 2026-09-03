@@ -498,6 +498,11 @@ refresh, and the `catch` block in `provideAppInitializer`. They run the same rou
 public `clearSession()` delegate. A call to `AuthStore.clearSession()` clears only the token and the
 persisted user.
 
+**The server sign-out is per device.** `POST /auth/logout` ends the session that the
+`refresh_token` cookie names and leaves the other devices of the account signed in, so the
+cross-tab teardown below is what covers the other tabs of **this** browser. It is a client-side
+mechanism and does not depend on the server revoking anything.
+
 A logout in one tab also ends the session in the other tabs. The constructor listens for the
 `storage` event. That event fires in each other tab of the same origin, and never in the tab that
 made the change. When `auth_user` goes away, the listener calls
@@ -971,6 +976,7 @@ list is the heaviest page, and it repeatedly came near to the default limit of 3
 - an administrator on `/admin` goes to `/forbidden` (`admin/admin-panel-permission-loss.spec.ts`)
 - a reactive 401 causes a refresh and a retry (`reactive-token-refresh.spec.ts`)
 - logout and then the browser Back button (`logout-back-button.spec.ts`)
+- a sign-out on one device leaves a second device signed in (`per-device-logout.spec.ts`)
 - a logout in one tab ends the session in a second tab of the same context
   (`cross-tab-logout.spec.ts`). The observing tab stays on `/profile`. A list page continues to send
   cursor requests, and the jwt interceptor sends the first 401 to `/login` with or without the
@@ -987,7 +993,7 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 240 Playwright tests. They cover auth, users, admin, billing, a11y,
+**Coverage.** The suite has 241 Playwright tests. They cover auth, users, admin, billing, a11y,
 keyboard and visual. There are also 1238 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page

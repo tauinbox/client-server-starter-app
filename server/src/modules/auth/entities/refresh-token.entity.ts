@@ -21,6 +21,14 @@ export class RefreshToken {
   @Column({ name: 'user_id' })
   userId: string;
 
+  /**
+   * The session this row belongs to. Rotation revokes one row and inserts the
+   * next with the same value, so the id survives a refresh and can bind an
+   * access token to a single device.
+   */
+  @Column({ name: 'session_id', type: 'uuid' })
+  sessionId: string;
+
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;

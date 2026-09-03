@@ -13,16 +13,23 @@ export class TokenGeneratorService {
     private readonly configService: ConfigService
   ) {}
 
+  /**
+   * `sessionId` is minted by the caller because the access token has to carry
+   * it before the refresh row exists. The row is then saved under the same id,
+   * so the two are one session from the first request.
+   */
   generateTokens(
     userId: string,
     email: string,
-    roles: string[]
+    roles: string[],
+    sessionId: string
   ): TokensResponseDto {
     const jwtPayload: CustomJwtPayload = {
       sub: userId,
       email,
       roles,
-      purpose: TOKEN_PURPOSE.ACCESS
+      purpose: TOKEN_PURPOSE.ACCESS,
+      sid: sessionId
     };
 
     const accessTokenExpiration = parseInt(

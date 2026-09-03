@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
 import { User } from '../../users/entities/user.entity';
 import { TokensResponseDto } from '../dtos/auth-response.dto';
 import { RefreshTokenService } from './refresh-token.service';
@@ -33,15 +34,21 @@ export class SessionIssuerService {
    * Returns the User entity, not a spread: a plain object carries no
    * class-transformer metadata, so ClassSerializerInterceptor could not strip
    * `@Exclude()` fields downstream.
+   *
+   * The session id is minted here rather than taken from the refresh row,
+   * because the access token is signed before that row exists and both have to
+   * carry the same value.
    */
   async issueSession(
     user: User
   ): Promise<{ tokens: TokensResponseDto; user: User }> {
     const roleNames = user.roles.map((r) => r.name);
+    const sessionId = randomUUID();
     const tokens = this.tokenGenerator.generateTokens(
       user.id,
       user.email,
-      roleNames
+      roleNames,
+      sessionId
     );
 
     const expiresIn = parseInt(
@@ -51,7 +58,8 @@ export class SessionIssuerService {
     await this.refreshTokenService.createRefreshToken(
       user.id,
       tokens.refresh_token,
-      expiresIn
+      expiresIn,
+      sessionId
     );
     await this.refreshTokenService.pruneOldestTokens(
       user.id,

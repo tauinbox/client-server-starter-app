@@ -126,6 +126,16 @@ export class AuthController {
   // A cookie is identified by name plus path, so the refresh clear above never
   // touches this one. An abandoned link attempt must not outlive the session
   // that started it: the callback links whatever identity signs in next.
+  /**
+   * OWASP session guidance: a sign-out asks the browser to drop what it holds
+   * for the origin. `storage` is deliberately absent - `auth_user` in
+   * localStorage is also the cross-tab sign-out signal, and clearing it from
+   * the header instead of through the store would race that teardown.
+   */
+  private setClearSiteData(res: Response): void {
+    res.setHeader('Clear-Site-Data', '"cache", "cookies"');
+  }
+
   private clearOAuthLinkCookie(res: Response): void {
     res.clearCookie(OAUTH_LINK_COOKIE, { path: OAUTH_INTENT_COOKIE_PATH });
     res.clearCookie(OAUTH_REAUTH_COOKIE, { path: OAUTH_INTENT_COOKIE_PATH });
@@ -233,13 +243,25 @@ export class AuthController {
     @Request() req: JwtAuthRequest,
     @Res({ passthrough: true }) res: Response
   ) {
-    await this.authService.logout(req.user.userId);
+    const cookieToken = (req.cookies as Record<string, string> | undefined)?.[
+      REFRESH_TOKEN_COOKIE
+    ];
+
+    // Per device, not per account. A cookie that never arrived ends nothing
+    // server side: the caller asked to sign this device out, and evicting the
+    // rest on a trigger it cannot see is a behaviour it did not ask for.
+    const endedSession = await this.authService.logoutSession(
+      req.user.userId,
+      cookieToken
+    );
     this.clearRefreshTokenCookie(res);
     this.clearOAuthLinkCookie(res);
+    this.setClearSiteData(res);
     await this.auditService.log({
       action: AuditAction.USER_LOGOUT,
       actorId: req.user.userId,
       actorEmail: req.user.email,
+      details: { scope: endedSession ? 'session' : 'none' },
       context: extractAuditContext(req)
     });
     this.metricsService.recordAuthEvent('logout');

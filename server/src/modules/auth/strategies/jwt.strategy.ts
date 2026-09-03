@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { CustomJwtPayload, PayloadFromJwt } from '../types/jwt-payload';
 import { User } from '../../users/entities/user.entity';
+import { RefreshTokenService } from '../services/refresh-token.service';
 import {
   ErrorKeys,
   JWT_AUDIENCE,
@@ -18,7 +19,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   constructor(
     private configService: ConfigService,
-    private dataSource: DataSource
+    private dataSource: DataSource,
+    private readonly refreshTokenService: RefreshTokenService
   ) {
     const algorithm = configService.get<string>('JWT_ALGORITHM') ?? 'HS256';
     const secretOrKey =
@@ -111,6 +113,34 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new HttpException(
         {
           message: 'Token has been revoked',
+          errorKey: ErrorKeys.AUTH.TOKEN_REVOKED
+        },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+
+    // Fail closed: without a session claim the token cannot be tied to one
+    // device, which is what makes a sign-out end it. A token issued before this
+    // claim existed lands here and the client exchanges it for a current one
+    // through the refresh cookie.
+    const sessionId = payload.sid;
+    if (typeof sessionId !== 'string' || sessionId === '') {
+      throw new HttpException(
+        {
+          message: 'Token is missing a valid session claim',
+          errorKey: ErrorKeys.AUTH.INVALID_TOKEN
+        },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+
+    // The second indexed read of this method. It is what a sign-out on one
+    // device spends to kill that device's access token at once, rather than
+    // stamping a revocation that ends every other device too.
+    if (!(await this.refreshTokenService.hasLiveSession(sessionId))) {
+      throw new HttpException(
+        {
+          message: 'Session has ended',
           errorKey: ErrorKeys.AUTH.TOKEN_REVOKED
         },
         HttpStatus.UNAUTHORIZED

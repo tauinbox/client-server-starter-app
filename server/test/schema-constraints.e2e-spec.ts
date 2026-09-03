@@ -117,7 +117,7 @@ runWithInfra('schema hardening constraints (e2e)', () => {
 
       const token = `uq-token-${Date.now()}`;
       const expiresAt = new Date(Date.now() + 60_000);
-      const insert = `INSERT INTO refresh_tokens (token, user_id, expires_at) VALUES ($1, $2, $3)`;
+      const insert = `INSERT INTO refresh_tokens (token, user_id, expires_at, session_id) VALUES ($1, $2, $3, gen_random_uuid())`;
       await runner.query(insert, [token, userId, expiresAt]);
 
       await expect(

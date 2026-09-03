@@ -9,6 +9,7 @@ import { AuthService } from './auth.service';
 import { User } from '../../users/entities/user.entity';
 import { UsersService } from '../../users/services/users.service';
 import { RefreshTokenService } from './refresh-token.service';
+import { RefreshToken } from '../entities/refresh-token.entity';
 import { RoleService } from './role.service';
 import { TokenGeneratorService } from './token-generator.service';
 import {
@@ -75,6 +76,7 @@ describe('AuthService', () => {
     createRefreshToken: jest.Mock;
     findByToken: jest.Mock;
     deleteByUserId: jest.Mock;
+    deleteBySessionId: jest.Mock;
     revokeToken: jest.Mock;
     pruneOldestTokens: jest.Mock;
   };
@@ -233,6 +235,7 @@ describe('AuthService', () => {
       createRefreshToken: jest.fn().mockResolvedValue(undefined),
       findByToken: jest.fn(),
       deleteByUserId: jest.fn().mockResolvedValue(undefined),
+      deleteBySessionId: jest.fn().mockResolvedValue(1),
       revokeToken: jest.fn().mockResolvedValue(undefined),
       pruneOldestTokens: jest.fn().mockResolvedValue(undefined)
     };
@@ -629,7 +632,8 @@ describe('AuthService', () => {
       expect(mockRefreshTokenService.createRefreshToken).toHaveBeenCalledWith(
         'user-1',
         expect.any(String),
-        604800
+        604800,
+        expect.any(String)
       );
       expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
         'user-1',
@@ -696,7 +700,8 @@ describe('AuthService', () => {
       expect(mockTokenGenerator.generateTokens).toHaveBeenCalledWith(
         'user-1',
         'test@example.com',
-        ['user']
+        ['user'],
+        expect.any(String)
       );
     });
   });
@@ -1173,6 +1178,69 @@ describe('AuthService', () => {
     });
   });
 
+  describe('logoutSession', () => {
+    const sessionRow = {
+      id: 'token-1',
+      userId: 'user-1',
+      sessionId: 'session-1',
+      revoked: false
+    };
+
+    it('ends only the session the presented token belongs to', async () => {
+      mockRefreshTokenService.findByToken.mockResolvedValue(sessionRow);
+
+      const ended = await service.logoutSession('user-1', 'raw-token');
+
+      expect(ended).toBe(true);
+      expect(mockRefreshTokenService.deleteBySessionId).toHaveBeenCalledWith(
+        'session-1'
+      );
+      // The two that would take every other device down with it.
+      expect(mockRefreshTokenService.deleteByUserId).not.toHaveBeenCalled();
+      expect(mockUserRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('revokes nothing when the request carries no refresh token', async () => {
+      const ended = await service.logoutSession('user-1', undefined);
+
+      expect(ended).toBe(false);
+      expect(mockRefreshTokenService.findByToken).not.toHaveBeenCalled();
+      expect(mockRefreshTokenService.deleteBySessionId).not.toHaveBeenCalled();
+      expect(mockRefreshTokenService.deleteByUserId).not.toHaveBeenCalled();
+      expect(mockUserRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('revokes nothing when the token resolves to no row', async () => {
+      mockRefreshTokenService.findByToken.mockResolvedValue(null);
+
+      const ended = await service.logoutSession('user-1', 'stale-token');
+
+      expect(ended).toBe(false);
+      expect(mockRefreshTokenService.deleteBySessionId).not.toHaveBeenCalled();
+    });
+
+    it('refuses a token owned by another account', async () => {
+      mockRefreshTokenService.findByToken.mockResolvedValue({
+        ...sessionRow,
+        userId: 'user-2'
+      });
+
+      const ended = await service.logoutSession('user-1', 'someone-elses');
+
+      expect(ended).toBe(false);
+      expect(mockRefreshTokenService.deleteBySessionId).not.toHaveBeenCalled();
+    });
+
+    it('reports no session ended when the row was already gone', async () => {
+      mockRefreshTokenService.findByToken.mockResolvedValue(sessionRow);
+      mockRefreshTokenService.deleteBySessionId.mockResolvedValue(0);
+
+      const ended = await service.logoutSession('user-1', 'raw-token');
+
+      expect(ended).toBe(false);
+    });
+  });
+
   describe('revokeAllUserSessions', () => {
     it('should delete all refresh tokens and set tokenRevokedAt', async () => {
       await service.revokeAllUserSessions('user-1');
@@ -1193,6 +1261,7 @@ describe('AuthService', () => {
       id: 'token-1',
       token: 'hashed-token',
       userId: 'user-1',
+      sessionId: 'session-1',
       revoked: false,
       expiresAt: new Date(Date.now() + 86400000),
       isExpired: () => false
@@ -1211,6 +1280,18 @@ describe('AuthService', () => {
       expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(mockManager.update).toHaveBeenCalled();
       expect(mockManager.save).toHaveBeenCalled();
+      // Rotation replaces a row inside one session. A new session id here would
+      // strand the access token every other tab of this device still holds.
+      expect(mockManager.save).toHaveBeenCalledWith(
+        RefreshToken,
+        expect.objectContaining({ sessionId: 'session-1' })
+      );
+      expect(mockTokenGenerator.generateTokens).toHaveBeenCalledWith(
+        'user-1',
+        'test@example.com',
+        ['user'],
+        'session-1'
+      );
       expect(result.tokens.access_token).toBe('mock-access-token');
       expect(typeof result.tokens.refresh_token).toBe('string');
       expect(result.tokens.expires_in).toBe(3600);

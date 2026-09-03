@@ -18,7 +18,12 @@ describe('TokenGeneratorService', () => {
   });
 
   it('signs JWT with correct payload and expiration', () => {
-    const result = service.generateTokens('user-1', 'a@b.c', ['admin']);
+    const result = service.generateTokens(
+      'user-1',
+      'a@b.c',
+      ['admin'],
+      'session-1'
+    );
 
     expect(configService.getOrThrow).toHaveBeenCalledWith('JWT_EXPIRATION');
     expect(jwtService.sign).toHaveBeenCalledWith(
@@ -26,7 +31,8 @@ describe('TokenGeneratorService', () => {
         sub: 'user-1',
         email: 'a@b.c',
         roles: ['admin'],
-        purpose: TOKEN_PURPOSE.ACCESS
+        purpose: TOKEN_PURPOSE.ACCESS,
+        sid: 'session-1'
       },
       { expiresIn: 3600 }
     );
@@ -35,13 +41,13 @@ describe('TokenGeneratorService', () => {
   });
 
   it('generates a refresh token of 80 hex chars (40 random bytes)', () => {
-    const { refresh_token } = service.generateTokens('u', 'e', []);
+    const { refresh_token } = service.generateTokens('u', 'e', [], 's');
     expect(refresh_token).toMatch(/^[a-f0-9]{80}$/);
   });
 
   it('produces a unique refresh token on each call', () => {
-    const a = service.generateTokens('u', 'e', []).refresh_token;
-    const b = service.generateTokens('u', 'e', []).refresh_token;
+    const a = service.generateTokens('u', 'e', [], 's').refresh_token;
+    const b = service.generateTokens('u', 'e', [], 's').refresh_token;
     expect(a).not.toBe(b);
   });
 });

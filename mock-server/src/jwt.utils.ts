@@ -15,6 +15,7 @@ function base64url(obj: Record<string, unknown>): string {
 
 export function generateAccessToken(
   user: MockUser,
+  sessionId: string,
   expiresInSeconds = 3600
 ): string {
   const header = base64url({ alg: 'HS256', typ: 'JWT' });
@@ -23,6 +24,7 @@ export function generateAccessToken(
     email: user.email,
     roles: user.roles,
     purpose: TOKEN_PURPOSE.ACCESS,
+    sid: sessionId,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + expiresInSeconds
   });
@@ -53,15 +55,25 @@ export function generateRefreshToken(): string {
   return uuidv4();
 }
 
+/**
+ * The caller mints the session id and binds it to the refresh token through
+ * `registerSession`. Rotation passes the id of the session it replaces a token
+ * in, so the access tokens issued earlier in that session stay usable.
+ */
 export function generateTokens(
   user: MockUser,
+  sessionId: string,
   expiresInSeconds = 3600
 ): { access_token: string; refresh_token: string; expires_in: number } {
   return {
-    access_token: generateAccessToken(user, expiresInSeconds),
+    access_token: generateAccessToken(user, sessionId, expiresInSeconds),
     refresh_token: generateRefreshToken(),
     expires_in: expiresInSeconds
   };
+}
+
+export function generateSessionId(): string {
+  return uuidv4();
 }
 
 export interface DecodedToken {
@@ -69,6 +81,7 @@ export interface DecodedToken {
   email: string;
   roles: string[];
   purpose?: string;
+  sid?: string;
   iat: number;
   exp: number;
 }

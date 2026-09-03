@@ -163,13 +163,46 @@ describe('SessionIssuerService', () => {
     expect(mockTokenGenerator.generateTokens).toHaveBeenCalledWith(
       'user-1',
       'test@example.com',
-      ['user']
+      ['user'],
+      expect.any(String)
     );
     expect(mockRefreshTokenService.createRefreshToken).toHaveBeenCalledWith(
       'user-1',
       'mock-refresh-token',
-      604800
+      604800,
+      expect.any(String)
     );
     expect(result.user).toBe(mockUser);
+  });
+
+  it('gives the access token and the refresh row the same session id', async () => {
+    await service.issueSession(mockUser);
+
+    const signedCall = mockTokenGenerator.generateTokens.mock.calls[0] as [
+      string,
+      string,
+      string[],
+      string
+    ];
+    const storedCall = mockRefreshTokenService.createRefreshToken.mock
+      .calls[0] as [string, string, number, string];
+
+    // A mismatch would leave the access token naming a session that never
+    // existed, so JwtStrategy would refuse the caller on its first request.
+    expect(signedCall[3]).toBe(storedCall[3]);
+  });
+
+  it('mints a distinct session id per sign-in, so one sign-out cannot end another device', async () => {
+    await service.issueSession(mockUser);
+    await service.issueSession(mockUser);
+
+    const calls = mockTokenGenerator.generateTokens.mock.calls as [
+      string,
+      string,
+      string[],
+      string
+    ][];
+
+    expect(calls[0][3]).not.toBe(calls[1][3]);
   });
 });

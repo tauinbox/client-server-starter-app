@@ -1418,7 +1418,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/register` | None | Register a new user |
 | POST | `/auth/login` | None | Log in. Sets the `refresh_token` HttpOnly cookie and returns an access token |
 | POST | `/auth/refresh-token` | None | Refresh the access token. Reads the `refresh_token` cookie and rotates it |
-| POST | `/auth/logout` | Bearer | Log out. Revokes the refresh tokens and cancels a started OAuth link |
+| POST | `/auth/logout` | Bearer | Log out this device. It ends the session the `refresh_token` cookie belongs to, leaves the other devices signed in, and cancels a started OAuth link. It answers `Clear-Site-Data` |
 | GET | `/auth/profile` | Bearer | Get the profile of the current user |
 | PATCH | `/auth/profile` | Bearer | Update your own profile: the name and the password. A password change needs a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one, and a `reauth_proof` cookie minted for `password_set` for a user with OAuth only |
 | POST | `/auth/profile/email/initiate` | Bearer | Start a self-service email change. Throttled to 3 calls each hour. Requires the current password. Rejects an account with OAuth only |
@@ -1570,8 +1570,8 @@ npm run release            # Bump versions, generate CHANGELOG.md, create git ta
 
 - A **modular NestJS architecture** with a dynamic root `CoreModule`.
 - **Passport strategies.** `LocalStrategy` uses the email and the password. `JwtStrategy` uses the
-  Bearer token. It verifies the signature and `tokenRevokedAt`, and it extracts
-  `{ userId, email, roles }`. `GoogleStrategy`, `FacebookStrategy` and `VkStrategy` do the OAuth
+  Bearer token. It verifies the signature, `tokenRevokedAt` and the `sid` claim, which must name a
+  session that still holds a live refresh row, and it extracts `{ userId, email, roles }`. `GoogleStrategy`, `FacebookStrategy` and `VkStrategy` do the OAuth
   logins, and the module registers them conditionally.
 - **Routing is secure by default.** `APP_GUARD` registers `JwtAuthGuard` globally. Each endpoint
   requires a valid Bearer token, and `@Public()` is the only exception. The `check-auth-coverage` e2e
@@ -1728,11 +1728,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2198 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 360 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 358 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2215 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 361 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 359 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1240 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 240 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 553 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 241 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 561 tests pass |
 
 ## CI/CD
 
@@ -1806,7 +1806,7 @@ The wrapper retries a maximum of 3 times, 15 s apart. It retries **only** when t
   completes a round trip at its provider through `POST /auth/oauth/reauth-init`, and the callback
   mints a `reauth_proof` cookie the change consumes. Before the password path was gated, a stolen
   access token alone could bind a password that survived the logout and the token rotation.
-  The proof lasts 300 seconds, is HttpOnly, and dies with a session revocation. It is not single use,
+  The proof lasts 300 seconds, is HttpOnly, and dies with an account-wide session revocation. It is not single use,
   so it also carries the operation it was minted for, and each sensitive action accepts only its own:
   a proof taken to change an address cannot bind a password. The callback mints nothing unless the
   provider identity that just authenticated already belongs to the caller, so a second account at the

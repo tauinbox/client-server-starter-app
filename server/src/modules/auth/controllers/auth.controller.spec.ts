@@ -87,11 +87,18 @@ function mockExpressRequest(cookies: Record<string, string> = {}): {
   return { ip: '127.0.0.1', headers: {}, cookies };
 }
 
-type MockedResponse = { cookie: jest.Mock; clearCookie: jest.Mock };
+type MockedResponse = {
+  cookie: jest.Mock;
+  clearCookie: jest.Mock;
+  setHeader: jest.Mock;
+};
 
 function mockResponse(): MockedResponse & Response {
-  return { cookie: jest.fn(), clearCookie: jest.fn() } as MockedResponse &
-    Response;
+  return {
+    cookie: jest.fn(),
+    clearCookie: jest.fn(),
+    setHeader: jest.fn()
+  } as MockedResponse & Response;
 }
 
 /**
@@ -114,6 +121,7 @@ describe('AuthController', () => {
     login: jest.Mock;
     refreshTokens: jest.Mock;
     logout: jest.Mock;
+    logoutSession: jest.Mock;
     verifyEmail: jest.Mock;
     resendVerificationEmail: jest.Mock;
     forgotPassword: jest.Mock;
@@ -174,6 +182,7 @@ describe('AuthController', () => {
       login: jest.fn().mockResolvedValue(mockAuthResult),
       refreshTokens: jest.fn().mockResolvedValue(mockAuthResult),
       logout: jest.fn().mockResolvedValue(undefined),
+      logoutSession: jest.fn().mockResolvedValue(true),
       verifyEmail: jest.fn().mockResolvedValue({ message: 'verified' }),
       resendVerificationEmail: jest.fn().mockResolvedValue({ message: 'sent' }),
       forgotPassword: jest.fn().mockResolvedValue({ message: 'sent' }),
@@ -461,20 +470,62 @@ describe('AuthController', () => {
   // ── logout ────────────────────────────────────────────────────────
 
   describe('logout', () => {
-    it('should call authService.logout, clear cookie, and return success message', async () => {
+    it('should end the presented session only, clear the cookie and return a success message', async () => {
+      const req = mockJwtRequest('user-1', 'user@example.com', {
+        refresh_token: 'this-device'
+      }) as JwtAuthRequest;
+      const res = mockResponse();
+
+      const result = await controller.logout(req, res);
+
+      expect(authServiceMock.logoutSession).toHaveBeenCalledWith(
+        'user-1',
+        'this-device'
+      );
+      // The account-wide teardown belongs to the password change. Calling it
+      // here evicts every other device the plan pays for.
+      expect(authServiceMock.logout).not.toHaveBeenCalled();
+      expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
+        path: '/api/v1/auth'
+      });
+      expect(result).toEqual({ message: 'Successfully logged out' });
+    });
+
+    it('should revoke nothing when the request carries no refresh cookie', async () => {
       const req = mockJwtRequest(
         'user-1',
         'user@example.com'
       ) as JwtAuthRequest;
       const res = mockResponse();
+      authServiceMock.logoutSession.mockResolvedValue(false);
 
       const result = await controller.logout(req, res);
 
-      expect(authServiceMock.logout).toHaveBeenCalledWith('user-1');
+      expect(authServiceMock.logoutSession).toHaveBeenCalledWith(
+        'user-1',
+        undefined
+      );
+      expect(authServiceMock.logout).not.toHaveBeenCalled();
       expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
         path: '/api/v1/auth'
       });
       expect(result).toEqual({ message: 'Successfully logged out' });
+    });
+
+    it('should ask the browser to drop the cached resources and cookies of the origin', async () => {
+      const req = mockJwtRequest('user-1', 'user@example.com', {
+        refresh_token: 'this-device'
+      }) as JwtAuthRequest;
+      const res = mockResponse();
+
+      await controller.logout(req, res);
+
+      // "storage" is deliberately absent: auth_user in localStorage is the
+      // cross-tab sign-out signal and the store owns its removal.
+      expect(res.setHeader).toHaveBeenCalledWith(
+        'Clear-Site-Data',
+        '"cache", "cookies"'
+      );
     });
 
     // Regression: the link cookie sits on a deeper path, so the refresh clear
@@ -507,7 +558,26 @@ describe('AuthController', () => {
         expect.objectContaining({
           action: AuditAction.USER_LOGOUT,
           actorId: 'user-99',
-          actorEmail: 'logout@example.com'
+          actorEmail: 'logout@example.com',
+          details: { scope: 'session' }
+        })
+      );
+    });
+
+    it('should audit the absent-cookie sign-out apart from the ordinary one', async () => {
+      const req = mockJwtRequest(
+        'user-99',
+        'logout@example.com'
+      ) as JwtAuthRequest;
+      const res = mockResponse();
+      authServiceMock.logoutSession.mockResolvedValue(false);
+
+      await controller.logout(req, res);
+
+      expect(auditServiceMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_LOGOUT,
+          details: { scope: 'none' }
         })
       );
     });
