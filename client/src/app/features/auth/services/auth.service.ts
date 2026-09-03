@@ -8,6 +8,7 @@ import { EMPTY, finalize, firstValueFrom, from, switchMap, tap } from 'rxjs';
 import { Router } from '@angular/router';
 import type { User } from '@shared/models/user.types';
 import type { UserPermissionsResponse } from '@app/shared/types';
+import type { StepUpOperation } from '@app/shared/constants';
 import type {
   AuthResponse,
   LoginCredentials,
@@ -356,14 +357,15 @@ export class AuthService {
 
   /**
    * Starts a step-up re-authentication for an account that holds no password.
-   * The provider round trip that follows mints the proof the email change
+   * The provider round trip that follows mints the proof the sensitive change
    * needs, so the caller must send the browser to the provider afterwards.
+   *
+   * The proof binds to `operation`, so it opens that change and no other.
    */
-  initOAuthReauth(): Observable<{ message: string }> {
-    return this.#http.post<{ message: string }>(
-      AuthApiEnum.OAuthReauthInit,
-      {}
-    );
+  initOAuthReauth(operation: StepUpOperation): Observable<{ message: string }> {
+    return this.#http.post<{ message: string }>(AuthApiEnum.OAuthReauthInit, {
+      operation
+    });
   }
 
   unlinkOAuthAccount(provider: string): Observable<{ message: string }> {

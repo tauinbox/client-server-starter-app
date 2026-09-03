@@ -17,7 +17,8 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import {
   LOCKOUT_DURATION_MS,
-  MAX_FAILED_ATTEMPTS
+  MAX_FAILED_ATTEMPTS,
+  STEP_UP_OPERATION
 } from '@app/shared/constants';
 import {
   ApiBearerAuth,
@@ -276,10 +277,18 @@ export class AuthController {
     @Body() updateProfileDto: UpdateProfileDto,
     @Res({ passthrough: true }) res: Response
   ) {
+    const reauthProof = (req.cookies as Record<string, string> | undefined)?.[
+      REAUTH_PROOF_COOKIE
+    ];
+
     if (updateProfileDto.password) {
-      await this.authService.verifyCurrentPassword(
+      // A first password binds a credential that outlives the session, so it
+      // needs the same fresh proof of identity an email change needs.
+      await this.authService.assertStepUpForUser(
         req.user.userId,
-        updateProfileDto.currentPassword
+        updateProfileDto.currentPassword,
+        reauthProof,
+        STEP_UP_OPERATION.PASSWORD_SET
       );
     }
 
@@ -297,6 +306,9 @@ export class AuthController {
       await this.authService.logout(req.user.userId);
       this.clearRefreshTokenCookie(res);
       this.clearOAuthLinkCookie(res);
+      // Cleared only now, so a rejected attempt keeps its remaining proof
+      // window. The logout above already ends the session that carried it.
+      res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
       await this.auditService.log({
         action: AuditAction.PASSWORD_CHANGE,
         actorId: req.user.userId,

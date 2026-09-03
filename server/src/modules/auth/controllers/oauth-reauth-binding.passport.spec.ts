@@ -19,10 +19,11 @@ import { MailService } from '../../mail/mail.service';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { CookieStateStore } from '../utils/cookie-state-store';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
-import { TOKEN_PURPOSE } from '@app/shared/constants';
+import { STEP_UP_OPERATION, TOKEN_PURPOSE } from '@app/shared/constants';
 
 const CLIENT = 'http://localhost:4200';
 const REAUTH_TOKEN = 'reauth-token-for-user-a';
+const UNBOUND_REAUTH_TOKEN = 'reauth-token-without-operation';
 const OWNER_ID = 'user-a';
 const SIGNED_PROOF = 'signed-reauth-proof';
 const PROVIDER_ID = 'google-id-of-the-signer';
@@ -159,12 +160,20 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
           useValue: {
             sign: jest.fn(() => SIGNED_PROOF),
             verify: jest.fn((token: string) => {
+              if (token === UNBOUND_REAUTH_TOKEN) {
+                return {
+                  sub: OWNER_ID,
+                  purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
+                  iat: Math.floor(Date.now() / 1000)
+                };
+              }
               if (token !== REAUTH_TOKEN) {
                 throw new Error('invalid token');
               }
               return {
                 sub: OWNER_ID,
                 purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
+                operation: STEP_UP_OPERATION.EMAIL_CHANGE,
                 iat: Math.floor(Date.now() / 1000)
               };
             })
@@ -216,6 +225,20 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
 
     return response.headers['location'];
   }
+
+  it('mints nothing when the intent names no operation', async () => {
+    // A proof that carries no operation would satisfy every consumer, which is
+    // the binding this flow exists to create.
+    const jar = new CookieJar();
+    jar.set('oauth_reauth', UNBOUND_REAUTH_TOKEN);
+
+    const state = await authorize(jar);
+
+    expect(await callback(jar, state)).toBe(
+      `${CLIENT}/profile?oauth_error=reauth_failed`
+    );
+    expect(jar.get('reauth_proof')).toBeUndefined();
+  });
 
   it('reaches the re-auth branch on a real round trip and mints a proof', async () => {
     const jar = new CookieJar();

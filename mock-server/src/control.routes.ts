@@ -31,6 +31,7 @@ import {
   MAX_CONCURRENT_SESSIONS
 } from '@app/shared/constants';
 import { OAUTH_DATA_MAX_AGE_MS, REAUTH_PROOF_MAX_AGE_MS } from './constants';
+import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
 import { generateTokens } from './jwt.utils';
 import { pruneOldestUserTokens } from './helpers/auth.helpers';
 import {
@@ -215,7 +216,8 @@ router.post('/oauth-data', (req, res) => {
 // provider halves answer 501 here, so E2E seeds the proof directly and sets
 // the cookie the value belongs to.
 router.post('/reauth-proof', (req, res) => {
-  const { userId }: { userId: string } = req.body;
+  const { userId, operation }: { userId: string; operation?: string } =
+    req.body;
   const user = userId ? findUserById(userId) : undefined;
 
   if (!user) {
@@ -223,11 +225,17 @@ router.post('/reauth-proof', (req, res) => {
     return;
   }
 
+  if (!isStepUpOperation(operation)) {
+    res.status(400).json({ message: 'Body must have a known operation' });
+    return;
+  }
+
   const token = randomUUID();
   getState().reauthProofs.set(token, {
     userId: user.id,
     issuedAt: Math.floor(Date.now() / 1000),
-    expiresAt: Date.now() + REAUTH_PROOF_MAX_AGE_MS
+    expiresAt: Date.now() + REAUTH_PROOF_MAX_AGE_MS,
+    operation
   });
 
   res.json({ token });

@@ -1,5 +1,6 @@
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
+import { STEP_UP_OPERATION } from '@app/shared/constants';
 
 // An account created through a provider holds no password. It used to be told
 // to set one before changing its email, and the form that would have set it
@@ -84,7 +85,10 @@ test.describe('OAuth-only account changes its email', () => {
 
     // Stand in for the provider round trip: the server would set this cookie
     // at the end of it, on the auth path.
-    const { token } = await _mockServer.issueReauthProof(userId);
+    const { token } = await _mockServer.issueReauthProof(
+      userId,
+      STEP_UP_OPERATION.EMAIL_CHANGE
+    );
     await page.context().addCookies([
       {
         name: 'reauth_proof',

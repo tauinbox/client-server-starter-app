@@ -48,7 +48,9 @@ export class UpdateProfileDto {
     description:
       'Current password. An account that holds one must supply it to change ' +
       'the password; the service rejects a missing value. An account created ' +
-      'through a provider holds none and omits this field.',
+      'through a provider holds none and omits this field, and proves itself ' +
+      'instead with a reauth_proof cookie minted for the password_set ' +
+      'operation by a round trip at its provider.',
     example: 'CurrentPassword123'
   })
   @ValidateIf(propertyIsDefined)

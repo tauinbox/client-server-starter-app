@@ -34,6 +34,27 @@ export const TOKEN_PURPOSE = {
 export type TokenPurpose = (typeof TOKEN_PURPOSE)[keyof typeof TOKEN_PURPOSE];
 
 /**
+ * The sensitive operation a step-up proof was minted for. The proof carries the
+ * value the caller declared when it started the provider round trip, and the
+ * operation that consumes the proof demands its own value back. Without this
+ * binding one round trip authorises every sensitive action inside the proof
+ * lifetime, because the proof is not single use.
+ */
+export const STEP_UP_OPERATION = {
+  EMAIL_CHANGE: 'email_change',
+  PASSWORD_SET: 'password_set',
+  MFA_SETUP: 'mfa_setup',
+  MFA_DISABLE: 'mfa_disable'
+} as const;
+
+export type StepUpOperation =
+  (typeof STEP_UP_OPERATION)[keyof typeof STEP_UP_OPERATION];
+
+export const STEP_UP_OPERATIONS = Object.values(
+  STEP_UP_OPERATION
+) as StepUpOperation[];
+
+/**
  * How long before an access token expires the client refreshes it.
  *
  * Paired with MIN_JWT_EXPIRATION_SECONDS: a token whose whole lifetime fits

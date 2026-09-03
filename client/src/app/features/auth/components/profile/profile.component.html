@@ -96,13 +96,9 @@
 
               <nxs-password-strength [password]="profileModel().password" />
 
-              @if (emailChangeNeedsReauth()) {
+              @if (reauthNoticeKey(); as noticeKey) {
                 <div class="reauth-notice" role="note">
-                  {{
-                    t('auth.profile.reauthNotice', {
-                      provider: reauthProviderLabel()
-                    })
-                  }}
+                  {{ t(noticeKey, { provider: reauthProviderLabel() }) }}
                 </div>
               }
 

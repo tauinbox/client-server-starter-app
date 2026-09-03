@@ -9,6 +9,7 @@ import {
   MAX_PASSWORD_LENGTH,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS,
   RESET_TOKEN_EXPIRY_MS,
+  STEP_UP_OPERATION,
   VERIFICATION_TOKEN_EXPIRY_MS
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
@@ -726,9 +727,23 @@ router.patch('/profile', authGuard, (req, res) => {
       return;
     }
 
-    // OAuth-only users (no password set) may set their first password without
-    // currentPassword. Users with an existing password must supply a matching one.
-    if (user.password !== null) {
+    // A first password binds a credential that outlives the session, so an
+    // account that holds no password proves itself with a provider proof, and
+    // an account that holds one supplies it.
+    if (user.password === null) {
+      const proof = (req.cookies as Record<string, string> | undefined)?.[
+        REAUTH_PROOF_COOKIE
+      ];
+      if (!isValidReauthProof(proof, user, STEP_UP_OPERATION.PASSWORD_SET)) {
+        res.status(400).json({
+          message:
+            'Confirm it is you with your sign-in provider, then try again',
+          statusCode: 400,
+          errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
+        });
+        return;
+      }
+    } else {
       // Plaintext comparison — mock only. Real server uses bcrypt.compare().
       if (!currentPassword || user.password !== currentPassword) {
         res.status(400).json({
@@ -782,6 +797,8 @@ router.patch('/profile', authGuard, (req, res) => {
       }
     }
     res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
+    // Cleared only now, so a rejected attempt keeps its remaining proof window.
+    res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
   }
   user.updatedAt = new Date().toISOString();
 
@@ -826,7 +843,7 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
     const proof = (req.cookies as Record<string, string> | undefined)?.[
       REAUTH_PROOF_COOKIE
     ];
-    if (!isValidReauthProof(proof, user)) {
+    if (!isValidReauthProof(proof, user, STEP_UP_OPERATION.EMAIL_CHANGE)) {
       res.status(400).json({
         message: 'Confirm it is you with your sign-in provider, then try again',
         statusCode: 400,

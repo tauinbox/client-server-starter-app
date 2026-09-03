@@ -19,22 +19,26 @@ import { JwtAuthRequest, LocalAuthRequest } from '../types/auth.request';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
+import { STEP_UP_OPERATION } from '@app/shared/constants';
 import { MfaRequiredGuard } from '../guards/mfa-required.guard';
 
 const allowAllGuard = { canActivate: () => true };
 
 function mockJwtRequest(
   userId = 'user-1',
-  email = 'admin@example.com'
+  email = 'admin@example.com',
+  cookies: Record<string, string> = {}
 ): {
   user: JwtAuthRequest['user'];
   ip: string;
   headers: Record<string, string>;
+  cookies: Record<string, string>;
 } {
   return {
     user: { userId, email, roles: [] },
     ip: '127.0.0.1',
-    headers: {}
+    headers: {},
+    cookies
   };
 }
 
@@ -114,7 +118,7 @@ describe('AuthController', () => {
     resendVerificationEmail: jest.Mock;
     forgotPassword: jest.Mock;
     resetPassword: jest.Mock;
-    verifyCurrentPassword: jest.Mock;
+    assertStepUpForUser: jest.Mock;
   };
   let mfaServiceMock: {
     issuePendingToken: jest.Mock;
@@ -174,7 +178,7 @@ describe('AuthController', () => {
       resendVerificationEmail: jest.fn().mockResolvedValue({ message: 'sent' }),
       forgotPassword: jest.fn().mockResolvedValue({ message: 'sent' }),
       resetPassword: jest.fn().mockResolvedValue({ message: 'reset' }),
-      verifyCurrentPassword: jest.fn().mockResolvedValue(undefined)
+      assertStepUpForUser: jest.fn().mockResolvedValue(undefined)
     };
 
     mfaServiceMock = {
@@ -537,7 +541,7 @@ describe('AuthController', () => {
         dto,
         SYSTEM_ABILITY
       );
-      expect(authServiceMock.verifyCurrentPassword).not.toHaveBeenCalled();
+      expect(authServiceMock.assertStepUpForUser).not.toHaveBeenCalled();
       expect(authServiceMock.logout).not.toHaveBeenCalled();
       expect(res.clearCookie).not.toHaveBeenCalled();
       expect(auditServiceMock.log).not.toHaveBeenCalled();
@@ -554,9 +558,11 @@ describe('AuthController', () => {
 
       await controller.updateProfile(req, dto, res);
 
-      expect(authServiceMock.verifyCurrentPassword).toHaveBeenCalledWith(
+      expect(authServiceMock.assertStepUpForUser).toHaveBeenCalledWith(
         'user-1',
-        'CurrentPass1'
+        'CurrentPass1',
+        undefined,
+        STEP_UP_OPERATION.PASSWORD_SET
       );
       expect(authServiceMock.logout).toHaveBeenCalledWith('user-1');
       expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
@@ -645,7 +651,7 @@ describe('AuthController', () => {
       );
     });
 
-    it('should propagate INVALID_CURRENT_PASSWORD when verifyCurrentPassword throws', async () => {
+    it('should propagate INVALID_CURRENT_PASSWORD when the step-up throws', async () => {
       const req = mockJwtRequest('user-1') as JwtAuthRequest;
       const res = mockResponse();
       const dto = { password: 'NewPassword1', currentPassword: 'WrongPass1' };
@@ -653,7 +659,7 @@ describe('AuthController', () => {
         { errorKey: 'errors.auth.invalidCurrentPassword' },
         400
       );
-      authServiceMock.verifyCurrentPassword.mockRejectedValueOnce(httpErr);
+      authServiceMock.assertStepUpForUser.mockRejectedValueOnce(httpErr);
 
       await expect(
         controller.updateProfile(req, dto as never, res)
@@ -661,6 +667,43 @@ describe('AuthController', () => {
 
       expect(userServiceMock.update).not.toHaveBeenCalled();
       expect(authServiceMock.logout).not.toHaveBeenCalled();
+    });
+
+    it('hands the re-authentication proof cookie to the step-up', async () => {
+      // An account created through a provider holds no password, so the proof
+      // is the only factor it can present before it binds one.
+      const req = mockJwtRequest('user-1', 'admin@example.com', {
+        reauth_proof: 'proof'
+      }) as JwtAuthRequest;
+      const res = mockResponse();
+
+      await controller.updateProfile(req, { password: 'NewPassword1' }, res);
+
+      expect(authServiceMock.assertStepUpForUser).toHaveBeenCalledWith(
+        'user-1',
+        undefined,
+        'proof',
+        STEP_UP_OPERATION.PASSWORD_SET
+      );
+      expect(res.clearCookie).toHaveBeenCalledWith('reauth_proof', {
+        path: '/api/v1/auth'
+      });
+    });
+
+    it('keeps the proof cookie when the step-up refuses the request', async () => {
+      const req = mockJwtRequest('user-1', 'admin@example.com', {
+        reauth_proof: 'proof'
+      }) as JwtAuthRequest;
+      const res = mockResponse();
+      authServiceMock.assertStepUpForUser.mockRejectedValueOnce(
+        new HttpException({ errorKey: 'errors.auth.reauthRequired' }, 400)
+      );
+
+      await expect(
+        controller.updateProfile(req, { password: 'NewPassword1' }, res)
+      ).rejects.toBeInstanceOf(HttpException);
+
+      expect(res.clearCookie).not.toHaveBeenCalled();
     });
   });
 

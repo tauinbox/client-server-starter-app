@@ -3,6 +3,7 @@ import {
   ErrorKeys,
   MAX_CONCURRENT_SESSIONS,
   MAX_PASSWORD_LENGTH,
+  STEP_UP_OPERATION,
   TOKEN_PURPOSE,
   TOTP_DIGITS,
   TOTP_ISSUER
@@ -22,6 +23,7 @@ import {
   REFRESH_COOKIE_OPTIONS,
   REFRESH_TOKEN_COOKIE
 } from '../constants';
+import type { StepUpOperation } from '@app/shared/constants';
 import type { AuthenticatedRequest, MockUser } from '../types';
 import type { Request, Response } from 'express';
 
@@ -65,7 +67,8 @@ function stepUpError(
   req: Request,
   user: MockUser,
   currentPassword: unknown,
-  code: unknown
+  code: unknown,
+  operation: StepUpOperation
 ): { message: string; statusCode: number; errorKey: string } | null {
   if (
     user.totpEnabledAt &&
@@ -79,7 +82,7 @@ function stepUpError(
     const proof = (req.cookies as Record<string, string> | undefined)?.[
       REAUTH_PROOF_COOKIE
     ];
-    return isValidReauthProof(proof, user)
+    return isValidReauthProof(proof, user, operation)
       ? null
       : {
           message:
@@ -175,7 +178,13 @@ router.post('/setup', authGuard, (req, res) => {
     return;
   }
 
-  const stepUp = stepUpError(req, user, currentPassword, undefined);
+  const stepUp = stepUpError(
+    req,
+    user,
+    currentPassword,
+    undefined,
+    STEP_UP_OPERATION.MFA_SETUP
+  );
   if (stepUp) {
     res.status(stepUp.statusCode).json(stepUp);
     return;
@@ -277,7 +286,13 @@ router.post('/disable', authGuard, (req, res) => {
     return;
   }
 
-  const stepUp = stepUpError(req, user, currentPassword, code);
+  const stepUp = stepUpError(
+    req,
+    user,
+    currentPassword,
+    code,
+    STEP_UP_OPERATION.MFA_DISABLE
+  );
   if (stepUp) {
     res.status(stepUp.statusCode).json(stepUp);
     return;

@@ -1,4 +1,5 @@
 import {
+  Body,
   ClassSerializerInterceptor,
   Controller,
   Delete,
@@ -17,6 +18,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -55,6 +57,8 @@ import {
   REAUTH_PROOF_COOKIE_PATH
 } from '../constants/oauth.constants';
 import { readIntentForFlow } from '../utils/oauth-flow-intent';
+import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
+import { ReauthInitDto } from '../dtos/reauth-init.dto';
 
 @ApiTags('OAuth API')
 @Controller({
@@ -111,18 +115,27 @@ export class OAuthController {
    * Starts a step-up re-authentication for an account that holds no password.
    * The provider round trip that follows proves the caller still controls the
    * identity the account is linked to, and the callback mints the proof.
+   *
+   * The operation travels in the intent token, so the proof the callback mints
+   * is bound to the change the user asked for and authorizes nothing else.
    */
   @Post('reauth-init')
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Initiate a step-up re-authentication through a linked provider'
   })
+  @ApiBody({ type: ReauthInitDto })
   initOAuthReauth(
     @Request() req: JwtAuthRequest,
+    @Body() dto: ReauthInitDto,
     @Res({ passthrough: true }) res: Response
   ) {
     const reauthToken = this.jwtService.sign(
-      { sub: req.user.userId, purpose: TOKEN_PURPOSE.OAUTH_REAUTH },
+      {
+        sub: req.user.userId,
+        purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
+        operation: dto.operation
+      },
       { expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS }
     );
 
@@ -416,6 +429,9 @@ export class OAuthController {
    * caller re-authenticated. It mints no session and links nothing, so the
    * worst a stolen intent can produce is a proof for an account whose provider
    * identity the attacker already controls.
+   *
+   * The proof repeats the operation the intent declared. A proof minted to
+   * change an address therefore cannot bind a password.
    */
   private async handleOAuthReauth(
     reauthToken: string,
@@ -430,10 +446,14 @@ export class OAuthController {
       const payload = this.jwtService.verify<{
         sub: string;
         purpose?: string;
+        operation?: string;
         iat?: number;
       }>(reauthToken);
       if (payload.purpose !== TOKEN_PURPOSE.OAUTH_REAUTH) {
         throw new Error('Unexpected token purpose');
+      }
+      if (!isStepUpOperation(payload.operation)) {
+        throw new Error('Re-authentication token names no known operation');
       }
       // The service compares this against the last session revocation, so a
       // token without one is refused rather than trusted.
@@ -449,7 +469,11 @@ export class OAuthController {
       );
 
       const proof = this.jwtService.sign(
-        { sub: payload.sub, purpose: TOKEN_PURPOSE.REAUTH_PROOF },
+        {
+          sub: payload.sub,
+          purpose: TOKEN_PURPOSE.REAUTH_PROOF,
+          operation: payload.operation
+        },
         { expiresIn: REAUTH_PROOF_MAX_AGE_SECONDS }
       );
 

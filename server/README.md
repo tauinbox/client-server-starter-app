@@ -1942,7 +1942,7 @@ The base URL is `/api/v1`.
 | POST | `/refresh-token` | None | Refresh the access token |
 | POST | `/logout` | Bearer | Revoke each refresh token |
 | GET | `/profile` | Bearer | Get the current user |
-| PATCH | `/profile` | Bearer | Update your own profile: the name and the password. `currentPassword` is necessary for a password change. A user with OAuth only can omit it |
+| PATCH | `/profile` | Bearer | Update your own profile: the name and the password. A password change needs a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one, and a `reauth_proof` cookie minted for `password_set` for an account with OAuth only |
 | POST | `/profile/email/initiate` | Bearer | Step 1 of the self-service email change, with a limit of 3 calls each hour. It requires a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one, and a `reauth_proof` cookie from a provider round trip for an account that has none. It stores `pendingEmail` and `pendingEmailToken` with an expiry of 1 h. It sends a confirmation link to the new address, and a masked alert with no link to the old address. The response is enumeration-safe |
 | POST | `/profile/email/confirm` | None | Step 2. It confirms the new address with the token, applies the change atomically, revokes each refresh token, and notifies the old address |
 | GET | `/permissions` | Bearer | Get the resolved permissions of the current user |

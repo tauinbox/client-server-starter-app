@@ -1,5 +1,6 @@
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
+import { STEP_UP_OPERATION } from '@app/shared/constants';
 
 const userId = '200';
 const email = 'provider-only@example.com';
@@ -46,7 +47,10 @@ test.describe('Profile init notifications wait for their translations', () => {
       }
     ]);
 
-    const { token } = await _mockServer.issueReauthProof(userId);
+    const { token } = await _mockServer.issueReauthProof(
+      userId,
+      STEP_UP_OPERATION.EMAIL_CHANGE
+    );
     await page.context().addCookies([
       {
         name: 'reauth_proof',

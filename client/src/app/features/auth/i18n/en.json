@@ -149,6 +149,8 @@
     "emailChangeInitiatedWithProfile": "Profile updated. Confirmation link sent - check your new email inbox to complete the address change.",
     "errorEmailChangeFailed": "Failed to initiate email change. Please try again.",
     "reauthNotice": "Your account signs in with {{ provider }}. We will ask {{ provider }} to confirm it is you before we change your email.",
+    "reauthNoticePassword": "Your account signs in with {{ provider }}. We will ask {{ provider }} to confirm it is you before we set your password.",
+    "reauthDonePassword": "Confirmed. Enter your new password again and save it now.",
     "reauthRedirecting": "Sending you to {{ provider }} to confirm it is you...",
     "reauthConfirmButton": "Continue to {{ provider }}",
     "errorReauthFailed": "We could not confirm it is you. Nothing was changed. Please try again.",
