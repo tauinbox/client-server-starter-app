@@ -2239,12 +2239,19 @@ The import covers:
 
   The RBAC types are `ResourceResponse`, `ActionResponse` and `RbacMetadataResponse`.
 - **Constants.** They are `MIN_PASSWORD_LENGTH`,
-  `MAX_PASSWORD_LENGTH`, `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, `MAX_CONCURRENT_SESSIONS`,
+  `MAX_PASSWORD_LENGTH`, `MAX_NEW_PASSWORD_LENGTH`, `MAX_NEW_PASSWORD_BYTES`,
+  `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, `MAX_CONCURRENT_SESSIONS`,
   `MAX_PAGE_SIZE`, `DEFAULT_CURSOR_PAGE_SIZE`, the user sort columns, `SYSTEM_ROLES` and
   `SystemRole`.
 
-  The password DTOs read the two length constants, thus `@MinLength` and `@MaxLength` cannot drift
-  away from the client form rules.
+  The password DTOs read these length constants, thus `@MinLength` and `@MaxLength` cannot drift
+  away from the client form rules. A DTO field that **sets** a password reads
+  `MAX_NEW_PASSWORD_LENGTH`, which is 72, and adds `@IsWithinPasswordByteLimit()`
+  (`src/common/validators/password-byte-limit.validator.ts`). That decorator counts UTF-8 bytes,
+  which `@MaxLength` cannot do, and bcrypt ignores each byte after the 72nd. A DTO field that only
+  **verifies** a password keeps `MAX_PASSWORD_LENGTH`, which is 128: the stored hash covers the same
+  truncated prefix, thus a lower cap there locks out the owner of a long legacy password and makes
+  no hash safer.
 
   Note that `PERMISSIONS` and `Permission` are gone. The code uses a typed `[Actions, Subjects]`
   tuple instead.

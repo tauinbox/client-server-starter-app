@@ -1,8 +1,12 @@
 import {
-  MAX_PASSWORD_LENGTH,
+  MAX_NEW_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   SUPPORTED_LOCALES
 } from '@app/shared/constants';
+import {
+  exceedsPasswordByteLimit,
+  passwordByteLimitMessage
+} from '@app/shared/utils/password-bytes';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -57,11 +61,18 @@ export function validateMinLength(
   return null;
 }
 
-/** The `@MinLength` / `@MaxLength` pair every password field carries. */
+/**
+ * The length rules every field that SETS a password carries: the
+ * `@MinLength` / `@MaxLength` pair, then the bcrypt byte cap. A field that
+ * only VERIFIES a password keeps MAX_PASSWORD_LENGTH and does not come here.
+ */
 export function passwordLengthError(value: unknown): string | null {
   return (
     validateMinLength(value, MIN_PASSWORD_LENGTH, 'password') ??
-    validateMaxLength(value, MAX_PASSWORD_LENGTH, 'password')
+    validateMaxLength(value, MAX_NEW_PASSWORD_LENGTH, 'password') ??
+    (exceedsPasswordByteLimit(value)
+      ? passwordByteLimitMessage('password')
+      : null)
   );
 }
 

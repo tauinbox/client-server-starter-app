@@ -73,11 +73,12 @@ import {
 } from '@core/services/display-preferences.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import {
-  MAX_PASSWORD_LENGTH,
+  MAX_NEW_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   OAUTH_PROVIDER_FLAGS
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
+import { passwordByteLimit } from '@shared/forms/password-byte-limit';
 
 type ProfileData = {
   email: string;
@@ -223,9 +224,10 @@ export class ProfileComponent implements OnInit {
     minLength(path.password, MIN_PASSWORD_LENGTH, {
       message: 'auth.profile.passwordMinLength'
     });
-    maxLength(path.password, MAX_PASSWORD_LENGTH, {
+    maxLength(path.password, MAX_NEW_PASSWORD_LENGTH, {
       message: 'auth.profile.passwordMaxLength'
     });
+    passwordByteLimit(path.password, 'auth.profile.passwordMaxBytes');
     validate(path.currentPassword, ({ value, valueOf }) => {
       // An account created through a provider holds no password, so demanding
       // one here is the defect this field used to carry.

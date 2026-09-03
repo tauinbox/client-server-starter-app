@@ -33,10 +33,11 @@ import { CaptchaWidgetComponent } from '@shared/components/captcha-widget/captch
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import {
   ErrorKeys,
-  MAX_PASSWORD_LENGTH,
+  MAX_NEW_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH
 } from '@app/shared/constants';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
+import { passwordByteLimit } from '@shared/forms/password-byte-limit';
 
 type RegisterData = {
   email: string;
@@ -95,9 +96,10 @@ export class RegisterComponent {
     minLength(path.password, MIN_PASSWORD_LENGTH, {
       message: 'auth.register.passwordMinLength'
     });
-    maxLength(path.password, MAX_PASSWORD_LENGTH, {
+    maxLength(path.password, MAX_NEW_PASSWORD_LENGTH, {
       message: 'auth.register.passwordMaxLength'
     });
+    passwordByteLimit(path.password, 'auth.register.passwordMaxBytes');
   });
 
   protected onCaptchaToken(token: string | null): void {

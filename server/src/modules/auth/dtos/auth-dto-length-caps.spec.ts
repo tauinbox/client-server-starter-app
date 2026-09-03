@@ -66,11 +66,11 @@ describe('Auth DTO length caps', () => {
       );
     });
 
-    it('rejects a password longer than 128 characters', async () => {
+    it('rejects a password longer than 72 characters', async () => {
       await expectRejected(
         ResetPasswordDto,
-        { token: 'x', password: 'A1' + 'a'.repeat(127) },
-        'password must be shorter than or equal to 128 characters'
+        { token: 'x', password: 'A1' + 'a'.repeat(71) },
+        'password must be shorter than or equal to 72 characters'
       );
     });
 

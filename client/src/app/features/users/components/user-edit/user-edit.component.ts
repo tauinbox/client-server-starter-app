@@ -52,11 +52,12 @@ import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { UsersStore } from '../../store/users.store';
 import type { RoleAdminResponse } from '@app/shared/types';
 import {
-  MAX_PASSWORD_LENGTH,
+  MAX_NEW_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH
 } from '@app/shared/constants';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { passwordByteLimit } from '@shared/forms/password-byte-limit';
 
 type UserFormData = {
   email: string;
@@ -138,9 +139,10 @@ export class UserEditComponent implements OnInit, OnDestroy {
     minLength(path.password, MIN_PASSWORD_LENGTH, {
       message: 'users.edit.passwordMinLength'
     });
-    maxLength(path.password, MAX_PASSWORD_LENGTH, {
+    maxLength(path.password, MAX_NEW_PASSWORD_LENGTH, {
       message: 'users.edit.passwordMaxLength'
     });
+    passwordByteLimit(path.password, 'users.edit.passwordMaxBytes');
   });
 
   protected readonly formChanged = computed(() => {

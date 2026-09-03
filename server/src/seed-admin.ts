@@ -1,7 +1,11 @@
 import * as dotenv from 'dotenv';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
-import { BCRYPT_SALT_ROUNDS } from '@app/shared/constants';
+import {
+  BCRYPT_SALT_ROUNDS,
+  MAX_NEW_PASSWORD_BYTES
+} from '@app/shared/constants';
+import { exceedsPasswordByteLimit } from '@app/shared/utils/password-bytes';
 import { postgresConfig } from './postgres.config';
 import { lookupBreachedPassword } from './modules/auth/breached-password/pwned-range-lookup';
 import { User } from './modules/users/entities/user.entity';
@@ -76,6 +80,18 @@ export async function seedAdmin(): Promise<void> {
         'WARNING: ADMIN_PASSWORD appears in a public data breach. The admin ' +
           'user is being created with it - change the password after the ' +
           'first sign-in and rotate the ADMIN_PASSWORD secret.'
+      );
+    }
+
+    // The set-password routes reject an over-long value; this one only warns,
+    // for the same reason the breach check above only warns. A truncated admin
+    // password is a problem to fix at leisure. Refusing to boot over it is an
+    // outage.
+    if (exceedsPasswordByteLimit(password)) {
+      console.warn(
+        `WARNING: ADMIN_PASSWORD is longer than ${MAX_NEW_PASSWORD_BYTES} ` +
+          'bytes. bcrypt ignores every byte past that point, so the tail is ' +
+          'not part of the stored credential - shorten the secret.'
       );
     }
 
