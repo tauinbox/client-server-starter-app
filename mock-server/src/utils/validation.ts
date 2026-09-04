@@ -8,14 +8,27 @@ import {
   passwordByteLimitMessage
 } from '@app/shared/utils/password-bytes';
 import { normalizeEmail } from '@app/shared/utils/email';
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import isEmail from 'validator/lib/isEmail';
 
 /** Every address field on the server carries the same `@MaxLength`. */
 const EMAIL_MAX_LENGTH = 255;
 
+/**
+ * Mirrors `@IsEmail()`, which is `typeof value === 'string' && isEmail(value)`
+ * over the same validator.js function with the default options
+ * (`class-validator/cjs/decorator/string/IsEmail.js`). The package is imported
+ * directly, not through `shared/src`, because the client Playwright fixture
+ * loads this server in process and a bare specifier inside `shared/src` has no
+ * `node_modules` to resolve from. The shared corpus in
+ * `shared/src/test-fixtures/email-address-corpus.ts` keeps the two copies of
+ * validator.js on the same verdicts.
+ *
+ * A regular expression here accepted thirteen shapes that the server answers
+ * with 400, among them a local part over 64 characters, a hyphen-edged domain
+ * label and a single-character last label.
+ */
 export function isValidEmail(email: unknown): boolean {
-  return typeof email === 'string' && EMAIL_REGEX.test(email);
+  return typeof email === 'string' && isEmail(email);
 }
 
 /**

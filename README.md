@@ -870,11 +870,13 @@ fullstack-starter-app/
 │       │                   # the bcrypt input limit), cursor page size, SYSTEM_ROLES,
 │       │                   # MAX_CONCURRENT_SESSIONS,
 │       │                   # ENTITLED/OPEN/CHANGEABLE_SUBSCRIPTION_STATUSES (one definition each), etc.
-│       └── utils/          # feature-flag-evaluator (needs node:crypto, server + mock only),
-│                           # feature-flag-attribute-value + feature-flag-timestamp (also imported by
-│                           # the client, thus free of node built-ins), mongo-query-safety,
-│                           # password-bytes (TextEncoder, thus also free of node built-ins),
-│                           # time (Temporal barrel), money (BigInt value object)
+│       ├── utils/          # feature-flag-evaluator (needs node:crypto, server + mock only),
+│       │                   # feature-flag-attribute-value + feature-flag-timestamp (also imported by
+│       │                   # the client, thus free of node built-ins), mongo-query-safety,
+│       │                   # password-bytes (TextEncoder, thus also free of node built-ins),
+│       │                   # time (Temporal barrel), money (BigInt value object)
+│       └── test-fixtures/  # email-address-corpus - the address verdicts the server and the mock
+│                           # must agree on (test data, imported by no production module)
 ├── client/                 # Angular 21 SPA
 │   ├── src/app/
 │   │   ├── core/           # Header, theme, storage, error interceptor, 404
@@ -949,7 +951,9 @@ after a `@Transform(trim)` makes it empty. They use
 the message text and the order of the true validator. A value that fails more than one constraint
 gives more than one message, thus a handler must collect them and must not answer with the first
 failure. `emailErrors` mirrors `@Transform(normalizeEmail) @IsEmail() @MaxLength(255)`, so an
-absent, null or non-string address gives two messages, and a malformed string gives one. That order puts the
+absent, null or non-string address gives two messages, and a malformed string gives one. The
+format itself comes from `validator.isEmail` with the default options, the function `@IsEmail()`
+calls, because a regular expression here accepted thirteen shapes that the server answers with 400. That order puts the
 unknown properties first, and then each property as the DTO declares it. Thus a handler composes its
 DTO from them and answers with the envelope of the server.
 
