@@ -4,7 +4,7 @@
   </mat-card-header>
 
   <mat-card-content>
-    @if (!accountHasPassword()) {
+    @if (!accountHasPassword() && !reauthProviderLabel()) {
       <p class="two-factor-note" role="note">
         {{ t('auth.twoFactor.needsPassword') }}
       </p>
@@ -117,23 +117,37 @@
         }
 
         @case ('disable') {
-          <p class="two-factor-note">{{ t('auth.twoFactor.disableHint') }}</p>
+          @if (accountHasPassword()) {
+            <p class="two-factor-note">{{ t('auth.twoFactor.disableHint') }}</p>
 
-          <nxs-form-field
-            [field]="passwordForm.currentPassword"
-            label="auth.twoFactor.currentPassword"
-            [type]="disablePwdToggle.show() ? 'text' : 'password'"
-            prefixIcon="lock"
-            autocomplete="current-password"
-          >
-            <nxs-password-toggle formFieldSuffix #disablePwdToggle />
-          </nxs-form-field>
+            <nxs-form-field
+              [field]="passwordForm.currentPassword"
+              label="auth.twoFactor.currentPassword"
+              [type]="disablePwdToggle.show() ? 'text' : 'password'"
+              prefixIcon="lock"
+              autocomplete="current-password"
+            >
+              <nxs-password-toggle formFieldSuffix #disablePwdToggle />
+            </nxs-form-field>
+          } @else {
+            <p class="two-factor-note">
+              {{ t('auth.twoFactor.disableHintCode') }}
+            </p>
+
+            <nxs-form-field
+              [field]="codeForm.code"
+              label="auth.twoFactor.code"
+              type="text"
+              prefixIcon="password"
+              autocomplete="one-time-code"
+            />
+          }
 
           <div class="two-factor-actions">
             <button
               matButton="filled"
               type="button"
-              [disabled]="passwordForm().invalid() || busy()"
+              [disabled]="disableBlocked()"
               (click)="disable()"
             >
               @if (busy()) {
@@ -166,6 +180,16 @@
                 : t('auth.twoFactor.offHint')
             }}
           </p>
+
+          @if (!enabled() && !accountHasPassword()) {
+            <p class="two-factor-note">
+              {{
+                t('auth.twoFactor.reauthNotice', {
+                  provider: reauthProviderLabel()
+                })
+              }}
+            </p>
+          }
 
           <div class="two-factor-actions">
             @if (enabled()) {

@@ -57,6 +57,7 @@ describe('ProfileComponent', () => {
     unlinkOAuthAccount: ReturnType<typeof vi.fn>;
     initOAuthLink: ReturnType<typeof vi.fn>;
     initOAuthReauth: ReturnType<typeof vi.fn>;
+    startMfaSetup: ReturnType<typeof vi.fn>;
   };
   let notifyMock: {
     success: ReturnType<typeof vi.fn>;
@@ -80,7 +81,15 @@ describe('ProfileComponent', () => {
       initOAuthLink: vi.fn().mockReturnValue(of({ message: 'Link initiated' })),
       initOAuthReauth: vi
         .fn()
-        .mockReturnValue(of({ message: 'Re-authentication initiated' }))
+        .mockReturnValue(of({ message: 'Re-authentication initiated' })),
+      startMfaSetup: vi.fn().mockReturnValue(
+        of({
+          secret: 'JBSWY3DPEHPK3PXP',
+          otpauthUri:
+            'otpauth://totp/Nexus:test@example.com?secret=JBSWY3DPEHPK3PXP',
+          qrDataUrl: 'data:image/png;base64,AAAA'
+        })
+      )
     };
     featureFlagServiceMock = {
       getEvaluatedFlags: vi
@@ -507,6 +516,69 @@ describe('ProfileComponent', () => {
       expect(authServiceMock.updateProfile).not.toHaveBeenCalledWith(
         expect.objectContaining({ password: 'Sunrise-Kettle-19' })
       );
+    });
+  });
+
+  describe('two-factor enrolment on an account created through a provider', () => {
+    const oauthOnlyUser = { ...mockUser, hasPassword: false };
+
+    beforeEach(() => {
+      authServiceMock.getProfile.mockReturnValue(of(oauthOnlyUser));
+      authServiceMock.getOAuthAccounts.mockReturnValue(
+        of([{ provider: 'google', createdAt: '2025-01-01T00:00:00.000Z' }])
+      );
+    });
+
+    it('starts a round trip bound to the enrolment when the card asks', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      component['startMfaReauth']();
+
+      expect(authServiceMock.initOAuthReauth).toHaveBeenCalledWith(
+        STEP_UP_OPERATION.MFA_SETUP
+      );
+      expect(sessionStorage.getItem('pending_mfa_setup')).not.toBeNull();
+    });
+
+    it('reports that no provider can confirm the account', async () => {
+      authServiceMock.getOAuthAccounts.mockReturnValue(of([]));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      component['startMfaReauth']();
+
+      expect(authServiceMock.initOAuthReauth).not.toHaveBeenCalled();
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        'auth.profile.errorReauthNoProvider'
+      );
+    });
+
+    it('tells the card to resume on the load that follows the round trip', async () => {
+      sessionStorage.setItem('pending_mfa_setup', 'true');
+      activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(component['resumeMfaSetup']()).toBe(true);
+      // The card is the consumer of that signal, and it asks for the secret.
+      expect(authServiceMock.startMfaSetup).toHaveBeenCalledWith();
+      expect(authServiceMock.initiateEmailChange).not.toHaveBeenCalled();
+    });
+
+    it('does not resume on a round trip taken for the email change', async () => {
+      sessionStorage.setItem('pending_email_change', 'new@example.com');
+      activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
+      authServiceMock.initiateEmailChange.mockReturnValue(
+        of({ message: 'ok' })
+      );
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(component['resumeMfaSetup']()).toBe(false);
+      expect(authServiceMock.startMfaSetup).not.toHaveBeenCalled();
     });
   });
 

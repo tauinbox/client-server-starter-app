@@ -106,6 +106,12 @@ const PENDING_EMAIL_KEY = 'pending_email_change';
  */
 const PENDING_PASSWORD_KEY = 'pending_password_set';
 
+/**
+ * The third resume path. The two-factor card asks for the round trip and picks
+ * the enrolment up again on the load that follows it.
+ */
+const PENDING_MFA_KEY = 'pending_mfa_setup';
+
 /** Keyed by OAuthProvider so a new entry in OAUTH_URLS fails the build until it gets a label. */
 const PROVIDER_KEYS: Record<OAuthProvider, string> = {
   google: 'auth.providers.google',
@@ -314,6 +320,9 @@ export class ProfileComponent implements OnInit {
    */
   readonly #reauthConfirmed = signal(false);
 
+  /** The same signal for the two-factor card, which resumes on its own. */
+  protected readonly resumeMfaSetup = signal(false);
+
   protected readonly passwordSetNeedsReauth = computed(
     () =>
       !this.accountHasPassword() &&
@@ -360,8 +369,10 @@ export class ProfileComponent implements OnInit {
       this.#sessionStorage.getItem<string>(PENDING_EMAIL_KEY);
     const pendingPassword =
       this.#sessionStorage.getItem<boolean>(PENDING_PASSWORD_KEY);
+    const pendingMfa = this.#sessionStorage.getItem<boolean>(PENDING_MFA_KEY);
     this.#sessionStorage.removeItem(PENDING_EMAIL_KEY);
     this.#sessionStorage.removeItem(PENDING_PASSWORD_KEY);
+    this.#sessionStorage.removeItem(PENDING_MFA_KEY);
 
     if (reauth !== 'ok') return;
 
@@ -382,7 +393,45 @@ export class ProfileComponent implements OnInit {
 
     if (pendingPassword) {
       this.#notify.info('auth.profile.reauthDonePassword');
+      return;
     }
+
+    // The card holds the enrolment, so all it needs is the signal that the
+    // proof its request will carry is now there.
+    if (pendingMfa) {
+      this.resumeMfaSetup.set(true);
+    }
+  }
+
+  /**
+   * The two-factor card cannot leave the app on its own: the provider, the
+   * label and the return address all belong to this page, exactly as they do
+   * for an email change and for a first password.
+   */
+  protected startMfaReauth(): void {
+    const provider = this.reauthProvider();
+    if (!provider) {
+      this.#notify.error('auth.profile.errorReauthNoProvider');
+      return;
+    }
+
+    this.#authService
+      .initOAuthReauth(STEP_UP_OPERATION.MFA_SETUP)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.#sessionStorage.setItem(PENDING_MFA_KEY, true);
+          this.#notify.info('auth.profile.reauthRedirecting', {
+            provider: this.reauthProviderLabel()
+          });
+          if (this.#window) {
+            this.#window.location.href = OAUTH_URLS[provider];
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.#notify.error(err, 'auth.profile.errorReauthFailed');
+        }
+      });
   }
 
   #resumeEmailChange(pending: string): void {
@@ -448,6 +497,9 @@ export class ProfileComponent implements OnInit {
   loadProfile(): void {
     this.loading.set(true);
     this.error.set(null);
+    // A reload takes the two-factor card down and builds a new one, which
+    // would read a stale resume signal and ask for a second secret.
+    this.resumeMfaSetup.set(false);
 
     this.#authService
       .getProfile()

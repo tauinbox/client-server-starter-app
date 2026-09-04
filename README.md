@@ -37,9 +37,12 @@ management and theming.
   account in: it returns a 300 second `mfa_pending` token, which the bearer strategy refuses, and
   only a code or a recovery code turns it into a session. The shared secret is encrypted at rest
   with `MFA_ENCRYPTION_KEY`; while that key is empty, enrolment answers HTTP 503 and every other
-  path is unchanged. `MFA_REQUIRED_FOR_ADMINS=true` makes the factor mandatory for an account that
-  holds a super role: it still signs in and still reaches its profile, but every route behind an
-  authorization check answers 403 until the enrolment is complete.
+  path is unchanged. An account created through a provider holds no password, so the card takes it
+  through a round trip at that provider and picks the enrolment up on the return, and it turns the
+  factor off with a code from the authenticator instead of a password. `MFA_REQUIRED_FOR_ADMINS=true`
+  makes the factor mandatory for an account that holds a super role: it still signs in and still
+  reaches its profile, but every route behind an authorization check answers 403 until the enrolment
+  is complete.
 
   An OAuth user becomes verified only when the provider asserts `email_verified=true` for that same
   address. Google and Facebook do this. The rule applies at the creation of the account and at each
@@ -1736,8 +1739,8 @@ activates the git hooks through the `prepare` script.
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2222 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 363 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 361 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1240 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 241 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1248 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 246 tests pass |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 581 tests pass |
 
 ## CI/CD
@@ -1812,7 +1815,10 @@ The wrapper retries a maximum of 3 times, 15 s apart. It retries **only** when t
   account actually holds. An account with a password supplies `currentPassword`. Thus a stolen token
   cannot become a permanent account takeover. An account with OAuth only holds no password, so it
   completes a round trip at its provider through `POST /auth/oauth/reauth-init`, and the callback
-  mints a `reauth_proof` cookie the change consumes. Before the password path was gated, a stolen
+  mints a `reauth_proof` cookie the change consumes. The **two-factor enrolment**
+  (`POST /auth/mfa/setup`) takes the same trip, under its own operation. Turning the factor off does
+  not: an enrolled account presents a code from its authenticator, which the step-up accepts before
+  it looks for a password. Before the password path was gated, a stolen
   access token alone could bind a password that survived the logout and the token rotation.
   The proof lasts 300 seconds, is HttpOnly, and dies with an account-wide session revocation. It is not single use,
   so it also carries the operation it was minted for, and each sensitive action accepts only its own:
