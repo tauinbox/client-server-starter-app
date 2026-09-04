@@ -7,8 +7,12 @@ import {
   exceedsPasswordByteLimit,
   passwordByteLimitMessage
 } from '@app/shared/utils/password-bytes';
+import { normalizeEmail } from '@app/shared/utils/email';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Every address field on the server carries the same `@MaxLength`. */
+const EMAIL_MAX_LENGTH = 255;
 
 export function isValidEmail(email: unknown): boolean {
   return typeof email === 'string' && EMAIL_REGEX.test(email);
@@ -146,6 +150,33 @@ export function stringErrors(
   ) {
     errors.push(`${field} should not be empty`);
   }
+  return errors;
+}
+
+/**
+ * Mirrors `@Transform(normalizeEmail) @IsEmail() @MaxLength(255)`, the chain
+ * every address field on the server carries. Both validators run on every body,
+ * so a value that fails both is reported MaxLength, IsEmail - a route that
+ * answers with the first failure it finds sends one message where the server
+ * sends two.
+ *
+ * Measured against the application's own `ValidationPipe` options: an absent
+ * field, a null and any non-string fail the length cap as well and give two
+ * messages; a string that normalizes to empty, or is simply malformed, gives
+ * one. Pass the raw body value - the transform belongs to the same chain.
+ */
+export function emailErrors(
+  field: string,
+  value: unknown,
+  optional?: OptionalMode
+): string[] {
+  if (isSkipped(value, optional)) return [];
+
+  const transformed = normalizeEmail(value) ?? value;
+  const errors: string[] = [];
+  const tooLong = validateMaxLength(transformed, EMAIL_MAX_LENGTH, field);
+  if (tooLong) errors.push(tooLong);
+  if (!isValidEmail(transformed)) errors.push(`${field} must be an email`);
   return errors;
 }
 

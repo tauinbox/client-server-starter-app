@@ -10,7 +10,7 @@ import {
   isBreachedPassword
 } from '../helpers/breached-password.helpers';
 import {
-  isValidEmail,
+  emailErrors,
   passwordLengthError,
   validateLocale,
   validateMaxLength
@@ -281,16 +281,10 @@ router.patch('/:id', adminGuard, requireUuid('id'), (req, res) => {
       ? undefined
       : (normalizeEmail(req.body.email) ?? req.body.email);
 
-  if (email !== undefined) {
-    if (!isValidEmail(email)) {
-      res.status(400).json(validationError('email must be an email'));
-      return;
-    }
-    const emailMaxErr = validateMaxLength(email, 255, 'email');
-    if (emailMaxErr) {
-      res.status(400).json(validationError(emailMaxErr));
-      return;
-    }
+  const bodyEmailErrors = emailErrors('email', req.body.email, 'definedOnly');
+  if (bodyEmailErrors.length > 0) {
+    res.status(400).json(validationError(bodyEmailErrors));
+    return;
   }
 
   if (firstName !== undefined) {
