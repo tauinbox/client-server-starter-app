@@ -5,7 +5,16 @@
 import { spawnSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const AUDIT_ARGS = ['audit', '--audit-level=high', '--omit=dev'];
+// The default fetch timeout is 300 s and `npm audit` asks two endpoints, so a
+// degraded one costs up to 10 min per attempt and outlives any job budget.
+// Measured against it while failing on 2026-09-04: 7m01 default, 32 s at 30 s.
+// A healthy call answers in about a second, so the margin is thirty-fold.
+const AUDIT_ARGS = [
+  'audit',
+  '--audit-level=high',
+  '--omit=dev',
+  '--fetch-timeout=30000'
+];
 const ENDPOINT_ERROR = 'audit endpoint returned an error';
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 15_000;
