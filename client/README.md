@@ -29,7 +29,7 @@ of `BACKEND_URL` is `http://localhost:3000`.
 | Unit tests | `npm test` (Vitest) |
 | E2E tests | `npm run test:e2e` (Playwright) |
 | E2E tests (UI) | `npm run test:e2e:ui` |
-| Audit dependencies | `npm run audit:ci` runs `npm audit --audit-level=high --omit=dev` through `scripts/audit-ci.mjs`. This is the same gate that CI applies. The script retries a failed registry endpoint, but it never retries a true finding |
+| Audit dependencies | `npm run audit:ci` runs `npm audit --audit-level=high --omit=dev` through `scripts/audit-ci.mjs`. This is the same gate that CI applies. The script retries a failed registry endpoint, with each attempt bounded by `--fetch-timeout=30000`, but it never retries a true finding |
 | Release | `npm run release` increases the versions, makes `CHANGELOG.md`, and makes a git tag |
 
 ## Architecture

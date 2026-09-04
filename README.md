@@ -1784,6 +1784,17 @@ with no source change.
 The wrapper retries a maximum of 3 times, 15 s apart. It retries **only** when the output holds
 `audit endpoint returned an error`. A true high-severity finding still fails on the first attempt.
 
+Each attempt carries `--fetch-timeout=30000`. The default is 300 s, and `npm audit` asks two
+endpoints, thus one degraded endpoint held a single attempt for 7 minutes on 2026-09-04 and the
+ladder outlived the 10 minute budget of the job. A healthy call answers in about a second. The gate
+stays fail closed: an endpoint the wrapper cannot reach after 3 attempts makes the build red, and
+never a silent pass.
+
+Every `npm ci` in the workflow carries `--no-audit`. The audit that npm runs at the end of an
+install only prints its findings: in the same run it reported 3 high and the step exited 0. The
+repository holds no `.npmrc`, thus no `audit-level` is set anywhere that could make it fail. It was
+a second request to the registry for a verdict that gates nothing.
+
 ## Security
 
 - bcrypt hashes each password, with a cost factor of 12. bcrypt reads at most 72 bytes of its

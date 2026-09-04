@@ -78,7 +78,9 @@ Run it before each push. An advisory comes from the dependency tree, thus the co
 no change in the source.
 
 The wrapper retries a maximum of 3 times, 15 s apart. It retries **only** when the advisory endpoint
-of the registry gives an error. A true finding still fails on the first attempt.
+of the registry gives an error. A true finding still fails on the first attempt. Each attempt carries
+`--fetch-timeout=30000`, thus a degraded endpoint costs about 30 s and not the 300 s default. The
+command still exits with 1 when it cannot reach the endpoint at all.
 
 ## Environment Configuration
 

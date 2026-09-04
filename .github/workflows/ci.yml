@@ -37,7 +37,12 @@ jobs:
             client/package-lock.json
             mock-server/package-lock.json
 
-      - run: npm ci
+      # `--no-audit` on every install in this file: the audit npm runs at the
+      # end of `npm ci` only prints, and gates nothing - it reported 3 high and
+      # exited 0. The gate is `audit:ci`, which fails on high in the production
+      # tree. The printed one still costs a registry round trip, up to 5 min
+      # each while the advisory endpoint was degraded on 2026-09-04.
+      - run: npm ci --no-audit --fund=false
       - run: npm run audit:ci
       - run: npm run lint
       - run: npm run format:check
@@ -115,7 +120,7 @@ jobs:
             client/package-lock.json
             mock-server/package-lock.json
 
-      - run: npm ci
+      - run: npm ci --no-audit --fund=false
       - run: npm run test:cov
       - run: npm run build
 
@@ -152,7 +157,7 @@ jobs:
             client/package-lock.json
             mock-server/package-lock.json
 
-      - run: npm ci
+      - run: npm ci --no-audit --fund=false
       - run: npm run audit:ci
       - run: npm run lint
       - run: npm run format:check
@@ -179,7 +184,7 @@ jobs:
             client/package-lock.json
             mock-server/package-lock.json
 
-      - run: npm ci
+      - run: npm ci --no-audit --fund=false
       - run: npm run audit:ci
       - run: npm run lint
       - run: npm run format:check
@@ -221,10 +226,10 @@ jobs:
             client/package-lock.json
             mock-server/package-lock.json
 
-      - run: npm ci
+      - run: npm ci --no-audit --fund=false
 
       - name: Install mock-server dependencies
-        run: npm ci
+        run: npm ci --no-audit --fund=false
         working-directory: mock-server
 
       # Only runnable here: e2e fixtures import mock-server sources, so the
