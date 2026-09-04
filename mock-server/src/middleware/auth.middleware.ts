@@ -599,7 +599,6 @@ router.post('/refresh-token', (req, res) => {
       ip: req.ip
     });
     revokeAllUserSessions(reusedUserId);
-    res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
     res.status(401).json({
       message: 'Invalid refresh token',
       statusCode: 401,
@@ -623,19 +622,35 @@ router.post('/refresh-token', (req, res) => {
   }
 
   const user = findUserById(userId);
-  if (!user || !user.isActive) {
+  if (!user) {
     logAudit('TOKEN_REFRESH_FAILURE', {
       actorId: userId,
-      details: {
-        reason: !user ? 'user_not_found' : 'user_deactivated'
-      },
+      details: { reason: 'user_not_found' },
       ip: req.ip
     });
-    state.refreshTokens.delete(cookieToken);
     res.status(401).json({
-      message: 'Invalid refresh token',
+      message: 'User not found',
       statusCode: 401,
-      errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+      errorKey: ErrorKeys.AUTH.USER_NOT_FOUND
+    });
+    return;
+  }
+
+  if (!user.isActive) {
+    // The server revokes the row and keeps it, so a later replay of the same
+    // token still reaches the reuse detector.
+    state.refreshTokens.delete(cookieToken);
+    state.revokedRefreshTokens.set(cookieToken, user.id);
+    logAudit('TOKEN_REFRESH_FAILURE', {
+      actorId: user.id,
+      actorEmail: user.email,
+      details: { reason: 'user_deactivated' },
+      ip: req.ip
+    });
+    res.status(401).json({
+      message: 'User account is deactivated',
+      statusCode: 401,
+      errorKey: ErrorKeys.AUTH.USER_DEACTIVATED
     });
     return;
   }
