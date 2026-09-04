@@ -870,11 +870,13 @@ fullstack-starter-app/
 │       │                   # the bcrypt input limit), cursor page size, SYSTEM_ROLES,
 │       │                   # MAX_CONCURRENT_SESSIONS,
 │       │                   # ENTITLED/OPEN/CHANGEABLE_SUBSCRIPTION_STATUSES (one definition each), etc.
-│       └── utils/          # feature-flag-evaluator (needs node:crypto, server + mock only),
-│                           # feature-flag-attribute-value + feature-flag-timestamp (also imported by
-│                           # the client, thus free of node built-ins), mongo-query-safety,
-│                           # password-bytes (TextEncoder, thus also free of node built-ins),
-│                           # time (Temporal barrel), money (BigInt value object)
+│       ├── utils/          # feature-flag-evaluator (needs node:crypto, server + mock only),
+│       │                   # feature-flag-attribute-value + feature-flag-timestamp (also imported by
+│       │                   # the client, thus free of node built-ins), mongo-query-safety,
+│       │                   # password-bytes (TextEncoder, thus also free of node built-ins),
+│       │                   # time (Temporal barrel), money (BigInt value object)
+│       └── test-fixtures/  # email-address-corpus - the address verdicts the server and the mock
+│                           # must agree on (test data, imported by no production module)
 ├── client/                 # Angular 21 SPA
 │   ├── src/app/
 │   │   ├── core/           # Header, theme, storage, error interceptor, 404
@@ -949,7 +951,9 @@ after a `@Transform(trim)` makes it empty. They use
 the message text and the order of the true validator. A value that fails more than one constraint
 gives more than one message, thus a handler must collect them and must not answer with the first
 failure. `emailErrors` mirrors `@Transform(normalizeEmail) @IsEmail() @MaxLength(255)`, so an
-absent, null or non-string address gives two messages, and a malformed string gives one. That order puts the
+absent, null or non-string address gives two messages, and a malformed string gives one. The
+format itself comes from `validator.isEmail` with the default options, the function `@IsEmail()`
+calls, because a regular expression here accepted thirteen shapes that the server answers with 400. That order puts the
 unknown properties first, and then each property as the DTO declares it. Thus a handler composes its
 DTO from them and answers with the envelope of the server.
 
@@ -1737,11 +1741,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2222 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2243 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 363 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 361 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1248 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 246 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 586 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 643 tests pass |
 
 ## CI/CD
 
