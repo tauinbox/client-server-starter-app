@@ -1012,7 +1012,10 @@ one only when its environment variables have a value.
 Each endpoint requires a valid Bearer token, and `@Public()` on a handler or on a controller is the
 only exception. Thus a new endpoint is protected when a person forgets to mark it. The
 `check-auth-coverage` e2e suite reads the per-feature route manifests in `contracts/routes/` and
-enforces this.
+enforces this. It asserts the entries that declare `expectedStatus: 401` only. Every other entry is
+asserted against the mock server alone, in `mock-server/src/__tests__/contract.spec.ts`, thus a
+wrong status there records mock behaviour and not server behaviour. Measure a new value against the
+real application before you write it.
 
 **The `@Public()` decorator** marks an endpoint that a caller can reach with no authentication. The
 routes are the login, the register, the password reset, the OAuth init and callback, the health check

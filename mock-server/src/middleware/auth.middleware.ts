@@ -14,7 +14,7 @@ import {
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
-  isValidEmail,
+  emailErrors,
   passwordLengthError,
   validateLocale,
   validateMaxLength
@@ -340,27 +340,18 @@ router.post('/verify-email', (req, res) => {
 
 // POST /api/v1/auth/resend-verification
 router.post('/resend-verification', (req, res) => {
-  const email = normalizeEmail(req.body.email) ?? '';
-
   const successMessage =
     'If an account with that email exists and is not yet verified, a verification email has been sent.';
 
-  if (!email) {
-    res.json({ message: successMessage });
+  // The DTO carries no `@IsOptional()`, so an absent address is a 400 here and
+  // never the enumeration-safe success message.
+  const bodyEmailErrors = emailErrors('email', req.body?.email);
+  if (bodyEmailErrors.length > 0) {
+    res.status(400).json(validationError(bodyEmailErrors));
     return;
   }
 
-  if (!isValidEmail(email)) {
-    res.status(400).json(validationError('email must be an email'));
-    return;
-  }
-
-  const emailLenError = validateMaxLength(email, 255, 'email');
-  if (emailLenError) {
-    res.status(400).json(validationError(emailLenError));
-    return;
-  }
-
+  const email = normalizeEmail(req.body.email) ?? '';
   const user = findUserByEmail(email);
 
   // Always return success to prevent email enumeration
@@ -404,26 +395,18 @@ router.post('/forgot-password', (req, res) => {
     return;
   }
 
-  const email = normalizeEmail(req.body.email) ?? '';
-
   const successMessage =
     'If an account with that email exists, a password reset link has been sent.';
 
-  if (!email) {
-    res.json({ message: successMessage });
+  // The DTO carries no `@IsOptional()`, so an absent address is a 400 here and
+  // never the enumeration-safe success message.
+  const bodyEmailErrors = emailErrors('email', req.body?.email);
+  if (bodyEmailErrors.length > 0) {
+    res.status(400).json(validationError(bodyEmailErrors));
     return;
   }
 
-  if (!isValidEmail(email)) {
-    res.status(400).json(validationError('email must be an email'));
-    return;
-  }
-
-  const emailLenError = validateMaxLength(email, 255, 'email');
-  if (emailLenError) {
-    res.status(400).json(validationError(emailLenError));
-    return;
-  }
+  const email = normalizeEmail(req.body.email) ?? '';
 
   const user = findUserByEmail(email);
 
@@ -837,24 +820,16 @@ router.patch('/profile', authGuard, (req, res) => {
 router.post('/profile/email/initiate', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword } = req.body;
-  const newEmail = normalizeEmail(req.body.newEmail) ?? '';
-
   const successMessage =
     'If the new email is available, a confirmation link has been sent to it.';
 
-  if (!newEmail) {
-    res.status(400).json(validationError('newEmail must be an email'));
+  const newEmailErrors = emailErrors('newEmail', req.body?.newEmail);
+  if (newEmailErrors.length > 0) {
+    res.status(400).json(validationError(newEmailErrors));
     return;
   }
-  if (!isValidEmail(newEmail)) {
-    res.status(400).json(validationError('newEmail must be an email'));
-    return;
-  }
-  const emailMaxErr = validateMaxLength(newEmail, 255, 'newEmail');
-  if (emailMaxErr) {
-    res.status(400).json(validationError(emailMaxErr));
-    return;
-  }
+
+  const newEmail = normalizeEmail(req.body.newEmail) ?? '';
   // Supplied values are still checked; an absent one reaches the step-up gate,
   // which is the only place that knows which factor this account holds.
   if (
