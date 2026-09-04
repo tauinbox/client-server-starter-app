@@ -97,6 +97,72 @@ describe('TwoFactorComponent', () => {
     expect(text).toContain('Set a password for this account');
   });
 
+  it('offers the provider round trip when a provider is connected', () => {
+    fixture.componentRef.setInput('user', buildUser({ hasPassword: false }));
+    fixture.componentRef.setInput('reauthProviderLabel', 'Google');
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).not.toContain('Set a password for this account');
+    expect(text).toContain('Google');
+  });
+
+  it('asks the page for a round trip instead of a password', () => {
+    fixture.componentRef.setInput('user', buildUser({ hasPassword: false }));
+    fixture.componentRef.setInput('reauthProviderLabel', 'Google');
+    fixture.detectChanges();
+
+    const asked = vi.fn();
+    component.reauthRequested.subscribe(asked);
+
+    component.startEnrolment();
+    fixture.detectChanges();
+
+    expect(asked).toHaveBeenCalledTimes(1);
+    expect(authServiceMock.startMfaSetup).not.toHaveBeenCalled();
+  });
+
+  it('resumes the enrolment on the load that follows the round trip', async () => {
+    fixture.componentRef.setInput('user', buildUser({ hasPassword: false }));
+    fixture.componentRef.setInput('reauthProviderLabel', 'Google');
+    fixture.componentRef.setInput('resumeSetup', true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    // The proof travels as an httpOnly cookie, so no factor is sent.
+    expect(authServiceMock.startMfaSetup).toHaveBeenCalledWith();
+    const img: HTMLImageElement | null =
+      fixture.nativeElement.querySelector('.two-factor-qr');
+    expect(img?.src).toContain('data:image/png;base64,AAAA');
+  });
+
+  it('turns the factor off with a code when the account holds no password', async () => {
+    fixture.componentRef.setInput(
+      'user',
+      buildUser({ hasPassword: false, mfaEnabled: true })
+    );
+    fixture.componentRef.setInput('reauthProviderLabel', 'Google');
+    fixture.detectChanges();
+
+    component.startDisable();
+    fixture.detectChanges();
+
+    // The password field is the one this account can never fill.
+    expect(fixture.nativeElement.textContent as string).not.toContain(
+      'Confirm your password'
+    );
+
+    component.codeModel.set({ code: '123456' });
+    component.disable();
+    await fixture.whenStable();
+
+    expect(authServiceMock.disableMfa).toHaveBeenCalledWith({
+      code: '123456'
+    });
+    expect(notifyMock.success).toHaveBeenCalledWith('auth.twoFactor.disabled');
+  });
+
   it('demands the password before it asks the server for a secret', async () => {
     component.startEnrolment();
     fixture.detectChanges();

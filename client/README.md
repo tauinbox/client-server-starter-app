@@ -993,15 +993,18 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 241 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1238 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 246 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1248 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
-shows a notice naming that provider in place of the current-password field, and both the email change
-and the first password leave for the provider and resume when the callback returns with `?reauth=ok`.
+shows a notice naming that provider in place of the current-password field, and the email change, the
+first password and the two-factor enrolment all leave for the provider and resume when the callback
+returns with `?reauth=ok`.
 The email change carries its pending address across the round trip; the first password carries only a
 marker, because a credential must not sit in web storage, so the page asks for the password again on
-return. Six Playwright tests cover the two paths, with the proof seeded through
+return. The enrolment carries a marker too, and the card asks for its secret on the return load. Each
+path names its own step-up operation, so a trip taken for one authorizes nothing else. Eleven
+Playwright tests cover the three paths, with the proof seeded through
 `POST /__control/reauth-proof`, because both provider halves of the mock stay 501 stubs. The unit tests also cover session restore, cross-tab logout, lockout, email
 verification, and password reset with a password confirmation. They cover the users list, detail, edit
 and search. This includes the email-change confirmation dialog of the administrator and the

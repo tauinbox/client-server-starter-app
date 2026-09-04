@@ -3,6 +3,7 @@ import {
   Component,
   DestroyRef,
   computed,
+  effect,
   inject,
   input,
   output,
@@ -26,6 +27,7 @@ import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-fie
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthService } from '../../services/auth.service';
+import type { MfaDisableRequest } from '../../models/auth.types';
 
 /**
  * The enrolment is a strict sequence, and each step needs the answer of the
@@ -59,8 +61,21 @@ export class TwoFactorComponent {
 
   readonly user = input<UserResponse | null>(null);
 
+  /**
+   * Label of the provider a step-up round trip can run against. It is empty
+   * only when the page found none, which is the one state an account with no
+   * password can do nothing from.
+   */
+  readonly reauthProviderLabel = input('');
+
+  /** True on the load that follows a round trip taken for this enrolment. */
+  readonly resumeSetup = input(false);
+
   /** Tells the profile page to reload, so the card reflects the new state. */
   readonly changed = output<void>();
+
+  /** Asks the page to take an account with no password through its provider. */
+  readonly reauthRequested = output<void>();
 
   protected readonly stage = signal<Stage>('idle');
   protected readonly busy = signal(false);
@@ -92,8 +107,38 @@ export class TwoFactorComponent {
     required(path.code, { message: 'auth.twoFactor.codeRequired' });
   });
 
+  /**
+   * An account with no password turns the factor off with a code from the
+   * authenticator it enrolled, which is the only factor it holds.
+   */
+  protected readonly disableBlocked = computed(
+    () =>
+      (this.accountHasPassword()
+        ? this.passwordForm().invalid()
+        : this.codeForm().invalid()) || this.busy()
+  );
+
+  /** A resumed round trip asks for one secret, however often the input emits. */
+  #resumed = false;
+
+  constructor() {
+    effect(() => {
+      if (!this.resumeSetup() || this.#resumed) return;
+      this.#resumed = true;
+      this.#requestSecretWithProof();
+    });
+  }
+
   startEnrolment(): void {
     this.#reset();
+
+    // An account with no password proves itself at its provider instead, and
+    // the page owns that round trip.
+    if (!this.accountHasPassword()) {
+      this.reauthRequested.emit();
+      return;
+    }
+
     this.stage.set('password');
   }
 
@@ -156,11 +201,15 @@ export class TwoFactorComponent {
   }
 
   disable(): void {
-    if (this.passwordForm().invalid() || this.busy()) return;
+    if (this.disableBlocked()) return;
+
+    const request: MfaDisableRequest = this.accountHasPassword()
+      ? { currentPassword: this.passwordModel().currentPassword }
+      : { code: this.codeModel().code.trim() };
 
     this.busy.set(true);
     this.#authService
-      .disableMfa({ currentPassword: this.passwordModel().currentPassword })
+      .disableMfa(request)
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
@@ -182,6 +231,28 @@ export class TwoFactorComponent {
     this.recoveryCodes.set([]);
     this.stage.set('idle');
     this.changed.emit();
+  }
+
+  /**
+   * The proof the round trip minted is an httpOnly cookie the page cannot
+   * read, so this request carries no factor of its own.
+   */
+  #requestSecretWithProof(): void {
+    this.busy.set(true);
+    this.#authService
+      .startMfaSetup()
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: (response) => {
+          this.busy.set(false);
+          this.setup.set(response);
+          this.stage.set('confirm');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.busy.set(false);
+          this.#notify.error(err, 'auth.twoFactor.errorSetupFailed');
+        }
+      });
   }
 
   #reset(): void {

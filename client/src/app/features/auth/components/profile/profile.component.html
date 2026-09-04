@@ -195,7 +195,13 @@
           </mat-card>
         }
 
-        <nxs-two-factor [user]="u" (changed)="loadProfile()" />
+        <nxs-two-factor
+          [user]="u"
+          [reauthProviderLabel]="reauthProviderLabel()"
+          [resumeSetup]="resumeMfaSetup()"
+          (changed)="loadProfile()"
+          (reauthRequested)="startMfaReauth()"
+        />
 
         <mat-card>
           <mat-card-header>
