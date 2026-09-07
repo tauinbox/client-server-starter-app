@@ -197,7 +197,7 @@ describe('Refresh token reuse detection (e2e)', () => {
           // never taken.
           provide: MfaService,
           useValue: {
-            isValidStepUpCode: jest.fn().mockReturnValue(false),
+            isValidStepUpCode: jest.fn().mockResolvedValue(false),
             issuePendingToken: jest
               .fn()
               .mockReturnValue({ mfaToken: 'mfa', expiresIn: 300 })

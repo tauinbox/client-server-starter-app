@@ -148,6 +148,7 @@ describe('AuthService', () => {
     totpSecret: null,
     totpEnabledAt: null,
     totpRecoveryCodes: null,
+    totpLastUsedStep: null,
     roles: [mockUserRole],
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
@@ -282,7 +283,7 @@ describe('AuthService', () => {
     };
 
     mockMfaService = {
-      isValidStepUpCode: jest.fn().mockReturnValue(false)
+      isValidStepUpCode: jest.fn().mockResolvedValue(false)
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -1697,7 +1698,8 @@ describe('AuthService', () => {
       // second factor existed a provider round trip was its only way to step up.
       const user = { id: 'user-1', password: null } as User;
       mockMfaService.isValidStepUpCode.mockImplementation(
-        (_user: User, code: string | undefined) => code === '123456'
+        (_user: User, code: string | undefined) =>
+          Promise.resolve(code === '123456')
       );
 
       await expect(
@@ -1713,7 +1715,7 @@ describe('AuthService', () => {
 
     it('still demands the provider proof when the code is wrong', async () => {
       const user = { id: 'user-1', password: null } as User;
-      mockMfaService.isValidStepUpCode.mockReturnValue(false);
+      mockMfaService.isValidStepUpCode.mockResolvedValue(false);
 
       await expect(
         service.assertStepUp(
@@ -1731,7 +1733,7 @@ describe('AuthService', () => {
     it('accepts a valid authenticator code in place of the password', async () => {
       const compare = jest.spyOn(bcrypt, 'compare').mockClear();
       const user = { id: 'user-1', password: '$2b$12$hash' } as User;
-      mockMfaService.isValidStepUpCode.mockReturnValue(true);
+      mockMfaService.isValidStepUpCode.mockResolvedValue(true);
 
       await expect(
         service.assertStepUp(
@@ -1751,7 +1753,7 @@ describe('AuthService', () => {
         email: 'user@example.com',
         password: '$2b$12$hash'
       } as User;
-      mockMfaService.isValidStepUpCode.mockReturnValue(false);
+      mockMfaService.isValidStepUpCode.mockResolvedValue(false);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
       await expect(
@@ -1791,7 +1793,7 @@ describe('AuthService', () => {
         email: 'user@example.com',
         password: null
       } as User;
-      mockMfaService.isValidStepUpCode.mockReturnValue(false);
+      mockMfaService.isValidStepUpCode.mockResolvedValue(false);
 
       await expect(
         service.assertStepUp(
@@ -1818,7 +1820,7 @@ describe('AuthService', () => {
 
     it('writes no row when the caller proves itself', async () => {
       const user = { id: 'user-1', password: '$2b$12$hash' } as User;
-      mockMfaService.isValidStepUpCode.mockReturnValue(false);
+      mockMfaService.isValidStepUpCode.mockResolvedValue(false);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
       await service.assertStepUp(

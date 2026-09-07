@@ -33,7 +33,9 @@ management and theming.
 - **Two-factor authentication.** TOTP, optional for every account and forced on none. The profile
   page shows a QR code and a manual key, and the factor stays off until a code from the
   authenticator proves the setup worked. Enrolment answers with ten single-use recovery codes,
-  stored as hashes and readable exactly once. After that a correct password no longer signs the
+  stored as hashes and readable exactly once. A code from the authenticator is single use
+  as well: the account records the time step of the code it spent, and any code at or below
+  that step is refused, so an observed code cannot be replayed inside its window. After that a correct password no longer signs the
   account in: it returns a 300 second `mfa_pending` token, which the bearer strategy refuses, and
   only a code or a recovery code turns it into a session. The shared secret is encrypted at rest
   with `MFA_ENCRYPTION_KEY`; while that key is empty, enrolment answers HTTP 503 and every other
@@ -1741,11 +1743,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2255 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2260 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 363 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 361 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1248 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 246 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 648 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 650 tests pass |
 
 ## CI/CD
 
@@ -1814,7 +1816,9 @@ a second request to the registry for a verdict that gates nothing.
   buys only an `mfa_pending` token, which `JwtStrategy` refuses as a bearer credential, so one
   factor alone reaches nothing. The two challenge routes carry the login throttle, including the
   long window that counts failures only, and each refused code is audited. A recovery code is spent
-  by deleting its hash, so it works once. The TOTP secret is encrypted (AES-256-GCM), not hashed,
+  by deleting its hash, so it works once, and a TOTP code is single use too: an acceptance
+  records the RFC 6238 step under a row lock, and a code at or below that step is refused on
+  the enrolment, the challenge and the step-up alike. The TOTP secret is encrypted (AES-256-GCM), not hashed,
   because verification needs the original value; the key lives in `MFA_ENCRYPTION_KEY` and never in
   the database. With `MFA_REQUIRED_FOR_ADMINS=true` the factor is mandatory for an account holding a
   super role: `MfaRequiredGuard` travels with `@Authorize`, so such an account signs in and reaches

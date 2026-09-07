@@ -30,6 +30,13 @@ export interface MockUser {
   totpSecret: string | null;
   totpEnabledAt: string | null;
   totpRecoveryCodes: string[] | null;
+  /**
+   * The 30-second step at which this account last spent a code. The server
+   * records the RFC 6238 step the code matched at and refuses anything at or
+   * below it; the mock has one fixed code, so it records the step the
+   * acceptance happened in and mirrors the same refusal.
+   */
+  totpLastUsedStep: number | null;
   pendingEmail: string | null;
   pendingEmailToken: string | null;
   pendingEmailExpiresAt: string | null;

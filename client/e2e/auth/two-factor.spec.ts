@@ -7,6 +7,8 @@ import type { Page } from '@playwright/test';
 
 const EMAIL = 'testlogin@example.com';
 const PASSWORD = 'Password1';
+/** The id `loginViaUi` seeds the account under. */
+const USER_ID = '100';
 
 async function logout(page: Page): Promise<void> {
   await page.getByRole('button', { name: /John Doe/i }).click();
@@ -49,6 +51,11 @@ test.describe('two-factor authentication', () => {
     ).toBeVisible();
 
     await logout(page);
+
+    // The enrolment spent that code and a code is single use. A real
+    // authenticator shows the next one 30 seconds later; clearing the ledger
+    // is that wait, without the sleep.
+    await _mockServer.clearTotpLedger(USER_ID);
 
     await page.getByLabel('Email').fill(EMAIL);
     await page.getByLabel('Password', { exact: true }).fill(PASSWORD);

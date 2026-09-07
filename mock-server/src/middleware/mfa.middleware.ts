@@ -6,7 +6,8 @@ import {
   STEP_UP_OPERATION,
   TOKEN_PURPOSE,
   TOTP_DIGITS,
-  TOTP_ISSUER
+  TOTP_ISSUER,
+  TOTP_PERIOD_SECONDS
 } from '@app/shared/constants';
 import { authGuard, pruneOldestUserTokens } from '../helpers/auth.helpers';
 import {
@@ -59,6 +60,29 @@ function isValidCodeShape(value: unknown): value is string {
   return typeof value === 'string' && value.length === TOTP_DIGITS;
 }
 
+/**
+ * Verifies the fixed code and spends it, the way the server verifies a real
+ * code and spends it. RFC 6238 section 5.2 forbids a second use of a code that
+ * already validated, so an acceptance records its 30-second step and any later
+ * acceptance at or below that step is refused.
+ *
+ * The mock has no secret to derive a step from, so it uses the step the
+ * acceptance happens in. The property is the same: one code, one use.
+ */
+function consumeTotpCode(user: MockUser, code: unknown): boolean {
+  if (typeof code !== 'string' || normalize(code) !== MOCK_TOTP_CODE) {
+    return false;
+  }
+
+  const step = Math.floor(Date.now() / 1000 / TOTP_PERIOD_SECONDS);
+  if (user.totpLastUsedStep !== null && step <= user.totpLastUsedStep) {
+    return false;
+  }
+
+  user.totpLastUsedStep = step;
+  return true;
+}
+
 function isValidPasswordShape(value: unknown): boolean {
   return (
     typeof value === 'string' &&
@@ -80,11 +104,7 @@ function stepUpError(
   code: unknown,
   operation: StepUpOperation
 ): { message: string; statusCode: number; errorKey: string } | null {
-  if (
-    user.totpEnabledAt &&
-    typeof code === 'string' &&
-    normalize(code) === MOCK_TOTP_CODE
-  ) {
+  if (user.totpEnabledAt && consumeTotpCode(user, code)) {
     return null;
   }
 
@@ -210,6 +230,8 @@ router.post('/setup', authGuard, (req, res) => {
   user.totpSecret = MOCK_TOTP_SECRET;
   user.totpEnabledAt = null;
   user.totpRecoveryCodes = null;
+  // A fresh enrolment must not inherit the floor of the secret it replaces.
+  user.totpLastUsedStep = null;
 
   res.json({
     secret: MOCK_TOTP_SECRET,
@@ -254,7 +276,7 @@ router.post('/enable', authGuard, (req, res) => {
     return;
   }
 
-  if (normalize(code) !== MOCK_TOTP_CODE) {
+  if (!consumeTotpCode(user, code)) {
     logAudit('MFA_CHALLENGE_FAILURE', {
       actorId: user.id,
       actorEmail: user.email,
@@ -327,6 +349,7 @@ router.post('/disable', authGuard, (req, res) => {
   user.totpSecret = null;
   user.totpEnabledAt = null;
   user.totpRecoveryCodes = null;
+  user.totpLastUsedStep = null;
 
   logAudit('MFA_DISABLE', {
     actorId: user.id,
@@ -366,7 +389,7 @@ router.post('/verify', (req, res) => {
     return;
   }
 
-  if (normalize(code) !== MOCK_TOTP_CODE) {
+  if (!consumeTotpCode(user, code)) {
     logAudit('MFA_CHALLENGE_FAILURE', {
       actorId: user.id,
       actorEmail: user.email,

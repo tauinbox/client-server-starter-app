@@ -35,6 +35,7 @@ export function createMockUser(options: MockUserOptions = {}): MockUser {
     totpSecret: options.totpSecret ?? null,
     totpEnabledAt: options.totpEnabledAt ?? null,
     totpRecoveryCodes: options.totpRecoveryCodes ?? null,
+    totpLastUsedStep: options.totpLastUsedStep ?? null,
     pendingEmail: options.pendingEmail ?? null,
     pendingEmailToken: options.pendingEmailToken ?? null,
     pendingEmailExpiresAt: options.pendingEmailExpiresAt ?? null,

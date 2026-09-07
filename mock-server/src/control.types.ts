@@ -45,6 +45,10 @@ export type ControlApi = {
   // Sets user.tokenRevokedAt = now so existing access tokens fail authentication
   // on the next call. Refresh tokens stay valid — interceptor can recover.
   invalidateAccessTokens(userId: string): Promise<void>;
+  // Clears the TOTP replay floor, so the one fixed mock code is accepted
+  // again. Stands in for the wait a real authenticator imposes between two
+  // codes; a test that presents the code twice needs it.
+  clearTotpLedger(userId: string): Promise<void>;
   // Mutates user.roles to `newRoles` (defaults to []) and pushes a
   // `permissions_updated` SSE event. Tokens are NOT revoked, so the client
   // session continues; the next /auth/permissions fetch returns the updated

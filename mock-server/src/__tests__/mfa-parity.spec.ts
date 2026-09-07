@@ -1,7 +1,7 @@
 import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
-import { resetState } from '../state';
+import { findUserByEmail, resetState } from '../state';
 import { MOCK_RECOVERY_CODES, MOCK_TOTP_CODE } from '../constants';
 
 let server: Server;
@@ -49,6 +49,21 @@ async function accessToken(): Promise<string> {
     tokens: { access_token: string };
   };
   return body.tokens.access_token;
+}
+
+/**
+ * Stands in for the wait a real authenticator imposes: the enrolment spends
+ * the code, and a code is single use. A test that must present the one fixed
+ * code again clears the floor rather than sleeping for 30 seconds.
+ */
+async function clearTotpLedger(): Promise<void> {
+  const user = findUserByEmail(CREDENTIALS.email);
+  const res = await fetch(`${baseUrl}/__control/totp-ledger`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ userId: user?.id })
+  });
+  expect(res.status).toBe(200);
 }
 
 /** Signs in, enrols, and returns the token of the session that enrolled. */
@@ -188,6 +203,7 @@ describe('two-factor sign-in', () => {
 
   it('exchanges the pending token and a code for a session', async () => {
     await enrol();
+    await clearTotpLedger();
     const { mfaToken } = (await login()) as { mfaToken: string };
 
     const res = await post('/auth/mfa/verify', {
@@ -203,6 +219,29 @@ describe('two-factor sign-in', () => {
     expect(body.tokens).not.toHaveProperty('refresh_token');
     expect(body.user.mfaEnabled).toBe(true);
     expect(res.headers.get('set-cookie')).toContain('refresh_token=');
+  });
+
+  it('refuses the same code a second time', async () => {
+    // The pending token stays usable for 300 seconds, so without a ledger one
+    // observed code buys a second session inside the same challenge.
+    await enrol();
+    await clearTotpLedger();
+    const { mfaToken } = (await login()) as { mfaToken: string };
+
+    const first = await post('/auth/mfa/verify', {
+      mfaToken,
+      code: MOCK_TOTP_CODE
+    });
+    expect(first.status).toBe(200);
+
+    const res = await post('/auth/mfa/verify', {
+      mfaToken,
+      code: MOCK_TOTP_CODE
+    });
+    const body = (await res.json()) as Record<string, string>;
+
+    expect(res.status).toBe(401);
+    expect(body['errorKey']).toBe('errors.auth.mfaInvalidCode');
   });
 
   it('refuses a wrong code', async () => {
@@ -279,6 +318,7 @@ describe('recovery codes', () => {
 describe('turning the factor off', () => {
   it('accepts an authenticator code in place of the password', async () => {
     const token = await enrol();
+    await clearTotpLedger();
 
     const res = await post(
       '/auth/mfa/disable',
@@ -288,6 +328,22 @@ describe('turning the factor off', () => {
 
     expect(res.status).toBe(200);
     expect(await login()).toHaveProperty('tokens');
+  });
+
+  it('refuses a code the enrolment already spent', async () => {
+    // The server records the step a code matched at and refuses anything at or
+    // below it, so an observed code cannot turn the factor off.
+    const token = await enrol();
+
+    const res = await post(
+      '/auth/mfa/disable',
+      { code: MOCK_TOTP_CODE },
+      token
+    );
+    const body = (await res.json()) as Record<string, string>;
+
+    expect(res.status).toBe(400);
+    expect(body['errorKey']).toBe('errors.auth.invalidCurrentPassword');
   });
 
   it('accepts the password', async () => {

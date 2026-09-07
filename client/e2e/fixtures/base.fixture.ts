@@ -136,6 +136,13 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           body: JSON.stringify({ userId })
         });
       },
+      async clearTotpLedger(userId) {
+        await fetch(`${baseUrl}/__control/totp-ledger`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+      },
       async changeUserRoles(userId, newRoles) {
         await fetch(`${baseUrl}/__control/change-user-roles`, {
           method: 'POST',

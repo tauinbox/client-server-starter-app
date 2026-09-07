@@ -73,7 +73,11 @@ export class MfaService {
     await this.dataSource.getRepository(User).update(user.id, {
       totpSecret: this.encryption.encrypt(secret),
       totpEnabledAt: null,
-      totpRecoveryCodes: null
+      totpRecoveryCodes: null,
+      // The floor belongs to the secret it was recorded against. A fresh
+      // enrolment must not inherit it, or the first code of a new
+      // authenticator is refused for as long as the old floor is ahead.
+      totpLastUsedStep: null
     });
 
     return {
@@ -106,7 +110,7 @@ export class MfaService {
       );
     }
 
-    if (!this.isValidTotp(user.totpSecret, code)) {
+    if (!(await this.consumeTotp(user, code))) {
       await this.recordChallengeFailure(user, 'enrolment', context);
       throw this.invalidCodeException();
     }
@@ -155,7 +159,8 @@ export class MfaService {
     await this.dataSource.getRepository(User).update(user.id, {
       totpSecret: null,
       totpEnabledAt: null,
-      totpRecoveryCodes: null
+      totpRecoveryCodes: null,
+      totpLastUsedStep: null
     });
 
     await this.auditService.log({
@@ -197,7 +202,7 @@ export class MfaService {
   ): Promise<User> {
     const user = await this.userFromPendingToken(mfaToken);
 
-    if (user.totpSecret === null || !this.isValidTotp(user.totpSecret, code)) {
+    if (!(await this.consumeTotp(user, code))) {
       await this.recordChallengeFailure(user, 'challenge', context);
       throw this.invalidCodeException();
     }
@@ -266,11 +271,14 @@ export class MfaService {
    * the holder as well as a password does, which is what an OAuth-only account
    * with an authenticator needs.
    */
-  isValidStepUpCode(user: User, code: string | undefined): boolean {
-    if (user.totpEnabledAt === null || user.totpSecret === null || !code) {
+  async isValidStepUpCode(
+    user: User,
+    code: string | undefined
+  ): Promise<boolean> {
+    if (user.totpEnabledAt === null || !code) {
       return false;
     }
-    return this.isValidTotp(user.totpSecret, code);
+    return this.consumeTotp(user, code);
   }
 
   private async userFromPendingToken(mfaToken: string): Promise<User> {
@@ -324,24 +332,70 @@ export class MfaService {
     return user;
   }
 
-  private isValidTotp(encryptedSecret: string, code: string): boolean {
-    let secret: string;
-    try {
-      secret = this.encryption.decrypt(encryptedSecret);
-    } catch (err) {
-      // A secret that will not decrypt is a key problem, not a wrong code. It
-      // must be loud in the log and must still refuse the sign-in.
-      this.logger.error('Failed to decrypt a stored TOTP secret', err);
+  /**
+   * Verifies a code and spends it. A code that already opened something is
+   * refused for the rest of its window, which is what RFC 6238 section 5.2
+   * asks of a verifier: the tolerance keeps three codes live at any instant,
+   * and without a ledger every one of them is replayable.
+   *
+   * Read and write are one atomic step, the way `consumeRecoveryCode` does it:
+   * a plain read-then-write lets two requests carrying the same code both see
+   * it unspent, which is the one property this buys.
+   */
+  private async consumeTotp(user: User, code: string): Promise<boolean> {
+    if (user.totpSecret === null) {
       return false;
     }
 
-    return verifySync({
-      secret,
-      token: normalize(code),
-      digits: TOTP_DIGITS,
-      period: TOTP_PERIOD_SECONDS,
-      epochTolerance: TOTP_EPOCH_TOLERANCE_SECONDS
-    }).valid;
+    const token = normalize(code);
+
+    return withTransaction(this.dataSource, async (manager) => {
+      // The locked row carries the secret as well as the floor. Verifying
+      // against it rather than against the caller's copy keeps a re-enrolment
+      // that landed in between from being judged by the secret it replaced.
+      const locked = await manager.findOne(User, {
+        where: { id: user.id },
+        lock: { mode: 'pessimistic_write' }
+      });
+
+      if (!locked || locked.totpSecret === null) {
+        return false;
+      }
+
+      let secret: string;
+      try {
+        secret = this.encryption.decrypt(locked.totpSecret);
+      } catch (err) {
+        // A secret that will not decrypt is a key problem, not a wrong code.
+        // It must be loud in the log and must still refuse the sign-in.
+        this.logger.error('Failed to decrypt a stored TOTP secret', err);
+        return false;
+      }
+
+      const result = verifySync({
+        secret,
+        token,
+        digits: TOTP_DIGITS,
+        period: TOTP_PERIOD_SECONDS,
+        epochTolerance: TOTP_EPOCH_TOLERANCE_SECONDS,
+        // Refuses a match at or below the floor. Passing the step back is what
+        // the library documents for replay protection, and it beats comparing
+        // against the clock: a code accepted one step in the past would
+        // otherwise be recorded as the current step.
+        afterTimeStep: locked.totpLastUsedStep ?? undefined
+      });
+
+      // `verifySync` covers the HOTP strategy too, and that branch carries no
+      // step. This call never selects it: the strategy defaults to TOTP.
+      if (!result.valid || !('timeStep' in result)) {
+        return false;
+      }
+
+      await manager.update(User, user.id, {
+        totpLastUsedStep: result.timeStep
+      });
+      return true;
+    });
   }
 
   private generateRecoveryCodes(): string[] {

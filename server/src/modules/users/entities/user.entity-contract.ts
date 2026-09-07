@@ -41,6 +41,7 @@ type _ExcludedFields =
   | 'totpSecret'
   | 'totpEnabledAt'
   | 'totpRecoveryCodes'
+  | 'totpLastUsedStep'
   | 'failedLoginAttempts'
   | 'lockedUntil';
 

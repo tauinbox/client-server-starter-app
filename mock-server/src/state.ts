@@ -287,6 +287,7 @@ export function toUserResponse(user: MockUser): UserResponse {
     totpSecret: ________,
     totpEnabledAt: _________,
     totpRecoveryCodes: __________,
+    totpLastUsedStep: ___________,
     roles: roleNames,
     ...rest
   } = user;
@@ -313,6 +314,7 @@ export function toAdminUserResponse(user: MockUser): AdminUserResponse {
     totpSecret: _______,
     totpEnabledAt: ________,
     totpRecoveryCodes: _________,
+    totpLastUsedStep: __________,
     roles: roleNames,
     ...rest
   } = user;
