@@ -837,6 +837,87 @@ describe('ProfileComponent', () => {
     });
   });
 
+  // A linked provider signs the account in and no recovery path removes it, so
+  // a stolen session must not be able to plant one.
+  describe('connectProvider', () => {
+    it('ignores a provider name it does not know', () => {
+      fixture.detectChanges();
+
+      component.connectProvider('unknown-provider');
+
+      expect(authServiceMock.initOAuthLink).not.toHaveBeenCalled();
+      expect(component['linkPasswordProvider']()).toBeNull();
+    });
+
+    it('asks an account that holds a password for it, and mints nothing yet', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      component.connectProvider('google');
+
+      expect(component['linkPasswordProvider']()).toBe('google');
+      expect(authServiceMock.initOAuthLink).not.toHaveBeenCalled();
+    });
+
+    it('sends the password with the link request', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      component.connectProvider('google');
+      component.linkPasswordModel.set({ currentPassword: 'Password1' });
+      await fixture.whenStable();
+      component['confirmLink']();
+
+      expect(authServiceMock.initOAuthLink).toHaveBeenCalledWith('Password1');
+    });
+
+    describe('on an account created through a provider', () => {
+      const oauthOnlyUser = { ...mockUser, hasPassword: false };
+
+      beforeEach(() => {
+        authServiceMock.getProfile.mockReturnValue(of(oauthOnlyUser));
+        authServiceMock.getOAuthAccounts.mockReturnValue(
+          of([{ provider: 'google', createdAt: '2025-01-01T00:00:00.000Z' }])
+        );
+      });
+
+      it('takes a round trip bound to the link instead of asking', async () => {
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        component.connectProvider('facebook');
+
+        expect(authServiceMock.initOAuthReauth).toHaveBeenCalledWith(
+          STEP_UP_OPERATION.OAUTH_LINK
+        );
+        expect(authServiceMock.initOAuthLink).not.toHaveBeenCalled();
+        expect(sessionStorage.getItem('pending_oauth_link')).toBe('facebook');
+        expect(component['linkPasswordProvider']()).toBeNull();
+      });
+
+      it('links on the load that follows the round trip', async () => {
+        sessionStorage.setItem('pending_oauth_link', 'facebook');
+        activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
+
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        expect(authServiceMock.initOAuthLink).toHaveBeenCalledWith(undefined);
+        expect(sessionStorage.getItem('pending_oauth_link')).toBeNull();
+      });
+
+      it('does not link on a round trip taken for the enrolment', async () => {
+        sessionStorage.setItem('pending_mfa_setup', 'true');
+        activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
+
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        expect(authServiceMock.initOAuthLink).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe('disconnectProvider', () => {
     it('ignores a provider name it does not know', () => {
       fixture.detectChanges();

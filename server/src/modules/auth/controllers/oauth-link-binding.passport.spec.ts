@@ -15,6 +15,7 @@ import { OAuthController } from './oauth.controller';
 import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
 import { AuditService } from '../../audit/audit.service';
+import { AuthService } from '../services/auth.service';
 import { MailService } from '../../mail/mail.service';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { CookieStateStore } from '../utils/cookie-state-store';
@@ -151,6 +152,10 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
           useValue: { findByUserId: jest.fn(), unlinkProvider: jest.fn() }
         },
         { provide: AuditService, useValue: { log: jest.fn() } },
+        {
+          provide: AuthService,
+          useValue: { assertStepUpForUser: jest.fn() }
+        },
         {
           provide: MailService,
           useValue: { sendOAuthUnlinkedNotification: jest.fn() }

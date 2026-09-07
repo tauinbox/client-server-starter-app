@@ -112,6 +112,13 @@ const PENDING_PASSWORD_KEY = 'pending_password_set';
  */
 const PENDING_MFA_KEY = 'pending_mfa_setup';
 
+/**
+ * The fourth resume path. It holds the provider the user asked to link, so the
+ * load that follows the step-up round trip can start the link round trip at
+ * the right provider without asking again.
+ */
+const PENDING_LINK_KEY = 'pending_oauth_link';
+
 /** Keyed by OAuthProvider so a new entry in OAUTH_URLS fails the build until it gets a label. */
 const PROVIDER_KEYS: Record<OAuthProvider, string> = {
   google: 'auth.providers.google',
@@ -215,6 +222,27 @@ export class ProfileComponent implements OnInit {
   });
   protected readonly locale = signal<AppLanguage>('en');
   protected readonly savingLocale = signal(false);
+
+  /**
+   * The provider whose link control is waiting for the password, or null when
+   * no prompt is open. One prompt at a time, because one link at a time.
+   */
+  protected readonly linkPasswordProvider = signal<OAuthProvider | null>(null);
+
+  protected readonly linkProviderLabel = computed(() => {
+    const provider = this.linkPasswordProvider();
+    return provider ? this.#providerLabel(provider) : '';
+  });
+
+  readonly linkPasswordModel = signal<{ currentPassword: string }>({
+    currentPassword: ''
+  });
+
+  readonly linkPasswordForm = form(this.linkPasswordModel, (path) => {
+    required(path.currentPassword, {
+      message: 'auth.profile.linkPasswordRequired'
+    });
+  });
 
   readonly profileModel = signal<ProfileData>({ ...INITIAL_PROFILE });
 
@@ -370,9 +398,11 @@ export class ProfileComponent implements OnInit {
     const pendingPassword =
       this.#sessionStorage.getItem<boolean>(PENDING_PASSWORD_KEY);
     const pendingMfa = this.#sessionStorage.getItem<boolean>(PENDING_MFA_KEY);
+    const pendingLink = this.#sessionStorage.getItem<string>(PENDING_LINK_KEY);
     this.#sessionStorage.removeItem(PENDING_EMAIL_KEY);
     this.#sessionStorage.removeItem(PENDING_PASSWORD_KEY);
     this.#sessionStorage.removeItem(PENDING_MFA_KEY);
+    this.#sessionStorage.removeItem(PENDING_LINK_KEY);
 
     if (reauth !== 'ok') return;
 
@@ -393,6 +423,13 @@ export class ProfileComponent implements OnInit {
 
     if (pendingPassword) {
       this.#notify.info('auth.profile.reauthDonePassword');
+      return;
+    }
+
+    // The proof this trip earned is in place, so the link trip can start at
+    // the provider the user picked before leaving.
+    if (pendingLink && isOAuthProvider(pendingLink)) {
+      this.#startLink(pendingLink);
       return;
     }
 
@@ -579,15 +616,49 @@ export class ProfileComponent implements OnInit {
     return this.oauthAccounts().some((a) => a.provider === provider);
   }
 
+  /**
+   * A link plants a credential the account owner cannot revoke by changing
+   * their password, so it asks for a factor first. An account that holds a
+   * password types it here; an account created through a provider proves
+   * itself at that provider, which is a round trip of its own before the one
+   * that does the linking.
+   */
   connectProvider(provider: string): void {
     if (!isOAuthProvider(provider)) return;
 
+    if (this.accountHasPassword()) {
+      this.linkPasswordModel.set({ currentPassword: '' });
+      this.linkPasswordProvider.set(provider);
+      return;
+    }
+
+    this.#startLinkReauth(provider);
+  }
+
+  /** The password prompt on the link control, answered. */
+  protected confirmLink(): void {
+    const provider = this.linkPasswordProvider();
+    if (!provider || this.linkPasswordForm().invalid() || this.oauthLoading()) {
+      return;
+    }
+
+    this.#startLink(provider, this.linkPasswordModel().currentPassword);
+  }
+
+  protected cancelLink(): void {
+    this.linkPasswordProvider.set(null);
+    this.linkPasswordModel.set({ currentPassword: '' });
+  }
+
+  #startLink(provider: OAuthProvider, currentPassword?: string): void {
     this.oauthLoading.set(true);
     this.#authService
-      .initOAuthLink()
+      .initOAuthLink(currentPassword)
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
+          this.linkPasswordProvider.set(null);
+          this.linkPasswordModel.set({ currentPassword: '' });
           this.#sessionStorage.setItem('oauth_return_url', '/profile');
           if (this.#window) {
             this.#window.location.href = OAUTH_URLS[provider];
@@ -596,6 +667,39 @@ export class ProfileComponent implements OnInit {
         error: (err: HttpErrorResponse) => {
           this.oauthLoading.set(false);
           this.#notify.error(err, 'auth.profile.errorInitiateLinkFailed');
+        }
+      });
+  }
+
+  /**
+   * An account with no password proves itself at the provider it already
+   * holds. The provider it asked to link waits in session storage, because the
+   * round trip comes back as a full page load.
+   */
+  #startLinkReauth(provider: OAuthProvider): void {
+    const reauthProvider = this.reauthProvider();
+    if (!reauthProvider) {
+      this.#notify.error('auth.profile.errorReauthNoProvider');
+      return;
+    }
+
+    this.oauthLoading.set(true);
+    this.#authService
+      .initOAuthReauth(STEP_UP_OPERATION.OAUTH_LINK)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.#sessionStorage.setItem(PENDING_LINK_KEY, provider);
+          this.#notify.info('auth.profile.reauthRedirecting', {
+            provider: this.reauthProviderLabel()
+          });
+          if (this.#window) {
+            this.#window.location.href = OAUTH_URLS[reauthProvider];
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.oauthLoading.set(false);
+          this.#notify.error(err, 'auth.profile.errorReauthFailed');
         }
       });
   }

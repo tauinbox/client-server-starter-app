@@ -44,7 +44,8 @@ export const STEP_UP_OPERATION = {
   EMAIL_CHANGE: 'email_change',
   PASSWORD_SET: 'password_set',
   MFA_SETUP: 'mfa_setup',
-  MFA_DISABLE: 'mfa_disable'
+  MFA_DISABLE: 'mfa_disable',
+  OAUTH_LINK: 'oauth_link'
 } as const;
 
 export type StepUpOperation =

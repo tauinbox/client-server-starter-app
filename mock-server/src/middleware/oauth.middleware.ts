@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { ErrorKeys } from '@app/shared/constants';
+import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
 import { findUserById, getState, logAudit, toUserResponse } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
+import { isValidPasswordShape, stepUpError } from '../helpers/reauth.helpers';
 import { validationError } from '../helpers/validation-error.helpers';
 import {
   OAUTH_DATA_COOKIE,
@@ -141,8 +142,31 @@ router.post('/exchange', (req, res) => {
   res.json({ tokens: publicTokens, user: toUserResponse(user) });
 });
 
-// POST /api/v1/auth/oauth/link-init (stub)
-router.post('/link-init', authGuard, (_req, res) => {
+// POST /api/v1/auth/oauth/link-init
+// The real server mints an intent cookie its provider callback consumes. Both
+// provider halves are 501 here, so only the step-up the route now demands is
+// reproduced: a linked provider is a credential no recovery path removes.
+router.post('/link-init', authGuard, (req, res) => {
+  const { user } = req as AuthenticatedRequest;
+  const { currentPassword } = req.body as { currentPassword?: unknown };
+
+  if (currentPassword !== undefined && !isValidPasswordShape(currentPassword)) {
+    res.status(400).json(validationError('currentPassword is required'));
+    return;
+  }
+
+  const stepUp = stepUpError(
+    req,
+    user,
+    currentPassword,
+    undefined,
+    STEP_UP_OPERATION.OAUTH_LINK
+  );
+  if (stepUp) {
+    res.status(stepUp.statusCode).json(stepUp);
+    return;
+  }
+
   res.json({ message: 'Link initiated' });
 });
 

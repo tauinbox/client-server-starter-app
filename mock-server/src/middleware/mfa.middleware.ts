@@ -2,17 +2,17 @@ import { Router } from 'express';
 import {
   ErrorKeys,
   MAX_CONCURRENT_SESSIONS,
-  MAX_PASSWORD_LENGTH,
   STEP_UP_OPERATION,
   TOKEN_PURPOSE,
   TOTP_DIGITS,
-  TOTP_ISSUER,
-  TOTP_PERIOD_SECONDS
+  TOTP_ISSUER
 } from '@app/shared/constants';
 import { authGuard, pruneOldestUserTokens } from '../helpers/auth.helpers';
 import {
-  isValidReauthProof,
-  logStepUpFailure
+  consumeTotpCode,
+  isValidPasswordShape,
+  normalize,
+  stepUpError
 } from '../helpers/reauth.helpers';
 import { validationError } from '../helpers/validation-error.helpers';
 import { decodeToken, generateSessionId, generateTokens } from '../jwt.utils';
@@ -26,14 +26,11 @@ import {
 import { resolveEntitlementLimit } from './billing.middleware';
 import {
   MOCK_RECOVERY_CODES,
-  MOCK_TOTP_CODE,
   MOCK_TOTP_QR_DATA_URL,
   MOCK_TOTP_SECRET,
-  REAUTH_PROOF_COOKIE,
   REFRESH_COOKIE_OPTIONS,
   REFRESH_TOKEN_COOKIE
 } from '../constants';
-import type { StepUpOperation } from '@app/shared/constants';
 import type { AuthenticatedRequest, MockUser } from '../types';
 import type { Request, Response } from 'express';
 
@@ -51,90 +48,8 @@ const invalidPendingTokenEnvelope = {
   errorKey: ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN
 };
 
-/** Normalises a code the way the server does before it compares anything. */
-function normalize(value: string): string {
-  return value.replace(/[^0-9a-zA-Z]/g, '').toUpperCase();
-}
-
 function isValidCodeShape(value: unknown): value is string {
   return typeof value === 'string' && value.length === TOTP_DIGITS;
-}
-
-/**
- * Verifies the fixed code and spends it, the way the server verifies a real
- * code and spends it. RFC 6238 section 5.2 forbids a second use of a code that
- * already validated, so an acceptance records its 30-second step and any later
- * acceptance at or below that step is refused.
- *
- * The mock has no secret to derive a step from, so it uses the step the
- * acceptance happens in. The property is the same: one code, one use.
- */
-function consumeTotpCode(user: MockUser, code: unknown): boolean {
-  if (typeof code !== 'string' || normalize(code) !== MOCK_TOTP_CODE) {
-    return false;
-  }
-
-  const step = Math.floor(Date.now() / 1000 / TOTP_PERIOD_SECONDS);
-  if (user.totpLastUsedStep !== null && step <= user.totpLastUsedStep) {
-    return false;
-  }
-
-  user.totpLastUsedStep = step;
-  return true;
-}
-
-function isValidPasswordShape(value: unknown): boolean {
-  return (
-    typeof value === 'string' &&
-    value.length > 0 &&
-    value.length <= MAX_PASSWORD_LENGTH
-  );
-}
-
-/**
- * Mirrors AuthService.assertStepUp: a code from the enrolled authenticator, a
- * password, or a provider proof, in that order. Returns an error envelope, or
- * null when the caller proved itself. A refusal writes the audit row the
- * server writes, because nothing else records the attempt.
- */
-function stepUpError(
-  req: Request,
-  user: MockUser,
-  currentPassword: unknown,
-  code: unknown,
-  operation: StepUpOperation
-): { message: string; statusCode: number; errorKey: string } | null {
-  if (user.totpEnabledAt && consumeTotpCode(user, code)) {
-    return null;
-  }
-
-  if (user.password === null) {
-    const proof = (req.cookies as Record<string, string> | undefined)?.[
-      REAUTH_PROOF_COOKIE
-    ];
-    if (isValidReauthProof(proof, user, operation)) {
-      return null;
-    }
-
-    logStepUpFailure(req, user, operation, 'reauth_proof', code !== undefined);
-    return {
-      message: 'Confirm it is you with your sign-in provider, then try again',
-      statusCode: 400,
-      errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
-    };
-  }
-
-  // Plaintext comparison — mock only. Real server uses bcrypt.compare().
-  if (user.password === currentPassword) {
-    return null;
-  }
-
-  logStepUpFailure(req, user, operation, 'password', code !== undefined);
-  return {
-    message: 'Current password is incorrect',
-    statusCode: 400,
-    errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
-  };
 }
 
 /** Resolves the account behind an mfa-pending token, or null. */
