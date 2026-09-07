@@ -58,7 +58,10 @@ import {
   REFRESH_COOKIE_OPTIONS,
   REFRESH_TOKEN_COOKIE
 } from '../constants';
-import { isValidReauthProof } from '../helpers/reauth.helpers';
+import {
+  isValidReauthProof,
+  logStepUpFailure
+} from '../helpers/reauth.helpers';
 
 /**
  * The 423 answer. It carries the standard Retry-After header, which the
@@ -761,6 +764,13 @@ router.patch('/profile', authGuard, (req, res) => {
         REAUTH_PROOF_COOKIE
       ];
       if (!isValidReauthProof(proof, user, STEP_UP_OPERATION.PASSWORD_SET)) {
+        logStepUpFailure(
+          req,
+          user,
+          STEP_UP_OPERATION.PASSWORD_SET,
+          'reauth_proof',
+          false
+        );
         res.status(400).json({
           message:
             'Confirm it is you with your sign-in provider, then try again',
@@ -772,6 +782,13 @@ router.patch('/profile', authGuard, (req, res) => {
     } else {
       // Plaintext comparison — mock only. Real server uses bcrypt.compare().
       if (!currentPassword || user.password !== currentPassword) {
+        logStepUpFailure(
+          req,
+          user,
+          STEP_UP_OPERATION.PASSWORD_SET,
+          'password',
+          false
+        );
         res.status(400).json({
           message: 'Current password is incorrect',
           statusCode: 400,
@@ -862,6 +879,13 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
       REAUTH_PROOF_COOKIE
     ];
     if (!isValidReauthProof(proof, user, STEP_UP_OPERATION.EMAIL_CHANGE)) {
+      logStepUpFailure(
+        req,
+        user,
+        STEP_UP_OPERATION.EMAIL_CHANGE,
+        'reauth_proof',
+        false
+      );
       res.status(400).json({
         message: 'Confirm it is you with your sign-in provider, then try again',
         statusCode: 400,
@@ -871,6 +895,13 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
     }
   } else if (user.password !== currentPassword) {
     // Plaintext comparison — mock only. Real server uses bcrypt.compare().
+    logStepUpFailure(
+      req,
+      user,
+      STEP_UP_OPERATION.EMAIL_CHANGE,
+      'password',
+      false
+    );
     res.status(400).json({
       message: 'Current password is incorrect',
       statusCode: 400,

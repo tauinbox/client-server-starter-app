@@ -63,6 +63,7 @@ import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import type { UserPermissionsResponse } from '@app/shared/types';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
+import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
 import { RegisterResource } from '../decorators/register-resource.decorator';
 import { Request as ExpressRequest } from 'express';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -285,6 +286,16 @@ export class AuthController {
   // own credentials: an account with no password sets one here before it can
   // satisfy the step-up that enrolment needs.
   @SkipMfaEnrolmentGate()
+  // The step-up in this handler verifies a secret, so a refused attempt must
+  // cost the caller the same budget a refused sign-in costs. A name or locale
+  // edit presents no secret and is left out of that count.
+  @Throttle({
+    'login-long-window': {
+      ttl: LOCKOUT_DURATION_MS,
+      limit: MAX_FAILED_ATTEMPTS - 1
+    }
+  })
+  @CountFailuresOnlyWhenBody('password')
   @Patch('profile')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update the current user profile' })
@@ -310,7 +321,8 @@ export class AuthController {
         req.user.userId,
         updateProfileDto.currentPassword,
         reauthProof,
-        STEP_UP_OPERATION.PASSWORD_SET
+        STEP_UP_OPERATION.PASSWORD_SET,
+        extractAuditContext(req)
       );
     }
 

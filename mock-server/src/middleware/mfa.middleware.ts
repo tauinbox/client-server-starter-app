@@ -9,7 +9,10 @@ import {
   TOTP_ISSUER
 } from '@app/shared/constants';
 import { authGuard, pruneOldestUserTokens } from '../helpers/auth.helpers';
-import { isValidReauthProof } from '../helpers/reauth.helpers';
+import {
+  isValidReauthProof,
+  logStepUpFailure
+} from '../helpers/reauth.helpers';
 import { validationError } from '../helpers/validation-error.helpers';
 import { decodeToken, generateSessionId, generateTokens } from '../jwt.utils';
 import {
@@ -67,7 +70,8 @@ function isValidPasswordShape(value: unknown): boolean {
 /**
  * Mirrors AuthService.assertStepUp: a code from the enrolled authenticator, a
  * password, or a provider proof, in that order. Returns an error envelope, or
- * null when the caller proved itself.
+ * null when the caller proved itself. A refusal writes the audit row the
+ * server writes, because nothing else records the attempt.
  */
 function stepUpError(
   req: Request,
@@ -88,24 +92,29 @@ function stepUpError(
     const proof = (req.cookies as Record<string, string> | undefined)?.[
       REAUTH_PROOF_COOKIE
     ];
-    return isValidReauthProof(proof, user, operation)
-      ? null
-      : {
-          message:
-            'Confirm it is you with your sign-in provider, then try again',
-          statusCode: 400,
-          errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
-        };
+    if (isValidReauthProof(proof, user, operation)) {
+      return null;
+    }
+
+    logStepUpFailure(req, user, operation, 'reauth_proof', code !== undefined);
+    return {
+      message: 'Confirm it is you with your sign-in provider, then try again',
+      statusCode: 400,
+      errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
+    };
   }
 
   // Plaintext comparison — mock only. Real server uses bcrypt.compare().
-  return user.password === currentPassword
-    ? null
-    : {
-        message: 'Current password is incorrect',
-        statusCode: 400,
-        errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
-      };
+  if (user.password === currentPassword) {
+    return null;
+  }
+
+  logStepUpFailure(req, user, operation, 'password', code !== undefined);
+  return {
+    message: 'Current password is incorrect',
+    statusCode: 400,
+    errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
+  };
 }
 
 /** Resolves the account behind an mfa-pending token, or null. */

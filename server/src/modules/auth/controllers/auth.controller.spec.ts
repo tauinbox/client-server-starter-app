@@ -24,6 +24,9 @@ import { MfaRequiredGuard } from '../guards/mfa-required.guard';
 
 const allowAllGuard = { canActivate: () => true };
 
+// Every request mockJwtRequest builds carries this address and no request id.
+const stepUpAuditContext = { ip: '127.0.0.1', requestId: undefined };
+
 function mockJwtRequest(
   userId = 'user-1',
   email = 'admin@example.com',
@@ -632,7 +635,8 @@ describe('AuthController', () => {
         'user-1',
         'CurrentPass1',
         undefined,
-        STEP_UP_OPERATION.PASSWORD_SET
+        STEP_UP_OPERATION.PASSWORD_SET,
+        stepUpAuditContext
       );
       expect(authServiceMock.logout).toHaveBeenCalledWith('user-1');
       expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
@@ -753,7 +757,8 @@ describe('AuthController', () => {
         'user-1',
         undefined,
         'proof',
-        STEP_UP_OPERATION.PASSWORD_SET
+        STEP_UP_OPERATION.PASSWORD_SET,
+        stepUpAuditContext
       );
       expect(res.clearCookie).toHaveBeenCalledWith('reauth_proof', {
         path: '/api/v1/auth'

@@ -23,6 +23,9 @@ function mockResponse(): MockedResponse & Response {
 
 const mockUser = { id: 'user-1', email: 'user@example.com' } as User;
 
+// Every request the helpers below build carries this address and no request id.
+const auditContext = { ip: '127.0.0.1', requestId: undefined };
+
 function jwtRequest(cookies: Record<string, string> = {}): JwtAuthRequest {
   return createMockRequest({
     user: { userId: 'user-1', email: 'user@example.com', roles: ['user'] },
@@ -113,7 +116,9 @@ describe('MfaController', () => {
         mockUser,
         'Password1',
         undefined,
-        STEP_UP_OPERATION.MFA_SETUP
+        STEP_UP_OPERATION.MFA_SETUP,
+        undefined,
+        auditContext
       );
       expect(mfaService.beginEnrolment).toHaveBeenCalledWith(mockUser);
     });
@@ -125,7 +130,9 @@ describe('MfaController', () => {
         mockUser,
         undefined,
         'proof',
-        STEP_UP_OPERATION.MFA_SETUP
+        STEP_UP_OPERATION.MFA_SETUP,
+        undefined,
+        auditContext
       );
     });
 
@@ -166,7 +173,8 @@ describe('MfaController', () => {
         undefined,
         undefined,
         STEP_UP_OPERATION.MFA_DISABLE,
-        '123456'
+        '123456',
+        auditContext
       );
       expect(mfaService.disable).toHaveBeenCalled();
     });

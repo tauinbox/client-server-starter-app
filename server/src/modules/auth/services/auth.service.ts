@@ -700,7 +700,9 @@ export class AuthService {
       user,
       dto.currentPassword,
       reauthProof,
-      STEP_UP_OPERATION.EMAIL_CHANGE
+      STEP_UP_OPERATION.EMAIL_CHANGE,
+      undefined,
+      auditContext
     );
 
     if (dto.newEmail === user.email) {
@@ -929,50 +931,88 @@ export class AuthService {
     currentPassword: string | undefined,
     reauthProof: string | undefined,
     operation: StepUpOperation,
-    totpCode?: string
+    totpCode?: string,
+    auditContext?: AuditContext
   ): Promise<void> {
-    if (this.mfaService.isValidStepUpCode(user, totpCode)) {
+    const factor = await this.stepUpFailure(
+      user,
+      currentPassword,
+      reauthProof,
+      operation,
+      totpCode
+    );
+
+    if (factor === null) {
       return;
+    }
+
+    // A refused step-up authorises nothing, so no other row carries the
+    // attempt. The value that was tried never enters the record.
+    this.auditService.logFireAndForget({
+      action: AuditAction.STEP_UP_FAILURE,
+      actorId: user.id,
+      actorEmail: user.email,
+      targetId: user.id,
+      targetType: 'User',
+      details: { operation, factor, codeOffered: totpCode !== undefined },
+      context: auditContext
+    });
+
+    throw factor === 'reauth_proof'
+      ? new HttpException(
+          {
+            message:
+              'Confirm it is you with your sign-in provider, then try again',
+            errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
+          },
+          HttpStatus.BAD_REQUEST
+        )
+      : new HttpException(
+          {
+            message: 'Current password is incorrect',
+            errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
+          },
+          HttpStatus.BAD_REQUEST
+        );
+  }
+
+  /**
+   * The factor that refused the caller, or null when the caller proved itself.
+   * Returning the verdict instead of throwing keeps the audit row and the
+   * response in one place.
+   */
+  private async stepUpFailure(
+    user: User,
+    currentPassword: string | undefined,
+    reauthProof: string | undefined,
+    operation: StepUpOperation,
+    totpCode?: string
+  ): Promise<'password' | 'reauth_proof' | null> {
+    if (this.mfaService.isValidStepUpCode(user, totpCode)) {
+      return null;
     }
 
     if (user.password === null) {
-      this.assertReauthProof(user, reauthProof, operation);
-      return;
+      return this.isValidReauthProof(user, reauthProof, operation)
+        ? null
+        : 'reauth_proof';
     }
 
-    const invalidCurrentPasswordError = new HttpException(
-      {
-        message: 'Current password is incorrect',
-        errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
-      },
-      HttpStatus.BAD_REQUEST
-    );
-
     if (!currentPassword) {
-      throw invalidCurrentPasswordError;
+      return 'password';
     }
 
     const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      throw invalidCurrentPasswordError;
-    }
+    return isMatch ? null : 'password';
   }
 
-  private assertReauthProof(
+  private isValidReauthProof(
     user: User,
     proof: string | undefined,
     operation: StepUpOperation
-  ): void {
-    const reauthRequiredError = new HttpException(
-      {
-        message: 'Confirm it is you with your sign-in provider, then try again',
-        errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
-      },
-      HttpStatus.BAD_REQUEST
-    );
-
+  ): boolean {
     if (!proof) {
-      throw reauthRequiredError;
+      return false;
     }
 
     try {
@@ -987,17 +1027,15 @@ export class AuthService {
         ? user.tokenRevokedAt.getTime() / 1000
         : null;
 
-      if (
-        payload.purpose !== TOKEN_PURPOSE.REAUTH_PROOF ||
-        payload.sub !== user.id ||
-        payload.operation !== operation ||
-        typeof payload.iat !== 'number' ||
-        (revokedAtSeconds !== null && payload.iat < revokedAtSeconds)
-      ) {
-        throw reauthRequiredError;
-      }
+      return (
+        payload.purpose === TOKEN_PURPOSE.REAUTH_PROOF &&
+        payload.sub === user.id &&
+        payload.operation === operation &&
+        typeof payload.iat === 'number' &&
+        (revokedAtSeconds === null || payload.iat >= revokedAtSeconds)
+      );
     } catch {
-      throw reauthRequiredError;
+      return false;
     }
   }
 
@@ -1010,11 +1048,19 @@ export class AuthService {
     userId: string,
     currentPassword: string | undefined,
     reauthProof: string | undefined,
-    operation: StepUpOperation
+    operation: StepUpOperation,
+    auditContext?: AuditContext
   ): Promise<void> {
     const user = await this.usersService.findOne(userId);
 
-    await this.assertStepUp(user, currentPassword, reauthProof, operation);
+    await this.assertStepUp(
+      user,
+      currentPassword,
+      reauthProof,
+      operation,
+      undefined,
+      auditContext
+    );
   }
 
   /**

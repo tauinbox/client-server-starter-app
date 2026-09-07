@@ -55,6 +55,10 @@ const REFRESH_TOKEN_COOKIE = 'refresh_token';
  * guesses, which an unthrottled route walks in minutes. The long window is the
  * same one the login route uses, and it refunds itself on success, so only
  * failures accumulate.
+ *
+ * Every route that verifies a secret carries this, the enrolment and the
+ * step-up ones included. `ThrottlerGuard.generateKey` hashes the handler name
+ * into the storage key, so each route keeps a counter of its own.
  */
 const CHALLENGE_THROTTLE = {
   default: { ttl: 60000, limit: 5 },
@@ -99,6 +103,7 @@ export class MfaController {
     ];
   }
 
+  @Throttle(CHALLENGE_THROTTLE)
   @Post('setup')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
@@ -120,12 +125,15 @@ export class MfaController {
       user,
       dto.currentPassword,
       this.reauthProof(req),
-      STEP_UP_OPERATION.MFA_SETUP
+      STEP_UP_OPERATION.MFA_SETUP,
+      undefined,
+      extractAuditContext(req)
     );
 
     return await this.mfaService.beginEnrolment(user);
   }
 
+  @Throttle(CHALLENGE_THROTTLE)
   @Post('enable')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
@@ -148,6 +156,7 @@ export class MfaController {
     );
   }
 
+  @Throttle(CHALLENGE_THROTTLE)
   @Post('disable')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
@@ -164,7 +173,8 @@ export class MfaController {
       dto.currentPassword,
       this.reauthProof(req),
       STEP_UP_OPERATION.MFA_DISABLE,
-      dto.code
+      dto.code,
+      extractAuditContext(req)
     );
 
     await this.mfaService.disable(user, extractAuditContext(req));
