@@ -55,6 +55,7 @@ describe('SessionIssuerService', () => {
     totpSecret: null,
     totpEnabledAt: null,
     totpRecoveryCodes: null,
+    totpLastUsedStep: null,
     roles: [mockUserRole],
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),

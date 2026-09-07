@@ -988,7 +988,7 @@ export class AuthService {
     operation: StepUpOperation,
     totpCode?: string
   ): Promise<'password' | 'reauth_proof' | null> {
-    if (this.mfaService.isValidStepUpCode(user, totpCode)) {
+    if (await this.mfaService.isValidStepUpCode(user, totpCode)) {
       return null;
     }
 

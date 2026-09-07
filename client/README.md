@@ -1005,7 +1005,11 @@ marker, because a credential must not sit in web storage, so the page asks for t
 return. The enrolment carries a marker too, and the card asks for its secret on the return load. Each
 path names its own step-up operation, so a trip taken for one authorizes nothing else. Eleven
 Playwright tests cover the three paths, with the proof seeded through
-`POST /__control/reauth-proof`, because both provider halves of the mock stay 501 stubs. The unit tests also cover session restore, cross-tab logout, lockout, email
+`POST /__control/reauth-proof`, because both provider halves of the mock stay 501 stubs.
+The two-factor tests carry one more control route. A code is single use on the server and on the
+mock, and the mock answers one fixed code, so a test that must present that code a second time
+calls `POST /__control/totp-ledger` to clear the recorded step. It stands in for the wait a real
+authenticator imposes, without a 30-second sleep in the run. The unit tests also cover session restore, cross-tab logout, lockout, email
 verification, and password reset with a password confirmation. They cover the users list, detail, edit
 and search. This includes the email-change confirmation dialog of the administrator and the
 soft-delete and restore flow. They also cover the administration of roles, resources and feature

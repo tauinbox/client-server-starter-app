@@ -124,7 +124,8 @@ router.post('/users', (req, res) => {
       ...user,
       totpSecret: user.totpSecret ?? null,
       totpEnabledAt: user.totpEnabledAt ?? null,
-      totpRecoveryCodes: user.totpRecoveryCodes ?? null
+      totpRecoveryCodes: user.totpRecoveryCodes ?? null,
+      totpLastUsedStep: user.totpLastUsedStep ?? null
     });
   }
 
@@ -333,6 +334,25 @@ router.post('/invalidate-access-tokens', (req, res) => {
   }
   user.tokenRevokedAt = new Date().toISOString();
   res.json({ message: `tokens invalidated for user ${userId}` });
+});
+
+// POST /__control/totp-ledger — clear the replay floor for a user.
+// A code is single use, so a test that must present the one fixed code twice
+// needs the wait for the next code that a real authenticator would impose.
+// Clearing the floor is that wait, without a 30-second sleep in the run.
+router.post('/totp-ledger', (req, res) => {
+  const { userId } = req.body as { userId?: string };
+  if (!userId) {
+    res.status(400).json({ message: 'userId is required' });
+    return;
+  }
+  const user = getState().users.get(userId);
+  if (!user) {
+    res.status(404).json({ message: 'user not found' });
+    return;
+  }
+  user.totpLastUsedStep = null;
+  res.json({ message: `totp ledger cleared for user ${userId}` });
 });
 
 // POST /__control/change-user-roles — mutate user.roles and push SSE without

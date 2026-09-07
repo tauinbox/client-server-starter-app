@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Exclude, Expose } from 'class-transformer';
 import { DEFAULT_LOCALE } from '@app/shared/constants';
+import { bigintNumberTransformer } from '../../../common/utils/bigint-number.transformer';
 import { Role } from '../../auth/entities/role.entity';
 
 @Entity('users')
@@ -126,6 +127,22 @@ export class User {
   @Column({ name: 'totp_recovery_codes', type: 'jsonb', nullable: true })
   @Exclude()
   totpRecoveryCodes: string[] | null;
+
+  /**
+   * The RFC 6238 time step of the last code this account spent. A code is
+   * accepted once: `verifySync` refuses any step at or below this floor, so an
+   * observed code cannot be replayed while it is still inside its window.
+   *
+   * NULL means no code was spent yet, which is where a fresh enrolment starts.
+   */
+  @Column({
+    name: 'totp_last_used_step',
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintNumberTransformer
+  })
+  @Exclude()
+  totpLastUsedStep: number | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz', precision: 3 })
   createdAt: Date;

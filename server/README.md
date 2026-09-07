@@ -997,6 +997,15 @@ of the same device holds. `AuthService.logoutSession` deletes every row of one s
 `POST /auth/logout` calls. `AuthService.logout` deletes every row of the account and stamps
 `tokenRevokedAt`; it belongs to the password change and to the other account-wide paths.
 
+**Two-factor codes are single use.** `MfaService.consumeTotp` is the one funnel for every path
+that reads a code: the enrolment, the sign-in challenge and the step-up. It reads the account row
+under a write lock, hands `users.totp_last_used_step` to the verifier as `afterTimeStep`, which
+refuses a match at or below that floor, and records the RFC 6238 step the code matched at. The
+accepted skew keeps three codes live at any instant, so without that floor each of them stays
+usable for its whole window and an observed code buys a second session, or turns the factor off.
+The lock is what makes it hold under load: a plain read-then-write lets two requests carrying one
+code both see it unspent. Starting a new enrolment and turning the factor off clear the floor.
+
 **Token purpose.** The service signs three token types: access, OAuth link and OAuth data. The three
 use the same key. Thus each token carries an explicit `purpose` claim, and each consumer accepts only
 its own purpose.

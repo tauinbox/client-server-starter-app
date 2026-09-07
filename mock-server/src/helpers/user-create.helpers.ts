@@ -135,6 +135,7 @@ export function buildMockUser(
     totpSecret: null,
     totpEnabledAt: null,
     totpRecoveryCodes: null,
+    totpLastUsedStep: null,
     pendingEmail: null,
     pendingEmailToken: null,
     pendingEmailExpiresAt: null,

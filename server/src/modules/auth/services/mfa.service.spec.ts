@@ -3,7 +3,11 @@ import { JwtService } from '@nestjs/jwt';
 import { DataSource } from 'typeorm';
 import { randomBytes } from 'crypto';
 import { generateSync } from 'otplib';
-import { ErrorKeys, TOKEN_PURPOSE } from '@app/shared/constants';
+import {
+  ErrorKeys,
+  TOKEN_PURPOSE,
+  TOTP_PERIOD_SECONDS
+} from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MfaService } from './mfa.service';
 import { User } from '../../users/entities/user.entity';
@@ -45,6 +49,7 @@ function buildUser(overrides: Partial<User> = {}): User {
     totpSecret: null,
     totpEnabledAt: null,
     totpRecoveryCodes: null,
+    totpLastUsedStep: null,
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),
     deletedAt: null,
@@ -125,15 +130,32 @@ describe('MfaService', () => {
     await build();
   });
 
-  /** Enrols a user for real and returns both halves of the enrolment. */
+  /**
+   * Enrols a user for real and returns both halves of the enrolment. The row
+   * is also what `findOne` resolves, because every code path now reads the
+   * stored secret and the replay floor under a lock.
+   */
   async function enrol(): Promise<{ user: User; secret: string }> {
-    const user = buildUser();
-    const setup = await service.beginEnrolment(user);
+    const setup = await service.beginEnrolment(buildUser());
     const stored = repository.update.mock.calls[0][1];
-    return {
-      user: buildUser({ totpSecret: stored.totpSecret }),
-      secret: setup.secret
-    };
+    const user = buildUser({ totpSecret: stored.totpSecret });
+    repository.findOne.mockResolvedValue(user);
+    return { user, secret: setup.secret };
+  }
+
+  /** The changes of the last `update` call, which is the one under test. */
+  function lastUpdate(): Partial<User> {
+    const { calls } = repository.update.mock;
+    return calls[calls.length - 1][1];
+  }
+
+  /**
+   * Applies what the service stored back onto the row, the way the database
+   * would, so a second call in one test reads the floor the first one wrote.
+   */
+  function persistLedger(row: User): void {
+    row.totpLastUsedStep =
+      lastUpdate().totpLastUsedStep ?? row.totpLastUsedStep;
   }
 
   describe('beginEnrolment', () => {
@@ -158,6 +180,7 @@ describe('MfaService', () => {
 
       expect(stored.totpEnabledAt).toBeNull();
       expect(stored.totpRecoveryCodes).toBeNull();
+      expect(stored.totpLastUsedStep).toBeNull();
     });
 
     it('returns a URI and a QR image the authenticator can read', async () => {
@@ -199,7 +222,7 @@ describe('MfaService', () => {
       );
 
       expect(result.recoveryCodes).toHaveLength(10);
-      const stored = repository.update.mock.calls[0][1];
+      const stored = lastUpdate();
       expect(stored.totpEnabledAt).toBeInstanceOf(Date);
       expect(auditService.log).toHaveBeenCalledWith(
         expect.objectContaining({ action: AuditAction.MFA_ENABLE })
@@ -215,7 +238,7 @@ describe('MfaService', () => {
         user,
         generateSync({ secret })
       );
-      const stored = repository.update.mock.calls[0][1];
+      const stored = lastUpdate();
 
       expect(stored.totpRecoveryCodes).not.toContain(recoveryCodes[0]);
       expect(stored.totpRecoveryCodes).toContain(
@@ -265,7 +288,8 @@ describe('MfaService', () => {
       expect(repository.update).toHaveBeenCalledWith('user-1', {
         totpSecret: null,
         totpEnabledAt: null,
-        totpRecoveryCodes: null
+        totpRecoveryCodes: null,
+        totpLastUsedStep: null
       });
       expect(auditService.log).toHaveBeenCalledWith(
         expect.objectContaining({ action: AuditAction.MFA_DISABLE })
@@ -485,45 +509,170 @@ describe('MfaService', () => {
   });
 
   describe('isValidStepUpCode', () => {
-    it('accepts a correct code from an enrolled account', async () => {
+    /** An enrolled account whose row is also what the lock read resolves. */
+    async function enrolled(): Promise<{ user: User; secret: string }> {
       const { user, secret } = await enrol();
       const enabled = buildUser({
         totpSecret: user.totpSecret,
         totpEnabledAt: new Date()
       });
+      repository.findOne.mockResolvedValue(enabled);
+      return { user: enabled, secret };
+    }
 
-      expect(service.isValidStepUpCode(enabled, generateSync({ secret }))).toBe(
-        true
-      );
+    it('accepts a correct code from an enrolled account', async () => {
+      const { user, secret } = await enrolled();
+
+      await expect(
+        service.isValidStepUpCode(user, generateSync({ secret }))
+      ).resolves.toBe(true);
     });
 
     it('rejects a code on an account that carries no factor', async () => {
       const { secret } = await enrol();
 
-      expect(
+      await expect(
         service.isValidStepUpCode(buildUser(), generateSync({ secret }))
-      ).toBe(false);
+      ).resolves.toBe(false);
     });
 
-    it('rejects a missing code', () => {
-      expect(
+    it('rejects a missing code', async () => {
+      await expect(
         service.isValidStepUpCode(
           buildUser({ totpSecret: 'v1.a.b.c', totpEnabledAt: new Date() }),
           undefined
         )
-      ).toBe(false);
+      ).resolves.toBe(false);
     });
 
-    it('rejects rather than throws when the stored secret will not decrypt', () => {
-      expect(
+    it('rejects rather than throws when the stored secret will not decrypt', async () => {
+      const broken = buildUser({
+        totpSecret: 'v1.AAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBB.CCCC',
+        totpEnabledAt: new Date()
+      });
+      repository.findOne.mockResolvedValue(broken);
+
+      await expect(service.isValidStepUpCode(broken, '123456')).resolves.toBe(
+        false
+      );
+    });
+
+    it('refuses the same code a second time', async () => {
+      // A step-up code opens `POST /auth/mfa/disable`. An observed code that
+      // stays usable for the rest of its window turns the factor off.
+      const { user, secret } = await enrolled();
+      const code = generateSync({ secret });
+
+      await expect(service.isValidStepUpCode(user, code)).resolves.toBe(true);
+      persistLedger(user);
+
+      await expect(service.isValidStepUpCode(user, code)).resolves.toBe(false);
+    });
+  });
+
+  describe('code replay', () => {
+    // One test pins the clock so a step boundary crossed mid-test cannot
+    // change which step a code belongs to.
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('refuses a code the sign-in challenge already spent', async () => {
+      const { user, secret } = await enrol();
+      const enabled = buildUser({
+        totpSecret: user.totpSecret,
+        totpEnabledAt: new Date()
+      });
+      jwtService.verify.mockReturnValue({
+        sub: 'user-1',
+        purpose: TOKEN_PURPOSE.MFA_PENDING,
+        iat: Math.floor(Date.now() / 1000)
+      });
+      repository.findOne.mockResolvedValue(enabled);
+      const code = generateSync({ secret });
+
+      await expect(service.verifyChallenge('token', code)).resolves.toBe(
+        enabled
+      );
+      persistLedger(enabled);
+
+      // The pending token outlives the code by minutes, so the whole replay
+      // fits inside one challenge.
+      await expect(
+        service.verifyChallenge('token', code)
+      ).rejects.toMatchObject({
+        status: 401,
+        response: { errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE }
+      });
+    });
+
+    it('refuses a code older than the last one the account spent', async () => {
+      // The tolerance keeps three codes live at once. Refusing only the exact
+      // code that was spent would leave the two neighbours replayable.
+      const { user, secret } = await enrol();
+      const enabled = buildUser({
+        totpSecret: user.totpSecret,
+        totpEnabledAt: new Date()
+      });
+      repository.findOne.mockResolvedValue(enabled);
+      const previous = generateSync({
+        secret,
+        epoch: Math.floor(Date.now() / 1000) - TOTP_PERIOD_SECONDS
+      });
+
+      await expect(
+        service.isValidStepUpCode(enabled, generateSync({ secret }))
+      ).resolves.toBe(true);
+      persistLedger(enabled);
+
+      await expect(service.isValidStepUpCode(enabled, previous)).resolves.toBe(
+        false
+      );
+    });
+
+    it('records the step the code matched at, not the step the clock is on', async () => {
+      const { user, secret } = await enrol();
+      const enabled = buildUser({
+        totpSecret: user.totpSecret,
+        totpEnabledAt: new Date()
+      });
+      repository.findOne.mockResolvedValue(enabled);
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-09-07T12:00:15Z'));
+      const nowSeconds = Math.floor(Date.now() / 1000);
+
+      await expect(
         service.isValidStepUpCode(
-          buildUser({
-            totpSecret: 'v1.AAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBB.CCCC',
-            totpEnabledAt: new Date()
-          }),
-          '123456'
+          enabled,
+          generateSync({ secret, epoch: nowSeconds - TOTP_PERIOD_SECONDS })
         )
-      ).toBe(false);
+      ).resolves.toBe(true);
+
+      expect(lastUpdate().totpLastUsedStep).toBe(
+        Math.floor((nowSeconds - TOTP_PERIOD_SECONDS) / TOTP_PERIOD_SECONDS)
+      );
+    });
+
+    it('lets the next code in once the current one is spent', async () => {
+      const { user, secret } = await enrol();
+      const enabled = buildUser({
+        totpSecret: user.totpSecret,
+        totpEnabledAt: new Date()
+      });
+      repository.findOne.mockResolvedValue(enabled);
+      const nowSeconds = Math.floor(Date.now() / 1000);
+
+      await expect(
+        service.isValidStepUpCode(enabled, generateSync({ secret }))
+      ).resolves.toBe(true);
+      persistLedger(enabled);
+
+      await expect(
+        service.isValidStepUpCode(
+          enabled,
+          generateSync({ secret, epoch: nowSeconds + TOTP_PERIOD_SECONDS })
+        )
+      ).resolves.toBe(true);
     });
   });
 });
