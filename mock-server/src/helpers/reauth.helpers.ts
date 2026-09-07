@@ -1,4 +1,5 @@
-import { getState } from '../state';
+import { getState, logAudit } from '../state';
+import type { Request } from 'express';
 import type { StepUpOperation } from '@app/shared/constants';
 import type { MockUser } from '../types';
 
@@ -34,4 +35,26 @@ export function isValidReauthProof(
   }
 
   return true;
+}
+
+/**
+ * The audit row AuthService.assertStepUp writes when it refuses a caller. A
+ * refused step-up authorises nothing, so no other row carries the attempt.
+ * The value that was tried never enters the record.
+ */
+export function logStepUpFailure(
+  req: Request,
+  user: MockUser,
+  operation: StepUpOperation,
+  factor: 'password' | 'reauth_proof',
+  codeOffered: boolean
+): void {
+  logAudit('STEP_UP_FAILURE', {
+    actorId: user.id,
+    actorEmail: user.email,
+    targetId: user.id,
+    targetType: 'User',
+    details: { operation, factor, codeOffered },
+    ip: req.ip
+  });
 }

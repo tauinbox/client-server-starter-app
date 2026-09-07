@@ -1741,11 +1741,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2243 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2255 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 363 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 361 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1248 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 246 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 643 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 648 tests pass |
 
 ## CI/CD
 
@@ -1874,7 +1874,7 @@ a second request to the registry for a verdict that gates nothing.
   The app hydrates the CASL ability at bootstrap, before the route activation. It caches the
   permissions for each user for 5 minutes. The `isSuper` flag on a role bypasses each check. The
   `*appRequirePermissions="{ action, subject }"` directive controls the visibility in a template.
-- **Audit logging** records 41 security-sensitive actions in the `audit_logs` table. Each row holds
+- **Audit logging** records 47 security-sensitive actions in the `audit_logs` table. Each row holds
   the actor, the target, the IP address and the request id. The actions include a login, a
   registration, a password change, a password reset, the CRUD of a user, a role and a permission, an
   OAuth link and unlink, a logout, a failed token refresh, a feature-flag change, and each

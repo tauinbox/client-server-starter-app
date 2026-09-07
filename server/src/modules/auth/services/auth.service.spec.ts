@@ -1744,6 +1744,94 @@ describe('AuthService', () => {
       ).resolves.toBeUndefined();
       expect(compare).not.toHaveBeenCalled();
     });
+
+    it('audits a refused password, and never records the value tried', async () => {
+      const user = {
+        id: 'user-1',
+        email: 'user@example.com',
+        password: '$2b$12$hash'
+      } as User;
+      mockMfaService.isValidStepUpCode.mockReturnValue(false);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+
+      await expect(
+        service.assertStepUp(
+          user,
+          'WrongPass1',
+          undefined,
+          STEP_UP_OPERATION.MFA_DISABLE,
+          '000000',
+          { ip: '203.0.113.7', requestId: 'req-1' }
+        )
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD }
+      });
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
+        action: AuditAction.STEP_UP_FAILURE,
+        actorId: 'user-1',
+        actorEmail: 'user@example.com',
+        targetId: 'user-1',
+        targetType: 'User',
+        details: {
+          operation: STEP_UP_OPERATION.MFA_DISABLE,
+          factor: 'password',
+          codeOffered: true
+        },
+        context: { ip: '203.0.113.7', requestId: 'req-1' }
+      });
+      expect(
+        JSON.stringify(mockAuditService.logFireAndForget.mock.calls)
+      ).not.toContain('WrongPass1');
+    });
+
+    it('audits a refused provider proof', async () => {
+      const user = {
+        id: 'user-1',
+        email: 'user@example.com',
+        password: null
+      } as User;
+      mockMfaService.isValidStepUpCode.mockReturnValue(false);
+
+      await expect(
+        service.assertStepUp(
+          user,
+          undefined,
+          undefined,
+          STEP_UP_OPERATION.MFA_SETUP
+        )
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
+      });
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.STEP_UP_FAILURE,
+          details: {
+            operation: STEP_UP_OPERATION.MFA_SETUP,
+            factor: 'reauth_proof',
+            codeOffered: false
+          }
+        })
+      );
+    });
+
+    it('writes no row when the caller proves itself', async () => {
+      const user = { id: 'user-1', password: '$2b$12$hash' } as User;
+      mockMfaService.isValidStepUpCode.mockReturnValue(false);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      await service.assertStepUp(
+        user,
+        'CorrectPassword1',
+        undefined,
+        STEP_UP_OPERATION.PASSWORD_SET
+      );
+
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: AuditAction.STEP_UP_FAILURE })
+      );
+    });
   });
 
   describe('initiateEmailChange', () => {

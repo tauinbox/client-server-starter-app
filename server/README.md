@@ -303,7 +303,7 @@ and the permission-cache invalidation after a role change.
 
 #### audit
 
-`audit.service.ts` holds `AuditService`. It records 41 security-sensitive actions in the `audit_logs`
+`audit.service.ts` holds `AuditService`. It records 47 security-sensitive actions in the `audit_logs`
 table.
 
 `audit-cleanup.service.ts` holds `AuditCleanupService`. A nightly cron job deletes an entry that is
@@ -1560,7 +1560,13 @@ parallel:
 | Throttler | Window | Limit | Notes |
 |-----------|--------|-------|-------|
 | `default` (unnamed) | 60 s | 120 requests for each IP | A soft ceiling for the whole SPA. A `@Throttle({ default: { ttl, limit } })` decorator on a route replaces it on a sensitive endpoint |
-| `login-long-window` | 15 min (`LOCKOUT_DURATION_MS`) | 4 999 (`MAX_FAILED_ATTEMPTS * 1000`) | It does nothing at the global level. `/auth/login` tightens it to `MAX_FAILED_ATTEMPTS - 1`. Thus one IP cannot collect enough failed attempts to trip the account-lockout protection (SEC-6). It counts a **failed** login only: `LoginThrottlerGuard` refunds the increment when the response finishes below 400. Thus a shared NAT egress cannot lock out its own users with a successful login |
+| `login-long-window` | 15 min (`LOCKOUT_DURATION_MS`) | 4 999 (`MAX_FAILED_ATTEMPTS * 1000`) | It does nothing at the global level. `/auth/login`, the two two-factor challenge routes, the three step-up routes and the password branch of `PATCH /auth/profile` tighten it to `MAX_FAILED_ATTEMPTS - 1`. Thus one IP cannot collect enough failed attempts to trip the account-lockout protection (SEC-6). It counts a **failed** attempt only: `LoginThrottlerGuard` refunds the increment when the response finishes below 400. Thus a shared NAT egress cannot lock out its own users with a successful login |
+
+A route that verifies a secret beside fields that verify none marks the secret with
+`@CountFailuresOnlyWhenBody('<field>')` (`modules/core/failure-counter.decorator.ts`). A request
+without that field then skips the `login-long-window` counter and keeps every other limit.
+`PATCH /auth/profile` needs this: it answers a password change and a display-name change through one
+handler, and a name change must never spend the budget that guards the password.
 
 `buildThrottlerOptions(REDIS_URL)` (`modules/core/throttler-options.ts`) builds the two throttlers.
 With `REDIS_URL` set, the throttler uses `RedisThrottlerStorage`, thus each instance shares the
@@ -1629,6 +1635,12 @@ These routes currently replace the default limit:
 | `POST /auth/forgot-password` | 5 min | 2 | The cost of an email, and enumeration mitigation. The CAPTCHA soft trigger starts near the limit |
 | `POST /auth/reset-password` | 1 min | 10 | Defense in depth against a token brute force |
 | `POST /auth/oauth/exchange` | 1 min | 10 | It is bound to a state token. The limit is tight enough to stop a replay attempt |
+| `POST /auth/mfa/verify` | 1 min | 5 plus `login-long-window` | Six digits is a million guesses, and an unthrottled route walks that in minutes |
+| `POST /auth/mfa/recovery` | 1 min | 5 plus `login-long-window` | The same, against the recovery codes |
+| `POST /auth/mfa/setup` | 1 min | 5 plus `login-long-window` | It verifies the step-up secret of an authenticated caller. A stolen access token must not buy unlimited guesses |
+| `POST /auth/mfa/enable` | 1 min | 5 plus `login-long-window` | It verifies a code from the pending secret |
+| `POST /auth/mfa/disable` | 1 min | 5 plus `login-long-window` | It verifies a password or a code, and it turns the second factor off |
+| `PATCH /auth/profile` | 15 min | `login-long-window` only, on a body that carries `password` | The step-up on the password branch verifies a secret. A name or locale edit keeps the application-wide ceiling |
 | `GET /rbac/metadata` | 1 min | 30 | The limit is higher, because each administrator route guard reads it |
 
 A rejected request gets the standard `429` answer with

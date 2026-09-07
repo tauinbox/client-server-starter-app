@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import type { ExecutionContext } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import type { ThrottlerRequest } from '@nestjs/throttler';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
+import { FAILURE_COUNTER_BODY_FIELDS } from './failure-counter.decorator';
 import type { DecrementableThrottlerStorage } from './throttler-storage.interface';
 
 const LOGIN_LONG_WINDOW = 'login-long-window';
@@ -11,6 +13,10 @@ const LOGIN_LONG_WINDOW = 'login-long-window';
  * failed login attempts. On a successful response (HTTP < 400) the increment
  * that was speculatively written to the store is removed, keeping the counter
  * accurate for brute-force protection without penalising legitimate logins.
+ *
+ * A route that guards one field of a mixed payload marks it with
+ * `@CountFailuresOnlyWhenBody`; requests without that field then bypass this
+ * counter and keep only the limits that apply to every request.
  */
 @Injectable()
 export class LoginThrottlerGuard extends ThrottlerGuard {
@@ -23,6 +29,10 @@ export class LoginThrottlerGuard extends ThrottlerGuard {
   ): Promise<boolean> {
     if (requestProps.throttler.name !== LOGIN_LONG_WINDOW) {
       return super.handleRequest(requestProps);
+    }
+
+    if (this.skipsFailureCounter(requestProps.context)) {
+      return true;
     }
 
     // Run the standard check (increments counter, throws if blocked).
@@ -46,5 +56,26 @@ export class LoginThrottlerGuard extends ThrottlerGuard {
     });
 
     return allowed;
+  }
+
+  /**
+   * True when the handler counts failures only for requests that present a
+   * secret, and this request presents none. Returning early leaves the counter
+   * untouched, so the route stays open to the fields it does not guard.
+   */
+  private skipsFailureCounter(context: ExecutionContext): boolean {
+    const fields = this.reflector.getAllAndOverride<string[] | undefined>(
+      FAILURE_COUNTER_BODY_FIELDS,
+      [context.getHandler(), context.getClass()]
+    );
+
+    if (!fields?.length) {
+      return false;
+    }
+
+    const { req } = this.getRequestResponse(context);
+    const body = (req as Request).body as Record<string, unknown> | undefined;
+
+    return !fields.some((field) => body?.[field] !== undefined);
   }
 }
