@@ -351,8 +351,18 @@ export class AuthService {
     );
   }
 
-  initOAuthLink(): Observable<{ message: string }> {
-    return this.#http.post<{ message: string }>(AuthApiEnum.OAuthLinkInit, {});
+  /**
+   * Starts a provider link. A linked provider is a sign-in credential that no
+   * recovery path removes, so the server demands the same fresh proof of
+   * identity the other credential changes demand: a password, or the proof an
+   * account with none earned at its own provider.
+   */
+  initOAuthLink(currentPassword?: string): Observable<{ message: string }> {
+    return this.#http.post<{ message: string }>(
+      AuthApiEnum.OAuthLinkInit,
+      currentPassword ? { currentPassword } : {},
+      { context: silentContext() }
+    );
   }
 
   /**

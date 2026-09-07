@@ -9,11 +9,16 @@ import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
 import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
+import { AuthService } from '../services/auth.service';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { ErrorKeys, TOKEN_PURPOSE } from '@app/shared/constants';
+import {
+  ErrorKeys,
+  STEP_UP_OPERATION,
+  TOKEN_PURPOSE
+} from '@app/shared/constants';
 import { bindIntent } from '../utils/oauth-flow-intent';
 
 // Seconds, as a JWT `iat` is.
@@ -21,14 +26,19 @@ const LINK_TOKEN_IAT = Math.floor(
   new Date('2026-01-01T00:00:00Z').getTime() / 1000
 );
 
-function mockJwtRequest(userId: string): {
+function mockJwtRequest(
+  userId: string,
+  cookies: Record<string, string> = {}
+): {
   user: JwtAuthRequest['user'];
   headers: Record<string, string>;
+  cookies: Record<string, string>;
   ip: string;
 } {
   return {
     user: { userId, email: 'test@example.com', roles: [] },
     headers: {},
+    cookies,
     ip: '127.0.0.1'
   };
 }
@@ -91,6 +101,7 @@ describe('OAuthController', () => {
     logFireAndForget: jest.Mock;
   };
   let mailServiceMock: { sendOAuthUnlinkedNotification: jest.Mock };
+  let authServiceMock: { assertStepUpForUser: jest.Mock };
   let configValues: Record<string, string | undefined>;
 
   beforeEach(async () => {
@@ -127,6 +138,10 @@ describe('OAuthController', () => {
       logFireAndForget: jest.fn()
     };
 
+    authServiceMock = {
+      assertStepUpForUser: jest.fn().mockResolvedValue(undefined)
+    };
+
     configValues = {
       CLIENT_URL: 'http://localhost:4200',
       JWT_REFRESH_EXPIRATION: '604800'
@@ -141,6 +156,7 @@ describe('OAuthController', () => {
         { provide: OAuthAccountService, useValue: oauthAccountServiceMock },
         { provide: AuditService, useValue: auditServiceMock },
         { provide: MailService, useValue: mailServiceMock },
+        { provide: AuthService, useValue: authServiceMock },
         {
           provide: ConfigService,
           useValue: {
@@ -295,11 +311,15 @@ describe('OAuthController', () => {
   });
 
   describe('initOAuthLink', () => {
-    it('should set oauth_link cookie and return message', () => {
+    it('should set oauth_link cookie and return message', async () => {
       const res = mockResponse();
       const req = mockJwtRequest('user-1');
 
-      const result = controller.initOAuthLink(req as JwtAuthRequest, res);
+      const result = await controller.initOAuthLink(
+        req as JwtAuthRequest,
+        { currentPassword: 'CurrentPassword123' },
+        res
+      );
 
       expect(jwtServiceMock.sign).toHaveBeenCalledWith(
         { sub: 'user-1', purpose: TOKEN_PURPOSE.OAUTH_LINK },
@@ -315,6 +335,48 @@ describe('OAuthController', () => {
         })
       );
       expect(result).toEqual({ message: 'Link initiated' });
+    });
+
+    // A linked provider signs the account in and no recovery path removes it,
+    // so a stolen session must not be able to plant one.
+    it('demands a step-up bound to the link operation', async () => {
+      const res = mockResponse();
+      const req = mockJwtRequest('user-1', { reauth_proof: 'proof-token' });
+
+      await controller.initOAuthLink(
+        req as JwtAuthRequest,
+        { currentPassword: 'CurrentPassword123' },
+        res
+      );
+
+      expect(authServiceMock.assertStepUpForUser).toHaveBeenCalledWith(
+        'user-1',
+        'CurrentPassword123',
+        'proof-token',
+        STEP_UP_OPERATION.OAUTH_LINK,
+        expect.anything()
+      );
+    });
+
+    it('mints no intent when the step-up refuses the caller', async () => {
+      const res = mockResponse();
+      const req = mockJwtRequest('user-1');
+      authServiceMock.assertStepUpForUser.mockRejectedValue(
+        new HttpException(
+          {
+            message: 'Current password is incorrect',
+            errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
+          },
+          HttpStatus.BAD_REQUEST
+        )
+      );
+
+      await expect(
+        controller.initOAuthLink(req as JwtAuthRequest, {}, res)
+      ).rejects.toBeInstanceOf(HttpException);
+
+      expect(jwtServiceMock.sign).not.toHaveBeenCalled();
+      expect(res.cookie).not.toHaveBeenCalled();
     });
   });
 

@@ -45,6 +45,7 @@ import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import {
   ErrorKeys,
   REAUTH_PROOF_MAX_AGE_SECONDS,
+  STEP_UP_OPERATION,
   TOKEN_PURPOSE
 } from '@app/shared/constants';
 import { CLIENT_URL } from '../providers/client-url.provider';
@@ -59,6 +60,10 @@ import {
 import { readIntentForFlow } from '../utils/oauth-flow-intent';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
 import { ReauthInitDto } from '../dtos/reauth-init.dto';
+import { OAuthLinkInitDto } from '../dtos/oauth-link-init.dto';
+import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
+import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
+import { AuthService } from '../services/auth.service';
 
 @ApiTags('OAuth API')
 @Controller({
@@ -77,6 +82,7 @@ export class OAuthController {
   constructor(
     private readonly oauthService: OAuthService,
     private readonly oauthAccountService: OAuthAccountService,
+    private readonly authService: AuthService,
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
     private readonly auditService: AuditService,
@@ -86,13 +92,35 @@ export class OAuthController {
 
   // --- Link initiation ---
 
+  /**
+   * A linked provider is a sign-in credential that outlives every session, and
+   * no recovery path deletes it: a password reset ends the sessions and leaves
+   * the row. A stolen session must therefore not be able to plant one, so this
+   * demands the same fresh proof of identity the other credential changes do.
+   */
+  @Throttle(CHALLENGE_THROTTLE)
+  @CountFailuresOnlyWhenBody('currentPassword')
   @Post('link-init')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Initiate OAuth account linking for current user' })
-  initOAuthLink(
+  @ApiBody({ type: OAuthLinkInitDto })
+  async initOAuthLink(
     @Request() req: JwtAuthRequest,
+    @Body() dto: OAuthLinkInitDto,
     @Res({ passthrough: true }) res: Response
   ) {
+    const reauthProof = (req.cookies as Record<string, string> | undefined)?.[
+      REAUTH_PROOF_COOKIE
+    ];
+
+    await this.authService.assertStepUpForUser(
+      req.user.userId,
+      dto.currentPassword,
+      reauthProof,
+      STEP_UP_OPERATION.OAUTH_LINK,
+      extractAuditContext(req)
+    );
+
     const linkToken = this.jwtService.sign(
       { sub: req.user.userId, purpose: TOKEN_PURPOSE.OAUTH_LINK },
       { expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS }

@@ -998,14 +998,16 @@ keyboard and visual. There are also 1248 Vitest unit tests. They cover login, re
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the
-first password and the two-factor enrolment all leave for the provider and resume when the callback
-returns with `?reauth=ok`.
+first password, the two-factor enrolment and a new provider link all leave for the provider and
+resume when the callback returns with `?reauth=ok`.
 The email change carries its pending address across the round trip; the first password carries only a
 marker, because a credential must not sit in web storage, so the page asks for the password again on
-return. The enrolment carries a marker too, and the card asks for its secret on the return load. Each
-path names its own step-up operation, so a trip taken for one authorizes nothing else. Eleven
-Playwright tests cover the three paths, with the proof seeded through
+return. The enrolment carries a marker too, and the card asks for its secret on the return load. A link
+carries the name of the provider the user asked for, and the page starts the link trip on the return
+load. Each path names its own step-up operation, so a trip taken for one authorizes nothing else.
+Sixteen Playwright tests cover the four paths, with the proof seeded through
 `POST /__control/reauth-proof`, because both provider halves of the mock stay 501 stubs.
+An account that holds a password answers a prompt on the "Connect" control instead of leaving.
 The two-factor tests carry one more control route. A code is single use on the server and on the
 mock, and the mock answers one fixed code, so a test that must present that code a second time
 calls `POST /__control/totp-ledger` to clear the recorded step. It stands in for the wait a real

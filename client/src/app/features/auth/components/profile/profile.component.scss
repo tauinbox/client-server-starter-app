@@ -136,6 +136,23 @@ form {
   align-items: center;
 }
 
+.oauth-link-confirm {
+  padding-top: vars.$spacing-md;
+  border-top: func.rem(1) solid var(--mat-sys-outline-variant);
+}
+
+.oauth-link-note {
+  margin: 0 0 vars.$spacing-sm;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.oauth-link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: vars.$spacing-sm;
+}
+
 // ── Preferences ────────────────────────────────────────────────────────────────
 
 .preference-label {
