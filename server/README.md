@@ -162,7 +162,7 @@ src/
 │   ├── utils/              # escapeLikePattern, hashToken, withTransaction,
 │   │                       #   extractAuditContext, cursor encode/decode,
 │   │                       #   applyKeysetPagination, cache-version-counter,
-│   │                       #   money-column.transformer
+│   │                       #   single-use-token-ledger, money-column.transformer
 │   ├── validators/         # is-safe-mongo-query, permission-condition-shape,
 │   │                       #   property-is-defined
 │   └── upload/             # createDiskStorageOptions()
@@ -190,8 +190,17 @@ The subsections below give the detail of each directory.
 
 `common/utils/` holds the shared utilities. They are `escapeLikePattern`, `hashToken`,
 `withTransaction`, `extractAuditContext`, the cursor encoder and decoder, and
-`applyKeysetPagination`. It also holds `cache-version-counter.ts` and
-`money-column.transformer.ts`.
+`applyKeysetPagination`. It also holds `cache-version-counter.ts`,
+`single-use-token-ledger.ts` and `money-column.transformer.ts`.
+
+`single-use-token-ledger.ts` records that a short-lived bearer credential was spent, so a second
+presentation of the same value is refused. With Redis the claim is one conditional write,
+`SET NX PX`, whose reply says whether this caller won the key. Thus two simultaneous presentations
+cannot both proceed. The raw Redis client is used for the same reason the version counter uses it:
+Keyv gives no conditional write. Without Redis one process owns the ledger, and the claims in flight
+are also reserved synchronously, because the read and the write are two awaits. A ledger that cannot
+be reached fails open, because it hardens a credential that is already signed and short-lived.
+`POST /auth/oauth/exchange` is the one consumer today.
 
 `common/validators/` holds `is-safe-mongo-query` and `permission-condition-shape`. It also holds
 `property-is-defined.ts`.
@@ -1644,7 +1653,7 @@ These routes currently replace the default limit:
 | `POST /auth/resend-verification` | 1 min | 3 | The cost of an email |
 | `POST /auth/forgot-password` | 5 min | 2 | The cost of an email, and enumeration mitigation. The CAPTCHA soft trigger starts near the limit |
 | `POST /auth/reset-password` | 1 min | 10 | Defense in depth against a token brute force |
-| `POST /auth/oauth/exchange` | 1 min | 10 | It is bound to a state token. The limit is tight enough to stop a replay attempt |
+| `POST /auth/oauth/exchange` | 1 min | 10 | It is bound to a state token, and the payload id it carries is spendable once. The limit bounds the attempts around both |
 | `POST /auth/mfa/verify` | 1 min | 5 plus `login-long-window` | Six digits is a million guesses, and an unthrottled route walks that in minutes |
 | `POST /auth/mfa/recovery` | 1 min | 5 plus `login-long-window` | The same, against the recovery codes |
 | `POST /auth/mfa/setup` | 1 min | 5 plus `login-long-window` | It verifies the step-up secret of an authenticated caller. A stolen access token must not buy unlimited guesses |

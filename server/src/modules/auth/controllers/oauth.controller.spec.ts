@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
@@ -20,6 +21,7 @@ import {
   TOKEN_PURPOSE
 } from '@app/shared/constants';
 import { bindIntent } from '../utils/oauth-flow-intent';
+import { createMockCache } from '../../../common/testing/cache.mock';
 
 // Seconds, as a JWT `iat` is.
 const LINK_TOKEN_IAT = Math.floor(
@@ -157,6 +159,7 @@ describe('OAuthController', () => {
         { provide: AuditService, useValue: auditServiceMock },
         { provide: MailService, useValue: mailServiceMock },
         { provide: AuthService, useValue: authServiceMock },
+        { provide: CACHE_MANAGER, useValue: createMockCache() },
         {
           provide: ConfigService,
           useValue: {
@@ -406,10 +409,19 @@ describe('OAuthController', () => {
 
       await controller.googleCallback(mockExpressRequest(profile), res);
 
-      expect(jwtServiceMock.sign).toHaveBeenCalledWith(
-        { data: mockAuthResponse, purpose: TOKEN_PURPOSE.OAUTH_DATA },
-        { expiresIn: 60 }
+      // The id is what the exchange records, so a payload without one cannot
+      // be tracked and a replay of it cannot be refused.
+      const [signedPayload, signOptions] = jwtServiceMock.sign.mock
+        .calls[0] as [
+        { data: unknown; purpose: string; jti: string },
+        { expiresIn: number }
+      ];
+      expect(signedPayload.data).toEqual(mockAuthResponse);
+      expect(signedPayload.purpose).toBe(TOKEN_PURPOSE.OAUTH_DATA);
+      expect(signedPayload.jti).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
       );
+      expect(signOptions).toEqual({ expiresIn: 60 });
       expect(res.cookie).toHaveBeenCalledWith(
         'oauth_data',
         'signed-link-token',
@@ -701,7 +713,7 @@ describe('OAuthController', () => {
   });
 
   describe('exchangeOAuthData', () => {
-    it('should set refresh_token cookie and return auth data without refresh_token', () => {
+    it('should set refresh_token cookie and return auth data without refresh_token', async () => {
       const mockPayloadData = {
         tokens: {
           access_token: 'token',
@@ -712,7 +724,8 @@ describe('OAuthController', () => {
       };
       jwtServiceMock.verify.mockReturnValue({
         data: mockPayloadData,
-        purpose: TOKEN_PURPOSE.OAUTH_DATA
+        purpose: TOKEN_PURPOSE.OAUTH_DATA,
+        jti: 'token-id'
       });
 
       const req = mockExpressRequest({} as OAuthUserProfile, {
@@ -720,7 +733,7 @@ describe('OAuthController', () => {
       });
       const res = mockResponse();
 
-      const result = controller.exchangeOAuthData(req, res);
+      const result = await controller.exchangeOAuthData(req, res);
 
       expect(jwtServiceMock.verify).toHaveBeenCalledWith('signed-jwt');
       expect(res.clearCookie).toHaveBeenCalledWith('oauth_data', {
@@ -741,19 +754,52 @@ describe('OAuthController', () => {
       });
     });
 
-    it('should throw BadRequestException when cookie is missing', () => {
+    it('should throw BadRequestException when cookie is missing', async () => {
       const req = mockExpressRequest({} as OAuthUserProfile, {});
       const res = mockResponse();
 
-      expect(() => controller.exchangeOAuthData(req, res)).toThrow(
+      await expect(controller.exchangeOAuthData(req, res)).rejects.toThrow(
         'Missing OAuth data'
       );
     });
 
-    // Regression: a missing JWT_REFRESH_EXPIRATION must fail loudly. The
-    // pre-fix code computed a NaN maxAge and silently set a session cookie.
-    it('should throw a configuration error and set no cookie when JWT_REFRESH_EXPIRATION is missing', () => {
-      delete configValues['JWT_REFRESH_EXPIRATION'];
+    // Regression: clearing the cookie only spends the credential in the
+    // caller's browser. A value captured before the exchange used to mint a
+    // second independent session inside the 60-second lifetime of the token.
+    it('should refuse a replayed payload and set no second refresh cookie', async () => {
+      jwtServiceMock.verify.mockReturnValue({
+        data: {
+          tokens: {
+            access_token: 'token',
+            refresh_token: 'refresh',
+            expires_in: 3600
+          },
+          user: { id: '1', email: 'test@example.com' }
+        },
+        purpose: TOKEN_PURPOSE.OAUTH_DATA,
+        jti: 'replayed-token-id'
+      });
+
+      const req = mockExpressRequest({} as OAuthUserProfile, {
+        oauth_data: 'signed-jwt'
+      });
+
+      const first = mockResponse();
+      await controller.exchangeOAuthData(req, first);
+      expect(first.cookie).toHaveBeenCalledWith(
+        'refresh_token',
+        'refresh',
+        expect.any(Object)
+      );
+
+      const replay = mockResponse();
+      await expect(controller.exchangeOAuthData(req, replay)).rejects.toThrow(
+        'Invalid or expired OAuth data'
+      );
+      expect(replay.cookie).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when the payload carries no token id', async () => {
       jwtServiceMock.verify.mockReturnValue({
         data: {
           tokens: {
@@ -771,13 +817,41 @@ describe('OAuthController', () => {
       });
       const res = mockResponse();
 
-      expect(() => controller.exchangeOAuthData(req, res)).toThrow(
+      await expect(controller.exchangeOAuthData(req, res)).rejects.toThrow(
+        'Invalid or expired OAuth data'
+      );
+      expect(res.cookie).not.toHaveBeenCalled();
+    });
+
+    // Regression: a missing JWT_REFRESH_EXPIRATION must fail loudly. The
+    // pre-fix code computed a NaN maxAge and silently set a session cookie.
+    it('should throw a configuration error and set no cookie when JWT_REFRESH_EXPIRATION is missing', async () => {
+      delete configValues['JWT_REFRESH_EXPIRATION'];
+      jwtServiceMock.verify.mockReturnValue({
+        data: {
+          tokens: {
+            access_token: 'token',
+            refresh_token: 'refresh',
+            expires_in: 3600
+          },
+          user: { id: '1', email: 'test@example.com' }
+        },
+        purpose: TOKEN_PURPOSE.OAUTH_DATA,
+        jti: 'token-id'
+      });
+
+      const req = mockExpressRequest({} as OAuthUserProfile, {
+        oauth_data: 'signed-jwt'
+      });
+      const res = mockResponse();
+
+      await expect(controller.exchangeOAuthData(req, res)).rejects.toThrow(
         'JWT_REFRESH_EXPIRATION'
       );
       expect(res.cookie).not.toHaveBeenCalled();
     });
 
-    it('should throw BadRequestException when JWT is expired', () => {
+    it('should throw BadRequestException when JWT is expired', async () => {
       jwtServiceMock.verify.mockImplementation(() => {
         throw new Error('jwt expired');
       });
@@ -787,7 +861,7 @@ describe('OAuthController', () => {
       });
       const res = mockResponse();
 
-      expect(() => controller.exchangeOAuthData(req, res)).toThrow(
+      await expect(controller.exchangeOAuthData(req, res)).rejects.toThrow(
         'Invalid or expired OAuth data'
       );
     });

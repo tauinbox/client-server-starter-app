@@ -11,6 +11,7 @@ import * as passport from 'passport';
 import * as cookieParser from 'cookie-parser';
 import * as request from 'supertest';
 import { Strategy as OAuth2Strategy } from 'passport-oauth2';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { OAuthController } from './oauth.controller';
 import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
@@ -19,6 +20,7 @@ import { AuthService } from '../services/auth.service';
 import { MailService } from '../../mail/mail.service';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { CookieStateStore } from '../utils/cookie-state-store';
+import { createMockCache } from '../../../common/testing/cache.mock';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { TOKEN_PURPOSE } from '@app/shared/constants';
 
@@ -143,6 +145,7 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
       imports: [PassportModule],
       controllers: [OAuthController],
       providers: [
+        { provide: CACHE_MANAGER, useValue: createMockCache() },
         {
           provide: OAuthService,
           useValue: { linkOAuthToUser, loginWithOAuth }
