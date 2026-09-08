@@ -308,8 +308,8 @@ management and theming.
   on the two permission-write routes, `PUT /roles/:id/permissions` and `POST /roles/:id/permissions`,
   for each caller and for a super role. The mock server mirrors the rule.
 
-  `fieldMatch` and `custom` stay usable on `create`. The instance-level check on `POST /users`
-  evaluates them against the submitted payload.
+  `fieldMatch` and `custom` stay usable on `create`. The instance-level check on `POST /users`,
+  `POST /roles` and `POST /rbac/actions` evaluates them against the submitted payload.
 - **Condition shape validation at the input.** `PermissionConditionDto` enforces the inner shape of
   `ownership`, `fieldMatch` and `userAttr`. It uses the shared finders in
   `shared/src/utils/permission-condition-shape.ts`, which the client editors and the mock server also

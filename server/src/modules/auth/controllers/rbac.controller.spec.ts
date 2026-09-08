@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ForbiddenException, HttpException, Logger } from '@nestjs/common';
+import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { RbacController } from './rbac.controller';
 import { ResourceService } from '../services/resource.service';
 import { ActionService } from '../services/action.service';
@@ -354,7 +355,7 @@ describe('RbacController', () => {
       actionServiceMock.create.mockResolvedValue(created);
       const req = mockJwtRequest() as JwtAuthRequest;
 
-      const result = await controller.createAction(dto, req);
+      const result = await controller.createAction(dto, req, mockAbility);
 
       expect(actionServiceMock.create).toHaveBeenCalledWith(dto);
       expect(result).toBe(created);
@@ -365,7 +366,8 @@ describe('RbacController', () => {
 
       await controller.createAction(
         { name: 'export', displayName: 'Export', description: '' },
-        req
+        req,
+        mockAbility
       );
 
       expect(cacheManagerMock.del).toHaveBeenCalledWith('rbac:metadata');
@@ -380,7 +382,7 @@ describe('RbacController', () => {
         'admin@example.com'
       ) as JwtAuthRequest;
 
-      await controller.createAction(dto, req);
+      await controller.createAction(dto, req, mockAbility);
 
       expect(auditServiceMock.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -392,6 +394,59 @@ describe('RbacController', () => {
           details: { name: 'export' }
         })
       );
+    });
+
+    // Built on a real CASL ability: a mocked `can` cannot show the difference
+    // between the type-level check the route guard runs and the instance-level
+    // one, which is the whole point of this path.
+    describe('conditional create grant', () => {
+      function abilityWithNameCondition(): AppAbility {
+        const { can, build } = new AbilityBuilder<AppAbility>(
+          createMongoAbility
+        );
+        can('create', 'Permission', { name: { $in: ['export'] } });
+        return build();
+      }
+
+      it('creates the action when the record satisfies the condition', async () => {
+        const created = { id: 'act-new', name: 'export' };
+        actionServiceMock.create.mockResolvedValue(created);
+        const req = mockJwtRequest() as JwtAuthRequest;
+
+        const result = await controller.createAction(
+          { name: 'export', displayName: 'Export' },
+          req,
+          abilityWithNameCondition()
+        );
+
+        expect(result).toBe(created);
+      });
+
+      it('throws ForbiddenException and audits when the record fails the condition', async () => {
+        const req = mockJwtRequest('user-1') as JwtAuthRequest;
+
+        await expect(
+          controller.createAction(
+            { name: 'archive', displayName: 'Archive' },
+            req,
+            abilityWithNameCondition()
+          )
+        ).rejects.toBeInstanceOf(ForbiddenException);
+
+        expect(actionServiceMock.create).not.toHaveBeenCalled();
+        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: AuditAction.PERMISSION_CHECK_FAILURE,
+            actorId: 'user-1',
+            targetType: 'Action'
+          })
+        );
+        expect(metricsServiceMock.recordPermissionDenied).toHaveBeenCalledWith(
+          'instance',
+          'create',
+          'Permission'
+        );
+      });
     });
   });
 

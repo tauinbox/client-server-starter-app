@@ -1109,10 +1109,12 @@ Those endpoints are `GET/PATCH/DELETE /users/:id`, `GET /users/:id/permissions`,
 `GET/PATCH/DELETE /roles/:id`, `GET /roles/:id/permissions`, `PATCH /rbac/resources/:id`,
 `POST /rbac/resources/:id/restore`, and `PATCH/DELETE /rbac/actions/:id`.
 
-`POST /users` runs the same check against the record that it makes. The subject comes from
-`CreateUserDto`, minus `password`, which no authorization condition can legitimately test. Thus the
-server enforces a `create` grant with a `fieldMatch` or `custom` condition, and that grant does not
-collapse to the type-level check.
+`POST /users`, `POST /roles` and `POST /rbac/actions` run the same check against the record that
+they make. The subject comes from the submitted DTO. `POST /users` removes `password` from it, which
+no authorization condition can legitimately test. `POST /rbac/actions` uses the `Permission` subject,
+because that is the `@Authorize` subject of the route, and it audits the denial with
+`targetType: 'Action'`. Thus the server enforces a `create` grant with a `fieldMatch` or `custom`
+condition, and that grant does not collapse to the type-level check.
 
 This blocks the type-level `@Authorize` bypass. Without it, a conditional grant that an administrator
 configured becomes unconditional on a single-entity route.
