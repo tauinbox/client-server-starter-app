@@ -580,10 +580,11 @@ router.post('/refresh-token', (req, res) => {
   ];
 
   if (!cookieToken) {
+    // The server throws a bare UnauthorizedException here, before the service
+    // runs, so this refusal carries no errorKey.
     res.status(401).json({
       message: 'Refresh token is required',
-      statusCode: 401,
-      errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+      statusCode: 401
     });
     return;
   }

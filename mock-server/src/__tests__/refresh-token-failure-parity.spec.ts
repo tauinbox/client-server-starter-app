@@ -64,6 +64,18 @@ function auditRows(action: string): MockAuditLog[] {
 }
 
 describe('refresh-token failure parity', () => {
+  it('answers a missing cookie with no errorKey', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/auth/refresh-token`, {
+      method: 'POST'
+    });
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({
+      message: 'Refresh token is required',
+      statusCode: 401
+    });
+    expect(auditRows('TOKEN_REFRESH_FAILURE')).toHaveLength(0);
+  });
+
   it('answers a deactivated account with the deactivated envelope', async () => {
     const session = await signIn();
     setActive(session.userId, false);
