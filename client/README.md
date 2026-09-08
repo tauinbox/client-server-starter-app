@@ -988,13 +988,17 @@ list is the heaviest page, and it repeatedly came near to the default limit of 3
 - an OAuth sign-in completes the session, thus a guarded return URL activates and does not go to
   `/forbidden` (`oauth-callback-session.spec.ts`)
 - a feature-flag toggle propagates through SSE (`admin/feature-flags.spec.ts`)
+- the ownership-scoped `update:User` grant of the seeded `user` role admits the owner of the
+  record on `/users/<own-id>/edit` and refuses every other record (`users/users-edit.spec.ts`).
+  The route runs `instancePermissionGuard`, so the MongoQuery condition of the grant is compared
+  against the record id in the URL
 
 **Design-token regression net.** `e2e/visual/m3-colors.spec.ts` asserts that each destructive utility
 resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that the drawer, the rail
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 252 Playwright tests. They cover auth, users, admin, billing, a11y,
+**Coverage.** The suite has 254 Playwright tests. They cover auth, users, admin, billing, a11y,
 keyboard and visual. There are also 1259 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
