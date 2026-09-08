@@ -60,3 +60,20 @@ export const MOCK_RECOVERY_CODES: readonly string[] = [
   'IIIIIIII-IIIIIIII',
   'JJJJJJJJ-JJJJJJJJ'
 ];
+
+/**
+ * What a regeneration hands back. It is a different set from the enrolment
+ * one on purpose: a test can then see that the replacement happened.
+ */
+export const MOCK_REGENERATED_RECOVERY_CODES: readonly string[] = [
+  'KKKKKKKK-KKKKKKKK',
+  'LLLLLLLL-LLLLLLLL',
+  'MMMMMMMM-MMMMMMMM',
+  'NNNNNNNN-NNNNNNNN',
+  'PPPPPPPP-PPPPPPPP',
+  'QQQQQQQQ-QQQQQQQQ',
+  'RRRRRRRR-RRRRRRRR',
+  'SSSSSSSS-SSSSSSSS',
+  'TTTTTTTT-TTTTTTTT',
+  'UUUUUUUU-UUUUUUUU'
+];

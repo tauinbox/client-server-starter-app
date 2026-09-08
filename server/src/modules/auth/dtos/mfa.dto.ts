@@ -49,7 +49,12 @@ export class MfaEnableDto {
   code: string;
 }
 
-export class MfaDisableDto {
+/**
+ * The step-up an operation on a live factor asks for. Turning the factor off
+ * and replacing the recovery set both accept the same two factors, so both
+ * read this one body.
+ */
+export class MfaStepUpDto {
   @ApiPropertyOptional({
     description: 'Current password, for an account that holds one',
     example: 'CurrentPassword123'

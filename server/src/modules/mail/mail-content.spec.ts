@@ -42,6 +42,23 @@ describe('mail-content', () => {
     }
   });
 
+  it('says the earlier recovery set stopped working, in both locales', () => {
+    const details = { when: '2026-09-01 12:34 UTC', ip: '198.51.100.7' };
+
+    for (const locale of ['en', 'ru'] as const) {
+      const msg = mailMessages(locale).mfaRecoveryCodesReplaced(details);
+      expect(msg.button).toBeUndefined();
+      expect(msg.paragraphs.length).toBeGreaterThan(0);
+    }
+
+    expect(
+      mailMessages('en').mfaRecoveryCodesReplaced(details).paragraphs[0]
+    ).toContain('stopped working');
+    expect(
+      mailMessages('ru').mfaRecoveryCodesReplaced(details).subject
+    ).not.toBe(mailMessages('en').mfaRecoveryCodesReplaced(details).subject);
+  });
+
   it('names the source of a password change', () => {
     const details = { when: '2026-09-01 12:34 UTC' };
     const self = mailMessages('en').passwordChanged('self', details);

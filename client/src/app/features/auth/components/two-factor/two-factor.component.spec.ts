@@ -45,6 +45,7 @@ describe('TwoFactorComponent', () => {
     startMfaSetup: ReturnType<typeof vi.fn>;
     enableMfa: ReturnType<typeof vi.fn>;
     disableMfa: ReturnType<typeof vi.fn>;
+    regenerateRecoveryCodes: ReturnType<typeof vi.fn>;
   };
   let notifyMock: {
     success: ReturnType<typeof vi.fn>;
@@ -64,7 +65,10 @@ describe('TwoFactorComponent', () => {
       enableMfa: vi
         .fn()
         .mockReturnValue(of({ recoveryCodes: ['AAAAAAAA-AAAAAAAA'] })),
-      disableMfa: vi.fn().mockReturnValue(of({ message: 'off' }))
+      disableMfa: vi.fn().mockReturnValue(of({ message: 'off' })),
+      regenerateRecoveryCodes: vi
+        .fn()
+        .mockReturnValue(of({ recoveryCodes: ['KKKKKKKK-KKKKKKKK'] }))
     };
     notifyMock = { success: vi.fn(), error: vi.fn() };
 
@@ -246,6 +250,88 @@ describe('TwoFactorComponent', () => {
     expect(notifyMock.error).toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).not.toContain(
       'AAAAAAAA-AAAAAAAA'
+    );
+  });
+
+  it('replaces the codes and says the earlier set stopped working', async () => {
+    fixture.componentRef.setInput('user', buildUser({ mfaEnabled: true }));
+    fixture.detectChanges();
+
+    component.startRegenerate();
+    component.passwordModel.set({ currentPassword: 'Password1' });
+    fixture.detectChanges();
+
+    component.regenerateCodes();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(authServiceMock.regenerateRecoveryCodes).toHaveBeenCalledWith({
+      currentPassword: 'Password1'
+    });
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('KKKKKKKK-KKKKKKKK');
+    expect(text).toContain('replace the earlier set');
+  });
+
+  it('replaces the codes with a code when the account holds no password', async () => {
+    fixture.componentRef.setInput(
+      'user',
+      buildUser({ hasPassword: false, mfaEnabled: true })
+    );
+    fixture.componentRef.setInput('reauthProviderLabel', 'Google');
+    fixture.detectChanges();
+
+    component.startRegenerate();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent as string).not.toContain(
+      'Confirm your password'
+    );
+
+    component.codeModel.set({ code: '123456' });
+    component.regenerateCodes();
+    await fixture.whenStable();
+
+    expect(authServiceMock.regenerateRecoveryCodes).toHaveBeenCalledWith({
+      code: '123456'
+    });
+  });
+
+  it('asks for a factor before it replaces the codes', async () => {
+    fixture.componentRef.setInput('user', buildUser({ mfaEnabled: true }));
+    fixture.detectChanges();
+
+    component.startRegenerate();
+    fixture.detectChanges();
+
+    component.regenerateCodes();
+    await fixture.whenStable();
+
+    expect(authServiceMock.regenerateRecoveryCodes).not.toHaveBeenCalled();
+  });
+
+  it('reports a refused replacement and shows no codes', async () => {
+    authServiceMock.regenerateRecoveryCodes.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 400,
+            error: { errorKey: 'errors.auth.invalidCurrentPassword' }
+          })
+      )
+    );
+    fixture.componentRef.setInput('user', buildUser({ mfaEnabled: true }));
+    fixture.detectChanges();
+
+    component.startRegenerate();
+    component.passwordModel.set({ currentPassword: 'wrong' });
+    component.regenerateCodes();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(notifyMock.error).toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).not.toContain(
+      'KKKKKKKK-KKKKKKKK'
     );
   });
 

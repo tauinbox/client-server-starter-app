@@ -205,6 +205,16 @@ describe('MailService', () => {
         service.sendOAuthUnlinkedNotification('user@example.com', 'vk', 'en')
       ).resolves.not.toThrow();
     });
+
+    it('should not throw when sending a recovery-codes replaced notice', async () => {
+      await expect(
+        service.sendMfaRecoveryCodesReplacedNotification(
+          'user@example.com',
+          'en',
+          '198.51.100.7'
+        )
+      ).resolves.not.toThrow();
+    });
   });
 
   describe('with a queue (Redis configured)', () => {

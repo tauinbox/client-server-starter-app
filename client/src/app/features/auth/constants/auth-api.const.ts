@@ -22,7 +22,8 @@ export enum AuthApiEnum {
   MfaEnable = `${AUTH_API_V1}/mfa/enable`,
   MfaDisable = `${AUTH_API_V1}/mfa/disable`,
   MfaVerify = `${AUTH_API_V1}/mfa/verify`,
-  MfaRecovery = `${AUTH_API_V1}/mfa/recovery`
+  MfaRecovery = `${AUTH_API_V1}/mfa/recovery`,
+  MfaRecoveryCodes = `${AUTH_API_V1}/mfa/recovery-codes`
 }
 
 export const OAUTH_URLS = {

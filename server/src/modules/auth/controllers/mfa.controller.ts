@@ -33,12 +33,12 @@ import { JwtAuthRequest } from '../types/auth.request';
 import { User } from '../../users/entities/user.entity';
 import { AuthResponseDto } from '../dtos/auth-response.dto';
 import {
-  MfaDisableDto,
   MfaEnableDto,
   MfaRecoveryCodesResponseDto,
   MfaRecoveryDto,
   MfaSetupDto,
   MfaSetupResponseDto,
+  MfaStepUpDto,
   MfaVerifyDto
 } from '../dtos/mfa.dto';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
@@ -140,11 +140,11 @@ export class MfaController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Turn two-factor off' })
-  @ApiBody({ type: MfaDisableDto })
+  @ApiBody({ type: MfaStepUpDto })
   @ApiOkResponse({ description: 'Two-factor has been turned off' })
   async disable(
     @Request() req: JwtAuthRequest,
-    @Body() dto: MfaDisableDto
+    @Body() dto: MfaStepUpDto
   ): Promise<{ message: string }> {
     const user = await this.userService.findOne(req.user.userId);
     await this.authService.assertStepUp(
@@ -158,6 +158,36 @@ export class MfaController {
 
     await this.mfaService.disable(user, extractAuditContext(req));
     return { message: 'Two-factor authentication has been turned off' };
+  }
+
+  @Throttle(CHALLENGE_THROTTLE)
+  @Post('recovery-codes')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Replace the recovery codes with a fresh set' })
+  @ApiBody({ type: MfaStepUpDto })
+  @ApiOkResponse({
+    description: 'The new codes, readable only in this response',
+    type: MfaRecoveryCodesResponseDto
+  })
+  async regenerateRecoveryCodes(
+    @Request() req: JwtAuthRequest,
+    @Body() dto: MfaStepUpDto
+  ): Promise<MfaRecoveryCodesResponseDto> {
+    const user = await this.userService.findOne(req.user.userId);
+    await this.authService.assertStepUp(
+      user,
+      dto.currentPassword,
+      this.reauthProof(req),
+      STEP_UP_OPERATION.MFA_RECOVERY_CODES,
+      dto.code,
+      extractAuditContext(req)
+    );
+
+    return await this.mfaService.regenerateRecoveryCodes(
+      user,
+      extractAuditContext(req)
+    );
   }
 
   @Public()

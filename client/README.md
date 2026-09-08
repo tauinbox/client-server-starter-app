@@ -51,7 +51,8 @@ src/app/
 ├── features/
 │   ├── auth/               # Login, register, profile, OAuth callback, verify-email,
 │   │                       # forgot-password, reset-password, forbidden,
-│   │                       # two-factor (the enrolment card on the profile page;
+│   │                       # two-factor (the enrolment card on the profile page,
+│   │                       # which also replaces the recovery set;
 │   │                       # the login card holds the code step itself)
 │   │   ├── casl/           # app-ability.ts holds AppAbility, Actions and Subjects.
 │   │   │                   # Subjects contains the generated KnownSubjects and AnyObject.
@@ -993,8 +994,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 251 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1254 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 252 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1259 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the
@@ -1011,7 +1012,10 @@ An account that holds a password answers a prompt on the "Connect" control inste
 The two-factor tests carry one more control route. A code is single use on the server and on the
 mock, and the mock answers one fixed code, so a test that must present that code a second time
 calls `POST /__control/totp-ledger` to clear the recorded step. It stands in for the wait a real
-authenticator imposes, without a 30-second sleep in the run. The unit tests also cover session restore, cross-tab logout, lockout, email
+authenticator imposes, without a 30-second sleep in the run. The card also replaces the recovery
+set on request: it asks for the same step-up the disable path asks for, then shows the new codes in
+the panel the enrolment ends on. The mock answers that route with a second fixed set, so one test
+can watch a code of the first set stop working and a code of the second set sign the account in. The unit tests also cover session restore, cross-tab logout, lockout, email
 verification, and password reset with a password confirmation. They cover the users list, detail, edit
 and search. This includes the email-change confirmation dialog of the administrator and the
 soft-delete and restore flow. They also cover the administration of roles, resources and feature

@@ -33,7 +33,8 @@ management and theming.
 - **Two-factor authentication.** TOTP, optional for every account and forced on none. The profile
   page shows a QR code and a manual key, and the factor stays off until a code from the
   authenticator proves the setup worked. Enrolment answers with ten single-use recovery codes,
-  stored as hashes and readable exactly once. A code from the authenticator is single use
+  stored as hashes and readable exactly once. The card can replace that set at any time, which is
+  what an account that spent all ten needs; the replacement retires every earlier code. A code from the authenticator is single use
   as well: the account records the time step of the code it spent, and any code at or below
   that step is refused, so an observed code cannot be replayed inside its window. After that a correct password no longer signs the
   account in: it returns a 300 second `mfa_pending` token, which the bearer strategy refuses, and
@@ -1743,11 +1744,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2272 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2279 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 366 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 364 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1254 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 251 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 659 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1259 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 252 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 668 tests pass |
 
 ## CI/CD
 
@@ -1816,7 +1817,9 @@ a second request to the registry for a verdict that gates nothing.
   buys only an `mfa_pending` token, which `JwtStrategy` refuses as a bearer credential, so one
   factor alone reaches nothing. The two challenge routes carry the login throttle, including the
   long window that counts failures only, and each refused code is audited. A recovery code is spent
-  by deleting its hash, so it works once, and a TOTP code is single use too: an acceptance
+  by deleting its hash, so it works once, and the whole set is replaced on request behind a
+  step-up of its own, so a spent set does not force the account to turn the factor off. A TOTP
+  code is single use too: an acceptance
   records the RFC 6238 step under a row lock, and a code at or below that step is refused on
   the enrolment, the challenge and the step-up alike. The TOTP secret is encrypted (AES-256-GCM), not hashed,
   because verification needs the original value; the key lives in `MFA_ENCRYPTION_KEY` and never in
@@ -1836,8 +1839,10 @@ a second request to the registry for a verdict that gates nothing.
   completes a round trip at its provider through `POST /auth/oauth/reauth-init`, and the callback
   mints a `reauth_proof` cookie the change consumes. The **two-factor enrolment**
   (`POST /auth/mfa/setup`) takes the same trip, under its own operation. Turning the factor off does
-  not: an enrolled account presents a code from its authenticator, which the step-up accepts before
-  it looks for a password. Before the password path was gated, a stolen
+  not, and neither does replacing the recovery codes: an enrolled account presents a code from its
+  authenticator, which the step-up accepts before it looks for a password. Each of those two actions
+  still names its own operation, because a proof is not single use and one trip must not authorize
+  both. Before the password path was gated, a stolen
   access token alone could bind a password that survived the logout and the token rotation.
   The proof lasts 300 seconds, is HttpOnly, and dies with an account-wide session revocation. It is not single use,
   so it also carries the operation it was minted for, and each sensitive action accepts only its own:

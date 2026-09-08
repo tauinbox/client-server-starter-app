@@ -1659,6 +1659,7 @@ These routes currently replace the default limit:
 | `POST /auth/mfa/setup` | 1 min | 5 plus `login-long-window` | It verifies the step-up secret of an authenticated caller. A stolen access token must not buy unlimited guesses |
 | `POST /auth/mfa/enable` | 1 min | 5 plus `login-long-window` | It verifies a code from the pending secret |
 | `POST /auth/mfa/disable` | 1 min | 5 plus `login-long-window` | It verifies a password or a code, and it turns the second factor off |
+| `POST /auth/mfa/recovery-codes` | 1 min | 5 plus `login-long-window` | It verifies a password or a code, and it replaces the recovery set |
 | `POST /auth/oauth/link-init` | 1 min | 5 plus `login-long-window`, on a body that carries `currentPassword` | It verifies the step-up secret before it mints the link intent. An account with no password takes a provider round trip instead, and spends none of that budget |
 | `PATCH /auth/profile` | 15 min | `login-long-window` only, on a body that carries `password` | The step-up on the password branch verifies a secret. A name or locale edit keeps the application-wide ceiling |
 | `GET /rbac/metadata` | 1 min | 30 | The limit is higher, because each administrator route guard reads it |

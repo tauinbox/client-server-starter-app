@@ -2,7 +2,11 @@ import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { findUserByEmail, resetState } from '../state';
-import { MOCK_RECOVERY_CODES, MOCK_TOTP_CODE } from '../constants';
+import {
+  MOCK_RECOVERY_CODES,
+  MOCK_REGENERATED_RECOVERY_CODES,
+  MOCK_TOTP_CODE
+} from '../constants';
 
 let server: Server;
 let baseUrl: string;
@@ -338,6 +342,112 @@ describe('recovery codes', () => {
       mfaToken,
       recoveryCode: 'nope'
     });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('replacing the recovery codes', () => {
+  it('hands back a fresh set the enrolment did not issue', async () => {
+    const token = await enrol();
+
+    const res = await post(
+      '/auth/mfa/recovery-codes',
+      { currentPassword: CREDENTIALS.password },
+      token
+    );
+    const body = (await res.json()) as { recoveryCodes: string[] };
+
+    expect(res.status).toBe(200);
+    expect(body.recoveryCodes).toEqual([...MOCK_REGENERATED_RECOVERY_CODES]);
+    expect(body.recoveryCodes).not.toContain(MOCK_RECOVERY_CODES[0]);
+  });
+
+  it('retires every code the enrolment issued', async () => {
+    const token = await enrol();
+    await post(
+      '/auth/mfa/recovery-codes',
+      { currentPassword: CREDENTIALS.password },
+      token
+    );
+
+    const { mfaToken } = (await login()) as { mfaToken: string };
+    const res = await post('/auth/mfa/recovery', {
+      mfaToken,
+      recoveryCode: MOCK_RECOVERY_CODES[0]
+    });
+    const body = (await res.json()) as Record<string, string>;
+
+    expect(res.status).toBe(401);
+    expect(body['errorKey']).toBe('errors.auth.mfaInvalidRecoveryCode');
+  });
+
+  it('signs the account in with a code of the new set', async () => {
+    const token = await enrol();
+    await post(
+      '/auth/mfa/recovery-codes',
+      { currentPassword: CREDENTIALS.password },
+      token
+    );
+
+    const { mfaToken } = (await login()) as { mfaToken: string };
+    const res = await post('/auth/mfa/recovery', {
+      mfaToken,
+      recoveryCode: MOCK_REGENERATED_RECOVERY_CODES[0]
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it('accepts an authenticator code in place of the password', async () => {
+    const token = await enrol();
+    await clearTotpLedger();
+
+    const res = await post(
+      '/auth/mfa/recovery-codes',
+      { code: MOCK_TOTP_CODE },
+      token
+    );
+
+    expect(res.status).toBe(200);
+  });
+
+  it('refuses without either factor', async () => {
+    const token = await enrol();
+
+    const res = await post('/auth/mfa/recovery-codes', {}, token);
+    const body = (await res.json()) as Record<string, string>;
+
+    expect(res.status).toBe(400);
+    expect(body['errorKey']).toBe('errors.auth.invalidCurrentPassword');
+  });
+
+  it('refuses an unauthenticated caller', async () => {
+    const res = await post('/auth/mfa/recovery-codes', {
+      currentPassword: CREDENTIALS.password
+    });
+
+    expect(res.status).toBe(401);
+  });
+
+  it('refuses when the factor is not on', async () => {
+    const token = await accessToken();
+
+    const res = await post(
+      '/auth/mfa/recovery-codes',
+      { currentPassword: CREDENTIALS.password },
+      token
+    );
+    const body = (await res.json()) as Record<string, string>;
+
+    expect(res.status).toBe(400);
+    expect(body['errorKey']).toBe('errors.auth.mfaNotEnabled');
+  });
+
+  it('rejects a code of the wrong length with a validation error', async () => {
+    const token = await enrol();
+
+    const res = await post('/auth/mfa/recovery-codes', { code: '12' }, token);
 
     expect(res.status).toBe(400);
   });

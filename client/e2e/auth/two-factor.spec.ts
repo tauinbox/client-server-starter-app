@@ -1,6 +1,7 @@
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
 import {
   MOCK_RECOVERY_CODES,
+  MOCK_REGENERATED_RECOVERY_CODES,
   MOCK_TOTP_CODE
 } from '../../../mock-server/src/constants';
 import type { Page } from '@playwright/test';
@@ -9,6 +10,26 @@ const EMAIL = 'testlogin@example.com';
 const PASSWORD = 'Password1';
 /** The id `loginViaUi` seeds the account under. */
 const USER_ID = '100';
+
+/** Fails the run on a horizontal overflow, at every width and both schemes. */
+async function expectNoOverflow(page: Page, panel: string): Promise<void> {
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme });
+    for (const width of [375, 768, 1366]) {
+      await page.setViewportSize({ width, height: 900 });
+      const overflow = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth
+      );
+      expect(
+        overflow,
+        `horizontal overflow on ${panel} at ${width}px in ${colorScheme}`
+      ).toBeLessThanOrEqual(0);
+    }
+  }
+  await page.setViewportSize({ width: 1366, height: 900 });
+}
 
 async function logout(page: Page): Promise<void> {
   await page.getByRole('button', { name: /John Doe/i }).click();
@@ -111,7 +132,52 @@ test.describe('two-factor authentication', () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test('renders the enrolment panel without overflow at every width', async ({
+  test('replaces the recovery set and retires the codes it replaced', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url);
+    await page.getByRole('button', { name: 'Turn on' }).click();
+    await page.getByLabel('Current password').fill(PASSWORD);
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByLabel('Authentication code').fill(MOCK_TOTP_CODE);
+    await page.getByRole('button', { name: 'Turn on' }).click();
+    await expect(page.getByText(MOCK_RECOVERY_CODES[0])).toBeVisible();
+    await page.getByRole('button', { name: 'I saved them' }).click();
+
+    await page.getByRole('button', { name: 'New recovery codes' }).click();
+    await page.getByLabel('Current password').fill(PASSWORD);
+    await page.getByRole('button', { name: 'Get new codes' }).click();
+
+    await expect(
+      page.getByText(MOCK_REGENERATED_RECOVERY_CODES[0])
+    ).toBeVisible();
+    await expect(page.getByText(/replace the earlier set/i)).toBeVisible();
+    await page.getByRole('button', { name: 'I saved them' }).click();
+
+    await logout(page);
+
+    await page.getByLabel('Email').fill(EMAIL);
+    await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
+    await page.getByRole('main').getByRole('button', { name: 'Login' }).click();
+    await page.getByRole('button', { name: 'Use a recovery code' }).click();
+
+    // A refused code leaves the card on this step, so both codes are tried
+    // against the one challenge the password bought.
+    const codeField = page.getByLabel('Recovery code');
+
+    // The set the enrolment issued died with the replacement.
+    await codeField.fill(MOCK_RECOVERY_CODES[0]);
+    await page.getByRole('button', { name: 'Verify' }).click();
+    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page).toHaveURL(/\/login/);
+
+    await codeField.fill(MOCK_REGENERATED_RECOVERY_CODES[0]);
+    await page.getByRole('button', { name: 'Verify' }).click();
+    await page.waitForURL((url) => !url.pathname.endsWith('/login'));
+  });
+
+  test('renders every panel without overflow at every width', async ({
     _mockServer,
     page
   }) => {
@@ -124,20 +190,18 @@ test.describe('two-factor authentication', () => {
     await page.getByRole('button', { name: 'Turn on' }).click();
     await expect(page.getByText(MOCK_RECOVERY_CODES[0])).toBeVisible();
 
-    for (const colorScheme of ['light', 'dark'] as const) {
-      await page.emulateMedia({ colorScheme });
-      for (const width of [375, 768, 1366]) {
-        await page.setViewportSize({ width, height: 900 });
-        const overflow = await page.evaluate(
-          () =>
-            document.documentElement.scrollWidth -
-            document.documentElement.clientWidth
-        );
-        expect(
-          overflow,
-          `horizontal overflow at ${width}px in ${colorScheme}`
-        ).toBeLessThanOrEqual(0);
-      }
-    }
+    await expectNoOverflow(page, 'the codes panel');
+
+    await page.getByRole('button', { name: 'I saved them' }).click();
+    // The card carries two buttons once the factor is on, and the narrow
+    // widths are where that row has to wrap.
+    await expect(
+      page.getByRole('button', { name: 'New recovery codes' })
+    ).toBeVisible();
+    await expectNoOverflow(page, 'the enabled card');
+
+    await page.getByRole('button', { name: 'New recovery codes' }).click();
+    await expect(page.getByLabel('Current password')).toBeVisible();
+    await expectNoOverflow(page, 'the replacement panel');
   });
 });

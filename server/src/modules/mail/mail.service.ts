@@ -217,6 +217,18 @@ export class MailService {
     await this.send(email, message, loc);
   }
 
+  async sendMfaRecoveryCodesReplacedNotification(
+    email: string,
+    locale: string = DEFAULT_LOCALE,
+    ip?: string
+  ): Promise<void> {
+    const loc = normalizeLocale(locale);
+    const message = mailMessages(loc).mfaRecoveryCodesReplaced(
+      credentialChangeDetails(ip)
+    );
+    await this.send(email, message, loc);
+  }
+
   private renderHtml(message: EmailMessage, locale: SupportedLocale): string {
     return this.template({
       lang: locale,

@@ -66,6 +66,7 @@ interface MessageBuilders {
   ) => EmailMessage;
   mfaEnabled: (details: CredentialChangeDetails) => EmailMessage;
   mfaDisabled: (details: CredentialChangeDetails) => EmailMessage;
+  mfaRecoveryCodesReplaced: (details: CredentialChangeDetails) => EmailMessage;
 }
 
 /**
@@ -191,6 +192,15 @@ const en: MessageBuilders = {
       enDetails(details),
       EN_RECOVERY
     ]
+  }),
+  mfaRecoveryCodesReplaced: (details) => ({
+    subject: 'Your two-factor recovery codes were replaced',
+    heading: 'New recovery codes were issued',
+    paragraphs: [
+      'A new set of recovery codes was issued for your account. Every code of the earlier set stopped working.',
+      enDetails(details),
+      EN_RECOVERY
+    ]
   })
 };
 
@@ -282,6 +292,15 @@ const ru: MessageBuilders = {
     heading: 'Двухфакторная аутентификация отключена',
     paragraphs: [
       'Теперь аккаунт защищён только паролем.',
+      ruDetails(details),
+      RU_RECOVERY
+    ]
+  }),
+  mfaRecoveryCodesReplaced: (details) => ({
+    subject: 'Резервные коды двухфакторной аутентификации заменены',
+    heading: 'Выпущены новые резервные коды',
+    paragraphs: [
+      'Для аккаунта выпущен новый набор резервных кодов. Все коды прежнего набора больше не работают.',
       ruDetails(details),
       RU_RECOVERY
     ]

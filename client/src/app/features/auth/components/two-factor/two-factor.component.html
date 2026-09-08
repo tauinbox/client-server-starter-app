@@ -95,7 +95,13 @@
         }
 
         @case ('codes') {
-          <p class="two-factor-note">{{ t('auth.twoFactor.recoveryHint') }}</p>
+          <p class="two-factor-note">
+            {{
+              codesReplaced()
+                ? t('auth.twoFactor.recoveryHintReplaced')
+                : t('auth.twoFactor.recoveryHint')
+            }}
+          </p>
 
           <ul class="two-factor-codes">
             @for (code of recoveryCodes(); track code) {
@@ -147,7 +153,7 @@
             <button
               matButton="filled"
               type="button"
-              [disabled]="disableBlocked()"
+              [disabled]="stepUpBlocked()"
               (click)="disable()"
             >
               @if (busy()) {
@@ -157,6 +163,57 @@
                 </span>
               } @else {
                 {{ t('auth.twoFactor.turnOff') }}
+              }
+            </button>
+            <button matButton="text" type="button" (click)="cancel()">
+              {{ t('auth.twoFactor.cancel') }}
+            </button>
+          </div>
+        }
+
+        @case ('regenerate') {
+          @if (accountHasPassword()) {
+            <p class="two-factor-note">
+              {{ t('auth.twoFactor.regenerateHint') }}
+            </p>
+
+            <nxs-form-field
+              [field]="passwordForm.currentPassword"
+              label="auth.twoFactor.currentPassword"
+              [type]="regeneratePwdToggle.show() ? 'text' : 'password'"
+              prefixIcon="lock"
+              autocomplete="current-password"
+            >
+              <nxs-password-toggle formFieldSuffix #regeneratePwdToggle />
+            </nxs-form-field>
+          } @else {
+            <p class="two-factor-note">
+              {{ t('auth.twoFactor.regenerateHintCode') }}
+            </p>
+
+            <nxs-form-field
+              [field]="codeForm.code"
+              label="auth.twoFactor.code"
+              type="text"
+              prefixIcon="password"
+              autocomplete="one-time-code"
+            />
+          }
+
+          <div class="two-factor-actions">
+            <button
+              matButton="filled"
+              type="button"
+              [disabled]="stepUpBlocked()"
+              (click)="regenerateCodes()"
+            >
+              @if (busy()) {
+                <span class="app-btn-loading">
+                  <mat-spinner diameter="20"></mat-spinner>
+                  {{ t('auth.twoFactor.working') }}
+                </span>
+              } @else {
+                {{ t('auth.twoFactor.regenerate') }}
               }
             </button>
             <button matButton="text" type="button" (click)="cancel()">
@@ -193,6 +250,13 @@
 
           <div class="two-factor-actions">
             @if (enabled()) {
+              <button
+                matButton="outlined"
+                type="button"
+                (click)="startRegenerate()"
+              >
+                {{ t('auth.twoFactor.newCodes') }}
+              </button>
               <button
                 matButton="outlined"
                 type="button"
