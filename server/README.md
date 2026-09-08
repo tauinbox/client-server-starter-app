@@ -1542,6 +1542,11 @@ data.
 A seeder does not touch a row that an administrator edited. A seeder writes the rules of a feature
 flag only beside a flag that it just made. Thus it does not restore a rule that a person deleted.
 
+The RBAC seeder gives the `admin` role every permission, and it gives the `user` role three grants:
+`read` and `update` on `profile`, plus `update` on `users` under
+`{ ownership: { userField: 'id' } }`. That last row is the only conditional grant the product seeds,
+and `mock-server/src/seed.ts` mirrors it, so an end-to-end test can reach an ownership-scoped rule.
+
 ## Deployment behind a reverse proxy
 
 The app can run behind nginx, Caddy, a Kubernetes ingress or Cloudflare. The TCP peer of each request

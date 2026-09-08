@@ -79,6 +79,38 @@ test.describe('User Edit page', () => {
     await expect(page).toHaveURL(/.*\/forbidden$/);
   });
 
+  // The seeded `user` role holds update:User only as
+  // { ownership: { userField: 'id' } }, so the route guard must compare the
+  // grant against the record in the URL, not against the subject type.
+  test('admits the owner of the record behind the ownership grant', async ({
+    _mockServer,
+    page
+  }) => {
+    const ownId = mockId('user-owner');
+    await loginViaUi(page, _mockServer.url, {
+      id: ownId,
+      email: 'owner@example.com'
+    });
+
+    await page.goto(`/users/${ownId}/edit`);
+
+    await expect(page).toHaveURL(new RegExp(`/users/${ownId}/edit$`));
+  });
+
+  test('refuses a record the ownership grant does not cover', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, {
+      id: mockId('user-owner'),
+      email: 'owner@example.com'
+    });
+
+    await page.goto(`/users/${mockId('user-3')}/edit`);
+
+    await expect(page).toHaveURL(/.*\/forbidden$/);
+  });
+
   test('should show validation errors on blur', async ({
     _mockServer,
     page

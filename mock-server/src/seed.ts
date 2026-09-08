@@ -453,18 +453,36 @@ function generateRolePermissions(
     }
   }
 
-  // User gets profile permissions only
+  // User gets profile:read, profile:update, and update:User (own record only),
+  // exactly as the server RBAC seeder grants them.
   if (userRole) {
     const profileResource = resources.find((r) => r.name === 'profile');
-    if (profileResource) {
-      for (const perm of permissions.filter(
-        (p) => p.resourceId === profileResource.id
-      )) {
+    const usersResource = resources.find((r) => r.name === 'users');
+    const readActionId = mockId('act-read');
+    const updateActionId = mockId('act-update');
+
+    for (const perm of permissions) {
+      if (
+        perm.resourceId === profileResource?.id &&
+        (perm.actionId === readActionId || perm.actionId === updateActionId)
+      ) {
         result.push({
           id: mockId(`rp-${id++}`),
           roleId: userRole.id,
           permissionId: perm.id,
           conditions: null
+        });
+      }
+
+      if (
+        perm.resourceId === usersResource?.id &&
+        perm.actionId === updateActionId
+      ) {
+        result.push({
+          id: mockId(`rp-${id++}`),
+          roleId: userRole.id,
+          permissionId: perm.id,
+          conditions: { ownership: { userField: 'id' } }
         });
       }
     }
