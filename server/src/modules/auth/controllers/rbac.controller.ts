@@ -244,8 +244,20 @@ export class RbacController {
   @ApiCreatedResponse({ description: 'Action created' })
   async createAction(
     @Body() dto: CreateActionDto,
-    @Request() req: JwtAuthRequest
+    @Request() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
+    // The route-level @Authorize check is type-level and ignores conditions,
+    // so a conditional create grant is re-evaluated against the record the
+    // caller is asking to create.
+    assertCan(
+      ability,
+      'create',
+      subject('Permission', dto),
+      this.auditService,
+      { actorId: req.user.userId, targetType: 'Action' },
+      this.metricsService
+    );
     const action = await this.actionService.create(dto);
     await this.cacheManager.del(METADATA_CACHE_KEY);
     await this.auditService.log({

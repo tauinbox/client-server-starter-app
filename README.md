@@ -308,8 +308,8 @@ management and theming.
   on the two permission-write routes, `PUT /roles/:id/permissions` and `POST /roles/:id/permissions`,
   for each caller and for a super role. The mock server mirrors the rule.
 
-  `fieldMatch` and `custom` stay usable on `create`. The instance-level check on `POST /users`
-  evaluates them against the submitted payload.
+  `fieldMatch` and `custom` stay usable on `create`. The instance-level check on `POST /users`,
+  `POST /roles` and `POST /rbac/actions` evaluates them against the submitted payload.
 - **Condition shape validation at the input.** `PermissionConditionDto` enforces the inner shape of
   `ownership`, `fieldMatch` and `userAttr`. It uses the shared finders in
   `shared/src/utils/permission-condition-shape.ts`, which the client editors and the mock server also
@@ -1744,8 +1744,8 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2279 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 366 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 364 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2284 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 367 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 365 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1259 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 252 tests pass |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 668 tests pass |

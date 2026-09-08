@@ -160,7 +160,22 @@ export class RolesController {
   @ApiOperation({ summary: 'Create a new role' })
   @ApiBody({ type: CreateRoleDto })
   @ApiCreatedResponse({ description: 'Role created' })
-  create(@Body() createRoleDto: CreateRoleDto) {
+  create(
+    @Body() createRoleDto: CreateRoleDto,
+    @Req() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
+  ) {
+    // The route-level @Authorize check is type-level and ignores conditions,
+    // so a conditional create grant is re-evaluated against the record the
+    // caller is asking to create.
+    assertCan(
+      ability,
+      'create',
+      subject('Role', createRoleDto),
+      this.auditService,
+      { actorId: req.user?.userId, targetType: 'Role' },
+      this.metricsService
+    );
     return this.roleService.create(createRoleDto);
   }
 

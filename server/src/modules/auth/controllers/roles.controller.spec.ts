@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
+import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { RolesController } from './roles.controller';
 import { RoleService } from '../services/role.service';
 import { AuditService } from '../../audit/audit.service';
@@ -211,10 +212,62 @@ describe('RolesController', () => {
       const role = { id: 'role-new', name: 'editor' };
       roleServiceMock.create.mockResolvedValue(role);
 
-      const result = await controller.create(dto);
+      const result = await controller.create(dto, mockReq, mockAbility);
 
       expect(roleServiceMock.create).toHaveBeenCalledWith(dto);
       expect(result).toBe(role);
+    });
+
+    // Built on a real CASL ability: a mocked `can` cannot show the difference
+    // between the type-level check the route guard runs and the instance-level
+    // one, which is the whole point of this path.
+    describe('conditional create grant', () => {
+      function abilityWithNameCondition(): AppAbility {
+        const { can, build } = new AbilityBuilder<AppAbility>(
+          createMongoAbility
+        );
+        can('create', 'Role', { name: { $in: ['support-only'] } });
+        return build();
+      }
+
+      it('creates the role when the record satisfies the condition', async () => {
+        const role = { id: 'role-new', name: 'support-only' };
+        roleServiceMock.create.mockResolvedValue(role);
+
+        const result = await controller.create(
+          { name: 'support-only' },
+          mockReq,
+          abilityWithNameCondition()
+        );
+
+        expect(result).toBe(role);
+      });
+
+      it('throws ForbiddenException and audits when the record fails the condition', () => {
+        // The handler is synchronous: assertCan throws before the service call,
+        // so the rejection never becomes a promise.
+        expect(() =>
+          controller.create(
+            { name: 'anything-else' },
+            mockReq,
+            abilityWithNameCondition()
+          )
+        ).toThrow(ForbiddenException);
+
+        expect(roleServiceMock.create).not.toHaveBeenCalled();
+        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: AuditAction.PERMISSION_CHECK_FAILURE,
+            actorId: 'actor-1',
+            targetType: 'Role'
+          })
+        );
+        expect(metricsServiceMock.recordPermissionDenied).toHaveBeenCalledWith(
+          'instance',
+          'create',
+          'Role'
+        );
+      });
     });
   });
 
