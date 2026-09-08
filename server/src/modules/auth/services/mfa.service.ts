@@ -141,20 +141,57 @@ export class MfaService {
   }
 
   /**
+   * Replaces the recovery set with a fresh one. The caller has already proved
+   * itself through AuthService.assertStepUp. Enrolment is the only other
+   * writer of this column, and it refuses an account that carries the factor,
+   * so without this an account that spent its ten codes never gets more.
+   */
+  async regenerateRecoveryCodes(
+    user: User,
+    context?: AuditContext
+  ): Promise<MfaRecoveryCodesResponse> {
+    this.assertEnabled(user);
+
+    const recoveryCodes = this.generateRecoveryCodes();
+
+    await this.dataSource.getRepository(User).update(user.id, {
+      totpRecoveryCodes: recoveryCodes.map((code) => hashToken(normalize(code)))
+    });
+
+    await this.auditService.log({
+      action: AuditAction.MFA_RECOVERY_CODES_REGENERATED,
+      actorId: user.id,
+      actorEmail: user.email,
+      targetId: user.id,
+      targetType: 'User',
+      context
+    });
+
+    // The replacement silently retires the codes the owner saved, so the notice
+    // is the only thing that tells them it happened.
+    this.mailService
+      .sendMfaRecoveryCodesReplacedNotification(
+        user.email,
+        user.locale,
+        context?.ip
+      )
+      .catch((err) =>
+        this.logger.error(
+          'Failed to send MFA recovery codes replaced notification',
+          err
+        )
+      );
+
+    return { recoveryCodes };
+  }
+
+  /**
    * Turns the factor off. The caller has already proved itself through
    * AuthService.assertStepUp; this clears every trace of the enrolment so a
    * later setup starts from a fresh secret.
    */
   async disable(user: User, context?: AuditContext): Promise<void> {
-    if (user.totpEnabledAt === null) {
-      throw new HttpException(
-        {
-          message: 'Two-factor authentication is not enabled',
-          errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED
-        },
-        HttpStatus.BAD_REQUEST
-      );
-    }
+    this.assertEnabled(user);
 
     await this.dataSource.getRepository(User).update(user.id, {
       totpSecret: null,
@@ -419,6 +456,18 @@ export class MfaService {
           errorKey: ErrorKeys.AUTH.MFA_UNAVAILABLE
         },
         HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
+  }
+
+  private assertEnabled(user: User): void {
+    if (user.totpEnabledAt === null) {
+      throw new HttpException(
+        {
+          message: 'Two-factor authentication is not enabled',
+          errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED
+        },
+        HttpStatus.BAD_REQUEST
       );
     }
   }

@@ -285,6 +285,20 @@ describe('AuthService', () => {
 
       await expect(disablePromise).resolves.toEqual({ message: 'off' });
     });
+
+    it('returns the fresh codes the regeneration answers with', async () => {
+      const regeneratePromise = firstValueFrom(
+        service.regenerateRecoveryCodes({ code: '123456' })
+      );
+
+      const req = httpMock.expectOne(AuthApiEnum.MfaRecoveryCodes);
+      expect(req.request.body).toEqual({ code: '123456' });
+      req.flush({ recoveryCodes: ['KKKKKKKK-KKKKKKKK'] });
+
+      await expect(regeneratePromise).resolves.toEqual({
+        recoveryCodes: ['KKKKKKKK-KKKKKKKK']
+      });
+    });
   });
 
   describe('login', () => {

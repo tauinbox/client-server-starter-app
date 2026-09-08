@@ -13,7 +13,7 @@ import type {
   AuthResponse,
   LoginCredentials,
   LoginResponse,
-  MfaDisableRequest,
+  MfaStepUpRequest,
   MfaRecoveryCodesResponse,
   MfaSetupResponse,
   RegisterRequest,
@@ -193,9 +193,20 @@ export class AuthService {
     );
   }
 
-  disableMfa(request: MfaDisableRequest): Observable<{ message: string }> {
+  disableMfa(request: MfaStepUpRequest): Observable<{ message: string }> {
     return this.#http.post<{ message: string }>(
       AuthApiEnum.MfaDisable,
+      request,
+      { context: silentContext() }
+    );
+  }
+
+  /** Replaces the recovery set and returns the new codes, once. */
+  regenerateRecoveryCodes(
+    request: MfaStepUpRequest
+  ): Observable<MfaRecoveryCodesResponse> {
+    return this.#http.post<MfaRecoveryCodesResponse>(
+      AuthApiEnum.MfaRecoveryCodes,
       request,
       { context: silentContext() }
     );

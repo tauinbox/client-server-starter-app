@@ -48,8 +48,12 @@ export type ResendVerificationRequest = {
   email: string;
 };
 
-/** What the two-factor card sends to turn the factor off. */
-export type MfaDisableRequest = {
+/**
+ * What the two-factor card sends for an operation on a live factor: turning
+ * the factor off, or replacing the recovery set. Both accept the same two
+ * factors, and an account created through a provider holds only the code.
+ */
+export type MfaStepUpRequest = {
   currentPassword?: string;
   code?: string;
 };

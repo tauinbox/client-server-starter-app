@@ -7,7 +7,7 @@ import {
 import { CreateUserDto } from '../../users/dtos/create-user.dto';
 import { InitiateEmailChangeDto } from './initiate-email-change.dto';
 import { LoginDto } from './login.dto';
-import { MfaDisableDto, MfaSetupDto } from './mfa.dto';
+import { MfaSetupDto, MfaStepUpDto } from './mfa.dto';
 import { ResetPasswordDto } from './reset-password.dto';
 import { UpdateProfileDto } from './update-profile.dto';
 
@@ -111,7 +111,7 @@ describe('Password byte cap', () => {
       { newEmail: 'new.user@example.com', currentPassword: ASCII_128 }
     ],
     ['MfaSetupDto', MfaSetupDto, { currentPassword: ASCII_128 }],
-    ['MfaDisableDto', MfaDisableDto, { currentPassword: ASCII_128 }]
+    ['MfaStepUpDto', MfaStepUpDto, { currentPassword: ASCII_128 }]
   ];
 
   // The anti-lockout regression test. A user whose stored hash came from a

@@ -26,6 +26,7 @@ import {
 import { resolveEntitlementLimit } from './billing.middleware';
 import {
   MOCK_RECOVERY_CODES,
+  MOCK_REGENERATED_RECOVERY_CODES,
   MOCK_TOTP_QR_DATA_URL,
   MOCK_TOTP_SECRET,
   REFRESH_COOKIE_OPTIONS,
@@ -277,6 +278,62 @@ router.post('/disable', authGuard, (req, res) => {
   console.log(`[MFA DISABLED] To: ${user.email}`);
 
   res.json({ message: 'Two-factor authentication has been turned off' });
+});
+
+// POST /api/v1/auth/mfa/recovery-codes
+router.post('/recovery-codes', authGuard, (req, res) => {
+  const { user } = req as AuthenticatedRequest;
+  const { currentPassword, code } = req.body;
+
+  if (currentPassword !== undefined && !isValidPasswordShape(currentPassword)) {
+    res.status(400).json(validationError('currentPassword is required'));
+    return;
+  }
+  if (code !== undefined && !isValidCodeShape(code)) {
+    res
+      .status(400)
+      .json(
+        validationError(
+          `code must be longer than or equal to ${TOTP_DIGITS} characters`
+        )
+      );
+    return;
+  }
+
+  const stepUp = stepUpError(
+    req,
+    user,
+    currentPassword,
+    code,
+    STEP_UP_OPERATION.MFA_RECOVERY_CODES
+  );
+  if (stepUp) {
+    res.status(stepUp.statusCode).json(stepUp);
+    return;
+  }
+
+  if (!user.totpEnabledAt) {
+    res.status(400).json({
+      message: 'Two-factor authentication is not enabled',
+      statusCode: 400,
+      errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED
+    });
+    return;
+  }
+
+  user.totpRecoveryCodes = [...MOCK_REGENERATED_RECOVERY_CODES];
+
+  logAudit('MFA_RECOVERY_CODES_REGENERATED', {
+    actorId: user.id,
+    actorEmail: user.email,
+    targetId: user.id,
+    targetType: 'User',
+    ip: req.ip
+  });
+
+  console.log(`[MFA RECOVERY CODES REPLACED] To: ${user.email}`);
+
+  res.json({ recoveryCodes: [...MOCK_REGENERATED_RECOVERY_CODES] });
 });
 
 // POST /api/v1/auth/mfa/verify

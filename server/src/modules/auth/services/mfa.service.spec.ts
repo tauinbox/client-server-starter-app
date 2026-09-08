@@ -71,6 +71,7 @@ describe('MfaService', () => {
   let mailService: {
     sendMfaEnabledNotification: jest.Mock;
     sendMfaDisabledNotification: jest.Mock;
+    sendMfaRecoveryCodesReplacedNotification: jest.Mock;
   };
 
   async function build(key: string | undefined = KEY): Promise<void> {
@@ -88,7 +89,10 @@ describe('MfaService', () => {
     auditService = { log: jest.fn().mockResolvedValue(undefined) };
     mailService = {
       sendMfaEnabledNotification: jest.fn().mockResolvedValue(undefined),
-      sendMfaDisabledNotification: jest.fn().mockResolvedValue(undefined)
+      sendMfaDisabledNotification: jest.fn().mockResolvedValue(undefined),
+      sendMfaRecoveryCodesReplacedNotification: jest
+        .fn()
+        .mockResolvedValue(undefined)
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -302,6 +306,58 @@ describe('MfaService', () => {
         status: 400,
         response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }
       });
+    });
+  });
+
+  describe('regenerateRecoveryCodes', () => {
+    it('replaces the stored set with a fresh one it returns once', async () => {
+      const user = buildUser({
+        totpSecret: 'v1.a.b.c',
+        totpEnabledAt: new Date(),
+        totpRecoveryCodes: ['spent-hash']
+      });
+
+      const { recoveryCodes } = await service.regenerateRecoveryCodes(user);
+      const stored = lastUpdate();
+
+      expect(recoveryCodes).toHaveLength(10);
+      expect(stored.totpRecoveryCodes).not.toContain('spent-hash');
+      expect(stored.totpRecoveryCodes).not.toContain(recoveryCodes[0]);
+      expect(stored.totpRecoveryCodes).toContain(
+        hashToken(recoveryCodes[0].replace('-', ''))
+      );
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.MFA_RECOVERY_CODES_REGENERATED
+        })
+      );
+      expect(
+        mailService.sendMfaRecoveryCodesReplacedNotification
+      ).toHaveBeenCalled();
+    });
+
+    it('leaves the secret and the enrolment alone', async () => {
+      const enabledAt = new Date();
+      const user = buildUser({
+        totpSecret: 'v1.a.b.c',
+        totpEnabledAt: enabledAt,
+        totpRecoveryCodes: ['spent-hash']
+      });
+
+      await service.regenerateRecoveryCodes(user);
+      const stored = lastUpdate();
+
+      expect(Object.keys(stored)).toEqual(['totpRecoveryCodes']);
+    });
+
+    it('refuses when the factor is not on', async () => {
+      await expect(
+        service.regenerateRecoveryCodes(buildUser())
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }
+      });
+      expect(repository.update).not.toHaveBeenCalled();
     });
   });
 

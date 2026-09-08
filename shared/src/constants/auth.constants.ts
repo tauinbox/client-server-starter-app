@@ -45,6 +45,7 @@ export const STEP_UP_OPERATION = {
   PASSWORD_SET: 'password_set',
   MFA_SETUP: 'mfa_setup',
   MFA_DISABLE: 'mfa_disable',
+  MFA_RECOVERY_CODES: 'mfa_recovery_codes',
   OAUTH_LINK: 'oauth_link'
 } as const;
 

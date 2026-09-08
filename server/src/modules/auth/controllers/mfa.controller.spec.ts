@@ -46,6 +46,7 @@ describe('MfaController', () => {
     beginEnrolment: jest.Mock;
     completeEnrolment: jest.Mock;
     disable: jest.Mock;
+    regenerateRecoveryCodes: jest.Mock;
     verifyChallenge: jest.Mock;
     consumeRecoveryCode: jest.Mock;
   };
@@ -75,6 +76,9 @@ describe('MfaController', () => {
         .fn()
         .mockResolvedValue({ recoveryCodes: ['ABCDEFGH-IJKLMNOP'] }),
       disable: jest.fn().mockResolvedValue(undefined),
+      regenerateRecoveryCodes: jest
+        .fn()
+        .mockResolvedValue({ recoveryCodes: ['QRSTUVWX-YZ234567'] }),
       verifyChallenge: jest.fn().mockResolvedValue(mockUser),
       consumeRecoveryCode: jest.fn().mockResolvedValue(mockUser)
     };
@@ -186,6 +190,50 @@ describe('MfaController', () => {
 
       await expect(controller.disable(jwtRequest(), {})).rejects.toBeDefined();
       expect(mfaService.disable).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('regenerateRecoveryCodes', () => {
+    it('demands its own step-up operation, not the one disable uses', async () => {
+      const result = await controller.regenerateRecoveryCodes(jwtRequest(), {
+        currentPassword: 'Password1'
+      });
+
+      expect(authService.assertStepUp).toHaveBeenCalledWith(
+        mockUser,
+        'Password1',
+        undefined,
+        STEP_UP_OPERATION.MFA_RECOVERY_CODES,
+        undefined,
+        auditContext
+      );
+      expect(result).toEqual({ recoveryCodes: ['QRSTUVWX-YZ234567'] });
+    });
+
+    it('accepts an authenticator code in place of the password', async () => {
+      await controller.regenerateRecoveryCodes(jwtRequest(), {
+        code: '123456'
+      });
+
+      expect(authService.assertStepUp).toHaveBeenCalledWith(
+        mockUser,
+        undefined,
+        undefined,
+        STEP_UP_OPERATION.MFA_RECOVERY_CODES,
+        '123456',
+        auditContext
+      );
+    });
+
+    it('does not replace the codes when the step-up fails', async () => {
+      authService.assertStepUp.mockRejectedValue(
+        new HttpException({}, HttpStatus.BAD_REQUEST)
+      );
+
+      await expect(
+        controller.regenerateRecoveryCodes(jwtRequest(), {})
+      ).rejects.toBeDefined();
+      expect(mfaService.regenerateRecoveryCodes).not.toHaveBeenCalled();
     });
   });
 

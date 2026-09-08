@@ -27,14 +27,15 @@ import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-fie
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthService } from '../../services/auth.service';
-import type { MfaDisableRequest } from '../../models/auth.types';
+import type { MfaStepUpRequest } from '../../models/auth.types';
 
 /**
  * The enrolment is a strict sequence, and each step needs the answer of the
  * one before it: the secret comes from `setup`, the recovery codes from
  * `enable`. A single state signal keeps an impossible pair off the screen.
  */
-type Stage = 'idle' | 'password' | 'confirm' | 'codes' | 'disable';
+type Stage =
+  'idle' | 'password' | 'confirm' | 'codes' | 'disable' | 'regenerate';
 
 @Component({
   selector: 'nxs-two-factor',
@@ -82,6 +83,12 @@ export class TwoFactorComponent {
   protected readonly setup = signal<MfaSetupResponse | null>(null);
   protected readonly recoveryCodes = signal<string[]>([]);
 
+  /**
+   * True when the codes on screen replaced an earlier set. The panel must say
+   * so: the codes the user saved at enrolment stopped working just now.
+   */
+  protected readonly codesReplaced = signal(false);
+
   protected readonly enabled = computed(() => this.user()?.mfaEnabled === true);
 
   /**
@@ -108,10 +115,11 @@ export class TwoFactorComponent {
   });
 
   /**
-   * An account with no password turns the factor off with a code from the
-   * authenticator it enrolled, which is the only factor it holds.
+   * An account with no password proves itself with a code from the
+   * authenticator it enrolled, which is the only factor it holds. Turning the
+   * factor off and replacing the recovery set ask for the same proof.
    */
-  protected readonly disableBlocked = computed(
+  protected readonly stepUpBlocked = computed(
     () =>
       (this.accountHasPassword()
         ? this.passwordForm().invalid()
@@ -145,6 +153,11 @@ export class TwoFactorComponent {
   startDisable(): void {
     this.#reset();
     this.stage.set('disable');
+  }
+
+  startRegenerate(): void {
+    this.#reset();
+    this.stage.set('regenerate');
   }
 
   cancel(): void {
@@ -201,15 +214,11 @@ export class TwoFactorComponent {
   }
 
   disable(): void {
-    if (this.disableBlocked()) return;
-
-    const request: MfaDisableRequest = this.accountHasPassword()
-      ? { currentPassword: this.passwordModel().currentPassword }
-      : { code: this.codeModel().code.trim() };
+    if (this.stepUpBlocked()) return;
 
     this.busy.set(true);
     this.#authService
-      .disableMfa(request)
+      .disableMfa(this.#stepUpRequest())
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
@@ -226,9 +235,37 @@ export class TwoFactorComponent {
       });
   }
 
+  /**
+   * Replaces the recovery set. The codes it returns are the only readable copy,
+   * so they take over the same panel the enrolment ends on.
+   */
+  regenerateCodes(): void {
+    if (this.stepUpBlocked()) return;
+
+    this.busy.set(true);
+    this.#authService
+      .regenerateRecoveryCodes(this.#stepUpRequest())
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: (response) => {
+          this.busy.set(false);
+          this.passwordModel.set({ currentPassword: '' });
+          this.codeModel.set({ code: '' });
+          this.recoveryCodes.set(response.recoveryCodes);
+          this.codesReplaced.set(true);
+          this.stage.set('codes');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.busy.set(false);
+          this.#notify.error(err, 'auth.twoFactor.errorRegenerateFailed');
+        }
+      });
+  }
+
   /** The codes are readable once, so leaving the panel is a deliberate act. */
   acknowledgeCodes(): void {
     this.recoveryCodes.set([]);
+    this.codesReplaced.set(false);
     this.stage.set('idle');
     this.changed.emit();
   }
@@ -255,9 +292,20 @@ export class TwoFactorComponent {
       });
   }
 
+  /**
+   * The factor is live in both paths that send this, so the account always
+   * holds a code. The password is what an account that has one uses.
+   */
+  #stepUpRequest(): MfaStepUpRequest {
+    return this.accountHasPassword()
+      ? { currentPassword: this.passwordModel().currentPassword }
+      : { code: this.codeModel().code.trim() };
+  }
+
   #reset(): void {
     this.setup.set(null);
     this.recoveryCodes.set([]);
+    this.codesReplaced.set(false);
     this.passwordModel.set({ currentPassword: '' });
     this.codeModel.set({ code: '' });
   }
