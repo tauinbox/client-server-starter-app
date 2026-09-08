@@ -174,6 +174,34 @@ describe('two-factor enrolment', () => {
     );
     expect(again.status).toBe(409);
   });
+
+  it('refuses a wrong password before it reports an existing enrolment', async () => {
+    const token = await enrol();
+
+    const res = await post(
+      '/auth/mfa/setup',
+      { currentPassword: 'wrong-value' },
+      token
+    );
+    const body = (await res.json()) as Record<string, string>;
+
+    expect(res.status).toBe(400);
+    expect(body['errorKey']).toBe('errors.auth.invalidCurrentPassword');
+  });
+
+  it('reports an existing enrolment once the password is right', async () => {
+    const token = await enrol();
+
+    const res = await post(
+      '/auth/mfa/setup',
+      { currentPassword: CREDENTIALS.password },
+      token
+    );
+    const body = (await res.json()) as Record<string, string>;
+
+    expect(res.status).toBe(409);
+    expect(body['errorKey']).toBe('errors.auth.mfaAlreadyEnabled');
+  });
 });
 
 describe('two-factor sign-in', () => {

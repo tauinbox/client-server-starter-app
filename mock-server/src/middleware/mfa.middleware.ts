@@ -121,15 +121,6 @@ router.post('/setup', authGuard, (req, res) => {
     return;
   }
 
-  if (user.totpEnabledAt) {
-    res.status(409).json({
-      message: 'Two-factor authentication is already enabled',
-      statusCode: 409,
-      errorKey: ErrorKeys.AUTH.MFA_ALREADY_ENABLED
-    });
-    return;
-  }
-
   const stepUp = stepUpError(
     req,
     user,
@@ -139,6 +130,15 @@ router.post('/setup', authGuard, (req, res) => {
   );
   if (stepUp) {
     res.status(stepUp.statusCode).json(stepUp);
+    return;
+  }
+
+  if (user.totpEnabledAt) {
+    res.status(409).json({
+      message: 'Two-factor authentication is already enabled',
+      statusCode: 409,
+      errorKey: ErrorKeys.AUTH.MFA_ALREADY_ENABLED
+    });
     return;
   }
 
