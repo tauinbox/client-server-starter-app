@@ -21,7 +21,10 @@ import {
   logAudit,
   toPermissionResponse
 } from '../state';
-import { adminGuard } from '../helpers/auth.helpers';
+import {
+  assertInstancePermission,
+  permissionGuard
+} from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';
 import { pushToUser } from '../sse-hub';
 import {
@@ -163,7 +166,7 @@ function isActorSuper(req: unknown): boolean {
 
 // GET /api/v1/roles
 // GET /api/v1/roles/cursor
-router.get('/cursor', adminGuard, (req, res) => {
+router.get('/cursor', permissionGuard('read', 'Role'), (req, res) => {
   const query = req.query as Record<string, unknown>;
   const errors = cursorQueryErrors(query, {
     sortColumns: ALLOWED_ROLE_SORT_COLUMNS
@@ -180,14 +183,14 @@ router.get('/cursor', adminGuard, (req, res) => {
   );
 });
 
-router.get('/', adminGuard, (_req, res) => {
+router.get('/', permissionGuard('read', 'Role'), (_req, res) => {
   const roles = Array.from(getState().roles.values());
 
   res.json(roles.sort((a, b) => a.name.localeCompare(b.name)));
 });
 
 // GET /api/v1/roles/permissions
-router.get('/permissions', adminGuard, (_req, res) => {
+router.get('/permissions', permissionGuard('read', 'Role'), (_req, res) => {
   const state = getState();
   const permissions = Array.from(state.permissions.values())
     .map((p) => toPermissionResponse(p))
@@ -200,59 +203,69 @@ router.get('/permissions', adminGuard, (_req, res) => {
 });
 
 // GET /api/v1/roles/:id/permissions
-router.get('/:id/permissions', adminGuard, requireUuid('id'), (req, res) => {
-  const id = req.params['id'] as string;
-  const state = getState();
-  const role = state.roles.get(id);
+router.get(
+  '/:id/permissions',
+  permissionGuard('read', 'Role'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const state = getState();
+    const role = state.roles.get(id);
 
-  if (!role) {
-    res.status(404).json({
-      message: 'Role not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.ROLES.NOT_FOUND
-    });
-    return;
+    if (!role) {
+      res.status(404).json({
+        message: 'Role not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.ROLES.NOT_FOUND
+      });
+      return;
+    }
+
+    const rolePerms = state.rolePermissions
+      .filter((rp) => rp.roleId === id)
+      .map((rp) => {
+        const permission = state.permissions.get(rp.permissionId);
+        if (!permission) return null;
+        const permResponse = toPermissionResponse(permission);
+        if (!permResponse) return null;
+        return {
+          id: rp.id,
+          roleId: rp.roleId,
+          permissionId: rp.permissionId,
+          permission: permResponse,
+          conditions: rp.conditions
+        };
+      })
+      .filter((rp): rp is NonNullable<typeof rp> => rp !== null);
+
+    res.json(rolePerms);
   }
-
-  const rolePerms = state.rolePermissions
-    .filter((rp) => rp.roleId === id)
-    .map((rp) => {
-      const permission = state.permissions.get(rp.permissionId);
-      if (!permission) return null;
-      const permResponse = toPermissionResponse(permission);
-      if (!permResponse) return null;
-      return {
-        id: rp.id,
-        roleId: rp.roleId,
-        permissionId: rp.permissionId,
-        permission: permResponse,
-        conditions: rp.conditions
-      };
-    })
-    .filter((rp): rp is NonNullable<typeof rp> => rp !== null);
-
-  res.json(rolePerms);
-});
+);
 
 // GET /api/v1/roles/:id
-router.get('/:id', adminGuard, requireUuid('id'), (req, res) => {
-  const id = req.params['id'] as string;
-  const role = getState().roles.get(id);
+router.get(
+  '/:id',
+  permissionGuard('read', 'Role'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const role = getState().roles.get(id);
 
-  if (!role) {
-    res.status(404).json({
-      message: 'Role not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.ROLES.NOT_FOUND
-    });
-    return;
+    if (!role) {
+      res.status(404).json({
+        message: 'Role not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.ROLES.NOT_FOUND
+      });
+      return;
+    }
+
+    res.json(role);
   }
-
-  res.json(role);
-});
+);
 
 // POST /api/v1/roles
-router.post('/', adminGuard, (req, res) => {
+router.post('/', permissionGuard('create', 'Role'), (req, res) => {
   const { description, isSuper } = req.body;
 
   const normalized = normalizeRoleName(req.body.name);
@@ -261,6 +274,14 @@ router.post('/', adminGuard, (req, res) => {
     return;
   }
   const name = normalized.name;
+
+  // CreateRoleDto carries `name` and `description`; the service raises every
+  // check below, so the instance check sits between the pipe and the service.
+  if (
+    !assertInstancePermission(req, res, 'create', 'Role', { name, description })
+  ) {
+    return;
+  }
 
   if (isSuper !== undefined) {
     res.status(400).json({
@@ -310,374 +331,398 @@ router.post('/', adminGuard, (req, res) => {
 });
 
 // PATCH /api/v1/roles/:id
-router.patch('/:id', adminGuard, requireUuid('id'), (req, res) => {
-  const id = req.params['id'] as string;
-  const state = getState();
+router.patch(
+  '/:id',
+  permissionGuard('update', 'Role'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const state = getState();
 
-  // The server's global ValidationPipe runs before the handler, so a body that
-  // fails UpdateRoleDto is a 400 whether or not the role exists. isSuper is not
-  // a DTO property either, so forbidNonWhitelisted rejects it just as early.
-  const { name, description, isSuper } = req.body;
+    // The server's global ValidationPipe runs before the handler, so a body that
+    // fails UpdateRoleDto is a 400 whether or not the role exists. isSuper is not
+    // a DTO property either, so forbidNonWhitelisted rejects it just as early.
+    const { name, description, isSuper } = req.body;
 
-  if (isSuper !== undefined) {
-    res.status(400).json({
-      message: 'isSuper flag cannot be changed via API',
-      statusCode: 400,
-      errorKey: ErrorKeys.ROLES.SUPER_FLAG_FORBIDDEN
-    });
-    return;
-  }
-
-  const normalized = name === undefined ? undefined : normalizeRoleName(name);
-  if (normalized && !normalized.ok) {
-    res.status(400).json(validationError(normalized.error));
-    return;
-  }
-
-  const role = state.roles.get(id);
-
-  if (!role) {
-    res.status(404).json({
-      message: 'Role not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.ROLES.NOT_FOUND
-    });
-    return;
-  }
-
-  if (role.isSystem) {
-    res.status(400).json({
-      message: 'Cannot modify system roles',
-      statusCode: 400,
-      errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
-    });
-    return;
-  }
-
-  if (normalized?.ok) {
-    if (normalized.name !== role.name) {
-      for (const existing of state.roles.values()) {
-        if (existing.name === normalized.name) {
-          res.status(400).json({
-            message: 'Role with this name already exists',
-            statusCode: 400,
-            errorKey: ErrorKeys.ROLES.NAME_EXISTS
-          });
-          return;
-        }
-      }
-      role.name = normalized.name;
+    if (isSuper !== undefined) {
+      res.status(400).json({
+        message: 'isSuper flag cannot be changed via API',
+        statusCode: 400,
+        errorKey: ErrorKeys.ROLES.SUPER_FLAG_FORBIDDEN
+      });
+      return;
     }
+
+    const normalized = name === undefined ? undefined : normalizeRoleName(name);
+    if (normalized && !normalized.ok) {
+      res.status(400).json(validationError(normalized.error));
+      return;
+    }
+
+    const role = state.roles.get(id);
+
+    if (!role) {
+      res.status(404).json({
+        message: 'Role not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.ROLES.NOT_FOUND
+      });
+      return;
+    }
+
+    if (role.isSystem) {
+      res.status(400).json({
+        message: 'Cannot modify system roles',
+        statusCode: 400,
+        errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
+      });
+      return;
+    }
+
+    if (normalized?.ok) {
+      if (normalized.name !== role.name) {
+        for (const existing of state.roles.values()) {
+          if (existing.name === normalized.name) {
+            res.status(400).json({
+              message: 'Role with this name already exists',
+              statusCode: 400,
+              errorKey: ErrorKeys.ROLES.NAME_EXISTS
+            });
+            return;
+          }
+        }
+        role.name = normalized.name;
+      }
+    }
+
+    if (description !== undefined) {
+      role.description = description;
+    }
+
+    role.updatedAt = new Date().toISOString();
+
+    const actor = (req as AuthenticatedRequest).user;
+    logAudit('ROLE_UPDATE', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: id,
+      targetType: 'Role',
+      details: { changedFields: Object.keys(req.body) },
+      ip: req.ip
+    });
+
+    res.json(role);
   }
-
-  if (description !== undefined) {
-    role.description = description;
-  }
-
-  role.updatedAt = new Date().toISOString();
-
-  const actor = (req as AuthenticatedRequest).user;
-  logAudit('ROLE_UPDATE', {
-    actorId: actor.id,
-    actorEmail: actor.email,
-    targetId: id,
-    targetType: 'Role',
-    details: { changedFields: Object.keys(req.body) },
-    ip: req.ip
-  });
-
-  res.json(role);
-});
+);
 
 // DELETE /api/v1/roles/:id
-router.delete('/:id', adminGuard, requireUuid('id'), (req, res) => {
-  const id = req.params['id'] as string;
-  const state = getState();
-  const role = state.roles.get(id);
+router.delete(
+  '/:id',
+  permissionGuard('delete', 'Role'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const state = getState();
+    const role = state.roles.get(id);
 
-  if (!role) {
-    res.status(404).json({
-      message: 'Role not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.ROLES.NOT_FOUND
+    if (!role) {
+      res.status(404).json({
+        message: 'Role not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.ROLES.NOT_FOUND
+      });
+      return;
+    }
+
+    if (role.isSystem) {
+      res.status(400).json({
+        message: 'Cannot delete system roles',
+        statusCode: 400,
+        errorKey: ErrorKeys.ROLES.CANNOT_DELETE_SYSTEM
+      });
+      return;
+    }
+
+    // Capture holders before unassigning — the loop below clears user.roles.
+    const holderIds = Array.from(state.users.values())
+      .filter((u) => u.roles.includes(role.name))
+      .map((u) => u.id);
+
+    // Remove role-permission associations
+    state.rolePermissions = state.rolePermissions.filter(
+      (rp) => rp.roleId !== id
+    );
+
+    // Remove role from users
+    for (const user of state.users.values()) {
+      user.roles = user.roles.filter((r) => r !== role.name);
+    }
+
+    state.roles.delete(id);
+
+    for (const userId of holderIds) {
+      pushToUser(userId, { type: 'permissions_updated', userId });
+    }
+
+    const actor = (req as AuthenticatedRequest).user;
+    logAudit('ROLE_DELETE', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: id,
+      targetType: 'Role',
+      details: { name: role.name },
+      ip: req.ip
     });
-    return;
+
+    res.send();
   }
-
-  if (role.isSystem) {
-    res.status(400).json({
-      message: 'Cannot delete system roles',
-      statusCode: 400,
-      errorKey: ErrorKeys.ROLES.CANNOT_DELETE_SYSTEM
-    });
-    return;
-  }
-
-  // Capture holders before unassigning — the loop below clears user.roles.
-  const holderIds = Array.from(state.users.values())
-    .filter((u) => u.roles.includes(role.name))
-    .map((u) => u.id);
-
-  // Remove role-permission associations
-  state.rolePermissions = state.rolePermissions.filter(
-    (rp) => rp.roleId !== id
-  );
-
-  // Remove role from users
-  for (const user of state.users.values()) {
-    user.roles = user.roles.filter((r) => r !== role.name);
-  }
-
-  state.roles.delete(id);
-
-  for (const userId of holderIds) {
-    pushToUser(userId, { type: 'permissions_updated', userId });
-  }
-
-  const actor = (req as AuthenticatedRequest).user;
-  logAudit('ROLE_DELETE', {
-    actorId: actor.id,
-    actorEmail: actor.email,
-    targetId: id,
-    targetType: 'Role',
-    details: { name: role.name },
-    ip: req.ip
-  });
-
-  res.send();
-});
+);
 
 // PUT /api/v1/roles/:id/permissions  — replaces the full permission set atomically
-router.put('/:id/permissions', adminGuard, requireUuid('id'), (req, res) => {
-  const id = req.params['id'] as string;
-  const state = getState();
+router.put(
+  '/:id/permissions',
+  permissionGuard('update', 'Role'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const state = getState();
 
-  // SetPermissionsDto is validated by the server's global pipe before the
-  // handler runs, so its shape checks precede the role lookup. Everything that
-  // needs the role or the permission registry stays below the 404.
-  const { items } = req.body as {
-    items?: { permissionId: string; conditions?: unknown }[];
-  };
-  if (!Array.isArray(items)) {
-    res.status(400).json(validationError('items must be an array'));
-    return;
-  }
-
-  if (items.length > 500) {
-    res
-      .status(400)
-      .json(validationError('items must contain no more than 500 elements'));
-    return;
-  }
-
-  // Validate condition shapes (mirrors the server's DTO validation)
-  for (const item of items) {
-    const error = findConditionShapeError(item.conditions);
-    if (error) {
-      res.status(400).json(validationError(error));
+    // SetPermissionsDto is validated by the server's global pipe before the
+    // handler runs, so its shape checks precede the role lookup. Everything that
+    // needs the role or the permission registry stays below the 404.
+    const { items } = req.body as {
+      items?: { permissionId: string; conditions?: unknown }[];
+    };
+    if (!Array.isArray(items)) {
+      res.status(400).json(validationError('items must be an array'));
       return;
     }
-  }
 
-  const role = state.roles.get(id);
+    if (items.length > 500) {
+      res
+        .status(400)
+        .json(validationError('items must contain no more than 500 elements'));
+      return;
+    }
 
-  if (!role) {
-    res.status(404).json({
-      message: 'Role not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.ROLES.NOT_FOUND
-    });
-    return;
-  }
+    // Validate condition shapes (mirrors the server's DTO validation)
+    for (const item of items) {
+      const error = findConditionShapeError(item.conditions);
+      if (error) {
+        res.status(400).json(validationError(error));
+        return;
+      }
+    }
 
-  if (role.isSystem && !isActorSuper(req)) {
-    res.status(400).json({
-      message: 'Cannot modify system roles',
-      statusCode: 400,
-      errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
-    });
-    return;
-  }
+    const role = state.roles.get(id);
 
-  for (const item of items) {
-    const error = findGrantConditionError(item.permissionId, item.conditions);
-    if (error) {
-      res.status(400).json({
-        message: error,
-        statusCode: 400,
-        errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE
+    if (!role) {
+      res.status(404).json({
+        message: 'Role not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.ROLES.NOT_FOUND
       });
       return;
     }
-  }
 
-  // Mirror the server: unknown ids fail validation with 400 before the
-  // existing set is touched.
-  const unknownItem = items.find(
-    (item) => !state.permissions.has(item.permissionId)
-  );
-  if (unknownItem) {
-    res.status(400).json({
-      message: `Permission ${unknownItem.permissionId} not found`,
-      statusCode: 400,
-      errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
+    if (role.isSystem && !isActorSuper(req)) {
+      res.status(400).json({
+        message: 'Cannot modify system roles',
+        statusCode: 400,
+        errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
+      });
+      return;
+    }
+
+    for (const item of items) {
+      const error = findGrantConditionError(item.permissionId, item.conditions);
+      if (error) {
+        res.status(400).json({
+          message: error,
+          statusCode: 400,
+          errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE
+        });
+        return;
+      }
+    }
+
+    // Mirror the server: unknown ids fail validation with 400 before the
+    // existing set is touched.
+    const unknownItem = items.find(
+      (item) => !state.permissions.has(item.permissionId)
+    );
+    if (unknownItem) {
+      res.status(400).json({
+        message: `Permission ${unknownItem.permissionId} not found`,
+        statusCode: 400,
+        errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
+      });
+      return;
+    }
+
+    // Replace all existing assignments for this role
+    state.rolePermissions = state.rolePermissions.filter(
+      (rp) => rp.roleId !== id
+    );
+
+    for (const item of items) {
+      state.rolePermissions.push({
+        id: uuidv4(),
+        roleId: id,
+        permissionId: item.permissionId,
+        conditions: (item.conditions as null) ?? null
+      });
+    }
+
+    notifyRoleHolders(role.name);
+
+    const actor = (req as AuthenticatedRequest).user;
+    logAudit('PERMISSION_ASSIGN', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: id,
+      targetType: 'Role',
+      details: { permissionIds: items.map((i) => i.permissionId) },
+      ip: req.ip
     });
-    return;
+
+    res.send();
   }
-
-  // Replace all existing assignments for this role
-  state.rolePermissions = state.rolePermissions.filter(
-    (rp) => rp.roleId !== id
-  );
-
-  for (const item of items) {
-    state.rolePermissions.push({
-      id: uuidv4(),
-      roleId: id,
-      permissionId: item.permissionId,
-      conditions: (item.conditions as null) ?? null
-    });
-  }
-
-  notifyRoleHolders(role.name);
-
-  const actor = (req as AuthenticatedRequest).user;
-  logAudit('PERMISSION_ASSIGN', {
-    actorId: actor.id,
-    actorEmail: actor.email,
-    targetId: id,
-    targetType: 'Role',
-    details: { permissionIds: items.map((i) => i.permissionId) },
-    ip: req.ip
-  });
-
-  res.send();
-});
+);
 
 // POST /api/v1/roles/:id/permissions
-router.post('/:id/permissions', adminGuard, requireUuid('id'), (req, res) => {
-  const id = req.params['id'] as string;
-  const state = getState();
+router.post(
+  '/:id/permissions',
+  permissionGuard('update', 'Role'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const state = getState();
 
-  // AssignPermissionsDto is validated by the server's global pipe before the
-  // handler runs, so its shape checks precede the role lookup. Everything that
-  // needs the role or the permission registry stays below the 404.
-  const { permissionIds, conditions } = req.body;
-  if (!Array.isArray(permissionIds)) {
-    res.status(400).json(validationError('permissionIds must be an array'));
-    return;
-  }
+    // AssignPermissionsDto is validated by the server's global pipe before the
+    // handler runs, so its shape checks precede the role lookup. Everything that
+    // needs the role or the permission registry stays below the 404.
+    const { permissionIds, conditions } = req.body;
+    if (!Array.isArray(permissionIds)) {
+      res.status(400).json(validationError('permissionIds must be an array'));
+      return;
+    }
 
-  if (permissionIds.length === 0) {
-    res.status(400).json(validationError('permissionIds should not be empty'));
-    return;
-  }
+    if (permissionIds.length === 0) {
+      res
+        .status(400)
+        .json(validationError('permissionIds should not be empty'));
+      return;
+    }
 
-  if (permissionIds.length > 500) {
-    res
-      .status(400)
-      .json(
-        validationError('permissionIds must contain no more than 500 elements')
-      );
-    return;
-  }
+    if (permissionIds.length > 500) {
+      res
+        .status(400)
+        .json(
+          validationError(
+            'permissionIds must contain no more than 500 elements'
+          )
+        );
+      return;
+    }
 
-  // Validate condition shape (mirrors the server's DTO validation)
-  const conditionError = findConditionShapeError(conditions);
-  if (conditionError) {
-    res.status(400).json(validationError(conditionError));
-    return;
-  }
+    // Validate condition shape (mirrors the server's DTO validation)
+    const conditionError = findConditionShapeError(conditions);
+    if (conditionError) {
+      res.status(400).json(validationError(conditionError));
+      return;
+    }
 
-  const role = state.roles.get(id);
+    const role = state.roles.get(id);
 
-  if (!role) {
-    res.status(404).json({
-      message: 'Role not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.ROLES.NOT_FOUND
-    });
-    return;
-  }
-
-  if (role.isSystem && !isActorSuper(req)) {
-    res.status(400).json({
-      message: 'Cannot modify system roles',
-      statusCode: 400,
-      errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
-    });
-    return;
-  }
-
-  for (const permissionId of permissionIds as string[]) {
-    const error = findGrantConditionError(permissionId, conditions);
-    if (error) {
-      res.status(400).json({
-        message: error,
-        statusCode: 400,
-        errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE
+    if (!role) {
+      res.status(404).json({
+        message: 'Role not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.ROLES.NOT_FOUND
       });
       return;
     }
-  }
 
-  // Mirror the server: unknown ids fail validation with 400 before anything
-  // is written, then a duplicate pair maps to 409 (unique constraint) with
-  // no partial writes (single-transaction save on the server).
-  const unknownId = (permissionIds as string[]).find(
-    (permissionId) => !state.permissions.has(permissionId)
-  );
-  if (unknownId !== undefined) {
-    res.status(400).json({
-      message: `Permission ${unknownId} not found`,
-      statusCode: 400,
-      errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
+    if (role.isSystem && !isActorSuper(req)) {
+      res.status(400).json({
+        message: 'Cannot modify system roles',
+        statusCode: 400,
+        errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
+      });
+      return;
+    }
+
+    for (const permissionId of permissionIds as string[]) {
+      const error = findGrantConditionError(permissionId, conditions);
+      if (error) {
+        res.status(400).json({
+          message: error,
+          statusCode: 400,
+          errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE
+        });
+        return;
+      }
+    }
+
+    // Mirror the server: unknown ids fail validation with 400 before anything
+    // is written, then a duplicate pair maps to 409 (unique constraint) with
+    // no partial writes (single-transaction save on the server).
+    const unknownId = (permissionIds as string[]).find(
+      (permissionId) => !state.permissions.has(permissionId)
+    );
+    if (unknownId !== undefined) {
+      res.status(400).json({
+        message: `Permission ${unknownId} not found`,
+        statusCode: 400,
+        errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
+      });
+      return;
+    }
+
+    const duplicateId = (permissionIds as string[]).find((permissionId) =>
+      state.rolePermissions.some(
+        (rp) => rp.roleId === id && rp.permissionId === permissionId
+      )
+    );
+    if (duplicateId !== undefined) {
+      res.status(409).json({
+        message: 'A record with this value already exists',
+        statusCode: 409,
+        errorKey: ErrorKeys.DB.UNIQUE_VIOLATION
+      });
+      return;
+    }
+
+    for (const permissionId of permissionIds as string[]) {
+      state.rolePermissions.push({
+        id: uuidv4(),
+        roleId: id,
+        permissionId,
+        conditions: conditions ?? null
+      });
+    }
+
+    notifyRoleHolders(role.name);
+
+    const actor = (req as AuthenticatedRequest).user;
+    logAudit('PERMISSION_ASSIGN', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: id,
+      targetType: 'Role',
+      details: { permissionIds },
+      ip: req.ip
     });
-    return;
+
+    res.send();
   }
-
-  const duplicateId = (permissionIds as string[]).find((permissionId) =>
-    state.rolePermissions.some(
-      (rp) => rp.roleId === id && rp.permissionId === permissionId
-    )
-  );
-  if (duplicateId !== undefined) {
-    res.status(409).json({
-      message: 'A record with this value already exists',
-      statusCode: 409,
-      errorKey: ErrorKeys.DB.UNIQUE_VIOLATION
-    });
-    return;
-  }
-
-  for (const permissionId of permissionIds as string[]) {
-    state.rolePermissions.push({
-      id: uuidv4(),
-      roleId: id,
-      permissionId,
-      conditions: conditions ?? null
-    });
-  }
-
-  notifyRoleHolders(role.name);
-
-  const actor = (req as AuthenticatedRequest).user;
-  logAudit('PERMISSION_ASSIGN', {
-    actorId: actor.id,
-    actorEmail: actor.email,
-    targetId: id,
-    targetType: 'Role',
-    details: { permissionIds },
-    ip: req.ip
-  });
-
-  res.send();
-});
+);
 
 // DELETE /api/v1/roles/:id/permissions/:permissionId
 router.delete(
   '/:id/permissions/:permissionId',
-  adminGuard,
+  permissionGuard('update', 'Role'),
   requireUuid('id', 'permissionId'),
   (req, res) => {
     const id = req.params['id'] as string;
@@ -726,7 +771,7 @@ router.delete(
 // POST /api/v1/roles/assign/:userId
 router.post(
   '/assign/:userId',
-  adminGuard,
+  permissionGuard('assign', 'Role'),
   requireUuid('userId'),
   (req, res) => {
     const userId = req.params['userId'] as string;
@@ -753,8 +798,8 @@ router.post(
       return;
     }
 
-    // Prevent assigning super roles via API (only super users bypass, and they
-    // already pass adminGuard — but a future non-super admin role would need this)
+    // Prevent assigning super roles via API. A delegated role that holds
+    // assign:Role now reaches this handler, so the super test is load-bearing.
     if (role.isSuper) {
       const actor = (req as AuthenticatedRequest).user;
       const actorRoles = Array.from(state.roles.values()).filter((r) =>
@@ -804,7 +849,7 @@ router.post(
 // DELETE /api/v1/roles/assign/:userId/:roleId
 router.delete(
   '/assign/:userId/:roleId',
-  adminGuard,
+  permissionGuard('assign', 'Role'),
   requireUuid('userId', 'roleId'),
   (req, res) => {
     const userId = req.params['userId'] as string;

@@ -265,6 +265,32 @@ function generateResources(): MockResource[] {
       allowedActionNames: null,
       lastSyncedAt: now,
       createdAt: now
+    },
+    {
+      id: mockId('res-billing'),
+      name: 'billing',
+      subject: 'Billing',
+      displayName: 'Billing',
+      description: 'Billing administration',
+      isSystem: true,
+      isOrphaned: false,
+      isRegistered: true,
+      allowedActionNames: null,
+      lastSyncedAt: now,
+      createdAt: now
+    },
+    {
+      id: mockId('res-feature-flags'),
+      name: 'feature-flags',
+      subject: 'FeatureFlag',
+      displayName: 'Feature Flags',
+      description: 'Feature flag administration',
+      isSystem: true,
+      isOrphaned: false,
+      isRegistered: true,
+      allowedActionNames: null,
+      lastSyncedAt: now,
+      createdAt: now
     }
   ];
 }
