@@ -3,6 +3,7 @@
 // it is signed into the oauth_data cookie that /exchange echoes back.
 
 import { Test } from '@nestjs/testing';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { VersioningType, type INestApplication } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
@@ -31,6 +32,7 @@ import { CaptchaRequiredGuard } from '../src/modules/auth/captcha/captcha-requir
 import { UsersService } from '../src/modules/users/services/users.service';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
+import { createMockCache } from '../src/common/testing/cache.mock';
 import { BreachedPasswordService } from '../src/modules/auth/breached-password/breached-password.service';
 import { SessionIssuerService } from '../src/modules/auth/services/session-issuer.service';
 import { SessionLimitService } from '../src/modules/auth/services/session-limit.service';
@@ -164,6 +166,7 @@ describe('Auth response serialization (e2e)', () => {
       imports: [JwtModule.register({ secret: 'test-secret' })],
       controllers: [AuthController, OAuthController],
       providers: [
+        { provide: CACHE_MANAGER, useValue: createMockCache() },
         {
           provide: BreachedPasswordService,
           useValue: { assertNotBreached: jest.fn() }

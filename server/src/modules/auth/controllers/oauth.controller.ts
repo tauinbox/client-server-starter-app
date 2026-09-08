@@ -25,6 +25,9 @@ import {
   ApiTags
 } from '@nestjs/swagger';
 import { Request as ExpressRequest, Response } from 'express';
+import { randomUUID } from 'crypto';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { instanceToPlain } from 'class-transformer';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -64,6 +67,7 @@ import { OAuthLinkInitDto } from '../dtos/oauth-link-init.dto';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
 import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
 import { AuthService } from '../services/auth.service';
+import { SingleUseTokenLedger } from '../../../common/utils/single-use-token-ledger';
 
 @ApiTags('OAuth API')
 @Controller({
@@ -79,6 +83,8 @@ export class OAuthController {
   private static readonly OAUTH_DATA_COOKIE = 'oauth_data';
   private static readonly OAUTH_DATA_MAX_AGE_SECONDS = 60;
 
+  private readonly oauthDataLedger: SingleUseTokenLedger;
+
   constructor(
     private readonly oauthService: OAuthService,
     private readonly oauthAccountService: OAuthAccountService,
@@ -87,8 +93,15 @@ export class OAuthController {
     private readonly jwtService: JwtService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
-    @Inject(CLIENT_URL) private readonly clientUrl: string
-  ) {}
+    @Inject(CLIENT_URL) private readonly clientUrl: string,
+    @Inject(CACHE_MANAGER) cache: Cache
+  ) {
+    this.oauthDataLedger = new SingleUseTokenLedger(
+      cache,
+      'oauth-data:spent:',
+      this.logger
+    );
+  }
 
   // --- Link initiation ---
 
@@ -311,7 +324,7 @@ export class OAuthController {
   @Post('exchange')
   @ApiOperation({ summary: 'Exchange OAuth data cookie for auth response' })
   @ApiOkResponse({ description: 'Auth response from OAuth login' })
-  exchangeOAuthData(
+  async exchangeOAuthData(
     @Request() req: ExpressRequest,
     @Res({ passthrough: true }) res: Response
   ) {
@@ -343,6 +356,7 @@ export class OAuthController {
     try {
       const payload = this.jwtService.verify<{
         purpose?: string;
+        jti?: string;
         data: {
           tokens: {
             refresh_token: string;
@@ -354,6 +368,20 @@ export class OAuthController {
       }>(cookie);
       if (payload.purpose !== TOKEN_PURPOSE.OAUTH_DATA) {
         throw new Error('Unexpected token purpose');
+      }
+      // Clearing the cookie only spends the credential in the caller's own
+      // browser. A value captured before the exchange stays valid for the rest
+      // of its 60 seconds unless the server records that it was already spent.
+      if (!payload.jti) {
+        throw new Error('Missing token id');
+      }
+      if (
+        !(await this.oauthDataLedger.claim(
+          payload.jti,
+          OAuthController.OAUTH_DATA_MAX_AGE_SECONDS * 1000
+        ))
+      ) {
+        throw new Error('OAuth data already exchanged');
       }
       const { refresh_token, ...publicTokens } = payload.data.tokens;
       res.cookie('refresh_token', refresh_token, {
@@ -422,7 +450,8 @@ export class OAuthController {
       const signedData = this.jwtService.sign(
         {
           data: { tokens, user: instanceToPlain(user) },
-          purpose: TOKEN_PURPOSE.OAUTH_DATA
+          purpose: TOKEN_PURPOSE.OAUTH_DATA,
+          jti: randomUUID()
         },
         { expiresIn: OAuthController.OAUTH_DATA_MAX_AGE_SECONDS }
       );

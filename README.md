@@ -1447,7 +1447,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/reset-password` | None | Reset the password with a token |
 | POST | `/auth/oauth/reauth-init` | Bearer | Start a step-up re-authentication for an account that holds no password. The body names the operation the proof is for. Sets a short-lived cookie tied to the authorization flow that starts next. The callback mints a `reauth_proof` cookie for that operation, and only when the provider identity already belongs to the caller |
 | POST | `/auth/oauth/link-init` | Bearer + step-up | Start an OAuth account link. The body carries the current password, or the account proves itself with a `reauth_proof` minted for the operation `oauth_link`. A linked provider signs the account in and no recovery path removes it, thus a stolen session must not plant one. Sets a cookie with a short life, thus the OAuth flow that starts next attaches the provider to the current user. The flow that starts next claims it, and no other flow can use it. A logout cancels it |
-| POST | `/auth/oauth/exchange` | None | Exchange the OAuth-data cookie from the callback for the auth response: an access token and a refresh cookie |
+| POST | `/auth/oauth/exchange` | None | Exchange the OAuth-data cookie from the callback for the auth response: an access token and a refresh cookie. The payload is spendable once, thus a replay inside its 60 seconds is refused |
 | GET | `/auth/oauth/accounts` | Bearer | List the linked OAuth accounts |
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink an OAuth provider |
 | GET | `/auth/permissions` | Bearer | Get the resolved permissions of the current user |
@@ -1743,8 +1743,8 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2262 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 363 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 361 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 7 |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2272 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 366 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 364 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1254 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 251 tests pass |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 658 tests pass |
