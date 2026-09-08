@@ -30,7 +30,7 @@ import {
   logAudit,
   toAdminUserResponse
 } from '../state';
-import { adminGuard, authGuard } from '../helpers/auth.helpers';
+import { permissionGuard } from '../helpers/auth.helpers';
 import {
   buildMockUser,
   validateCreateUserBody
@@ -131,7 +131,7 @@ function userQueryErrors(query: Record<string, unknown>): string[] {
 const router = Router();
 
 // POST /api/v1/users
-router.post('/', adminGuard, (req, res) => {
+router.post('/', permissionGuard('create', 'User'), (req, res) => {
   const validated = validateCreateUserBody(req.body);
   if (!validated.ok) {
     res.status(validated.status).json(validated.body);
@@ -156,7 +156,7 @@ router.post('/', adminGuard, (req, res) => {
 });
 
 // GET /api/v1/users/cursor
-router.get('/cursor', adminGuard, (req, res) => {
+router.get('/cursor', permissionGuard('search', 'User'), (req, res) => {
   const queryErrors = userQueryErrors(req.query as Record<string, unknown>);
   if (queryErrors.length > 0) {
     res.status(400).json(validationError(queryErrors));
@@ -174,7 +174,7 @@ router.get('/cursor', adminGuard, (req, res) => {
 });
 
 // GET /api/v1/users/search/cursor
-router.get('/search/cursor', adminGuard, (req, res) => {
+router.get('/search/cursor', permissionGuard('search', 'User'), (req, res) => {
   const queryErrors = userQueryErrors(req.query as Record<string, unknown>);
   if (queryErrors.length > 0) {
     res.status(400).json(validationError(queryErrors));
@@ -225,295 +225,320 @@ router.get('/search/cursor', adminGuard, (req, res) => {
   res.json(result);
 });
 
-// GET /api/v1/users/:id — requires auth (not admin) to match client route guards
-router.get('/:id', authGuard, requireUuid('id'), (req, res) => {
-  const id = req.params['id'] as string;
-  const user = findUserById(id);
-  if (!user) {
-    res.status(404).json({
-      message: 'User not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.USERS.NOT_FOUND
-    });
-    return;
-  }
-
-  res.json(toAdminUserResponse(user));
-});
-
-// GET /api/v1/users/:id/permissions — admin read-only preview of a user's
-// effective permissions: DB roles, resolved permissions and compiled CASL rules.
-router.get('/:id/permissions', adminGuard, requireUuid('id'), (req, res) => {
-  const id = req.params['id'] as string;
-  const user = findUserById(id);
-  if (!user) {
-    res.status(404).json({
-      message: 'User not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.USERS.NOT_FOUND
-    });
-    return;
-  }
-
-  const adminResponse = toAdminUserResponse(user);
-  const permissions = getResolvedPermissionsForUser(user);
-  const rules = getPackedRulesForUser(user);
-  res.json({
-    roles: adminResponse.roles,
-    permissions,
-    rules
-  });
-});
-
-// PATCH /api/v1/users/:id
-router.patch('/:id', adminGuard, requireUuid('id'), (req, res) => {
-  const id = req.params['id'] as string;
-
-  // The server's global ValidationPipe runs before the handler, so a body that
-  // fails UpdateUserDto is a 400 whether or not the addressed row exists. Only
-  // checks that need the looked-up row stay below the 404.
-  const { firstName, lastName, password, isActive, unlockAccount, locale } =
-    req.body;
-  // An explicit null is a 400 on the server, not an absent field: UpdateUserDto
-  // uses PartialType(..., { skipNullProperties: false }).
-  const email =
-    req.body.email === undefined
-      ? undefined
-      : (normalizeEmail(req.body.email) ?? req.body.email);
-
-  const bodyEmailErrors = emailErrors('email', req.body.email, 'definedOnly');
-  if (bodyEmailErrors.length > 0) {
-    res.status(400).json(validationError(bodyEmailErrors));
-    return;
-  }
-
-  if (firstName !== undefined) {
-    const fnMaxErr = validateMaxLength(firstName, 255, 'firstName');
-    if (fnMaxErr) {
-      res.status(400).json(validationError(fnMaxErr));
-      return;
-    }
-  }
-
-  if (lastName !== undefined) {
-    const lnMaxErr = validateMaxLength(lastName, 255, 'lastName');
-    if (lnMaxErr) {
-      res.status(400).json(validationError(lnMaxErr));
-      return;
-    }
-  }
-
-  if (password !== undefined) {
-    const pwLenErr = passwordLengthError(password);
-    if (pwLenErr) {
-      res.status(400).json(validationError(pwLenErr));
-      return;
-    }
-    // The blocklist verdict comes from UsersService.update on the real server,
-    // after the ability check and before any field assignment, so a 400 must
-    // leave the record unchanged.
-    if (isBreachedPassword(password)) {
-      res.status(400).json(breachedPasswordEnvelope());
-      return;
-    }
-  }
-
-  const localeErr = validateLocale(locale);
-  if (localeErr) {
-    res.status(400).json(validationError(localeErr));
-    return;
-  }
-
-  if (isActive !== undefined && typeof isActive !== 'boolean') {
-    res.status(400).json(validationError('isActive must be a boolean value'));
-    return;
-  }
-
-  if (unlockAccount !== undefined && typeof unlockAccount !== 'boolean') {
-    res
-      .status(400)
-      .json(validationError('unlockAccount must be a boolean value'));
-    return;
-  }
-
-  const user = findUserById(id);
-  if (!user) {
-    res.status(404).json({
-      message: 'User not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.USERS.NOT_FOUND
-    });
-    return;
-  }
-
-  if (email !== undefined) {
-    const existing = findUserByEmail(email);
-    const pendingConflict = Array.from(getState().users.values()).find(
-      (u) => !u.deletedAt && u.pendingEmail === email && u.id !== user.id
-    );
-    if ((existing && existing.id !== user.id) || pendingConflict) {
-      res.status(409).json({
-        message: 'User with this email already exists',
-        statusCode: 409,
-        errorKey: ErrorKeys.USERS.EMAIL_EXISTS
+// GET /api/v1/users/:id
+router.get(
+  '/:id',
+  permissionGuard('read', 'User'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const user = findUserById(id);
+    if (!user) {
+      res.status(404).json({
+        message: 'User not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.USERS.NOT_FOUND
       });
       return;
     }
-    if (email !== user.email) {
-      user.isEmailVerified = false;
-      // Admin-set email overrides any self-service change in flight.
-      if (user.pendingEmailToken) {
-        getState().pendingEmailTokens.delete(user.pendingEmailToken);
+
+    res.json(toAdminUserResponse(user));
+  }
+);
+
+// GET /api/v1/users/:id/permissions — admin read-only preview of a user's
+// effective permissions: DB roles, resolved permissions and compiled CASL rules.
+router.get(
+  '/:id/permissions',
+  permissionGuard('read', 'User'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const user = findUserById(id);
+    if (!user) {
+      res.status(404).json({
+        message: 'User not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.USERS.NOT_FOUND
+      });
+      return;
+    }
+
+    const adminResponse = toAdminUserResponse(user);
+    const permissions = getResolvedPermissionsForUser(user);
+    const rules = getPackedRulesForUser(user);
+    res.json({
+      roles: adminResponse.roles,
+      permissions,
+      rules
+    });
+  }
+);
+
+// PATCH /api/v1/users/:id
+router.patch(
+  '/:id',
+  permissionGuard('update', 'User'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+
+    // The server's global ValidationPipe runs before the handler, so a body that
+    // fails UpdateUserDto is a 400 whether or not the addressed row exists. Only
+    // checks that need the looked-up row stay below the 404.
+    const { firstName, lastName, password, isActive, unlockAccount, locale } =
+      req.body;
+    // An explicit null is a 400 on the server, not an absent field: UpdateUserDto
+    // uses PartialType(..., { skipNullProperties: false }).
+    const email =
+      req.body.email === undefined
+        ? undefined
+        : (normalizeEmail(req.body.email) ?? req.body.email);
+
+    const bodyEmailErrors = emailErrors('email', req.body.email, 'definedOnly');
+    if (bodyEmailErrors.length > 0) {
+      res.status(400).json(validationError(bodyEmailErrors));
+      return;
+    }
+
+    if (firstName !== undefined) {
+      const fnMaxErr = validateMaxLength(firstName, 255, 'firstName');
+      if (fnMaxErr) {
+        res.status(400).json(validationError(fnMaxErr));
+        return;
       }
-      user.pendingEmail = null;
-      user.pendingEmailToken = null;
-      user.pendingEmailExpiresAt = null;
-      // The address is moved to recover an account; the previous holder must
-      // not keep authenticating with the tokens issued before the move.
+    }
+
+    if (lastName !== undefined) {
+      const lnMaxErr = validateMaxLength(lastName, 255, 'lastName');
+      if (lnMaxErr) {
+        res.status(400).json(validationError(lnMaxErr));
+        return;
+      }
+    }
+
+    if (password !== undefined) {
+      const pwLenErr = passwordLengthError(password);
+      if (pwLenErr) {
+        res.status(400).json(validationError(pwLenErr));
+        return;
+      }
+      // The blocklist verdict comes from UsersService.update on the real server,
+      // after the ability check and before any field assignment, so a 400 must
+      // leave the record unchanged.
+      if (isBreachedPassword(password)) {
+        res.status(400).json(breachedPasswordEnvelope());
+        return;
+      }
+    }
+
+    const localeErr = validateLocale(locale);
+    if (localeErr) {
+      res.status(400).json(validationError(localeErr));
+      return;
+    }
+
+    if (isActive !== undefined && typeof isActive !== 'boolean') {
+      res.status(400).json(validationError('isActive must be a boolean value'));
+      return;
+    }
+
+    if (unlockAccount !== undefined && typeof unlockAccount !== 'boolean') {
+      res
+        .status(400)
+        .json(validationError('unlockAccount must be a boolean value'));
+      return;
+    }
+
+    const user = findUserById(id);
+    if (!user) {
+      res.status(404).json({
+        message: 'User not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.USERS.NOT_FOUND
+      });
+      return;
+    }
+
+    if (email !== undefined) {
+      const existing = findUserByEmail(email);
+      const pendingConflict = Array.from(getState().users.values()).find(
+        (u) => !u.deletedAt && u.pendingEmail === email && u.id !== user.id
+      );
+      if ((existing && existing.id !== user.id) || pendingConflict) {
+        res.status(409).json({
+          message: 'User with this email already exists',
+          statusCode: 409,
+          errorKey: ErrorKeys.USERS.EMAIL_EXISTS
+        });
+        return;
+      }
+      if (email !== user.email) {
+        user.isEmailVerified = false;
+        // Admin-set email overrides any self-service change in flight.
+        if (user.pendingEmailToken) {
+          getState().pendingEmailTokens.delete(user.pendingEmailToken);
+        }
+        user.pendingEmail = null;
+        user.pendingEmailToken = null;
+        user.pendingEmailExpiresAt = null;
+        // The address is moved to recover an account; the previous holder must
+        // not keep authenticating with the tokens issued before the move.
+        revokeUserSessions(user);
+      }
+      user.email = email;
+    }
+    if (firstName !== undefined) user.firstName = firstName;
+    if (lastName !== undefined) user.lastName = lastName;
+    if (locale !== undefined) user.locale = locale as string;
+    if (password !== undefined) {
+      user.password = password;
+      // Invalidate target user's sessions so attacker cannot keep access after admin password reset
       revokeUserSessions(user);
     }
-    user.email = email;
-  }
-  if (firstName !== undefined) user.firstName = firstName;
-  if (lastName !== undefined) user.lastName = lastName;
-  if (locale !== undefined) user.locale = locale as string;
-  if (password !== undefined) {
-    user.password = password;
-    // Invalidate target user's sessions so attacker cannot keep access after admin password reset
-    revokeUserSessions(user);
-  }
-  if (isActive !== undefined) {
-    if (isActive === false && user.isActive !== false) {
-      user.tokenRevokedAt = new Date().toISOString();
+    if (isActive !== undefined) {
+      if (isActive === false && user.isActive !== false) {
+        user.tokenRevokedAt = new Date().toISOString();
+      }
+      user.isActive = isActive;
     }
-    user.isActive = isActive;
-  }
-  if (unlockAccount) {
-    user.failedLoginAttempts = 0;
-    user.lockedUntil = null;
-  }
-  user.updatedAt = new Date().toISOString();
+    if (unlockAccount) {
+      user.failedLoginAttempts = 0;
+      user.lockedUntil = null;
+    }
+    user.updatedAt = new Date().toISOString();
 
-  const actor = (req as AuthenticatedRequest).user;
-  const changedFields = Object.keys(req.body).filter(
-    (k: string) => k !== 'password'
-  );
-  logAudit('USER_UPDATE', {
-    actorId: actor.id,
-    actorEmail: actor.email,
-    targetId: id,
-    targetType: 'User',
-    details: { changedFields },
-    ip: req.ip
-  });
-
-  if (password !== undefined) {
-    logAudit('PASSWORD_CHANGE', {
+    const actor = (req as AuthenticatedRequest).user;
+    const changedFields = Object.keys(req.body).filter(
+      (k: string) => k !== 'password'
+    );
+    logAudit('USER_UPDATE', {
       actorId: actor.id,
       actorEmail: actor.email,
       targetId: id,
       targetType: 'User',
-      details: { source: 'admin' },
+      details: { changedFields },
       ip: req.ip
     });
 
-    console.log(
-      `[PASSWORD CHANGED] To: ${user.email}\n  Source: administrator | IP: ${req.ip}`
-    );
-    pushToUser(id, { type: 'session_invalidated', userId: id });
-  }
+    if (password !== undefined) {
+      logAudit('PASSWORD_CHANGE', {
+        actorId: actor.id,
+        actorEmail: actor.email,
+        targetId: id,
+        targetType: 'User',
+        details: { source: 'admin' },
+        ip: req.ip
+      });
 
-  pushUserCrudEvent('updated', id);
-  res.json(toAdminUserResponse(user));
-});
+      console.log(
+        `[PASSWORD CHANGED] To: ${user.email}\n  Source: administrator | IP: ${req.ip}`
+      );
+      pushToUser(id, { type: 'session_invalidated', userId: id });
+    }
+
+    pushUserCrudEvent('updated', id);
+    res.json(toAdminUserResponse(user));
+  }
+);
 
 // DELETE /api/v1/users/:id
-router.delete('/:id', adminGuard, requireUuid('id'), (req, res) => {
-  const id = req.params['id'] as string;
-  const state = getState();
-  const targetUser = findUserById(id);
-  if (!targetUser) {
-    res.status(404).json({
-      message: 'User not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.USERS.NOT_FOUND
+router.delete(
+  '/:id',
+  permissionGuard('delete', 'User'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const state = getState();
+    const targetUser = findUserById(id);
+    if (!targetUser) {
+      res.status(404).json({
+        message: 'User not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.USERS.NOT_FOUND
+      });
+      return;
+    }
+
+    // Soft delete: set deletedAt timestamp
+    targetUser.deletedAt = new Date().toISOString();
+    targetUser.updatedAt = new Date().toISOString();
+
+    // Clear any in-flight self-service email change so a stale token cannot
+    // confirm against a soft-deleted row.
+    if (targetUser.pendingEmailToken) {
+      state.pendingEmailTokens.delete(targetUser.pendingEmailToken);
+    }
+    targetUser.pendingEmail = null;
+    targetUser.pendingEmailToken = null;
+    targetUser.pendingEmailExpiresAt = null;
+
+    // Revoke all refresh tokens for this user (active + revoked)
+    for (const [token, userId] of state.refreshTokens.entries()) {
+      if (userId === id) {
+        state.refreshTokens.delete(token);
+      }
+    }
+    for (const [token, userId] of state.revokedRefreshTokens.entries()) {
+      if (userId === id) {
+        state.revokedRefreshTokens.delete(token);
+      }
+    }
+
+    // Stop any renewals/charges on the deleted user's subscriptions.
+    cancelSubscriptionsForDeletedUser(id);
+
+    const actor = (req as AuthenticatedRequest).user;
+    logAudit('USER_DELETE', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: id,
+      targetType: 'User',
+      details: { targetEmail: targetUser.email },
+      ip: req.ip
     });
-    return;
+
+    pushToUser(id, { type: 'session_invalidated', userId: id });
+    pushUserCrudEvent('deleted', id);
+    res.json({});
   }
-
-  // Soft delete: set deletedAt timestamp
-  targetUser.deletedAt = new Date().toISOString();
-  targetUser.updatedAt = new Date().toISOString();
-
-  // Clear any in-flight self-service email change so a stale token cannot
-  // confirm against a soft-deleted row.
-  if (targetUser.pendingEmailToken) {
-    state.pendingEmailTokens.delete(targetUser.pendingEmailToken);
-  }
-  targetUser.pendingEmail = null;
-  targetUser.pendingEmailToken = null;
-  targetUser.pendingEmailExpiresAt = null;
-
-  // Revoke all refresh tokens for this user (active + revoked)
-  for (const [token, userId] of state.refreshTokens.entries()) {
-    if (userId === id) {
-      state.refreshTokens.delete(token);
-    }
-  }
-  for (const [token, userId] of state.revokedRefreshTokens.entries()) {
-    if (userId === id) {
-      state.revokedRefreshTokens.delete(token);
-    }
-  }
-
-  // Stop any renewals/charges on the deleted user's subscriptions.
-  cancelSubscriptionsForDeletedUser(id);
-
-  const actor = (req as AuthenticatedRequest).user;
-  logAudit('USER_DELETE', {
-    actorId: actor.id,
-    actorEmail: actor.email,
-    targetId: id,
-    targetType: 'User',
-    details: { targetEmail: targetUser.email },
-    ip: req.ip
-  });
-
-  pushToUser(id, { type: 'session_invalidated', userId: id });
-  pushUserCrudEvent('deleted', id);
-  res.json({});
-});
+);
 
 // POST /api/v1/users/:id/restore
-router.post('/:id/restore', adminGuard, requireUuid('id'), (req, res) => {
-  const id = req.params['id'] as string;
-  const targetUser = findUserByIdWithDeleted(id);
-  if (!targetUser) {
-    res.status(404).json({
-      message: 'User not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.USERS.NOT_FOUND
+router.post(
+  '/:id/restore',
+  permissionGuard('delete', 'User'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const targetUser = findUserByIdWithDeleted(id);
+    if (!targetUser) {
+      res.status(404).json({
+        message: 'User not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.USERS.NOT_FOUND
+      });
+      return;
+    }
+
+    // Restore lifts the soft-delete only - `isActive` is a separate
+    // administrative state changed through PATCH /users/:id.
+    targetUser.deletedAt = null;
+    targetUser.updatedAt = new Date().toISOString();
+
+    const actor = (req as AuthenticatedRequest).user;
+    logAudit('USER_RESTORE', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: id,
+      targetType: 'User',
+      details: { targetEmail: targetUser.email },
+      ip: req.ip
     });
-    return;
+
+    pushUserCrudEvent('restored', id);
+    res.json(toAdminUserResponse(targetUser));
   }
-
-  // Restore lifts the soft-delete only - `isActive` is a separate
-  // administrative state changed through PATCH /users/:id.
-  targetUser.deletedAt = null;
-  targetUser.updatedAt = new Date().toISOString();
-
-  const actor = (req as AuthenticatedRequest).user;
-  logAudit('USER_RESTORE', {
-    actorId: actor.id,
-    actorEmail: actor.email,
-    targetId: id,
-    targetType: 'User',
-    details: { targetEmail: targetUser.email },
-    ip: req.ip
-  });
-
-  pushUserCrudEvent('restored', id);
-  res.json(toAdminUserResponse(targetUser));
-});
+);
 
 export default router;

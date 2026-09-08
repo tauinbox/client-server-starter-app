@@ -17,7 +17,10 @@ import {
   toResourceResponse,
   toActionResponse
 } from '../state';
-import { adminGuard } from '../helpers/auth.helpers';
+import {
+  assertInstancePermission,
+  permissionGuard
+} from '../helpers/auth.helpers';
 import { CASL_RESERVED_ACTION_NAMES } from '../constants';
 import type { AuthenticatedRequest } from '../types';
 import {
@@ -34,7 +37,7 @@ import {
 const router = Router();
 
 // GET /api/v1/rbac/metadata
-router.get('/metadata', adminGuard, (_req, res) => {
+router.get('/metadata', permissionGuard('read', 'Permission'), (_req, res) => {
   const state = getState();
   const resources = Array.from(state.resources.values()).map(
     toResourceResponse
@@ -45,23 +48,27 @@ router.get('/metadata', adminGuard, (_req, res) => {
 
 // GET /api/v1/rbac/resources
 // GET /api/v1/rbac/resources/cursor
-router.get('/resources/cursor', adminGuard, (req, res) => {
-  const query = req.query as Record<string, unknown>;
-  const errors = cursorQueryErrors(query, {
-    sortColumns: ALLOWED_RESOURCE_SORT_COLUMNS
-  });
-  if (errors.length > 0) {
-    res.status(400).json(validationError(errors));
-    return;
+router.get(
+  '/resources/cursor',
+  permissionGuard('read', 'Permission'),
+  (req, res) => {
+    const query = req.query as Record<string, unknown>;
+    const errors = cursorQueryErrors(query, {
+      sortColumns: ALLOWED_RESOURCE_SORT_COLUMNS
+    });
+    if (errors.length > 0) {
+      res.status(400).json(validationError(errors));
+      return;
+    }
+    const page = cursorPaginate(
+      Array.from(getState().resources.values()),
+      parseCursorQuery(query)
+    );
+    res.json({ data: page.data.map(toResourceResponse), meta: page.meta });
   }
-  const page = cursorPaginate(
-    Array.from(getState().resources.values()),
-    parseCursorQuery(query)
-  );
-  res.json({ data: page.data.map(toResourceResponse), meta: page.meta });
-});
+);
 
-router.get('/resources', adminGuard, (_req, res) => {
+router.get('/resources', permissionGuard('read', 'Permission'), (_req, res) => {
   const resources = Array.from(getState().resources.values()).map(
     toResourceResponse
   );
@@ -71,7 +78,7 @@ router.get('/resources', adminGuard, (_req, res) => {
 // POST /api/v1/rbac/resources/:id/restore
 router.post(
   '/resources/:id/restore',
-  adminGuard,
+  permissionGuard('update', 'Permission'),
   requireUuid('id'),
   (req, res) => {
     const id = req.params['id'] as string;
@@ -112,102 +119,111 @@ router.post(
 );
 
 // PATCH /api/v1/rbac/resources/:id
-router.patch('/resources/:id', adminGuard, requireUuid('id'), (req, res) => {
-  const id = req.params['id'] as string;
-  const state = getState();
+router.patch(
+  '/resources/:id',
+  permissionGuard('update', 'Permission'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const state = getState();
 
-  const { displayName, description, allowedActionNames } = req.body;
+    const { displayName, description, allowedActionNames } = req.body;
 
-  // The server's global pipe runs before the handler, so a malformed body is a
-  // 400 whether or not the resource exists, and it reports every violation at
-  // once, in DTO declaration order.
-  const errors = [
-    ...unknownPropertyErrors(req.body, [
-      'displayName',
-      'description',
-      'allowedActionNames'
-    ]),
-    ...stringErrors('displayName', displayName, {
-      max: 100,
-      optional: 'definedOnly'
-    }),
-    ...stringErrors('description', description, {
-      max: 500,
-      optional: 'nullable'
-    }),
-    ...stringArrayErrors('allowedActionNames', allowedActionNames, {
-      maxItems: 100,
-      maxItemLength: 50,
-      optional: 'nullable'
-    })
-  ];
+    // The server's global pipe runs before the handler, so a malformed body is a
+    // 400 whether or not the resource exists, and it reports every violation at
+    // once, in DTO declaration order.
+    const errors = [
+      ...unknownPropertyErrors(req.body, [
+        'displayName',
+        'description',
+        'allowedActionNames'
+      ]),
+      ...stringErrors('displayName', displayName, {
+        max: 100,
+        optional: 'definedOnly'
+      }),
+      ...stringErrors('description', description, {
+        max: 500,
+        optional: 'nullable'
+      }),
+      ...stringArrayErrors('allowedActionNames', allowedActionNames, {
+        maxItems: 100,
+        maxItemLength: 50,
+        optional: 'nullable'
+      })
+    ];
 
-  if (errors.length > 0) {
-    res.status(400).json(validationError(errors));
-    return;
-  }
+    if (errors.length > 0) {
+      res.status(400).json(validationError(errors));
+      return;
+    }
 
-  const resource = state.resources.get(id);
+    const resource = state.resources.get(id);
 
-  if (!resource) {
-    res.status(404).json({
-      message: 'Resource not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.RESOURCES.NOT_FOUND
+    if (!resource) {
+      res.status(404).json({
+        message: 'Resource not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.RESOURCES.NOT_FOUND
+      });
+      return;
+    }
+
+    if (displayName !== undefined) {
+      resource.displayName = displayName;
+    }
+
+    if (description !== undefined) {
+      resource.description = description;
+    }
+
+    if (allowedActionNames !== undefined) {
+      resource.allowedActionNames = allowedActionNames;
+    }
+
+    const actor = (req as AuthenticatedRequest).user;
+    logAudit('RESOURCE_UPDATE', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: id,
+      targetType: 'Resource',
+      details: { changedFields: Object.keys(req.body) },
+      ip: req.ip
     });
-    return;
+
+    res.json(toResourceResponse(resource));
   }
-
-  if (displayName !== undefined) {
-    resource.displayName = displayName;
-  }
-
-  if (description !== undefined) {
-    resource.description = description;
-  }
-
-  if (allowedActionNames !== undefined) {
-    resource.allowedActionNames = allowedActionNames;
-  }
-
-  const actor = (req as AuthenticatedRequest).user;
-  logAudit('RESOURCE_UPDATE', {
-    actorId: actor.id,
-    actorEmail: actor.email,
-    targetId: id,
-    targetType: 'Resource',
-    details: { changedFields: Object.keys(req.body) },
-    ip: req.ip
-  });
-
-  res.json(toResourceResponse(resource));
-});
+);
 
 // GET /api/v1/rbac/actions
 // GET /api/v1/rbac/actions/cursor
-router.get('/actions/cursor', adminGuard, (req, res) => {
-  const query = req.query as Record<string, unknown>;
-  const errors = cursorQueryErrors(query, {
-    sortColumns: ALLOWED_ACTION_SORT_COLUMNS
-  });
-  if (errors.length > 0) {
-    res.status(400).json(validationError(errors));
-    return;
+router.get(
+  '/actions/cursor',
+  permissionGuard('read', 'Permission'),
+  (req, res) => {
+    const query = req.query as Record<string, unknown>;
+    const errors = cursorQueryErrors(query, {
+      sortColumns: ALLOWED_ACTION_SORT_COLUMNS
+    });
+    if (errors.length > 0) {
+      res.status(400).json(validationError(errors));
+      return;
+    }
+    const page = cursorPaginate(
+      Array.from(getState().actions.values()),
+      parseCursorQuery(query)
+    );
+    res.json({ data: page.data.map(toActionResponse), meta: page.meta });
   }
-  const page = cursorPaginate(
-    Array.from(getState().actions.values()),
-    parseCursorQuery(query)
-  );
-  res.json({ data: page.data.map(toActionResponse), meta: page.meta });
-});
+);
 
-router.get('/actions', adminGuard, (_req, res) => {
+router.get('/actions', permissionGuard('read', 'Permission'), (_req, res) => {
   const actions = Array.from(getState().actions.values()).map(toActionResponse);
   res.json(actions);
 });
 
 // POST /api/v1/rbac/actions
-router.post('/actions', adminGuard, (req, res) => {
+router.post('/actions', permissionGuard('create', 'Permission'), (req, res) => {
   const { name, displayName, description } = req.body;
 
   // `name` carries a `@Transform` that trims and lowercases before the
@@ -228,6 +244,19 @@ router.post('/actions', adminGuard, (req, res) => {
   }
 
   const trimmedName = (name as string).trim().toLowerCase();
+
+  // CreateActionDto reaches the controller with `name` already trimmed and
+  // lowercased, and the checks below live in the service, so the instance
+  // check sits between the pipe and the service.
+  if (
+    !assertInstancePermission(req, res, 'create', 'Permission', {
+      name: trimmedName,
+      displayName,
+      description
+    })
+  ) {
+    return;
+  }
 
   // Raised by the service, below the pipe, so it carries no `errors` array.
   if (CASL_RESERVED_ACTION_NAMES.includes(trimmedName)) {
@@ -292,129 +321,139 @@ router.post('/actions', adminGuard, (req, res) => {
 });
 
 // PATCH /api/v1/rbac/actions/:id
-router.patch('/actions/:id', adminGuard, requireUuid('id'), (req, res) => {
-  const id = req.params['id'] as string;
-  const state = getState();
+router.patch(
+  '/actions/:id',
+  permissionGuard('update', 'Permission'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const state = getState();
 
-  const { displayName, description } = req.body;
+    const { displayName, description } = req.body;
 
-  // `actions.description` is NOT NULL, so UpdateActionDto rejects an explicit
-  // null - unlike `resources.description`, which is nullable.
-  const errors = [
-    ...unknownPropertyErrors(req.body, ['displayName', 'description']),
-    ...stringErrors('displayName', displayName, {
-      max: 100,
-      optional: 'definedOnly'
-    }),
-    ...stringErrors('description', description, {
-      max: 500,
-      optional: 'definedOnly'
-    })
-  ];
+    // `actions.description` is NOT NULL, so UpdateActionDto rejects an explicit
+    // null - unlike `resources.description`, which is nullable.
+    const errors = [
+      ...unknownPropertyErrors(req.body, ['displayName', 'description']),
+      ...stringErrors('displayName', displayName, {
+        max: 100,
+        optional: 'definedOnly'
+      }),
+      ...stringErrors('description', description, {
+        max: 500,
+        optional: 'definedOnly'
+      })
+    ];
 
-  if (errors.length > 0) {
-    res.status(400).json(validationError(errors));
-    return;
-  }
+    if (errors.length > 0) {
+      res.status(400).json(validationError(errors));
+      return;
+    }
 
-  const action = state.actions.get(id);
+    const action = state.actions.get(id);
 
-  if (!action) {
-    res.status(404).json({
-      message: 'Action not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
+    if (!action) {
+      res.status(404).json({
+        message: 'Action not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
+      });
+      return;
+    }
+
+    if (displayName !== undefined) {
+      action.displayName = displayName;
+    }
+
+    if (description !== undefined) {
+      action.description = description;
+    }
+
+    const actor = (req as AuthenticatedRequest).user;
+    logAudit('ACTION_UPDATE', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: id,
+      targetType: 'Action',
+      details: { changedFields: Object.keys(req.body) },
+      ip: req.ip
     });
-    return;
+
+    res.json(toActionResponse(action));
   }
-
-  if (displayName !== undefined) {
-    action.displayName = displayName;
-  }
-
-  if (description !== undefined) {
-    action.description = description;
-  }
-
-  const actor = (req as AuthenticatedRequest).user;
-  logAudit('ACTION_UPDATE', {
-    actorId: actor.id,
-    actorEmail: actor.email,
-    targetId: id,
-    targetType: 'Action',
-    details: { changedFields: Object.keys(req.body) },
-    ip: req.ip
-  });
-
-  res.json(toActionResponse(action));
-});
+);
 
 // DELETE /api/v1/rbac/actions/:id
-router.delete('/actions/:id', adminGuard, requireUuid('id'), (req, res) => {
-  const id = req.params['id'] as string;
-  const state = getState();
-  const action = state.actions.get(id);
+router.delete(
+  '/actions/:id',
+  permissionGuard('delete', 'Permission'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const state = getState();
+    const action = state.actions.get(id);
 
-  if (!action) {
-    res.status(404).json({
-      message: 'Action not found',
-      statusCode: 404,
-      errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
-    });
-    return;
-  }
-
-  if (action.isDefault) {
-    res.status(403).json({
-      message: 'Cannot delete default actions',
-      statusCode: 403,
-      errorKey: ErrorKeys.ACTIONS.CANNOT_DELETE_DEFAULT
-    });
-    return;
-  }
-
-  // Find all permissions that reference this action
-  const affectedPermissionIds: string[] = [];
-  for (const [permId, perm] of state.permissions) {
-    if (perm.actionId === id) {
-      affectedPermissionIds.push(permId);
+    if (!action) {
+      res.status(404).json({
+        message: 'Action not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
+      });
+      return;
     }
-  }
 
-  // Check if any role_permissions reference these permissions
-  const usedInRolePerms = state.rolePermissions.some((rp) =>
-    affectedPermissionIds.includes(rp.permissionId)
-  );
+    if (action.isDefault) {
+      res.status(403).json({
+        message: 'Cannot delete default actions',
+        statusCode: 403,
+        errorKey: ErrorKeys.ACTIONS.CANNOT_DELETE_DEFAULT
+      });
+      return;
+    }
 
-  if (usedInRolePerms) {
-    res.status(409).json({
-      message:
-        'Cannot delete action: it is referenced by role permissions. Remove the role-permission assignments first.',
-      statusCode: 409,
-      errorKey: ErrorKeys.ACTIONS.ASSIGNED_TO_ROLES
+    // Find all permissions that reference this action
+    const affectedPermissionIds: string[] = [];
+    for (const [permId, perm] of state.permissions) {
+      if (perm.actionId === id) {
+        affectedPermissionIds.push(permId);
+      }
+    }
+
+    // Check if any role_permissions reference these permissions
+    const usedInRolePerms = state.rolePermissions.some((rp) =>
+      affectedPermissionIds.includes(rp.permissionId)
+    );
+
+    if (usedInRolePerms) {
+      res.status(409).json({
+        message:
+          'Cannot delete action: it is referenced by role permissions. Remove the role-permission assignments first.',
+        statusCode: 409,
+        errorKey: ErrorKeys.ACTIONS.ASSIGNED_TO_ROLES
+      });
+      return;
+    }
+
+    // Delete associated permissions
+    for (const permId of affectedPermissionIds) {
+      state.permissions.delete(permId);
+    }
+
+    // Delete the action
+    state.actions.delete(id);
+
+    const actor = (req as AuthenticatedRequest).user;
+    logAudit('ACTION_DELETE', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: id,
+      targetType: 'Action',
+      details: { name: action.name },
+      ip: req.ip
     });
-    return;
+
+    res.send();
   }
-
-  // Delete associated permissions
-  for (const permId of affectedPermissionIds) {
-    state.permissions.delete(permId);
-  }
-
-  // Delete the action
-  state.actions.delete(id);
-
-  const actor = (req as AuthenticatedRequest).user;
-  logAudit('ACTION_DELETE', {
-    actorId: actor.id,
-    actorEmail: actor.email,
-    targetId: id,
-    targetType: 'Action',
-    details: { name: action.name },
-    ip: req.ip
-  });
-
-  res.send();
-});
+);
 
 export default router;

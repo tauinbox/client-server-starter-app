@@ -1,6 +1,7 @@
 import {
   AbilityBuilder,
   createMongoAbility,
+  ForcedSubject,
   MongoAbility
 } from '@casl/ability';
 import type { MongoQuery } from '@casl/ability';
@@ -365,10 +366,26 @@ export function logAudit(
   state.auditLogs.push(entry);
 }
 
-type Actions =
+export type Actions =
   'manage' | 'create' | 'read' | 'update' | 'delete' | 'search' | 'assign';
-type Subjects = 'User' | 'Role' | 'Permission' | 'Profile' | 'all';
-type MockAbility = MongoAbility<[Actions, Subjects]>;
+
+/** Every subject the server registers through `@RegisterResource`. */
+export type SubjectNames =
+  'User' | 'Role' | 'Permission' | 'Profile' | 'FeatureFlag' | 'Billing';
+
+/**
+ * Branded plain-object subject for instance-level checks, mirroring
+ * `AppAbility` on the server. The mapped type distributes over each subject
+ * name so CASL resolves the matching brand for `subject('Role', record)`.
+ */
+type SubjectInstanceMap = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [K in SubjectNames]: ForcedSubject<K> & Record<PropertyKey, any>;
+};
+export type SubjectInstance = SubjectInstanceMap[SubjectNames];
+
+export type Subjects = SubjectNames | SubjectInstance | 'all';
+export type MockAbility = MongoAbility<[Actions, Subjects]>;
 
 export function getResolvedPermissionsForUser(
   user: MockUser
@@ -442,7 +459,12 @@ export function mustEnrolMfa(user: MockUser): boolean {
   return isMfaMandatoryFor(user) && !user.totpEnabledAt;
 }
 
-export function getPackedRulesForUser(user: MockUser): unknown[][] {
+/**
+ * Compiles the caller's CASL ability - the same object the server's
+ * CaslAbilityFactory produces. Route guards evaluate it directly, so the mock
+ * authorizes by permission the way PermissionsGuard does, not by role name.
+ */
+export function buildAbilityForUser(user: MockUser): MockAbility {
   const { can, cannot, build } = new AbilityBuilder<MockAbility>(
     createMongoAbility
   );
@@ -451,7 +473,7 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
 
   if (hasSuperRole(user)) {
     can('manage', 'all');
-    return packRules(build().rules);
+    return build();
   }
 
   const subjectMap = new Map<string, string>();
@@ -470,7 +492,7 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
   ];
 
   for (const { resource, action, conditions } of orderedEntries) {
-    const subject = subjectMap.get(resource) as Subjects | undefined;
+    const subject = subjectMap.get(resource) as SubjectNames | undefined;
     if (!subject) continue;
 
     const isDeny = conditions?.effect === 'deny';
@@ -586,7 +608,11 @@ export function getPackedRulesForUser(user: MockUser): unknown[][] {
     }
   }
 
-  return packRules(build().rules);
+  return build();
+}
+
+export function getPackedRulesForUser(user: MockUser): unknown[][] {
+  return packRules(buildAbilityForUser(user).rules);
 }
 
 export function toFeatureFlagRuleResponse(

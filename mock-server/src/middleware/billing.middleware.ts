@@ -28,7 +28,7 @@ import {
   toSubscriptionResponse,
   toUsageResponse
 } from '../state';
-import { adminGuard, authGuard } from '../helpers/auth.helpers';
+import { authGuard, permissionGuard } from '../helpers/auth.helpers';
 import {
   billClosingUsagePeriod,
   sumPlanMeterUnits
@@ -1044,9 +1044,9 @@ billingRouter.get(
 );
 
 // ---------------------------------------------------------------------------
-// Admin billing. CASL `manage Billing` is mirrored by adminGuard:
-// 401 unauthenticated, 403 non-admin. Reads and mutations are addressed by
-// entity id across all customers (no per-caller scoping).
+// Admin billing. Every route carries CASL `manage Billing`: 401
+// unauthenticated, 403 without the permission. Reads and mutations are
+// addressed by entity id across all customers (no per-caller scoping).
 // ---------------------------------------------------------------------------
 const billingAdminRouter = Router();
 
@@ -1073,7 +1073,7 @@ function auditAdminAction(
 
 billingAdminRouter.get(
   '/subscriptions',
-  adminGuard,
+  permissionGuard('manage', 'Billing'),
   (req: Request, res: Response) => {
     const query = req.query as Record<string, unknown>;
     const errors = cursorQueryErrors(query, {
@@ -1095,7 +1095,7 @@ billingAdminRouter.get(
 
 billingAdminRouter.get(
   '/invoices',
-  adminGuard,
+  permissionGuard('manage', 'Billing'),
   (req: Request, res: Response) => {
     const query = req.query as Record<string, unknown>;
     const errors = cursorQueryErrors(query, {
@@ -1114,7 +1114,7 @@ billingAdminRouter.get(
 
 billingAdminRouter.post(
   '/subscriptions/:id/cancel',
-  adminGuard,
+  permissionGuard('manage', 'Billing'),
   requireUuid('id'),
   (req: Request, res: Response) => {
     if (rejectInvalidBody(res, cancelBodyErrors(req.body))) return;
@@ -1193,7 +1193,7 @@ function revokeOneTimeEffects(invoice: MockInvoice): void {
 
 billingAdminRouter.post(
   '/invoices/:id/refund',
-  adminGuard,
+  permissionGuard('manage', 'Billing'),
   requireUuid('id'),
   (req: Request, res: Response) => {
     const amountMinor = (req.body as Record<string, unknown> | undefined)?.[
@@ -1260,7 +1260,7 @@ billingAdminRouter.post(
 // server's auth contract (401 unauthenticated / 403 non-admin), then 404.
 billingAdminRouter.post(
   '/webhook-events/:id/replay',
-  adminGuard,
+  permissionGuard('manage', 'Billing'),
   requireUuid('id'),
   (_req: Request, res: Response) => {
     res
@@ -1272,126 +1272,136 @@ billingAdminRouter.post(
 // Metering ingest. Mirrors RecordUsageRequestDto validation, the
 // active-subscription requirement, and idempotency on `idempotencyKey`. There is
 // no public meter endpoint — this lives under the `manage Billing` admin guard.
-billingAdminRouter.post('/usage', adminGuard, (req: Request, res: Response) => {
-  const body = (req.body ?? {}) as Record<string, unknown>;
-  const occurredAtRaw = body['occurredAt'];
+billingAdminRouter.post(
+  '/usage',
+  permissionGuard('manage', 'Billing'),
+  (req: Request, res: Response) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const occurredAtRaw = body['occurredAt'];
 
-  if (
-    rejectInvalidBody(res, [
-      ...unknownPropertyErrors(body, [
-        'customerId',
-        'meterKey',
-        'quantity',
-        'occurredAt',
-        'idempotencyKey'
-      ]),
-      ...uuidErrors('customerId', body['customerId']),
-      ...trimmedStringErrors('meterKey', body['meterKey'], {
-        min: 1,
-        max: 100
-      }),
-      ...intErrors('quantity', body['quantity'], {
-        min: 1,
-        max: 1_000_000_000
-      }),
-      ...iso8601Errors('occurredAt', occurredAtRaw),
-      ...trimmedStringErrors('idempotencyKey', body['idempotencyKey'], {
-        min: 1,
-        max: 255
-      })
-    ])
-  ) {
-    return;
-  }
+    if (
+      rejectInvalidBody(res, [
+        ...unknownPropertyErrors(body, [
+          'customerId',
+          'meterKey',
+          'quantity',
+          'occurredAt',
+          'idempotencyKey'
+        ]),
+        ...uuidErrors('customerId', body['customerId']),
+        ...trimmedStringErrors('meterKey', body['meterKey'], {
+          min: 1,
+          max: 100
+        }),
+        ...intErrors('quantity', body['quantity'], {
+          min: 1,
+          max: 1_000_000_000
+        }),
+        ...iso8601Errors('occurredAt', occurredAtRaw),
+        ...trimmedStringErrors('idempotencyKey', body['idempotencyKey'], {
+          min: 1,
+          max: 255
+        })
+      ])
+    ) {
+      return;
+    }
 
-  const customerId = (body['customerId'] as string).trim();
-  const meterKey = (body['meterKey'] as string).trim();
-  const quantity = body['quantity'] as number;
-  const idempotencyKey = (body['idempotencyKey'] as string).trim();
+    const customerId = (body['customerId'] as string).trim();
+    const meterKey = (body['meterKey'] as string).trim();
+    const quantity = body['quantity'] as number;
+    const idempotencyKey = (body['idempotencyKey'] as string).trim();
 
-  const state = getState();
+    const state = getState();
 
-  // Idempotent replay: this customer already has a record for the key — return
-  // it as-is. Scoped to the customer, like the server's unique constraint: the
-  // same key from another customer is a distinct event, not a replay.
-  const existing = [...state.billingUsageRecords.values()].find(
-    (r) => r.customerId === customerId && r.idempotencyKey === idempotencyKey
-  );
-  if (existing) {
-    // The server audits by response, so an idempotent replay is recorded too,
-    // pointing at the original record's id.
-    auditAdminAction(req, 'BILLING_USAGE_RECORD', 'UsageRecord', existing.id, {
+    // Idempotent replay: this customer already has a record for the key — return
+    // it as-is. Scoped to the customer, like the server's unique constraint: the
+    // same key from another customer is a distinct event, not a replay.
+    const existing = [...state.billingUsageRecords.values()].find(
+      (r) => r.customerId === customerId && r.idempotencyKey === idempotencyKey
+    );
+    if (existing) {
+      // The server audits by response, so an idempotent replay is recorded too,
+      // pointing at the original record's id.
+      auditAdminAction(
+        req,
+        'BILLING_USAGE_RECORD',
+        'UsageRecord',
+        existing.id,
+        {
+          customerId,
+          meterKey,
+          quantity
+        }
+      );
+      res.status(201).json(toUsageResponse(existing));
+      return;
+    }
+
+    // A negative balance means a refund clawed back already-spent credits: no
+    // new usage may accrue until the debt is topped up. Replays above still
+    // succeed — the record predates the block, exactly like the server.
+    const creditBalance = state.billingCreditBalances.get(customerId);
+    if (creditBalance && creditBalance.balanceUnits < 0) {
+      res.status(409).json({
+        message:
+          'Credit balance is negative. Top up credits before recording more usage.',
+        statusCode: 409
+      });
+      return;
+    }
+
+    // Newest-first like the server, so usage is billed to the same subscription
+    // the entitlement resolver reports.
+    const subscription = [...state.billingSubscriptions.values()]
+      .filter(
+        (s) =>
+          s.customerId === customerId &&
+          ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    if (!subscription) {
+      res.status(404).json({
+        message: 'No active subscription for customer to record usage against',
+        statusCode: 404
+      });
+      return;
+    }
+
+    // A record is an observation, so the customer's current plan does not gate it
+    // — rating decides at period close. Only a meter no plan declares is refused:
+    // it can never become chargeable and is a producer typo.
+    if (![...state.plans.values()].some((p) => p.meterKey === meterKey)) {
+      res.status(400).json({
+        message: `Meter "${meterKey}" is not declared by any plan`,
+        statusCode: 400
+      });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const record: MockUsageRecord = {
+      id: uuidv4(),
+      customerId,
+      subscriptionId: subscription.id,
+      meterKey,
+      quantity,
+      occurredAt:
+        typeof occurredAtRaw === 'string'
+          ? new Date(occurredAtRaw).toISOString()
+          : now,
+      idempotencyKey,
+      recordedAt: now
+    };
+    state.billingUsageRecords.set(record.id, record);
+    auditAdminAction(req, 'BILLING_USAGE_RECORD', 'UsageRecord', record.id, {
       customerId,
       meterKey,
       quantity
     });
-    res.status(201).json(toUsageResponse(existing));
-    return;
+    res.status(201).json(toUsageResponse(record));
   }
-
-  // A negative balance means a refund clawed back already-spent credits: no
-  // new usage may accrue until the debt is topped up. Replays above still
-  // succeed — the record predates the block, exactly like the server.
-  const creditBalance = state.billingCreditBalances.get(customerId);
-  if (creditBalance && creditBalance.balanceUnits < 0) {
-    res.status(409).json({
-      message:
-        'Credit balance is negative. Top up credits before recording more usage.',
-      statusCode: 409
-    });
-    return;
-  }
-
-  // Newest-first like the server, so usage is billed to the same subscription
-  // the entitlement resolver reports.
-  const subscription = [...state.billingSubscriptions.values()]
-    .filter(
-      (s) =>
-        s.customerId === customerId &&
-        ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
-    )
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-  if (!subscription) {
-    res.status(404).json({
-      message: 'No active subscription for customer to record usage against',
-      statusCode: 404
-    });
-    return;
-  }
-
-  // A record is an observation, so the customer's current plan does not gate it
-  // — rating decides at period close. Only a meter no plan declares is refused:
-  // it can never become chargeable and is a producer typo.
-  if (![...state.plans.values()].some((p) => p.meterKey === meterKey)) {
-    res.status(400).json({
-      message: `Meter "${meterKey}" is not declared by any plan`,
-      statusCode: 400
-    });
-    return;
-  }
-
-  const now = new Date().toISOString();
-  const record: MockUsageRecord = {
-    id: uuidv4(),
-    customerId,
-    subscriptionId: subscription.id,
-    meterKey,
-    quantity,
-    occurredAt:
-      typeof occurredAtRaw === 'string'
-        ? new Date(occurredAtRaw).toISOString()
-        : now,
-    idempotencyKey,
-    recordedAt: now
-  };
-  state.billingUsageRecords.set(record.id, record);
-  auditAdminAction(req, 'BILLING_USAGE_RECORD', 'UsageRecord', record.id, {
-    customerId,
-    meterKey,
-    quantity
-  });
-  res.status(201).json(toUsageResponse(record));
-});
+);
 
 export default router;
 export { billingRouter, billingAdminRouter };

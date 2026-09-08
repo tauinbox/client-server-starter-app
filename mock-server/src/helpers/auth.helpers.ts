@@ -1,7 +1,14 @@
+import { subject as caslSubject } from '@casl/ability';
 import type { Request, Response, NextFunction } from 'express';
 import { validateToken, type DecodedToken } from '../jwt.utils';
 import { ErrorKeys } from '@app/shared/constants';
-import { findUserById, isSessionLive, mustEnrolMfa } from '../state';
+import {
+  buildAbilityForUser,
+  findUserById,
+  isSessionLive,
+  mustEnrolMfa
+} from '../state';
+import type { Actions, SubjectNames } from '../state';
 import type { AuthenticatedRequest, MockUser } from '../types';
 
 export function extractBearerToken(req: Request): string | null {
@@ -51,22 +58,36 @@ export type GuardError = {
   errorKey?: string;
 };
 
-export function requireAdmin(
-  req: Request
-): { user: MockUser; decoded: DecodedToken } | GuardError {
-  const result = requireAuth(req);
-  if ('error' in result) return result;
-  if (!result.user.roles?.includes('admin')) return { error: 403 };
-  // Mirrors MfaRequiredGuard, which travels with @Authorize on the server.
-  if (mustEnrolMfa(result.user)) {
-    return {
-      error: 403,
-      message:
-        'Two-factor authentication must be turned on before this account can use the administration surface',
-      errorKey: ErrorKeys.AUTH.MFA_ENROLMENT_REQUIRED
-    };
-  }
-  return result;
+/**
+ * Mirrors the three layers that `@Authorize` composes on the server:
+ * JwtAuthGuard, then MfaRequiredGuard, then PermissionsGuard. The last layer is
+ * a type-level CASL check, so a route that also needs the record itself runs a
+ * second check inside the handler, exactly as the server controllers do.
+ */
+export function requirePermission(
+  action: Actions,
+  subject: SubjectNames
+): (req: Request) => { user: MockUser; decoded: DecodedToken } | GuardError {
+  return (req) => {
+    const result = requireAuth(req);
+    if ('error' in result) return result;
+
+    // Mirrors MfaRequiredGuard, which travels with @Authorize on the server.
+    if (mustEnrolMfa(result.user)) {
+      return {
+        error: 403,
+        message:
+          'Two-factor authentication must be turned on before this account can use the administration surface',
+        errorKey: ErrorKeys.AUTH.MFA_ENROLMENT_REQUIRED
+      };
+    }
+
+    if (!buildAbilityForUser(result.user).can(action, subject)) {
+      return { error: 403, message: 'Insufficient permissions' };
+    }
+
+    return result;
+  };
 }
 
 /** Express middleware — requires authenticated user, attaches req.user */
@@ -82,21 +103,47 @@ export function authGuard(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-/** Express middleware — requires admin user, attaches req.user */
-export function adminGuard(req: Request, res: Response, next: NextFunction) {
-  const result = requireAdmin(req);
-  if ('error' in result) {
-    const msg =
-      result.message ?? (result.error === 403 ? 'Forbidden' : 'Unauthorized');
-    res.status(result.error).json({
-      message: msg,
-      statusCode: result.error,
-      ...(result.errorKey ? { errorKey: result.errorKey } : {})
-    });
-    return;
+/** Express middleware - requires one CASL permission, attaches req.user */
+export function permissionGuard(action: Actions, subject: SubjectNames) {
+  const check = requirePermission(action, subject);
+  return (req: Request, res: Response, next: NextFunction) => {
+    const result = check(req);
+    if ('error' in result) {
+      const msg =
+        result.message ?? (result.error === 403 ? 'Forbidden' : 'Unauthorized');
+      res.status(result.error).json({
+        message: msg,
+        statusCode: result.error,
+        ...(result.errorKey ? { errorKey: result.errorKey } : {})
+      });
+      return;
+    }
+    (req as AuthenticatedRequest).user = result.user;
+    next();
+  };
+}
+
+/**
+ * Mirrors the controller-level `assertCan` on the server. The route guard is a
+ * type-level check that ignores conditions, so a conditional grant has to be
+ * re-evaluated against the record the caller submits. Answers 403 and returns
+ * false when the caller may not act on that record.
+ */
+export function assertInstancePermission(
+  req: Request,
+  res: Response,
+  action: Actions,
+  subjectName: SubjectNames,
+  record: Record<string, unknown>
+): boolean {
+  const { user } = req as AuthenticatedRequest;
+  if (buildAbilityForUser(user).can(action, caslSubject(subjectName, record))) {
+    return true;
   }
-  (req as AuthenticatedRequest).user = result.user;
-  next();
+  res
+    .status(403)
+    .json({ message: 'Insufficient permissions', statusCode: 403 });
+  return false;
 }
 
 /**

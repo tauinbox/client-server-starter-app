@@ -35,7 +35,7 @@ import {
   parseCursorQuery
 } from '../helpers/pagination.helpers';
 import { attributeValueError } from '@app/shared/utils/feature-flag-attribute-value';
-import { adminGuard, authenticateRequest } from '../helpers/auth.helpers';
+import { authenticateRequest, permissionGuard } from '../helpers/auth.helpers';
 import {
   requireUuid,
   validationError
@@ -535,7 +535,7 @@ publicRouter.get('/', (req, res) => {
 // ── Admin router ───────────────────────────────────────────────────────────
 const adminRouter = Router();
 
-adminRouter.use(adminGuard);
+adminRouter.use(permissionGuard('manage', 'FeatureFlag'));
 
 adminRouter.get('/cursor', (req, res) => {
   const query = req.query as Record<string, unknown>;
