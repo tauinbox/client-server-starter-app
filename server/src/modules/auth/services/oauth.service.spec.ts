@@ -14,6 +14,7 @@ import { EntitlementService } from '../../entitlements/entitlement.service';
 import { TokenGeneratorService } from './token-generator.service';
 import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
+import { MfaService } from './mfa.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { User } from '../../users/entities/user.entity';
 import { ErrorKeys, MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
@@ -58,6 +59,9 @@ describe('OAuthService', () => {
   let mockAuditService: {
     log: jest.Mock;
     logFireAndForget: jest.Mock;
+  };
+  let mockMfaService: {
+    issuePendingToken: jest.Mock;
   };
   let mockMailService: {
     sendEmailVerification: jest.Mock;
@@ -168,6 +172,12 @@ describe('OAuthService', () => {
       sendOAuthLinkedNotification: jest.fn().mockResolvedValue(undefined)
     };
 
+    mockMfaService = {
+      issuePendingToken: jest
+        .fn()
+        .mockReturnValue({ mfaToken: 'mock-mfa-token', expiresIn: 300 })
+    };
+
     // Free tier by default: no plan-specific allowance, so pruning must fall
     // back to the constant. Individual tests raise or break it.
     mockEntitlementService = {
@@ -188,12 +198,26 @@ describe('OAuthService', () => {
         { provide: RoleService, useValue: mockRoleService },
         { provide: TokenGeneratorService, useValue: mockTokenGenerator },
         { provide: AuditService, useValue: mockAuditService },
-        { provide: MailService, useValue: mockMailService }
+        { provide: MailService, useValue: mockMailService },
+        { provide: MfaService, useValue: mockMfaService }
       ]
     }).compile();
 
     service = module.get<OAuthService>(OAuthService);
   });
+
+  /**
+   * Narrows away the two-factor branch. Every case that reads `tokens` or
+   * `user` signs in an account with no factor, so a challenge there is a
+   * failure and not a shape to handle.
+   */
+  const loginExpectingSession = async (profile: OAuthUserProfile) => {
+    const result = await service.loginWithOAuth(profile);
+    if ('mfaRequired' in result) {
+      throw new Error('Expected a session, received a two-factor challenge');
+    }
+    return result;
+  };
 
   it('should be defined', () => {
     expect(service).toBeDefined();
@@ -231,7 +255,7 @@ describe('OAuthService', () => {
       );
       mockUsersService.findOne.mockResolvedValue(oauthUser);
 
-      const result = await service.loginWithOAuth(oauthProfile);
+      const result = await loginExpectingSession(oauthProfile);
 
       expect(result.user.email).toBe('oauth@example.com');
       expect(result.tokens).toBeDefined();
@@ -242,6 +266,33 @@ describe('OAuthService', () => {
       );
       // OAuth response must carry roles as RoleResponse[] (not string[]).
       expect(result.user.roles).toEqual([mockUserRole]);
+    });
+
+    // A provider proves one credential. An enrolled account is therefore not
+    // signed in yet: it answers with a challenge, and no session is created -
+    // otherwise a refresh row would have to be deleted after the fact.
+    it('answers with a challenge and issues no session when the account carries a second factor', async () => {
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        id: '1',
+        provider: 'google',
+        providerId: 'google-123',
+        userId: 'oauth-user-1'
+      });
+      mockUsersService.findOne.mockResolvedValue({
+        ...oauthUser,
+        totpEnabledAt: new Date()
+      });
+
+      const result = await service.loginWithOAuth(oauthProfile);
+
+      expect(result).toEqual({
+        mfaRequired: true,
+        mfaToken: 'mock-mfa-token',
+        expiresIn: 300
+      });
+      expect(mockRefreshTokenService.createRefreshToken).not.toHaveBeenCalled();
+      expect(mockRefreshTokenService.pruneOldestTokens).not.toHaveBeenCalled();
+      expect(mockTokenGenerator.generateTokens).not.toHaveBeenCalled();
     });
 
     it('prunes to the plan allowance when the plan carries a sessions limit', async () => {
@@ -281,7 +332,7 @@ describe('OAuthService', () => {
         new Error('billing unavailable')
       );
 
-      const result = await service.loginWithOAuth(oauthProfile);
+      const result = await loginExpectingSession(oauthProfile);
 
       expect(result.tokens).toBeDefined();
       expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
@@ -302,7 +353,7 @@ describe('OAuthService', () => {
       });
       mockUsersService.findOne.mockResolvedValue(entity);
 
-      const result = await service.loginWithOAuth(oauthProfile);
+      const result = await loginExpectingSession(oauthProfile);
 
       expect(result.user).toBe(entity);
       expect(instanceToPlain(result.user)).not.toHaveProperty(
@@ -326,7 +377,7 @@ describe('OAuthService', () => {
       );
       mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
 
-      const result = await service.loginWithOAuth(oauthProfile);
+      const result = await loginExpectingSession(oauthProfile);
 
       expect(mockUsersService.markEmailVerified).toHaveBeenCalledWith(
         'oauth-user-1'
@@ -347,7 +398,7 @@ describe('OAuthService', () => {
       });
       mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
 
-      const result = await service.loginWithOAuth({
+      const result = await loginExpectingSession({
         ...oauthProfile,
         provider: 'vkontakte',
         providerId: 'vk-123',
@@ -371,7 +422,7 @@ describe('OAuthService', () => {
       });
       mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
 
-      const result = await service.loginWithOAuth({
+      const result = await loginExpectingSession({
         ...oauthProfile,
         email: 'someone-else@example.com'
       });
@@ -536,7 +587,7 @@ describe('OAuthService', () => {
       // `roles` relation hydrated so the response carries RoleResponse[].
       mockUsersService.findOne.mockResolvedValue(oauthUser);
 
-      const result = await service.loginWithOAuth(oauthProfile);
+      const result = await loginExpectingSession(oauthProfile);
 
       expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(mockManager.save).toHaveBeenCalledWith(

@@ -7,6 +7,8 @@ import { OAuthAccount } from '../entities/oauth-account.entity';
 import { OAuthAccountService } from './oauth-account.service';
 import { RoleService } from './role.service';
 import { SessionIssuerService } from './session-issuer.service';
+import { MfaService } from './mfa.service';
+import { TokensResponseDto } from '../dtos/auth-response.dto';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { AuditService, AuditContext } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -20,6 +22,7 @@ import {
   VERIFICATION_TOKEN_EXPIRY_MS
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
+import type { MfaRequiredResponse } from '@app/shared/types';
 
 @Injectable()
 export class OAuthService {
@@ -32,10 +35,34 @@ export class OAuthService {
     private readonly roleService: RoleService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
-    private readonly sessionIssuer: SessionIssuerService
+    private readonly sessionIssuer: SessionIssuerService,
+    private readonly mfaService: MfaService
   ) {}
 
-  async loginWithOAuth(profile: OAuthUserProfile) {
+  /**
+   * A provider proves one credential. An account that carries a second factor
+   * is therefore not signed in yet, exactly as it is not signed in by a correct
+   * password: it answers with a challenge and `POST /auth/mfa/verify` finishes
+   * the sign-in.
+   *
+   * The session is never created on that branch, so no refresh row has to be
+   * deleted afterwards - a live refresh token value in flight between two
+   * writes is the shape this split exists to avoid.
+   */
+  async loginWithOAuth(
+    profile: OAuthUserProfile
+  ): Promise<{ tokens: TokensResponseDto; user: User } | MfaRequiredResponse> {
+    const user = await this.resolveUserForOAuth(profile);
+
+    if (user.totpEnabledAt) {
+      return { mfaRequired: true, ...this.mfaService.issuePendingToken(user) };
+    }
+
+    return this.sessionIssuer.issueSession(user);
+  }
+
+  /** Finds, or creates, the account the provider profile names. */
+  private async resolveUserForOAuth(profile: OAuthUserProfile): Promise<User> {
     // 1. Check if OAuth account already linked
     const existingOAuth =
       await this.oauthAccountService.findByProviderAndProviderId(
@@ -156,7 +183,7 @@ export class OAuthService {
       user = await this.usersService.findOne(createdUserId);
     }
 
-    return this.sessionIssuer.issueSession(user);
+    return user;
   }
 
   /** A provider vouching for a different mailbox says nothing about this one. */

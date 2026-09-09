@@ -53,7 +53,9 @@ src/app/
 │   │                       # forgot-password, reset-password, forbidden,
 │   │                       # two-factor (the enrolment card on the profile page,
 │   │                       # which also replaces the recovery set;
-│   │                       # the login card holds the code step itself)
+│   │                       # components/mfa-challenge holds the code step, and the login
+│   │                       # card and the OAuth callback page both render it, because a
+│   │                       # provider sign-in on an enrolled account asks for a code too)
 │   │   ├── casl/           # app-ability.ts holds AppAbility, Actions and Subjects.
 │   │   │                   # Subjects contains the generated KnownSubjects and AnyObject.
 │   │   │                   # PermissionCheck holds action, subject and an optional instance.
@@ -998,8 +1000,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 254 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1259 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 257 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1270 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the

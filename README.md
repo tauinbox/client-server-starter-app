@@ -116,6 +116,11 @@ management and theming.
 
   A canceled **link** attempt and a failed link attempt return to `/profile`, which is where the
   attempt started. They do not leave an authenticated user on the login page.
+
+  A provider proves one credential. An account that carries a second factor is therefore not signed
+  in by the round trip: the callback page asks for a code, exactly as the login card does after a
+  correct password, and no session exists until the code is accepted. The application never reads
+  `amr` or `acr` from a provider, so it cannot know whether a second factor was presented there.
 - **The configuration gates the provider buttons automatically.** Each provider is a public feature
   flag: `oauth-google`, `oauth-facebook` or `oauth-vk`. Each flag has an attribute rule on a signal
   that the server registers from the environment. The signal is `oauth<Provider>Configured`, and it is
@@ -1448,7 +1453,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/reset-password` | None | Reset the password with a token |
 | POST | `/auth/oauth/reauth-init` | Bearer | Start a step-up re-authentication for an account that holds no password. The body names the operation the proof is for. Sets a short-lived cookie tied to the authorization flow that starts next. The callback mints a `reauth_proof` cookie for that operation, and only when the provider identity already belongs to the caller |
 | POST | `/auth/oauth/link-init` | Bearer + step-up | Start an OAuth account link. The body carries the current password, or the account proves itself with a `reauth_proof` minted for the operation `oauth_link`. A linked provider signs the account in and no recovery path removes it, thus a stolen session must not plant one. Sets a cookie with a short life, thus the OAuth flow that starts next attaches the provider to the current user. The flow that starts next claims it, and no other flow can use it. A logout cancels it |
-| POST | `/auth/oauth/exchange` | None | Exchange the OAuth-data cookie from the callback for the auth response: an access token and a refresh cookie. The payload is spendable once, thus a replay inside its 60 seconds is refused |
+| POST | `/auth/oauth/exchange` | None | Exchange the OAuth-data cookie from the callback for the auth response: an access token and a refresh cookie. An account that carries a second factor gets the same challenge the login route gives, and no refresh cookie. The payload is spendable once, thus a replay inside its 60 seconds is refused |
 | GET | `/auth/oauth/accounts` | Bearer | List the linked OAuth accounts |
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink an OAuth provider |
 | GET | `/auth/permissions` | Bearer | Get the resolved permissions of the current user |
@@ -1744,11 +1749,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2284 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 367 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 365 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1259 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 254 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 705 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2287 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 369 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 367 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1270 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 257 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 707 tests pass |
 
 ## CI/CD
 

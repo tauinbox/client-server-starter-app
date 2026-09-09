@@ -1,5 +1,6 @@
 import type { Request } from 'express';
 import type { StepUpOperation } from '@app/shared/constants';
+import type { MfaRequiredResponse } from '@app/shared/types';
 
 export type {
   AdminUserResponse,
@@ -304,11 +305,25 @@ export interface CaptchaAttemptWindow {
   timestamps: number[];
 }
 
-export interface MockOAuthData {
+interface MockOAuthDataBase {
   userId: string;
-  tokens: { access_token: string; refresh_token: string; expires_in: number };
   expiresAt: number;
 }
+
+/** The provider round trip signed the caller in: a session already exists. */
+export interface MockOAuthSessionData extends MockOAuthDataBase {
+  tokens: { access_token: string; refresh_token: string; expires_in: number };
+}
+
+/**
+ * The account carries a second factor, so the round trip bought only the right
+ * to present a code. No session was minted, exactly as on the password path.
+ */
+export interface MockOAuthChallengeData extends MockOAuthDataBase {
+  challenge: MfaRequiredResponse;
+}
+
+export type MockOAuthData = MockOAuthSessionData | MockOAuthChallengeData;
 
 export interface MockReauthProof {
   userId: string;

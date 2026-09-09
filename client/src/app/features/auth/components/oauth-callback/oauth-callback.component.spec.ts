@@ -24,6 +24,7 @@ import { RbacMetadataService } from '../../services/rbac-metadata.service';
 import { RbacMetadataStore } from '../../store/rbac-metadata.store';
 import { permissionGuard } from '../../guards/permission.guard';
 import { AuthApiEnum } from '../../constants/auth-api.const';
+import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
 import type { AppAbility } from '../../casl/app-ability';
 import { SessionStorageService } from '@core/services/session-storage.service';
 import { LocalStorageService } from '@core/services/local-storage.service';
@@ -70,6 +71,8 @@ describe('OAuthCallbackComponent', () => {
   let authServiceMock: {
     completeAuthentication: ReturnType<typeof vi.fn>;
     exchangeOAuthData: ReturnType<typeof vi.fn>;
+    verifyMfa: ReturnType<typeof vi.fn>;
+    verifyMfaRecoveryCode: ReturnType<typeof vi.fn>;
   };
   let sessionStorageMock: {
     getItem: ReturnType<typeof vi.fn>;
@@ -85,7 +88,9 @@ describe('OAuthCallbackComponent', () => {
 
     authServiceMock = {
       completeAuthentication: vi.fn().mockResolvedValue(undefined),
-      exchangeOAuthData: vi.fn().mockReturnValue(of(mockAuthResponse))
+      exchangeOAuthData: vi.fn().mockReturnValue(of(mockAuthResponse)),
+      verifyMfa: vi.fn().mockReturnValue(of(mockAuthResponse)),
+      verifyMfaRecoveryCode: vi.fn().mockReturnValue(of(mockAuthResponse))
     };
 
     sessionStorageMock = {
@@ -162,6 +167,81 @@ describe('OAuthCallbackComponent', () => {
 
     expect(router.navigateByUrl).toHaveBeenCalledWith('/profile', {
       replaceUrl: true
+    });
+  });
+
+  describe('when the account carries a second factor', () => {
+    const challenge = {
+      mfaRequired: true as const,
+      mfaToken: 'pending-token',
+      expiresIn: 300
+    };
+
+    async function reachChallenge(): Promise<void> {
+      authServiceMock.exchangeOAuthData.mockReturnValue(of(challenge));
+      fixture = TestBed.createComponent(OAuthCallbackComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    async function submitCode(value: string): Promise<void> {
+      const input: HTMLInputElement = fixture.nativeElement.querySelector(
+        'input[autocomplete="one-time-code"]'
+      );
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const challengeForm: HTMLFormElement =
+        fixture.nativeElement.querySelector('nxs-mfa-challenge form');
+      challengeForm.dispatchEvent(new Event('submit'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    it('saves no session and asks for the code instead', async () => {
+      await reachChallenge();
+
+      expect(authStoreMock.saveAuthResponse).not.toHaveBeenCalled();
+      expect(authServiceMock.completeAuthentication).not.toHaveBeenCalled();
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+      expect(
+        fixture.nativeElement.querySelector(
+          'input[autocomplete="one-time-code"]'
+        )
+      ).toBeTruthy();
+    });
+
+    it('navigates to the return url once the code is accepted', async () => {
+      sessionStorageMock.getItem.mockReturnValue('/dashboard');
+      await reachChallenge();
+
+      await submitCode('123456');
+
+      expect(authServiceMock.verifyMfa).toHaveBeenCalledWith(
+        'pending-token',
+        '123456'
+      );
+      expect(router.navigateByUrl).toHaveBeenCalledWith('/dashboard', {
+        replaceUrl: true
+      });
+    });
+
+    it('sends the user back to the login page when the code step is cancelled', async () => {
+      await reachChallenge();
+
+      const buttons: HTMLButtonElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('.mfa-links button')
+      );
+      buttons[buttons.length - 1].click();
+      await fixture.whenStable();
+
+      expect(router.navigate).toHaveBeenCalledWith(['/login'], {
+        queryParams: { oauth_error: OAUTH_ERROR_CANCELLED },
+        replaceUrl: true
+      });
     });
   });
 

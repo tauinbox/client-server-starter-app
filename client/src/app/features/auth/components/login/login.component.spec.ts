@@ -117,6 +117,24 @@ describe('LoginComponent', () => {
       expiresIn: 300
     };
 
+    async function typeCode(value: string): Promise<void> {
+      const input: HTMLInputElement = fixture.nativeElement.querySelector(
+        'input[autocomplete="one-time-code"]'
+      );
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    async function submitChallenge(): Promise<void> {
+      const challengeForm: HTMLFormElement =
+        fixture.nativeElement.querySelector('nxs-mfa-challenge form');
+      challengeForm.dispatchEvent(new Event('submit'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
     async function reachChallenge(): Promise<void> {
       authServiceMock.login.mockReturnValue(of(challenge));
       component.loginModel.set({
@@ -146,33 +164,14 @@ describe('LoginComponent', () => {
       await reachChallenge();
       authServiceMock.verifyMfa.mockReturnValue(of(mockAuthResponse));
 
-      component.mfaModel.set({ code: '123456' });
-      component.onSubmitMfa();
-      await fixture.whenStable();
+      await typeCode('123456');
+      await submitChallenge();
 
       expect(authServiceMock.verifyMfa).toHaveBeenCalledWith(
         'pending-token',
         '123456'
       );
       expect(navigateSpy).toHaveBeenCalledWith('/');
-    });
-
-    it('sends a recovery code to the recovery route instead', async () => {
-      await reachChallenge();
-      authServiceMock.verifyMfaRecoveryCode.mockReturnValue(
-        of(mockAuthResponse)
-      );
-
-      component.toggleRecoveryCode();
-      component.mfaModel.set({ code: 'AAAAAAAA-AAAAAAAA' });
-      component.onSubmitMfa();
-      await fixture.whenStable();
-
-      expect(authServiceMock.verifyMfaRecoveryCode).toHaveBeenCalledWith(
-        'pending-token',
-        'AAAAAAAA-AAAAAAAA'
-      );
-      expect(authServiceMock.verifyMfa).not.toHaveBeenCalled();
     });
 
     it('puts the password form back when the challenge has expired', async () => {
@@ -190,10 +189,8 @@ describe('LoginComponent', () => {
         )
       );
 
-      component.mfaModel.set({ code: '123456' });
-      component.onSubmitMfa();
-      await fixture.whenStable();
-      fixture.detectChanges();
+      await typeCode('123456');
+      await submitChallenge();
 
       const passwordInput: HTMLInputElement | null =
         fixture.nativeElement.querySelector(
@@ -217,10 +214,8 @@ describe('LoginComponent', () => {
         )
       );
 
-      component.mfaModel.set({ code: '000000' });
-      component.onSubmitMfa();
-      await fixture.whenStable();
-      fixture.detectChanges();
+      await typeCode('000000');
+      await submitChallenge();
 
       const codeInput: HTMLInputElement | null =
         fixture.nativeElement.querySelector(

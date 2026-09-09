@@ -1,0 +1,25 @@
+@use 'abstracts/variables' as vars;
+@use 'abstracts/mixins' as mix;
+
+:host {
+  .oauth-callback-container {
+    mat-card {
+      width: 100%;
+    }
+
+    @include mix.centered-container(vars.$card-width-sm);
+  }
+
+  mat-card-header {
+    padding-bottom: vars.$spacing-md;
+  }
+
+  .oauth-callback-progress {
+    display: flex;
+    flex-direction: column;
+    gap: vars.$spacing-md;
+    align-items: center;
+    justify-content: center;
+    height: 50vh;
+  }
+}

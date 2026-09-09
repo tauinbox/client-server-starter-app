@@ -29,11 +29,16 @@ import type {
 } from './types';
 import {
   ENTITLED_SUBSCRIPTION_STATUSES,
-  MAX_CONCURRENT_SESSIONS
+  MAX_CONCURRENT_SESSIONS,
+  MFA_PENDING_TOKEN_EXPIRY_SECONDS
 } from '@app/shared/constants';
 import { OAUTH_DATA_MAX_AGE_MS, REAUTH_PROOF_MAX_AGE_MS } from './constants';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
-import { generateSessionId, generateTokens } from './jwt.utils';
+import {
+  generateMfaPendingToken,
+  generateSessionId,
+  generateTokens
+} from './jwt.utils';
 import { pruneOldestUserTokens } from './helpers/auth.helpers';
 import {
   billClosingUsagePeriod,
@@ -196,6 +201,26 @@ router.post('/oauth-data', (req, res) => {
   }
 
   const state = getState();
+  const token = randomUUID();
+  const expiresAt = Date.now() + OAUTH_DATA_MAX_AGE_MS;
+
+  // The real server decides this in its provider callback, which is a 501 stub
+  // here. An account that carries a second factor is not signed in yet, so no
+  // session is minted and the round trip carries a challenge instead.
+  if (user.totpEnabledAt) {
+    state.oauthDataTokens.set(token, {
+      userId: user.id,
+      challenge: {
+        mfaRequired: true,
+        mfaToken: generateMfaPendingToken(user),
+        expiresIn: MFA_PENDING_TOKEN_EXPIRY_SECONDS
+      },
+      expiresAt
+    });
+    res.json({ token });
+    return;
+  }
+
   const sessionId = generateSessionId();
   const tokens = generateTokens(user, sessionId);
   state.refreshTokens.set(tokens.refresh_token, user.id);
@@ -206,11 +231,10 @@ router.post('/oauth-data', (req, res) => {
     resolveEntitlementLimit(user.id, 'sessions') ?? MAX_CONCURRENT_SESSIONS
   );
 
-  const token = randomUUID();
   state.oauthDataTokens.set(token, {
     userId: user.id,
     tokens,
-    expiresAt: Date.now() + OAUTH_DATA_MAX_AGE_MS
+    expiresAt
   });
 
   res.json({ token });

@@ -137,6 +137,13 @@ router.post('/exchange', (req, res) => {
     return;
   }
 
+  // No session exists behind a challenge, so nothing is handed out but the
+  // right to present a code. POST /auth/mfa/verify finishes the sign-in.
+  if ('challenge' in pending) {
+    res.json(pending.challenge);
+    return;
+  }
+
   const { refresh_token, ...publicTokens } = pending.tokens;
   res.cookie(REFRESH_TOKEN_COOKIE, refresh_token, REFRESH_COOKIE_OPTIONS);
   res.json({ tokens: publicTokens, user: toUserResponse(user) });
