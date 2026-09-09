@@ -1,0 +1,23 @@
+<div class="oauth-callback-container" *transloco="let t; scope: 'auth'">
+  @if (mfaChallenge(); as challenge) {
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>{{ t('auth.login.title') }}</mat-card-title>
+      </mat-card-header>
+
+      <mat-card-content>
+        <nxs-mfa-challenge
+          [challenge]="challenge"
+          (verified)="onMfaVerified()"
+          (cancelled)="onMfaCancelled()"
+          (expired)="onMfaExpired()"
+        />
+      </mat-card-content>
+    </mat-card>
+  } @else {
+    <div class="oauth-callback-progress">
+      <mat-spinner></mat-spinner>
+      <p>{{ t('auth.oauthCallback.completingSignIn') }}</p>
+    </div>
+  }
+</div>

@@ -436,6 +436,46 @@ describe('OAuthController', () => {
       );
     });
 
+    // The provider proved one credential only. An enrolled account gets the
+    // challenge in the cookie instead of a session, and no session is minted.
+    it('should sign a challenge into the cookie when the account carries a second factor', async () => {
+      oauthServiceMock.loginWithOAuth.mockResolvedValue({
+        mfaRequired: true,
+        mfaToken: 'pending-token',
+        expiresIn: 300
+      });
+
+      const res = mockResponse();
+      const profile: OAuthUserProfile = {
+        provider: OAuthProvider.GOOGLE,
+        providerId: '123',
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        emailVerified: true
+      };
+
+      await controller.googleCallback(mockExpressRequest(profile), res);
+
+      const [signedPayload] = jwtServiceMock.sign.mock.calls[0] as [
+        { data: unknown; purpose: string }
+      ];
+      expect(signedPayload.data).toEqual({
+        mfaRequired: true,
+        mfaToken: 'pending-token',
+        expiresIn: 300
+      });
+      expect(signedPayload.purpose).toBe(TOKEN_PURPOSE.OAUTH_DATA);
+      expect(res.cookie).toHaveBeenCalledWith(
+        'oauth_data',
+        'signed-link-token',
+        expect.objectContaining({ path: '/api/v1/auth/oauth' })
+      );
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://localhost:4200/oauth/callback'
+      );
+    });
+
     it('should redirect to login with error when no email', async () => {
       const res = mockResponse();
       const profile: OAuthUserProfile = {
@@ -752,6 +792,33 @@ describe('OAuthController', () => {
         tokens: { access_token: 'token', expires_in: 3600 },
         user: { id: '1', email: 'test@example.com' }
       });
+    });
+
+    // No session exists behind a challenge, so the exchange must hand the
+    // challenge through and plant no refresh cookie.
+    it('should return the challenge and set no refresh cookie', async () => {
+      jwtServiceMock.verify.mockReturnValue({
+        data: { mfaRequired: true, mfaToken: 'pending-token', expiresIn: 300 },
+        purpose: TOKEN_PURPOSE.OAUTH_DATA,
+        jti: 'token-id'
+      });
+
+      const req = mockExpressRequest({} as OAuthUserProfile, {
+        oauth_data: 'signed-jwt'
+      });
+      const res = mockResponse();
+
+      const result = await controller.exchangeOAuthData(req, res);
+
+      expect(result).toEqual({
+        mfaRequired: true,
+        mfaToken: 'pending-token',
+        expiresIn: 300
+      });
+      expect(res.clearCookie).toHaveBeenCalledWith('oauth_data', {
+        path: '/api/v1/auth/oauth'
+      });
+      expect(res.cookie).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException when cookie is missing', async () => {

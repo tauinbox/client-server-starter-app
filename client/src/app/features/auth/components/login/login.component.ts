@@ -39,6 +39,7 @@ import type {
   MfaRequiredResponse
 } from '../../models/auth.types';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
+import { MfaChallengeComponent } from '../mfa-challenge/mfa-challenge.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
@@ -71,6 +72,7 @@ const OAUTH_ERROR_KEYS: Record<string, string> = {
     RouterLink,
     NxsFormFieldComponent,
     PasswordToggleComponent,
+    MfaChallengeComponent,
     TranslocoDirective
   ],
   templateUrl: './login.component.html',
@@ -121,12 +123,6 @@ export class LoginComponent implements OnInit, OnDestroy {
   // Holding it here, rather than in storage, keeps it out of every other tab
   // and drops it the moment the user leaves the page.
   protected readonly mfaChallenge = signal<MfaRequiredResponse | null>(null);
-  protected readonly usingRecoveryCode = signal(false);
-
-  readonly mfaModel = signal<{ code: string }>({ code: '' });
-  readonly mfaForm = form(this.mfaModel, (path) => {
-    required(path.code, { message: 'auth.login.mfaCodeRequired' });
-  });
 
   readonly loginModel = signal<LoginData>({ email: '', password: '' });
   readonly loginForm = form(this.loginModel, (path) => {
@@ -204,41 +200,20 @@ export class LoginComponent implements OnInit, OnDestroy {
       });
   }
 
-  onSubmitMfa(): void {
-    const challenge = this.mfaChallenge();
-    if (!challenge || this.mfaForm().invalid()) return;
-
-    this.loading.set(true);
-    this.error.set(null);
-
-    const code = this.mfaModel().code.trim();
-    const request$ = this.usingRecoveryCode()
-      ? this.#authService.verifyMfaRecoveryCode(challenge.mfaToken, code)
-      : this.#authService.verifyMfa(challenge.mfaToken, code);
-
-    request$.pipe(takeUntilDestroyed(this.#destroyRef)).subscribe({
-      next: () => {
-        this.loading.set(false);
-        void this.#router.navigateByUrl(this.#returnUrl());
-      },
-      error: (err: HttpErrorResponse) => {
-        this.loading.set(false);
-        this.#handleMfaError(err);
-      }
-    });
+  /** The code was accepted, so the session the password started is live. */
+  onMfaVerified(): void {
+    void this.#router.navigateByUrl(this.#returnUrl());
   }
 
-  toggleRecoveryCode(): void {
-    this.usingRecoveryCode.update((using) => !using);
-    this.mfaModel.set({ code: '' });
-    this.error.set(null);
+  /** The challenge died: back to the password form, carrying the reason. */
+  onMfaExpired(message: string): void {
+    this.cancelMfa();
+    this.error.set(message);
   }
 
   /** Drops the challenge and puts the password form back. */
   cancelMfa(): void {
     this.mfaChallenge.set(null);
-    this.usingRecoveryCode.set(false);
-    this.mfaModel.set({ code: '' });
     this.error.set(null);
   }
 
@@ -303,29 +278,6 @@ export class LoginComponent implements OnInit, OnDestroy {
 
     this.error.set(
       this.#resolveErrorMessage(err, 'auth.login.errorCredentialsInvalid')
-    );
-  }
-
-  /**
-   * An expired challenge cannot be retried with a code, so the password form
-   * comes back rather than leaving the user typing into a dead field.
-   */
-  #handleMfaError(err: HttpErrorResponse): void {
-    if (err.error?.errorKey === ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN) {
-      this.cancelMfa();
-      this.error.set(
-        this.#resolveErrorMessage(err, 'errors.auth.mfaInvalidPendingToken')
-      );
-      return;
-    }
-
-    this.error.set(
-      this.#resolveErrorMessage(
-        err,
-        this.usingRecoveryCode()
-          ? 'errors.auth.mfaInvalidRecoveryCode'
-          : 'errors.auth.mfaInvalidCode'
-      )
     );
   }
 

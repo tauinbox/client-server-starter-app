@@ -68,6 +68,7 @@ import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
 import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
 import { AuthService } from '../services/auth.service';
 import { SingleUseTokenLedger } from '../../../common/utils/single-use-token-ledger';
+import { MfaRequiredResponseDto } from '../dtos/mfa.dto';
 
 @ApiTags('OAuth API')
 @Controller({
@@ -323,7 +324,10 @@ export class OAuthController {
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Post('exchange')
   @ApiOperation({ summary: 'Exchange OAuth data cookie for auth response' })
-  @ApiOkResponse({ description: 'Auth response from OAuth login' })
+  @ApiOkResponse({
+    description:
+      'Auth response from OAuth login, or a challenge when the account carries a second factor'
+  })
   async exchangeOAuthData(
     @Request() req: ExpressRequest,
     @Res({ passthrough: true }) res: Response
@@ -357,14 +361,16 @@ export class OAuthController {
       const payload = this.jwtService.verify<{
         purpose?: string;
         jti?: string;
-        data: {
-          tokens: {
-            refresh_token: string;
-            access_token: string;
-            expires_in: number;
-          };
-          user: unknown;
-        };
+        data:
+          | {
+              tokens: {
+                refresh_token: string;
+                access_token: string;
+                expires_in: number;
+              };
+              user: unknown;
+            }
+          | MfaRequiredResponseDto;
       }>(cookie);
       if (payload.purpose !== TOKEN_PURPOSE.OAUTH_DATA) {
         throw new Error('Unexpected token purpose');
@@ -382,6 +388,11 @@ export class OAuthController {
         ))
       ) {
         throw new Error('OAuth data already exchanged');
+      }
+      // The account carries a second factor, so the round trip bought only the
+      // right to present a code. No session exists yet and no cookie is set.
+      if ('mfaRequired' in payload.data) {
+        return payload.data;
       }
       const { refresh_token, ...publicTokens } = payload.data.tokens;
       res.cookie('refresh_token', refresh_token, {
@@ -443,13 +454,17 @@ export class OAuthController {
         return;
       }
 
-      const { tokens, user } = await this.oauthService.loginWithOAuth(profile);
+      const result = await this.oauthService.loginWithOAuth(profile);
 
       // Serialize here, not at /exchange: the cookie payload is plain JSON, so
       // an entity signed as-is would be echoed verbatim past any interceptor.
+      // A challenge carries no entity, so it travels as it stands.
       const signedData = this.jwtService.sign(
         {
-          data: { tokens, user: instanceToPlain(user) },
+          data:
+            'mfaRequired' in result
+              ? result
+              : { tokens: result.tokens, user: instanceToPlain(result.user) },
           purpose: TOKEN_PURPOSE.OAUTH_DATA,
           jti: randomUUID()
         },

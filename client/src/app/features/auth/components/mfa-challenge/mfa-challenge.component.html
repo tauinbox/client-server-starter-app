@@ -1,0 +1,56 @@
+<form
+  *transloco="let t; scope: 'auth'"
+  (submit)="$event.preventDefault(); onSubmit()"
+>
+  <p class="mfa-hint">
+    {{
+      usingRecoveryCode()
+        ? t('auth.login.mfaRecoveryHint')
+        : t('auth.login.mfaHint')
+    }}
+  </p>
+
+  <nxs-form-field
+    [field]="codeForm.code"
+    [label]="
+      usingRecoveryCode() ? 'auth.login.mfaRecoveryCode' : 'auth.login.mfaCode'
+    "
+    type="text"
+    prefixIcon="password"
+    autocomplete="one-time-code"
+  />
+
+  @if (error()) {
+    <div class="error-message" role="alert">{{ error() }}</div>
+  }
+
+  <div class="form-actions">
+    <button
+      matButton="filled"
+      type="submit"
+      [disabled]="codeForm().invalid() || loading()"
+    >
+      @if (loading()) {
+        <span class="app-btn-loading">
+          <mat-spinner diameter="24"></mat-spinner>
+          {{ t('auth.login.loggingIn') }}
+        </span>
+      } @else {
+        {{ t('auth.login.mfaVerify') }}
+      }
+    </button>
+  </div>
+
+  <div class="mfa-links">
+    <button matButton="text" type="button" (click)="toggleRecoveryCode()">
+      {{
+        usingRecoveryCode()
+          ? t('auth.login.mfaUseAuthenticator')
+          : t('auth.login.mfaUseRecoveryCode')
+      }}
+    </button>
+    <button matButton="text" type="button" (click)="cancel()">
+      {{ t('auth.login.mfaCancel') }}
+    </button>
+  </div>
+</form>

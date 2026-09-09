@@ -1,6 +1,10 @@
 import type { Server } from 'http';
-import { ErrorKeys } from '@app/shared/constants';
+import {
+  ErrorKeys,
+  MFA_PENDING_TOKEN_EXPIRY_SECONDS
+} from '@app/shared/constants';
 import { createApp } from '../app';
+import { MOCK_TOTP_CODE } from '../constants';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { findUserByEmail, getState, resetState } from '../state';
 
@@ -62,6 +66,45 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
     ]);
     // The refresh token is cookie-only, never part of the JSON body.
     expect(res.headers.get('set-cookie')).toContain('refresh_token=');
+  });
+
+  // The provider proves one credential only. An enrolled account is not signed
+  // in by the round trip: it gets the same challenge the password path gives.
+  it('answers with a challenge and no session for an enrolled account', async () => {
+    const admin = findUserByEmail('admin@example.com');
+    admin!.totpEnabledAt = new Date().toISOString();
+    const refreshTokensBefore = getState().refreshTokens.size;
+
+    const token = await issueOAuthData(admin!.id);
+    const res = await exchange(token);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      mfaRequired: true,
+      expiresIn: MFA_PENDING_TOKEN_EXPIRY_SECONDS
+    });
+    expect(res.headers.get('set-cookie')).not.toContain('refresh_token=');
+    // The round trip minted no session, so there is no refresh row to abandon.
+    expect(getState().refreshTokens.size).toBe(refreshTokensBefore);
+  });
+
+  it('mints a pending token the two-factor route accepts', async () => {
+    const admin = findUserByEmail('admin@example.com');
+    admin!.totpEnabledAt = new Date().toISOString();
+
+    const token = await issueOAuthData(admin!.id);
+    const body = (await (await exchange(token)).json()) as {
+      mfaToken: string;
+    };
+
+    const verified = await fetch(`${baseUrl}/api/v1/auth/mfa/verify`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mfaToken: body.mfaToken, code: MOCK_TOTP_CODE })
+    });
+
+    expect(verified.status).toBe(200);
+    expect(verified.headers.get('set-cookie')).toContain('refresh_token=');
   });
 
   it('400s without the cookie', async () => {

@@ -354,8 +354,13 @@ export class AuthService {
     );
   }
 
-  exchangeOAuthData(): Observable<AuthResponse> {
-    return this.#http.post<AuthResponse>(
+  /**
+   * A provider round trip does not always end the sign-in either: an account
+   * carrying a second factor answers with a challenge, exactly as the password
+   * route does, and no session exists until a code is presented.
+   */
+  exchangeOAuthData(): Observable<LoginResponse> {
+    return this.#http.post<LoginResponse>(
       AuthApiEnum.OAuthExchange,
       {},
       { withCredentials: true }

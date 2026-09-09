@@ -12,66 +12,13 @@
         </div>
       }
 
-      @if (mfaChallenge()) {
-        <form (submit)="$event.preventDefault(); onSubmitMfa()">
-          <p class="mfa-hint">
-            {{
-              usingRecoveryCode()
-                ? t('auth.login.mfaRecoveryHint')
-                : t('auth.login.mfaHint')
-            }}
-          </p>
-
-          <nxs-form-field
-            [field]="mfaForm.code"
-            [label]="
-              usingRecoveryCode()
-                ? 'auth.login.mfaRecoveryCode'
-                : 'auth.login.mfaCode'
-            "
-            type="text"
-            prefixIcon="password"
-            autocomplete="one-time-code"
-          />
-
-          @if (error()) {
-            <div class="error-message" role="alert">{{ error() }}</div>
-          }
-
-          <div class="form-actions">
-            <button
-              matButton="filled"
-              type="submit"
-              [disabled]="mfaForm().invalid() || loading()"
-            >
-              @if (loading()) {
-                <span class="app-btn-loading">
-                  <mat-spinner diameter="24"></mat-spinner>
-                  {{ t('auth.login.loggingIn') }}
-                </span>
-              } @else {
-                {{ t('auth.login.mfaVerify') }}
-              }
-            </button>
-          </div>
-
-          <div class="mfa-links">
-            <button
-              matButton="text"
-              type="button"
-              (click)="toggleRecoveryCode()"
-            >
-              {{
-                usingRecoveryCode()
-                  ? t('auth.login.mfaUseAuthenticator')
-                  : t('auth.login.mfaUseRecoveryCode')
-              }}
-            </button>
-            <button matButton="text" type="button" (click)="cancelMfa()">
-              {{ t('auth.login.mfaCancel') }}
-            </button>
-          </div>
-        </form>
+      @if (mfaChallenge(); as challenge) {
+        <nxs-mfa-challenge
+          [challenge]="challenge"
+          (verified)="onMfaVerified()"
+          (cancelled)="cancelMfa()"
+          (expired)="onMfaExpired($event)"
+        />
       } @else {
         <form (submit)="$event.preventDefault(); onSubmit()">
           <nxs-form-field

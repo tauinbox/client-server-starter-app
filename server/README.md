@@ -280,6 +280,13 @@ generates the tokens, persists the refresh token, and then prunes the sessions t
 allowance. `AuthService.login` and `OAuthService.loginWithOAuth` both delegate to it and hold no
 session logic. Thus the two paths cannot diverge.
 
+Neither path reaches it for an account that carries a second factor. `AuthController.login` answers
+`{ mfaRequired, mfaToken, expiresIn }` before it calls `AuthService.login`, and `loginWithOAuth`
+resolves the account first and returns the same shape, so the challenge branch creates no session
+and no refresh row. The gate is not inside `issueSession` on purpose: `MfaController.issueSession`
+reaches that method after the code was verified, so a test there would refuse the request that
+satisfies it.
+
 Token rotation intentionally does NOT use that method. A rotation replaces a session instead of an
 addition of one, and it runs no prune.
 
@@ -988,7 +995,8 @@ not a string becomes an empty string. Thus a login answers 401 and never 400.
 
 **Email canonicalization.** `normalizeEmail` trims the address and makes it lowercase. The DTO
 `@Transform` decorators apply it. `LocalStrategy` applies it. The three OAuth strategies apply it. It
-also runs once more inside `loginWithOAuth`, which is the only writer of a user that OAuth makes. The
+also runs once more inside `OAuthService.resolveUserForOAuth`, which is the only writer of a user
+that OAuth makes. The
 `UQ_users_email_lower` index in the schema is the backstop.
 
 **JwtStrategy** verifies the signature of the Bearer token. It pins the issuer, the audience and the
