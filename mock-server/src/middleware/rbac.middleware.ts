@@ -94,6 +94,12 @@ router.post(
       return;
     }
 
+    // `ResourceService.restore` raises the isRegistered 400, so it sits below
+    // the instance check on the server.
+    if (!assertInstancePermission(req, res, 'update', 'Permission', resource)) {
+      return;
+    }
+
     if (!resource.isRegistered) {
       res.status(400).json({
         message: `Cannot restore resource "${resource.name}": its @RegisterResource controller is not registered. Restore the controller code first.`,
@@ -166,6 +172,10 @@ router.patch(
         statusCode: 404,
         errorKey: ErrorKeys.RESOURCES.NOT_FOUND
       });
+      return;
+    }
+
+    if (!assertInstancePermission(req, res, 'update', 'Permission', resource)) {
       return;
     }
 
@@ -361,6 +371,10 @@ router.patch(
       return;
     }
 
+    if (!assertInstancePermission(req, res, 'update', 'Permission', action)) {
+      return;
+    }
+
     if (displayName !== undefined) {
       action.displayName = displayName;
     }
@@ -399,6 +413,12 @@ router.delete(
         statusCode: 404,
         errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
       });
+      return;
+    }
+
+    // `ActionService.delete` raises the isDefault 403, so it sits below the
+    // instance check on the server.
+    if (!assertInstancePermission(req, res, 'delete', 'Permission', action)) {
       return;
     }
 
