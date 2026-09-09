@@ -134,7 +134,7 @@ export function assertInstancePermission(
   res: Response,
   action: Actions,
   subjectName: SubjectNames,
-  record: Record<string, unknown>
+  record: object
 ): boolean {
   const { user } = req as AuthenticatedRequest;
   if (buildAbilityForUser(user).can(action, caslSubject(subjectName, record))) {

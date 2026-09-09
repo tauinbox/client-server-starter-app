@@ -30,10 +30,14 @@ import {
   logAudit,
   toAdminUserResponse
 } from '../state';
-import { permissionGuard } from '../helpers/auth.helpers';
+import {
+  assertInstancePermission,
+  permissionGuard
+} from '../helpers/auth.helpers';
 import {
   buildMockUser,
-  validateCreateUserBody
+  findCreateUserConflict,
+  validateCreateUserDto
 } from '../helpers/user-create.helpers';
 import { cancelSubscriptionsForDeletedUser } from './billing.middleware';
 import type { AuthenticatedRequest, MockUser } from '../types';
@@ -132,9 +136,22 @@ const router = Router();
 
 // POST /api/v1/users
 router.post('/', permissionGuard('create', 'User'), (req, res) => {
-  const validated = validateCreateUserBody(req.body);
+  const validated = validateCreateUserDto(req.body);
   if (!validated.ok) {
     res.status(validated.status).json(validated.body);
+    return;
+  }
+
+  // The password is left out of the subject on purpose: no authorization
+  // condition can legitimately be written over it.
+  const { password: _password, ...subjectFields } = validated.fields;
+  if (!assertInstancePermission(req, res, 'create', 'User', subjectFields)) {
+    return;
+  }
+
+  const conflict = findCreateUserConflict(validated.fields);
+  if (conflict) {
+    res.status(conflict.status).json(conflict.body);
     return;
   }
 
@@ -242,6 +259,10 @@ router.get(
       return;
     }
 
+    if (!assertInstancePermission(req, res, 'read', 'User', user)) {
+      return;
+    }
+
     res.json(toAdminUserResponse(user));
   }
 );
@@ -261,6 +282,10 @@ router.get(
         statusCode: 404,
         errorKey: ErrorKeys.USERS.NOT_FOUND
       });
+      return;
+    }
+
+    if (!assertInstancePermission(req, res, 'read', 'User', user)) {
       return;
     }
 
@@ -323,13 +348,6 @@ router.patch(
         res.status(400).json(validationError(pwLenErr));
         return;
       }
-      // The blocklist verdict comes from UsersService.update on the real server,
-      // after the ability check and before any field assignment, so a 400 must
-      // leave the record unchanged.
-      if (isBreachedPassword(password)) {
-        res.status(400).json(breachedPasswordEnvelope());
-        return;
-      }
     }
 
     const localeErr = validateLocale(locale);
@@ -357,6 +375,18 @@ router.patch(
         statusCode: 404,
         errorKey: ErrorKeys.USERS.NOT_FOUND
       });
+      return;
+    }
+
+    if (!assertInstancePermission(req, res, 'update', 'User', user)) {
+      return;
+    }
+
+    // The blocklist verdict comes from UsersService.update on the real server,
+    // after the ability check and before any field assignment, so a 400 must
+    // leave the record unchanged.
+    if (password !== undefined && isBreachedPassword(password)) {
+      res.status(400).json(breachedPasswordEnvelope());
       return;
     }
 
@@ -460,6 +490,10 @@ router.delete(
       return;
     }
 
+    if (!assertInstancePermission(req, res, 'delete', 'User', targetUser)) {
+      return;
+    }
+
     // Soft delete: set deletedAt timestamp
     targetUser.deletedAt = new Date().toISOString();
     targetUser.updatedAt = new Date().toISOString();
@@ -518,6 +552,11 @@ router.post(
         statusCode: 404,
         errorKey: ErrorKeys.USERS.NOT_FOUND
       });
+      return;
+    }
+
+    // `UsersService.restore` gates on `delete`, not `update`.
+    if (!assertInstancePermission(req, res, 'delete', 'User', targetUser)) {
       return;
     }
 

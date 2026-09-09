@@ -11,6 +11,12 @@ let baseUrl: string;
 const ADMIN_ID = mockId('user-1');
 const REGULAR_ID = mockId('user-2');
 const EDITOR_ROLE_ID = mockId('role-editor');
+const MODERATOR_ROLE_ID = mockId('role-moderator');
+const SUPPORT_ROLE_ID = mockId('role-support');
+const USERS_RESOURCE_ID = mockId('res-users');
+const ROLES_RESOURCE_ID = mockId('res-roles');
+const READ_ACTION_ID = mockId('act-read');
+const UPDATE_ACTION_ID = mockId('act-update');
 
 beforeAll(async () => {
   resetState();
@@ -216,6 +222,477 @@ describe('permission-based route authorization', () => {
       });
 
       expect(res.status).toBe(400);
+    });
+  });
+
+  // Every route whose server counterpart calls `assertCan` a second time with
+  // the looked-up record. The route guard admits the tuple, and the condition
+  // decides the record.
+  describe('instance-level check on the record routes', () => {
+    const UNBREACHED_PASSWORD = 'Sc3nicRoute!42';
+
+    async function send(
+      token: string,
+      method: string,
+      path: string,
+      body?: unknown
+    ): Promise<Response> {
+      return fetch(`${baseUrl}${path}`, {
+        method,
+        headers: {
+          authorization: `Bearer ${token}`,
+          ...(body === undefined ? {} : { 'content-type': 'application/json' })
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) })
+      });
+    }
+
+    async function expectRefused(res: Response): Promise<void> {
+      expect(res.status).toBe(403);
+      expect(await readMessage(res)).toBe('Insufficient permissions');
+    }
+
+    async function delegate(
+      grants: {
+        permissionId: string;
+        conditions?: MockRolePermission['conditions'];
+      }[]
+    ): Promise<string> {
+      delegateToRegularUser(grants);
+      return login('user@example.com');
+    }
+
+    it('applies a conditional read:User grant to the two user read routes', async () => {
+      const token = await delegate([
+        {
+          permissionId: permissionId('res-users', 'act-read'),
+          conditions: { fieldMatch: { id: [REGULAR_ID] } }
+        }
+      ]);
+
+      expect(
+        (await send(token, 'GET', `/api/v1/users/${REGULAR_ID}`)).status
+      ).toBe(200);
+      await expectRefused(
+        await send(token, 'GET', `/api/v1/users/${ADMIN_ID}`)
+      );
+
+      expect(
+        (await send(token, 'GET', `/api/v1/users/${REGULAR_ID}/permissions`))
+          .status
+      ).toBe(200);
+      await expectRefused(
+        await send(token, 'GET', `/api/v1/users/${ADMIN_ID}/permissions`)
+      );
+    });
+
+    it('applies a conditional create:User grant to POST /users', async () => {
+      const token = await delegate([
+        {
+          permissionId: permissionId('res-users', 'act-create'),
+          conditions: { fieldMatch: { locale: ['ru'] } }
+        }
+      ]);
+
+      const allowed = await send(token, 'POST', '/api/v1/users', {
+        email: 'allowed@example.com',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        password: UNBREACHED_PASSWORD,
+        locale: 'ru'
+      });
+      expect(allowed.status).toBe(201);
+
+      await expectRefused(
+        await send(token, 'POST', '/api/v1/users', {
+          email: 'refused@example.com',
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          password: UNBREACHED_PASSWORD,
+          locale: 'en'
+        })
+      );
+    });
+
+    it('answers 400 on POST /users for a body that fails the DTO, even when the condition refuses', async () => {
+      const token = await delegate([
+        {
+          permissionId: permissionId('res-users', 'act-create'),
+          conditions: { fieldMatch: { locale: ['ru'] } }
+        }
+      ]);
+
+      const res = await send(token, 'POST', '/api/v1/users', {
+        email: 'refused@example.com',
+        firstName: 'Ada',
+        password: UNBREACHED_PASSWORD,
+        locale: 'en'
+      });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('answers 403 on POST /users above the blocklist, which the server checks below the ability', async () => {
+      const token = await delegate([
+        {
+          permissionId: permissionId('res-users', 'act-create'),
+          conditions: { fieldMatch: { locale: ['ru'] } }
+        }
+      ]);
+
+      await expectRefused(
+        await send(token, 'POST', '/api/v1/users', {
+          email: 'refused@example.com',
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          password: 'Password1',
+          locale: 'en'
+        })
+      );
+    });
+
+    it('applies a conditional update:User grant to PATCH /users/:id', async () => {
+      const token = await delegate([
+        {
+          permissionId: permissionId('res-users', 'act-update'),
+          conditions: { fieldMatch: { id: [REGULAR_ID] } }
+        }
+      ]);
+
+      const allowed = await send(
+        token,
+        'PATCH',
+        `/api/v1/users/${REGULAR_ID}`,
+        { firstName: 'Renamed' }
+      );
+      expect(allowed.status).toBe(200);
+
+      await expectRefused(
+        await send(token, 'PATCH', `/api/v1/users/${ADMIN_ID}`, {
+          firstName: 'Renamed'
+        })
+      );
+    });
+
+    it('answers 403 on PATCH /users/:id above the blocklist, which the server checks below the ability', async () => {
+      const token = await delegate([
+        {
+          permissionId: permissionId('res-users', 'act-update'),
+          conditions: { fieldMatch: { id: [REGULAR_ID] } }
+        }
+      ]);
+
+      await expectRefused(
+        await send(token, 'PATCH', `/api/v1/users/${ADMIN_ID}`, {
+          password: 'Password1'
+        })
+      );
+    });
+
+    it('applies a conditional delete:User grant to DELETE /users/:id and its restore', async () => {
+      const token = await delegate([
+        {
+          permissionId: permissionId('res-users', 'act-delete'),
+          conditions: { fieldMatch: { id: [ADMIN_ID] } }
+        }
+      ]);
+
+      expect(
+        (await send(token, 'DELETE', `/api/v1/users/${ADMIN_ID}`)).status
+      ).toBe(200);
+      await expectRefused(
+        await send(token, 'DELETE', `/api/v1/users/${REGULAR_ID}`)
+      );
+
+      expect(
+        (await send(token, 'POST', `/api/v1/users/${ADMIN_ID}/restore`)).status
+      ).toBe(200);
+      await expectRefused(
+        await send(token, 'POST', `/api/v1/users/${REGULAR_ID}/restore`)
+      );
+    });
+
+    it('applies a conditional read:Role grant to the two role read routes', async () => {
+      const token = await delegate([
+        {
+          permissionId: permissionId('res-roles', 'act-read'),
+          conditions: { fieldMatch: { name: ['editor'] } }
+        }
+      ]);
+
+      expect(
+        (await send(token, 'GET', `/api/v1/roles/${EDITOR_ROLE_ID}`)).status
+      ).toBe(200);
+      await expectRefused(
+        await send(token, 'GET', `/api/v1/roles/${MODERATOR_ROLE_ID}`)
+      );
+
+      expect(
+        (
+          await send(
+            token,
+            'GET',
+            `/api/v1/roles/${EDITOR_ROLE_ID}/permissions`
+          )
+        ).status
+      ).toBe(200);
+      await expectRefused(
+        await send(
+          token,
+          'GET',
+          `/api/v1/roles/${MODERATOR_ROLE_ID}/permissions`
+        )
+      );
+    });
+
+    it('applies a conditional update:Role grant to PATCH /roles/:id', async () => {
+      const token = await delegate([
+        {
+          permissionId: permissionId('res-roles', 'act-update'),
+          conditions: { fieldMatch: { name: ['moderator'] } }
+        }
+      ]);
+
+      const allowed = await send(
+        token,
+        'PATCH',
+        `/api/v1/roles/${MODERATOR_ROLE_ID}`,
+        { description: 'Renamed' }
+      );
+      expect(allowed.status).toBe(200);
+
+      await expectRefused(
+        await send(token, 'PATCH', `/api/v1/roles/${SUPPORT_ROLE_ID}`, {
+          description: 'Renamed'
+        })
+      );
+    });
+
+    it('applies a conditional delete:Role grant to DELETE /roles/:id', async () => {
+      const token = await delegate([
+        {
+          permissionId: permissionId('res-roles', 'act-delete'),
+          conditions: { fieldMatch: { name: ['moderator'] } }
+        }
+      ]);
+
+      expect(
+        (await send(token, 'DELETE', `/api/v1/roles/${MODERATOR_ROLE_ID}`))
+          .status
+      ).toBe(200);
+      await expectRefused(
+        await send(token, 'DELETE', `/api/v1/roles/${SUPPORT_ROLE_ID}`)
+      );
+    });
+
+    it('applies a conditional update:Role grant to the three role-permission routes', async () => {
+      const token = await delegate([
+        {
+          permissionId: permissionId('res-roles', 'act-update'),
+          conditions: { fieldMatch: { name: ['moderator'] } }
+        }
+      ]);
+      const granted = permissionId('res-profile', 'act-read');
+
+      expect(
+        (
+          await send(
+            token,
+            'PUT',
+            `/api/v1/roles/${MODERATOR_ROLE_ID}/permissions`,
+            { items: [] }
+          )
+        ).status
+      ).toBe(200);
+      await expectRefused(
+        await send(
+          token,
+          'PUT',
+          `/api/v1/roles/${SUPPORT_ROLE_ID}/permissions`,
+          { items: [] }
+        )
+      );
+
+      expect(
+        (
+          await send(
+            token,
+            'POST',
+            `/api/v1/roles/${MODERATOR_ROLE_ID}/permissions`,
+            { permissionIds: [granted] }
+          )
+        ).status
+      ).toBe(200);
+      await expectRefused(
+        await send(
+          token,
+          'POST',
+          `/api/v1/roles/${SUPPORT_ROLE_ID}/permissions`,
+          { permissionIds: [granted] }
+        )
+      );
+
+      expect(
+        (
+          await send(
+            token,
+            'DELETE',
+            `/api/v1/roles/${MODERATOR_ROLE_ID}/permissions/${granted}`
+          )
+        ).status
+      ).toBe(200);
+      await expectRefused(
+        await send(
+          token,
+          'DELETE',
+          `/api/v1/roles/${SUPPORT_ROLE_ID}/permissions/${granted}`
+        )
+      );
+    });
+
+    it('applies a conditional update:User grant to the two role-assignment routes', async () => {
+      const token = await delegate([
+        { permissionId: permissionId('res-roles', 'act-assign') },
+        {
+          permissionId: permissionId('res-users', 'act-update'),
+          conditions: { fieldMatch: { id: [ADMIN_ID] } }
+        }
+      ]);
+
+      expect(
+        (
+          await send(token, 'POST', `/api/v1/roles/assign/${ADMIN_ID}`, {
+            roleId: SUPPORT_ROLE_ID
+          })
+        ).status
+      ).toBe(200);
+      await expectRefused(
+        await send(token, 'POST', `/api/v1/roles/assign/${REGULAR_ID}`, {
+          roleId: SUPPORT_ROLE_ID
+        })
+      );
+
+      expect(
+        (
+          await send(
+            token,
+            'DELETE',
+            `/api/v1/roles/assign/${ADMIN_ID}/${SUPPORT_ROLE_ID}`
+          )
+        ).status
+      ).toBe(200);
+      await expectRefused(
+        await send(
+          token,
+          'DELETE',
+          `/api/v1/roles/assign/${REGULAR_ID}/${SUPPORT_ROLE_ID}`
+        )
+      );
+    });
+
+    it('applies a conditional update:Permission grant to the two resource routes', async () => {
+      const token = await delegate([
+        {
+          permissionId: permissionId('res-permissions', 'act-update'),
+          conditions: { fieldMatch: { name: ['users'] } }
+        }
+      ]);
+
+      expect(
+        (
+          await send(
+            token,
+            'PATCH',
+            `/api/v1/rbac/resources/${USERS_RESOURCE_ID}`,
+            { displayName: 'Renamed' }
+          )
+        ).status
+      ).toBe(200);
+      await expectRefused(
+        await send(
+          token,
+          'PATCH',
+          `/api/v1/rbac/resources/${ROLES_RESOURCE_ID}`,
+          { displayName: 'Renamed' }
+        )
+      );
+
+      expect(
+        (
+          await send(
+            token,
+            'POST',
+            `/api/v1/rbac/resources/${USERS_RESOURCE_ID}/restore`
+          )
+        ).status
+      ).toBe(200);
+      await expectRefused(
+        await send(
+          token,
+          'POST',
+          `/api/v1/rbac/resources/${ROLES_RESOURCE_ID}/restore`
+        )
+      );
+    });
+
+    it('applies a conditional update:Permission grant to PATCH /rbac/actions/:id', async () => {
+      const token = await delegate([
+        {
+          permissionId: permissionId('res-permissions', 'act-update'),
+          conditions: { fieldMatch: { name: ['read'] } }
+        }
+      ]);
+
+      const allowed = await send(
+        token,
+        'PATCH',
+        `/api/v1/rbac/actions/${READ_ACTION_ID}`,
+        { displayName: 'Renamed' }
+      );
+      expect(allowed.status).toBe(200);
+
+      await expectRefused(
+        await send(token, 'PATCH', `/api/v1/rbac/actions/${UPDATE_ACTION_ID}`, {
+          displayName: 'Renamed'
+        })
+      );
+    });
+
+    it('applies a conditional delete:Permission grant to DELETE /rbac/actions/:id', async () => {
+      const adminToken = await login('admin@example.com');
+      const created: Record<string, string> = {};
+      for (const name of ['publish', 'archive']) {
+        const res = await send(adminToken, 'POST', '/api/v1/rbac/actions', {
+          name,
+          displayName: name
+        });
+        expect(res.status).toBe(201);
+        created[name] = ((await res.json()) as { id: string }).id;
+      }
+
+      const token = await delegate([
+        {
+          permissionId: permissionId('res-permissions', 'act-delete'),
+          conditions: { fieldMatch: { name: ['publish'] } }
+        }
+      ]);
+
+      expect(
+        (
+          await send(
+            token,
+            'DELETE',
+            `/api/v1/rbac/actions/${created['publish']}`
+          )
+        ).status
+      ).toBe(200);
+      await expectRefused(
+        await send(
+          token,
+          'DELETE',
+          `/api/v1/rbac/actions/${created['archive']}`
+        )
+      );
     });
   });
 

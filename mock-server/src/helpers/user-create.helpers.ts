@@ -37,15 +37,23 @@ type CreateUserResult =
       body: ReturnType<typeof validationError> | ConflictEnvelope;
     };
 
+type CreateUserDtoResult =
+  | { ok: true; fields: CreateUserFields }
+  | { ok: false; status: number; body: ReturnType<typeof validationError> };
+
+interface CreateUserConflict {
+  status: number;
+  body: ReturnType<typeof validationError> | ConflictEnvelope;
+}
+
 /**
- * The `CreateUserDto` validation and the email-conflict check shared by
- * `POST /auth/register` and the admin `POST /users`. Both hit the same DTO on
- * the real server, so the checks and their order have to stay identical; all
- * that differs is what each caller does with the validated fields.
+ * The `CreateUserDto` stage. The server runs it in the global pipe, above the
+ * ability check, so the admin route places its instance check between this and
+ * `findCreateUserConflict`.
  */
-export function validateCreateUserBody(
+export function validateCreateUserDto(
   body: Record<string, unknown>
-): CreateUserResult {
+): CreateUserDtoResult {
   const email = normalizeEmail(body['email']) ?? '';
   const { firstName, lastName, password, locale } = body;
 
@@ -74,6 +82,11 @@ export function validateCreateUserBody(
     return { ok: false, status: 400, body: validationError(lengthErr) };
   }
 
+  const localeErr = validateLocale(locale);
+  if (localeErr) {
+    return { ok: false, status: 400, body: validationError(localeErr) };
+  }
+
   // Every field above cleared a length check, which rejects non-strings.
   const fields: CreateUserFields = {
     email,
@@ -83,21 +96,23 @@ export function validateCreateUserBody(
     locale: typeof locale === 'string' ? locale : 'en'
   };
 
-  // The server checks the blocklist inside the service, after the DTO clears
-  // and ahead of the address conflict below, so both routes answer the same
-  // way for the same body.
+  return { ok: true, fields };
+}
+
+/**
+ * The `UsersService.create` stage. The server runs it below the ability check,
+ * and answers the blocklist ahead of the address conflict, so both create
+ * routes answer the same way for the same body.
+ */
+export function findCreateUserConflict(
+  fields: CreateUserFields
+): CreateUserConflict | null {
   if (isBreachedPassword(fields.password)) {
-    return { ok: false, status: 400, body: breachedPasswordEnvelope() };
+    return { status: 400, body: breachedPasswordEnvelope() };
   }
 
-  const localeErr = validateLocale(locale);
-  if (localeErr) {
-    return { ok: false, status: 400, body: validationError(localeErr) };
-  }
-
-  if (findUserByEmail(email) || findUserByPendingEmail(email)) {
+  if (findUserByEmail(fields.email) || findUserByPendingEmail(fields.email)) {
     return {
-      ok: false,
       status: 409,
       body: {
         message: 'User with this email already exists',
@@ -107,7 +122,25 @@ export function validateCreateUserBody(
     };
   }
 
-  return { ok: true, fields };
+  return null;
+}
+
+/**
+ * Both stages in one call, for `POST /auth/register`. That route is public, so
+ * it has no ability check to place between them.
+ */
+export function validateCreateUserBody(
+  body: Record<string, unknown>
+): CreateUserResult {
+  const validated = validateCreateUserDto(body);
+  if (!validated.ok) return validated;
+
+  const conflict = findCreateUserConflict(validated.fields);
+  if (conflict) {
+    return { ok: false, status: conflict.status, body: conflict.body };
+  }
+
+  return validated;
 }
 
 /**

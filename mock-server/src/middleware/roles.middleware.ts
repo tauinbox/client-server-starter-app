@@ -221,6 +221,10 @@ router.get(
       return;
     }
 
+    if (!assertInstancePermission(req, res, 'read', 'Role', role)) {
+      return;
+    }
+
     const rolePerms = state.rolePermissions
       .filter((rp) => rp.roleId === id)
       .map((rp) => {
@@ -257,6 +261,10 @@ router.get(
         statusCode: 404,
         errorKey: ErrorKeys.ROLES.NOT_FOUND
       });
+      return;
+    }
+
+    if (!assertInstancePermission(req, res, 'read', 'Role', role)) {
       return;
     }
 
@@ -370,6 +378,12 @@ router.patch(
       return;
     }
 
+    // `RoleService.update` raises the isSystem 400, so it sits below the
+    // instance check on the server.
+    if (!assertInstancePermission(req, res, 'update', 'Role', role)) {
+      return;
+    }
+
     if (role.isSystem) {
       res.status(400).json({
         message: 'Cannot modify system roles',
@@ -431,6 +445,12 @@ router.delete(
         statusCode: 404,
         errorKey: ErrorKeys.ROLES.NOT_FOUND
       });
+      return;
+    }
+
+    // `RoleService.delete` raises the isSystem 400, so it sits below the
+    // instance check on the server.
+    if (!assertInstancePermission(req, res, 'delete', 'Role', role)) {
       return;
     }
 
@@ -522,6 +542,12 @@ router.put(
         statusCode: 404,
         errorKey: ErrorKeys.ROLES.NOT_FOUND
       });
+      return;
+    }
+
+    // `RoleService.assertCanUpdateRole` runs above `assertNotSystem`, so the
+    // instance check sits above the isSystem 400 on the server.
+    if (!assertInstancePermission(req, res, 'update', 'Role', role)) {
       return;
     }
 
@@ -644,6 +670,12 @@ router.post(
       return;
     }
 
+    // `RoleService.assertCanUpdateRole` runs above `assertNotSystem`, so the
+    // instance check sits above the isSystem 400 on the server.
+    if (!assertInstancePermission(req, res, 'update', 'Role', role)) {
+      return;
+    }
+
     if (role.isSystem && !isActorSuper(req)) {
       res.status(400).json({
         message: 'Cannot modify system roles',
@@ -739,6 +771,12 @@ router.delete(
       return;
     }
 
+    // `RoleService.assertCanUpdateRole` runs above `assertNotSystem`, so the
+    // instance check sits above the isSystem 400 on the server.
+    if (!assertInstancePermission(req, res, 'update', 'Role', role)) {
+      return;
+    }
+
     if (role.isSystem && !isActorSuper(req)) {
       res.status(400).json({
         message: 'Cannot modify system roles',
@@ -812,6 +850,12 @@ router.post(
         });
         return;
       }
+    }
+
+    // `RoleService.assignRoleToUser` re-checks `update` on the target user,
+    // below the super-role test and above the duplicate 409.
+    if (!assertInstancePermission(req, res, 'update', 'User', user)) {
+      return;
     }
 
     // Mirror the server: a duplicate assignment hits the user_roles unique
@@ -889,6 +933,10 @@ router.delete(
         });
         return;
       }
+    }
+
+    if (!assertInstancePermission(req, res, 'update', 'User', user)) {
+      return;
     }
 
     user.roles = user.roles.filter((r) => r !== role.name);
