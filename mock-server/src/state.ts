@@ -476,9 +476,14 @@ export function buildAbilityForUser(user: MockUser): MockAbility {
     return build();
   }
 
-  const subjectMap = new Map<string, string>();
+  // Mirrors the server factory: the subject map is split in two, because an
+  // allow needs a live resource while a deny must outlive its resource going
+  // orphaned rather than vanish with it.
+  const activeSubjects = new Map<string, string>();
+  const orphanedSubjects = new Map<string, string>();
   for (const resource of currentState.resources.values()) {
-    subjectMap.set(resource.name, resource.subject);
+    const target = resource.isOrphaned ? orphanedSubjects : activeSubjects;
+    target.set(resource.name, resource.subject);
   }
 
   const resolved = getResolvedPermissionsForUser(user);
@@ -492,11 +497,15 @@ export function buildAbilityForUser(user: MockUser): MockAbility {
   ];
 
   for (const { resource, action, conditions } of orderedEntries) {
-    const subject = subjectMap.get(resource) as SubjectNames | undefined;
-    if (!subject) continue;
-
     const isDeny = conditions?.effect === 'deny';
     const register = isDeny ? cannot : can;
+
+    const subject = (
+      isDeny
+        ? (activeSubjects.get(resource) ?? orphanedSubjects.get(resource))
+        : activeSubjects.get(resource)
+    ) as SubjectNames | undefined;
+    if (!subject) continue;
 
     // Mirrors the server factory: a reserved keyword bypassed the write-time
     // checks, and can('manage', X) / can(X, 'all') grant far beyond what the
