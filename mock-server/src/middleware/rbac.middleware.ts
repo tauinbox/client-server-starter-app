@@ -96,7 +96,16 @@ router.post(
 
     // `ResourceService.restore` raises the isRegistered 400, so it sits below
     // the instance check on the server.
-    if (!assertInstancePermission(req, res, 'update', 'Permission', resource)) {
+    if (
+      !assertInstancePermission(
+        req,
+        res,
+        'update',
+        'Permission',
+        resource,
+        'Resource'
+      )
+    ) {
       return;
     }
 
@@ -175,7 +184,16 @@ router.patch(
       return;
     }
 
-    if (!assertInstancePermission(req, res, 'update', 'Permission', resource)) {
+    if (
+      !assertInstancePermission(
+        req,
+        res,
+        'update',
+        'Permission',
+        resource,
+        'Resource'
+      )
+    ) {
       return;
     }
 
@@ -259,11 +277,18 @@ router.post('/actions', permissionGuard('create', 'Permission'), (req, res) => {
   // lowercased, and the checks below live in the service, so the instance
   // check sits between the pipe and the service.
   if (
-    !assertInstancePermission(req, res, 'create', 'Permission', {
-      name: trimmedName,
-      displayName,
-      description
-    })
+    !assertInstancePermission(
+      req,
+      res,
+      'create',
+      'Permission',
+      {
+        name: trimmedName,
+        displayName,
+        description
+      },
+      'Action'
+    )
   ) {
     return;
   }
@@ -371,7 +396,16 @@ router.patch(
       return;
     }
 
-    if (!assertInstancePermission(req, res, 'update', 'Permission', action)) {
+    if (
+      !assertInstancePermission(
+        req,
+        res,
+        'update',
+        'Permission',
+        action,
+        'Action'
+      )
+    ) {
       return;
     }
 
@@ -418,7 +452,16 @@ router.delete(
 
     // `ActionService.delete` raises the isDefault 403, so it sits below the
     // instance check on the server.
-    if (!assertInstancePermission(req, res, 'delete', 'Permission', action)) {
+    if (
+      !assertInstancePermission(
+        req,
+        res,
+        'delete',
+        'Permission',
+        action,
+        'Action'
+      )
+    ) {
       return;
     }
 

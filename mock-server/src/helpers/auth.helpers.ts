@@ -6,6 +6,7 @@ import {
   buildAbilityForUser,
   findUserById,
   isSessionLive,
+  logAudit,
   mustEnrolMfa
 } from '../state';
 import type { Actions, SubjectNames } from '../state';
@@ -83,6 +84,14 @@ export function requirePermission(
     }
 
     if (!buildAbilityForUser(result.user).can(action, subject)) {
+      // PermissionsGuard writes this row before it throws, and carries only the
+      // required tuple and the caller ip. It passes no actorEmail, so the server
+      // row holds null there.
+      logAudit('PERMISSION_CHECK_FAILURE', {
+        actorId: result.user.id,
+        details: { required: [`${action}:${subject}`] },
+        ip: req.ip
+      });
       return { error: 403, message: 'Insufficient permissions' };
     }
 
@@ -128,18 +137,36 @@ export function permissionGuard(action: Actions, subject: SubjectNames) {
  * type-level check that ignores conditions, so a conditional grant has to be
  * re-evaluated against the record the caller submits. Answers 403 and returns
  * false when the caller may not act on that record.
+ *
+ * `targetType` is the audited entity name, which is not always the CASL subject:
+ * the rbac routes authorize `Permission` while the server audits `Resource` or
+ * `Action`. It defaults to the subject, which is the server's own fallback.
  */
 export function assertInstancePermission(
   req: Request,
   res: Response,
   action: Actions,
   subjectName: SubjectNames,
-  record: object
+  record: object,
+  targetType: string = subjectName
 ): boolean {
   const { user } = req as AuthenticatedRequest;
   if (buildAbilityForUser(user).can(action, caslSubject(subjectName, record))) {
     return true;
   }
+  // Mirrors assertCan, which audits before it throws. It passes no context, so
+  // the server row holds a null ip, and no actorEmail. A create route submits a
+  // record with no id, which is why targetId reads off the record itself.
+  logAudit('PERMISSION_CHECK_FAILURE', {
+    actorId: user.id,
+    targetId: (record as { id?: string }).id ?? null,
+    targetType,
+    details: {
+      instanceCheck: true,
+      deniedAction: action,
+      subject: subjectName
+    }
+  });
   res
     .status(403)
     .json({ message: 'Insufficient permissions', statusCode: 403 });

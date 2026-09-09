@@ -3,7 +3,7 @@ import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
 import { mockId } from '../utils/mock-id';
-import type { MockRolePermission } from '../types';
+import type { MockAuditLog, MockRolePermission } from '../types';
 
 let server: Server;
 let baseUrl: string;
@@ -768,6 +768,118 @@ describe('permission-based route authorization', () => {
       expect(res.status).toBe(200);
       const permissions = (await res.json()) as unknown[];
       expect(permissions).toHaveLength(36);
+    });
+  });
+  // Parity with the two server layers that audit a denial before they throw:
+  // PermissionsGuard (permissions.guard.ts) and assertCan (assert-can.util.ts).
+  // Neither passes an actorEmail, so both rows hold null there.
+  describe('audit trail on a denied authorization', () => {
+    function denials(): MockAuditLog[] {
+      return getState().auditLogs.filter(
+        (row) => row.action === 'PERMISSION_CHECK_FAILURE'
+      );
+    }
+
+    it('records the required tuple when the type-level guard refuses', async () => {
+      const token = await login('user@example.com');
+
+      const res = await fetch(`${baseUrl}/api/v1/users/${ADMIN_ID}`, {
+        headers: { authorization: `Bearer ${token}` }
+      });
+      expect(res.status).toBe(403);
+
+      const rows = denials();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        actorId: REGULAR_ID,
+        actorEmail: null,
+        targetId: null,
+        targetType: null,
+        details: { required: ['read:User'] }
+      });
+      expect(rows[0]?.ipAddress).toBeTruthy();
+    });
+
+    it('writes no row when the request carries no token', async () => {
+      const res = await fetch(`${baseUrl}/api/v1/users/${ADMIN_ID}`);
+
+      expect(res.status).toBe(401);
+      expect(denials()).toHaveLength(0);
+    });
+
+    it('records the instance check when a condition refuses a create', async () => {
+      delegateToRegularUser([
+        {
+          permissionId: permissionId('res-roles', 'act-create'),
+          conditions: { fieldMatch: { name: ['blessed'] } }
+        }
+      ]);
+      const token = await login('user@example.com');
+
+      const res = await fetch(`${baseUrl}/api/v1/roles`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ name: 'unblessed' })
+      });
+      expect(res.status).toBe(403);
+
+      const rows = denials();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        actorId: REGULAR_ID,
+        actorEmail: null,
+        // A create route submits a record that carries no id yet, and the
+        // server omits targetId there.
+        targetId: null,
+        targetType: 'Role',
+        ipAddress: null,
+        details: {
+          instanceCheck: true,
+          deniedAction: 'create',
+          subject: 'Role'
+        }
+      });
+    });
+
+    // The rbac routes authorize the `Permission` subject while the server
+    // audits the entity the record belongs to.
+    it('audits an rbac action denial as targetType Action', async () => {
+      delegateToRegularUser([
+        {
+          permissionId: permissionId('res-permissions', 'act-update'),
+          conditions: { fieldMatch: { name: ['publish'] } }
+        }
+      ]);
+      const token = await login('user@example.com');
+
+      const res = await fetch(
+        `${baseUrl}/api/v1/rbac/actions/${READ_ACTION_ID}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ displayName: 'Renamed' })
+        }
+      );
+      expect(res.status).toBe(403);
+
+      const rows = denials();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        actorId: REGULAR_ID,
+        targetId: READ_ACTION_ID,
+        targetType: 'Action',
+        details: {
+          instanceCheck: true,
+          deniedAction: 'update',
+          subject: 'Permission'
+        }
+      });
     });
   });
 });
