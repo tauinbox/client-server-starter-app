@@ -305,6 +305,14 @@ export interface CaptchaAttemptWindow {
   timestamps: number[];
 }
 
+export interface FailedAttemptWindow {
+  // Failures counted since the window opened.
+  count: number;
+  // Epoch ms at which the window closes. It is set when the window opens and
+  // never extended, mirroring the fixed window of the server counter.
+  expiresAt: number;
+}
+
 interface MockOAuthDataBase {
   userId: string;
   expiresAt: number;
@@ -400,6 +408,10 @@ export interface State {
   // Per-route + per-IP attempt tracker for captcha soft-trigger. Keyed
   // `${routeName}:${ip}`.
   captchaAttempts: Map<string, CaptchaAttemptWindow>;
+  // Per-account counter of refused authenticator codes, keyed by user id. The
+  // route throttles bound one caller, so this is the brake the source address
+  // cannot move. Mirrors the server counter in `FailedAttemptCounter`.
+  mfaChallengeFailures: Map<string, FailedAttemptWindow>;
   // Sample of the public breach corpus the server checks a new password
   // against. Seeded from `seedBreachedPasswords`; a test adds more through
   // `POST /__control/breached-passwords`.

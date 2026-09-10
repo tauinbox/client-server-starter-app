@@ -76,6 +76,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
     auditLogs: state.auditLogs,
     captchaConfig: state.captchaConfig,
     captchaAttempts: state.captchaAttempts.size,
+    mfaChallengeFailures: state.mfaChallengeFailures.size,
     breachedPasswords: Array.from(state.breachedPasswords),
     featureFlags: Array.from(state.featureFlags.values()),
     featureFlagRules: state.featureFlagRules,

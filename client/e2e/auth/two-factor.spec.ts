@@ -4,6 +4,7 @@ import {
   MOCK_REGENERATED_RECOVERY_CODES,
   MOCK_TOTP_CODE
 } from '../../../mock-server/src/constants';
+import { MAX_FAILED_ATTEMPTS } from '@app/shared/constants';
 import type { Page } from '@playwright/test';
 
 const EMAIL = 'testlogin@example.com';
@@ -173,6 +174,52 @@ test.describe('two-factor authentication', () => {
     await expect(page).toHaveURL(/\/login/);
 
     await codeField.fill(MOCK_REGENERATED_RECOVERY_CODES[0]);
+    await page.getByRole('button', { name: 'Verify' }).click();
+    await page.waitForURL((url) => !url.pathname.endsWith('/login'));
+  });
+
+  // The brake is per account, so it is the one the code step can hit with no
+  // help from a throttle. This also proves the key the server ships reaches the
+  // screen as text: an untranslated key renders as a raw dot path.
+  test('bars the code step after too many wrong codes and keeps recovery open', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url);
+    await page.getByRole('button', { name: 'Turn on' }).click();
+    await page.getByLabel('Current password').fill(PASSWORD);
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByLabel('Authentication code').fill(MOCK_TOTP_CODE);
+    await page.getByRole('button', { name: 'Turn on' }).click();
+    await page.getByRole('button', { name: 'I saved them' }).click();
+    await logout(page);
+    await _mockServer.clearTotpLedger(USER_ID);
+
+    await page.getByLabel('Email').fill(EMAIL);
+    await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
+    await page.getByRole('main').getByRole('button', { name: 'Login' }).click();
+
+    const codeField = page.getByLabel('Authentication code');
+    await expect(codeField).toBeVisible();
+
+    for (let attempt = 0; attempt < MAX_FAILED_ATTEMPTS; attempt += 1) {
+      await codeField.fill('000000');
+      await page.getByRole('button', { name: 'Verify' }).click();
+      await expect(page.getByRole('alert')).toBeVisible();
+    }
+
+    await expect(page.getByRole('alert')).toContainText(
+      /Too many incorrect verification codes/i
+    );
+
+    // The correct code buys nothing while the window is open.
+    await codeField.fill(MOCK_TOTP_CODE);
+    await page.getByRole('button', { name: 'Verify' }).click();
+    await expect(page).toHaveURL(/\/login/);
+
+    // The way back in that the brake never closes.
+    await page.getByRole('button', { name: 'Use a recovery code' }).click();
+    await page.getByLabel('Recovery code').fill(MOCK_RECOVERY_CODES[0]);
     await page.getByRole('button', { name: 'Verify' }).click();
     await page.waitForURL((url) => !url.pathname.endsWith('/login'));
   });

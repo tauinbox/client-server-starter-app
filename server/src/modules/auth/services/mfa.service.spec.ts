@@ -1,10 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { JwtService } from '@nestjs/jwt';
 import { DataSource } from 'typeorm';
 import { randomBytes } from 'crypto';
 import { generateSync } from 'otplib';
 import {
   ErrorKeys,
+  MAX_FAILED_ATTEMPTS,
   TOKEN_PURPOSE,
   TOTP_PERIOD_SECONDS
 } from '@app/shared/constants';
@@ -16,6 +18,7 @@ import { MailService } from '../../mail/mail.service';
 import { SecretEncryptionService } from '../../../common/crypto/secret-encryption.service';
 import { hashToken } from '../../../common/utils/hash-token';
 import { createMockConfigService } from '../../../common/testing/config-service.mock';
+import { createMockCache } from '../../../common/testing/cache.mock';
 
 const KEY = randomBytes(32).toString('base64');
 
@@ -123,7 +126,8 @@ describe('MfaService', () => {
         { provide: JwtService, useValue: jwtService },
         { provide: AuditService, useValue: auditService },
         { provide: MailService, useValue: mailService },
-        { provide: SecretEncryptionService, useValue: encryption }
+        { provide: SecretEncryptionService, useValue: encryption },
+        { provide: CACHE_MANAGER, useValue: createMockCache() }
       ]
     }).compile();
 
@@ -414,7 +418,7 @@ describe('MfaService', () => {
       expect(auditService.log).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.MFA_CHALLENGE_FAILURE,
-          details: { stage: 'challenge' }
+          details: { stage: 'challenge', attempt: 1 }
         })
       );
     });
@@ -502,6 +506,99 @@ describe('MfaService', () => {
     });
   });
 
+  /**
+   * The route throttles are keyed by client address, so they bound one caller
+   * and not one account. These cover the brake that the address cannot move.
+   */
+  describe('per-account brake on the authenticator challenge', () => {
+    /** An enrolled account whose pending token resolves, ready to be guessed at. */
+    async function guessable(): Promise<{ user: User; secret: string }> {
+      const enrolment = await enrol();
+      const enabled = buildUser({
+        totpSecret: enrolment.user.totpSecret,
+        totpEnabledAt: new Date()
+      });
+      jwtService.verify.mockReturnValue({
+        sub: 'user-1',
+        purpose: TOKEN_PURPOSE.MFA_PENDING,
+        iat: Math.floor(Date.now() / 1000)
+      });
+      repository.findOne.mockResolvedValue(enabled);
+      return { user: enabled, secret: enrolment.secret };
+    }
+
+    async function guessWrong(times: number): Promise<void> {
+      for (let i = 0; i < times; i += 1) {
+        await expect(
+          service.verifyChallenge('token', '000000')
+        ).rejects.toBeDefined();
+      }
+    }
+
+    it('bars the account after the same number of tries the password gets', async () => {
+      await guessable();
+
+      await guessWrong(MAX_FAILED_ATTEMPTS - 1);
+      await expect(
+        service.verifyChallenge('token', '000000')
+      ).rejects.toMatchObject({
+        status: 423,
+        response: { errorKey: ErrorKeys.AUTH.MFA_CHALLENGE_LOCKED }
+      });
+    });
+
+    it('refuses a correct code while the account is barred', async () => {
+      const { secret } = await guessable();
+
+      await guessWrong(MAX_FAILED_ATTEMPTS);
+
+      await expect(
+        service.verifyChallenge('token', generateSync({ secret }))
+      ).rejects.toMatchObject({
+        status: 423,
+        response: { errorKey: ErrorKeys.AUTH.MFA_CHALLENGE_LOCKED }
+      });
+    });
+
+    it('counts a new address into the same window', async () => {
+      await guessable();
+
+      await guessWrong(MAX_FAILED_ATTEMPTS - 1);
+
+      // Nothing in the counter is derived from the caller, so a second source
+      // address inherits the window rather than opening one of its own.
+      await expect(
+        service.verifyChallenge('token', '000000', { ip: '203.0.113.9' })
+      ).rejects.toMatchObject({ status: 423 });
+    });
+
+    it('closes the window on a correct code', async () => {
+      const { secret } = await guessable();
+
+      await guessWrong(MAX_FAILED_ATTEMPTS - 1);
+      await expect(
+        service.verifyChallenge('token', generateSync({ secret }))
+      ).resolves.toBeDefined();
+
+      // The window is closed, so the next wrong code is a first strike again
+      // and answers 401 rather than 423.
+      await expect(
+        service.verifyChallenge('token', '000000')
+      ).rejects.toMatchObject({ status: 401 });
+    });
+
+    it('reports how long the account stays barred', async () => {
+      await guessable();
+      await guessWrong(MAX_FAILED_ATTEMPTS - 1);
+
+      await expect(
+        service.verifyChallenge('token', '000000')
+      ).rejects.toMatchObject({
+        response: { retryAfter: expect.any(Number) as unknown }
+      });
+    });
+  });
+
   describe('consumeRecoveryCode', () => {
     const code = 'ABCDEFGH-IJKLMNOP';
 
@@ -561,6 +658,46 @@ describe('MfaService', () => {
       await expect(
         service.consumeRecoveryCode('token', 'abcdefgh ijklmnop')
       ).resolves.toBeDefined();
+    });
+
+    // A brake that shuts every door lets a caller who holds only the password
+    // deny the owner their own account, which is what the recorded lockout
+    // decision forbids. This is the escape hatch that keeps it open.
+    it('stays open while the authenticator challenge is barred', async () => {
+      const enabled = enabledWithCode();
+      enabled.totpSecret = null;
+      repository.findOne.mockResolvedValue(enabled);
+
+      for (let i = 0; i < MAX_FAILED_ATTEMPTS; i += 1) {
+        await expect(
+          service.verifyChallenge('token', '000000')
+        ).rejects.toBeDefined();
+      }
+      await expect(
+        service.verifyChallenge('token', '000000')
+      ).rejects.toMatchObject({ status: 423 });
+
+      await expect(
+        service.consumeRecoveryCode('token', code)
+      ).resolves.toBeDefined();
+    });
+
+    it('closes the challenge window once a recovery code lands', async () => {
+      const enabled = enabledWithCode();
+      enabled.totpSecret = null;
+      repository.findOne.mockResolvedValue(enabled);
+
+      for (let i = 0; i < MAX_FAILED_ATTEMPTS; i += 1) {
+        await expect(
+          service.verifyChallenge('token', '000000')
+        ).rejects.toBeDefined();
+      }
+      await service.consumeRecoveryCode('token', code);
+
+      // The owner proved possession, so the next wrong code is a first strike.
+      await expect(
+        service.verifyChallenge('token', '000000')
+      ).rejects.toMatchObject({ status: 401 });
     });
   });
 
