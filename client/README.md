@@ -1026,7 +1026,11 @@ the panel the enrolment ends on. The mock answers that route with a second fixed
 can watch a code of the first set stop working and a code of the second set sign the account in. One
 more test drives the per-account brake on the code step: it presents five wrong codes, reads the
 locked message off the screen, which also proves the server key resolves to text and not to a raw dot
-path, and then signs in with a recovery code, because that route stays open while the brake holds.
+path, and then signs in with a recovery code, because that route stays open while the brake holds. The
+step-up code carries its own brake on the server, under a separate namespace and a separate key,
+`errors.auth.mfaStepUpLocked`. The card needs no branch for it: the panel reports the 423 through
+`NotifyService.error`, which is the shared `parseHttpErrorMessage` funnel every server error takes,
+and both language files carry the key.
 The unit tests also cover session restore, cross-tab logout, lockout, email
 verification, and password reset with a password confirmation. They cover the users list, detail, edit
 and search. This includes the email-change confirmation dialog of the administrator and the

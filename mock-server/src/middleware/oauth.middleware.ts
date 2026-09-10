@@ -3,7 +3,11 @@ import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
 import { findUserById, getState, logAudit, toUserResponse } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
-import { isValidPasswordShape, stepUpError } from '../helpers/reauth.helpers';
+import {
+  isValidPasswordShape,
+  sendWithRetryAfter,
+  stepUpError
+} from '../helpers/reauth.helpers';
 import { validationError } from '../helpers/validation-error.helpers';
 import {
   OAUTH_DATA_COOKIE,
@@ -170,7 +174,7 @@ router.post('/link-init', authGuard, (req, res) => {
     STEP_UP_OPERATION.OAUTH_LINK
   );
   if (stepUp) {
-    res.status(stepUp.statusCode).json(stepUp);
+    sendWithRetryAfter(res, stepUp);
     return;
   }
 

@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import {
   ErrorKeys,
-  LOCKOUT_DURATION_MS,
   MAX_CONCURRENT_SESSIONS,
   MAX_FAILED_ATTEMPTS,
   STEP_UP_OPERATION,
@@ -11,9 +10,13 @@ import {
 } from '@app/shared/constants';
 import { authGuard, pruneOldestUserTokens } from '../helpers/auth.helpers';
 import {
+  clearFailures,
   consumeTotpCode,
   isValidPasswordShape,
   normalize,
+  readFailures,
+  recordFailure,
+  sendWithRetryAfter,
   stepUpError
 } from '../helpers/reauth.helpers';
 import { validationError } from '../helpers/validation-error.helpers';
@@ -62,35 +65,27 @@ function readChallengeFailures(userId: string): {
   count: number;
   remainingMs: number;
 } {
-  const open = getState().mfaChallengeFailures.get(userId);
-  const now = Date.now();
-  if (!open || open.expiresAt <= now) return { count: 0, remainingMs: 0 };
-  return { count: open.count, remainingMs: open.expiresAt - now };
+  return readFailures(getState().mfaChallengeFailures, userId);
 }
 
 function recordChallengeFailure(userId: string): {
   count: number;
   remainingMs: number;
 } {
-  const windows = getState().mfaChallengeFailures;
-  const now = Date.now();
-  const open = windows.get(userId);
-  // The window is set when it opens and never extended, so a caller who keeps
-  // trying cannot be barred past the duration.
-  const entry =
-    open && open.expiresAt > now
-      ? open
-      : { count: 0, expiresAt: now + LOCKOUT_DURATION_MS };
-  entry.count += 1;
-  windows.set(userId, entry);
-  return { count: entry.count, remainingMs: entry.expiresAt - now };
+  return recordFailure(getState().mfaChallengeFailures, userId);
 }
 
 function clearChallengeFailures(userId: string): void {
-  getState().mfaChallengeFailures.delete(userId);
+  clearFailures(getState().mfaChallengeFailures, userId);
 }
 
-function challengeLockedEnvelope(remainingMs: number): Record<string, unknown> {
+function challengeLockedEnvelope(remainingMs: number): {
+  message: string;
+  statusCode: number;
+  errorKey: string;
+  lockedUntil: string;
+  retryAfter: number;
+} {
   return {
     message:
       'Too many incorrect verification codes. Use a recovery code or try again later',
@@ -182,7 +177,7 @@ router.post('/setup', authGuard, (req, res) => {
     STEP_UP_OPERATION.MFA_SETUP
   );
   if (stepUp) {
-    res.status(stepUp.statusCode).json(stepUp);
+    sendWithRetryAfter(res, stepUp);
     return;
   }
 
@@ -301,7 +296,7 @@ router.post('/disable', authGuard, (req, res) => {
     STEP_UP_OPERATION.MFA_DISABLE
   );
   if (stepUp) {
-    res.status(stepUp.statusCode).json(stepUp);
+    sendWithRetryAfter(res, stepUp);
     return;
   }
 
@@ -360,7 +355,7 @@ router.post('/recovery-codes', authGuard, (req, res) => {
     STEP_UP_OPERATION.MFA_RECOVERY_CODES
   );
   if (stepUp) {
-    res.status(stepUp.statusCode).json(stepUp);
+    sendWithRetryAfter(res, stepUp);
     return;
   }
 
@@ -415,7 +410,7 @@ router.post('/verify', (req, res) => {
 
   const open = readChallengeFailures(user.id);
   if (open.count >= MAX_FAILED_ATTEMPTS) {
-    res.status(423).json(challengeLockedEnvelope(open.remainingMs));
+    sendWithRetryAfter(res, challengeLockedEnvelope(open.remainingMs));
     return;
   }
 
@@ -430,7 +425,7 @@ router.post('/verify', (req, res) => {
       ip: req.ip
     });
     if (count >= MAX_FAILED_ATTEMPTS) {
-      res.status(423).json(challengeLockedEnvelope(remainingMs));
+      sendWithRetryAfter(res, challengeLockedEnvelope(remainingMs));
       return;
     }
     res.status(401).json(invalidCodeEnvelope);

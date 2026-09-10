@@ -939,7 +939,8 @@ export class AuthService {
       currentPassword,
       reauthProof,
       operation,
-      totpCode
+      totpCode,
+      auditContext
     );
 
     if (factor === null) {
@@ -986,9 +987,10 @@ export class AuthService {
     currentPassword: string | undefined,
     reauthProof: string | undefined,
     operation: StepUpOperation,
-    totpCode?: string
+    totpCode?: string,
+    auditContext?: AuditContext
   ): Promise<'password' | 'reauth_proof' | null> {
-    if (await this.mfaService.isValidStepUpCode(user, totpCode)) {
+    if (await this.mfaService.isValidStepUpCode(user, totpCode, auditContext)) {
       return null;
     }
 

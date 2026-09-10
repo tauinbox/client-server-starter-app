@@ -412,6 +412,10 @@ export interface State {
   // route throttles bound one caller, so this is the brake the source address
   // cannot move. Mirrors the server counter in `FailedAttemptCounter`.
   mfaChallengeFailures: Map<string, FailedAttemptWindow>;
+  // The same brake for the step-up code, in its own namespace. A caller who
+  // holds a stolen session must not be able to bar the owner out of the
+  // sign-in code step by firing wrong codes at a step-up route.
+  mfaStepUpFailures: Map<string, FailedAttemptWindow>;
   // Sample of the public breach corpus the server checks a new password
   // against. Seeded from `seedBreachedPasswords`; a test adds more through
   // `POST /__control/breached-passwords`.

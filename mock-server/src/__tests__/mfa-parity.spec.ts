@@ -629,3 +629,99 @@ describe('turning the factor off', () => {
     expect(body['errorKey']).toBe('errors.auth.mfaNotEnabled');
   });
 });
+
+/**
+ * The step-up code opens `POST /auth/mfa/disable`, which removes the second
+ * factor. The route throttles bound one caller, so the account needs the same
+ * brake the sign-in challenge carries, in a namespace of its own.
+ */
+describe('the brake on the step-up code', () => {
+  async function guessWrong(token: string, times: number): Promise<void> {
+    for (let i = 0; i < times; i += 1) {
+      const res = await post('/auth/mfa/disable', { code: '000000' }, token);
+      expect(res.status).toBe(400);
+    }
+  }
+
+  it('bars the account after the same number of tries the challenge gets', async () => {
+    const token = await enrol();
+
+    await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
+    const res = await post('/auth/mfa/disable', { code: '000000' }, token);
+    const body = (await res.json()) as Record<string, string>;
+
+    expect(res.status).toBe(423);
+    expect(body['errorKey']).toBe('errors.auth.mfaStepUpLocked');
+    expect(body['retryAfter']).toEqual(expect.any(Number));
+    expect(res.headers.get('retry-after')).toBe(String(body['retryAfter']));
+    expect(await login()).toHaveProperty('mfaRequired');
+  });
+
+  it('refuses a correct code while the account is barred', async () => {
+    const token = await enrol();
+    await clearTotpLedger();
+
+    await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
+    expect(
+      (await post('/auth/mfa/disable', { code: '000000' }, token)).status
+    ).toBe(423);
+
+    const res = await post(
+      '/auth/mfa/disable',
+      { code: MOCK_TOTP_CODE },
+      token
+    );
+
+    expect(res.status).toBe(423);
+    expect(await login()).toHaveProperty('mfaRequired');
+  });
+
+  it('leaves the sign-in challenge open while the step-up is barred', async () => {
+    const token = await enrol();
+
+    await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
+    expect(
+      (await post('/auth/mfa/disable', { code: '000000' }, token)).status
+    ).toBe(423);
+
+    const { mfaToken } = (await login()) as { mfaToken: string };
+    const res = await post('/auth/mfa/verify', { mfaToken, code: '000000' });
+    const body = (await res.json()) as Record<string, string>;
+
+    expect(res.status).toBe(401);
+    expect(body['errorKey']).toBe('errors.auth.mfaInvalidCode');
+  });
+
+  it('does not count a step-up that offers no code', async () => {
+    const token = await enrol();
+    await clearTotpLedger();
+
+    for (let i = 0; i < MAX_FAILED_ATTEMPTS * 2; i += 1) {
+      const res = await post('/auth/mfa/disable', {}, token);
+      expect(res.status).toBe(400);
+    }
+
+    const res = await post(
+      '/auth/mfa/disable',
+      { code: MOCK_TOTP_CODE },
+      token
+    );
+
+    expect(res.status).toBe(200);
+  });
+
+  it('closes the window on a correct code', async () => {
+    const token = await enrol();
+    await clearTotpLedger();
+
+    await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
+    expect(
+      (await post('/auth/mfa/recovery-codes', { code: MOCK_TOTP_CODE }, token))
+        .status
+    ).toBe(200);
+
+    const res = await post('/auth/mfa/disable', { code: '000000' }, token);
+
+    expect(res.status).toBe(400);
+  });
+});

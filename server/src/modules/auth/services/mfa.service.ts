@@ -54,6 +54,14 @@ const RECOVERY_CODE_GROUP = 8;
 /** Namespace of the per-account counter of refused authenticator codes. */
 const CHALLENGE_FAILURE_KEY_PREFIX = 'mfa:challenge-failures:';
 
+/**
+ * Namespace of the per-account counter of refused step-up codes. It is separate
+ * from the challenge namespace on purpose: a caller who holds a stolen access
+ * token must not be able to bar the owner out of the sign-in code step by
+ * firing wrong codes at a step-up route.
+ */
+const STEP_UP_FAILURE_KEY_PREFIX = 'mfa:step-up-failures:';
+
 @Injectable()
 export class MfaService {
   private readonly logger = new Logger(MfaService.name);
@@ -66,6 +74,14 @@ export class MfaService {
    */
   readonly #challengeFailures: FailedAttemptCounter;
 
+  /**
+   * The same brake for the step-up code. The routes that spend one are
+   * `POST /auth/mfa/disable` and `POST /auth/mfa/recovery-codes`, so a caller
+   * who already holds a session must not get a fresh budget of guesses with
+   * every address they add either.
+   */
+  readonly #stepUpFailures: FailedAttemptCounter;
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly jwtService: JwtService,
@@ -77,6 +93,11 @@ export class MfaService {
     this.#challengeFailures = new FailedAttemptCounter(
       cache,
       CHALLENGE_FAILURE_KEY_PREFIX,
+      this.logger
+    );
+    this.#stepUpFailures = new FailedAttemptCounter(
+      cache,
+      STEP_UP_FAILURE_KEY_PREFIX,
       this.logger
     );
   }
@@ -357,12 +378,38 @@ export class MfaService {
    */
   async isValidStepUpCode(
     user: User,
-    code: string | undefined
+    code: string | undefined,
+    context?: AuditContext
   ): Promise<boolean> {
+    // Every step-up runs through here, including the ones that carry no code
+    // at all. Counting those would let an ordinary password step-up burn the
+    // budget of an account that never offered a code.
     if (user.totpEnabledAt === null || !code) {
       return false;
     }
-    return this.consumeTotp(user, code);
+
+    const open = await this.#stepUpFailures.read(user.id);
+    if (open.count >= MAX_FAILED_ATTEMPTS) {
+      throw this.stepUpLockedException(open.remainingMs);
+    }
+
+    if (!(await this.consumeTotp(user, code))) {
+      const { count, remainingMs } = await this.#stepUpFailures.record(
+        user.id,
+        LOCKOUT_DURATION_MS
+      );
+      await this.recordChallengeFailure(user, 'step_up', context, count);
+
+      if (count >= MAX_FAILED_ATTEMPTS) {
+        throw this.stepUpLockedException(remainingMs);
+      }
+      // The caller may still hold a password, so a wrong code is a refusal of
+      // this factor rather than of the whole step-up.
+      return false;
+    }
+
+    await this.#stepUpFailures.clear(user.id);
+    return true;
   }
 
   private async userFromPendingToken(mfaToken: string): Promise<User> {
@@ -533,7 +580,7 @@ export class MfaService {
 
   private async recordChallengeFailure(
     user: User,
-    stage: 'enrolment' | 'challenge' | 'recovery_code',
+    stage: 'enrolment' | 'challenge' | 'recovery_code' | 'step_up',
     context?: AuditContext,
     attempt?: number
   ): Promise<void> {
@@ -560,6 +607,24 @@ export class MfaService {
         message:
           'Too many incorrect verification codes. Use a recovery code or try again later',
         errorKey: ErrorKeys.AUTH.MFA_CHALLENGE_LOCKED,
+        lockedUntil: new Date(Date.now() + remainingMs).toISOString(),
+        retryAfter
+      },
+      HttpStatus.LOCKED
+    );
+  }
+
+  /**
+   * The step-up code is shut for the rest of the window. The message names no
+   * recovery code: that route answers a sign-in challenge, and it opens no
+   * step-up.
+   */
+  private stepUpLockedException(remainingMs: number): HttpException {
+    const retryAfter = Math.max(1, Math.ceil(remainingMs / 1000));
+    return new HttpException(
+      {
+        message: 'Too many incorrect verification codes. Try again later',
+        errorKey: ErrorKeys.AUTH.MFA_STEP_UP_LOCKED,
         lockedUntil: new Date(Date.now() + remainingMs).toISOString(),
         retryAfter
       },

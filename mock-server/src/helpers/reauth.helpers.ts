@@ -1,13 +1,68 @@
 import {
   ErrorKeys,
+  LOCKOUT_DURATION_MS,
+  MAX_FAILED_ATTEMPTS,
   MAX_PASSWORD_LENGTH,
   TOTP_PERIOD_SECONDS
 } from '@app/shared/constants';
 import { getState, logAudit } from '../state';
 import { MOCK_TOTP_CODE, REAUTH_PROOF_COOKIE } from '../constants';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import type { StepUpOperation } from '@app/shared/constants';
-import type { MockUser } from '../types';
+import type { FailedAttemptWindow, MockUser } from '../types';
+
+/**
+ * The per-account failure window the server keeps in `FailedAttemptCounter`.
+ * The map is the namespace: the caller passes the one it wants to brake, so
+ * the sign-in challenge and the step-up code never share a budget.
+ */
+export function readFailures(
+  windows: Map<string, FailedAttemptWindow>,
+  userId: string
+): { count: number; remainingMs: number } {
+  const open = windows.get(userId);
+  const now = Date.now();
+  if (!open || open.expiresAt <= now) return { count: 0, remainingMs: 0 };
+  return { count: open.count, remainingMs: open.expiresAt - now };
+}
+
+export function recordFailure(
+  windows: Map<string, FailedAttemptWindow>,
+  userId: string
+): { count: number; remainingMs: number } {
+  const now = Date.now();
+  const open = windows.get(userId);
+  // The window is set when it opens and never extended, so a caller who keeps
+  // trying cannot be barred past the duration.
+  const entry =
+    open && open.expiresAt > now
+      ? open
+      : { count: 0, expiresAt: now + LOCKOUT_DURATION_MS };
+  entry.count += 1;
+  windows.set(userId, entry);
+  return { count: entry.count, remainingMs: entry.expiresAt - now };
+}
+
+export function clearFailures(
+  windows: Map<string, FailedAttemptWindow>,
+  userId: string
+): void {
+  windows.delete(userId);
+}
+
+/**
+ * Retry-After is the standard carrier of a retry delay, and the server sets it
+ * from the same body field in its exception filter.
+ */
+export function sendWithRetryAfter(
+  res: Response,
+  body: { statusCode: number; retryAfter?: number }
+): void {
+  if (body.retryAfter !== undefined) {
+    res.setHeader('Retry-After', String(Math.max(0, body.retryAfter)));
+  }
+  res.status(body.statusCode).json(body);
+}
 
 /**
  * Mirrors the checks the server runs on a `reauth_proof` JWT: the proof names
@@ -101,6 +156,72 @@ export function consumeTotpCode(user: MockUser, code: unknown): boolean {
   return true;
 }
 
+export interface StepUpErrorEnvelope {
+  message: string;
+  statusCode: number;
+  errorKey: string;
+  lockedUntil?: string;
+  retryAfter?: number;
+}
+
+/**
+ * The per-account brake on the step-up code, mirroring
+ * `MfaService.isValidStepUpCode`. It answers `null` when the code proved the
+ * caller, an envelope when the account is barred, and `undefined` when the
+ * step-up must fall through to the password or the provider proof.
+ *
+ * A step-up that offers no code never touches the counter, so an ordinary
+ * password step-up cannot burn the budget of the account.
+ */
+function stepUpCodeError(
+  req: Request,
+  user: MockUser,
+  code: unknown
+): StepUpErrorEnvelope | null | undefined {
+  if (!user.totpEnabledAt || !code) {
+    return undefined;
+  }
+
+  const windows = getState().mfaStepUpFailures;
+  const open = readFailures(windows, user.id);
+  if (open.count >= MAX_FAILED_ATTEMPTS) {
+    return stepUpLockedEnvelope(open.remainingMs);
+  }
+
+  if (!consumeTotpCode(user, code)) {
+    const { count, remainingMs } = recordFailure(windows, user.id);
+    logAudit('MFA_CHALLENGE_FAILURE', {
+      actorId: user.id,
+      actorEmail: user.email,
+      targetId: user.id,
+      targetType: 'User',
+      details: { stage: 'step_up', attempt: count },
+      ip: req.ip
+    });
+    return count >= MAX_FAILED_ATTEMPTS
+      ? stepUpLockedEnvelope(remainingMs)
+      : undefined;
+  }
+
+  clearFailures(windows, user.id);
+  return null;
+}
+
+/**
+ * The step-up code is shut for the rest of the window. The message names no
+ * recovery code: that route answers a sign-in challenge, and it opens no
+ * step-up.
+ */
+function stepUpLockedEnvelope(remainingMs: number): StepUpErrorEnvelope {
+  return {
+    message: 'Too many incorrect verification codes. Try again later',
+    statusCode: 423,
+    errorKey: ErrorKeys.AUTH.MFA_STEP_UP_LOCKED,
+    lockedUntil: new Date(Date.now() + remainingMs).toISOString(),
+    retryAfter: Math.max(1, Math.ceil(remainingMs / 1000))
+  };
+}
+
 /**
  * Mirrors AuthService.assertStepUp: a code from the enrolled authenticator, a
  * password, or a provider proof, in that order. Returns an error envelope, or
@@ -113,9 +234,10 @@ export function stepUpError(
   currentPassword: unknown,
   code: unknown,
   operation: StepUpOperation
-): { message: string; statusCode: number; errorKey: string } | null {
-  if (user.totpEnabledAt && consumeTotpCode(user, code)) {
-    return null;
+): StepUpErrorEnvelope | null {
+  const lock = stepUpCodeError(req, user, code);
+  if (lock !== undefined) {
+    return lock;
   }
 
   if (user.password === null) {

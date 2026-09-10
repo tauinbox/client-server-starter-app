@@ -761,6 +761,116 @@ describe('MfaService', () => {
 
       await expect(service.isValidStepUpCode(user, code)).resolves.toBe(false);
     });
+
+    describe('per-account brake', () => {
+      async function guessWrong(user: User, times: number): Promise<void> {
+        for (let i = 0; i < times; i += 1) {
+          await expect(service.isValidStepUpCode(user, '000000')).resolves.toBe(
+            false
+          );
+        }
+      }
+
+      it('bars the account after the same number of tries the challenge gets', async () => {
+        const { user } = await enrolled();
+
+        await guessWrong(user, MAX_FAILED_ATTEMPTS - 1);
+
+        // The route throttle is keyed by client address. This is the brake the
+        // address cannot move, and `POST /auth/mfa/disable` is what it guards.
+        await expect(
+          service.isValidStepUpCode(user, '000000')
+        ).rejects.toMatchObject({
+          status: 423,
+          response: {
+            errorKey: ErrorKeys.AUTH.MFA_STEP_UP_LOCKED,
+            retryAfter: expect.any(Number) as unknown
+          }
+        });
+      });
+
+      it('refuses a correct code while the account is barred', async () => {
+        const { user, secret } = await enrolled();
+
+        await guessWrong(user, MAX_FAILED_ATTEMPTS - 1);
+        await expect(
+          service.isValidStepUpCode(user, '000000')
+        ).rejects.toBeDefined();
+
+        await expect(
+          service.isValidStepUpCode(user, generateSync({ secret }))
+        ).rejects.toMatchObject({ status: 423 });
+      });
+
+      it('leaves the sign-in challenge open while the step-up is barred', async () => {
+        const { user } = await enrolled();
+        jwtService.verify.mockReturnValue({
+          sub: 'user-1',
+          purpose: TOKEN_PURPOSE.MFA_PENDING,
+          iat: Math.floor(Date.now() / 1000)
+        });
+
+        await guessWrong(user, MAX_FAILED_ATTEMPTS - 1);
+        await expect(
+          service.isValidStepUpCode(user, '000000')
+        ).rejects.toMatchObject({ status: 423 });
+
+        // The two counters hold separate namespaces on purpose: a caller who
+        // holds a stolen session must not be able to shut the owner out of the
+        // way back in.
+        await expect(
+          service.verifyChallenge('token', '000000')
+        ).rejects.toMatchObject({
+          status: 401,
+          response: { errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE }
+        });
+      });
+
+      it('does not count a step-up that offers no code', async () => {
+        const { user, secret } = await enrolled();
+
+        for (let i = 0; i < MAX_FAILED_ATTEMPTS * 2; i += 1) {
+          await expect(
+            service.isValidStepUpCode(user, undefined)
+          ).resolves.toBe(false);
+        }
+
+        // An ordinary password step-up reaches this method as well, so it must
+        // not burn the budget of an account that never offered a code.
+        await expect(
+          service.isValidStepUpCode(user, generateSync({ secret }))
+        ).resolves.toBe(true);
+      });
+
+      it('closes the window on a correct code', async () => {
+        const { user, secret } = await enrolled();
+
+        await guessWrong(user, MAX_FAILED_ATTEMPTS - 1);
+        await expect(
+          service.isValidStepUpCode(user, generateSync({ secret }))
+        ).resolves.toBe(true);
+        persistLedger(user);
+
+        // The window is closed, so the next wrong code is a first strike again
+        // and refuses the factor rather than barring the account.
+        await expect(service.isValidStepUpCode(user, '000000')).resolves.toBe(
+          false
+        );
+      });
+
+      it('records every refused code in the audit log', async () => {
+        const { user } = await enrolled();
+
+        await guessWrong(user, 1);
+
+        expect(auditService.log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: AuditAction.MFA_CHALLENGE_FAILURE,
+            details: { stage: 'step_up', attempt: 1 }
+          })
+        );
+      });
+    });
   });
 
   describe('code replay', () => {
