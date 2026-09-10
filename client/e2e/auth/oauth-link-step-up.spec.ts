@@ -231,6 +231,36 @@ test.describe('Linking a provider demands a step-up', () => {
     });
   });
 
+  // A step-up refused at the provider must come back to the page that started
+  // it. The mock answers 501 for both provider halves, so the redirect the
+  // guard produces is driven directly, exactly as the browser would receive it.
+  test('reports a step-up refused at the provider on the profile page', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, {
+      id: providerUserId,
+      email: providerEmail,
+      roles: ['user']
+    });
+    await seedProviderOnlyUser(_mockServer);
+
+    await page.addInitScript(() =>
+      sessionStorage.setItem('pending_oauth_link', 'facebook')
+    );
+
+    await page.goto('/profile?oauth_error=reauth_failed');
+
+    const snackbar = page.locator('mat-snack-bar-container');
+    await expect(snackbar).toBeVisible({ timeout: 5000 });
+    await expect(snackbar).toContainText('We could not confirm it is you');
+
+    await expect(page).toHaveURL(/\/profile$/);
+    expect(
+      await page.evaluate(() => sessionStorage.getItem('pending_oauth_link'))
+    ).toBeNull();
+  });
+
   // The proof names one operation, so a trip taken for the two-factor
   // enrolment buys no provider link.
   test('refuses a proof taken for another operation', async ({

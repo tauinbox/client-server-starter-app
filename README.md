@@ -120,6 +120,9 @@ management and theming.
   A canceled **link** attempt and a failed link attempt return to `/profile`, which is where the
   attempt started. They do not leave an authenticated user on the login page.
 
+  A canceled or failed **step-up** attempt does the same, and gives `oauth_error=reauth_failed` so
+  the profile page can say that nothing was changed.
+
   A provider proves one credential. An account that carries a second factor is therefore not signed
   in by the round trip: the callback page asks for a code, exactly as the login card does after a
   correct password, and no session exists until the code is accepted. The application never reads

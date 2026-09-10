@@ -24,6 +24,7 @@ import { VkOAuthGuard } from './vk-oauth.guard';
 import {
   OAUTH_ERROR_AUTH_FAILED,
   OAUTH_ERROR_CANCELLED,
+  OAUTH_ERROR_REAUTH_FAILED,
   OAuthAuthenticationFailedException
 } from '../exceptions/oauth-authentication-failed.exception';
 
@@ -149,6 +150,57 @@ describe.each([
       );
 
       expect(failure.oauthError).toBe(OAUTH_ERROR_CANCELLED);
+      expect(failure.redirectPath).toBe('/profile');
+    });
+
+    it('sends a cancelled step-up back to the profile page', () => {
+      const failure = captureFailure(() =>
+        new GuardClass().handleRequest<unknown>(
+          null,
+          false,
+          undefined,
+          contextWith({
+            query: { error: 'access_denied' },
+            cookies: { oauth_reauth: 'reauth-token' }
+          })
+        )
+      );
+
+      expect(failure.oauthError).toBe(OAUTH_ERROR_REAUTH_FAILED);
+      expect(failure.redirectPath).toBe('/profile');
+    });
+
+    it('reports a step-up that failed at the provider as reauth_failed', () => {
+      const failure = captureFailure(() =>
+        new GuardClass().handleRequest<unknown>(
+          new Error('Failed to obtain access token'),
+          undefined,
+          undefined,
+          contextWith({
+            query: {},
+            cookies: { oauth_reauth: 'reauth-token' }
+          })
+        )
+      );
+
+      expect(failure.oauthError).toBe(OAUTH_ERROR_REAUTH_FAILED);
+      expect(failure.redirectPath).toBe('/profile');
+    });
+
+    it('lets the step-up intent win when both intent cookies are present', () => {
+      const failure = captureFailure(() =>
+        new GuardClass().handleRequest<unknown>(
+          null,
+          false,
+          undefined,
+          contextWith({
+            query: { error: 'access_denied' },
+            cookies: { oauth_link: 'link-token', oauth_reauth: 'reauth-token' }
+          })
+        )
+      );
+
+      expect(failure.oauthError).toBe(OAUTH_ERROR_REAUTH_FAILED);
       expect(failure.redirectPath).toBe('/profile');
     });
 

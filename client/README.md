@@ -1000,8 +1000,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 258 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1270 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 259 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1271 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the
@@ -1012,8 +1012,10 @@ marker, because a credential must not sit in web storage, so the page asks for t
 return. The enrolment carries a marker too, and the card asks for its secret on the return load. A link
 carries the name of the provider the user asked for, and the page starts the link trip on the return
 load. Each path names its own step-up operation, so a trip taken for one authorizes nothing else.
-Sixteen Playwright tests cover the four paths, with the proof seeded through
-`POST /__control/reauth-proof`, because both provider halves of the mock stay 501 stubs.
+Seventeen Playwright tests cover the four paths, with the proof seeded through
+`POST /__control/reauth-proof`, because both provider halves of the mock stay 501 stubs. One of them
+covers the refusal: a step-up that ends at the provider returns to `/profile?oauth_error=reauth_failed`,
+and the page reports that nothing was changed.
 An account that holds a password answers a prompt on the "Connect" control instead of leaving.
 The two-factor tests carry one more control route. A code is single use on the server and on the
 mock, and the mock answers one fixed code, so a test that must present that code a second time

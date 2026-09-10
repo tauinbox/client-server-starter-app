@@ -3,6 +3,7 @@ import { OAuthAuthenticationExceptionFilter } from './oauth-authentication-excep
 import {
   OAUTH_ERROR_AUTH_FAILED,
   OAUTH_ERROR_CANCELLED,
+  OAUTH_ERROR_REAUTH_FAILED,
   OAuthAuthenticationFailedException
 } from '../exceptions/oauth-authentication-failed.exception';
 
@@ -58,6 +59,24 @@ describe('OAuthAuthenticationExceptionFilter', () => {
       `${clientUrl}/profile?oauth_error=oauth_cancelled`
     );
     expect(clearCookie).toHaveBeenCalledWith('oauth_link', {
+      path: '/api/v1/auth/oauth'
+    });
+  });
+
+  it('sends a failed step-up back to the profile page and drops the reauth cookie', () => {
+    filter.catch(
+      new OAuthAuthenticationFailedException(
+        OAUTH_ERROR_REAUTH_FAILED,
+        undefined,
+        '/profile'
+      ),
+      host
+    );
+
+    expect(redirect).toHaveBeenCalledWith(
+      `${clientUrl}/profile?oauth_error=reauth_failed`
+    );
+    expect(clearCookie).toHaveBeenCalledWith('oauth_reauth', {
       path: '/api/v1/auth/oauth'
     });
   });

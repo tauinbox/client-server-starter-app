@@ -157,7 +157,23 @@ describe('createOAuthProviderGuard (real Passport pipeline)', () => {
       `${CLIENT}/profile?oauth_error=oauth_cancelled`
     );
     expect(response.headers['set-cookie']).toEqual([
-      expect.stringContaining('oauth_link=;')
+      expect.stringContaining('oauth_link=;'),
+      expect.stringContaining('oauth_reauth=;')
+    ]);
+  });
+
+  it('returns a cancelled step-up to the profile page and clears the reauth cookie', async () => {
+    const response = await request(server)
+      .get('/oauth/fail/callback?error=access_denied')
+      .set('Cookie', 'oauth_reauth=reauth-token');
+
+    expect(response.status).toBe(302);
+    expect(response.headers['location']).toBe(
+      `${CLIENT}/profile?oauth_error=reauth_failed`
+    );
+    expect(response.headers['set-cookie']).toEqual([
+      expect.stringContaining('oauth_link=;'),
+      expect.stringContaining('oauth_reauth=;')
     ]);
   });
 
