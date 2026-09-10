@@ -2,19 +2,9 @@ import { expect, loginViaUi, test } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
 import { STEP_UP_OPERATION } from '@app/shared/constants';
 
-// Regression for the OAuth-only-account safety check. Server: /oauth/accounts
-// /:provider DELETE rejects with `auth.unlinkLastProvider` when the user has
-// no password set AND no other OAuth account remains, so the user cannot
-// strand themselves with no way to authenticate. The mock-server mirrors
-// this. Both paths must keep behaving so the user is never locked out.
-//
-// The route now demands a step-up first, so this account reaches the check
-// only on the page load that follows a provider round trip.
-//
-// Given an OAuth-only account (no password) with exactly one linked provider,
-// when the unlink resumes after that round trip,
-// then the request must fail with the unlink-last-provider error and the
-// provider must remain linked.
+// An account with no password and one linked provider must not be able to
+// strand itself with no way to authenticate. The route demands a step-up
+// first, so it reaches that refusal only on the load after a round trip.
 test.describe('OAuth — unlink last provider safety', () => {
   test('cannot unlink the only OAuth account when no password is set', async ({
     _mockServer,
