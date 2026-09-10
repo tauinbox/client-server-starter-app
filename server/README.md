@@ -1046,6 +1046,22 @@ on a cache outage, which returns the route to the throttle-only behaviour and ne
 The counter is deliberately not bound to the `mfa_pending` token: a fresh token costs one
 `POST /auth/login` with the password the caller already holds.
 
+**The step-up code carries the same brake, in a namespace of its own.**
+`POST /auth/mfa/disable` and `POST /auth/mfa/recovery-codes` are the two routes that spend a
+step-up code, and the operation the first one opens removes the second factor.
+`MfaService.isValidStepUpCode` therefore counts refused codes against the account too, on a second
+`FailedAttemptCounter` keyed `mfa:step-up-failures:`, with the same threshold, the same window and
+the same 423 envelope. The error key is `errors.auth.mfaStepUpLocked`, because the challenge message
+sends the reader to a recovery code and that route answers a sign-in challenge, not a step-up.
+
+The namespaces are separate on purpose. A shared window would let a caller who holds a stolen access
+token, and nothing else, bar the account out of its own sign-in code step for the whole window by
+firing wrong codes at the disable route. That is an availability fan-out rather than an escalation,
+and it is the same one the recovery route is kept open to prevent. A step-up that offers no code
+never touches the counter: every step-up reaches that method, `PATCH /auth/profile` and
+`POST /auth/oauth/link-init` included, and counting those would let an ordinary password step-up
+burn the budget of an account that never offered a code.
+
 **Token purpose.** The service signs three token types: access, OAuth link and OAuth data. The three
 use the same key. Thus each token carries an explicit `purpose` claim, and each consumer accepts only
 its own purpose.

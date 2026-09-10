@@ -1758,11 +1758,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2319 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2325 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 369 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 367 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1270 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1271 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 259 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 713 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 718 tests pass |
 
 ## CI/CD
 
@@ -1834,7 +1834,11 @@ a second request to the registry for a verdict that gates nothing.
   client address, so `POST /auth/mfa/verify` also counts refused codes against the account itself:
   five inside 15 minutes answer HTTP 423 `errors.auth.mfaChallengeLocked`, and a correct code is
   refused for the rest of that window as well. `POST /auth/mfa/recovery` stays outside the brake, so
-  a caller who holds only the password can never deny the owner every way in. A recovery code is spent
+  a caller who holds only the password can never deny the owner every way in. The two routes that
+  spend a **step-up** code, `POST /auth/mfa/disable` and `POST /auth/mfa/recovery-codes`, carry the
+  same counter under a separate namespace and answer `errors.auth.mfaStepUpLocked`, so a stolen
+  session cannot guess its way to turning the factor off, and cannot bar the owner out of the
+  sign-in code step either. A recovery code is spent
   by deleting its hash, so it works once, and the whole set is replaced on request behind a
   step-up of its own, so a spent set does not force the account to turn the factor off. A TOTP
   code is single use too: an acceptance

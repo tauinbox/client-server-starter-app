@@ -100,6 +100,7 @@ export function resetState(): void {
     captchaConfig: { enabled: false, siteKey: null },
     captchaAttempts: new Map(),
     mfaChallengeFailures: new Map(),
+    mfaStepUpFailures: new Map(),
     breachedPasswords: new Set(seedBreachedPasswords),
     featureFlags: new Map(seedFeatureFlags.map((f) => [f.id, { ...f }])),
     featureFlagRules: seedFeatureFlagRules.map((r) => ({

@@ -122,7 +122,8 @@
       "mfaInvalidRecoveryCode": "That recovery code is invalid or was already used.",
       "mfaEnrolmentRequired": "Two-factor authentication must be turned on before this account can use the administration pages.",
       "mfaInvalidPendingToken": "The two-factor sign-in expired. Please sign in again.",
-      "mfaChallengeLocked": "Too many incorrect verification codes. Use a recovery code, or try again later."
+      "mfaChallengeLocked": "Too many incorrect verification codes. Use a recovery code, or try again later.",
+      "mfaStepUpLocked": "Too many incorrect verification codes. Try again later."
     },
     "users": {
       "notFound": "User not found",
